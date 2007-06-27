@@ -24,7 +24,7 @@
 
    Invocation: sg_simple1 [-x] <sg_device>
 
-   Version 03.55 (991208)
+   Version 03.56 (20020113)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -38,6 +38,8 @@
 #define INQ_CMD_LEN 6
 #define TUR_CMD_LEN 6
 
+#define EBUFF_SZ 256
+
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
@@ -48,7 +50,7 @@ int main(int argc, char * argv[])
     unsigned char inqBuff[INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
-    char ebuff[128];
+    char ebuff[EBUFF_SZ];
     unsigned char sense_buffer[32];
     int do_extra = 0;
 
@@ -74,7 +76,8 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
-        sprintf(ebuff, "sg_simple1: error opening file: %s", file_name);
+        snprintf(ebuff, EBUFF_SZ,
+		 "sg_simple1: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }

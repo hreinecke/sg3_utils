@@ -72,6 +72,10 @@ Available dd options:
 Extra options:
    bpt=<n>       blocks per transfer (default 128)
    dio=<n>       0 or 1, request direct IO (default 0)
+   cdbsz=6|10|12|16   allow the command size of SCSI READ and WRITE commands
+                      to be specified (default is 10)
+   gen=0|1       either "if" or "of" must be a sg or raw device when "gen=0"
+                 (default). Set to 1 to remove this restriction
 
 All numeric arguments can take multiplier suffixes:
   "c", "C"        * 1
@@ -111,7 +115,8 @@ signals are caught. This command has a "man" page [section 8].
 "sgm_dd" is very similar to sg_dd but it uses mmap-ed IO on one of its
 given sg device names. If both "if" and "of" are sg devices then mmap-ed
 IO is selected on "if" while normal IO is selected on "of". Direct IO
-cannot be selected with this command.
+cannot be selected with this command. The "sgm_dd" command has a "man"
+page [section 8].
 
 "sgq_dd" is yet another implementation found in the archive directory.
 From the user point of view it is very similar to sgp_dd but uses a
@@ -162,9 +167,8 @@ up (or down) disks. See README.sg_start .
 "sg_reset" exercises the SCSI device/bus/host reset capability. It is
 supported by the sg driver in lk 2.2.16 and beyond but associated
 SCSI middle level driver changes have not been accepted into the
-standard kernel at this time. Some distributions contain the patch to
-the mid-level that activates this feature. Due to this uncertainty
-the source is placed in the "archive" directory.
+standard kernel at this time. Many distributions contain the patch to
+the mid-level that activates this feature.
 
 
 4) Timing and testing
@@ -187,7 +191,7 @@ disk manuafacturers, "MB" is 1,000,000 bytes in this context.] Its
 command line syntax is modelled on "sg_dd". It allows SCSI device,
 SCSI bus bandwidth and the SCSI sub-system throughput to be measured.
 This can be done in 3 modes: normal transfer to user space, direct
-IO or mmap-ed IO.
+IO or mmap-ed IO.  The "sg_read" command has a "man" page [section 8].
 
 "sg_turs" executes a user specified number of TEST UNIT READY commands on
 the given device. This can be used to time SCSI command overhead.
@@ -269,4 +273,4 @@ The include file path issues are now all addressed in one file called
 
 
 Doug Gilbert
-23rd December 2001
+13th February 2002

@@ -15,7 +15,7 @@
    data transfer (and no REQUEST SENSE command iff the unit is ready)
    then this can be used for timing per SCSI command overheads.
 
-*  Copyright (C) 2000 D. Gilbert
+*  Copyright (C) 2000-2002 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
      'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
      'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
 
-   Version 03.05 (20010914)
+   Version 03.06 (20020114)
 
 6 byte TEST UNIT READY command:
 [0x00][   |lu][res   ][res   ][res   ][res   ]
@@ -72,6 +72,9 @@ int get_num(char * buf)
     }
 }
 
+#define EBUFF_SZ 256
+
+
 int main(int argc, char * argv[])
 {
     int sg_fd, k;
@@ -79,7 +82,7 @@ int main(int argc, char * argv[])
                                 {0x00, 0, 0, 0, 0, 0};
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
-    char ebuff[128];
+    char ebuff[EBUFF_SZ];
     unsigned char sense_buffer[32];
     int num_turs = 0;
     int num_errs = 0;
@@ -112,7 +115,8 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
-        sprintf(ebuff, "sg_turs: error opening file: %s", file_name);
+        snprintf(ebuff, EBUFF_SZ, 
+		 "sg_turs: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }

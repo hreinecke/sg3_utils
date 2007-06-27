@@ -2,12 +2,22 @@ Each utility has its own version number, date of last changes and
 some description at the top of its ".c" file. "KG" indicates work by
 Kurt Garloff <garloff@suse.de>.
 
+Changelog for sg3_utils-0.98 [20020216]
+----------------------------
+  - move sg_reset back from archive to main directory + build
+  - sprintf() to snprintf() changes
+  - add "time=<n>" argument to sg_dd, sgp_dd and sgm_dd to time transfer
+  - add man pages for sgm_dd and sg_read, update sg_dd and sgp_dd man pages
+  - add "cdbsz=" argument to sg_dd, sgp_dd, sgm_dd + sg_read
+  - add "gen=0|1" argument to sg_dd
+
 Changelog for sg3_utils-0.97 [20011223]
-  - move isosize to archive since introduced unto util-linux-2.10s
+----------------------------
+  - move isosize to archive since introduced into util-linux-2.10s
 
 Changelog for sg3_utils-0.96 [20011221]
 ----------------------------
-  - add '-p' switch to sg_inq to provode PCI slot_name
+  - add '-p' switch to sg_inq to provide PCI slot_name
   - add '-n' switch to scsi_inquiry for non-blocking open
   - new sgm_dd (dd variant) using mmap-ed IO
   - sg_rbuf now has a '-m' argument to select mmap-ed IO

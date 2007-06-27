@@ -79,7 +79,7 @@ typedef struct my_sg_scsi_id {
 int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra);
 #endif
 
-#define EBUFF_LEN 256
+#define EBUFF_SZ 256
 static unsigned char inqCmdBlk [INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
 
@@ -142,7 +142,7 @@ int main(int argc, char * argv[])
     int num_silent = 0;
     int eacces_err = 0;
     char fname[64];
-    char ebuff[EBUFF_LEN];
+    char ebuff[EBUFF_SZ];
     My_scsi_idlun my_idlun;
     int host_no;
     int flags;
@@ -186,7 +186,7 @@ int main(int argc, char * argv[])
     for (k = 0, res = 0; (k < 1000)  && (num_errors < MAX_ERRORS);
          ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
         if (res < 0) {
-            sprintf(ebuff, "Error closing %s ", fname);
+            snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
             perror("sg_scan: close error");
             return 1;
         }
@@ -207,7 +207,7 @@ int main(int argc, char * argv[])
             else {
                 if (EACCES == errno)
                     eacces_err = 1;
-                sprintf(ebuff, "Error opening %s ", fname);
+                snprintf(ebuff, EBUFF_SZ, "Error opening %s ", fname);
                 perror(ebuff);
                 ++num_errors;
                 continue;
@@ -215,15 +215,16 @@ int main(int argc, char * argv[])
         }
         res = ioctl(sg_fd, SCSI_IOCTL_GET_IDLUN, &my_idlun);
         if (res < 0) {
-            sprintf(ebuff, "device %s failed on scsi ioctl, skip", fname);
+            snprintf(ebuff, EBUFF_SZ,
+	    	     "device %s failed on scsi ioctl, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
         }
         res = ioctl(sg_fd, SCSI_IOCTL_GET_BUS_NUMBER, &host_no);
         if (res < 0) {
-            sprintf(ebuff, "device %s failed on scsi ioctl(2), skip",
-                    fname);
+            snprintf(ebuff, EBUFF_SZ, "device %s failed on scsi "
+	    	     "ioctl(2), skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
@@ -231,7 +232,8 @@ int main(int argc, char * argv[])
 #ifdef SG_EMULATED_HOST
         res = ioctl(sg_fd, SG_EMULATED_HOST, &emul);
         if (res < 0) {
-            sprintf(ebuff, "device %s failed on sg ioctl(3), skip", fname);
+            snprintf(ebuff, EBUFF_SZ, 
+	    	     "device %s failed on sg ioctl(3), skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
@@ -253,7 +255,7 @@ int main(int argc, char * argv[])
 
             res = ioctl(sg_fd, SG_GET_SCSI_ID, &m_id);
             if (res < 0) {
-                sprintf(ebuff, "device %s ioctls(4), skip", fname);
+                snprintf(ebuff, EBUFF_SZ, "device %s ioctls(4), skip", fname);
                 perror(ebuff);
                 ++num_errors;
                 continue;
@@ -292,14 +294,14 @@ int main(int argc, char * argv[])
 
         res = write(sg_fd, inqBuff, inqInLen);
         if (res < 0) {
-            sprintf(ebuff, "device %s writing, skip", fname);
+            snprintf(ebuff, EBUFF_SZ, "device %s writing, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
         }
         res = read(sg_fd, inqBuff, inqOutLen);
         if (res < 0) {
-            sprintf(ebuff, "device %s reading, skip", fname);
+            snprintf(ebuff, EBUFF_SZ, "device %s reading, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;

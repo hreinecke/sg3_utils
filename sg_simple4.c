@@ -24,7 +24,7 @@
 
    Invocation: sg_simple4 [-x] <sg_device>
 
-   Version 1.00 (20011123)
+   Version 1.01 (20020113)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -42,6 +42,8 @@
 #define INQ_CMD_LEN 6
 #define TUR_CMD_LEN 6
 
+#define EBUFF_SZ 256
+
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
@@ -53,7 +55,7 @@ int main(int argc, char * argv[])
     unsigned char * inqBuff2;
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
-    char ebuff[128];
+    char ebuff[EBUFF_SZ];
     unsigned char sense_buffer[32];
     int do_extra = 0;
 
@@ -79,7 +81,8 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = open(file_name, O_RDWR)) < 0) {
-        sprintf(ebuff, "sg_simple4: error opening file: %s", file_name);
+        snprintf(ebuff, EBUFF_SZ,
+		 "sg_simple4: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
@@ -95,8 +98,8 @@ int main(int argc, char * argv[])
        PROT_READ rather than PROT_READ | PROT_WRITE */
     inqBuff = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
     if (MAP_FAILED == inqBuff) {
-        sprintf(ebuff, "sg_simple4: error using mmap() on file: %s", 
-		file_name);
+        snprintf(ebuff, EBUFF_SZ, "sg_simple4: error using mmap() on "
+		 "file: %s", file_name);
         perror(ebuff);
         return 1;
     }
@@ -203,8 +206,8 @@ int main(int argc, char * argv[])
 #if 1
     inqBuff2 = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
     if (MAP_FAILED == inqBuff2) {
-        sprintf(ebuff, "sg_simple4: error using mmap() 2 on file: %s", 
-		file_name);
+        snprintf(ebuff, EBUFF_SZ, "sg_simple4: error using mmap() 2 on "
+		 "file: %s", file_name);
         perror(ebuff);
         return 1;
     }

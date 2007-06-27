@@ -14,8 +14,6 @@ Since I actively use some of these programs for testing, a Makefile has
 been set up which builds:
     - sgq_dd   [a dd variant the uses a dispatch loop rather than
                 POSIX threads (as does sgp_dd)]
-    - sg_reset [does SCSI bus/device/host resets if mid level SCSI patch
-                in place]
     - sg_hold  holds a sg device open and periodically sends a TEST
 		UNIT READY command to the device
     - sg_poll  [internal testing]
@@ -31,4 +29,4 @@ to side step various buffer copies. See:
 http://www.torque.net/sg/mem2disk.html
 
 Doug Gilbert
-23rd December 2001
+24th January 2002

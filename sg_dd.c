@@ -12,14 +12,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <linux/major.h> 
+#include <sys/time.h> 
+#include <linux/major.h>
 typedef unsigned char u_char;	/* horrible, for scsi.h */
 #include "sg_include.h"
 #include "sg_err.h"
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999 - 2001 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2002 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -39,16 +40,22 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
    the maximum number of blocks in each transfer. The default value is 128.
    For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16KB
    in this case) is transferred to or from the sg device in a single SCSI
-   command.
+   command. The actual size of the SCSI READ or WRITE command block can be
+   selected with the "cdbsz" argument.
 
    This version should compile with Linux sg drivers with version numbers
    >= 30000 .
-
-   Version 5.13 20010819
 */
+
+static char * version_str = "5.18 20020213";
+
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
+#define DEF_SCSI_CDBSZ 10
+#define MAX_SCSI_CDBSZ 16
+
+#define ME "sg_dd: "
 
 // #define SG_DEBUG
 
@@ -133,12 +140,17 @@ int dd_filetype(const char * filename)
 void usage()
 {
     fprintf(stderr, "Usage: "
-           "sg_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
-           "              [bs=<num>] [bpt=<num>] [count=<n>]"
+           "sg_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>] "
+           "[bs=<num>]\n"
+           "              [bpt=<num>] [count=<n>] [time=<n>]"
            " [dio=<n>]\n"
+	   "              [cdbsz=<6|10|12|16>] [gen=0|1] [--version]\n"
            "            either 'if' or 'of' must be a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
-           " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n");
+           " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
+           " 'gen' 0->either 'if' or 'of' must be sg or raw device(def)\n"
+           " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
+           " 'cdbsz' size of SCSI READ or WRITE command (default is 10)\n");
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
@@ -179,26 +191,104 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
     return 0;
 }
 
+int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
+		      unsigned int start_block, int write_true)
+{
+    int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
+    int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
+    int sz_ind;
+
+    memset(cdbp, 0, cdb_sz);
+    switch (cdb_sz) {
+    case 6:
+    	sz_ind = 0;
+	cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+					       rd_opcode[sz_ind]);
+	cdbp[1] |= (unsigned char)((start_block >> 16) & 0x1f);
+	cdbp[2] = (unsigned char)((start_block >> 8) & 0xff);
+	cdbp[3] = (unsigned char)(start_block & 0xff);
+	cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
+	if (blocks > 256) {
+	    fprintf(stderr, ME "for 6 byte commands, maximum number of "
+	    		    "blocks is 256\n");
+	    return 1;
+	}
+	if ((start_block + blocks - 1) & (~0x1fffff)) {
+	    fprintf(stderr, ME "for 6 byte commands, can't address blocks"
+	    		    " beyond %d\n", 0x1fffff);
+	    return 1;
+	}
+    	break;
+    case 10:
+    	sz_ind = 1;
+	cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+					       rd_opcode[sz_ind]);
+	cdbp[2] = (unsigned char)((start_block >> 24) & 0xff);
+	cdbp[3] = (unsigned char)((start_block >> 16) & 0xff);
+	cdbp[4] = (unsigned char)((start_block >> 8) & 0xff);
+	cdbp[5] = (unsigned char)(start_block & 0xff);
+	cdbp[7] = (unsigned char)((blocks >> 8) & 0xff);
+	cdbp[8] = (unsigned char)(blocks & 0xff);
+	if (blocks & (~0xffff)) {
+	    fprintf(stderr, ME "for 10 byte commands, maximum number of "
+	    		    "blocks is %d\n", 0xffff);
+	    return 1;
+	}
+    	break;
+    case 12:
+    	sz_ind = 2;
+	cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+					       rd_opcode[sz_ind]);
+	cdbp[2] = (unsigned char)((start_block >> 24) & 0xff);
+	cdbp[3] = (unsigned char)((start_block >> 16) & 0xff);
+	cdbp[4] = (unsigned char)((start_block >> 8) & 0xff);
+	cdbp[5] = (unsigned char)(start_block & 0xff);
+	cdbp[6] = (unsigned char)((blocks >> 24) & 0xff);
+	cdbp[7] = (unsigned char)((blocks >> 16) & 0xff);
+	cdbp[8] = (unsigned char)((blocks >> 8) & 0xff);
+	cdbp[9] = (unsigned char)(blocks & 0xff);
+    	break;
+    case 16:
+    	sz_ind = 3;
+	cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+					       rd_opcode[sz_ind]);
+	/* can't cope with block number > 32 bits (yet) */
+	cdbp[6] = (unsigned char)((start_block >> 24) & 0xff);
+	cdbp[7] = (unsigned char)((start_block >> 16) & 0xff);
+	cdbp[8] = (unsigned char)((start_block >> 8) & 0xff);
+	cdbp[9] = (unsigned char)(start_block & 0xff);
+	cdbp[10] = (unsigned char)((blocks >> 24) & 0xff);
+	cdbp[11] = (unsigned char)((blocks >> 16) & 0xff);
+	cdbp[12] = (unsigned char)((blocks >> 8) & 0xff);
+	cdbp[13] = (unsigned char)(blocks & 0xff);
+    	break;
+    default:
+    	fprintf(stderr, ME "expected cdb size of 6, 10, 12, or 16 but got"
+			"=%d\n", cdb_sz);
+    	return 1;
+    }
+    return 0;
+}
+
 /* -1 -> unrecoverable error, 0 -> successful, 1 -> recoverable (ENOMEM),
    2 -> try again */
 int sg_read(int sg_fd, unsigned char * buff, int blocks, int from_block,
-            int bs, int * diop)
+            int bs, int cdbsz, int * diop)
 {
-    unsigned char rdCmd[10] = {0x28, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     sg_io_hdr_t io_hdr;
     int res;
 
-    rdCmd[2] = (unsigned char)((from_block >> 24) & 0xFF);
-    rdCmd[3] = (unsigned char)((from_block >> 16) & 0xFF);
-    rdCmd[4] = (unsigned char)((from_block >> 8) & 0xFF);
-    rdCmd[5] = (unsigned char)(from_block & 0xFF);
-    rdCmd[7] = (unsigned char)((blocks >> 8) & 0xff);
-    rdCmd[8] = (unsigned char)(blocks & 0xff);
+    if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0)) {
+    	fprintf(stderr, ME "bad rd cdb build, from_block=%d, blocks=%d\n",
+		from_block, blocks);
+    	return -1;
+    }
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rdCmd);
+    io_hdr.cmd_len = cdbsz;
     io_hdr.cmdp = rdCmd;
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = bs * blocks;
@@ -253,23 +343,22 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, int from_block,
 /* -1 -> unrecoverable error, 0 -> successful, 1 -> recoverable (ENOMEM),
    2 -> try again */
 int sg_write(int sg_fd, unsigned char * buff, int blocks, int to_block,
-             int bs, int * diop)
+             int bs, int cdbsz, int * diop)
 {
-    unsigned char wrCmd[10] = {0x2a, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     sg_io_hdr_t io_hdr;
     int res;
 
-    wrCmd[2] = (unsigned char)((to_block >> 24) & 0xFF);
-    wrCmd[3] = (unsigned char)((to_block >> 16) & 0xFF);
-    wrCmd[4] = (unsigned char)((to_block >> 8) & 0xFF);
-    wrCmd[5] = (unsigned char)(to_block & 0xFF);
-    wrCmd[7] = (unsigned char)((blocks >> 8) & 0xff);
-    wrCmd[8] = (unsigned char)(blocks & 0xff);
+    if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, 1)) {
+    	fprintf(stderr, ME "bad wr cdb build, to_block=%d, blocks=%d\n",
+		to_block, blocks);
+    	return -1;
+    }
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(wrCmd);
+    io_hdr.cmd_len = cdbsz;
     io_hdr.cmdp = wrCmd;
     io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
     io_hdr.dxfer_len = bs * blocks;
@@ -354,6 +443,10 @@ int get_num(char * buf)
     }
 }
 
+#define STR_SZ 1024
+#define INOUTF_SZ 512
+#define EBUFF_SZ 512
+
 
 int main(int argc, char * argv[])
 {
@@ -363,15 +456,18 @@ int main(int argc, char * argv[])
     int ibs = 0;
     int obs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
-    char str[512];
+    char str[STR_SZ];
     char * key;
     char * buf;
-    char inf[512];
+    char inf[INOUTF_SZ];
     int in_type = FT_OTHER;
-    char outf[512];
+    char outf[INOUTF_SZ];
     int out_type = FT_OTHER;
     int dio = 0;
     int dio_incomplete = 0;
+    int do_time = 0;
+    int do_gen = 0;
+    int scsi_cdbsz = DEF_SCSI_CDBSZ;
     int res, k, t, buf_sz, dio_tmp;
     int infd, outfd, blocks;
     unsigned char * wrkBuff;
@@ -379,8 +475,10 @@ int main(int argc, char * argv[])
     int in_num_sect = 0;
     int out_num_sect = 0;
     int in_sect_sz, out_sect_sz;
-    char ebuff[256];
+    char ebuff[EBUFF_SZ];
     int blocks_per;
+    int req_count;
+    struct timeval start_tm, end_tm;
 
     inf[0] = '\0';
     outf[0] = '\0';
@@ -390,8 +488,10 @@ int main(int argc, char * argv[])
     }
 
     for(k = 1; k < argc; k++) {
-        if (argv[k])
-            strcpy(str, argv[k]);
+        if (argv[k]) {
+            strncpy(str, argv[k], STR_SZ);
+	    str[STR_SZ - 1] = '\0';
+	}
         else
             continue;
         for(key = str, buf = key; *buf && *buf != '=';)
@@ -399,9 +499,9 @@ int main(int argc, char * argv[])
         if (*buf)
             *buf++ = '\0';
         if (strcmp(key,"if") == 0)
-            strcpy(inf, buf);
+            strncpy(inf, buf, INOUTF_SZ);
         else if (strcmp(key,"of") == 0)
-            strcpy(outf, buf);
+            strncpy(outf, buf, INOUTF_SZ);
         else if (0 == strcmp(key,"ibs"))
             ibs = get_num(buf);
         else if (0 == strcmp(key,"obs"))
@@ -418,6 +518,17 @@ int main(int argc, char * argv[])
             dd_count = get_num(buf);
         else if (0 == strcmp(key,"dio"))
             dio = get_num(buf);
+        else if (0 == strcmp(key,"time"))
+            do_time = get_num(buf);
+        else if (0 == strcmp(key,"gen"))
+            do_gen = get_num(buf);
+        else if (0 == strcmp(key,"cdbsz"))
+            scsi_cdbsz = get_num(buf);
+        else if (0 == strncmp(key, "--vers", 6)) {
+            fprintf(stderr, ME "for Linux sg version 3 driver: %s\n",
+                    version_str);
+            return 0;
+        }
         else {
             fprintf(stderr, "Unrecognized argument '%s'\n", key);
             usage();
@@ -438,7 +549,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 #ifdef SG_DEBUG
-    fprintf(stderr, "sg_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
+    fprintf(stderr, ME "if=%s skip=%d of=%s seek=%d count=%d\n",
            inf, skip, outf, seek, dd_count);
 #endif
     install_handler (SIGINT, interrupt_handler);
@@ -453,23 +564,25 @@ int main(int argc, char * argv[])
 
 	if (FT_SG == in_type) {
 	    if ((infd = open(inf, O_RDWR)) < 0) {
-                sprintf(ebuff, "sg_dd: could not open %s for sg reading", inf);
+                snprintf(ebuff, EBUFF_SZ,
+			 ME "could not open %s for sg reading", inf);
                 perror(ebuff);
                 return 1;
             }
 	    t = bs * bpt;
             res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
             if (res < 0)
-                perror("sg_dd: SG_SET_RESERVED_SIZE error");
+                perror(ME "SG_SET_RESERVED_SIZE error");
             res = ioctl(infd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
-                fprintf(stderr, "sg_dd: sg driver prior to 3.x.y\n");
+                fprintf(stderr, ME "sg driver prior to 3.x.y\n");
                 return 1;
             }
         }
         if (FT_SG != in_type) {
             if ((infd = open(inf, O_RDONLY)) < 0) {
-                sprintf(ebuff, "sg_dd: could not open %s for reading", inf);
+                snprintf(ebuff, EBUFF_SZ,
+			 ME "could not open %s for reading", inf);
                 perror(ebuff);
                 return 1;
             }
@@ -478,8 +591,8 @@ int main(int argc, char * argv[])
 
                 offset *= bs;       /* could exceed 32 bits here! */
                 if (llse_llseek(infd, offset, SEEK_SET) < 0) {
-                    sprintf(ebuff,
-                "sg_dd: couldn't skip to required position on %s", inf);
+                    snprintf(ebuff, EBUFF_SZ,
+			ME "couldn't skip to required position on %s", inf);
                     perror(ebuff);
                     return 1;
                 }
@@ -492,33 +605,34 @@ int main(int argc, char * argv[])
 
 	if (FT_SG == out_type) {
 	    if ((outfd = open(outf, O_RDWR)) < 0) {
-                sprintf(ebuff, "sg_dd: could not open %s for sg writing", outf);
+                snprintf(ebuff, EBUFF_SZ,
+			 ME "could not open %s for sg writing", outf);
                 perror(ebuff);
                 return 1;
             }
             t = bs * bpt;
             res = ioctl(outfd, SG_SET_RESERVED_SIZE, &t);
             if (res < 0)
-                perror("sg_dd: SG_SET_RESERVED_SIZE error");
+                perror(ME "SG_SET_RESERVED_SIZE error");
             res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
-                fprintf(stderr, "sg_dd: sg driver prior to 3.x.y\n");
+                fprintf(stderr, ME "sg driver prior to 3.x.y\n");
                 return 1;
             }
         }
 	else {
 	    if (FT_OTHER == out_type) {
 		if ((outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
-		    sprintf(ebuff,
-			    "sg_dd: could not open %s for writing", outf);
+		    snprintf(ebuff, EBUFF_SZ,
+			    ME "could not open %s for writing", outf);
 		    perror(ebuff);
 		    return 1;
 		}
 	    }
 	    else {
 		if ((outfd = open(outf, O_WRONLY)) < 0) {
-		    sprintf(ebuff,
-			    "sg_dd: could not open %s for raw writing", outf);
+		    snprintf(ebuff, EBUFF_SZ,
+			    ME "could not open %s for raw writing", outf);
 		    perror(ebuff);
 		    return 1;
 		}
@@ -528,8 +642,8 @@ int main(int argc, char * argv[])
 
                 offset *= bs;       /* could exceed 32 bits here! */
                 if (llse_llseek(outfd, offset, SEEK_SET) < 0) {
-                    sprintf(ebuff,
-                "sg_dd: couldn't seek to required position on %s", outf);
+                    snprintf(ebuff, EBUFF_SZ,
+			ME "couldn't seek to required position on %s", outf);
                     perror(ebuff);
                     return 1;
                 }
@@ -541,12 +655,11 @@ int main(int argc, char * argv[])
 		"Can't have both 'if' as stdin _and_ 'of' as stdout\n");
         return 1;
     }
-#if 1
-    if ((FT_OTHER == in_type) && (FT_OTHER == out_type)) {
+    if ((FT_OTHER == in_type) && (FT_OTHER == out_type) && !do_gen) {
         fprintf(stderr, "Both 'if' and 'of' can't be ordinary files\n");
+        fprintf(stderr, "If you really want this set 'gen=1'\n");
         return 1;
     }
-#endif
     if (0 == dd_count)
         return 0;
     else if (dd_count < 0) {
@@ -634,11 +747,19 @@ int main(int argc, char * argv[])
     fprintf(stderr, "Start of loop, count=%d, blocks_per=%d\n", 
 	    dd_count, blocks_per);
 #endif
+    if (do_time) {
+        start_tm.tv_sec = 0;
+        start_tm.tv_usec = 0;
+        gettimeofday(&start_tm, NULL);
+    }
+    req_count = dd_count;
+
     while (dd_count > 0) {
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG == in_type) {
             dio_tmp = dio;
-            res = sg_read(infd, wrkPos, blocks, skip, bs, &dio_tmp);
+            res = sg_read(infd, wrkPos, blocks, skip, bs, scsi_cdbsz, 
+	    		  &dio_tmp);
             if (1 == res) {     /* ENOMEM, find what's available+try that */
                 if (ioctl(infd, SG_GET_RESERVED_SIZE, &buf_sz) < 0) {
                     perror("RESERVED_SIZE ioctls failed");
@@ -648,12 +769,14 @@ int main(int argc, char * argv[])
                 blocks = blocks_per;
                 fprintf(stderr, 
 			"Reducing read to %d blocks per loop\n", blocks_per);
-                res = sg_read(infd, wrkPos, blocks, skip, bs, &dio_tmp);
+                res = sg_read(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
+			      &dio_tmp);
             }
             else if (2 == res) {
                 fprintf(stderr, 
 			"Unit attention, media changed, continuing (r)\n");
-                res = sg_read(infd, wrkPos, blocks, skip, bs, &dio_tmp);
+                res = sg_read(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
+			      &dio_tmp);
             }
             if (0 != res) {
                 fprintf(stderr, "sg_read failed, skip=%d\n", skip);
@@ -670,7 +793,7 @@ int main(int argc, char * argv[])
 		   (EINTR == errno))
 		;
             if (res < 0) {
-                sprintf(ebuff, "sg_dd: reading, skip=%d ", skip);
+                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%d ", skip);
                 perror(ebuff);
                 break;
             }
@@ -687,7 +810,8 @@ int main(int argc, char * argv[])
 
         if (FT_SG == out_type) {
             dio_tmp = dio;
-            res = sg_write(outfd, wrkPos, blocks, seek, bs, &dio_tmp);
+            res = sg_write(outfd, wrkPos, blocks, seek, bs, scsi_cdbsz,
+	    		   &dio_tmp);
             if (1 == res) {     /* ENOMEM, find what's available+try that */
                 if (ioctl(outfd, SG_GET_RESERVED_SIZE, &buf_sz) < 0) {
                     perror("RESERVED_SIZE ioctls failed");
@@ -697,12 +821,14 @@ int main(int argc, char * argv[])
                 blocks = blocks_per;
                 fprintf(stderr, 
 			"Reducing write to %d blocks per loop\n", blocks);
-                res = sg_write(outfd, wrkPos, blocks, seek, bs, &dio_tmp);
+                res = sg_write(outfd, wrkPos, blocks, seek, bs, scsi_cdbsz,
+			       &dio_tmp);
             }
             else if (2 == res) {
                 fprintf(stderr, 
 			"Unit attention, media changed, continuing (w)\n");
-                res = sg_write(outfd, wrkPos, blocks, seek, bs, &dio_tmp);
+                res = sg_write(outfd, wrkPos, blocks, seek, bs, scsi_cdbsz,
+			       &dio_tmp);
             }
             else if (0 != res) {
                 fprintf(stderr, "sg_write failed, seek=%d\n", seek);
@@ -719,7 +845,7 @@ int main(int argc, char * argv[])
 		   && (EINTR == errno))
 		;
             if (res < 0) {
-                sprintf(ebuff, "sg_dd: writing, seek=%d ", seek);
+                snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%d ", seek);
                 perror(ebuff);
                 break;
             }
@@ -738,6 +864,27 @@ int main(int argc, char * argv[])
             dd_count -= blocks;
         skip += blocks;
         seek += blocks;
+    }
+    if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+        struct timeval res_tm;
+        double a, b;
+
+        gettimeofday(&end_tm, NULL);
+        res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
+        res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
+        if (res_tm.tv_usec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_usec += 1000000;
+        }
+        a = res_tm.tv_sec;
+        a += (0.000001 * res_tm.tv_usec);
+        b = (double)bs * (req_count - dd_count);
+        printf("time to transfer data was %d.%06d secs",
+               (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+        if ((a > 0.00001) && (b > 511))
+            printf(", %.2f MB/sec\n", b / (a * 1000000.0));
+        else
+            printf("\n");
     }
 
     free(wrkBuff);

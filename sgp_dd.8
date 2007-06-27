@@ -1,6 +1,6 @@
-.TH SGP_DD "8" "September 2001" "sg3_utils-0.95" SG3_UTILS
+.TH SGP_DD "8" "February 2002" "sg3_utils-0.98" SG3_UTILS
 .SH NAME
-copies data to and from sg and raw devices
+sgp_dd \- copies data to and from sg and raw devices
 .SH SYNOPSIS
 .B sgp_dd
 [\fIOPTION\fR]...
@@ -25,10 +25,14 @@ be the block size of the physical device. Note that this differs from
 which permits "bs" to be an integral multiple. Default is 512 which 
 is usually correct for disks but incorrect for cdroms (which normally
 have 2048 byte blocks).
+cdbsz=6 | 10 | 12 | 16
+size of SCSI READ and/or WRITE commands issued on sg device names.
+Default is 10 byte SCSI command blocks
 .TP
 coe=0 | 1
 continue on error is 0 (off) by default. When it is 1 read errors
-are stepped over (with a block (or blocks) of zeroes being output)
+are stepped over (with a block (or blocks) of zeroes being output).
+When 1 write errors are ignored (and alignment is maintained)
 .TP
 count=BLOCKS
 copy this number of blocks. Default is minimum number that sg devices
@@ -70,6 +74,10 @@ thr=NUM
 this is the number or worker threads (default 4) that attempt to
 copy in parallel. Minimum is 0 and maximum is 16
 .TP
+time=0 | 1
+when 1, times transfer and does throughput calculation, outputting the
+results (to stderr) at completion. When 0 (default) doesn't perform timing
+.TP
 --version
 outputs version number information and exits
 .PP
@@ -101,7 +109,7 @@ issues "direct IO" is disabled in the sg driver and needs a
 configuration change to activate it.
 .PP
 All informative, warning and error output is sent to stderr so that
-dd\'s output file can be stdout and remain unpolluted. If no options
+dd's output file can be stdout and remain unpolluted. If no options
 are given, then the usage message is output and nothing else happens.
 .PP
 Why use sgp_dd? Because in some cases it is twice as fast as dd
@@ -121,7 +129,7 @@ equivalent to:
 .PP
    dd if=/dev/sda of=t bs=512 count=1000000
 .PP
-although dd\'s speed may improve if bs was larger and count was suitably
+although dd's speed may improve if bs was larger and count was suitably
 reduced. Using a raw device to do something similar on a IDE disk:
 .PP
    raw /dev/raw/raw1 /dev/hda

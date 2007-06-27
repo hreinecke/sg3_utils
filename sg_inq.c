@@ -12,7 +12,7 @@
 #include "sg_err.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000 D. Gilbert
+*  Copyright (C) 2000-2002 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "0.15 20011221";
+static char * version_str = "0.16 20020114";
 
 
 /* #define SG_DEBUG */
@@ -35,6 +35,8 @@ static char * version_str = "0.15 20011221";
 #define INQUIRY_CMD     0x12
 #define INQUIRY_CMDLEN  6
 #define MX_ALLOC_LEN 255
+
+#define EBUFF_SZ 256
 
 #ifndef SCSI_IOCTL_GET_PCI
 #define SCSI_IOCTL_GET_PCI 0x5387
@@ -77,9 +79,9 @@ static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op,
 	return 0;
     default:
 	if (noisy) {
-	    char ebuff[256];
-	    sprintf(ebuff, "Inquiry error, CmdDt=%d, EVPD=%d, page_opcode=%x ",
-		    cmddt, evpd, pg_op);
+	    char ebuff[EBUFF_SZ];
+	    snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt=%d, "
+	    	     "EVPD=%d, page_opcode=%x ", cmddt, evpd, pg_op);
             sg_chk_n_print3(ebuff, &io_hdr);
 	}
 	return -1;
@@ -151,11 +153,12 @@ static void dStrHex(const char* str, int len)
 }
 
 
+
 int main(int argc, char * argv[])
 {
     int sg_fd, k, num, len;
     char * file_name = 0;
-    char ebuff[128];
+    char ebuff[EBUFF_SZ];
     char buff[MX_ALLOC_LEN + 1];
     unsigned char rsp_buff[MX_ALLOC_LEN + 1];
     unsigned int num_opcode = 0;
@@ -211,7 +214,7 @@ int main(int argc, char * argv[])
     if (do_pci)
     	oflags = O_RDWR;
     if ((sg_fd = open(file_name, oflags)) < 0) {
-        sprintf(ebuff, "sg_inq: error opening file: %s", file_name);
+        snprintf(ebuff, EBUFF_SZ, "sg_inq: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }

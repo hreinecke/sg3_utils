@@ -1,14 +1,14 @@
-.TH SG_DD "8" "February 2002" "sg3_utils-0.98" SG3_UTILS
+.TH SGM_DD "8" "January 2002" "sg3_utils-0.98" SG3_UTILS
 .SH NAME
-sg_dd \- copies data to and from sg and raw devices
+sgm_dd \- copies data to and from sg and raw devices
 .SH SYNOPSIS
-.B sg_dd
+.B sgm_dd
 [\fIOPTION\fR]...
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Copy data to and from Linux SCSI generic (sg) and raw devices.
-Similar syntax and semantics to 
+Copy data to and from Linux SCSI generic (sg) and raw devices
+using memory mapped IO. Similar syntax and semantics to 
 .B dd(1) 
 but does not perform any conversions.
 .TP
@@ -25,23 +25,9 @@ which permits "bs" to be an integral multiple. Default is 512 which
 is usually correct for disks but incorrect for cdroms (which normally
 have 2048 byte blocks).
 .TP
-cdbsz=6 | 10 | 12 | 16
-size of SCSI READ and/or WRITE commands issued on sg device names.
-Default is 10 byte SCSI command blocks
-.TP
 count=BLOCKS
 copy this number of blocks. Default is minimum number that sg devices
 return from READ CAPACITY (if that works) or 0
-.TP
-dio=0 | 1
-default is 0 which selects indirect IO. Value of 1 attempts direct
-IO which, if not available, falls back to indirect IO and notes this
-at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
-has the value of 0 then a warning is issued (and indirect IO is performed)
-.TP
-gen=0 | 1
-the default action (when "gen=0") is to require that either "if" or "of"
-is a sg or raw device name. To remove this restriction set "gen=1"
 .TP
 ibs=BYTES
 if given must be the same as bs
@@ -68,14 +54,13 @@ results (to stderr) at completion. When 0 (default) doesn't perform timing
 --version
 outputs version number information and exits
 .PP
-Either the input file or the output file must be a sg or raw device,
-unless "gen=1".
-A raw device must be bound to a block device prior to using sg_dd.
+Either the input file or the output file must be a sg or raw device.
+A raw device must be bound to a block device prior to using sgm_dd.
 See
 .B raw(8)
 for more information about binding raw devices. To be safe, the sg device
-mapping to SCSI block devices should be checked with "cat /proc/scsi/scsi",
-or sg_map before use.
+mapping to SCSI block devices should be checked with "cat /proc/scsi/scsi"
+before use.
 .PP
 The count is only deduced for sg devices (minimum > 0 if both input and
 output are sg devices) otherwise it defaults to 0. This is for safety!
@@ -90,58 +75,25 @@ g *1,073,741,824; and G *1,000,000,000
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
 this data into user memory (write operations reverse this sequence).
-This is called "indirect IO" and there is a "dio" option to select
-"direct IO" which will DMA directly into user memory. Due to some
-issues "direct IO" is disabled in the sg driver and needs a 
-configuration change to activate it. This is typically done with
-"echo 1 > /proc/scsi/sg/allow_dio".
+With memory mapped IO a kernel buffer reserved by sg is memory mapped
+(see the 
+.B mmap(2) 
+system call) into the user space. When this is done
+the second (redundant) copy from kernel buffers to user space is
+not needed. Hence the transfer is faster and requires less "grunt"
+from the CPU.
 .PP
 All informative, warning and error output is sent to stderr so that
 dd's output file can be stdout and remain unpolluted. If no options
 are given, then the usage message is output and nothing else happens.
 .SH EXAMPLES
 .PP
-Looks quite similar in usage to dd:
-.PP
-   sg_dd if=/dev/sg0 of=t bs=512 count=1M
-.PP
-This will copy 1 million 512 byte blocks from the device associated with
-/dev/sg0 (which should have 512 byte blocks) to a file called t.
-Assuming /dev/sda and /dev/sg0 are the same device then the above is
-equivalent to:
-.PP
-   dd if=/dev/sda of=t bs=512 count=1000000
-.PP
-although dd's speed may improve if bs was larger and count was suitably
-reduced. Using a raw device to do something similar on a IDE disk:
-.PP
-   raw /dev/raw/raw1 /dev/hda
-.br
-   sg_dd if=/dev/raw/raw1 of=t bs=512 count=1M
-.PP
-To copy a SCSI disk partition to an IDE disk partition:
-.PP
-   raw /dev/raw/raw2 /dev/hda3
-.br
-   sg_dd if=/dev/sg0 skip=10123456 of=/dev/raw/raw2 bs=512
-.PP
-This assumes a valid partition is found on the SCSI disk at the given
-skip block address (past the 5 GB point of that disk) and that
-the partition goes to the end of the SCSI disk. An explicit count
-is probably a safer option.
-.PP
-To time a streaming read of the first 1 GB on a disk this command
-could be used:
-.PP
-   sg_dd if=/dev/sg0 of=/dev/null bs=512 count=2m time=1
-.PP
-On completion this will output a line like:
-"time to transfer data was 26.020794 secs, 41.26 MB/sec". The "MB/sec"
-in this case is 1,000,000 bytes per second.
+See the examples given in the man page for 
+.B sg_dd(8).
 .SH NOTE
 For sg devices this command issues READ_10 and WRITE_10 SCSI commands which
 are appropriate for disks and CDROM players. Those commands are not
-formatted correctly for tape devices so sg_dd should not be used on
+formatted correctly for tape devices so sgm_dd should not be used on
 tape devices.
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and
@@ -159,6 +111,8 @@ Copyright \(co 2000-2002 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
+The simplest variant of this command is called
+.B sg_dd.
 A POSIX threads version of this command called
 .B sgp_dd
 is in the sg3_utils package. The lmbench package contains

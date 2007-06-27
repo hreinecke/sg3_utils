@@ -79,8 +79,8 @@ typedef struct my_scsi_idlun {
 } My_scsi_idlun;
 
 
-#define EBUFF_LEN 256
-static char ebuff[EBUFF_LEN];
+#define EBUFF_SZ 256
+static char ebuff[EBUFF_SZ];
 
 static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                           int lin_dev_type, int last_sg_ind);
@@ -206,7 +206,7 @@ int main(int argc, char * argv[])
     for (k = 0, res = 0; (k < MAX_SG_DEVS)  && (num_errors < MAX_ERRORS);
          ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
         if (res < 0) {
-            sprintf(ebuff, "Error closing %s ", fname);
+            snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
             perror("sg_map: close error");
             return 1;
         }
@@ -228,7 +228,7 @@ int main(int argc, char * argv[])
             else {
                 if (EACCES == errno)
                     eacces_err = 1;
-                sprintf(ebuff, "Error opening %s ", fname);
+                snprintf(ebuff, EBUFF_SZ, "Error opening %s ", fname);
                 perror(ebuff);
                 ++num_errors;
                 continue;
@@ -236,7 +236,8 @@ int main(int argc, char * argv[])
         }
         res = ioctl(sg_fd, SG_GET_SCSI_ID, &map_arr[k].sg_dat);
         if (res < 0) {
-            sprintf(ebuff, "device %s failed on sg ioctl, skip", fname);
+            snprintf(ebuff, EBUFF_SZ,
+	    	     "device %s failed on sg ioctl, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
@@ -363,7 +364,7 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
     for (k = 0, res = 0; (k < max_dev)  && (num_errors < MAX_ERRORS);
          ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
         if (res < 0) {
-            sprintf(ebuff, "Error closing %s ", fname);
+            snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
             perror("sg_map: close error");
 #ifndef IGN_CLOSE_ERR		
             return;
@@ -394,7 +395,7 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                 continue;
             }
             else {
-                sprintf(ebuff, "Error opening %s ", fname);
+                snprintf(ebuff, EBUFF_SZ, "Error opening %s ", fname);
                 perror(ebuff);
                 ++num_errors;
                 continue;
@@ -403,8 +404,8 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 
         res = ioctl(sg_fd, SCSI_IOCTL_GET_IDLUN, &my_idlun);
         if (res < 0) {
-            sprintf(ebuff, "device %s failed on scsi ioctl(idlun), skip", 
-                    fname);
+            snprintf(ebuff, EBUFF_SZ,
+	    	     "device %s failed on scsi ioctl(idlun), skip", fname);
             perror(ebuff);
             ++num_errors;
 #ifdef DEBUG
@@ -414,8 +415,8 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
         }
         res = ioctl(sg_fd, SCSI_IOCTL_GET_BUS_NUMBER, &host_no);
         if (res < 0) {
-            sprintf(ebuff, "device %s failed on scsi ioctl(bus_number), skip",
-                    fname);
+            snprintf(ebuff, EBUFF_SZ,
+		 "device %s failed on scsi ioctl(bus_number), skip", fname);
             perror(ebuff);
             ++num_errors;
 #ifdef DEBUG
@@ -481,9 +482,9 @@ static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op,
 	return 0;
     default:
 	if (noisy) {
-	    char ebuff[256];
-	    sprintf(ebuff, "Inquiry error, CmdDt=%d, EVPD=%d, page_opcode=%x ",
-		    cmddt, evpd, pg_op);
+	    char ebuff[EBUFF_SZ];
+	    snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt=%d, "
+	    	     "EVPD=%d, page_opcode=%x ", cmddt, evpd, pg_op);
             sg_chk_n_print3(ebuff, &io_hdr);
 	}
 	return -1;

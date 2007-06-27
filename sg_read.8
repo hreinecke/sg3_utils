@@ -1,0 +1,108 @@
+.TH SG_READ "8" "February 2002" "sg3_utils-0.98" SG3_UTILS
+.SH NAME
+sg_read \- read blocks of data continually from same offset
+.SH SYNOPSIS
+.B sg_read
+[\fIOPTION\fR]...
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Read data from a Linux SCSI generic (sg) device, a raw devices or
+a normal file with each read command issued to the same offset. This 
+will test (or time) disk caching and/or SCSI (or some other) bus 
+throughput.
+.TP
+bpt=BLOCKS
+each read operation will be made using this number of blocks (or less if 
+near the end of count). Default is 128. Note also that each read operation
+starts at the same offset (as given by skip or 0).
+.TP
+bs=BYTES
+this
+.B must
+be the block size of the physical device (defaults to 512)
+.TP
+cdbsz=6 | 10 | 12 | 16
+size of SCSI READ commands issued on sg device names.
+Default is 10 byte SCSI READ command blocks
+.TP
+count=BLOCKS
+read this number of blocks. This argument must be given
+.TP
+dio=0 | 1
+default is 0 which selects indirect IO. Value of 1 attempts direct
+IO which, if not available, falls back to indirect IO and notes this
+at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
+has the value of 0 then a warning is issued (and indirect IO is performed)
+.TP
+if=FILE
+read from this FILE. This argument must be given
+.TP
+mmap= 0 | 1
+default is 0 which selects indirect IO. Value of 1 causes memory mapped
+IO to be performed. Selecting both dio and mmap is an error
+.TP
+skip=BLOCKS
+all read operations will start offset by BLOCKS bs-sized blocks 
+from the start of input (file or device)
+.TP
+time=0 | 1 | 2
+When 0 (default) doesn't perform timing.
+when 1, times transfer and does throughput calculation, starting at the
+first issued command until completion. When 2, times transfer and does 
+throughput calculation, starting at the second issued command until 
+completion
+.PP
+The input file must be either a sg device, a raw device or a normal file.
+A raw device must be bound to a block device prior to using sg_raw.
+See
+.B raw(8)
+for more information about binding raw devices.
+.PP
+BYTES and BLOCKS may be followed by the following multiplicative suffixes:
+c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
+g *1,073,741,824; and G *1,000,000,000
+.PP
+Data usually gets to the user space in a 2 stage process: first the
+SCSI adapter DMAs into kernel buffers and then the sg driver copies
+this data into user memory.
+This is called "indirect IO" and there is a "dio" option to select
+"direct IO" which will DMA directly into user memory. Due to some
+issues "direct IO" is disabled in the sg driver and needs a 
+configuration change to activate it. This is typically done with
+"echo 1 > /proc/scsi/sg/allow_dio". An alternate way to avoid the
+2 stage copy is to select memory mapped IO.
+.SH EXAMPLES
+.PP
+Let us assume that /dev/sg0 is a disk and we wish to time the disk's
+cache performance.
+.PP
+   sg_read if=/dev/sg0 bs=512 count=1M mmap=1 time=2
+.PP
+This command will continually read 128 512 byte blocks from block 0. 
+The "128" is the default value for "bpt" while "block 0" is chosen 
+because the "skip" argument was not given. This will continue until 
+1,000,000 blocks are read. The idea behind using "time=2" is that the 
+first 64 KB read operation will involve reading the magnetic media
+while the remaining read operations will "hit" the disk's cache. The 
+output of thid command will look like this:
+.PP
+  time from second command to end was 8.51 secs, 60.19 MB/sec
+.br
+  1000000+0 records in, SCSI commands issued: 7813
+.SH AUTHORS
+Written by Doug Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert@interlog.com>.
+.SH COPYRIGHT
+Copyright \(co 2000-2002 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+To time streaming media read or write time see
+.B sg_dd
+is in the sg3_utils package. The lmbench package contains
+.B lmdd
+which is also interesting.
+.B raw(8), dd(1)

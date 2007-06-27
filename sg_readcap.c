@@ -13,7 +13,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2001 D. Gilbert
+*  Copyright (C) 1999 - 2002 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -23,7 +23,7 @@
    of Linux kernels no matter which of those environments it was
    compiled and built under.
 
-   Version 3.56 (20010115)
+   Version 3.57 (20020114)
 
 10 byte READ CAPACITY command:
 [0x25][  |lu][    ][    ][    ][    ][    ][    ][cntrl] {ignore PMI mode}
@@ -376,7 +376,7 @@ static int open_scsi_dev_as_sg(const char * devname)
     int do_numeric = DEF_SCAN;
     char name[MAX_FILENAME_LEN];
 
-    strcpy(name, devname);
+    strncpy(name, devname, MAX_FILENAME_LEN);
     if ((fd = open(name, O_RDONLY | O_NONBLOCK)) < 0) {
         if (EACCES == errno) {
             if ((fd = open(name, O_RDWR | O_NONBLOCK)) < 0)

@@ -88,6 +88,9 @@
  * 		sizeof(buffer) (which is sizeof(char*) == 4 or 32 bit archs) 
  *			was used incorrectly all over the place. Fixed.
  *                                      [version 1.95]
+ *
+ * Douglas Gilbert (dgilbert@interlog.com) 
+ *    20020113	snprintf() type cleanup
  */
 
 #include <stdio.h>
@@ -383,16 +386,21 @@ static int putnbyte(unsigned char *pnt, unsigned int value,
     return 0;
 }
 
+#define REASON_SZ 128
+
 static void check_parm_type(int i)
 {
-    char reason[128];
+    char reason[REASON_SZ];
+
     if (i == 1 && is_hex[next_parameter] != 1) {
-        sprintf (reason, "simple number (pos %i) instead of @ hexdatafield: %llu",
+        snprintf(reason, REASON_SZ,
+		 "simple number (pos %i) instead of @ hexdatafield: %llu",
 		 next_parameter, replacement_values[next_parameter]);
 	usage (reason, 1);
     }
     if (i != 1 && is_hex[next_parameter]) {
-        sprintf (reason, "@ hexdatafield (pos %i) instead of a simple number: %llu",
+        snprintf(reason, REASON_SZ,
+		 "@ hexdatafield (pos %i) instead of a simple number: %llu",
 		 next_parameter, replacement_values[next_parameter]);
 	usage (reason, 1);
     }
@@ -943,8 +951,8 @@ trytenbyte:
             i = 0;
             if ((buffer[9] & 7) == 4) {
                 while (len > 0) {
-                    sprintf((char *)buffer, "%6d:%3u:%8d", getnbyte(df, 3),
-                            df[3], getnbyte(df + 4, 4));
+                    snprintf((char *)buffer, 40, "%6d:%3u:%8d", getnbyte(df, 3),
+                             df[3], getnbyte(df + 4, 4));
                     printf("%19s", (char *)buffer);
                     len -= 8;
                     df += 8;
@@ -957,8 +965,8 @@ trytenbyte:
                 }
             } else if ((buffer[9] & 7) == 5) {
                 while (len > 0) {
-                    sprintf((char *)buffer, "%6d:%2u:%5d", getnbyte(df, 3),
-                            df[3], getnbyte(df + 4, 4));
+                    snprintf((char *)buffer, 40, "%6d:%2u:%5d", getnbyte(df, 3),
+                             df[3], getnbyte(df + 4, 4));
                     printf("%15s", (char *)buffer);
                     len -= 8;
                     df += 8;
@@ -1177,7 +1185,7 @@ static int do_user_page(int page_code, int page_no)
     name = "Vendor specific";
     for (i = 2; i < pagestart[1]+2; i++)
     {
-       char nm[8]; sprintf (nm, "%02x", i);
+       char nm[8]; snprintf (nm, 8, "%02x", i);
        hexdatafield (pagestart + i, 1, nm);
     }
 
@@ -1337,15 +1345,18 @@ typedef struct my_scsi_idlun
 
 } My_scsi_idlun;
 
+#define MDEV_NAME_SZ 256
+
 static void make_dev_name(char * fname, int k, int do_numeric)
 {
-    char buff[64];
+    char buff[MDEV_NAME_SZ];
+    size_t len;
 
-    strcpy(fname, "/dev/sg");
-    if (do_numeric) {
-        sprintf(buff, "%d", k);
-        strcat(fname, buff);
-    }
+    strncpy(fname, "/dev/sg", MDEV_NAME_SZ);
+    fname[MDEV_NAME_SZ - 1] = '\0';
+    len = strlen(fname);
+    if (do_numeric)
+        snprintf(buff + len, MDEV_NAME_SZ - len, "%d", k);
     else {
         if (k <= 26) {
             buff[0] = 'a' + (char)k;
@@ -1373,13 +1384,15 @@ char *devices[] =
 
 static Sg_map sg_map_arr[(sizeof(devices) / sizeof(char *)) + 1];
 
+#define EBUFF_SZ 256
+
 /* Print out a list of the known devices on the system */
 static void show_devices()
 {
     int k, j, fd, err, bus;
     My_scsi_idlun m_idlun;
-    char name[64];
-    char ebuff[256];
+    char name[MDEV_NAME_SZ];
+    char ebuff[EBUFF_SZ];
     int do_numeric = 1;
 
     for (k = 0, j = 0; k < sizeof(devices) / sizeof(char *); k++) {
@@ -1388,14 +1401,16 @@ static void show_devices()
             continue;
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &(sg_map_arr[j].bus));
         if (err < 0) {
-            sprintf(ebuff, "SCSI(1) ioctl on %s failed", devices[k]);
+            snprintf(ebuff, EBUFF_SZ,
+	    	     "SCSI(1) ioctl on %s failed", devices[k]);
             perror(ebuff);
             close(fd);
             continue;
         }
         err = ioctl(fd, SCSI_IOCTL_GET_IDLUN, &m_idlun);
         if (err < 0) {
-            sprintf(ebuff, "SCSI(2) ioctl on %s failed", devices[k]);
+            snprintf(ebuff, EBUFF_SZ, 
+	    	     "SCSI(2) ioctl on %s failed", devices[k]);
             perror(ebuff);
             close(fd);
             continue;
@@ -1428,7 +1443,8 @@ static void show_devices()
                     continue;   /* step over if O_EXCL already on it */
                 else {
 #if 0
-                    sprintf(ebuff, "open on %s failed (%d)", name, errno);
+                    snprintf(ebuff, EBUFF_SZ,
+		    	     "open on %s failed (%d)", name, errno);
                     perror(ebuff);
 #endif
                     break;
@@ -1437,14 +1453,14 @@ static void show_devices()
         }
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &bus);
         if (err < 0) {
-            sprintf(ebuff, "SCSI(3) ioctl on %s failed", name);
+            snprintf(ebuff, EBUFF_SZ, "SCSI(3) ioctl on %s failed", name);
             perror(ebuff);
             close(fd);
             continue;
         }
         err = ioctl(fd, SCSI_IOCTL_GET_IDLUN, &m_idlun);
         if (err < 0) {
-            sprintf(ebuff, "SCSI(3) ioctl on %s failed", name);
+            snprintf(ebuff, EBUFF_SZ, "SCSI(3) ioctl on %s failed", name);
             perror(ebuff);
             close(fd);
             continue;
@@ -1634,14 +1650,17 @@ static int show_pages(int page_code)
     return 0;
 }
 
+#define DEVNAME_SZ 256
+
 static int open_sg_dev(char * devname)
 {
     int fd, err, bus, bbus, k;
     My_scsi_idlun m_idlun, mm_idlun;
     int do_numeric = 0;
-    char name[128];
+    char name[DEVNAME_SZ];
 
-    strcpy(name, devname);
+    strncpy(name, devname, DEVNAME_SZ);
+    name[DEVNAME_SZ - 1] = '\0';
     fd = open(name, O_RDONLY);
     if (fd < 0)
         return fd;
@@ -1897,7 +1916,7 @@ int main(int argc, char *argv[])
             notch = 1;
             /* fall through */
         case 'v':
-            fprintf(stdout, " Sginfo version 1.95\n");
+            fprintf(stdout, " Sginfo version 1.96\n");
             break;
         default:
             fprintf(stdout, "Unknown option '-%c' (ascii %02xh)\n", c, c);
