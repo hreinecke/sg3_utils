@@ -2,6 +2,14 @@ Each utility has its own version number, date of last changes and
 some description at the top of its ".c" file.
 
 
+Changelog for sg3_utils-0.92 [20010116]
+----------------------------
+  - change sg_err.c output from stdout to stderr
+  - change sg_debug to call system("cat /proc/scsi/sg/debug");
+  - fix in+out totals in sg_dd and sgp_dd when partial transfers
+  - lower include dependencies in sg_err.h
+  - add sgq_dd + Makefile to archive directory
+
 Changelog for sg3_utils-0.91 [20001221]
 ----------------------------
   - signalling handling added to sg_dd (and documented in sg_dd.8)

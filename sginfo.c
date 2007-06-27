@@ -84,6 +84,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <linux/../scsi/sg.h>  /* cope with silly includes */
+#include <linux/../scsi/scsi.h>
 
 #ifdef SG_GET_RESERVED_SIZE
 #include "sg_err.h"

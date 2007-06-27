@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/../scsi/sg.h>  /* cope with silly includes */
+#include <linux/../scsi/scsi.h> 
 #include "sg_err.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")

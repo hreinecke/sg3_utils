@@ -20,7 +20,7 @@
    This program outputs debug information to the console/log for _all_
    active sg devices.
 
-   Version 3.53 (990719)
+   Version 3.54 (20010110)
 */
 
 
@@ -46,7 +46,10 @@ int main(int argc, char * argv[])
     }
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res >= 0) || (t >= 30000)) {
-        printf("For debug information try: 'cat /proc/scsi/sg/debug'\n");
+        printf("System is using sg version 3 driver. Hence the user can");
+        printf(" execute:\n  'cat /proc/scsi/sg/debug' themselves. ");
+        printf("Here is an example:\n");
+	system("cat /proc/scsi/sg/debug");
         return 0;
     }
     debug = 10;

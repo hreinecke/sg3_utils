@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 500
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -5,28 +7,35 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
-#include <poll.h>
+#include <limits.h>
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <sys/poll.h>
 #include <linux/../scsi/sg.h>  /* cope with silly includes */
+#include <linux/major.h>
+typedef unsigned char u_char;   /* horrible, for scsi.h */
 #include "sg_err.h"
+#include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999 D. Gilbert and P. Allworth
+*  Copyright (C) 1999, 2000 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
    This program is a specialization of the Unix "dd" command in which
-   one or both of the given files is a scsi generic device. A block size
-   ('bs') is assumed to be 512 if not given. This program complains if
-   'ibs' or 'obs' are given with some other value than 'bs'.
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given of 'of=-' then stdout assumed. The multipliers "c, b, k, m"
-   are recognized on numeric arguments.
-
+   one or both of the given files is a scsi generic device or a raw
+   device. A block size ('bs') is assumed to be 512 if not given. This
+   program complains if 'ibs' or 'obs' are given with some other value
+   than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
+   'of' is not given or 'of=-' then stdout assumed.  Multipliers:
+      'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
+      'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
+   
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
    For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16KB
@@ -34,10 +43,11 @@
    command.
 
    This version should compile with Linux sg drivers with version numbers
-   >= 30000 . This version uses usleep() for a delay loop.
+   >= 30000 . This version uses posix threads.
 
-   Version 3.982 20000827
 */
+
+static char * version_str = "0.51 20010114";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -45,28 +55,66 @@
 /* #define SG_DEBUG */
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 40000       /* 40,000 millisecs == 40 seconds */
+#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 #define S_RW_LEN 10             /* Use SCSI READ(10) and WRITE(10) */
-#define RCAP_REPLY_LEN 8
-#define SGQ_MAX_RD_AHEAD 4
-#define SGQ_MAX_WR_AHEAD 4
-#define SGQ_NUM_ELEMS (SGQ_MAX_RD_AHEAD+ SGQ_MAX_WR_AHEAD + 1)
 
-#define SGQ_FREE 0
-#define SGQ_IO_STARTED 1
-#define SGQ_IO_FINISHED 2
-#define SGQ_IO_ERR 3
-#define SGQ_IO_WAIT 4
+#define SGP_READ10 0x28
+#define SGP_WRITE10 0x2a
+#define DEF_NUM_THREADS 4	/* actually degree of concurrency */
+#define MAX_NUM_THREADS 32
 
-#define SGQ_CAN_DO_NOTHING 0    /* only temporarily in use */
-#define SGQ_CAN_READ 1
-#define SGQ_CAN_WRITE 2
-#define SGQ_TIMEOUT 4
+#ifndef RAW_MAJOR
+#define RAW_MAJOR 255   /*unlikey value */
+#endif
+
+#define FT_OTHER 0              /* filetype other than sg or raw device */
+#define FT_SG 1                 /* filetype is sg char device */
+#define FT_RAW 2                /* filetype is raw char device */
+
+#define QS_IDLE 0		/* ready to start a copy cycle */
+#define QS_IN_STARTED 1		/* commenced read */
+#define QS_IN_FINISHED 2	/* finished read, ready for write */
+#define QS_OUT_STARTED 3	/* commenced write */
+
+#define QS_IN_POLL 11
+#define QS_OUT_POLL 12
+
+struct request_element;
+
+typedef struct request_collection
+{       /* one instance visible to all threads */
+    int infd;
+    int skip;
+    int in_type;
+    int in_scsi_type;
+    int in_blk;                 /* next block address to read */
+    int in_count;               /* blocks remaining for next read */
+    int in_done_count;          /* count of completed in blocks */
+    int in_partial;
+    int outfd;
+    int seek;
+    int out_type;
+    int out_scsi_type;
+    int out_blk;                /* next block address to write */
+    int out_count;              /* blocks remaining for next write */
+    int out_done_count;         /* count of completed out blocks */
+    int out_partial; 
+    int bs;
+    int bpt;
+    int dio;
+    int dio_incomplete; 
+    int sum_of_resids;
+    int coe;
+    int debug;
+    int num_rq_elems;
+    struct request_element * req_arr;
+} Rq_coll;
 
 typedef struct request_element
-{
-    struct request_element * nextp;
-    int state;
+{       /* one instance per worker thread */
+    int qstate;			/* "QS" state */
+    int infd;
+    int outfd;
     int wr;
     int blk;
     int num_blks;
@@ -75,48 +123,148 @@ typedef struct request_element
     sg_io_hdr_t io_hdr;
     unsigned char cmd[S_RW_LEN];
     unsigned char sb[SENSE_BUFF_LEN];
-    int result;
-    int stop_after_wr;
-} Rq_elem;
-
-typedef struct request_collection
-{
-    int infd;
-    int in_is_sg;
-    int in_blk;                 /* next block address to read */
-    int in_count;               /* blocks remaining for next read */
-    int in_done_count;          /* count of completed in blocks */
-    int in_partial;
-    int outfd;
-    int out_is_sg;
-    int lowest_seek;
-    int out_blk;                /* next block address to write */
-    int out_count;              /* blocks remaining for next write */
-    int out_done_count;         /* count of completed out blocks */
-    int out_partial;
     int bs;
-    int bpt;
     int dio;
     int dio_incomplete;
-    int sum_of_resids;
+    int resid;
+    int in_scsi_type;
+    int out_scsi_type;
     int debug;
-    Rq_elem * rd_posp;
-    Rq_elem * wr_posp;
-    Rq_elem elem[SGQ_NUM_ELEMS];
-} Rq_coll;
+} Rq_elem;
 
+static Rq_coll rcoll;
+static struct pollfd in_pollfd_arr[MAX_NUM_THREADS];
+static struct pollfd out_pollfd_arr[MAX_NUM_THREADS];
+static int dd_count = -1;
+
+int sg_fin_in_operation(Rq_coll * clp, Rq_elem * rep);
+int sg_fin_out_operation(Rq_coll * clp, Rq_elem * rep);
+int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks);
+int normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks);
+int sg_start_io(Rq_elem * rep);
+int sg_finish_io(int wr, Rq_elem * rep);
+
+
+static void install_handler (int sig_num, void (*sig_handler) (int sig))
+{
+    struct sigaction sigact;
+    sigaction (sig_num, NULL, &sigact);
+    if (sigact.sa_handler != SIG_IGN)
+    {
+        sigact.sa_handler = sig_handler;
+        sigemptyset (&sigact.sa_mask);
+        sigact.sa_flags = 0;
+        sigaction (sig_num, &sigact, NULL);
+    }
+}
+
+void print_stats()
+{
+    int infull, outfull;
+
+    if (0 != rcoll.out_count)
+        fprintf(stderr, "  remaining block count=%d\n", rcoll.out_count);
+    infull = dd_count - rcoll.in_done_count - rcoll.in_partial;
+    fprintf(stderr, "%d+%d records in\n", infull, rcoll.in_partial);
+    outfull = dd_count - rcoll.out_done_count - rcoll.out_partial;
+    fprintf(stderr, "%d+%d records out\n", outfull, rcoll.out_partial);
+}
+
+static void interrupt_handler(int sig)
+{
+    struct sigaction sigact;
+
+    sigact.sa_handler = SIG_DFL;
+    sigemptyset (&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    sigaction (sig, &sigact, NULL);
+    fprintf(stderr, "Interrupted by signal,");
+    print_stats ();
+    kill (getpid (), sig);
+}
+
+static void siginfo_handler(int sig)
+{
+    fprintf(stderr, "Progress report, continuing ...\n");
+    print_stats ();
+}
+
+int dd_filetype(const char * filename)
+{
+    struct stat st;
+
+    if (stat(filename, &st) < 0)
+        return FT_OTHER;
+    if (S_ISCHR(st.st_mode)) {
+        if (RAW_MAJOR == major(st.st_rdev))
+            return FT_RAW;
+        else if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
+            return FT_SG;
+    }
+    return FT_OTHER;
+}
 
 void usage()
 {
-    printf("Usage: "
+    fprintf(stderr, "Usage: "
            "sgq_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
-           "              [bs=<num>] [bpt=<num>] [count=<n>]"
-           " [dio=<n>] [deb=<n>]\n"
-           "            either 'if' or 'of' must be a scsi generic device\n"
+           "               [bs=<num>] [bpt=<num>] [count=<n>]\n"
+           "               [dio=<n>] [thr=<n>] [coe=<n>] [gen=<n>]\n"
+           "               [deb=<n>] [--version]\n"
+           "            usually either 'if' or 'of' is a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
-           " 'deb' is debug, 1->output some, 0->no debug (def)\n");
+           " 'thr' is number of queues, must be > 0, default 4, max 32\n");
+    fprintf(stderr, " 'coe' continue on sg error, 0->exit (def), "
+    	   "1->zero + continue\n"
+           " 'gen' 0-> 1 file is special(def), 1-> any files allowed\n"
+           " 'deb' is debug, 0->none (def), > 0->varying degrees of debug\n");
 }
+
+/* Returns -1 for error, 0 for nothing found, QS_IN_POLL or QS_OUT_POLL */
+int do_poll(Rq_coll * clp, int timeout, int * req_indexp)
+{
+    int k, res;
+
+    if (FT_SG == clp->out_type) {
+	while (((res = poll(out_pollfd_arr, clp->num_rq_elems, timeout)) < 0)
+	       && (EINTR == errno))
+	    ;
+	if (res < 0) {
+	    perror("poll error on output fds");
+	    return -1;
+	}
+	else if (res > 0) {
+	    for (k = 0; k < clp->num_rq_elems; ++k) {
+		if (out_pollfd_arr[k].revents & POLLIN) {
+		    if (req_indexp)
+			*req_indexp = k;
+		    return QS_OUT_POLL;
+		}
+	    }
+	}
+    }
+    if (FT_SG == clp->in_type) {
+	while (((res = poll(in_pollfd_arr, clp->num_rq_elems, timeout)) < 0)
+	       && (EINTR == errno))
+	    ;
+	if (res < 0) {
+	    perror("poll error on input fds");
+	    return -1;
+	}
+	else if (res > 0) {
+	    for (k = 0; k < clp->num_rq_elems; ++k) {
+		if (in_pollfd_arr[k].revents & POLLIN) {
+		    if (req_indexp)
+			*req_indexp = k;
+		    return QS_IN_POLL;
+		}
+	    }
+	}
+    }
+    return 0;
+}
+
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
 int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
@@ -132,10 +280,10 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
     io_hdr.cmd_len = sizeof(rcCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = RCAP_REPLY_LEN;
+    io_hdr.dxfer_len = sizeof(rcBuff);
     io_hdr.dxferp = rcBuff;
     io_hdr.cmdp = rcCmdBlk;
-    io_hdr.sbp = sense_b; 
+    io_hdr.sbp = sense_b;
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
@@ -154,22 +302,145 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
     *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
                (rcBuff[6] << 8) | rcBuff[7];
 #ifdef SG_DEBUG
-    printf("number of sectors=%d, sector size=%d\n", *num_sect, *sect_sz);
+    fprintf(stderr, "number of sectors=%d, sector size=%d\n",
+            *num_sect, *sect_sz);
 #endif
     return 0;
 }
 
-/* -ve -> unrecoverable error, 0 -> successful, 1 -> recoverable (ENOMEM) */
-int sg_start_io(Rq_coll * clp, Rq_elem * rep)
+/* 0 -> ok, 1 -> short read, -1 -> error */
+int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
+{
+    int res;
+    int stop_after_write = 0;
+
+    rep->qstate = QS_IN_STARTED;
+    if (rep->debug > 8) 
+        fprintf(stderr, "normal_in_operation: start blk=%d num_blks=%d\n",
+		rep->blk, rep->num_blks);
+    while (((res = read(rep->infd, rep->buffp,
+                        blocks * rep->bs)) < 0) && (EINTR == errno))
+        ;
+    if (res < 0) {
+        fprintf(stderr, "sgq_dd: reading, in_blk=%d, errno=%d\n", rep->blk, 
+		errno);
+        return -1;
+    }
+    if (res < blocks * rep->bs) {
+        int o_blocks = blocks;
+        stop_after_write = 1;
+        blocks = res / rep->bs;
+        if ((res % rep->bs) > 0) {
+            blocks++;
+            clp->in_partial++;
+        }
+        /* Reverse out + re-apply blocks on clp */
+        clp->in_blk -= o_blocks;
+        clp->in_count += o_blocks;
+        rep->num_blks = blocks;
+        clp->in_blk += blocks;
+        clp->in_count -= blocks;
+    }
+    clp->in_done_count -= blocks;
+    rep->qstate = QS_IN_FINISHED;
+    return stop_after_write;
+}
+
+/* 0 -> ok, -1 -> error */
+int normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
+{
+    int res;
+
+    rep->qstate = QS_OUT_STARTED;
+    if (rep->debug > 8) 
+        fprintf(stderr, "normal_out_operation: start blk=%d num_blks=%d\n",
+		rep->blk, rep->num_blks);
+    while (((res = write(rep->outfd, rep->buffp,
+                 rep->num_blks * rep->bs)) < 0) && (EINTR == errno))
+        ;
+    if (res < 0) {
+        fprintf(stderr, "sgq_dd: output, out_blk=%d, errno=%d\n", rep->blk,
+		errno);
+        return -1;
+    }
+    if (res < blocks * rep->bs) {
+        blocks = res / rep->bs;
+        if ((res % rep->bs) > 0) {
+            blocks++;
+            clp->out_partial++;
+        }
+        rep->num_blks = blocks;
+    }
+    clp->out_done_count -= blocks;
+    rep->qstate = QS_IDLE;
+    return 0;
+}
+
+/* Returns 1 for retryable, 0 for ok, -ve for error */
+int sg_fin_in_operation(Rq_coll * clp, Rq_elem * rep)
+{
+    int res;
+
+    rep->qstate = QS_IN_FINISHED;
+    res = sg_finish_io(rep->wr, rep);
+    if (res < 0) {
+	if (clp->coe) {
+	    memset(rep->buffp, 0, rep->num_blks * rep->bs);
+	    fprintf(stderr, ">> substituted zeros for in blk=%d for "
+		    "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
+	    res = 0;
+	}
+	else {
+	    fprintf(stderr, "error finishing sg in command\n");
+	    return res;
+	}
+    }
+    if (0 == res) { /* looks good, going to return */
+	if (rep->dio_incomplete || rep->resid) {
+	    clp->dio_incomplete += rep->dio_incomplete;
+	    clp->sum_of_resids += rep->resid;
+	}
+	clp->in_done_count -= rep->num_blks;
+    }
+    return res;
+}
+
+/* Returns 1 for retryable, 0 for ok, -ve for error */
+int sg_fin_out_operation(Rq_coll * clp, Rq_elem * rep)
+{
+    int res;
+
+    rep->qstate = QS_IDLE;
+    res = sg_finish_io(rep->wr, rep);
+    if (res < 0) {
+	if (clp->coe) {
+	    fprintf(stderr, ">> ignored error for out blk=%d for "
+		    "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
+	    res = 0;
+	}
+	else {
+	    fprintf(stderr, "error finishing sg out command\n");
+	    return res;
+	}
+    }
+    if (0 == res) {
+	if (rep->dio_incomplete || rep->resid) {
+	    clp->dio_incomplete += rep->dio_incomplete;
+	    clp->sum_of_resids += rep->resid;
+	}
+	clp->out_done_count -= rep->num_blks;
+    }
+    return res;
+}
+
+int sg_start_io(Rq_elem * rep)
 {
     sg_io_hdr_t * hp = &rep->io_hdr;
     int res;
-#if 0
-    static int testing = 0;
-#endif
 
+    rep->qstate = rep->wr ? QS_OUT_STARTED : QS_IN_STARTED;
     memset(rep->cmd, 0, sizeof(rep->cmd));
-    rep->cmd[0] = rep->wr ? 0x2a : 0x28;
+    rep->cmd[0] = rep->wr ? SGP_WRITE10 : SGP_READ10;
     rep->cmd[2] = (unsigned char)((rep->blk >> 24) & 0xFF);
     rep->cmd[3] = (unsigned char)((rep->blk >> 16) & 0xFF);
     rep->cmd[4] = (unsigned char)((rep->blk >> 8) & 0xFF);
@@ -181,124 +452,244 @@ int sg_start_io(Rq_coll * clp, Rq_elem * rep)
     hp->cmd_len = sizeof(rep->cmd);
     hp->cmdp = rep->cmd;
     hp->dxfer_direction = rep->wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
-    hp->dxfer_len = clp->bs * rep->num_blks;
+    hp->dxfer_len = rep->bs * rep->num_blks;
     hp->dxferp = rep->buffp;
     hp->mx_sb_len = sizeof(rep->sb);
     hp->sbp = rep->sb;
     hp->timeout = DEF_TIMEOUT;
     hp->usr_ptr = rep;
     hp->pack_id = rep->blk;
-    if (clp->dio)
+    if (rep->dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
-#ifdef SG_DEBUG
-    printf("sg_start_io: SCSI %s, blk=%d num_blks=%d\n", 
-           rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
-    sg_print_command(hp->cmdp);
-    printf("dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n", hp->dxfer_direction,
-           hp->dxfer_len, hp->dxferp, hp->cmd_len);
-#endif
-
-#if 0
-    testing++;
-    if (0 == (testing % 10)) {
-        rep->state = SGQ_IO_WAIT;   /* busy so wait */
-        return 0;
+    if (rep->debug > 8) {
+        fprintf(stderr, "sg_start_io: SCSI %s, blk=%d num_blks=%d\n",
+               rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
+        sg_print_command(hp->cmdp);
+        fprintf(stderr, "dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n",
+                hp->dxfer_direction, hp->dxfer_len, hp->dxferp, hp->cmd_len);
     }
-#endif
 
-    while (((res = write(rep->wr ? clp->outfd : clp->infd, hp,
+    while (((res = write(rep->wr ? rep->outfd : rep->infd, hp,
                          sizeof(sg_io_hdr_t))) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
             return 1;
-        if ((EDOM == errno) || (EAGAIN == errno)) {
-            rep->state = SGQ_IO_WAIT;   /* busy so wait */
-            return 0;
-        }
-        perror("starting io on sg device, error");
-        rep->state = SGQ_IO_ERR;
         return res;
     }
-    rep->state = SGQ_IO_STARTED;
     return 0;
 }
 
 /* -1 -> unrecoverable error, 0 -> successful, 1 -> try again */
-int sg_finish_io(Rq_coll * clp, int wr, Rq_elem ** repp)
+int sg_finish_io(int wr, Rq_elem * rep)
 {
     int res;
     sg_io_hdr_t io_hdr;
     sg_io_hdr_t * hp;
-    Rq_elem * rep;
+#if 0
+    static int testing = 0;     /* thread dubious! */
+#endif
 
     memset(&io_hdr, 0 , sizeof(sg_io_hdr_t));
-    while (((res = read(wr ? clp->outfd : clp->infd, &io_hdr,
+    /* FORCE_PACK_ID active set only read packet with matching pack_id */
+    io_hdr.interface_id = 'S';
+    io_hdr.dxfer_direction = rep->wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
+    io_hdr.pack_id = rep->blk;
+
+    while (((res = read(wr ? rep->outfd : rep->infd, &io_hdr,
                         sizeof(sg_io_hdr_t))) < 0) && (EINTR == errno))
         ;
-    rep = (Rq_elem *)io_hdr.usr_ptr;
     if (res < 0) {
         perror("finishing io on sg device, error");
-        rep->state = SGQ_IO_ERR;
         return -1;
     }
-    if (! (rep && (SGQ_IO_STARTED == rep->state))) {
-        printf("sg_finish_io: bad usr_ptr\n");
-        rep->state = SGQ_IO_ERR;
-        return -1;
+    if (rep != (Rq_elem *)io_hdr.usr_ptr) {
+        fprintf(stderr, 
+		"sg_finish_io: bad usr_ptr, request-response mismatch\n");
+	exit(1);
     }
     memcpy(&rep->io_hdr, &io_hdr, sizeof(sg_io_hdr_t));
     hp = &rep->io_hdr;
-    if (repp)
-        *repp = rep;
 
     switch (sg_err_category3(hp)) {
         case SG_ERR_CAT_CLEAN:
             break;
         case SG_ERR_CAT_RECOVERED:
-            printf("Recovered error on block=%d, num=%d\n",
-                   rep->blk, rep->num_blks);
+            fprintf(stderr, "Recovered error on block=%d, num=%d\n",
+                    rep->blk, rep->num_blks);
             break;
         case SG_ERR_CAT_MEDIA_CHANGED:
             return 1;
         default:
-            sg_chk_n_print3(rep->wr ? "writing": "reading", hp);
-            rep->state = SGQ_IO_ERR;
-            return -1;
+            {
+                char ebuff[64];
+                sprintf(ebuff, "%s blk=%d", rep->wr ? "writing": "reading",
+                        rep->blk);
+                sg_chk_n_print3(ebuff, hp);
+                return -1;
+            }
     }
-    if (clp->dio &&
-        ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
-        ++clp->dio_incomplete; /* count dios done as indirect IO */
-    clp->sum_of_resids += hp->resid;
-    rep->state = SGQ_IO_FINISHED;
-#ifdef SG_DEBUG
-    printf("sg_finish_io: %s  ", wr ? "writing" : "reading");
-    printf("    SGQ_IO_FINISHED elem idx=%d\n", rep - clp->elem);
+#if 0
+    if (0 == (++testing % 100)) return -1;
 #endif
+    if (rep->dio &&
+        ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
+        rep->dio_incomplete = 1; /* count dios done as indirect IO */
+    else
+        rep->dio_incomplete = 0;
+    rep->resid = hp->resid;
+    if (rep->debug > 8)
+        fprintf(stderr, "sg_finish_io: completed %s\n", wr ? "WRITE" : "READ");
     return 0;
 }
 
-int sz_reserve(int fd, int bs, int bpt)
+/* Returns scsi_type or -1 for error */
+int sg_prepare(int fd, int sz)
 {
     int res, t;
+    struct sg_scsi_id info;
 
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 30000)) {
-        printf("sgq_dd: sg driver prior to 3.x.y\n");
-        return 1;
+        fprintf(stderr, "sgq_dd: sg driver prior to 3.x.y\n");
+        return -1;
     }
-    res = 0;
-    t = bs * bpt;
-    res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
-    if (res < 0)
+    res = ioctl(fd, SG_SET_RESERVED_SIZE, &sz);
+    if (res < 0) 
         perror("sgq_dd: SG_SET_RESERVED_SIZE error");
+#if 0
+    t = 1;
+    res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
+    if (res < 0)
+        perror("sgq_dd: SG_SET_FORCE_PACK_ID error");
+#endif
+    res = ioctl(fd, SG_GET_SCSI_ID, &info);
+    if (res < 0) {
+	perror("sgq_dd: SG_SET_SCSI_ID error");
+	return -1;
+    }
+    else
+        return info.scsi_type;
+}
+
+/* Return 0 for ok, anything else for errors */
+int prepare_rq_elems(Rq_coll * clp, const char * inf, const char * outf)
+{
+    int k;
+    Rq_elem * rep;
+    size_t psz;
+    char ebuff[256];
+    int sz = clp->bpt * clp->bs;
+    int scsi_type;
+
+    clp->req_arr = malloc(sizeof(Rq_elem) * clp->num_rq_elems);
+    if (NULL == clp->req_arr)
+    	return 1;
+    for (k = 0; k < clp->num_rq_elems; ++k) {
+    	rep = &clp->req_arr[k];
+	memset(rep, 0, sizeof(Rq_elem));
+	psz = getpagesize();
+	if (NULL == (rep->alloc_bp = malloc(sz + psz)))
+	    return 1;
+	rep->buffp = (unsigned char *)
+		(((unsigned long)rep->alloc_bp + psz - 1) & (~(psz - 1)));
+	rep->qstate = QS_IDLE;
+	rep->bs = clp->bs;
+	rep->dio = clp->dio;
+	rep->debug = clp->debug;
+	rep->out_scsi_type = clp->out_scsi_type;
+	if (FT_SG == clp->in_type) {
+	    if (0 == k)
+		rep->infd = clp->infd;
+	    else {
+		if ((rep->infd = open(inf, O_RDWR)) < 0) {
+                    sprintf(ebuff, "sgq_dd: could not open %s for sg reading",
+                            inf);
+                    perror(ebuff);
+                    return 1;
+                }
+	    }
+	    in_pollfd_arr[k].fd = rep->infd;
+	    in_pollfd_arr[k].events = POLLIN;
+	    if ((scsi_type = sg_prepare(rep->infd, sz)) < 0)
+		return 1;
+	    if (0 == k)
+		clp->in_scsi_type = scsi_type;
+	    rep->in_scsi_type = clp->in_scsi_type;
+	}
+	else
+	    rep->infd = clp->infd;
+
+	if (FT_SG == clp->out_type) {
+	    if (0 == k)
+		rep->outfd = clp->outfd;
+	    else {
+		if ((rep->outfd = open(outf, O_RDWR)) < 0) {
+                    sprintf(ebuff, "sgq_dd: could not open %s for sg writing",
+                            outf);
+                    perror(ebuff);
+                    return 1;
+                }
+	    }
+	    out_pollfd_arr[k].fd = rep->outfd;
+	    out_pollfd_arr[k].events = POLLIN;
+	    if ((scsi_type = sg_prepare(rep->outfd, sz)) < 0)
+		return 1;
+	    if (0 == k)
+		clp->out_scsi_type = scsi_type;
+	    rep->out_scsi_type = clp->out_scsi_type;
+	}
+	else
+	    rep->outfd = clp->outfd;
+    }
     return 0;
+}
+
+/* Returns a "QS" code and req index, or QS_IDLE and position of first idle
+   (-1 if no idle position). Returns -1 on poll error. */
+int decider(Rq_coll * clp, int first_xfer, int * req_indexp)
+{
+    int k, res;
+    Rq_elem * rep;
+    int first_idle_index = -1;
+    int lowest_blk_index = -1;
+    int times;
+    int try_poll = 0;
+    int lowest_blk = INT_MAX;
+
+    times = first_xfer ? 1 : clp->num_rq_elems;
+    for (k = 0; k < times; ++k) {
+	rep = &clp->req_arr[k];
+	if ((QS_IN_STARTED == rep->qstate) ||
+	    (QS_OUT_STARTED == rep->qstate))
+	    try_poll = 1;
+	else if ((QS_IN_FINISHED == rep->qstate) && (rep->blk < lowest_blk)) {
+	    lowest_blk = rep->blk;
+	    lowest_blk_index = k;
+	}
+	else if ((QS_IDLE == rep->qstate) && (first_idle_index < 0))
+	    first_idle_index = k;
+    }
+    if (try_poll) {
+	res = do_poll(clp, 0, req_indexp);
+	if (0 != res)
+	    return res;
+    }
+
+    if (lowest_blk_index >= 0) {
+	if (req_indexp)
+	    *req_indexp = lowest_blk_index;
+	return QS_IN_FINISHED;
+    }
+    if (req_indexp)
+    	*req_indexp = first_idle_index;
+    return QS_IDLE;
 }
 
 int get_num(char * buf)
 {
     int res, num;
-    char c, cc;
+    char c;
 
     res = sscanf(buf, "%d%c", &num, &c);
     if (0 == res)
@@ -306,303 +697,30 @@ int get_num(char * buf)
     else if (1 == res)
         return num;
     else {
-        cc = (char)toupper(c);
-        if ('B' == cc)
-            return num * 512;
-        else if ('C' == cc)
+        switch (c) {
+        case 'c':
+        case 'C':
             return num;
-        else if ('K' == cc)
+        case 'b':
+        case 'B':
+            return num * 512;
+        case 'k':
             return num * 1024;
-        else if ('M' == cc)
+        case 'K':
+            return num * 1000;
+        case 'm':
             return num * 1024 * 1024;
-        else {
-            printf("unrecognized multiplier\n");
+        case 'M':
+            return num * 1000000;
+        case 'g':
+            return num * 1024 * 1024 * 1024;
+        case 'G':
+            return num * 1000000000;
+        default:
+            fprintf(stderr, "unrecognized multiplier\n");
             return -1;
         }
     }
-}
-
-void init_elems(Rq_coll * clp)
-{
-    Rq_elem * rep;
-    int k;
-    int off = 0;
-    int sz = clp->bpt * clp->bs;
-
-    if (clp->dio) {
-        off = getpagesize();
-        sz += off;
-    }
-    clp->wr_posp = &clp->elem[0]; /* making ring buffer */
-    clp->rd_posp = clp->wr_posp;
-    for (k = 0; k < SGQ_NUM_ELEMS - 1; ++k)
-        clp->elem[k].nextp = &clp->elem[k + 1];
-    clp->elem[SGQ_NUM_ELEMS - 1].nextp = &clp->elem[0];
-    for (k = 0; k < SGQ_NUM_ELEMS; ++k) {
-        rep = &clp->elem[k];
-        rep->state = SGQ_FREE;
-        if (NULL == (rep->alloc_bp = malloc(sz))) {
-            printf("out of memory creating user buffers\n");
-            exit(1);
-        }
-        else
-            rep->buffp = rep->alloc_bp + off;
-    }
-}
-
-int start_read(Rq_coll * clp)
-{
-    int blocks = (clp->in_count > clp->bpt) ? clp->bpt : clp->in_count;
-    Rq_elem * rep = clp->rd_posp;
-    int buf_sz, res;
-    char ebuff[256];
-
-#ifdef SG_DEBUG
-    printf("start_read, elem idx=%d\n", rep - clp->elem);
-#endif
-    rep->wr = 0;
-    rep->blk = clp->in_blk;
-    rep->num_blks = blocks;
-    clp->in_blk += blocks;
-    clp->in_count -= blocks;
-    if (clp->in_is_sg) {
-        res = sg_start_io(clp, rep);
-        if (1 == res) {     /* ENOMEM, find what's available+try that */
-            if ((res = ioctl(clp->infd, SG_GET_RESERVED_SIZE, &buf_sz)) < 0) {
-                perror("RESERVED_SIZE ioctls failed");
-                return res;
-            }
-            clp->bpt = (buf_sz + clp->bs - 1) / clp->bs;
-            printf("Reducing blocks per transfer to %d\n", clp->bpt);
-            if (clp->bpt < 1)
-                return -ENOMEM;
-            res = sg_start_io(clp, rep);
-            if (1 == res)
-                res = -ENOMEM;
-        }
-        else if (res < 0) {
-            printf("sgq_dd inputting from sg failed, blk=%d\n", rep->blk);
-            rep->state = SGQ_IO_ERR;
-            return res;
-        }
-    }
-    else {
-        rep->state = SGQ_IO_STARTED;
-        while (((res = read(clp->infd, rep->buffp, blocks * clp->bs)) < 0) &&
-               (EINTR == errno))
-            ;
-        if (res < 0) {
-            sprintf(ebuff, "sgq_dd: reading, in_blk=%d ", rep->blk);
-            perror(ebuff);
-            rep->state = SGQ_IO_ERR;
-            return res;
-        }
-        if (res < blocks * clp->bs) {
-            int o_blocks = blocks;
-            rep->stop_after_wr = 1;
-            blocks = res / clp->bs;
-            if ((res % clp->bs) > 0) {
-                blocks++;
-                clp->in_partial++;
-            }
-            /* Reverse out + re-apply blocks on clp */
-            clp->in_blk -= o_blocks;
-            clp->in_count += o_blocks;
-            rep->num_blks = blocks;
-            clp->in_blk += blocks;
-            clp->in_count -= blocks;
-        }
-        clp->in_done_count -= blocks;
-        rep->state = SGQ_IO_FINISHED;
-    }
-    clp->rd_posp = rep->nextp;
-    return blocks;
-}
-
-int start_write(Rq_coll * clp)
-{
-    Rq_elem * rep = clp->wr_posp;
-    int res, blocks;
-    char ebuff[256];
-
-    while ((0 != rep->wr) || (SGQ_IO_FINISHED != rep->state)) {
-        rep = rep->nextp;
-        if (rep == clp->rd_posp)
-            return -1;
-    }
-#ifdef SG_DEBUG
-    printf("start_write, elem idx=%d\n", rep - clp->elem);
-#endif
-    rep->wr = 1;
-    blocks = rep->num_blks;
-    rep->blk = clp->out_blk;
-    clp->out_blk += blocks;
-    clp->out_count -= blocks;
-    if (clp->out_is_sg) {
-        res = sg_start_io(clp, rep);
-        if (1 == res)      /* ENOMEM, give up */
-            return -ENOMEM;
-        else if (res < 0) {
-            printf("sgq_dd output to sg failed, blk=%d\n", rep->blk);
-            rep->state = SGQ_IO_ERR;
-            return res;
-        }
-    }
-    else {
-        rep->state = SGQ_IO_STARTED;
-        while (((res = write(clp->outfd, rep->buffp,
-                     rep->num_blks * clp->bs)) < 0) && (EINTR == errno))
-            ;
-        if (res < 0) {
-            sprintf(ebuff, "sgq_dd: output, out_blk=%d ", rep->blk);
-            perror(ebuff);
-            rep->state = SGQ_IO_ERR;
-            return res;
-        }
-        if (res < blocks * clp->bs) {
-            blocks = res / clp->bs;
-            if ((res % clp->bs) > 0) {
-                blocks++;
-                clp->out_partial++;
-            }
-            rep->num_blks = blocks;
-        }
-        rep->state = SGQ_IO_FINISHED;
-    }
-    return blocks;
-}
-
-int do_poll(int fd)
-{
-    struct pollfd a_pollfd = {0, POLLIN | POLLOUT, 0};
-
-    a_pollfd.fd = fd;
-    if (poll(&a_pollfd, 1, 0) < 0) {
-        perror("poll error");
-        return 0;
-    }
-    /* printf("do_poll: revents=0x%x\n", (int)a_pollfd.revents); */
-    return (a_pollfd.revents & POLLIN) ? 1 : 0;
-}
-
-int can_read_write(Rq_coll * clp)
-{
-    Rq_elem * rep = NULL;
-    int res = 0;
-    int reading = 0;
-    int writing = 0;
-    int writeable = 0;
-    int rd_waiting = 0;
-    int wr_waiting = 0;
-    int sg_finished = 0;
-
-    /* if write completion pending, then complete it + start read */
-    if (clp->out_is_sg) {
-        while ((res = do_poll(clp->outfd))) {
-            if (res < 0)
-                return res;
-            res = sg_finish_io(clp, 1, &rep);
-            if (res < 0)
-                return res;
-            else if (1 == res) {
-                res = sg_start_io(clp, rep);
-                if (0 != res)
-                    return -1;  /* give up if any problems with retry */
-            }
-            else 
-                sg_finished++;
-        }
-        while ((rep = clp->wr_posp) && (SGQ_IO_FINISHED == rep->state) &&
-               (1 == rep->wr) && (rep != clp->rd_posp)) {
-            rep->state = SGQ_FREE;
-            clp->out_done_count -= rep->num_blks;
-            clp->wr_posp = rep->nextp;
-            if (rep->stop_after_wr)
-                return -1;
-        }
-    }
-    else if ((rep = clp->wr_posp) && (1 == rep->wr) &&
-             (SGQ_IO_FINISHED == rep->state)) {
-        rep->state = SGQ_FREE;
-        clp->out_done_count -= rep->num_blks;
-        clp->wr_posp = rep->nextp;
-        if (rep->stop_after_wr)
-            return -1;
-    }
-
-    /* if read completion pending, then complete it + start maybe write */
-    if (clp->in_is_sg) {
-        while ((res = do_poll(clp->infd))) {
-            if (res < 0)
-                return res;
-            res = sg_finish_io(clp, 0, &rep);
-            if (res < 0)
-                return res;
-            if (1 == res) {
-                res = sg_start_io(clp, rep);
-                if (0 != res)
-                    return -1;  /* give up if any problems with retry */
-            }
-            else {
-                sg_finished++;
-                clp->in_done_count -= rep->num_blks;
-            }
-        }
-    }
-
-    for (rep = clp->wr_posp, res = 1;
-         rep != clp->rd_posp; rep = rep->nextp) {
-        if (SGQ_IO_STARTED == rep->state) {
-            if (rep->wr)
-                ++writing;
-            else {
-                res = 0;
-                ++reading;
-            }
-        }
-        else if ((0 == rep->wr) && (SGQ_IO_FINISHED == rep->state)) {
-            if (res)
-                writeable = 1;
-        }
-        else if (SGQ_IO_WAIT == rep->state) {
-            res = 0;
-            if (rep->wr)
-                ++wr_waiting;
-            else
-                ++rd_waiting;
-        }
-        else
-            res = 0;
-    }
-    if (clp->debug) {
-        if ((clp->debug >= 9) || wr_waiting || rd_waiting)
-            printf("%d/%d (nwb/nrb): read=%d/%d (do/wt) "
-                   "write=%d/%d (do/wt) writeable=%d sg_fin=%d\n",
-                   clp->out_blk, clp->in_blk, reading, rd_waiting, 
-                   writing, wr_waiting, writeable, sg_finished);
-    }
-    if (writeable && (writing < SGQ_MAX_WR_AHEAD) && (clp->out_count > 0))
-        return SGQ_CAN_WRITE;
-    if ((reading < SGQ_MAX_RD_AHEAD) && (clp->in_count > 0) &&
-        (0 == rd_waiting) && (clp->rd_posp->nextp != clp->wr_posp))
-        return SGQ_CAN_READ;
-
-    if (clp->out_done_count <= 0)
-        return SGQ_CAN_DO_NOTHING;
-        
-    usleep(3000);      /* hang about for 10 milliseconds */
-    /* Now check the _whole_ buffer for pending requests */
-    for (rep = clp->rd_posp->nextp; rep != clp->rd_posp; rep = rep->nextp) {
-        if (SGQ_IO_WAIT == rep->state) {
-            res = sg_start_io(clp, rep);
-            if (res < 0)
-                return res;
-            if (res > 0)
-                return -1;
-            break;
-        }
-    }
-    return SGQ_CAN_DO_NOTHING;
 }
 
 
@@ -612,7 +730,6 @@ int main(int argc, char * argv[])
     int seek = 0;
     int ibs = 0;
     int obs = 0;
-    int count = -1;
     char str[512];
     char * key;
     char * buf;
@@ -621,12 +738,17 @@ int main(int argc, char * argv[])
     int res, k;
     int in_num_sect = 0;
     int out_num_sect = 0;
-    int in_sect_sz, out_sect_sz, crw;
+    int num_threads = DEF_NUM_THREADS;
+    int gen = 0;
+    int in_sect_sz, out_sect_sz, first_xfer, qstate, req_index, seek_skip;
+    int blocks, stop_after_write, terminate;
     char ebuff[256];
-    Rq_coll rcoll;
+    Rq_elem * rep;
 
     memset(&rcoll, 0, sizeof(Rq_coll));
     rcoll.bpt = DEF_BLOCKS_PER_TRANSFER;
+    rcoll.in_type = FT_OTHER;
+    rcoll.out_type = FT_OTHER;
     inf[0] = '\0';
     outf[0] = '\0';
     if (argc < 2) {
@@ -660,49 +782,79 @@ int main(int argc, char * argv[])
         else if (0 == strcmp(key,"seek"))
             seek = get_num(buf);
         else if (0 == strcmp(key,"count"))
-            count = get_num(buf);
+            dd_count = get_num(buf);
         else if (0 == strcmp(key,"dio"))
             rcoll.dio = get_num(buf);
-        else if (0 == strcmp(key,"deb"))
+        else if (0 == strcmp(key,"thr"))
+            num_threads = get_num(buf);
+        else if (0 == strcmp(key,"coe"))
+            rcoll.coe = get_num(buf);
+        else if (0 == strcmp(key,"gen"))
+            gen = get_num(buf);
+        else if (0 == strncmp(key,"deb", 3))
             rcoll.debug = get_num(buf);
+        else if (0 == strncmp(key, "--vers", 6)) {
+            fprintf(stderr, "sgq_dd for sg version 3 driver: %s\n", 
+	    	    version_str);
+            return 0;
+        }
         else {
-            printf("Unrecognized argument '%s'\n", key);
+            fprintf(stderr, "Unrecognized argument '%s'\n", key);
             usage();
             return 1;
         }
     }
     if (rcoll.bs <= 0) {
         rcoll.bs = DEF_BLOCK_SIZE;
-        printf("Assume default 'bs' (block size) of %d bytes\n", rcoll.bs);
+        fprintf(stderr, "Assume default 'bs' (block size) of %d bytes\n",
+                rcoll.bs);
     }
     if ((ibs && (ibs != rcoll.bs)) || (obs && (obs != rcoll.bs))) {
-        printf("If 'ibs' or 'obs' given must be same as 'bs'\n");
+        fprintf(stderr, "If 'ibs' or 'obs' given must be same as 'bs'\n");
         usage();
         return 1;
     }
     if ((skip < 0) || (seek < 0)) {
-        printf("skip and seek cannot be negative\n");
+        fprintf(stderr, "skip and seek cannot be negative\n");
         return 1;
     }
-#ifdef SG_DEBUG
-    printf("sgq_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
-           inf, skip, outf, seek, count);
-#endif
+    if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
+        fprintf(stderr, "too few or too many threads requested\n");
+        usage();
+        return 1;
+    }
+    if (rcoll.debug)
+        fprintf(stderr, "sgq_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
+               inf, skip, outf, seek, dd_count);
+    install_handler (SIGINT, interrupt_handler);
+    install_handler (SIGQUIT, interrupt_handler);
+    install_handler (SIGPIPE, interrupt_handler);
+    install_handler (SIGUSR1, siginfo_handler);
+
     rcoll.infd = STDIN_FILENO;
     rcoll.outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
-        if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
-            sprintf(ebuff, "sgq_dd: could not open %s for reading", inf);
-            perror(ebuff);
-            return 1;
-        }
-        if (ioctl(rcoll.infd, SG_GET_TIMEOUT, 0) < 0) {
-            rcoll.in_is_sg = 0;
-            if (skip > 0) {
-                off_t offset = skip;
+    	rcoll.in_type = dd_filetype(inf);
 
-                offset *= rcoll.bs;       /* could overflow here! */
-                if (lseek(rcoll.infd, offset, SEEK_SET) < 0) {
+        if (FT_SG == rcoll.in_type) {
+            if ((rcoll.infd = open(inf, O_RDWR)) < 0) {
+                sprintf(ebuff, "sgq_dd: could not open %s for sg reading", 
+			inf);
+                perror(ebuff);
+                return 1;
+            }
+        }
+        if (FT_SG != rcoll.in_type) {
+            if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
+                sprintf(ebuff, "sgq_dd: could not open %s for reading", inf);
+                perror(ebuff);
+                return 1;
+            }
+            else if (skip > 0) {
+                llse_loff_t offset = skip;
+
+                offset *= rcoll.bs;       /* could exceed 32 here! */
+                if (llse_llseek(rcoll.infd, offset, SEEK_SET) < 0) {
                     sprintf(ebuff,
                 "sgq_dd: couldn't skip to required position on %s", inf);
                     perror(ebuff);
@@ -710,69 +862,67 @@ int main(int argc, char * argv[])
                 }
             }
         }
-        else { /* looks like sg device so close then re-open it RW */
-            close(rcoll.infd);
-            if ((rcoll.infd = open(inf, O_RDWR | O_NONBLOCK)) < 0) {
-                printf("If %s is a sg device, need read+write permissions,"
-                       " even to read it!\n", inf);
-                return 1;
-            }
-            rcoll.in_is_sg = 1;
-            if (sz_reserve(rcoll.infd, rcoll.bs, rcoll.bpt))
-                return 1;
-        }
     }
     if (outf[0] && ('-' != outf[0])) {
-        if ((rcoll.outfd = open(outf, O_RDWR | O_NONBLOCK)) >= 0) {
-            if (ioctl(rcoll.outfd, SG_GET_TIMEOUT, 0) < 0) {
-                /* not a scsi generic device so now try and open RDONLY */
-                close(rcoll.outfd);
-            }
-            else {
-                rcoll.out_is_sg = 1;
-                if (sz_reserve(rcoll.outfd, rcoll.bs, rcoll.bpt))
-                    return 1;
-            }
-        }
-        if (! rcoll.out_is_sg) {
-            if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
-                sprintf(ebuff,
-                        "sgq_dd: could not open %s for writing", outf);
+	rcoll.out_type = dd_filetype(outf);
+
+        if (FT_SG == rcoll.out_type) {
+	    if ((rcoll.outfd = open(outf, O_RDWR)) < 0) {
+                sprintf(ebuff, 
+			"sgq_dd: could not open %s for sg writing", outf);
                 perror(ebuff);
                 return 1;
             }
-            else if (seek > 0) {
-                off_t offset = seek;
+        }
+	else {
+	    if (FT_OTHER == rcoll.out_type) {
+		if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
+                    sprintf(ebuff,
+                            "sgq_dd: could not open %s for writing", outf);
+                    perror(ebuff);
+                    return 1;
+                }
+	    }
+	    else {
+		if ((rcoll.outfd = open(outf, O_WRONLY)) < 0) {
+                    sprintf(ebuff,
+                            "sgq_dd: could not open %s for raw writing", outf);
+                    perror(ebuff);
+                    return 1;
+                }
+            }
+            if (seek > 0) {
+                llse_loff_t offset = seek;
 
-                offset *= rcoll.bs;       /* could overflow here! */
-                if (lseek(rcoll.outfd, offset, SEEK_SET) < 0) {
+                offset *= rcoll.bs;       /* could exceed 32 bits here! */
+		if (llse_llseek(rcoll.outfd, offset, SEEK_SET) < 0) {
                     sprintf(ebuff,
                 "sgq_dd: couldn't seek to required position on %s", outf);
                     perror(ebuff);
                     return 1;
                 }
             }
-        }
+	}
     }
     if ((STDIN_FILENO == rcoll.infd) && (STDOUT_FILENO == rcoll.outfd)) {
-        printf("Can't have both 'if' as stdin _and_ 'of' as stdout\n");
+        fprintf(stderr, "Disallow both if and of to be stdin and stdout");
         return 1;
     }
-    if (! (rcoll.in_is_sg || rcoll.out_is_sg)) {
-        printf("Either 'if' or 'of' must be a scsi generic device\n");
+    if ((FT_OTHER == rcoll.in_type) && (FT_OTHER == rcoll.out_type) && !gen) {
+        fprintf(stderr, "Either 'if' or 'of' must be a sg or raw device\n");
         return 1;
     }
-    if (0 == count)
+    if (0 == dd_count)
         return 0;
-    else if (count < 0) {
-        if (rcoll.in_is_sg) {
+    else if (dd_count < 0) {
+        if (FT_SG == rcoll.in_type) {
             res = read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
-                printf("Unit attention, media changed(in), try again\n");
+                fprintf(stderr, "Unit attention, media changed(in), repeat\n");
                 res = read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
-                printf("Unable to read capacity on %s\n", inf);
+                fprintf(stderr, "Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
             }
             else {
@@ -780,14 +930,14 @@ int main(int argc, char * argv[])
                     in_num_sect -= skip;
             }
         }
-        if (rcoll.out_is_sg) {
+        if (FT_SG == rcoll.out_type) {
             res = read_capacity(rcoll.outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
-                printf("Unit attention, media changed(out), try again\n");
+                fprintf(stderr, "Unit attention, media changed(out), repeat\n");
                 res = read_capacity(rcoll.outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
-                printf("Unable to read capacity on %s\n", outf);
+                fprintf(stderr, "Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
             }
             else {
@@ -795,71 +945,178 @@ int main(int argc, char * argv[])
                     out_num_sect -= seek;
             }
         }
-#ifdef SG_DEBUG
-        printf("Start of loop, count=%d, in_num_sect=%d, out_num_sect=%d\n",
-               count, in_num_sect, out_num_sect);
-#endif
         if (in_num_sect > 0) {
             if (out_num_sect > 0)
-                count = (in_num_sect > out_num_sect) ? out_num_sect :
+                dd_count = (in_num_sect > out_num_sect) ? out_num_sect :
                                                        in_num_sect;
             else
-                count = in_num_sect;
+                dd_count = in_num_sect;
         }
         else
-            count = out_num_sect;
+            dd_count = out_num_sect;
+    }
+    if (rcoll.debug > 1)
+        fprintf(stderr, "Start of loop, count=%d, in_num_sect=%d, "
+                "out_num_sect=%d\n", dd_count, in_num_sect, out_num_sect);
+    if (dd_count <= 0) {
+        fprintf(stderr, "Couldn't calculate count, please give one\n");
+        return 1;
     }
 
-#ifdef SG_DEBUG
-    printf("Start of loop, count=%d, bpt=%d\n", count, rcoll.bpt);
-#endif
-
-    rcoll.in_count = count;
-    rcoll.in_done_count = count;
+    rcoll.in_count = dd_count;
+    rcoll.in_done_count = dd_count;
+    rcoll.skip = skip;
     rcoll.in_blk = skip;
-    rcoll.out_count = count;
-    rcoll.out_done_count = count;
+    rcoll.out_count = dd_count;
+    rcoll.out_done_count = dd_count;
+    rcoll.seek = seek;
     rcoll.out_blk = seek;
-    init_elems(&rcoll);
 
-/* vvvvvvvvvvvvvvvvv  Main Loop  vvvvvvvvvvvvvvvvvvvvvvvv */
-    while (rcoll.out_done_count > 0) {
-        crw = can_read_write(&rcoll);
-        if (crw < 0)
-            break;
-        if (SGQ_CAN_READ & crw) {
-            res = start_read(&rcoll);
-            if (res <= 0) {
-                printf("start_read: res=%d\n", res);
-                break;
-            }
-        }
-        if (SGQ_CAN_WRITE & crw) {
-            res = start_write(&rcoll);
-            if (res <= 0) {
-                printf("start_write: res=%d\n", res);
-                break;
-            }
-        }
+    if ((FT_SG == rcoll.in_type) || (FT_SG == rcoll.out_type))
+    	rcoll.num_rq_elems = num_threads;
+    else
+    	rcoll.num_rq_elems = 1;
+    if (prepare_rq_elems(&rcoll, inf, outf)) {
+        fprintf(stderr, "Setup failure, perhaps no memory\n");
+	return 1;
     }
+
+    first_xfer = 1;
+    stop_after_write = 0;
+    terminate = 0;
+    seek_skip =  rcoll.seek - rcoll.skip;
+    while (rcoll.out_done_count > 0) { /* >>>>>>>>> main loop */
+        req_index = -1;
+	qstate = decider(&rcoll, first_xfer, &req_index);
+	rep = (req_index < 0) ? NULL : (rcoll.req_arr + req_index);
+	switch (qstate) {
+	case QS_IDLE:
+	    if ((NULL == rep) || (rcoll.in_count <= 0)) {
+	    	/* usleep(1000); */
+		do_poll(&rcoll, 10, NULL);
+		break;
+	    }
+	    if (rcoll.debug > 8)
+	    	fprintf(stderr, "    sgq_dd: non-sleeping QS_IDLE state, "
+				"req_index=%d\n", req_index);
+	    if (first_xfer >= 2)
+	    	first_xfer = 0;
+	    else if (1 == first_xfer)
+	    	++first_xfer;
+	    if (stop_after_write) {
+		terminate = 1;
+		break;
+	    }
+	    blocks = (rcoll.in_count > rcoll.bpt) ? rcoll.bpt : rcoll.in_count;
+	    rep->wr = 0;
+	    rep->blk = rcoll.in_blk;
+	    rep->num_blks = blocks;
+	    rcoll.in_blk += blocks;
+	    rcoll.in_count -= blocks;
+
+	    if (FT_SG == rcoll.in_type) {
+	    	res = sg_start_io(rep);
+		if (0 != res) {
+		    if (1 == res)
+			fprintf(stderr, "Out of memory starting sg io\n");
+		    terminate = 1;
+		}
+	    }
+	    else {
+		res = normal_in_operation(&rcoll, rep, blocks);
+		if (res < 0)
+		    terminate = 1;
+		else if (res > 0)
+		    stop_after_write = 1;
+	    }
+	    break;
+	case QS_IN_FINISHED:
+	    if (rcoll.debug > 8)
+	    	fprintf(stderr, "    sgq_dd: state is QS_IN_FINISHED, "
+				"req_index=%d\n", req_index);
+	    if ((rep->blk + seek_skip) != rcoll.out_blk) {
+		/* if write would be out of sequence then wait */
+		usleep(1000);
+		break;
+	    }
+            rep->wr = 1;
+            rep->blk = rcoll.out_blk;
+	    blocks = rep->num_blks;
+            rcoll.out_blk += blocks;
+            rcoll.out_count -= blocks;
+
+	    if (FT_SG == rcoll.out_type) {
+	    	res = sg_start_io(rep);
+		if (0 != res) {
+		    if (1 == res)
+			fprintf(stderr, "Out of memory starting sg io\n");
+		    terminate = 1;
+		}
+	    }
+	    else {
+		if (normal_out_operation(&rcoll, rep, blocks) < 0)
+		    terminate = 1;
+	    }
+	    break;
+	case QS_IN_POLL:
+	    if (rcoll.debug > 8)
+	    	fprintf(stderr, "    sgq_dd: state is QS_IN_POLL, "
+				"req_index=%d\n", req_index);
+	    res = sg_fin_in_operation(&rcoll, rep);
+	    if (res < 0)
+	    	terminate = 1;
+	    else if (res > 1) {
+	    	if (first_xfer) {
+		    /* only retry on first xfer */
+		    if (0 != sg_start_io(rep))
+		    	terminate = 1;
+		}
+		else
+		    terminate = 1;
+	    }
+	    break;
+	case QS_OUT_POLL:
+	    if (rcoll.debug > 8)
+	    	fprintf(stderr, "    sgq_dd: state is QS_OUT_POLL, "
+				"req_index=%d\n", req_index);
+	    res = sg_fin_out_operation(&rcoll, rep);
+	    if (res < 0)
+	    	terminate = 1;
+	    else if (res > 1) {
+	    	if (first_xfer) {
+		    /* only retry on first xfer */
+		    if (0 != sg_start_io(rep))
+		    	terminate = 1;
+		}
+		else
+		    terminate = 1;
+	    }
+	    break;
+	default:
+	    if (rcoll.debug > 8)
+		fprintf(stderr, "    sgq_dd: state is ?????\n");
+	    terminate = 1;
+	    break;
+	}
+	if (terminate)
+	    break;
+    } /* >>>>>>>>>>>>> end of main loop */
 
     if (STDIN_FILENO != rcoll.infd)
         close(rcoll.infd);
     if (STDOUT_FILENO != rcoll.outfd)
         close(rcoll.outfd);
+    res = 0;
     if (0 != rcoll.out_count) {
-        printf("Some error occurred, remaining blocks=%d\n", rcoll.out_count);
-        return 1;
+        fprintf(stderr, ">>>> Some error occurred,\n");
+	res = 2;
     }
-    printf("%d+%d records in\n", count - rcoll.in_done_count, 
-           rcoll.in_partial);
-    printf("%d+%d records out\n", count - rcoll.out_done_count,
-           rcoll.out_partial);
+    print_stats();
     if (rcoll.dio_incomplete)
-        printf(">> Direct IO requested but incomplete %d times\n",
+        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
                rcoll.dio_incomplete);
     if (rcoll.sum_of_resids)
-        printf(">> Non-zero sum of residual counts=%d\n",
+        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                rcoll.sum_of_resids);
-    return 0;
+    return res;
 }

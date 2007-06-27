@@ -3,12 +3,23 @@ subsystem and typically use the SCSI generic interface (sg) as
 well.
 
 The programs in this directory are fully functional but have been
-"retired" from the main sg_utils directory most likely because
+"retired" from the main sg3_utils directory most likely because
 their functionality is done in another (perhaps better) way.
 
 The last time I checked these programs compiled and built and
 didn't depend on too many other things (see the Makefile in the
 parent directory for ideas).
 
+Since I actively use some of these programs for testing, a Makefile has
+been set up which builds:
+    - sgq_dd   [a dd variant the uses a dispatch loop rather than
+                POSIX threads (as does sgp_dd)]
+    - sg_reset [does SCSI bus/device/host resets if mid level SCSI patch
+                in place]
+    - sg_poll  [internal testing]
+
+The sg_err.h and llseek.h headers have simply been copied from the parent
+directory.
+
 Doug Gilbert
-8th December 2000
+13th January 2001

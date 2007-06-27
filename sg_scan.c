@@ -8,11 +8,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/../scsi/sg.h>  /* cope with silly includes */
+#include <linux/../scsi/scsi.h>
 #include "sg_err.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999,2000 D. Gilbert
+*  Copyright (C) 1999 - 2001 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +32,7 @@
    Note: This program is written to work under both the original and
    the new sg driver.
 
-   Version 3.90 20000311
+   Version 3.91 20010115
 
    F. Jansen - minor modification to extend beyond 26 sg devices.
 
