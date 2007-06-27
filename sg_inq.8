@@ -1,0 +1,85 @@
+.TH SG_INQ "8" "March 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sg_inq \- outputs data retrieved from the SCSI INQUIRY command
+.SH SYNOPSIS
+.B sg_inq
+[\fI-c\fR] [\fI-cl>\fR] [\fI-e\fR] [\fI-h\fR] [\fI-o=<opcode_page>\fR]
+[\fI-p\fR] [\fI-r\fR] [\fI-V\fR] [\fI-36\fR] [\fI-?\fR] \fI<sg_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This command sends an INQUIRY SCSI command to the given device and then
+outputs the response. All SCSI devices are meant to respond to
+a "standard" INQUIRY command with at least a 36 byte response (in SCSI 2
+and higher). An INQUIRY is termed as "standard" when both the EVPD and
+CmdDt bits are clear.
+.TP
+-c
+set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used
+in conjunction with the '-o=<opcode>' option to specify the SCSI command
+opcode to supply the support data for. The command support data is a mask of
+the same length as the command with bits set in positions that are
+modifiable. For example, '12 03 ff 00 ff 01' shows the device 
+supports the EVPD and CmdDt bits ]byte 1 bits 0 and 1] in an INQUIRY command.
+.TP
+-cl
+lists the command data for all supported commands (followed by the command
+name) by looping through all 256 opcodes.
+.TP
+-e
+enable (i.e. sets) the Vital Product Data (EVPD) bit (defaults to clear(0)).
+Used in conjunction with the '-o=<page>' option to specify the VPD page
+to fetch. According to the SCSI 2 standard VPD page 0 lists the supported
+VPD page numbers.
+.TP
+-h
+outputs INQUIRY response in hex rather than trying to decode it.
+.TP
+-o=<opcode_page>
+used in conjunction with the '-c' option in which case the argument is
+a command opcode. Alternatively it can be used in conjunction with
+the '-e' option in which case the argument is a VPD page number. Argument
+is hexadecimal and expected to be in the range 0 to ff inclusive.
+.TP
+-p
+outputs PCI slot information of the given device (if there is any) after
+the INQUIRY response.
+.TP
+-r
+outputs the INQUIRY response in binary. Standard output should be redirected
+to a file or some other program that can process binary data.
+.TP
+-V
+print out version string
+.TP
+-36
+only requires 36 bytes of response data for an INQUIRY. Furthermore even
+if the device indicates in its response it can supply more data, a
+second (longer) INQUIRY is not performed.
+.TP
+-?
+output usage message. Ignore all other parameters.
+.PP
+Some device with weak SCSI command set implementations lock up when
+they receive commands they don't understand (or even response lengths
+that they don't expect). Such devices need to be treated carefully
+hence the '-36' option. Without this option this utility will issue
+a standard INQUIRY requesting 36 bytes of response data. If the device
+indicates it could have supplied more data then a second INQUIRY is
+issued to fetch the longer response.
+.PP
+In the 2.4 series of Linux kernels the given device must be
+a SCSI generic (sg) device. In the 2.5 series block devices (e.g. disks
+and SCSI DVDs) can also be specified. For example "sg_inq /dev/sda"
+will work in the 2.5 series kernels.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert@interlog.com>.
+.SH COPYRIGHT
+Copyright \(co 2001-2003 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sgdiag(scsirastools), sg_modes(sg3_utils), sg_logs(sg3_utils)
