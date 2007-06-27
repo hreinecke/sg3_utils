@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "0.16 20020114";
+static char * version_str = "0.17 20020228";
 
 
 /* #define SG_DEBUG */
@@ -42,7 +42,7 @@ static char * version_str = "0.16 20020114";
 #define SCSI_IOCTL_GET_PCI 0x5387
 #endif
 
-
+/* Returns 0 when successful, else -1 */
 static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op, 
 		  void * resp, int mx_resp_len, int noisy)
 {
@@ -94,10 +94,12 @@ static void usage()
 	   " <sg_device>'\n"
 	   " where -e   set EVPD mode\n"
 	   "       -c   set CmdDt mode\n"
+	   "       -cl  list supported commands using CmdDt mode\n"
 	   "       -h   output in hex (ASCII to the right)\n"
 	   "       -o=<opcode_page> opcode or page code in hex\n"
 	   "       -p   output SCSI adapter PCI information\n"
 	   "       -V   output version string\n"
+	   "       -36  only perform a 36 byte INQUIRY\n"
 	   "       -?   output this usage message\n"
 	   " If no optional switches given (or '-h') then does"
 	   " a standard INQUIRY\n");
@@ -114,13 +116,13 @@ static void dStrHex(const char* str, int len)
     const int cpstart = 60;
     int cpos = cpstart;
     int bpos = bpstart;
-    int i;
+    int i, k;
     
     if (len <= 0) return;
     memset(buff,' ',80);
     buff[80]='\0';
-    sprintf(buff + 1, "%.2x", a);
-    buff[3] = ' ';
+    k = sprintf(buff + 1, "%.2x", a);
+    buff[k + 1] = ' ';
     if (bpos >= ((bpstart + (9 * 3))))
     	bpos++;
 
@@ -142,8 +144,8 @@ static void dStrHex(const char* str, int len)
 	    cpos = cpstart;
 	    a += 16;
 	    memset(buff,' ',80);
-	    sprintf(buff + 1, "%.2x", a);
-	    buff[3] = ' ';
+	    k = sprintf(buff + 1, "%.2x", a);
+	    buff[k + 1] = ' ';
 	}
     }
     if (cpos > cpstart)
@@ -156,7 +158,8 @@ static void dStrHex(const char* str, int len)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, len;
+    int sg_fd, k, j, num, len, act_len;
+    int support_num;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     char buff[MX_ALLOC_LEN + 1];
@@ -164,9 +167,12 @@ int main(int argc, char * argv[])
     unsigned int num_opcode = 0;
     int do_evpd = 0;
     int do_cmddt = 0;
+    int do_cmdlst = 0;
     int do_hex = 0;
     int do_pci = 0;
+    int do_36 = 0;
     int oflags = O_RDONLY;
+    int ansi_version = 0;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strncmp("-o=", argv[k], 3)) {
@@ -181,10 +187,16 @@ int main(int argc, char * argv[])
 	    do_evpd = 1;
         else if (0 == strcmp("-h", argv[k]))
 	    do_hex = 1;
+        else if (0 == strcmp("-cl", argv[k])) {
+	    do_cmdlst = 1;
+	    do_cmddt = 1;
+	}
         else if (0 == strcmp("-c", argv[k]))
 	    do_cmddt = 1;
 	else if (0 == strcmp("-p", argv[k]))
             do_pci = 1;
+	else if (0 == strcmp("-36", argv[k]))
+            do_36 = 1;
         else if (0 == strcmp("-?", argv[k])) {
 	    file_name = 0;
 	    break;
@@ -225,17 +237,34 @@ int main(int argc, char * argv[])
         close(sg_fd);
         return 1;
     }
+    memset(rsp_buff, 0, MX_ALLOC_LEN + 1);
 
     if (! (do_cmddt || do_evpd)) {
 	printf("standard INQUIRY:\n");
-        if (0 == do_inq(sg_fd, 0, 0, 0, rsp_buff, MX_ALLOC_LEN, 1)) {
+        if (0 == do_inq(sg_fd, 0, 0, 0, rsp_buff, 36, 1)) {
 	    len = rsp_buff[4] + 5;
+	    ansi_version = rsp_buff[2] & 0x7;
+	    if ((len > 36) && (len < 256) && (! do_36)) {
+		if (do_inq(sg_fd, 0, 0, 0, rsp_buff, len, 1)) {
+	    	    printf("second INQUIRY (%d byte) failed\n", len);
+	    	    return 1;
+		}
+		if (len != (rsp_buff[4] + 5))
+	    	    printf("strange, twin INQUIRYs yield different "
+		    	   "'additional length'\n");
+	    }
+	    if (do_36) {
+	    	act_len = len;
+	    	len = 36;
+	    }
+	    else
+	    	act_len = len;
 	    if (do_hex)
 		dStrHex((const char *)rsp_buff, len);
 	    else {
 	        printf("  PQual=%d, Device type=%d, RMB=%d, ANSI version=%d, ",
 	               (rsp_buff[0] & 0xe0) >> 5, rsp_buff[0] & 0x1f,
-	               !!(rsp_buff[1] & 0x80), rsp_buff[2] & 0x7);
+	               !!(rsp_buff[1] & 0x80), ansi_version);
 	        printf("[full version=0x%02x]\n", (unsigned int)rsp_buff[2]);
 	        printf("  AERC=%d, TrmTsk=%d, NormACA=%d, HiSUP=%d, "
 		       "Resp data format=%d, SCCS=%d\n",
@@ -258,20 +287,40 @@ int main(int argc, char * argv[])
 		    printf("  Clocking=0x%x, QAS=%d, IUS=%d\n",
 		           (rsp_buff[56] & 0x0c) >> 2, !!(rsp_buff[56] & 0x2),
 			   !!(rsp_buff[56] & 0x1));
-		printf("    length=%d (0x%x)\n", len, len);
-	        if (len >= 36) {
+		if (act_len == len)
+		    printf("    length=%d (0x%x)", len, len);
+		else
+		    printf("    length=%d (0x%x), but only read 36 bytes", 
+		    	   len, len);
+		if ((ansi_version >= 2) && (len < 36))
+		    printf("  [for SCSI>=2, len>=36 is expected]\n");
+		else
+		    printf("\n");
+
+		if (len <= 8)
+	            printf(" Inquiry response length=%d\n, no vendor, "
+		    	   "product or revision data\n", len);
+		else {
+		    if (len < 36)
+		    	rsp_buff[len] = '\0';
 	            memcpy(buff, &rsp_buff[8], 8);
 	            buff[8] = '\0';
 	            printf(" Vendor identification: %s\n", buff);
-	            memcpy(buff, &rsp_buff[16], 16);
-	            buff[16] = '\0';
-	            printf(" Product identification: %s\n", buff);
-	            memcpy(buff, &rsp_buff[32], 4);
-	            buff[4] = '\0';
-	            printf(" Product revision level: %s\n", buff);
-	        }
-	        else
-	            printf(" Inquiry response length shorter than expected\n");
+		    if (len <= 16)
+			printf(" Product identification: <none>\n");
+		    else {
+			memcpy(buff, &rsp_buff[16], 16);
+			buff[16] = '\0';
+			printf(" Product identification: %s\n", buff);
+		    }
+		    if (len <= 32)
+			printf(" Product revision level: <none>\n");
+		    else {
+			memcpy(buff, &rsp_buff[32], 4);
+			buff[4] = '\0';
+			printf(" Product revision level: %s\n", buff);
+		    }
+		}
             }
 	    if (0 == do_inq(sg_fd, 0, 1, 0x80, rsp_buff, MX_ALLOC_LEN, 0)) {
 	        len = rsp_buff[3];
@@ -282,15 +331,62 @@ int main(int argc, char * argv[])
 		}
 	    }
 	}
+	else {
+	    printf("36 byte INQUIRY failed\n");
+	    return 1;
+	}
     }
     else if (do_cmddt) {
-	printf("CmdDt INQUIRY, opcode=0x%.2x:\n", num_opcode);
-        if (0 == do_inq(sg_fd, 1, 0, num_opcode, rsp_buff, MX_ALLOC_LEN, 1)) {
-	    len = rsp_buff[5] + 6;
-	    if (do_hex)
-		dStrHex((const char *)rsp_buff, len);
-	    else {
-	    	printf("  Support=%d\n", rsp_buff[1] & 7);
+    	if (do_cmdlst) {
+	    printf("Supported command list:\n");
+	    for (k = 0; k < 256; ++k) {
+		if (0 == do_inq(sg_fd, 1, 0, k, rsp_buff, MX_ALLOC_LEN, 1)) {
+		    support_num = rsp_buff[1] & 7;
+		    if ((3 == support_num) || (5 == support_num)) {
+		    	num = rsp_buff[5];
+		    	for (j = 0; j < num; ++j)
+			    printf(" %.2x", (int)rsp_buff[6 + j]);
+			if (5 == support_num)
+			    printf("  [vendor specific manner (5)]\n");
+			else
+			    printf("\n");
+		    }
+		    else if ((4 == support_num) || (6 == support_num))
+		    	printf("  opcode=0x%.2x vendor specific (%d)\n",
+			       k, support_num);
+		}
+		else {
+		    printf("CmdDt INQUIRY on opcode=0x%.2x: failed\n", k);
+		    break;
+		}
+	    }
+	}
+	else {
+	    printf("CmdDt INQUIRY, opcode=0x%.2x:\n", num_opcode);
+	    if (0 == do_inq(sg_fd, 1, 0, num_opcode, rsp_buff, 
+	    		    MX_ALLOC_LEN, 1)) {
+		len = rsp_buff[5] + 6;
+		if (do_hex)
+		    dStrHex((const char *)rsp_buff, len);
+		else {
+		    const char * desc_p;
+		    support_num = rsp_buff[1] & 7;
+
+		    switch (support_num) {
+		    case 0: desc_p = "no data available"; break;
+		    case 1: desc_p = "not supported"; break;
+		    case 2: desc_p = "reserved (2)"; break;
+		    case 3: desc_p = "supported as per standard"; break;
+		    case 4: desc_p = "vendor specific (4)"; break;
+		    case 5: desc_p = "supported in vendor specific way"; 
+		    	    break;
+		    case 6: desc_p = "vendor specific (6)"; break;
+		    case 7: desc_p = "reserved (7)"; break;
+		    default: desc_p = "impossible value > 7"; break;
+		    }
+
+		    printf("  Support field: %s\n", desc_p);
+		}
 	    }
 	}
     }

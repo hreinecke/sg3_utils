@@ -10,7 +10,8 @@ LD = gcc
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_dd sg_debug \
 	sg_scan scsi_inquiry sg_rbuf sginfo sg_readcap \
 	sgp_dd sg_map sg_turs sg_inq sg_test_rwbuf scsi_devfs_scan \
-	sg_start sgm_dd sg_simple4 sg_simple16 sg_read sg_reset
+	sg_start sgm_dd sg_simple4 sg_simple16 sg_read sg_reset \
+	sg_modes sg_logs
 
 COMMON = sg_scan scsi_inquiry sginfo sg_readcap sg_start
 
@@ -98,6 +99,12 @@ sg_read: sg_read.o sg_err.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_reset: sg_reset.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_modes: sg_modes.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_logs: sg_logs.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS) $(COMMON)

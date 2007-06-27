@@ -25,7 +25,7 @@
 
    Invocation: sg_simple3 [-x] <sg_device>
 
-   Version 03.57 (20020113)
+   Version 03.58 (20020226)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -84,6 +84,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
+    /* N.B. An access mode of O_RDWR is required for some SCSI commands */
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
 		 "sg_simple3: error opening file: %s", file_name);

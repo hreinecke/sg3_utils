@@ -1,4 +1,4 @@
-.TH SG_DD "8" "February 2002" "sg3_utils-0.98" SG3_UTILS
+.TH SG_DD "8" "March 2002" "sg3_utils-0.99" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from sg and raw devices
 .SH SYNOPSIS
@@ -39,6 +39,12 @@ IO which, if not available, falls back to indirect IO and notes this
 at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
+fua=0 | 1 | 2 | 3
+force unit access bit. When 3, fua is set on both "if" and "of", when 2, fua
+is set on "if", when 1, fua is set on "of", when 0, fua is cleared on both.
+6 byte SCSI READ and WRITE commands (cdbsz=6) do not support the fua bit.
+Only active for sg device file names
+.TP
 gen=0 | 1
 the default action (when "gen=0") is to require that either "if" or "of"
 is a sg or raw device name. To remove this restriction set "gen=1"
@@ -60,6 +66,10 @@ skip BLOCKS bs-sized blocks at start of output
 .TP
 skip=BLOCKS
 skip BLOCKS bs-sized blocks at start of input
+.TP
+sync=0 | 1
+when 1, does SYNCHRONIZE CACHE command on "of" at the end of the transfer.
+Only active when "of" is a sg device file name
 .TP
 time=0 | 1
 when 1, times transfer and does throughput calculation, outputting the

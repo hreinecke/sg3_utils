@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "January 2002" "sg3_utils-0.98" SG3_UTILS
+.TH SGM_DD "8" "March 2002" "sg3_utils-0.99" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from sg and raw devices
 .SH SYNOPSIS
@@ -29,6 +29,12 @@ count=BLOCKS
 copy this number of blocks. Default is minimum number that sg devices
 return from READ CAPACITY (if that works) or 0
 .TP
+fua=0 | 1 | 2 | 3
+force unit access bit. When 3, fua is set on both "if" and "of", when 2, fua
+is set on "if", when 1, fua is set on "of", when 0, fua is cleared on both.
+6 byte SCSI READ and WRITE commands (cdbsz=6) do not support the fua bit.
+Only active for sg device file names
+.TP
 ibs=BYTES
 if given must be the same as bs
 .TP
@@ -46,6 +52,10 @@ skip BLOCKS bs-sized blocks at start of output
 .TP
 skip=BLOCKS
 skip BLOCKS bs-sized blocks at start of input
+.TP
+sync=0 | 1
+when 1, does SYNCHRONIZE CACHE command on "of" at the end of the transfer.
+Only active when "of" is a sg device file name
 .TP
 time=0 | 1
 when 1, times transfer and does throughput calculation, outputting the
