@@ -70,6 +70,10 @@ extern int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
 extern int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy,
                                  int verbose);
 
+extern int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id,
+                                          int * progress, int noisy,
+                                          int verbose);
+
 extern int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
                                  int loej, int start, int noisy, int verbose);
 

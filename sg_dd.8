@@ -1,14 +1,17 @@
-.TH SG_DD "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_DD "8" "November 2005" "sg3_utils-1.18" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
 .SH SYNOPSIS
 .B sg_dd
-[\fIappend=0|1\fR] [\fIblk_sgio=0|1\fR] [\fIbpt=<n>\fR] [\fIbs=<n>\fR]
-[\fIcdbsz=6|10|12|16\fR] [\fIcoe=0|1\fR] [\fIcount=<n>\fR] [\fIdio=0|1\fR]
-[\fIfua=0|1|2|3\fR] [\fIibs=<n>\fR] [\fIif=<ifile>\fR] [\fIobs=<n>\fR]
-[\fIodir=0|1\fR] [\fIof=<ofile>\fR] [\fIseek=<n>\fR] [\fIskip=<n>\fR]
-[\fIsync=0|1\fR] [\fItime=0|1\fR] [\fIverbose=<n>\fR] [\fI--version\fR]
+[\fIbs=<n>\fR] [\fIcount=<n>\fR] [\fIibs=<n>\fR] [\fIif=<ifile>\fR]
+[\fIiflag=<flags>\fR] [\fIobs=<n>\fR] [\fIof=<ofile>\fR]
+[\fIoflag=<flags>\fR] [\fIseek=<n>\fR] [\fIskip=<n>\fR]
+[\fI--help\fR] [\fI--version\fR]
+.PP
+[\fIblk_sgio=0|1\fR] [\fIbpt=<n>\fR] [\fIcdbsz=6|10|12|16\fR]
+[\fIcoe=0|1\fR] [\fIdio=0|1\fR] [\fIodir=0|1\fR] [\fIsync=0|1\fR]
+[\fItime=0|1\fR] [\fIverbose=<n>\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -18,14 +21,6 @@ that support the SG_IO ioctl (which are only found in the lk 2.6
 series). Similar syntax and semantics to
 .B dd(1) 
 but does not perform any conversions.
-.TP
-append=0 | 1
-when set to 1 the output will be appended to the normal file given
-to the "of=<name>" argument. Appending only takes place to normal files:
-not to pipes nor raw files nor sg devices nor block devices. Error
-message produced if append=1 and seek=<n> where <n> > 0. Default is 0
-which starts output at the beginning of a normal file (or at some other
-offset if the "seek=" argument is given).
 .TP
 blk_sgio=0 | 1
 when set to 0, block devices (e.g. /dev/sda) are treated like normal
@@ -40,7 +35,7 @@ the SCSI command set but ATA disks do not (unless there is a protocol
 conversion as often occurs in the USB mass storage class). If the input
 or output device is a block device partition (e.g. /dev/sda3) then setting
 this option causes the partition information to be ignored (since access
-is directly to the underlying device). Default is 0.
+is directly to the underlying device). Default is 0. See the "sgio" flag.
 .TP
 bpt=BLOCKS
 each IO transaction will be made using this number of blocks (or less if 
@@ -51,7 +46,7 @@ transfer or memory restrictions). When cd/dvd drives are accessed, the
 block size is typically 2048 bytes and bpt defaults to 32 which again
 implies 64 KiB transfers. The block layer when the blk_sgio=1 option
 is used has relatively low upper limits for transfer sizes (compared
-to sg device nodes).
+to sg device nodes, see /sys/block/<dev/queue/max_sectors_kb ).
 .TP
 bs=BYTES
 this
@@ -66,18 +61,16 @@ IO operation is 'bs * bpt' bytes.
 .TP
 cdbsz=6 | 10 | 12 | 16
 size of SCSI READ and/or WRITE commands issued on sg device 
-names (or block devices when "blk_sgio=1" is given).
+names (or block devices when "iflag=sgio" and/or "oflag=sgio" is given).
 Default is 10 byte SCSI command blocks (unless calculations indicate
 that a 4 byte block number may be exceeded, in which case it defaults
 to 16 byte SCSI commands).
 .TP
 coe=0 | 1
-set to 1 for continue on error: if reading assume zeros read, if writing 
-then ignore and continue. Only applies to errors on sg devices (e.g. 
-errors on normal files will stop sg_dd). Error messages are still sent to
-stderr. Similar to "conv=noerror" in the
-.B dd(1) 
-utility. Default is 0 which implies stop on error.
+set to 1 for continue on error. Only applies to errors on sg devices or
+block devices with the "sgio" flag set. Thus errors on other files will
+stop sg_dd. Default is 0 which implies stop on any error. See the "coe"
+flag for more information.
 .TP
 count=BLOCKS
 copy this number of blocks from 'if' to 'of'. Default is the 
@@ -97,12 +90,6 @@ IO which, if not available, falls back to indirect IO and notes this
 at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
-fua=0 | 1 | 2 | 3
-force unit access bit. When 3, fua is set on both "if" and "of", when 2, fua
-is set on "if", when 1, fua is set on "of", when 0 (default), fua is cleared
-on both. 6 byte SCSI READ and WRITE commands (cdbsz=6) do not support the 
-fua bit. Only active for sg device file names
-.TP
 ibs=BYTES
 if given must be the same as bs
 .TP
@@ -110,12 +97,18 @@ if=FILE
 read from FILE instead of stdin. A file name of - is taken to be stdin.
 Starts reading at the beginning of FILE unless "skip" is given.
 .TP
+iflag=FLAGS
+where FLAGS is a comma separated list of one or more flags outlined below.
+These flags are associated with <ifile> and are ignored when <ifile> is
+stdin.
+.TP
 obs=BYTES
 if given must be the same as bs
 .TP
 odir=0 | 1
 when set to one opens block devices (e.g. /dev/sda) with the O_DIRECT
-flag. User memory buffers are aligned to the page size when set. The
+flag.
+ User memory buffers are aligned to the page size when set. The
 default is 0 (i.e. the O_DIRECT flag is not used). Has no effect on sg,
 normal or raw files. If blk_sgio is also set then both are honoured:
 block devices are opened with the O_DIRECT flag and SCSI commands are
@@ -126,7 +119,12 @@ write to FILE instead of stdout. A file name of - is taken to be stdout.
 If FILE is /dev/null then no actual writes are performed. If FILE is .
 (period) then it is treated the same way as /dev/null (this is a
 shorthand notation). If FILE exists then it is _not_ truncated; it is
-overwritten from the start of FILE unless "append=1" or "seek" is given.
+overwritten from the start of FILE unless "oflag=append" or "seek" is given.
+.TP
+oflag=FLAGS
+where FLAGS is a comma separated list of one or more flags outlined below.
+These flags are associated with <ofile> and are ignored when <ofile>
+is /dev/null, . (period), or stdout.
 .TP
 seek=BLOCKS
 start writing BLOCKS bs-sized blocks from the start of the output file.
@@ -153,14 +151,88 @@ A value of 1 reports extra information that is not repetitive. A value
 (i.e. other that READ and WRITE). Error processing is not considered
 repetitive. Values of 3 and 4 yield output for all SCSI commands (and
 Unix read() and write() calls) so there can be a lot of output.
-Non-zero verbose settings result in some caching mode page and read write
-error recovery mode page information being output prior to the copy.
 This only occurs for scsi generic (sg) devices and block devices when
 the 'blk_sgio=1' option is set.
 .TP
+--help
+outputs usage message and exits
+.TP
 --version
 outputs version number information and exits
-.PP
+.SH FLAGS
+Here is a list of flags and their meanings:
+.TP
+append
+causes the O_APPEND flag to be added to the open of <ofile>. For normal
+files this will lead to data appended to the end of any existing data.
+Cannot be used together with the "seek=<n>" option as they conflict.
+The default action of this utility is to overwrite any existing data
+from the beginning of the file or, if "seek=<n>" is given, starting at
+block <n>.
+.TP
+coe
+continue on error. Only active for sg devices and block devices that
+have the "sgio" flag set. A medium or hardware error while reading
+will re-read blocks prior to the bad block, then use READ LONG on
+the bad block, supplying zeroes if that fails, and finally reread
+the blocks after the bad block. A medium error while writing is
+noted and ignored. SCSI disks may automatically try and remap
+faulty sectors (see the AWRE and ARRE in the read write error
+recoevry mode page (perhaps with the sdparm utility)).
+Errors on other files will stop sg_dd. Error messages are sent to
+stderr. Similar to "conv=noerror" in the
+.B dd(1) 
+utility.
+.TP
+direct
+causes the O_DIRECT flag to be added to the open of <ifile> and/or <ofile>.
+This flag requires some memory alignment on IO. Hence user memory buffers
+are aligned to the page size. Has no effect on sg, normal or raw files.
+If "iflag=sgio" and/or "oflag=sgio" is also set then both are honoured:
+block devices are opened with the O_DIRECT flag and SCSI commands are
+issued via the SG_IO ioctl.
+.TP
+dpo
+set the DPO bit (disable page out) in READ and WRITE SCSI commands. Not
+supported for 6 byte cdb variants of READ and WRITE. Indicates that
+data is unlikely to be required to stay in device (e.g. disk) cache.
+May speed media copy and/or cause a media copy to have less impact
+on other device users.
+.TP
+dsync
+causes the O_SYNC flag to be added to the open of <ifile> and/or <ofile>.
+The "d" is prepended to lower confusion with the "sync=0|1" option which
+has another action (i.e. a synchronisation to media at the end of the
+transfer).
+.TP
+excl
+causes the O_EXCL flag to be added to the open of <ifile> and/or <ofile>.
+.TP
+fua
+causes the FUA (force unit access) bit to be set in READ and/or WRITE
+SCSI commands. This only has effect with sg devices or block devices
+that have the "sgio" flag set. The 6 byte variants of the READ and
+WRITE SCSI commands do not support the FUA bit.
+.TP
+sgio
+causes block devices to be accessed via the SG_IO ioctl rather than
+standard UNIX read() and write() commands. When the SG_IO ioctl is
+used the SCSI READ and WRITE commands are used directly to move
+data. sg devices always use the SG_IO ioctl. This flag offers finer
+grain control compared to the otherwise identical 'blk_sgio=1' option.
+.SH RETIRED OPTIONS
+Here are some retired options that are still present:
+.TP
+append=0 | 1
+when set, equivalent to "oflag=append". When clear the action is
+to overwrite the existing file (if it exists); this is the default.
+See the "append" flag.
+.TP
+fua=0 | 1 | 2 | 3
+force unit access bit. When 3, fua is set on both "if" and "of", when 2, fua
+is set on "if", when 1, fua is set on "of", when 0 (default), fua is cleared
+on both. See the "fua" flag.
+.SH NOTES
 The exit status of the sg_dd utility is 0 when successful, 1 for
 total failure (i.e. failed before copying data) and 2 when some
 data has been copied (prior to some problem).
@@ -282,13 +354,16 @@ A POSIX threads version of this utility called
 is in the sg3_utils package. Another version from that package is called
 .B sgm_dd
 and it uses memory mapped IO to speed transfers from sg devices.
+.PP
 The lmbench package contains
 .B lmdd
 which is also interesting. For moving data to and from tapes see
 .B dt
 which is found at http://www.scsifaq.org/RMiller_Tools/index.html
-To change mode parameters that effect SCSI devices caching and error
+.PP
+To change mode parameters that effect a SCSI device's caching and error
 recovery see
 .B sdparm
+.PP
 See also
 .B raw(8), dd(1)

@@ -1,14 +1,15 @@
-.TH SG_WRITE_LONG "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_WRITE_LONG "8" "October 2005" "sg3_utils-1.18" SG3_UTILS
 .SH NAME
 sg_write_long \- send the SCSI command write long
 .SH SYNOPSIS
 .B sg_write_long
-[\fI--help\fR] [\fI--in=<name>\fR] [\fI--lba=<num>\fR] [\fI--verbose\fR]
-[\fI--version\fR] [\fI--xfer_len=<num>\fR] \fI<scsi_device>\fR
+[\fI--cor_dis\fR] [\fI--help\fR] [\fI--in=<name>\fR] [\fI--lba=<num>\fR]
+[\fI--verbose\fR] [\fI--version\fR] [\fI--xfer_len=<num>\fR]
+\fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send WRITE LONG command to a Linux SCSI device. The
+Send WRITE LONG (10) command to a Linux SCSI device. The
 buffer to be written to the device is filled with
 .B 0xff
 bytes or read from the given file. This buffer includes the sector data
@@ -25,6 +26,11 @@ logical block address. An alternate strategy would be to read the "long"
 contents of the logical block address with
 .B sg_read_long
 utility prior to testing and restore it with this utility after testing.
+.TP
+--cor_dis | -c
+sets the correction disabled bit. This inhibits various other
+mechanisms such as automatic block reallocation, error recovery
+and various informational exception conditions being triggered.
 .TP
 --help | -h
 output the usage message then exit.

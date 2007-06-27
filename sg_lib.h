@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.13 [20050906]
+/* Version 1.15 [20051113]
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
@@ -130,7 +130,7 @@ extern const unsigned char * sg_scsi_sense_desc_find(
                 const unsigned char * sensep, int sense_len, int desc_type);
 
 /* Yield string associated with sense_key value. Returns 'buff'. */
-extern char * sg_get_sense_key_str(int sense_key,int buff_len, char * buff);
+extern char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff);
 
 /* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
 extern char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len,
@@ -149,6 +149,10 @@ extern int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
    to get percentage completion from given value. */
 extern int sg_get_sense_progress_fld(const unsigned char * sensep,
                                      int sb_len, int * progress_outp);
+
+/* Yield string associated with peripheral device type (pdt). Returns
+   'buff'. If 'pdt' out of range yields "bad pdt" string. */
+extern char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
 
 
 /* <<< General purpose (i.e. not SCSI specific) utility functions >>> */
@@ -180,7 +184,9 @@ extern int sg_is_big_endian();
    All output numbers are in hex. 'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 8 ASCII-hex words
        = 0     in addition, the words are listed in ASCII pairs to the right
-       < 0     only the ASCII-hex words are listed (i.e. without address)
+       = -1    only the ASCII-hex words are listed (i.e. without address)
+       = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
+       < -2    same as -1
    If 'swapb' non-zero then bytes in each word swapped. Needs to be set
    for ATA IDENTIFY DEVICE response on big-endian machines.
 */
@@ -191,8 +197,8 @@ extern void dWordHex(const unsigned short* words, int num, int no_ascii,
    then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
    multiplier suffix (not both). Recognised multipliers: c C  *1;  w W  *2;
    b  B *512;  k K KiB  *1,024;  KB  *1,000;  m M MiB  *1,048,576;
-   MB *1,000,000; g G GiB *1,073,741,824;  GB *1,000,000,000 and x<m>
-   which multiplies the leading number by <n> . */
+   MB *1,000,000; g G GiB *1,073,741,824;  GB *1,000,000,000 and <n>x<m>
+   which multiplies <n> by <m> . */
 extern int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown

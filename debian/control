@@ -28,6 +28,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_logs - prints out log sense pages
      * sg_luns - prints out REPORT LUNS response
      * sg_map - shows the mapping between SCSI devices and sg devices
+     * sg_map26 - map primary device node and generic node (lk 2.6 only)
      * sgm_dd - like sg_dd, but uses mmap()'d IO
      * sg_modes - prints out mode sense pages
      * sg_opcodes - reports supported opcodes and task management fcns

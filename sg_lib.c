@@ -68,7 +68,7 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.13 20050906";    /* spc-4 rev 01a */
+static char * version_str = "1.15 20051113";    /* spc-4 rev 02 */
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -592,6 +592,7 @@ static struct error_info additional[] =
     {0x11,0x11,"Read error - loss of streaming"},
     {0x11,0x12,"Auxiliary memory read error"},
     {0x11,0x13,"Read error - failed retransmission request"},
+    {0x11,0x14,"Read error - LBA marked bad by application client"},
     {0x12,0x00,"Address mark not found for id field"},
     {0x13,0x00,"Address mark not found for data field"},
     {0x14,0x00,"Recorded entity not found"},
@@ -724,6 +725,7 @@ static struct error_info additional[] =
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2F,0x00,"Commands cleared by another initiator"},
+    {0x2F,0x01,"Commands cleared by power loss notification"},
     {0x30,0x00,"Incompatible medium installed"},
     {0x30,0x01,"Cannot read medium - unknown format"},
     {0x30,0x02,"Cannot read medium - incompatible format"},
@@ -1153,6 +1155,8 @@ int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
     const unsigned char * ucp;
     unsigned long long ull;
 
+    if (info_outp)
+        *info_outp = 0;
     if (sb_len < 7)
         return 0;
     switch (sensep[0] & 0x7f) {
@@ -1174,7 +1178,7 @@ int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
             }
             if (info_outp)
                 *info_outp = ull;
-            return !!(ucp[2] & 0x80);
+            return !!(ucp[2] & 0x80);   /* since spc3r23 should be set */
         } else
             return 0;
     default:
@@ -1217,6 +1221,41 @@ int sg_get_sense_progress_fld(const unsigned char * sensep,
     default:
         return 0;
     }
+}
+
+static const char * scsi_pdt_strs[] = {
+    /* 0 */ "disk",
+    "tape",
+    "printer",
+    "processor",        /* often SAF-TE (seldom scanner) device */
+    "write once optical disk",
+    /* 5 */ "cd/dvd",
+    "scanner",
+    "optical memory device",
+    "medium changer",
+    "communications",
+    /* 0xa */ "graphics [0xa]",
+    "graphics [0xb]",
+    "storage array controller",
+    "enclosure services device",
+    "simplified direct access device",
+    "optical card reader/writer device",
+    /* 0x10 */ "bridge controller commands",
+    "object based storage",
+    "automation/driver interface",
+    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
+    "0x19", "0x1a", "0x1b", "0x1c", "0x1d", 
+    "well known logical unit",
+    "no physical device on this lu",
+};
+
+char * sg_get_pdt_str(int pdt, int buff_len, char * buff)
+{
+    if ((pdt < 0) || (pdt > 31))
+        snprintf(buff, buff_len, "bad pdt");
+    else
+        snprintf(buff, buff_len, "%s", scsi_pdt_strs[pdt]);
+    return buff;
 }
 
 /* Print descriptor format sense descriptors (assumes sense buffer is
@@ -2151,7 +2190,9 @@ static unsigned short swapb_ushort(unsigned short u)
    'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 8 ASCII-hex 16 bit words
        = 0     in addition, the ASCI bytes pairs are listed to the right
-       < 0     only the ASCII-hex words are listed (i.e. without address)
+       = -1    only the ASCII-hex words are listed (i.e. without address)
+       = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
+       < -2    same as -1
    If 'swapb' non-zero then bytes in each word swapped. Needs to be set
    for ATA IDENTIFY DEVICE response on big-endian machines. */
 void dWordHex(const unsigned short* words, int num, int no_ascii,
@@ -2181,13 +2222,20 @@ void dWordHex(const unsigned short* words, int num, int no_ascii,
             sprintf(&buff[bpos], "%.4x", (unsigned int)c);
             buff[bpos + 4] = ' ';
             if ((k > 0) && (0 == ((k + 1) % 8))) {
-                printf("%.60s\n", buff);
+                if (-2 == no_ascii)
+                    printf("%.39s\n", buff +8);
+                else
+                    printf("%.47s\n", buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
             }
         }
-        if (bpos > bpstart)
-            printf("%.60s\n", buff);
+        if (bpos > bpstart) {
+            if (-2 == no_ascii)
+                printf("%.39s\n", buff +8);
+            else
+                printf("%.47s\n", buff);
+        }
         return;
     }
     /* no_ascii>=0, start each line with address (offset) */

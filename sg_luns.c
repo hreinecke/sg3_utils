@@ -47,7 +47,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.03 20050808";
+static char * version_str = "1.04 20051116";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -84,9 +84,9 @@ static void usage()
 
 }
 
-/* Decoded according to SAM-3 rev 14. Note that one draft: BCC rev 0,
- * defines its own "bridge addressing method" in place of the
- * SAM-3 "logical addressing method".  */ 
+/* Decoded according to SAM-4 rev 4. Note that one draft: BCC rev 0,
+ * defines its own "bridge addressing method" in place of the SAM-3
+ * "logical addressing method".  */ 
 static void decode_lun(const char * leadin, unsigned char * lunp)
 {
     int k, j, x, a_method, bus_id, target, lun, len, e_a_method, next_level;
@@ -154,12 +154,19 @@ static void decode_lun(const char * leadin, unsigned char * lunp)
                     printf("%swell known logical unit %d\n", l_leadin, x);
                     break;
                 }
-            } else {
+            } else if ((1 == len) && (2 == e_a_method)) {
+                x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
+                printf("%sExtended flat space logical unit addressing: "
+                       "value=0x%x\n", l_leadin, x);
+            } else if ((3 == len) && (0xf == e_a_method))
+                printf("%sLogical unit _not_ specified addressing\n",
+                       l_leadin);
+            else {
                 if (len < 2) {
                     if (1 == len)
                         x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
                     printf("%sExtended logical unit addressing: length=%d, "
-                           "e. a. method=%d, value=0x%x\n", l_leadin, len,
+                           "e.a. method=%d, value=0x%x\n", l_leadin, len,
                            e_a_method, x);
                 } else {
                     ull = 0;

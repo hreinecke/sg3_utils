@@ -54,7 +54,7 @@
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
-static char * version_str = "1.20 20050904";
+static char * version_str = "1.21 20051027";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -180,7 +180,7 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Inquiry", &io_hdr, verbose);
+            sg_chk_n_print3("Inquiry", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         got = io_hdr.dxfer_len - io_hdr.resid;
@@ -206,7 +206,7 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
                          pg_op);
             else
                 snprintf(ebuff, EBUFF_SZ, "Inquiry error, [standard]");
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -2;
     }
@@ -263,7 +263,7 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Inquiry", &io_hdr, verbose);
+            sg_chk_n_print3("Inquiry", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         got = io_hdr.dxfer_len - io_hdr.resid;
@@ -295,7 +295,7 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "Inquiry error ");
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -2;
     }
@@ -303,8 +303,11 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
 
 /* Invokes a SCSI TEST UNIT READY command.
  * 'pack_id' is just for diagnostics, safe to set to 0.
+ * Looks for progress indicator if 'progress' non-NULL;
+ * if found writes value [0..65535] else write -1.
  * Return of 0 -> success, -1 -> failure */
-int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
+int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
+                                   int noisy, int verbose)
 {
     int res, k;
     unsigned char turCmbBlk[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
@@ -345,10 +348,24 @@ int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
     case SG_LIB_CAT_CLEAN:
         return 0;
     default:
+        if (progress) {
+            if (! sg_get_sense_progress_fld(sense_b, sizeof(sense_b),
+                                            progress))
+                *progress = -1;
+        }
         if (noisy || verbose)
-            sg_chk_n_print3("test unit ready", &io_hdr, verbose);
+            sg_chk_n_print3("test unit ready", &io_hdr, (verbose > 1));
         return -1;
     }
+}
+
+/* Invokes a SCSI TEST UNIT READY command.
+ * 'pack_id' is just for diagnostics, safe to set to 0.
+ * Return of 0 -> success, -1 -> failure */
+int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
+{
+    return sg_ll_test_unit_ready_progress(sg_fd, pack_id, NULL, noisy,
+                                          verbose);
 }
 
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
@@ -420,7 +437,7 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
         return res;
     default:
         if (noisy || verbose)
-            sg_chk_n_print3("synchronize cache", &io_hdr, verbose);
+            sg_chk_n_print3("synchronize cache", &io_hdr, (verbose > 1));
         return -1;
     }
     return 0;
@@ -488,7 +505,7 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Read capacity (16)", &io_hdr, 1);
+            sg_chk_n_print3("Read capacity (16)", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -505,7 +522,7 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr,
-                            verbose);
+                            (verbose > 1));
         return -1;
     }
 }
@@ -562,7 +579,7 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Read capacity (10)", &io_hdr, 1);
+            sg_chk_n_print3("Read capacity (10)", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -579,7 +596,7 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr,
-                            verbose);
+                            (verbose > 1));
         return -1;
     }
 }
@@ -637,7 +654,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode sense (6)", &io_hdr, verbose);
+            sg_chk_n_print3("Mode sense (6)", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -665,7 +682,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
             snprintf(ebuff, EBUFF_SZ, "Mode sense (6) error, dbd=%d "
                     "pc=%d page_code=%x sub_page_code=%x\n     ", dbd,
                     pc, pg_code, sub_pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -726,7 +743,7 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode sense (10)", &io_hdr, verbose);
+            sg_chk_n_print3("Mode sense (10)", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -754,7 +771,7 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
             snprintf(ebuff, EBUFF_SZ, "Mode sense (10) error, dbd=%d "
                     "pc=%d page_code=%x sub_page_code=%x\n     ", dbd,
                     pc, pg_code, sub_pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -815,7 +832,7 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode select (6)", &io_hdr, verbose);
+            sg_chk_n_print3("Mode select (6)", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -830,7 +847,7 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
 
             snprintf(ebuff, EBUFF_SZ, "Mode select (6) error, pf=%d "
                     "sp=%d\n     ", pf, sp);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -892,7 +909,7 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode select (10)", &io_hdr, verbose);
+            sg_chk_n_print3("Mode select (10)", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -907,7 +924,7 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
 
             snprintf(ebuff, EBUFF_SZ, "Mode select (10) error, pf=%d "
                     "sp=%d\n     ", pf, sp);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -1128,7 +1145,7 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Request sense", &io_hdr, 1);
+            sg_chk_n_print3("Request sense", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if ((mx_resp_len >= 8) && (io_hdr.resid > (mx_resp_len - 8))) {
@@ -1149,7 +1166,7 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr,
-                            verbose);
+                            (verbose > 1));
         return -1;
     }
 }
@@ -1203,7 +1220,7 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Report luns", &io_hdr, verbose);
+            sg_chk_n_print3("Report luns", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -1220,7 +1237,8 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
         return 2;
     default:
         if (noisy || verbose)
-            sg_chk_n_print3("REPORT LUNS command error", &io_hdr, verbose);
+            sg_chk_n_print3("REPORT LUNS command error", &io_hdr,
+                            (verbose > 1));
         return -1;
     }
 }
@@ -1281,7 +1299,7 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Log sense", &io_hdr, verbose);
+            sg_chk_n_print3("Log sense", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -1300,7 +1318,7 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
             snprintf(ebuff, EBUFF_SZ, "log_sense: ppc=%d, sp=%d, "
                      "pc=%d, page_code=%x, paramp=%x\n    ", ppc, sp, pc, 
                      pg_code, paramp);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -1365,7 +1383,7 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Log select", &io_hdr, verbose);
+            sg_chk_n_print3("Log select", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -1379,7 +1397,7 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "log_select: pcr=%d, sp=%d, "
                      "pc=%d\n    ", pcr, sp, pc);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -1434,7 +1452,8 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Report target port groups", &io_hdr, verbose);
+            sg_chk_n_print3("Report target port groups", &io_hdr,
+                            (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -1450,7 +1469,7 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("REPORT TARGET PORT GROUPS command error",
-                            &io_hdr, verbose);
+                            &io_hdr, (verbose > 1));
         return -1;
     }
 }
@@ -1512,7 +1531,8 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Send diagnostic, continuing", &io_hdr, verbose);
+            sg_chk_n_print3("Send diagnostic, continuing", &io_hdr,
+                            (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -1526,7 +1546,7 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "Send diagnostic error, sf_code=0x%x, "
                      "pf_bit=%d, sf_bit=%d ", sf_code, pf_bit, sf_bit);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -1582,7 +1602,7 @@ int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
             sg_chk_n_print3("Receive diagnostics results, continuing",
-                            &io_hdr, verbose);
+                            &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -1596,7 +1616,7 @@ int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "Receive diagnostics results error, "
                      "pcv=%d, page_code=%x ", pcv, pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -1656,7 +1676,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Read defect (10)", &io_hdr, verbose);
+            sg_chk_n_print3("Read defect (10)", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -1684,7 +1704,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
             snprintf(ebuff, EBUFF_SZ, "Read defect (10) error, req_plist=%d "
                     "req_glist=%d dl_format=%x\n     ", req_plist, req_glist,
                     dl_format);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
         }
         return -1;
     }
@@ -1739,7 +1759,8 @@ int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Read media serial number", &io_hdr, verbose);
+            sg_chk_n_print3("Read media serial number", &io_hdr,
+                            (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -1763,7 +1784,7 @@ int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("READ MEDIA SERIAL NUMBER command error",
-                            &io_hdr, verbose);
+                            &io_hdr, (verbose > 1));
         return -1;
     }
 }
@@ -1789,8 +1810,8 @@ int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
     if (verbose) {
         fprintf(sg_warnings_str, "    Start stop unit command:");
         for (k = 0; k < (int)sizeof(ssuBlk); ++k)
-                fprintf (stderr, " %02x", ssuBlk[k]);
-        fprintf(stderr, "\n");
+                fprintf (sg_warnings_str, " %02x", ssuBlk[k]);
+        fprintf(sg_warnings_str, "\n");
     }
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(ssuBlk);
@@ -1814,7 +1835,7 @@ int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Start stop unit", &io_hdr, verbose);
+            sg_chk_n_print3("Start stop unit", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -1826,7 +1847,7 @@ int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("START STOP UNIT command error", &io_hdr,
-                            verbose);
+                            (verbose > 1));
         return -1;
     }
 }
@@ -1880,7 +1901,8 @@ int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Prevent allow medium removal", &io_hdr, verbose);
+            sg_chk_n_print3("Prevent allow medium removal", &io_hdr,
+                            (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -1893,7 +1915,7 @@ int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
     default:
         if (noisy || verbose)
             sg_chk_n_print3("Prevent allow medium removal command problem",
-                            &io_hdr, verbose);
+                            &io_hdr, (verbose > 1));
         return -1;
     }
 }
@@ -1947,7 +1969,8 @@ int sg_ll_report_dev_id(int sg_fd, void * resp, int mx_resp_len,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Report device identifier", &io_hdr, verbose);
+            sg_chk_n_print3("Report device identifier", &io_hdr,
+                            (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -1971,7 +1994,7 @@ int sg_ll_report_dev_id(int sg_fd, void * resp, int mx_resp_len,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("REPORT DEVICE IDENTIFIER command error",
-                            &io_hdr, verbose);
+                            &io_hdr, (verbose > 1));
         return -1;
     }
 }
@@ -2030,7 +2053,7 @@ int sg_ll_set_dev_id(int sg_fd, void * paramp, int param_len,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Set device identifier", &io_hdr, verbose);
+            sg_chk_n_print3("Set device identifier", &io_hdr, (verbose > 1));
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -2042,7 +2065,7 @@ int sg_ll_set_dev_id(int sg_fd, void * paramp, int param_len,
     default:
         if (noisy || verbose)
             sg_chk_n_print3("SET DEVICE IDENTIFIER command error",
-                            &io_hdr, verbose);
+                            &io_hdr, (verbose > 1));
         return -1;
     }
 }

@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.21 20050904";
+static char * version_str = "0.22 20051025";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -143,7 +143,7 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         sg_chk_n_print3("Report supported operation codes", &io_hdr,
-                        verbose);
+                        verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -159,7 +159,7 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
             else
                 snprintf(ebuff, EBUFF_SZ, "RSOC error, rq_opcode=0x%x, "
                          "rq_sa=0x%x ", rq_opcode, rq_servact);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
         }
         return -1;
     }
@@ -208,7 +208,7 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         sg_chk_n_print3("Report supported task management fns", &io_hdr,
-                        verbose);
+                        verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -216,7 +216,7 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
         if (noisy | verbose) {
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "RSTMF error ");
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
         }
         return -1;
     }
@@ -239,39 +239,6 @@ static void usage()
             "       -?   output this usage message\n\n"
             "Performs a REPORT SUPPORTED OPERATION CODES (or supported task "
             "management\nfunctions) SCSI command\n");
-}
-
-static const char * scsi_ptype_strs[] = {
-    /* 0 */ "disk",
-    "tape",
-    "printer",
-    "processor",
-    "write once optical disk",
-    /* 5 */ "cd/dvd",
-    "scanner",
-    "optical memory device",
-    "medium changer",
-    "communications",
-    /* 0xa */ "graphics [0xa]",
-    "graphics [0xb]",
-    "storage array controller",
-    "enclosure services device",
-    "simplified direct access device",
-    "optical card reader/writer device",
-    /* 0x10 */ "bridge controller commands",
-    "object based storage",
-    "automation/driver interface",
-    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
-    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
-    "well known logical unit",
-    "no physical device on this lu",
-};
-
-static const char * get_ptype_str(int scsi_ptype)
-{
-    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
-
-    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 /* returns -1 when left < right, 0 when left == right, else returns 1 */
@@ -407,6 +374,7 @@ int main(int argc, char * argv[])
     int rep_opts = 0;
     int ret = 0;
     const char * cp;
+    char buff[48];
     struct sg_simple_inquiry_resp inq_resp;
 
     for (k = 1; k < argc; ++k) {
@@ -503,7 +471,7 @@ int main(int argc, char * argv[])
         printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                inq_resp.revision);
         peri_type = inq_resp.peripheral_type;
-        cp = get_ptype_str(peri_type);
+        cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
         if (strlen(cp) > 0)
             printf("  Peripheral device type: %s\n", cp);
         else

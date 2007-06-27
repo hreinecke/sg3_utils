@@ -27,7 +27,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.06 20050808";
+static char * version_str = "1.08 20051113";
 
 #define WRITE_LONG_OPCODE 0x3F
 #define WRITE_LONG_CMD_LEN 10
@@ -42,6 +42,7 @@ static char * version_str = "1.06 20050808";
 #define EBUFF_SZ 256
 
 static struct option long_options[] = {
+        {"cor_dis", 0, 0, 'c'},
         {"help", 0, 0, 'h'},
         {"in", 1, 0, 'i'},
         {"lba", 1, 0, 'l'},
@@ -54,9 +55,11 @@ static struct option long_options[] = {
 static void usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_write_long [--help] [--in=<name>] [--lba=<num>] [--verbose]\n"
-          "                     [--version] [--xfer_len=<num>] <scsi_device>\n"
-          "  where: --help            print out usage message\n"
+          "sg_write_long [--cor_dis] [--help] [--in=<name>] [--lba=<num>]\n"
+          "                     [--verbose] [--version] [--xfer_len=<num>] "
+          "<scsi_device>\n"
+          "  where: --cor_dis         set correction disabled bit\n"
+          "         --help            print out usage message\n"
           "         --in=<name>       input from file <name> (default write "
           "0xff bytes)\n"
           "         --lba=<num>|-l <num>  logical block address (default 0)\n"
@@ -70,7 +73,7 @@ static void usage()
           " To write to a defected sector use:\n"
           "    sg_dd of=<scsi_device> seek=<lba> if=/dev/zero bs=512 "
           "count=1\n\n"       
-          "Performs a WRITE LONG SCSI command\n"
+          "Performs a WRITE LONG (10) SCSI command\n"
           );
 }
 
@@ -121,6 +124,7 @@ int main(int argc, char * argv[])
     void * rawp = NULL;
     unsigned char sense_buffer[SENSE_BUFF_LEN];
     int xfer_len = 520;
+    int cor_dis = 0;
     unsigned int lba = 0;
     int verbose = 0;
     int got_stdin;
@@ -136,11 +140,15 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hi:l:vVx:", long_options, &option_index);
+        c = getopt_long(argc, argv, "chi:l:vVx:", long_options,
+                        &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'c':
+            cor_dis = 1;
+            break;
         case 'h':
         case '?':
             usage();
@@ -252,6 +260,9 @@ int main(int argc, char * argv[])
     /*size*/
     writeLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
     writeLongCmdBlk[8] = (xfer_len & 0x000000ff);
+
+    if (cor_dis)
+        writeLongCmdBlk[1] |= 0x80;
   
     fprintf(stderr, ME "issue write long to device %s\n\t\txfer_len= %d "
             "(0x%x), lba=%d (0x%x)\n", device_name, xfer_len, xfer_len,
@@ -284,7 +295,7 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("WRITE LONG, continuing", &io_hdr, verbose);
+        sg_chk_n_print3("WRITE LONG, continuing", &io_hdr, verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
@@ -302,7 +313,7 @@ int main(int argc, char * argv[])
                         "expected but not found]\n");
             goto err_out;
         }
-        sg_chk_n_print3("WRITE LONG problem error", &io_hdr, verbose);
+        sg_chk_n_print3("WRITE LONG problem error", &io_hdr, verbose > 1);
         goto err_out;
     }
 

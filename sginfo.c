@@ -110,7 +110,7 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * sginfo_version_str = "sginfo version 2.18 [20050906]";
+static const char * version_str = "2.20 [20051114]";
 
 #include <stdio.h>
 #include <string.h>
@@ -180,6 +180,8 @@ static int common_proto_spec_port(struct mpage_info * mpi,
                                   const char * prefix);
 static int common_proto_spec_port_sp1(struct mpage_info * mpi, 
                                       const char * prefix);
+static int common_proto_spec_port_sp2(struct mpage_info * mpi, 
+                                      const char * prefix);
 static int common_power_condition(struct mpage_info * mpi, 
                                   const char * prefix);
 static int common_informational(struct mpage_info * mpi, const char * prefix);
@@ -237,8 +239,10 @@ static struct mpage_name_func mpage_common[] =
     { 0x19, 0, PC_COMMON, "Protocol specific port", common_proto_spec_port},
     { 0x19, 1, PC_COMMON, "Protocol specific port, subpage 1 overload", 
       common_proto_spec_port_sp1},
-    { 0x19, 2, PC_COMMON, "SPI-4 Saved Training configuration", 
-      spi4_training_config},
+    { 0x19, 2, PC_COMMON, "Protocol specific port, subpage 2 overload", 
+      common_proto_spec_port_sp2},
+/*    { 0x19, 2, PC_COMMON, "SPI-4 Saved Training configuration", 
+        spi4_training_config}, */
     { 0x19, 3, PC_COMMON, "SPI-4 Negotiated Settings", spi4_negotiated},
     { 0x19, 4, PC_COMMON, "SPI-4 Report transfer capabilities", 
       spi4_report_xfer},
@@ -1100,24 +1104,26 @@ int setup_mode_page(struct mpage_info * mpi, int nparam,
     return 0;
 }
 
-static int get_protocol_id(int port1_or_lu0, unsigned char * buff,
+static int get_protocol_id(int port_not_lu, unsigned char * buff,
                            int * proto_idp, int * offp)
 {
-    int status, off, proto_id;
+    int status, off, proto_id, spf;
     struct mpage_info mp_i;
 
     memset(&mp_i, 0, sizeof(mp_i));
-    mp_i.page = (port1_or_lu0 ? 0x19 : 0x18);
+    mp_i.page = (port_not_lu ? 0x19 : 0x18);
+    /* N.B. getting port or lu specific mode page (not subpage) */
     status = get_mode_page(&mp_i, 0, buff);
     if (status)
         return status;
     off = modePageOffset(buff, mp_i.resp_len, mode6byte);
     if (off < 0)
         return off;
-    proto_id = buff[off + 2] & 0xf;
+    spf = (buff[off] & 0x40) ? 1 : 0;  /* subpages won't happen here */
+    proto_id = buff[off + (spf ? 5 : 2)] & 0xf;
     if (trace_cmd > 0)
         printf("Protocol specific %s, protocol_id=%s\n",
-               (port1_or_lu0 ? "port" : "lu"), 
+               (port_not_lu ? "port" : "lu"), 
                transport_proto_arr[proto_id]);
     if (proto_idp)
         *proto_idp = proto_id;
@@ -2642,8 +2648,8 @@ static int sas_phy_control_discover(struct mpage_info * mpi,
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", "SAS Phy Control and Discover",
-                mpi->page, mpi->subpage);
+        printf("%s mode subpage (0x%x,0x%x)\n", "SAS Phy Control and "
+               "Discover", mpi->page, mpi->subpage);
         printf("--------------------------------------------\n");
     }
     intfield(pagestart + 7, 1, "Number of phys");
@@ -2701,8 +2707,8 @@ static int spi4_training_config(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", get_page_name(mpi), mpi->page,
-               mpi->subpage);
+        printf("%s mode subpage (0x%x,0x%x)\n", "training configuration",
+               mpi->page, mpi->subpage);
         printf("----------------------------------------------------------\n");
     }
     hexdatafield(pagestart + 10, 4, "DB(0) value");
@@ -2738,6 +2744,48 @@ static int spi4_training_config(struct mpage_info * mpi, const char * prefix)
     else
         printf("\n");
     return 0;
+}
+
+/* SAS(2) SSP, shared protocol specific port mode subpage (subpage 2) */
+static int sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
+{
+    int status;
+    unsigned char *pagestart;
+
+    status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
+    if (status)
+        return status;
+
+    if (prefix[0])
+        printf("%s", prefix);
+    if (!x_interface && !replace) {
+        printf("%s mode subpage (0x%x,0x%x)\n", "SAS SSP shared protocol "
+               "specific port", mpi->page, mpi->subpage);
+        printf("-----------------------------------------------------\n");
+    }
+    intfield(pagestart + 6, 2, "Power loss timeout(ms)");
+
+    if (x_interface && replace)
+        return put_mode_page(mpi, cbuffer);
+    else
+        printf("\n");
+    return 0;
+}
+
+static int common_proto_spec_port_sp2(struct mpage_info * mpi, 
+                                      const char * prefix)
+{
+    int status, proto_id;
+
+    status = get_protocol_id(1, cbuffer, &proto_id, NULL);
+    if (status)
+        return status;
+    if (1 == proto_id)
+        return spi4_training_config(mpi, prefix);
+    else if (6 == proto_id)
+        return sas_shared_spec_port(mpi, prefix);
+    else
+        return DECODE_FAILED_TRY_HEX;
 }
 
 static int spi4_negotiated(struct mpage_info * mpi, const char * prefix)
@@ -2974,8 +3022,8 @@ static int do_inquiry(int * peri_type, int * resp_byte6,
     }
 
     if (!x_interface && !replace) {
-        printf("INQUIRY reponse (cmd: 0x12)\n");
-        printf("---------------------------\n");
+        printf("INQUIRY response (cmd: 0x12)\n");
+        printf("----------------------------\n");
     };
     bitfield(pagestart + 0, "Device Type", 0x1f, 0);
     if (2 == inquiry_verbosity) {
@@ -3463,8 +3511,8 @@ static void usage(char *errtext)
     "\t-R    Replace parameters - best used with -X (expert use only)\n"
     "\t      [replacement parameters placed after device on command line]\n\n",
     stdout);
-    printf("\t      %s; See man page for further details.\n", 
-           sginfo_version_str);
+    printf("\t      sginfo version: %s; See man page for further details.\n", 
+           version_str);
     exit(2);
 }
 
@@ -3474,6 +3522,7 @@ int main(int argc, char *argv[])
     unsigned int unum, unum2;
     int decode_in_hex = 0;
     char c;
+    char * cp;
     int status = 0;
     long tmp;
     struct mpage_info mp_i;
@@ -3604,7 +3653,12 @@ int main(int argc, char *argv[])
                 unum2 = 0;
                 j = sscanf(optarg, "0x%x,0x%x", &unum, &unum2);
                 mp_i.page = unum;
-                mp_i.subpage = unum2;
+                if (1 == j) {
+                    cp = strchr(optarg, ',');
+                    if (cp && (1 == sscanf(cp, ",%d", &mp_i.subpage)))
+                        j = 2;
+                } else
+                    mp_i.subpage = unum2;
             } else
                 j = sscanf(optarg, "%d,%d", &mp_i.page, &mp_i.subpage);
             if (1 == j)
@@ -3619,7 +3673,7 @@ int main(int argc, char *argv[])
             found = 1;
             break;
         case 'v':
-            fprintf(stdout, " %s\n", sginfo_version_str);
+            fprintf(stdout, "sginfo version: %s\n", version_str);
             return 0;
         case 'V':
             mp_i.page = 0x7;

@@ -1,4 +1,4 @@
-.TH SG_SES "8" "July 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_SES "8" "October 2005" "sg3_utils-1.18" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -96,8 +96,20 @@ be sent to a device with the sg_senddiag utility.
 There is a related command set called SAF-TE (SCSI attached fault-tolerant
 enclosure) for enclosure (including RAID) status and control. SCSI devices
 that support SAF-TE report "Processor" peripheral device type (0x3) in their
-INQUIRY reponse. See safte-monitor on the internet.
-.SH EXAMPLE
+INQUIRY response. See safte-monitor on the internet.
+.SH EXAMPLES
+To view the supported pages:
+.PP
+   sg_ses /dev/sda
+.PP
+To view the configuration page:
+.PP
+   sg_ses --page=1 /dev/sda
+.PP
+To view the status page:
+.PP
+   sg_ses --page=2 /dev/sda
+.PP
 Changing a temperature threshold is possible, if a little awkward. The
 current thresholds can be shown with:
 .PP

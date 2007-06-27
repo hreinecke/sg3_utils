@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.06 20050806";
+static const char * version_str = "1.06 20051025";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -299,7 +299,7 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("reading", &io_hdr, verbose);
+        sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         return -1;
     }
     if (diop && *diop && 

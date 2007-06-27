@@ -1,5 +1,5 @@
 %define	name	sg3_utils
-%define	version	1.17
+%define	version	1.18
 %define	release	1
 
 %define	major	1
@@ -80,7 +80,7 @@ make install \
 
 %files
 %defattr(-,root,root)
-%doc CHANGELOG COVERAGE CREDITS INSTALL README README.sg_start
+%doc CHANGELOG COPYING COVERAGE CREDITS INSTALL README README.sg_start
 %attr(0755,root,root) %{_bindir}/*
 %{_mandir}/man8/*
 
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Fri Nov 18 2005 - dgilbert at interlog dot com
+- add sg_map26; sg_inq '-rr' option to play with hdparm
+  * sg3_utils-1.18
+
 * Thu Sep 22 2005 - dgilbert at interlog dot com
 - add ATA information VPD page to sg_inq
   * sg3_utils-1.17

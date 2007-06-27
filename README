@@ -25,7 +25,7 @@ found at http://www.torque.net/sg . The most recent release version
 of sg3_utils and the most recent beta is on that page. There is also
 a page describing the utilities in the sg3_utils and sg_utils packages:
 http://www.torque.net/sg/u_index.html . A copy of the "u_index.html"
-file is in the "html" subdirectory.
+file is in the "doc" subdirectory.
 
 In the Linux 2.4 kernel series these utilities need to use the SCSI generic
 (sg) driver to access SCSI devices. The name of this package (i.e.
@@ -137,11 +137,11 @@ Utilities
 Here is list in alphabetical order of utilities found in the main directory
 of the sg3_utils directory:
   - sginfo, sgm_dd, sgp_dd, sg_dd, sg_emc_trespass, sg_get_config,
-    sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map, sg_modes,
-    sg_opcodes, sg_persist, sg_prevent, sg_rbuf, sg_read, sg_readcap,
-    sg_read_long, sg_reassign, sg_request, sg_reset, sg_rmsn, sg_rtpg,
-    sg_scan, sg_senddiag, sg_ses, sg_start, sg_sync, sg_test_rwbuff,
-    sg_turs, sg_verify, sg_write_long, sg_wr_mode
+    sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map, sg_map26,
+    sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_rbuf, sg_read,
+    sg_readcap, sg_read_long, sg_reassign, sg_request, sg_reset, sg_rmsn,
+    sg_rtpg, sg_scan, sg_senddiag, sg_ses, sg_start, sg_sync,
+    sg_test_rwbuff, sg_turs, sg_verify, sg_write_long, sg_wr_mode
 
 These utilities and the libsgutils.so library which they depend on are built
 by the Makefile in the main directory. This Makefile does not invoke the
@@ -150,8 +150,8 @@ Makefile's in the subdirectories. Each utility in the main directory has a
 distributions of the sg3_utils package (e.g. "rpm" and debian packages)
 typically contains the shared library, the utilities in the main directory,
 their associated man pages and some documentation files (e.g. README, INSTALL,
-CREDITS and COVERAGE). See the INSTALL file for instructions about building
-and installing from a "tarball".
+CREDITS, COPYING and COVERAGE). See the INSTALL file for instructions about
+building and installing from a "tarball".
 
 Man pages can be read (without building and installing the package) by
 going to the main directory and executing something like this:
@@ -179,11 +179,14 @@ The "utils" subdirectory contains source and a Makefile to build
 command line) and outputs an ASCII-HEX and ASCII representation of
 it. It is similar to the Unix od command.
 
-The "html" subdirectory contains copies of web pages relevant to
+The "doc" subdirectory contains copies of web pages relevant to
 the sg3_utils package. Currently it contains:
-  - u_index.html : a description of the sg3_utils package contents
   - sg_dd.html : describes the sg_dd utility and compares it with the
                  Unix dd command
+  - sg_io.html : describes the SG_IO ioctl used by sg3_utils. Looks
+                 at differences between the lk 2.4 and 2.6 series;
+                 including its use with block devices
+  - u_index.html : a description of the sg3_utils package contents
     
 
 Notes for utilities without man pages
@@ -280,4 +283,4 @@ user). It is available for Linux and other operating systems.
 See http://members.aol.com/plscsi .
 
 Doug Gilbert
-22nd September 2005
+18th November 2005
