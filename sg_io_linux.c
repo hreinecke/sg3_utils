@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2005 Douglas Gilbert.
+ * Copyright (c) 1999-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,9 @@
 #include <string.h>
 #include <ctype.h>
 #include "sg_io_linux.h"
+
+
+/* Version 1.01 20060626 */
 
 
 void sg_print_masked_status(int masked_status) 
@@ -139,6 +142,9 @@ static int sg_linux_sense_print(const char * leadin, int scsi_status,
         fprintf(sg_warnings_strm, "\n");
     }
     if (0 != driver_status) {
+        if (done_sense &&
+            (SG_LIB_DRIVER_SENSE == (SG_LIB_DRIVER_MASK & driver_status)))
+            return 0;
         if (leadin && (! done_leadin))
             fprintf(sg_warnings_strm, "%s: ", leadin);
         if (done_leadin)

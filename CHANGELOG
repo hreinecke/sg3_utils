@@ -1,6 +1,53 @@
 Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
-directory have their own "man" pages.
+directory have their own "man" pages. There is also a sg3_utils man page.
+
+Changelog for sg3_utils-1.21 [20060706]
+  - sg_vpd: new utility for decoding VPD pages. sg_inq's cli is
+    cluttered; also borrows from sdparm's VPD handling
+  - sg_rdac: new utility for vendor specific work
+  - sg_lib: add sg_vpd_dev_id_iter() to iterate over di VPD page
+    - add sg_ata_get_chars() to fetch chars from ATA words
+    - sync additional sense code strings with spc4r05a
+    - add SG_LIB_CAT_NOT_READY category when sense_key is NOT READY
+    - add SG_LIB_FILE_ERROR category for open problems
+    - add SG_LIB_SYNTAX_ERROR category for command line problems
+    - broaden SG_LIB_CAT_MEDIA_CHANGED to SG_LIB_CAT_UNIT_ATTENTION
+    - add SG_LIB_CAT_MALFORMED for bad responses
+    - BEWARE: these changes cause confusion if an executable from this
+      version is run with a libsgutils library from 1.20 or earlier
+  - sg_cmds: add SG_LIB_CAT_NOT_READY return to most "ll" functions
+    - alter many utilities to report SG_LIB_CAT_NOT_READY
+  - sg_dd: add retries=<n> option for sg_io
+  - sg_logs: add '-T' option to output protocol specific port log page
+    - add support for log subpages (new in spc4r05)
+    - more sanity checks in Start Stop Cycle Counter page
+  - sg_cmds: add sg_ll_read_long16()
+    - add page_code and subpage_code to sg_ll_log_select()
+    - add subpage_code to sg_ll_log_sense()
+  - sg_read_long: do READ LONG(16) when '--16' given
+  - sg_read: accept and ignore 'of=' arguments
+  - sg_dd: expand medium/hardware error "coe' processing to include
+    the "blank check" sense key (for optical devices)
+  - sg_ses: expand display element (per 05-011r2)
+  - sg_format: clear 'cmplist' bit (for MO disks)
+    - add '--six' ('-6') option for mode sense/select(6)
+  - sg_format + sg_test_rwbuf: fix for when char is unsigned
+  - sg_inq: VPD page 0x89: output ATA IDENTIFY DEVICE strings
+    - for IDENTIFY (PACKET) DEVICE response use sg_ata_get_chars()
+  - sg3_utils.html : new name, was previously u_index.html. Copy
+    placed in doc subdirectory
+  - tools.html : SCSI and storage tools reference, copy placed in
+    doc subdirectory
+  - sg3_utils.8 : add a new man page containing general information
+    especially common exit status values
+  - sg_sat_identify: added to examples directory (SAT passthrough test)
+    - extend to pass through IDENTIFY PACKET DEVICE with '-p' option
+  - sg_sat_chk_power: added to examples directory
+  - sg_sat_smart_rd_data: added to examples directory
+  - sg_chk_asc: added to utils directory to check asc_ascq codes
+  - debian: stop placing archive directory under examples
+    - add build_debian.sh script
 
 Changelog for sg3_utils-1.20 [20060418]
   - sg_logs: decode phy event descriptors in SAS port specific

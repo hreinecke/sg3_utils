@@ -25,7 +25,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.09 20060106";
+static char * version_str = "1.10 20060623";
 
 
 #define MAX_XFER_LEN 10000
@@ -112,7 +112,7 @@ int main(int argc, char * argv[])
             lba = sg_get_num(optarg);
             if ((unsigned long)(-1) == lba) {
                 fprintf(stderr, "bad argument to '--lba'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'v':
@@ -125,13 +125,13 @@ int main(int argc, char * argv[])
             xfer_len = sg_get_num(optarg);
            if (-1 == xfer_len) {
                 fprintf(stderr, "bad argument to '--xfer_len'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -145,32 +145,32 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (xfer_len >= MAX_XFER_LEN){
         fprintf(stderr, "xfer_len (%d) is out of range ( < %d)\n",
                 xfer_len, MAX_XFER_LEN);
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
   
     if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
         fprintf(stderr, ME "out of memory (query)\n");
         sg_cmds_close_device(sg_fd);
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     writeLongBuff = rawp;
     memset(rawp, 0xff, MAX_XFER_LEN);
@@ -207,26 +207,28 @@ int main(int argc, char * argv[])
 
     res = sg_ll_write_long10(sg_fd, cor_dis, lba, writeLongBuff, xfer_len,
                              &offset, 1, verbose);
+    ret = res;
     switch (res) {
     case 0:
-        ret = 0;
+        break;
+    case SG_LIB_CAT_NOT_READY:
+        fprintf(stderr, "  SCSI WRITE LONG (10) failed, device not ready\n");
+        break;
+    case SG_LIB_CAT_UNIT_ATTENTION:
+        fprintf(stderr, "  SCSI WRITE LONG (10), unit attention\n");
         break;
     case SG_LIB_CAT_INVALID_OP:
         fprintf(stderr, "  SCSI WRITE LONG (10) command not supported\n");
-        ret = 1;
         break;
     case SG_LIB_CAT_ILLEGAL_REQ:
         fprintf(stderr, "  SCSI WRITE LONG (10) command, bad field in cdb\n");
-        ret = 1;
         break;
     case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
         fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
                 ">>>\n", xfer_len - offset);
-        ret = 1;
         break;
     default:
         fprintf(stderr, "  SCSI WRITE LONG (10) command error\n");
-        ret = 1;
         break;
     }
 
@@ -235,8 +237,9 @@ err_out:
         free(rawp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-sg_fd));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -86,7 +86,7 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
         return -1;
     }
     res = sg_err_category3(&io_hdr);
-    if (SG_LIB_CAT_MEDIA_CHANGED == res)
+    if (SG_LIB_CAT_UNIT_ATTENTION == res)
         return 2; /* probably have another go ... */
     else if (SG_LIB_CAT_CLEAN != res) {
         sg_chk_n_print3("read capacity", &io_hdr);
@@ -157,7 +157,7 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, int from_block,
         printf("Recovered error while reading block=%d, num=%d\n",
                from_block, blocks);
         break;
-    case SG_LIB_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_UNIT_ATTENTION:
         return 2;
     default:
         sg_chk_n_print3("reading", &io_hdr);
@@ -228,7 +228,7 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, int to_block,
         printf("Recovered error while writing block=%d, num=%d\n",
                to_block, blocks);
         break;
-    case SG_LIB_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_UNIT_ATTENTION:
         return 2;
     default:
         sg_chk_n_print3("writing", &io_hdr);

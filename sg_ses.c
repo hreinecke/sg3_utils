@@ -43,7 +43,7 @@
  *commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.24 20060329";    /* ses2r14 */
+static char * version_str = "1.27 20060623";    /* ses2r15 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -105,8 +105,8 @@ static void usage()
 }
 
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
- * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other
- * failure */
+ * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, 
+ * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failures */
 static int do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, 
                        int outgoing_len, int noisy, int verbose)
 {
@@ -320,20 +320,23 @@ truncated:
     return;
 }
 
+/* Returns number of elements written to 'ehp' or -1 if there is
+   a problem */ 
 static int populate_element_hdr_arr(int fd, struct element_hdr * ehp,
                                     unsigned int * generationp, int verbose)
 {
-    int resp_len, k, el, num_subs, sum_elem_types;
+    int resp_len, k, el, num_subs, sum_elem_types, res;
     unsigned int gen_code;
     unsigned char resp[MX_ALLOC_LEN];
     int rsp_buff_size = MX_ALLOC_LEN;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
-    if (0 == sg_ll_receive_diag(fd, 1, 1, resp, rsp_buff_size, 1, verbose)) {
+    res = sg_ll_receive_diag(fd, 1, 1, resp, rsp_buff_size, 1, verbose);
+    if (0 == res) {
         resp_len = (resp[2] << 8) + resp[3] + 4;
         if (resp_len > rsp_buff_size) {
-            fprintf(stderr, "<<< warning response buffer too small "
+            fprintf(stderr, "<<< warning: response buffer too small "
                     "[%d but need %d]>>>\n", rsp_buff_size, resp_len);
             resp_len = rsp_buff_size;
         }
@@ -383,7 +386,7 @@ static int populate_element_hdr_arr(int fd, struct element_hdr * ehp,
         }
         return sum_elem_types;
     } else {
-        fprintf(stderr, "populate: couldn't read config page\n");
+        fprintf(stderr, "populate: couldn't read config page, res=%d\n", res);
         return -1;
     }
 p_truncated:
@@ -406,6 +409,9 @@ static char * find_sas_connector_type(int conn_type, char * buff,
         snprintf(buff, buff_len, "Mini SAS 4x receptacle (SFF-8088) "
                  "[max 4 phys]");
         break;
+    case 0xf:
+        snprintf(buff, buff_len, "Vendor specific external connector");
+        break;
     case 0x10:
         snprintf(buff, buff_len, "SAS 4i plug (SFF-8484) [max 4 phys]");
         break;
@@ -425,6 +431,9 @@ static char * find_sas_connector_type(int conn_type, char * buff,
         break;
     case 0x23:
         snprintf(buff, buff_len, "SATA device plug [max 1 phy]");
+        break;
+    case 0x3f:
+        snprintf(buff, buff_len, "Vendor specific internal connector");
         break;
     default:
         if (conn_type < 0x10)
@@ -529,7 +538,7 @@ static void print_element_status(const char * pad,
                    !!(statp[1] & 0x80), !!(statp[3] & 0x40),
                    !!(statp[3] & 0x20), !!(statp[3] & 0x10));
         printf("%sActual speed=%d rpm, Fan %s\n", pad,
-               (((0x7 & statp[1]) << 8) + statp[2]) * 10,    /* 05-372r0 */
+               (((0x7 & statp[1]) << 8) + statp[2]) * 10,
                actual_speed_desc[7 & statp[3]]);
         break;
     case 4:     /* temperature sensor */
@@ -615,10 +624,10 @@ static void print_element_status(const char * pad,
                    !!(statp[2] & 0x1), !!(statp[3] & 0x80), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
-    case 0xc:   /* Display (ses2r14 + 05-011r1) */
+    case 0xc:   /* Display (ses2r15) */
         if ((! filter) || (0x80 & statp[1]))
             printf("%sIdent=%d, Display mode status=%d, Display "
-                   "character=0x%x\n", pad,
+                   "character status=0x%x\n", pad,
                    !!(statp[1] & 0x80), (statp[1] & 0x3),
                    ((statp[2] << 8) & statp[3]));
         break;
@@ -1397,9 +1406,9 @@ static int read_hex(const char * inp, unsigned char * arr, int * arr_len)
     return 0;
 }
 
-static void ses_process_status(int sg_fd, int page_code, int do_raw,
-                               int do_hex, int inner_hex, int filter,
-                               int verbose)
+static int ses_process_status(int sg_fd, int page_code, int do_raw,
+                              int do_hex, int inner_hex, int filter,
+                              int verbose)
 {
     int rsp_len, res;
     unsigned int ref_gen_code;
@@ -1409,8 +1418,9 @@ static void ses_process_status(int sg_fd, int page_code, int do_raw,
 
     memset(rsp_buff, 0, rsp_buff_size);
     cp = find_in_page_code_desc(page_code);
-    if (0 == sg_ll_receive_diag(sg_fd, 1, page_code, rsp_buff,
-                                rsp_buff_size, 1, verbose)) {
+    res = sg_ll_receive_diag(sg_fd, 1, page_code, rsp_buff,
+                             rsp_buff_size, 1, verbose);
+    if (0 == res) {
         rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
         if (rsp_len > rsp_buff_size) {
             fprintf(stderr, "<<< warning response buffer too small "
@@ -1534,6 +1544,7 @@ static void ses_process_status(int sg_fd, int page_code, int do_raw,
             printf("Attempt to fetch status diagnostic page [0x%x] "
                    "failed\n", page_code);
     }
+    return res;
 }
 
 
@@ -1556,7 +1567,7 @@ int main(int argc, char * argv[])
     unsigned char data_arr[1024];
     int arr_len = 0;
     int pd_type = 0;
-    int ret = 1;
+    int ret = 0;
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
 
@@ -1575,7 +1586,7 @@ int main(int argc, char * argv[])
             if ((byte1 < 0) || (byte1 > 255)) {
                 fprintf(stderr, "bad argument to '--byte1' (0 to 255 "
                         "inclusive)\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'c':
@@ -1585,7 +1596,7 @@ int main(int argc, char * argv[])
             memset(data_arr, 0, sizeof(data_arr));
             if (read_hex(optarg, data_arr + 4, &arr_len)) {
                 fprintf(stderr, "bad argument to '--data'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             do_data = 1;
             break;
@@ -1610,7 +1621,7 @@ int main(int argc, char * argv[])
             if ((page_code < 0) || (page_code > 255)) {
                 fprintf(stderr, "bad argument to '--page' (0 to 255 "
                         "inclusive)\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'r':
@@ -1628,7 +1639,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -1642,7 +1653,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (do_list) {
@@ -1665,12 +1676,12 @@ int main(int argc, char * argv[])
     if (do_control && do_status) {
         fprintf(stderr, "cannot have both '--control' and '--status'\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     } else if (1 == do_control) {
         if (! do_data) {
             fprintf(stderr, "need to give '--data' in control mode\n");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     } else if (0 == do_status)
         do_status = 1;  /* default to receiving status pages */
@@ -1678,19 +1689,20 @@ int main(int argc, char * argv[])
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     if (! do_raw) {
         if (sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
             fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
                     device_name);
+            ret = SG_LIB_CAT_OTHER;
             goto err_out;
         } else {
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
@@ -1705,10 +1717,10 @@ int main(int argc, char * argv[])
                 printf("    %s device (not an enclosure)\n", cp);
         }
     }
-    if (do_status)
-        ses_process_status(sg_fd, page_code, do_raw, do_hex, inner_hex,
-                           do_filter, verbose);
-    else { /* control page requested */
+    if (do_status) {
+        ret = ses_process_status(sg_fd, page_code, do_raw, do_hex,
+                                 inner_hex, do_filter, verbose);
+    } else { /* control page requested */
         data_arr[0] = page_code;
         data_arr[1] = byte1;
         data_arr[2] = (arr_len >> 8) & 0xff;
@@ -1717,7 +1729,8 @@ int main(int argc, char * argv[])
         case 0x2:       /* Enclosure control diagnostic page */
             printf("Sending Enclosure control [0x%x] page, with page "
                    "length=%d bytes\n", page_code, arr_len);
-            if (do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose)) {
+            ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
+            if (ret) {
                 fprintf(stderr, "couldn't send Enclosure control page\n");
                 goto err_out;
             }
@@ -1725,7 +1738,8 @@ int main(int argc, char * argv[])
         case 0x4:       /* String Out diagnostic page */
             printf("Sending String Out [0x%x] page, with page length=%d "
                    "bytes\n", page_code, arr_len);
-            if (do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose)) {
+            ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
+            if (ret) {
                 fprintf(stderr, "couldn't send String Out page\n");
                 goto err_out;
             }
@@ -1733,7 +1747,8 @@ int main(int argc, char * argv[])
         case 0x5:       /* Threshold Out diagnostic page */
             printf("Sending Threshold Out [0x%x] page, with page length=%d "
                    "bytes\n", page_code, arr_len);
-            if (do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose)) {
+            ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
+            if (ret) {
                 fprintf(stderr, "couldn't send Threshold Out page\n");
                 goto err_out;
             }
@@ -1741,7 +1756,8 @@ int main(int argc, char * argv[])
         case 0x6:       /* Array control diagnostic page (obsolete) */
             printf("Sending Array control [0x%x] page, with page "
                    "length=%d bytes\n", page_code, arr_len);
-            if (do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose)) {
+            ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
+            if (ret) {
                 fprintf(stderr, "couldn't send Array control page\n");
                 goto err_out;
             }
@@ -1749,7 +1765,8 @@ int main(int argc, char * argv[])
         case 0xc:       /* Subenclosure String Out diagnostic page */
             printf("Sending Subenclosure String Out [0x%x] page, with page "
                    "length=%d bytes\n", page_code, arr_len);
-            if (do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose)) {
+            ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
+            if (ret) {
                 fprintf(stderr, "couldn't send Subenclosure String Out "
                         "page\n");
                 goto err_out;
@@ -1758,16 +1775,17 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "Setting SES control page 0x%x not supported "
                     "yet\n", page_code);
+            ret = SG_LIB_SYNTAX_ERROR;
             break;
         }
     }
 
-    ret = 0;
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 2;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -6,21 +6,24 @@ on the right. The second table lists supported ATA commands.
 
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
+ATA COMMAND PASS THROUGH(16)    examples/sg_sat_chk_power,
+			        examples/sg_sat_identify, 
+			        examples/sg_sat_smart_rd_data 
 GET CONFIGURATION   sg_get_config, ++
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
                     sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
-                    sg_persist, sg_scan, sg_ses, ++
+                    sg_persist, sg_scan, sg_ses, sg_vpd ++
 FORMAT UNIT         sg_format, ++
 LOG SELECT          sg_logs('-r', '-scum' or '-sthr'), ++
 LOG SENSE           sg_logs, ++
 MODE SELECT(6)      sg_wr_mode, sginfo, sg_format,
-                    sg_emc_trespass, ++
+                    sg_emc_trespass, sg_rdac, ++
 MODE SELECT(10)     sg_wr_mode, sginfo, sg_format,
-                    sg_emc_trespass, ++
+                    sg_emc_trespass, sg_rdac, ++
 MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_format,
-                    sg_senddiag('-e'), ++
+                    sg_senddiag('-e'), sg_rdac, ++
 MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_format,
-                    sg_senddiag('-e'), ++
+                    sg_senddiag('-e'), sg_rdac, ++
 PERSISTENT RESERVE IN       sg_persist ++
 PERSISTENT RESERVE OUT      sg_persist ++
 PREVENT ALLOW MEDIUM REMOVAL        sg_prevent, ++
@@ -31,9 +34,10 @@ READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ BUFFER         sg_rbuf, sg_test_rwbuf
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
-READ DEFECT(10)     sginfo, sg_reassign, ++
+READ DEFECT(10)     sginfo, sg_reassign('-g'), ++
 READ DEFECT(12)     sginfo
 READ LONG (10)      sg_read_long, sg_dd
+READ LONG (16)      sg_read_long
 READ MEDIA SERIAL NUMBER     sg_rmsn, ++
 REASSIGN BLOCKS     sg_reassign, ++
 RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses, ++
@@ -57,13 +61,16 @@ WRITE BUFFER        sg_test_rwbuf
 WRITE LONG (10)     sg_write_long
 
 
+
 ATA command         sg3_utils utilities that use this SCSI command
 -----------         ----------------------------------------------
-IDENTIFY DEVICE     sg_inq, sg_scan
-IDENTIFY PACKET DEVICE     sg_inq
+CHECK POWER MODE    examples/sg_sat_chk_power
+IDENTIFY DEVICE     sg_inq, sg_scan, examples/sg_sat_identify
+IDENTIFY PACKET DEVICE     sg_inq, examples/sg_sat_identify
+SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 ++  command wrapper found in sg_cmds.c for this command
 
 Doug Gilbert
-22nd March 2006
+2nd July 2006

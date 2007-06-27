@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SGM_DD "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from files and devices. Specialized for
 devices that understand the SCSI command set and does memory mapped
@@ -234,6 +234,12 @@ SIGPIPE output the number of remaining blocks to be transferred and
 the records in + out counts; then they have their default action.
 SIGUSR1 causes the same information to be output yet the copy continues.
 All output caused by signals is sent to stderr.
+.SH EXIT STATUS
+The exit status of sgm_dd is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page. Since this utility works at a higher level
+than individual commands, and there are 'coe' and 'retries' flags,
+individual SCSI command failures do not necessary cause the process
+to exit.
 .SH AUTHORS
 Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"

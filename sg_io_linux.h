@@ -31,7 +31,7 @@
  */
 
 /*
- * Version 1.00 [20051221]
+ * Version 1.01 [20060621]
  */
 
 /*
@@ -161,8 +161,7 @@ extern int sg_normalize_sense(const struct sg_io_hdr * hp,
 
 
 /* Some extra "category" function returns (beyond those in sg_lib.h) */
-#define SG_LIB_CAT_TIMEOUT 3
-#define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
+#define SG_LIB_CAT_TIMEOUT 33
 
 extern int sg_err_category(int masked_status, int host_status,
                int driver_status, const unsigned char * sense_buffer,

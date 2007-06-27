@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.10 20060409";
+static const char * version_str = "1.14 20060702";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -159,6 +159,8 @@ static void usage()
            "SG_IO\n"
            " bpt      is blocks_per_transfer (default is 128, or 64 KiB for "
            "def 'bs')\n"
+           "          setting 'bpt=0' will do 'count' zero block SCSI "
+           "READs\n"
            " bs       must match sector size if 'if' accessed via SCSI "
            "commands (def=512)\n"
            " cdbsz    size of SCSI READ command (default is 10)\n"
@@ -278,8 +280,9 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
     return 0;
 }
 
-/* -1 -> unrecoverable error, 0 -> successful, 1 -> recoverable (ENOMEM),
-   2 -> try again */
+/* -3 medium/hardware error, -2 -> not ready, 0 -> successful,
+   1 -> recoverable (ENOMEM), 2 -> try again (e.g. unit attention),
+   -1 -> other unrecoverable error */
 static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
                     long long from_block, int bs, int cdbsz,
                     int fua, int dpo, int * diop, int do_mmap,
@@ -339,8 +342,18 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
-    case SG_LIB_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_UNIT_ATTENTION:
+        if (verbose)
+            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
         return 2;
+    case SG_LIB_CAT_NOT_READY:
+        if (verbose)
+            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
+        return -2;
+    case SG_LIB_CAT_MEDIUM_HARD:
+        if (verbose)
+            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
+        return -3;
     default:
         sg_chk_n_print3("reading", &io_hdr, verbose);
         return -1;
@@ -368,6 +381,7 @@ int main(int argc, char * argv[])
     char * key;
     char * buf;
     char inf[INF_SZ];
+    char outf[INF_SZ];
     int in_type = FT_OTHER;
     int do_dio = 0;
     int do_odir = 0;
@@ -387,8 +401,10 @@ int main(int argc, char * argv[])
     char ebuff[EBUFF_SZ];
     struct timeval start_tm, end_tm;
     const char * read_str;
-    size_t psz = getpagesize();
+    int ret = 0;
+    size_t psz;
 
+    psz = getpagesize();
     inf[0] = '\0';
 
     for (k = 1; k < argc; k++) {
@@ -407,13 +423,13 @@ int main(int argc, char * argv[])
             bpt = sg_get_num(buf);
             if (-1 == bpt) {
                 fprintf(stderr, ME "bad argument to 'bpt'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"bs")) {
             bs = sg_get_num(buf);
             if (-1 == bs) {
                 fprintf(stderr, ME "bad argument to 'bs'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"cdbsz"))
             scsi_cdbsz = sg_get_num(buf);
@@ -423,14 +439,14 @@ int main(int argc, char * argv[])
                 dd_count = sg_get_llnum(buf + 1);
                 if (-1 == dd_count) {
                     fprintf(stderr, ME "bad argument to 'count'\n");
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 dd_count = - dd_count;
             } else {
                 dd_count = sg_get_llnum(buf);
                 if (-1 == dd_count) {
                     fprintf(stderr, ME "bad argument to 'count'\n");
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             }
         } else if (0 == strcmp(key,"dio"))
@@ -447,11 +463,13 @@ int main(int argc, char * argv[])
             no_dxfer = sg_get_num(buf);
         else if (0 == strcmp(key,"odir"))
             do_odir = sg_get_num(buf);
+        else if (strcmp(key,"of") == 0)
+            strncpy(outf, buf, INF_SZ);
         else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if (-1 == skip) {
                 fprintf(stderr, ME "bad argument to 'skip'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"time"))
             do_time = sg_get_num(buf);
@@ -466,7 +484,7 @@ int main(int argc, char * argv[])
         } else {
             fprintf(stderr, "Unrecognized argument '%s'\n", key);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (bs <= 0) {
@@ -478,11 +496,11 @@ int main(int argc, char * argv[])
     if (! count_given) {
         fprintf(stderr, "'count' must be given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (skip < 0) {
         fprintf(stderr, "skip cannot be negative\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (bpt < 1) {
         if (0 == bpt) {
@@ -490,16 +508,16 @@ int main(int argc, char * argv[])
                 dd_count = - dd_count;
         } else {
             fprintf(stderr, "bpt must be greater than 0\n");
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (do_dio && do_mmap) {
         fprintf(stderr, "cannot select both dio and mmap\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (no_dxfer && (do_dio || do_mmap)) {
         fprintf(stderr, "cannot select no_dxfer with dio or mmap\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     install_handler (SIGINT, interrupt_handler);
@@ -510,17 +528,17 @@ int main(int argc, char * argv[])
     if (! inf[0]) {
         fprintf(stderr, "must provide 'if=<filename>'\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (0 == strcmp("-", inf)) {
         fprintf(stderr, "'-' (stdin) invalid as <filename>\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     in_type = dd_filetype(inf);
     if (FT_ERROR == in_type) {
         fprintf(stderr, "Unable to access: %s\n", inf);
-        return 1;
+        return SG_LIB_FILE_ERROR;
     } else if ((FT_BLOCK & in_type) && do_blk_sgio)
         in_type |= FT_SG;
 
@@ -528,7 +546,7 @@ int main(int argc, char * argv[])
         if ((dd_count < 0) && (6 == scsi_cdbsz)) {
             fprintf(stderr, ME "SCSI READ (6) can't do zero block "
                     "reads\n");
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         flags = O_RDWR;
         if (do_odir)
@@ -541,13 +559,17 @@ int main(int argc, char * argv[])
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for sg reading", inf);
                 perror(ebuff);
-                return 1;
+                return SG_LIB_FILE_ERROR;
             }
         }
         if (verbose)
             fprintf(stderr, "Opened %s for SG_IO with flags=0x%x\n", inf,
                     flags);
         if ((dd_count > 0) && (! (FT_BLOCK & in_type))) {
+            if (verbose > 2) {
+                if (ioctl(infd, SG_GET_RESERVED_SIZE, &t) >= 0)
+                    fprintf(stderr, "  SG_GET_RESERVED_SIZE yields: %d\n", t);
+            } 
             t = bs * bpt;
             if ((do_mmap) && (0 != (t % psz)))
                 t = ((t / psz) + 1) * psz;    /* round up to next pagesize */
@@ -557,24 +579,24 @@ int main(int argc, char * argv[])
             res = ioctl(infd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
                 fprintf(stderr, ME "sg driver prior to 3.x.y\n");
-                return 1;
+                return SG_LIB_CAT_OTHER;
             }
             if (do_mmap && (t < 30122)) {
                 fprintf(stderr, ME "mmap-ed IO needs a sg driver version "
                         ">= 3.1.22\n");
-                return 1;
+                return SG_LIB_CAT_OTHER;
             }
         }
     } else {
         if (do_mmap) {
             fprintf(stderr, ME "mmap-ed IO only support on sg "
                     "devices\n");
-            return 1;
+            return SG_LIB_CAT_OTHER;
         }
         if (dd_count < 0) {
             fprintf(stderr, ME "negative 'count' only supported with "
                     "SCSI READs\n");
-            return 1;
+            return SG_LIB_CAT_OTHER;
         }
         flags = O_RDONLY;
         if (do_odir)
@@ -583,7 +605,7 @@ int main(int argc, char * argv[])
             snprintf(ebuff,  EBUFF_SZ,
                      ME "could not open %s for reading", inf);
             perror(ebuff);
-            return 1;
+            return SG_LIB_FILE_ERROR;
         }
         if (verbose)
             fprintf(stderr, "Opened %s for Unix reads with flags=0x%x\n",
@@ -596,7 +618,7 @@ int main(int argc, char * argv[])
                 snprintf(ebuff,  EBUFF_SZ,
                     ME "couldn't skip to required position on %s", inf);
                 perror(ebuff);
-                return 1;
+                return SG_LIB_FILE_ERROR;
             }
         }
     }
@@ -611,7 +633,7 @@ int main(int argc, char * argv[])
             if (0 == wrkBuff) {
                 fprintf(stderr, "Not enough user memory for aligned "
                         "storage\n");
-                return 1;
+                return SG_LIB_CAT_OTHER;
             }
             wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
@@ -620,13 +642,13 @@ int main(int argc, char * argv[])
                           MAP_SHARED, infd, 0);
             if (MAP_FAILED == wrkPos) {
                 perror(ME "error from mmap()");
-                return 1;
+                return SG_LIB_CAT_OTHER;
             }
         } else {
             wrkBuff = malloc(bs * bpt);
             if (0 == wrkBuff) {
                 fprintf(stderr, "Not enough user memory\n");
-                return 1;
+                return SG_LIB_CAT_OTHER;
             }
             wrkPos = wrkBuff;
         }
@@ -667,12 +689,29 @@ int main(int argc, char * argv[])
                                fua, dpo, &dio_tmp, do_mmap, no_dxfer);
             } else if (2 == res) {
                 fprintf(stderr, 
-                        "Unit attention, media changed, continuing (r)\n");
+                        "Unit attention, try again (r)\n");
                 res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
                                fua, dpo, &dio_tmp, do_mmap, no_dxfer);
             }
             if (0 != res) {
-                fprintf(stderr, ME "SCSI READ failed\n");
+                switch (res) {
+                case -3:
+                    ret = SG_LIB_CAT_MEDIUM_HARD;
+                    fprintf(stderr, ME "SCSI READ medium/hardware error\n");
+                    break;
+                case -2:
+                    ret = SG_LIB_CAT_NOT_READY;
+                    fprintf(stderr, ME "device not ready\n");
+                    break;
+                case 2:
+                    ret = SG_LIB_CAT_UNIT_ATTENTION;
+                    fprintf(stderr, ME "SCSI READ unit attention\n");
+                    break;
+                default:
+                    ret = SG_LIB_CAT_OTHER;
+                    fprintf(stderr, ME "SCSI READ failed\n");
+                    break;
+                }
                 break;
             } else {
                 in_full += blocks;
@@ -779,7 +818,8 @@ int main(int argc, char * argv[])
     res = 0;
     if (0 != dd_count) {
         fprintf(stderr, "Some error occurred,");
-        res = 2;
+        if (0 == ret)
+            ret = SG_LIB_CAT_OTHER;
     }
     print_stats(iters, read_str);
 
@@ -801,5 +841,5 @@ int main(int argc, char * argv[])
     if (sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
                 sum_of_resids);
-    return res;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

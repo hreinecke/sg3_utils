@@ -20,7 +20,7 @@
 
 */
 
-static char * version_str = "0.25 20060117";
+static char * version_str = "0.26 20060623";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -104,7 +104,7 @@ static void usage()
 {
     fprintf(stderr,
             "Usage: 'sg_persist [<options>] [<scsi_device>]\n"
-            " where Persistent Reservation (PR) <options> include:\n"
+            " where Persistent Reserve (PR) <options> include:\n"
             "       --clear|-C             PR Out: Clear\n"
             "       --device=<scsi_device> device to query or change\n"
             "       -d <scsi_device>       device to query or change "
@@ -279,11 +279,14 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                                       sizeof(pr_buff), 1, do_verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Persistent reserve in command not supported\n");
+            fprintf(stderr, "Persistent reserve in, command not "
+                    "supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Persistent reserve in cdb\n");
+            fprintf(stderr, "Persistent reserve in: bad field in cdb\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "Persistent reserve in: unit attention\n");
         else
-            fprintf(stderr, "Persistent reserve in command failed\n");
+            fprintf(stderr, "Persistent reserve in, command failed\n");
         return 1;
     }
     if (PRIN_RCAP_SA == prin_sa) {
@@ -461,11 +464,13 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
                                        pr_buff, len, 1, do_verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Persistent reserve out command not supported\n");
+            fprintf(stderr, "Persistent reserve out, command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Persistent reserve out cdb\n");
+            fprintf(stderr, "Persistent reserve out, bad field in cdb\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "Persistent reserve out, unit attention\n");
         else
-            fprintf(stderr, "Persistent reserve out command failed\n");
+            fprintf(stderr, "Persistent reserve out, command failed\n");
         return 1;
     } else if (do_verbose) {
         char buff[64];
@@ -521,7 +526,9 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
        if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "Persistent reserve out command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Persistent reserve out cdb\n");
+            fprintf(stderr, "Persistent reserve out, bad field in cdb\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "Persistent reserve out, unit attention\n");
         else
             fprintf(stderr, "Persistent reserve out command failed\n");
         return 1;
@@ -665,7 +672,7 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, c;
+    int sg_fd, c, res;
     unsigned int prout_type;
     unsigned long long param_rk = 0;
     unsigned long long param_sark = 0;
@@ -744,7 +751,7 @@ int main(int argc, char * argv[])
         case 'K':
             if (1 != sscanf(optarg, "%llx", &param_rk)) {
                 fprintf(stderr, "bad argument to '--param-rk'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
@@ -769,12 +776,12 @@ int main(int argc, char * argv[])
         case 'Q':
             if (1 != sscanf(optarg, "%x", &param_rtp)) {
                 fprintf(stderr, "bad argument to '--relative-target-port'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             if (param_rtp > 0xffff) {
                 fprintf(stderr, "argument to '--relative-target-port' 0 to "
                         "ffff inclusive\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
@@ -793,14 +800,14 @@ int main(int argc, char * argv[])
         case 'S':
             if (1 != sscanf(optarg, "%llx", &param_sark)) {
                 fprintf(stderr, "bad argument to '--param-sark'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
         case 'T':
             if (1 != sscanf(optarg, "%x", &prout_type)) {
                 fprintf(stderr, "bad argument to '--prout-type'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
@@ -820,7 +827,7 @@ int main(int argc, char * argv[])
                                        &num_transportids,
                                        sizeof(transportid_arr))) {
                 fprintf(stderr, "bad argument to '--transport-id'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
@@ -834,12 +841,12 @@ int main(int argc, char * argv[])
             break;
         case '?':
             usage();
-            return 1;
+            return 0;
         default:
             fprintf(stderr, "unrecognised switch "
                                 "code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -853,33 +860,33 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if ('\0' == device_name[0]) {
         fprintf(stderr, "No device name given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((want_prout + want_prin) > 1) {
         fprintf(stderr, "choose '--in' _or_ '--out' (not both)\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     } else if (want_prout) { /* syntax check on PROUT arguments */
         prin = 0;
         if ((1 != num_prout_sa) || (0 != num_prin_sa)) {
             fprintf(stderr, ">> For Persistent Reserve Out one and "
                     "only one appropriate\n>> service action must be "
                     "chosen (e.g. '--register')\n");
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     } else { /* syntax check on PRIN arguments */
         if (num_prout_sa > 0) {
             fprintf(stderr, ">> When a service action for Persistent "
                     "Reserve Out is chosen the\n"
                     ">> '--out' option must be given (as a safeguard)\n");
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         if (0 == num_prin_sa) {
             fprintf(stderr, ">> No service action given; assume Persistent"
@@ -891,20 +898,20 @@ int main(int argc, char * argv[])
             fprintf(stderr, "Too many service actions given; choose "
                     "one only\n");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if ((param_unreg || param_rtp) && (PROUT_REG_MOVE_SA != prout_sa)) {
         fprintf(stderr, "--unreg or --relative-target-port"
                 " only useful with --register-move\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((PROUT_REG_MOVE_SA == prout_sa) && (1 != num_transportids)) {
         fprintf(stderr, "with --register-move one (and only one) "
                 "--transport-id should be given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (((PROUT_RES_SA == prout_sa) ||
          (PROUT_REL_SA == prout_sa) ||
@@ -926,7 +933,7 @@ int main(int argc, char * argv[])
                                          do_verbose)) < 0) {
             fprintf(stderr, "sg_persist: error opening file (ro): %s: %s\n",
                      device_name, safe_strerror(-sg_fd));
-            return 1;
+            return SG_LIB_FILE_ERROR;
         }
         if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, do_verbose)) {
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
@@ -940,7 +947,7 @@ int main(int argc, char * argv[])
         } else {
             printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n", 
                    device_name);
-            return 1;
+            return SG_LIB_CAT_OTHER;
         }
         sg_cmds_close_device(sg_fd);
     }
@@ -949,7 +956,7 @@ int main(int argc, char * argv[])
                                      do_verbose)) < 0) {
         fprintf(stderr, "sg_persist: error opening file (rw): %s: %s\n",
                 device_name, safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     if (prin)
@@ -965,6 +972,11 @@ int main(int argc, char * argv[])
                          param_sark, param_alltgpt, param_aptpl,
                          transportid_arr, transportid_arr_len, do_verbose);
 
-    sg_cmds_close_device(sg_fd);
-    return ret;
+    res = sg_cmds_close_device(sg_fd);
+    if (res < 0) {
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
+    }
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

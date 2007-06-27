@@ -1,12 +1,12 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.20
+Version: 1.21
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
 Group: Utilities/System
 Source: ftp://www.torque.net/sg/p/sg3_utils-%{version}.tgz
-Url: http://www.torque.net/sg/u_index.html
+Url: http://www.torque.net/sg/sg3_utils.html
 Provides: sg_utils
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
 
@@ -84,6 +84,8 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_rmsn
 %attr(755,root,root) %{_bindir}/sg_ident
 %attr(755,root,root) %{_bindir}/sg_map26
+%attr(755,root,root) %{_bindir}/sg_vpd
+%attr(755,root,root) %{_bindir}/sg_rdac
 # Mandrake compresses man pages with bzip2, RedHat with gzip
 %attr(-,root,root) %doc %{_mandir}/man8/sg_dd.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sgp_dd.8*
@@ -121,9 +123,16 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_rmsn.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_ident.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_map26.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_vpd.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_rdac.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg3_utils.8*
  
 
 %changelog
+* Thu Jul 06 2006 - dgilbert at interlog dot com
+- add sg_vpd and sg_rdac, uniform exit statuses
+  * sg3_utils-1.21
+
 * Tue Apr 18 2006 - dgilbert at interlog dot com
 - sg_logs: sas port specific page decoding, sg*_dd updates
   * sg3_utils-1.20

@@ -1,4 +1,4 @@
-.TH SG_REASSIGN "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_REASSIGN "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_reassign \- reassign defective blocks on the given (disk) device
 .SH SYNOPSIS
@@ -118,12 +118,15 @@ with the same addresses will cause the earlier addresses to be reassigned
 again. At some stage the disk will run out of reserved locations.
 So unless a large number of addresses are involved it may be safer to
 reassign them one address at a time.
+.SH EXIT STATUS
+The exit status of sg_reassign is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005 Douglas Gilbert
+Copyright \(co 2005-2006 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,4 +1,4 @@
-.TH SG_REQUESTS "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_REQUESTS "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_requests \- send one or more SCSI REQUEST SENSE commands
 .SH SYNOPSIS
@@ -54,6 +54,9 @@ to "no sense" while the asc/ascq code convey the information (e.g.
 The REQUEST SENSE command is not marked as mandatory in SPC-3 (i.e. for
 all SCSI devices) but is marked as mandatory in SBC-2 (i.e. for disks),
 SSC-3 (i.e. for tapes) and MMC-4 (i.e. for CD/DVD drives).
+.SH EXIT STATUS
+The exit status of sg_requests is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

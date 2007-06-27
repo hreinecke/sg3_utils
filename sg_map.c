@@ -36,7 +36,7 @@
 */
 
 
-static char * version_str = "1.05 20060405";
+static char * version_str = "1.06 20060623";
 
 static const char * devfs_id = "/dev/.devfsd";
 
@@ -223,15 +223,15 @@ int main(int argc, char * argv[])
             printf(
             "Show mapping from sg devices to other scsi device names\n\n");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         } else if (*argv[k] == '-') {
             printf("Unknown switch: %s\n", argv[k]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         } else if (*argv[k] != '-') {
             printf("Unknown argument\n");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
@@ -246,7 +246,7 @@ int main(int argc, char * argv[])
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
             perror("sg_map: close error");
-            return 1;
+            return SG_LIB_FILE_ERROR;
         }
         if (has_sysfs_sg) {
            if (0 == gen_index_arr[k]) {
@@ -305,7 +305,7 @@ int main(int argc, char * argv[])
         printf("Stopping because there are too many error\n");
         if (eacces_err)
             printf("    root access may be required\n");
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     if (last_sg_ind < 0) {
         printf("Stopping because no sg devices found\n");

@@ -42,7 +42,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.07 20060324";
+static char * version_str = "4.08 20060623";
 
 #define ME "sg_scan: "
 
@@ -189,7 +189,7 @@ int main(int argc, char * argv[])
         memset(gen_index_arr, 0, max_file_args * sizeof(int));
     else {
         printf(ME "Out of memory\n");
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
 
     for (k = 1, j = 0; k < argc; ++k) {
@@ -208,7 +208,7 @@ int main(int argc, char * argv[])
                     printf("Scan sg device names and optionally do an "
                            "INQUIRY\n\n");
                     usage();
-                    return 1;
+                    return 0;
                 case 'i':
                     do_inquiry = 1;
                     break;
@@ -239,7 +239,7 @@ int main(int argc, char * argv[])
             if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else {
             if (j < max_file_args) {
@@ -247,7 +247,7 @@ int main(int argc, char * argv[])
                 gen_index_arr[j++] = k;
             } else {
                 printf("Too many command line arguments\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         }
     }
@@ -264,7 +264,7 @@ int main(int argc, char * argv[])
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, ME "Error closing %s ", fname);
             perror(ebuff);
-            return 1;
+            return SG_LIB_FILE_ERROR;
         }
         if (has_file_args) {
             if (gen_index_arr[j])

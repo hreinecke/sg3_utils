@@ -1,4 +1,4 @@
-.TH SG_SES "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_SES "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -41,7 +41,7 @@ page to be specified. The string given should not include the first 4
 bytes (i.e. page code and length). See next entry for using stdin.
 .TP
 --data=- | -d -
-reads a data string from stdin. Space, tabs and line feeds additionally
+reads a data string from stdin. Spaces, tabs and line feeds additionally
 are permitted as separators.
 .TP
 --filter | -f
@@ -133,6 +133,9 @@ check try:
    sg_ses --page=5 /dev/sda
 .PP
 again.
+.SH EXIT STATUS
+The exit status of sg_ses is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

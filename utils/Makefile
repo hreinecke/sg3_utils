@@ -7,7 +7,7 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 CC = gcc
 LD = gcc
 
-EXECS = hxascdmp
+EXECS = hxascdmp sg_chk_asc
 
 MAN_PGS = 
 MAN_PREF = man8
@@ -27,6 +27,9 @@ clean:
 	/bin/rm -f *.o $(EXECS) core .depend
 
 hxascdmp: hxascdmp.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_chk_asc: sg_chk_asc.o ../sg_lib.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 

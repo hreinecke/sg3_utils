@@ -1,4 +1,4 @@
-.TH SG_READ "8" "April 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_READ "8" "July 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_read \- read blocks of data continually from same offset
 .SH SYNOPSIS
@@ -10,14 +10,15 @@ sg_read \- read blocks of data continually from same offset
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Read data from a Linux SCSI generic (sg) device, a block device, a raw
-device or a normal file with each read command issued to the same offset.
-This can be used to test (or time) disk caching, SCSI (or some other)
-transport throughput, and/or SCSI command overhead.
+Read data from a Linux SCSI generic (sg) device, a block device or
+a normal file with each read command issued to the same offset or
+logical block address (lba). This can be used to test (or time) disk
+caching, SCSI (or some other) transport throughput, and/or SCSI
+command overhead.
 .PP
 When the 'count' argument is positive, then up to 'bpt' blocks are read
 at a time, until the 'count' is exhausted. Each read operation
-starts at the same offset which, if 'skip' is not given, is the beginning
+starts at the same lba which, if 'skip' is not given, is the beginning
 of the file or device.
 .PP
 The 'count' argument may be negative when '<ifile>' is a sg device
@@ -38,7 +39,7 @@ device.
 bpt=BLOCKS
 each read operation will be made using this number of blocks (or less if 
 near the end of 'count'). Default is 128. Note also that each read
-operation starts at the same offset (as given by skip or 0). If 'bpt=0'
+operation starts at the same lba (as given by 'skip=<n>' or 0). If 'bpt=0'
 then the 'count' is interpreted as the number of zero block READ SCSI
 commands to issue.
 .TP
@@ -160,6 +161,9 @@ output of third command will look like this:
   Average number of READ commands per second was 1735.27
 .br
   1000000+0 records in, SCSI commands issued: 7813
+.SH EXIT STATUS
+The exit status of sg_read is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Doug Gilbert.
 .SH "REPORTING BUGS"

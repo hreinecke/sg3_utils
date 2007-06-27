@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
+.TH SG_INQ "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_inq \- outputs data retrieved from the SCSI INQUIRY or
 ATA IDENTIFY (PACKET) DEVICE command
@@ -35,7 +35,7 @@ transport information to be found for ATAPI cd/dvd drives; since
 without this option such drives respond to a SCSI INQUIRY command.
 .PP
 The reference document used for interpreting an INQUIRY is T10/1713-D
-Revision 2 (SPC-4, 15 September 2005) found at http://www.t10.org .
+Revision 4 (SPC-4, 9 March 2006) found at http://www.t10.org .
 Obsolete items in the standard INQUIRY response are displayed in
 brackets. The reference document for the ATA IDENTIFY (PACKET) DEVICE
 command is ATA8-ACS found at http://www.t13.org .
@@ -245,15 +245,18 @@ This utility doesn't decode the response to an ATA IDENTIFY (PACKET)
 DEVICE command, hdparm does a good job at that. The '-rr' option has
 been added to use with either the '-A' or '-a' option to produce a
 format acceptable to "hdparm --Istdin". See hdparm.
+.SH EXIT STATUS
+The exit status of sg_inq is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2001-2005 Douglas Gilbert
+Copyright \(co 2001-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sgdiag(scsirastools), sg_opcodes(sg3_utils), sg_modes(sg3_utils),
-.B sg_logs(sg3_utils), hdparm(hdparm)
+.B sg_logs(sg3_utils), hdparm(hdparm), sg_vpd(sg_vpd)

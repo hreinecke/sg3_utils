@@ -1,4 +1,4 @@
-.TH SG_TEST_RWBUF "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_TEST_RWBUF "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_test_rwbuf \- Tests the SCSI host adapter by issuing write and read 
 operations on a device's buffer and calculating checksums.
@@ -72,6 +72,9 @@ file systems on them.
 Following this theme further, a disk with active mounted file systems may cause
 the data read back to be different (due to caching activity) to what was written
 and hence a checksum error.
+.SH EXIT STATUS
+The exit status of sg_test_rwbuf is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert and K. Garloff
 .SH COPYRIGHT

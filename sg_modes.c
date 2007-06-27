@@ -21,7 +21,7 @@
    
 */
 
-static char * version_str = "1.15 20060331";
+static char * version_str = "1.16 20060623";
 
 #define ME "sg_modes: "
 
@@ -408,7 +408,7 @@ static int examine_pages(int sg_fd, int do_mode6, int inq_pdt, int inq_byte6,
             if (SG_LIB_CAT_INVALID_OP == res) {
                 fprintf(stderr, ">>>>>> try again without the '-6' "
                         "switch for a 10 byte MODE SENSE command\n");
-                return 1;
+                return res;
             }
         } else {
             res = sg_ll_mode_sense10(sg_fd, 0, 0, 0, k,
@@ -416,7 +416,7 @@ static int examine_pages(int sg_fd, int do_mode6, int inq_pdt, int inq_byte6,
             if (SG_LIB_CAT_INVALID_OP == res) {
                 fprintf(stderr, ">>>>>> try again with a '-6' "
                         "switch for a 6 byte MODE SENSE command\n");
-                return 1;
+                return res;
             }
         }
         if (0 == res) {
@@ -429,9 +429,10 @@ static int examine_pages(int sg_fd, int do_mode6, int inq_pdt, int inq_byte6,
                 printf("    %s\n", cp);
             else
                 printf("    [0x%x]\n", k);
-        }
+        } else if (SG_LIB_CAT_NOT_READY == res)
+            fprintf(stderr, "MODE SENSE failed, device not ready\n");
     }
-    return 0;
+    return res;
 }
 
 static const char * pg_control_str_arr[] = {
@@ -501,8 +502,9 @@ int main(int argc, char * argv[])
     int do_list = 0;
     int do_raw = 0;
     int do_verbose = 0;
+    int ret = 0;
     int density_code_off, t_proto, inq_pdt, inq_byte6, resp_mode6;
-    int num_ua_pages, plen, jmp_out, ret;
+    int num_ua_pages, plen, jmp_out;
     unsigned char * ucp;
     unsigned char uc;
     struct sg_simple_inquiry_resp inq_out;
@@ -559,7 +561,7 @@ int main(int argc, char * argv[])
                     exit(0);
                 case '?':
                     usage();
-                    return 1;
+                    return 0;
                 default:
                     jmp_out = 1;
                     break;
@@ -574,7 +576,7 @@ int main(int argc, char * argv[])
                 if ((1 != num) || (u > 3)) {
                     fprintf(stderr, "Bad page control after 'c=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 pc = u;
             } else if (0 == strncmp("p=", cp, 2)) {
@@ -584,7 +586,7 @@ int main(int argc, char * argv[])
                         fprintf(stderr, "Bad page code value after 'p=' "
                                 "option\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                     }
                     pg_code = u;
                 } else if (2 == sscanf(cp + 2, "%x,%x", &u, &uu)) {
@@ -592,7 +594,7 @@ int main(int argc, char * argv[])
                         fprintf(stderr, "Bad sub page code value after 'p=' "
                                 "option\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                     }
                     pg_code = u;
                     sub_pg_code = uu;
@@ -601,7 +603,7 @@ int main(int argc, char * argv[])
                     fprintf(stderr, "Bad page code, subpage code sequence "
                             "after 'p=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             } else if (0 == strncmp("subp=", cp, 5)) {
                 num = sscanf(cp + 5, "%x", &u);
@@ -609,7 +611,7 @@ int main(int argc, char * argv[])
                     fprintf(stderr, "Bad sub page code after 'subp=' "
                             "option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 sub_pg_code = u;
                 sub_pg_code_set = 1;
@@ -618,7 +620,7 @@ int main(int argc, char * argv[])
             } else if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == file_name)
             file_name = cp;
@@ -626,7 +628,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
                     "%s\n", file_name, cp);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     
@@ -647,12 +649,12 @@ int main(int argc, char * argv[])
         }
         fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     if (do_examine && (pg_code >= 0)) {
         fprintf(stderr, "can't give '-e' and a page number\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     /* The 6 bytes command only allows up to 252 bytes of response data */
@@ -660,7 +662,7 @@ int main(int argc, char * argv[])
         if (do_llbaa) {
             fprintf(stderr, "LLBAA not defined for MODE SENSE 6, try "
                     "without '-L'\n");
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         rsp_buff_size = 252;
     }
@@ -671,14 +673,14 @@ int main(int argc, char * argv[])
     if ((sg_fd = sg_cmds_open_device(file_name, 1 /* ro */, do_verbose)) < 0) {
         fprintf(stderr, ME "error opening file: %s: %s\n", file_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     if (sg_simple_inquiry(sg_fd, &inq_out, 1, do_verbose)) {
         fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
                 file_name);
         sg_cmds_close_device(sg_fd);
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
     inq_pdt = inq_out.peripheral_type;
     inq_byte6 = inq_out.byte_6;
@@ -708,12 +710,12 @@ int main(int argc, char * argv[])
         if (do_all) {
             fprintf(stderr, "'-r' requires a given (sub)page (not all)\n");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         if (do_hex) {
             fprintf(stderr, "'-r' and '-h' clash");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
@@ -738,7 +740,14 @@ int main(int argc, char * argv[])
             fprintf(stderr, "invalid field in cdb (perhaps subpages "
                     "or page control (PC) not supported)\n");
     }
-    ret = 1;
+    if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "invalid field in cdb (perhaps subpages "
+                "or page control (PC) not supported)\n");
+    else if (SG_LIB_CAT_NOT_READY == res)
+        fprintf(stderr, "device not ready\n");
+    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+        fprintf(stderr, "unit attention\n");
+    ret = res;
     if (0 == res) {
         int medium_type, specific, headerlen;
 
@@ -905,5 +914,5 @@ int main(int argc, char * argv[])
     }
 finish:
     sg_cmds_close_device(sg_fd);
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

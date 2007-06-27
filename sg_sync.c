@@ -45,7 +45,7 @@
  * (e.g. disks)
  */
 
-static char * version_str = "1.04 20060125";
+static char * version_str = "1.05 20060623";
 
 
 #define ME "sg_sync: "
@@ -101,7 +101,7 @@ int main(int argc, char * argv[])
     int sync_nv = 0;
     int verbose = 0;
     char device_name[256];
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -117,14 +117,14 @@ int main(int argc, char * argv[])
             count = sg_get_llnum(optarg);
             if (count < 0) {
                 fprintf(stderr, "bad argument to '--count'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'g':
             group = sg_get_num(optarg);
             if ((group < 0) || (group > 31)) {
                 fprintf(stderr, "bad argument to '--group'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'h':
@@ -138,7 +138,7 @@ int main(int argc, char * argv[])
             lba = sg_get_llnum(optarg);
             if (lba < 0) {
                 fprintf(stderr, "bad argument to '--lba'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 's':
@@ -153,7 +153,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -167,27 +167,32 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     res = sg_ll_sync_cache_10(sg_fd, sync_nv, immed, group,
                               (unsigned int)lba, (unsigned int)count,
                               1, verbose);
+    ret = res;
     if (0 == res)
-        ret = 0;
+        ;
+    else if (SG_LIB_CAT_NOT_READY == res)
+        fprintf(stderr, "Synchronize cache failed, device not ready\n");
+    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+        fprintf(stderr, "Synchronize cache, unit attention\n");
     else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Synchronize cache command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
@@ -197,8 +202,9 @@ int main(int argc, char * argv[])
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

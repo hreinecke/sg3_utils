@@ -1,4 +1,4 @@
-.TH SG_VERIFY "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_VERIFY "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
@@ -46,8 +46,9 @@ output the usage message then exit.
 .TP
 --lba=<n> | -l <n>
 specifies the logical block address on the device to start the verify
-operation. <n> is assumed to be decimal unless prefixed by '0x' (see
-below). The default value is 0 (i.e. the start of the device).
+operation. <n> is assumed to be decimal unless prefixed by '0x' or
+a trailing 'h' (see below). The default value is 0 (i.e. the start of the
+device).
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output).
@@ -77,6 +78,9 @@ the DCR bit to 1, the verify retry count to 0 and the verify error
 recovery timeout to 0. Mode pages can be modified with the
 .B sginfo
 utility.
+.SH EXIT STATUS
+The exit status of sg_verify is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

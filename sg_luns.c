@@ -43,7 +43,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.05 20060127";
+static char * version_str = "1.06 20060623";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -203,7 +203,7 @@ int main(int argc, char * argv[])
     int select_rep = 0;
     int verbose = 0;
     char device_name[256];
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -226,7 +226,7 @@ int main(int argc, char * argv[])
            if ((1 != sscanf(optarg, "%d", &select_rep)) ||
                (select_rep < 0) || (select_rep > 255)) {
                 fprintf(stderr, "bad argument to '--select'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'v':
@@ -238,7 +238,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -252,20 +252,20 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     memset(reportLunsBuff, 0x0, sizeof(reportLunsBuff));
@@ -273,6 +273,7 @@ int main(int argc, char * argv[])
 
     res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff,
                             sizeof(reportLunsBuff), 1, verbose);
+    ret = res;
     if (0 == res) {
         list_len = (reportLunsBuff[0] << 24) + (reportLunsBuff[1] << 16) +
                    (reportLunsBuff[2] << 8) + reportLunsBuff[3];
@@ -300,7 +301,6 @@ int main(int argc, char * argv[])
             if (decode)
                 decode_lun("      ", reportLunsBuff + off - 8);
         }
-        ret = 0;
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Luns command not supported (support "
                 "mandatory in SPC-3)\n");
@@ -314,8 +314,9 @@ int main(int argc, char * argv[])
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -5,7 +5,7 @@ By default, the Makefile will build for Linux with a shared library.
 The invocation sequence is:
 
 make
-make install	[may need root permission]
+make install    [may need root permission]
 
 Unless overridden or edited in the Makefile, INSTDIR places the executables
 in the /usr/local/bin directory, LIBDIR places libraries in the
@@ -64,7 +64,9 @@ change directory to the top level within the sg3_utils source. Then:
  # chmod +x debian/rules
  # dpkg-buildpackage -b -rfakeroot
 The binary deb packages will be placed in the parent directory (of
-the sg3_utils source directory) if all goes well.
+the sg3_utils source directory) if all goes well. There is now
+a script called build_debian.sh in the main directory which invokes
+those two commands.
 
 If the shared object (library) is troublesome or unwanted then
 a "no_lib" version of the Makefile and the sg3_utils.spec file
@@ -91,4 +93,4 @@ Utilities that are linux specific (e.g. sg_map) are not built for
 Tru64.
 
 
-24th January 2006
+29th June 2006

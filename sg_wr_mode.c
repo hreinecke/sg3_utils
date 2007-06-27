@@ -43,7 +43,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.05 20060106";
+static char * version_str = "1.06 20060623";
 
 #define ME "sg_wr_mode: "
 
@@ -296,7 +296,7 @@ int main(int argc, char * argv[])
     unsigned char ref_md[MX_ALLOC_LEN];
     char ebuff[EBUFF_SZ];
     struct sg_simple_inquiry_resp inq_data;
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -313,7 +313,7 @@ int main(int argc, char * argv[])
             if (0 != build_mode_page(optarg, read_in, &read_in_len,
                                      sizeof(read_in))) {
                 fprintf(stderr, "bad argument to '--contents'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             got_contents = 1;
             break;
@@ -333,7 +333,7 @@ int main(int argc, char * argv[])
                 mode_6 = (6 == res) ? 1 : 0;
             else {
                 fprintf(stderr, "length (of cdb) must be 6 or 10\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'm':
@@ -341,7 +341,7 @@ int main(int argc, char * argv[])
             if (0 != build_mask(optarg, mask_in, &mask_in_len,
                                 sizeof(mask_in))) {
                 fprintf(stderr, "bad argument to '--mask'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             got_mask = 1;
             break;
@@ -351,21 +351,21 @@ int main(int argc, char * argv[])
                 if ((1 != num) || (u > 62)) {
                     fprintf(stderr, "Bad page code value after '--page' "
                             "switch\n");
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 pg_code = u;
             } else if (2 == sscanf(optarg, "%x,%x", &u, &uu)) {
                 if (uu > 254) {
                     fprintf(stderr, "Bad sub page code value after '--page'"
                             " switch\n");
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 pg_code = u;
                 sub_pg_code = uu;
             } else {
                 fprintf(stderr, "Bad page code, subpage code sequence after "
                         "'--page' switch\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 's':
@@ -380,7 +380,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -394,30 +394,30 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (pg_code < 0) {
         fprintf(stderr, "need page code (see '--page=')\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (got_mask && force) {
         fprintf(stderr, "cannot use both '--force' and '--mask'\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_data, 0, verbose))
         pdt = inq_data.peripheral_type;
@@ -434,9 +434,18 @@ int main(int argc, char * argv[])
         res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd, 0 /* current */,
                                  pg_code, sub_pg_code, ref_md, alloc_len, 1,
                                  verbose);
+    ret = res;
     if (SG_LIB_CAT_INVALID_OP == res) {
         fprintf(stderr, "MODE SENSE (%d) not supported, try '--len=%d'\n",
                 (mode_6 ? 6 : 10), (mode_6 ? 10 : 6));
+        goto err_out;
+    } else if (SG_LIB_CAT_NOT_READY == res) {
+        fprintf(stderr, "MODE SENSE (%d) failed, device not ready\n",
+                (mode_6 ? 6 : 10));
+        goto err_out;
+    } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
+        fprintf(stderr, "MODE SENSE (%d) failed, unit attention\n",
+                (mode_6 ? 6 : 10));
         goto err_out;
     } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
         fprintf(stderr, "bad field in MODE SENSE (%d) command\n",
@@ -523,8 +532,17 @@ int main(int argc, char * argv[])
         else
             res = sg_ll_mode_select10(sg_fd, 1, save, ref_md, md_len, 1,
                                       verbose);
+        ret = res;
         if (SG_LIB_CAT_INVALID_OP == res) {
             fprintf(stderr, "MODE SELECT (%d) not supported\n",
+                    (mode_6 ? 6 : 10));
+            goto err_out;
+        } else if (SG_LIB_CAT_NOT_READY == res) {
+            fprintf(stderr, "MODE SELECT (%d) failed, device not ready\n",
+                    (mode_6 ? 6 : 10));
+            goto err_out;
+        } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
+            fprintf(stderr, "MODE SELECT (%d) failed, unit attention\n",
                     (mode_6 ? 6 : 10));
             goto err_out;
         } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
@@ -547,12 +565,12 @@ int main(int argc, char * argv[])
         printf("  mode page:\n");
         dStrHex((const char *)(ref_md + off), md_len - off, -1);
     }
-    ret = 0;
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -54,7 +54,9 @@
 #include <sys/stat.h>
 #include <linux/major.h>
 
-static char * version_str = "1.03 20060323";
+#include "sg_lib.h"
+
+static char * version_str = "1.03 20060623";
 
 #define ME "sg_map26: "
 
@@ -978,7 +980,7 @@ static int map_sg(const char * device_name, const char * device_dir, int ma,
 
 int main(int argc, char * argv[])
 {
-        int c, num, res, tt, cont;
+        int c, num, tt, cont, res;
         int do_dev_dir = 0;
         int given_is = -1;
         int result = 0;
@@ -1012,7 +1014,7 @@ int main(int argc, char * argv[])
                         else {
                                 fprintf(stderr, "value for '--given_to=' "
                                         "must be 0 or 1\n");
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'h':
@@ -1026,7 +1028,7 @@ int main(int argc, char * argv[])
                         else {
                                 fprintf(stderr, "value for '--result=' "
                                         "must be 0..3\n");
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 's':
@@ -1042,7 +1044,7 @@ int main(int argc, char * argv[])
                         fprintf(stderr, "unrecognised switch code 0x%x ??\n",
                                 c);
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         }
         if (optind < argc) {
@@ -1057,14 +1059,14 @@ int main(int argc, char * argv[])
                                 fprintf(stderr, "Unexpected extra argument: "
                                         "%s\n", argv[optind]);
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         }
 
         if (0 == device_name[0]) {
                 fprintf(stderr, "missing device name!\n");
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
         }
 
         ma = 0;
@@ -1080,7 +1082,7 @@ int main(int argc, char * argv[])
                                         "dev_dir: %s\n", device_dir);
                 } else {
                         fprintf(stderr, "dev_dir: %s invalid\n", device_dir);
-                        return 1;
+                        return SG_LIB_FILE_ERROR;
                 }
         } else {
                 strcpy(device_dir, device_name);
@@ -1094,7 +1096,7 @@ int main(int argc, char * argv[])
         if (ret < 0) {
                 fprintf(stderr, "stat failed on %s: %s\n", device_name,
                         ssafe_strerror(-ret));
-                return 1;
+                return SG_LIB_FILE_ERROR;
         }
         if (verbose)
                 fprintf(stderr, " %s: %s device [maj=%d, min=%d]\n",
@@ -1107,7 +1109,7 @@ int main(int argc, char * argv[])
                 if (given_is > 0) {
                         fprintf(stderr, "block special but '--given_is=' "
                                 "suggested sysfs device\n");
-                        return 1;
+                        return SG_LIB_FILE_ERROR;
                 }
                 break;
         case NT_ST:
@@ -1117,14 +1119,14 @@ int main(int argc, char * argv[])
                 if (given_is > 0) {
                         fprintf(stderr, "character special but '--given_is=' "
                                 "suggested sysfs device\n");
-                        return 1;
+                        return SG_LIB_FILE_ERROR;
                 }
                 break;
         case NT_REG:
                 if (0 == given_is) {
                         fprintf(stderr, "regular file but '--given_is=' "
                                 "suggested block or char special\n");
-                        return 1;
+                        return SG_LIB_FILE_ERROR;
                 }
                 strcpy(device_dir, def_dev_dir);
                 break;
@@ -1132,7 +1134,7 @@ int main(int argc, char * argv[])
                 if (0 == given_is) {
                         fprintf(stderr, "directory but '--given_is=' "
                                 "suggested block or char special\n");
-                        return 1;
+                        return SG_LIB_FILE_ERROR;
                 }
                 strcpy(device_dir, def_dev_dir);
                 break;
@@ -1159,7 +1161,7 @@ int main(int argc, char * argv[])
                         if (result < 2) {
                                 fprintf(stderr, "a hd device does not map "
                                         "to a sg device\n");
-                                return 1;
+                                return SG_LIB_FILE_ERROR;
                         }
                         res = map_hd(device_dir, ma, mi, result,
                                      follow_symlink, verbose);
@@ -1185,13 +1187,13 @@ int main(int argc, char * argv[])
                                         sizeof(value))) {
                                 fprintf(stderr, "Couldn't fetch value "
                                         "from: %s\n", device_name);
-                                return 1;
+                                return SG_LIB_FILE_ERROR;
                         }
                         if (verbose)
                                 fprintf(stderr, "value: %s\n", value);
                         if (2 != sscanf(value, "%d:%d", &ma, &mi)) {
                                 fprintf(stderr, "Couldn't decode value\n");
-                                return 1;
+                                return SG_LIB_FILE_ERROR;
                         }
                         tt = nt_typ_from_major(ma);
                         cont = 1;
@@ -1201,13 +1203,13 @@ int main(int argc, char * argv[])
                                         sizeof(value))) {
                                 fprintf(stderr, "Couldn't fetch value from: "
                                         "%s/dev\n", device_name);
-                                return 1;
+                                return SG_LIB_FILE_ERROR;
                         }
                         if (verbose)
                                 fprintf(stderr, "value: %s\n", value);
                         if (2 != sscanf(value, "%d:%d", &ma, &mi)) {
                                 fprintf(stderr, "Couldn't decode value\n");
-                                return 1;
+                                return SG_LIB_FILE_ERROR;
                         }
                         tt = nt_typ_from_major(ma);
                         cont = 1;

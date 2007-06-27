@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "April 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SGP_DD "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sgp_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -274,6 +274,12 @@ To do a fast copy from one SCSI disk to another one with similar
 geometry (stepping over errors on the source disk):
 .PP
    sgp_dd if=/dev/sg0 of=/dev/sg1 bs=512 coe=1
+.SH EXIT STATUS
+The exit status of sgp_dd is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page. Since this utility works at a higher level
+than individual commands, and there are 'coe' and 'retries' flags,
+individual SCSI command failures do not necessary cause the process
+to exit.
 .SH AUTHORS
 Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"

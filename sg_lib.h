@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.20 [20050418]
+/* Version 1.24 [20050630]
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
@@ -162,10 +162,11 @@ extern int sg_get_sense_progress_fld(const unsigned char * sensep,
                                      int sb_len, int * progress_outp);
 
 /* Closely related to sg_print_sense(). Puts decode sense data in 'buff'.
-   Usually multiline with multiple '\n' including one trailing. */
+   Usually multiline with multiple '\n' including one trailing. If
+   'raw_sinfo' set appends sense buffer in hex. */
 extern void sg_get_sense_str(const char * leadin,
                              const unsigned char * sense_buffer, int sb_len,
-                             int raw_info, int buff_len, char * buff);
+                             int raw_sinfo, int buff_len, char * buff);
 
 /* Yield string associated with peripheral device type (pdt). Returns
    'buff'. If 'pdt' out of range yields "bad pdt" string. */
@@ -183,24 +184,51 @@ extern void sg_print_sense(const char * leadin,
                            int raw_info);
 extern void sg_print_scsi_status(int scsi_status);
 
-/* The following "category" function returns one of the following */
+/* Utilities can use these process status values for syntax errors and
+   file (device node) problems (e.g. not found or permissions). */
+#define SG_LIB_SYNTAX_ERROR 1
+#define SG_LIB_FILE_ERROR 15
+
+/* The sg_err_category_sense() function returns one of the following.
+   These may be used as process status values (on exit). Notice that
+   some of the lower values correspond to SCSI sense key values. */
 #define SG_LIB_CAT_CLEAN 0      /* No errors or other information */
-#define SG_LIB_CAT_MEDIA_CHANGED 1 /* interpreted from sense buffer */
-                                /*       [sk,asc,ascq: 0x6,0x28,*] */
-#define SG_LIB_CAT_RECOVERED 4  /* Successful command after recovered err */
-                                /*       [sk,asc,ascq: 0x1,*,*] */
-#define SG_LIB_CAT_INVALID_OP 5 /* Invalid operation code: */
-                                /*       [sk,asc,ascq: 0x5,0x20,0x0] */
-#define SG_LIB_CAT_MEDIUM_HARD 6 /* medium or hardware error sense key */
-                                /*       [sk,asc,ascq: 0x3/0x4,*,*] */
-#define SG_LIB_CAT_ILLEGAL_REQ 7 /* Illegal request (other than invalid */
+/* Value 1 left unused for utilities to use SG_LIB_SYNTAX_ERROR */
+#define SG_LIB_CAT_NOT_READY 2  /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0x2,*,*] */
+#define SG_LIB_CAT_MEDIUM_HARD 3 /* medium or hardware error, blank check */
+                                /*       [sk,asc,ascq: 0x3/0x4/0x8,*,*] */
+#define SG_LIB_CAT_ILLEGAL_REQ 5 /* Illegal request (other than invalid */
                                 /* opcode):   [sk,asc,ascq: 0x5,*,*] */
-#define SG_LIB_CAT_NO_SENSE 8   /* sense data with key of "no sense" */
+#define SG_LIB_CAT_UNIT_ATTENTION 6 /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0x6,*,*] */
+        /* was SG_LIB_CAT_MEDIA_CHANGED earlier [sk,asc,ascq: 0x6,0x28,*] */
+#define SG_LIB_CAT_INVALID_OP 9 /* (Illegal request,) Invalid opcode: */
+                                /*       [sk,asc,ascq: 0x5,0x20,0x0] */
+#define SG_LIB_CAT_NO_SENSE 10  /* sense data with key of "no sense" */
                                 /*       [sk,asc,ascq: 0x0,*,*] */
+#define SG_LIB_CAT_RECOVERED 11 /* Successful command after recovered err */
+                                /*       [sk,asc,ascq: 0x1,*,*] */
+#define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
+#define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred
+                                   (e.g. a transport or driver error) */
 
 extern int sg_err_category_sense(const unsigned char * sense_buffer,
                                  int sb_len);
+
+/* Iterates to next designation descriptor in the device identification
+   VPD page. The 'initial_desig_desc' should point to start of first
+   descriptor with 'page_len' being the number of valid bytes in that
+   and following descriptors. To start, 'off' should point to a negative
+   value, thereafter it should point to the value yielded by the previous
+   call. If 0 returned then 'initial_desig_desc + *off' should be a valid
+   descriptor; returns -1 if normal end condition and -2 for an abnormal
+   termination. Matches association, designator_type and/or code_set when
+   any of those values are greater than or equal to zero. */
+extern int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc,
+                              int page_len, int * off, int m_assoc,
+                              int m_desig_type, int m_code_set);
 
 
 /* <<< General purpose (i.e. not SCSI specific) utility functions >>> */
@@ -225,6 +253,13 @@ extern void dStrHex(const char* str, int len, int no_ascii);
    big endian machine).
 */
 extern int sg_is_big_endian();
+
+/* Extract character sequence from ATA words as in the model string
+   in a IDENTIFY DEVICE response. Returns number of characters
+   written to 'ochars' before 0 character is found or 'num' words
+   are processed. */
+extern int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
+                            int num_words, int is_big_endian, char * ochars);
 
 /* Print (to stdout) 16 bit 'words' in hex, 8 words per line optionally
    followed at the right hand side of the line with an ASCII interpretation

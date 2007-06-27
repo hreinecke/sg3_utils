@@ -36,6 +36,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_persist - accesses the Persistent Reservation In and Out commands
      * sg_prevent - issues PREVENT ALLOW MEDIUM REMOVAL command (MMC + SSC)
      * sg_rbuf - tests SCSI bus speed
+     * sg_rdac - vendor specific for RDAC hardware
      * sg_read - reads multiple blocks, useful for timing
      * sg_read_long - read a "long" block from the given device
      * sg_readcap - prints the output of a READ CAPACITY command
@@ -52,6 +53,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_test_rwbuf - tests the SCSI host adapter
      * sg_turs - execute a TEST UNIT READY command on the given device
      * sg_verify - issues VERIFY command on SCSI disks
+     * sg_vpd - decode VPD pages
      * sg_write_long - write a "long" block to the given device
      * sg_wr_mode - low level utility to change mode pages
  .
