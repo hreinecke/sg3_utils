@@ -47,7 +47,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "5.08 20020204";
+static char * version_str = "5.10 20020317";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -102,6 +102,7 @@ typedef struct request_collection
     pthread_cond_t out_sync_cv; /* -/ hold writes until "in order" */
     int bs;
     int bpt;
+    int fua_mode;
     int dio;
     int dio_incomplete;         /* -\ */
     int sum_of_resids;          /*  | */
@@ -124,6 +125,7 @@ typedef struct request_element
     unsigned char cmd[MAX_SCSI_CDBSZ];
     unsigned char sb[SENSE_BUFF_LEN];
     int bs;
+    int fua_mode;
     int dio;
     int dio_incomplete;
     int resid;
@@ -181,8 +183,8 @@ void usage()
     fprintf(stderr, "Usage: "
            "sgp_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
            "               [bs=<num>] [bpt=<num>] [count=<n>]\n"
-           "               [dio=<n>] [thr=<n>] [coe=<n>] [gen=<n>]\n"
-           "               [time=<n>] [deb=<n>] [cdbsz=<6|10|12|16>] "
+           "               [dio=<n>] [thr=<n>] [coe=<n>] [gen=0|1]\n"
+           "               [time=0|1] [deb=<n>] [cdbsz=<6|10|12|16>] "
 	   "[--version]\n"
            "            usually either 'if' or 'of' is a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
@@ -190,8 +192,10 @@ void usage()
            " 'thr' is number of threads, must be > 0, default 4, max 16\n");
     fprintf(stderr, " 'coe' continue on error, 0->exit (def), "
     	   "1->zero + continue\n"
-           " 'gen' 0-> 1 file is special(def), 1-> any files allowed\n"
+           " 'gen' 0-> one file is special(def), 1-> any files allowed\n"
 	   " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
+           " 'fua' force unit access: 0->don't(def), 1->of, 2->if, 3->of+if\n"
+           " 'sync' 0->no sync(def), 1->SYNCHRONIZE CACHE on of after xfer\n"
 	   " 'cdbsz' size of SCSI READ or WRITE command (default is 10)\n"
            " 'deb' is debug, 0->none (def), > 0->varying degrees of debug\n");
 }
@@ -220,7 +224,7 @@ static void guarded_stop_both(Rq_coll * clp)
 int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
 {
     int res;
-    unsigned char rcCmdBlk [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char rcCmdBlk [10] = {READ_CAPACITY, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char rcBuff[64];
     unsigned char sense_b[64];
     sg_io_hdr_t io_hdr;
@@ -255,6 +259,40 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
     fprintf(stderr, "number of sectors=%d, sector size=%d\n",
             *num_sect, *sect_sz);
 #endif
+    return 0;
+}
+
+/* Return of 0 -> success, -1 -> failure, 2 -> try again */
+int sync_cache(int sg_fd)
+{
+    int res;
+    unsigned char scCmdBlk [10] = {SYNCHRONIZE_CACHE, 0, 0, 0, 0, 0, 0, 
+    				   0, 0, 0};
+    unsigned char sense_b[64];
+    sg_io_hdr_t io_hdr;
+
+    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(scCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_NONE;
+    io_hdr.dxfer_len = 0;
+    io_hdr.dxferp = NULL;
+    io_hdr.cmdp = scCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        perror("synchronize_cache (SG_IO) error");
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    if (SG_ERR_CAT_MEDIA_CHANGED == res)
+        return 2; /* probably have another go ... */
+    else if (SG_ERR_CAT_CLEAN != res) {
+        sg_chk_n_print3("synchronize cache", &io_hdr);
+        return -1;
+    }
     return 0;
 }
 
@@ -315,6 +353,7 @@ void * read_write_thread(void * v_clp)
 				   (~(psz - 1)));
     /* Follow clp members are constant during lifetime of thread */
     rep->bs = clp->bs;
+    rep->fua_mode = clp->fua_mode;
     rep->dio = clp->dio;
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
@@ -476,19 +515,24 @@ void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 }
 
 int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
-		      unsigned int start_block, int write_true)
+		      unsigned int start_block, int write_true, int fua,
+		      int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
     int sz_ind;
 
     memset(cdbp, 0, cdb_sz);
+    if (dpo)
+	cdbp[1] |= 0x10;
+    if (fua)
+	cdbp[1] |= 0x8;
     switch (cdb_sz) {
     case 6:
     	sz_ind = 0;
 	cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
 					       rd_opcode[sz_ind]);
-	cdbp[1] |= (unsigned char)((start_block >> 16) & 0x1f);
+	cdbp[1] = (unsigned char)((start_block >> 16) & 0x1f);
 	cdbp[2] = (unsigned char)((start_block >> 8) & 0xff);
 	cdbp[3] = (unsigned char)(start_block & 0xff);
 	cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
@@ -500,6 +544,11 @@ int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
 	if ((start_block + blocks - 1) & (~0x1fffff)) {
 	    fprintf(stderr, ME "for 6 byte commands, can't address blocks"
 	    		    " beyond %d\n", 0x1fffff);
+	    return 1;
+	}
+	if (dpo || fua) {
+	    fprintf(stderr, ME "for 6 byte commands, neither dpo nor fua"
+	    		    " bits supported\n");
 	    return 1;
 	}
     	break;
@@ -673,10 +722,11 @@ void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
 int sg_start_io(Rq_elem * rep)
 {
     sg_io_hdr_t * hp = &rep->io_hdr;
+    int fua = rep->wr ? (rep->fua_mode & 1) : (rep->fua_mode & 2);
     int res;
 
     if (sg_build_scsi_cdb(rep->cmd, rep->cdbsz, rep->num_blks, rep->blk, 
-    			  rep->wr)) {
+    			  rep->wr, fua, 0)) {
         fprintf(stderr, ME "bad cdb build, start_blk=%d, blocks=%d\n",
                 rep->blk, rep->num_blks);
         return -1;
@@ -869,6 +919,7 @@ int main(int argc, char * argv[])
     pthread_t threads[MAX_NUM_THREADS];
     int gen = 0;
     int do_time = 0;
+    int do_sync = 0;
     int in_sect_sz, out_sect_sz, status, infull, outfull;
     void * vp;
     char ebuff[EBUFF_SZ];
@@ -928,6 +979,10 @@ int main(int argc, char * argv[])
             do_time = get_num(buf);
         else if (0 == strcmp(key,"cdbsz"))
             rcoll.cdbsz = get_num(buf);
+        else if (0 == strcmp(key,"fua"))
+            rcoll.fua_mode = get_num(buf);
+        else if (0 == strcmp(key,"sync"))
+            do_sync = get_num(buf);
         else if (0 == strncmp(key,"deb", 3))
             rcoll.debug = get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
@@ -1052,9 +1107,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Either 'if' or 'of' must be a sg or raw device\n");
         return 1;
     }
-    if (0 == count)
-        return 0;
-    else if (count < 0) {
+    if (count < 0) {
         if (FT_SG == rcoll.in_type) {
             res = read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
@@ -1100,7 +1153,7 @@ int main(int argc, char * argv[])
     if (rcoll.debug > 1)
         fprintf(stderr, "Start of loop, count=%d, in_num_sect=%d, "
                 "out_num_sect=%d\n", count, in_num_sect, out_num_sect);
-    if (count <= 0) {
+    if (count < 0) {
         fprintf(stderr, "Couldn't calculate count, please give one\n");
         return 1;
     }
@@ -1193,6 +1246,19 @@ int main(int argc, char * argv[])
             printf(", %.2f MB/sec\n", b / (a * 1000000.0));
         else
             printf("\n");
+    }
+    if (do_sync) {
+        if (FT_SG == rcoll.out_type) {
+            fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
+            res = sync_cache(rcoll.outfd);
+            if (2 == res) {
+                fprintf(stderr,
+                        "Unit attention, media changed(in), continuing\n");
+                res = sync_cache(rcoll.outfd);
+            }
+            if (0 != res)
+                fprintf(stderr, "Unable to synchronize cache\n");
+        }
     }
 
     status = pthread_cancel(sig_listen_thread_id);

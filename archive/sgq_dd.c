@@ -48,7 +48,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "0.53 20020124";
+static char * version_str = "0.54 20020223";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -740,11 +740,11 @@ int main(int argc, char * argv[])
     int seek = 0;
     int ibs = 0;
     int obs = 0;
-    char str[512];
+    char str[STR_SZ];
     char * key;
     char * buf;
-    char inf[512];
-    char outf[512];
+    char inf[INOUTF_SZ];
+    char outf[INOUTF_SZ];
     int res, k;
     int in_num_sect = 0;
     int out_num_sect = 0;

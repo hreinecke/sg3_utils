@@ -43,8 +43,8 @@ Here is a (somewhat arbitrary) categorization of the utilities included
 in this package:
   1) dd variants: sg_dd, sgp_dd, sgm_dd and sgq_dd
   2) scanning and mapping: sg_scan, sg_map and scsi_devfs_scan
-  3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start
-     and sg_reset
+  3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
+     sg_modes, sg_logs, and sg_reset
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
@@ -76,6 +76,10 @@ Extra options:
                       to be specified (default is 10)
    gen=0|1       either "if" or "of" must be a sg or raw device when "gen=0"
                  (default). Set to 1 to remove this restriction
+   sync=0|1      when 1, do a SYNCHRONIZE CACHE on "of" after the transfer
+   		 is complete
+   fua=0|1|2|3   when 0, do not set 'force unit access' bit; when 1, set it
+   		 on "of"; when 2, set it on "if"; when 3, set it on "if"+"of"
 
 All numeric arguments can take multiplier suffixes:
   "c", "C"        * 1
@@ -163,6 +167,9 @@ descriptor may be any SCSI device (i.e. not just sg devices).
 
 "sg_start" has been provided by Kurt Garloff <garloff@suse.de> for spinning
 up (or down) disks. See README.sg_start .
+
+"sg_modes" and "sg_logs" print out mode sense pages and log sense pages 
+respectively.
 
 "sg_reset" exercises the SCSI device/bus/host reset capability. It is
 supported by the sg driver in lk 2.2.16 and beyond but associated
@@ -273,4 +280,4 @@ The include file path issues are now all addressed in one file called
 
 
 Doug Gilbert
-13th February 2002
+17th March 2002

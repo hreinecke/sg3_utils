@@ -80,6 +80,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
+    /* N.B. An access mode of O_RDWR is required for some SCSI commands */
     if ((sg_fd = open(file_name, O_RDWR)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
 		 "sg_simple4: error opening file: %s", file_name);

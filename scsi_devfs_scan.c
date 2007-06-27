@@ -23,7 +23,7 @@
       This program scans the /dev directory structure looking for the
       devfs "primary" scsi (and optionally IDE) device names.
 
-   Version 0.11 20020114
+   Version 0.12 20020228
 */
 
 void usage()
@@ -64,13 +64,13 @@ static void dStrHex(const char* str, int len)
     const int cpstart = 60;
     int cpos = cpstart;
     int bpos = bpstart;
-    int i;
+    int i, k;
 
     if (len <= 0) return;
     memset(buff,' ',80);
     buff[80]='\0';
-    sprintf(buff + 1, "%.2x", a);
-    buff[3] = ' ';
+    k = sprintf(buff + 1, "%.2x", a);
+    buff[k + 1] = ' ';
     if (bpos >= ((bpstart + (9 * 3))))
         bpos++;
 
@@ -92,8 +92,8 @@ static void dStrHex(const char* str, int len)
             cpos = cpstart;
             a += 16;
             memset(buff,' ',80);
-            sprintf(buff + 1, "%.2x", a);
-            buff[3] = ' ';
+            k = sprintf(buff + 1, "%.2x", a);
+            buff[k + 1] = ' ';
         }
     }
     if (cpos > cpstart)

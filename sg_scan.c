@@ -12,7 +12,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999 - 2001 D. Gilbert
+*  Copyright (C) 1999 - 2002 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,13 +31,15 @@
    Note: This program is written to work under both the original and
    the new sg driver.
 
-   Version 3.92 20010119
+   Version 3.93 20020226
 
-   F. Jansen - minor modification to extend beyond 26 sg devices.
+   F. Jansen - modification to extend beyond 26 sg devices.
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
 */
+
+#define ME "sg_scan: "
 
 #define NUMERIC_SCAN_DEF 1   /* change to 0 to make alpha scan default */
 
@@ -186,8 +188,8 @@ int main(int argc, char * argv[])
     for (k = 0, res = 0; (k < 1000)  && (num_errors < MAX_ERRORS);
          ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
         if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
-            perror("sg_scan: close error");
+            snprintf(ebuff, EBUFF_SZ, ME "Error closing %s ", fname);
+            perror(ME "close error");
             return 1;
         }
         make_dev_name(fname, k, do_numeric);
@@ -207,7 +209,7 @@ int main(int argc, char * argv[])
             else {
                 if (EACCES == errno)
                     eacces_err = 1;
-                snprintf(ebuff, EBUFF_SZ, "Error opening %s ", fname);
+                snprintf(ebuff, EBUFF_SZ, ME "Error opening %s ", fname);
                 perror(ebuff);
                 ++num_errors;
                 continue;
@@ -216,14 +218,14 @@ int main(int argc, char * argv[])
         res = ioctl(sg_fd, SCSI_IOCTL_GET_IDLUN, &my_idlun);
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ,
-	    	     "device %s failed on scsi ioctl, skip", fname);
+	    	     ME "device %s failed on scsi ioctl, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
         }
         res = ioctl(sg_fd, SCSI_IOCTL_GET_BUS_NUMBER, &host_no);
         if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, "device %s failed on scsi "
+            snprintf(ebuff, EBUFF_SZ, ME "device %s failed on scsi "
 	    	     "ioctl(2), skip", fname);
             perror(ebuff);
             ++num_errors;
@@ -233,7 +235,7 @@ int main(int argc, char * argv[])
         res = ioctl(sg_fd, SG_EMULATED_HOST, &emul);
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, 
-	    	     "device %s failed on sg ioctl(3), skip", fname);
+	    	     ME "device %s failed on sg ioctl(3), skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
@@ -255,7 +257,8 @@ int main(int argc, char * argv[])
 
             res = ioctl(sg_fd, SG_GET_SCSI_ID, &m_id);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, "device %s ioctls(4), skip", fname);
+                snprintf(ebuff, EBUFF_SZ, ME "device %s ioctls(4), skip",
+			 fname);
                 perror(ebuff);
                 ++num_errors;
                 continue;
@@ -294,14 +297,14 @@ int main(int argc, char * argv[])
 
         res = write(sg_fd, inqBuff, inqInLen);
         if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, "device %s writing, skip", fname);
+            snprintf(ebuff, EBUFF_SZ, ME "device %s writing, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
         }
         res = read(sg_fd, inqBuff, inqOutLen);
         if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, "device %s reading, skip", fname);
+            snprintf(ebuff, EBUFF_SZ, ME "device %s reading, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
@@ -354,7 +357,7 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("sg_scan: Inquiry SG_IO ioctl error");
+        perror(ME "Inquiry SG_IO ioctl error");
         return 1;
     }
 
