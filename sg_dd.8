@@ -1,4 +1,4 @@
-.TH SG_DD "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
+.TH SG_DD "8" "October 2004" "sg3_utils-1.10" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -37,7 +37,9 @@ are used for IO). When set to 1, block
 devices are assumed to accept the SG_IO ioctl and SCSI commands are
 issued for IO. This is only supported for 2.6 series kernels. Note
 that ATAPI devices (e.g. cd/dvd players) use the SCSI command set
-but ATA disks do not.
+but ATA disks do not. If the input or output device is a block device
+partition then setting this option causes the partition information
+to be ignored (since access is directly to the underlying device).
 Default is 0.
 .TP
 bpt=BLOCKS
@@ -73,8 +75,8 @@ utility. Default is 0 which implies stop on error.
 count=BLOCKS
 copy this number of blocks from 'if' to 'of'. Default is the 
 minimum (of 'if' and 'of') number of blocks that sg devices return from
-READ CAPACITY SCSI commands or that block devices report.
-Normal files are not probed for their size. If 'skip'
+READ CAPACITY SCSI commands or that block devices (or their partitions)
+report. Normal files are not probed for their size. If 'skip'
 or 'seek' are given and the count is derived (i.e. not explicitly given)
 then the derived count is scaled back so that the copy will not overrun the
 device. If the file name is a block device partition and count is not given
@@ -145,8 +147,6 @@ for more information about binding raw devices. To be safe, the sg device
 mapping to SCSI block devices should be checked with "cat /proc/scsi/scsi",
 or sg_map before use.
 .PP
-The count is only deduced for sg devices (minimum > 0 if both input and
-output are sg devices) otherwise it defaults to 0. This is for safety!
 Raw disk partition information can often be found with
 .B fdisk(8)
 [the "-ul" argument is useful in this respect].

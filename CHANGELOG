@@ -2,6 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.10 [20041030]
+  - sg_readcap, sg_dd, sgm_dd, sgp_dd: fix sg_ll_readcap_10+16 (sg_cmds.c)
+  - sg_luns: new utility to report luns
+  - sg_logs: with '-t' (show temperature) ignore extra parameters in
+        temperature log page (still show them with '-p=d')
+  - sg_ses: clean argument sanity checks
+  - sg_cmds: add more common command wrappers
+
 Changelog for sg3_utils-1.09 [20041022]
   - sg_ses: new utility to get status and set control on SES devices
   - sg_verify: new utility to verify block devices

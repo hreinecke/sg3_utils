@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_cmds.h"
 
 /* This program sends a user specified number of TEST UNIT READY commands
    to the given sg device. Since TUR is a simple command involing no
@@ -25,21 +26,16 @@
 
 */
 
-static char * version_str = "3.12 20041011";
+static char * version_str = "3.13 20041029";
 
-#define TUR_CMD_LEN 6
 #define EBUFF_SZ 256
 
 
 int main(int argc, char * argv[])
 {
     int sg_fd, k;
-    unsigned char turCmdBlk [TUR_CMD_LEN] =
-                                {0x00, 0, 0, 0, 0, 0};
-    struct sg_io_hdr io_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    unsigned char sense_buffer[32];
     int num_turs = 1;
     int num_errs = 0;
     int do_time = 0;
@@ -94,40 +90,15 @@ int main(int argc, char * argv[])
         perror(ebuff);
         return 1;
     }
-    /* Prepare TEST UNIT READY command */
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(turCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_buffer);
-    io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.cmdp = turCmdBlk;
-    io_hdr.sbp = sense_buffer;
-    io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
-    if (verbose) {
-        fprintf(stderr, "    Test unit ready cmd: ");
-        for (k = 0; k < TUR_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", turCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
     if (do_time) {
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
         gettimeofday(&start_tm, NULL);
     }
     for (k = 0; k < num_turs; ++k) {
-        io_hdr.pack_id = k;
-        if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-            perror("sg_turs: Test Unit Ready SG_IO ioctl error");
-            close(sg_fd);
-            return 1;
-        }
-        if (io_hdr.info & SG_INFO_OK_MASK) {
+        if (sg_ll_test_unit_ready(sg_fd, k, ((1 == num_turs) ? 1 : 0),
+                                  verbose))
             ++num_errs;
-            if (1 == num_turs) {        /* then print out the error message */
-                if (SG_LIB_CAT_CLEAN != sg_err_category3(&io_hdr))
-                    sg_chk_n_print3("tur", &io_hdr);
-            }
-        }
     }
     if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
@@ -154,5 +125,5 @@ int main(int argc, char * argv[])
     printf("Completed %d Test Unit Ready commands with %d errors\n",
             num_turs, num_errs);
     close(sg_fd);
-    return 0;
+    return num_errs ? 1 : 0;
 }

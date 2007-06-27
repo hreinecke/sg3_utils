@@ -54,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.33 20041011";
+static char * version_str = "5.34 20041029";
 
 
 #define DEF_BLOCK_SIZE 512
@@ -1021,11 +1021,11 @@ int main(int argc, char * argv[])
     if (do_sync) {
         if (FT_SG & out_type) {
             fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
-            res = sg_ll_sync_cache(outfd, 0, 0, 0);
+            res = sg_ll_sync_cache(outfd, 0, 0, 0, 0);
             if (2 == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed(in), continuing\n");
-                res = sg_ll_sync_cache(outfd, 0, 0, 0);
+                res = sg_ll_sync_cache(outfd, 0, 0, 0, 0);
             }
             if (0 != res)
                 fprintf(stderr, "Unable to synchronize cache\n");

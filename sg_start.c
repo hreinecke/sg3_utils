@@ -31,7 +31,7 @@
  
 */
 
-static char * version_str = "0.38 20041011";
+static char * version_str = "0.39 20041029";
 
 #define START_STOP              0x1b
 
@@ -186,7 +186,7 @@ int main(int argc, char * argv[])
         }
         
         if (synccache)
-                sg_ll_sync_cache(fd, 0, 0, verbose);
+                sg_ll_sync_cache(fd, 0, 0, 1, verbose);
         
         if (power_conds > 0)
                 do_start_stop(fd, 0, immed, 0, power_conds, verbose);

@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "3.67 20041011";
+static char * version_str = "3.68 20041024";
 
 #define ME "sg_readcap: "
 
@@ -90,7 +90,7 @@ int main(int argc, char * argv[])
             lba = (unsigned int)llba;
         }
         else if (0 == strcmp("-v", argv[k]))
-	    ++verbose;
+            ++verbose;
         else if (0 == strcmp("-V", argv[k])) {
             printf("Version string: %s\n", version_str);
             exit(0);
@@ -127,14 +127,13 @@ int main(int argc, char * argv[])
     }
 
     if (! do16) {
-        // res = do_readcap_10(sg_fd, pmi, lba, &last_blk_addr, &block_size);
         res = sg_ll_readcap_10(sg_fd, pmi, lba, resp_buff, RCAP_REPLY_LEN,
-			       verbose);
-	if (0 == res) {
-	    last_blk_addr = ((resp_buff[0] << 24) | (resp_buff[1] << 16) |
-                 	     (resp_buff[2] << 8) | resp_buff[3]);
-	    if (0xffffffff != last_blk_addr) {
-		block_size = ((resp_buff[4] << 24) | (resp_buff[5] << 16) |
+                               verbose);
+        if (0 == res) {
+            last_blk_addr = ((resp_buff[0] << 24) | (resp_buff[1] << 16) |
+                             (resp_buff[2] << 8) | resp_buff[3]);
+            if (0xffffffff != last_blk_addr) {
+                block_size = ((resp_buff[4] << 24) | (resp_buff[5] << 16) |
                              (resp_buff[6] << 8) | resp_buff[7]);
                 printf("Read Capacity results:\n");
                 if (pmi)
@@ -142,8 +141,8 @@ int main(int argc, char * argv[])
                            "delay=0x%x\n", lba, last_blk_addr);
                 else
                     printf("   Last block address=%u (0x%x), Number of "
-			   "blocks=%u\n", last_blk_addr, last_blk_addr,
-			   last_blk_addr + 1);
+                           "blocks=%u\n", last_blk_addr, last_blk_addr,
+                           last_blk_addr + 1);
                 printf("   Block size = %u bytes\n", block_size);
                 if (! pmi) {
                     unsigned long long total_sz = last_blk_addr + 1;
@@ -158,9 +157,9 @@ int main(int argc, char * argv[])
                     printf("   Device size: %llu bytes, %.1f MB, %.2f GB\n",
                            total_sz, sz_mb, sz_gb);
                 }
-	    }
+            }
         }
-        else if (0 == res) {
+        else if (SG_LIB_CAT_INVALID_OP == res) {
             do16 = 1;
             close(sg_fd);
             if ((sg_fd = open(file_name, O_RDWR)) < 0) {
@@ -169,23 +168,25 @@ int main(int argc, char * argv[])
                 perror(ebuff);
                 return 1;
             }
-        }
+            if (verbose)
+                fprintf(stderr, "READ CAPACITY (10) not supported, trying "
+                        "READ CAPACITY (16)\n");
+        } else if (verbose)
+            fprintf(stderr, "READ CAPACITY (10) failed [res=%d]\n", res);
     }
     if (do16) {
-        // res = do_readcap_16(sg_fd, pmi, llba, &llast_blk_addr, &block_size,
-                            // &byte12);
         res = sg_ll_readcap_16(sg_fd, pmi, llba, resp_buff, RCAP16_REPLY_LEN,
                                verbose);
         if (0 == res) {
-    	    for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
-        	llast_blk_addr <<= 8;
-        	llast_blk_addr |= resp_buff[k];
-    	    }
-	    block_size = ((resp_buff[8] << 24) | (resp_buff[9] << 16) |
+            for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
+                llast_blk_addr <<= 8;
+                llast_blk_addr |= resp_buff[k];
+            }
+            block_size = ((resp_buff[8] << 24) | (resp_buff[9] << 16) |
                           (resp_buff[10] << 8) | resp_buff[11]);
             printf("Read Capacity results:\n");
             printf("   Protection: prot_en=%d, rto_en=%d\n",
-		   (resp_buff[12] & 0x1), ((resp_buff[12] & 0x2) ? 1 : 0));
+                   (resp_buff[12] & 0x1), ((resp_buff[12] & 0x2) ? 1 : 0));
             if (pmi)
                 printf("   PMI mode: given lba=0x%llx, last block before "
                        "delay=0x%llx\n", llba, llast_blk_addr);
@@ -208,6 +209,10 @@ int main(int argc, char * argv[])
                        total_sz, sz_mb, sz_gb);
             }
         }
+        else if (SG_LIB_CAT_INVALID_OP == res) 
+            fprintf(stderr, "READ CAPACITY (16) not supported\n");
+        else if (verbose)
+            fprintf(stderr, "READ CAPACITY (16) failed [res=%d]\n", res);
     }
     close(sg_fd);
     return 0;

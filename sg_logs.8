@@ -32,6 +32,7 @@ response in hex instead.
 .TP
 -l
 lists the names of all logs sense pages supported by this device.
+See the list of common log page codes below.
 .TP
 -p=<page_code>
 log page code to fetch. Should be a hexadecimal number between 0 and 3f
@@ -49,8 +50,14 @@ being output in ASCII).
 sets the Parameter Pointer Control (PPC) bit. Default is 0 (i.e. cleared).
 .TP
 -r
-use LOG SELECT SCSI command to reset all implemented parameters to be
-the target defined (i.e. manufacturer's) default values.
+use LOG SELECT SCSI command to reset all implemented parameter values
+to be the device defined (i.e. manufacturer's) default values. In most
+cases the default values are zeroes. This option seems to
+clear error counter log pages but leaves pages like self-test results,
+start-stop cycle counter and temperature log pages uneffected.
+This option may be required to clear log pages if a counter reaches its
+maximum value since the log page in which the counter is found will
+remain "stuck" until something is done.
 .TP
 -sp
 sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared).
@@ -75,6 +82,29 @@ start stop cycles since device produced and the results of the last
 The smartmontools package provides much of the information found with
 sg_logs in a form suitable for monitoring the health of SCSI disks and
 tape drives.
+.PP
+Here is a list of commonly used log pages (drop the "0x" prefix when
+using them as an argument to the '-p=' option):
+.PP
+0x0     Supported log pages
+.br
+0x2     Write error counter
+.br
+0x3     Read error counter
+.br
+0x6     Non-medium error
+.br
+0x7     Last n error events
+.br
+0xd     Temperature
+.br
+0xe     Start-stop cycle counter
+.br
+0x10    Self-test results
+.br
+0x18    Protocol specific port
+.br
+0x2f    Informational exceptions
 .PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks

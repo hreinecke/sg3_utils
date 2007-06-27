@@ -6,12 +6,12 @@
 
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.09
+Version: 1.10
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
 Group: Utilities/System
-Source: ftp://www.torque.net/sg/p/sg3_utils-1.09.tgz
+Source: ftp://www.torque.net/sg/p/sg3_utils-1.10.tgz
 Url: http://www.torque.net/sg/u_index.html
 Provides: sg_utils
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
@@ -89,6 +89,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_ses
 %attr(755,root,root) %{_bindir}/sg_verify
 %attr(755,root,root) %{_bindir}/sg_emc_trespass
+%attr(755,root,root) %{_bindir}/sg_luns
 %attr(755,root,root) %{_libdir}/libsgutils.so
 %attr(755,root,root) %{_libdir}/libsgutils.so.1
 %attr(755,root,root) %{_libdir}/libsgutils.so.1.0.0
@@ -118,6 +119,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_ses.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_verify.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_emc_trespass.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_luns.8*
 
 %files devel
 %defattr(-,root,root)
@@ -128,6 +130,9 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Sat Oct 30 2004 - dgilbert at interlog dot com
+- fix read capacity (10+16), add sg_luns
+  * sg3_utils-1.10
 * Thu Oct 21 2004 - dgilbert at interlog dot com
 - sg_requests, sg_ses, sg_verify, libsgutils(sg_lib.c+sg_cmds.c), devel rpm
   * sg3_utils-1.09

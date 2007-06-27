@@ -98,8 +98,8 @@ in this package:
   2) scanning and mapping: sg_scan, sg_map and scsi_devfs_scan
   3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
      sg_modes, sg_logs, sg_senddiag, sg_reset, sg_opcodes, sg_persist,
-     sg_write_long, sg_read_long, sg_requests, sg_ses, sg_verify
-     and sg_emc_trespass
+     sg_write_long, sg_read_long, sg_requests, sg_ses, sg_verify,
+     sg_emc_trespass and sg_luns
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
@@ -294,6 +294,10 @@ a standard INQUIRY response.
 "sg_emc_trespass" permits modification of EMC specific trespass
 mode page.
 
+"sg_emc_trespass" sends a REPORT LUNS SCSI command to the given device
+and outputs the response. The '--select' options allows the "select
+report" field to be specified.
+
 
 4) Timing and testing
 ---------------------
@@ -416,4 +420,4 @@ a similar utility called "plscsi" which is available for Linux and other
 operating systems. See http://members.aol.com/plscsi .
 
 Doug Gilbert
-20th October 2004
+30th October 2004

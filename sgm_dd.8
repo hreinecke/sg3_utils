@@ -40,8 +40,8 @@ to 16 byte SCSI commands).
 count=BLOCKS
 copy this number of blocks from 'if' to 'of'. Default is the
 minimum (of 'if' and 'of') number of blocks that sg devices return from
-READ CAPACITY SCSI commands or that block devices report.
-Normal files are not probed for their size. If 'skip'
+READ CAPACITY SCSI commands or that block devices (or their partitions)
+report. Normal files are not probed for their size. If 'skip'
 or 'seek' are given and the count is derived (i.e. not explicitly given)
 then the derived count is scaled back so that the copy will not overrun the
 device. If the file name is a block device partition and count is not given
@@ -105,8 +105,6 @@ for more information about binding raw devices. To be safe, the sg device
 mapping to SCSI block devices should be checked with "cat /proc/scsi/scsi"
 before use.
 .PP
-The count is only deduced for sg devices (minimum > 0 if both input and
-output are sg devices) otherwise it defaults to 0. This is for safety!
 Raw device partition information can often be found with
 .B fdisk(8)
 [the "-ul" argument is useful in this respect].

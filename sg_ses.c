@@ -50,7 +50,7 @@
  * tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.07 20041015";
+static char * version_str = "1.08 20041026";
 
 #define SEND_DIAGNOSTIC_CMD     0x1d
 #define SEND_DIAGNOSTIC_CMDLEN  6
@@ -103,7 +103,8 @@ static void usage()
           "         --hex|-H           print status response in hex\n"
           "         --inner-hex|-i     print innermost level of a"
           " status page in hex\n"
-          "         --list|-l          list pages and elements then exit\n"
+          "         --list|-l          list known pages and elements (ignore"
+          " device)\n"
           "         --page=<n>|-p <n>  page code value <n> (def: 0)\n"
           "         --raw|-r           print status page in hex suitable "
           "for '-d'\n"
@@ -1451,7 +1452,7 @@ int main(int argc, char * argv[])
         switch (c) {
         case 'b':
             byte1 = sg_get_num(optarg);
-            if ((byte1 < 0) && (byte1 > 255)) {
+            if ((byte1 < 0) || (byte1 > 255)) {
                 fprintf(stderr, "bad argument to '--byte1' (0 to 255 "
                         "inclusive)\n");
                 return 1;
@@ -1486,7 +1487,7 @@ int main(int argc, char * argv[])
             break;
         case 'p':
             page_code = sg_get_num(optarg);
-            if ((page_code < 0) && (page_code > 255)) {
+            if ((page_code < 0) || (page_code > 255)) {
                 fprintf(stderr, "bad argument to '--page' (0 to 255 "
                         "inclusive)\n");
                 return 1;
