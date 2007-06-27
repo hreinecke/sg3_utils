@@ -217,6 +217,24 @@ scsi device. This is only supported for lk >= 2.4.15 and for adapter
 drivers that indicate that they have 16 byte CDB capability (otherwise
 DID_ABORT will appear in the host_status).
 
+Command line processing
+=======================
+These utilities can be divided into 3 groups when their handling of
+command line arguments is considered:
+  - ad hoc, typically in a short form only, sometimes longer (e.g.
+    "sg_start -stop /dev/sdc")
+  - inspired by the dd Unix command (e.g. sg_dd, sgm_dd, sgp_dd, sg_read)
+  - recent utilities use "getopt_long" (see "man getopt_long")
+    type command lines. These have short form (starting with "-")
+    and corresponding longer form (starting with "--") options.
+
+The recent utilities that use "getopt_long" are, in alphabetical
+order:
+  - sg_format sg_get_config sg_ident sg_luns sg_persist sg_prevent
+    sg_read_long sg_reassign sg_requests sg_rmsn sg_rtpg sg_ses
+    sg_sync sg_test_rwbuf sg_verify sg_write_long sg_wr_mode
+
+
 Header file problems
 ====================
 These utilities include 2 special Linux header files:
@@ -262,4 +280,4 @@ user). It is available for Linux and other operating systems.
 See http://members.aol.com/plscsi .
 
 Doug Gilbert
-10th August 2005
+22nd September 2005

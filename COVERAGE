@@ -57,10 +57,11 @@ WRITE LONG          sg_write_long
 
 ATA command         sg3_utils utilities that use this SCSI command
 -----------         ----------------------------------------------
-IDENTIFY            sg_inq, sg_scan
+IDENTIFY DEVICE     sg_inq, sg_scan
+IDENTIFY PACKET DEVICE     sg_inq
 
 
 ** sdparm is now in its own package called sdparm (rather than sg3_utils)
 
 Doug Gilbert
-5th August 2005
+19th September 2005

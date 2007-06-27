@@ -110,7 +110,7 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * sginfo_version_str = "sginfo version 2.17 [20050806]";
+static const char * sginfo_version_str = "sginfo version 2.18 [20050906]";
 
 #include <stdio.h>
 #include <string.h>
@@ -191,6 +191,7 @@ static int disk_geometry(struct mpage_info * mpi, const char * prefix);
 static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix);
 static int disk_cache(struct mpage_info * mpi, const char * prefix);
 static int disk_xor_control(struct mpage_info * mpi, const char * prefix);
+static int disk_background(struct mpage_info * mpi, const char * prefix);
 static int optical_memory(struct mpage_info * mpi, const char * prefix);
 static int cdvd_error_recovery(struct mpage_info * mpi, const char * prefix);
 static int cdvd_mrw(struct mpage_info * mpi, const char * prefix);
@@ -261,7 +262,7 @@ static struct mpage_name_func mpage_disk[] =
     { 0xb, 0, PC_DISK, "Medium Types Supported", NULL},
     { 0xc, 0, PC_DISK, "Notch and Partition", disk_notch_parameters},
     { 0x10, 0, PC_DISK, "XOR control", disk_xor_control},
-    { 0x1c, 1, PC_DISK, "Background control", NULL},
+    { 0x1c, 1, PC_DISK, "Background control", disk_background},
 };
 static const int mpage_disk_len = sizeof(mpage_disk) / sizeof(mpage_disk[0]);
 
@@ -1266,7 +1267,7 @@ static int common_informational(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 9, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 10, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -1281,6 +1282,7 @@ static int common_informational(struct mpage_info * mpi, const char * prefix)
     bitfield(pagestart + 2, "EWASC", 1, 4);
     bitfield(pagestart + 2, "DEXCPT", 1, 3);
     bitfield(pagestart + 2, "TEST", 1, 2);
+    bitfield(pagestart + 2, "EBACKERR", 1, 1);
     bitfield(pagestart + 2, "LOGERR", 1, 0);
     bitfield(pagestart + 3, "MRIE", 0xf, 0);
     intfield(pagestart + 4, 4, "Interval Timer");
@@ -1911,6 +1913,34 @@ static int disk_xor_control(struct mpage_info * mpi, const char * prefix)
     intfield(pagestart + 12, 4, "Maximum regenerate size");
     intfield(pagestart + 16, 4, "Maximum rebuild transfer size");
     intfield(pagestart + 22, 2, "Rebuild delay");
+
+    if (x_interface && replace)
+        return put_mode_page(mpi, cbuffer);
+    else
+        printf("\n");
+    return 0;
+}
+
+static int disk_background(struct mpage_info * mpi, const char * prefix)
+{
+    int status;
+    unsigned char *pagestart;
+
+    status = setup_mode_page(mpi, 4, cbuffer, &pagestart);
+    if (status)
+        return status;
+
+    if (prefix[0])
+        printf("%s", prefix);
+    if (!x_interface && !replace) {
+        printf("%s mode subpage (0x%x,0x%x)\n", get_page_name(mpi), mpi->page,
+               mpi->subpage);
+        printf("--------------------------------------------\n");
+    }
+    bitfield(pagestart + 4, "Enable background medium scan", 1, 0);
+    bitfield(pagestart + 5, "Enable pre-scan", 1, 0);
+    intfield(pagestart + 6, 2, "BMS interval time (hour)");
+    intfield(pagestart + 8, 2, "Pre-scan timeout value (hour)");
 
     if (x_interface && replace)
         return put_mode_page(mpi, cbuffer);
@@ -2578,7 +2608,7 @@ static int spi4_margin_control(struct mpage_info * mpi, const char * prefix)
     bitfield(pagestart + 5, "Protocol identifier", 0xf, 0);
     bitfield(pagestart + 7, "Driver Strength", 0xf, 4);
     bitfield(pagestart + 8, "Driver Asymmetry", 0xf, 4);
-    bitfield(pagestart + 8, "Driver Precompensation", 0xf, 4);
+    bitfield(pagestart + 8, "Driver Precompensation", 0xf, 0);
     bitfield(pagestart + 9, "Driver Slew rate", 0xf, 4);
 
     if (x_interface && replace)
@@ -2730,9 +2760,9 @@ static int spi4_negotiated(struct mpage_info * mpi, const char * prefix)
     intfield(pagestart + 8, 1, "REQ/ACK offset");
     intfield(pagestart + 9, 1, "Transfer width exponent");
     bitfield(pagestart + 10, "Protocol option bits", 0x7f, 0);
-    bitfield(pagestart + 11, "Transciever mode", 3, 2);
-    bitfield(pagestart + 11, "Sent PCOMP_EN", 3, 1);
-    bitfield(pagestart + 11, "Received PCOMP_EN", 3, 0);
+    bitfield(pagestart + 11, "Transceiver mode", 3, 2);
+    bitfield(pagestart + 11, "Sent PCOMP_EN", 1, 1);
+    bitfield(pagestart + 11, "Received PCOMP_EN", 1, 0);
 
     if (x_interface && replace)
         return put_mode_page(mpi, cbuffer);
@@ -2907,6 +2937,7 @@ static int do_inquiry(int * peri_type, int * resp_byte6,
     struct scsi_cmnd_io sci;
 
     memset(cbuffer, 0, INQUIRY_RESP_INITIAL_LEN);
+    cbuffer[0] = 0x7f;
 
     cmd[0] = 0x12;              /* INQUIRY */
     cmd[1] = 0x00;              /* evpd=0 */

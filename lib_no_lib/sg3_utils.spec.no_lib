@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.16
+Version: 1.17
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -122,6 +122,10 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Thu Sep 22 2005 - dgilbert at interlog dot com
+- add ATA information VPD page
+  * sg3_utils-1.17
+
 * Wed Aug 10 2005 - dgilbert at interlog dot com
 - add sg_ident, sg_inq VPD page extensions
   * sg3_utils-1.16

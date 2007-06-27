@@ -1,21 +1,26 @@
-.TH SGM_DD "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SGM_DD "8" "September 2005" "sg3_utils-1.17" SG3_UTILS
 .SH NAME
-sgm_dd \- copies data to and from files and devices. Specialised for
-devices that understand the SCSI command set.
+sgm_dd \- copies data to and from files and devices. Specialized for
+devices that understand the SCSI command set and does memory mapped
+transfers from sg devices.
 .SH SYNOPSIS
 .B sgm_dd
 [\fIbpt=<n>\fR] [\fIbs=<n>\fR] [\fIcdbsz=6|10|12|16\fR] [\fIcount=<n>\fR]
 [\fIdio=0|1\fR] [\fIfua=0|1|2|3\fR] [\fIibs=<n>\fR] [\fIif=<ifile>\fR]
 [\fIobs=<n>\fR] [\fIof=<ofile>\fR] [\fIseek=<n>\fR] [\fIskip=<n>\fR]
-[\fIsync=0|1\fR] [\fItime=0|1\fR] [\fI--version\fR]
+[\fIsync=0|1\fR] [\fItime=0|1\fR] [\fIverbose=<n>\fR] [\fI--version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Copy data to and from any files. Specialised for "files" that are
-Linux SCSI generic (sg) devices and raw devices. Uses memory mapped IO on
-sg devices. Similar syntax and semantics to
+Copy data to and from any files. Specialized for "files" that are
+Linux SCSI generic (sg) devices and raw devices. Uses memory mapped 
+transfers on sg devices. Similar syntax and semantics to
 .B dd(1) 
 but does not perform any conversions.
+.PP
+Will only perform memory mapped transfers when <ifile> or <ofile> are
+SCSI generic (sg) devices. If both <ifile> and <ofile> are sg devices
+then memory mapped transfers are only performed on <ifile>.
 .TP
 bpt=BLOCKS
 each IO transaction will be made using this number of blocks (or less if 
@@ -52,7 +57,7 @@ is issued and no copy takes place.
 dio=0 | 1
 permits direct IO to be selected on the write-side (i.e. "of"). Only
 allowed when the read-side (i.e. "if") is a sg device. When 1 there
-may be a "zero copy" copy (i.e. mmap-ed IO on the read into the user
+may be a "zero copy" copy (i.e. mmap-ed transfer on the read into the user
 space and direct IO from there on the write, potentially two DMAs and
 no data copying from the CPU). Default is 0
 .TP
@@ -95,6 +100,15 @@ time=0 | 1
 when 1, times transfer and does throughput calculation, outputting the
 results (to stderr) at completion. When 0 (default) doesn't perform timing
 .TP
+verbose=<n>
+as <n> increases so does the amount of debug output sent to stderr.
+Default value is zero which yields the minimum amount of debug output.
+A value of 1 reports extra information that is not repetitive. A value
+2 reports cdbs and responses for SCSI commands that are not repetitive
+(i.e. other that READ and WRITE). Error processing is not considered
+repetitive. Values of 3 and 4 yield output for all SCSI commands (and
+Unix read() and write() calls) so there can be a lot of output.
+.TP
 --version
 outputs version number information and exits
 .PP
@@ -128,8 +142,8 @@ big numbers). Other values are limited to what can fit in a signed
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
 this data into user memory (write operations reverse this sequence).
-With memory mapped IO a kernel buffer reserved by sg is memory mapped
-(see the 
+With memory mapped transfers a kernel buffer reserved by sg is memory
+mapped (see the 
 .B mmap(2) 
 system call) into the user space. When this is done
 the second (redundant) copy from kernel buffers to user space is

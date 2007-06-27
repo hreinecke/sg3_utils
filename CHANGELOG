@@ -2,6 +2,24 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.17 [20050922]
+  - sg_inq: add '-a' option for ATA information VPD page
+    - add '-b' option for Block limits VPD page (SBC)
+    - add '-A' option for probing ATA or ATAPI device
+    - increase raw ('-r') and verbose ('-v') output for
+      ATA(PI) devices to 512 bytes (was 256 bytes)
+    - output hex ('-H') and verbose response for ATA(PI)
+      devices in 16 bit words (corrected for endianness)
+      - output bytes if '-HH' option given
+    - sync with spc4 rev 02
+  - sg_lib: add dWordHex() and sg_is_big_endian()
+    - sync asc/ascq with spc4 rev 02
+  - sg_cmds: defensive prefill for inquiry commands
+  - sg_opcodes: sync with spc4 rev 02 (add tmf I_T nexus reset)
+  - sginfo: add EBACKERR in Informational exception mode page
+    - add Background control mode page (SBC-3)
+  - sgm_dd: add 'verbose=<n>' option
+
 Changelog for sg3_utils-1.16 [20050810]
   - sg_ident: new utility to report+set device identifier
   - sg_map: increase MAX_SG_DEVS from 256 to 2048

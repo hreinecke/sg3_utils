@@ -1,5 +1,6 @@
 /*
-** sg_format : format a SCSI disk (potentially with a different block size)
+** sg_format : format a SCSI disk
+**             potentially with a different number of blocks and block size
 **
 ** formerly called blk512-linux.c (v0.4)
 **
@@ -67,7 +68,7 @@ static unsigned char sbuff[MAX_SENSE_SZ];
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.05 20050808";
+static char * version_str = "1.05 20050908";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},

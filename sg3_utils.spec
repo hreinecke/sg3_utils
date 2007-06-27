@@ -1,5 +1,5 @@
 %define	name	sg3_utils
-%define	version	1.16
+%define	version	1.17
 %define	release	1
 
 %define	major	1
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Thu Sep 22 2005 - dgilbert at interlog dot com
+- add ATA information VPD page to sg_inq
+  * sg3_utils-1.17
+
 * Wed Aug 10 2005 - dgilbert at interlog dot com
 - add sg_ident, sg_inq VPD page extensions
   * sg3_utils-1.16

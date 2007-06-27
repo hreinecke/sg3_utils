@@ -8,10 +8,10 @@ in the /usr/local/bin directory, LIBDIR places libraries in the
 /usr/local/include/scsi directory.
 
 Other Makefile targets that might be useful:
-make clean	# remove .o, executables, core and .depend file
-make depend	# generate dependency hierarchy in .depend file
-make dep   	# same as 'make depend'
-make sg_inq   	# build a specific executable (e.g. 'sg_inq')
+make clean      # remove .o, executables, core and .depend file
+make depend     # generate dependency hierarchy in .depend file
+make dep        # same as 'make depend'
+make sg_inq     # build a specific executable (e.g. 'sg_inq')
 make uninstall  # removes executables, libraries and build remnants
 make -f lib_no_lib/Makefile.no_lib  # build without a library
 
@@ -53,11 +53,16 @@ files.
 Binary rpms (at least in the RedHat distribution) tend to install
 executables in /usr/bin and libraries in /usr/lib .
 
+To build debian "deb" (binary) packages, first untar the tarball, then
+change directory to the top level within the sg3_utils source. Then:
+ # chmod +x debian/rules
+ # dpkg-buildpackage -b -rfakeroot
+The binary deb packages will be placed in the parent directory (of
+the sg3_utils source directory) if all goes well.
+
 If the shared object (library) is troublesome or unwanted then
 a "no_lib" version of the Makefile and the sg3_utils.spec file
 can be found in the "lib_no_lib" subdirectory.
 
-There is also infrastructure in the debian subdirectory to build
-deb packages.
 
-8th June 2005
+28th August 2005

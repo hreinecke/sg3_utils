@@ -49,7 +49,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.42 20050807";
+static char * version_str = "5.42 20050909";
 
 #define ME "sg_dd: "
 
@@ -1221,10 +1221,10 @@ int main(int argc, char * argv[])
     out_pdt = -1;
     if (inf[0] && ('-' != inf[0])) {
         in_type = dd_filetype(inf);
-
         if (verbose)
             fprintf(stderr, " >> Input file type: %s\n",
                     dd_filetype_str(in_type, ebuff));
+
         if ((FT_BLOCK & in_type) && do_blk_sgio)
             in_type |= FT_SG;
 
@@ -1311,10 +1311,10 @@ int main(int argc, char * argv[])
 
     if (outf[0] && ('-' != outf[0])) {
         out_type = dd_filetype(outf);
-
         if (verbose)
             fprintf(stderr, " >> Output file type: %s\n",
                     dd_filetype_str(out_type, ebuff));
+
         if ((FT_BLOCK & out_type) && do_blk_sgio)
             out_type |= FT_SG;
 
