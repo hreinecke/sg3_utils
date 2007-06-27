@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "July 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_FORMAT "8" "September 2005" "sg3_utils-1.17" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
@@ -141,6 +141,9 @@ from the current value then a MODE SELECT command is used to change it
 prior to the FORMAT command being started (as recommended in the draft
 standard). Recent SCSI disks usually have 512 byte sectors by default
 and allow up to 16 bytes extra in a sector (i.e. 528 byte sectors).
+If the given size in unacceptable to the disk, most likely an "Invalid
+field in parameter list" message will appear in sense data (requires the
+use of '-v' to decode sense data).
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output). "-vvv" gives
@@ -287,4 +290,4 @@ This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg_turs, sg_requests, sg_inq, sg_modes, sginfo, sg_wr_mode
-.B (all in sg3_utils), sdparm, scsiformat
+.B (all in sg3_utils), sdparm, scsiformat, setblocksize

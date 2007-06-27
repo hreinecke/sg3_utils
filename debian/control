@@ -22,6 +22,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_emc_trespass - vendor specific for Clariion hardware
      * sg_format - format SCSI disks
      * sg_get_config - get features and profiles of MMC devices
+     * sg_ident - report and set device identifiers
      * sginfo - a re-porting of the 'scsiinfo' program, updated
      * sg_inq - a utility for poking around with the SCSI INQUIRY command
      * sg_logs - prints out log sense pages

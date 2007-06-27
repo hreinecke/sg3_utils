@@ -23,12 +23,12 @@
    
 */
 
-static char * version_str = "0.43 20050808";
+static char * version_str = "0.44 20050916";
 
 #define ME "sg_logs: "
 
 #define MX_ALLOC_LEN (1024 * 17)
-#define PG_CODE_ALL 0x00
+#define PG_CODE_ALL 0x0
 #define EBUFF_SZ 256
 
 
@@ -145,7 +145,7 @@ static void show_page_name(int page_no,
                 printf("    0x08    Format status (sbc-2)\n");
                 break;
             case 0x15:
-                printf("    0x15    Background scan results (sbc-2)\n");
+                printf("    0x15    Background scan results (sbc-3)\n");
                 break;
             case 0x17:
                 printf("    0x17    Non-volatile cache (sbc-2)\n");
@@ -172,6 +172,9 @@ static void show_page_name(int page_no,
             switch (page_no) {
             case 0xc:
                 printf("    0x0c    Sequential Access (ssc-2)\n");
+                break;
+            case 0x14:
+                printf("    0x14    Device statistics (ssc-3)\n");
                 break;
             case 0x2e:
                 printf("    0x2e    Tape alerts (ssc-2)\n");

@@ -38,7 +38,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.04 20050806";
+static char * version_str = "4.05 20050905";
 
 #define ME "sg_scan: "
 
@@ -337,6 +337,8 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
     int ok, err, sg_io;
 
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(inqBuff, 0, INQ_REPLY_LEN);
+    inqBuff[0] = 0x7f;
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(inqCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_buffer);
@@ -402,6 +404,7 @@ int scsi_inq(int sg_fd, unsigned char * inqBuff)
     unsigned char buff[512];
     struct lscsi_ioctl_command * sicp = (struct lscsi_ioctl_command *)buff;
 
+    memset(buff, 0, sizeof(buff));
     sicp->inlen = 0;
     sicp->outlen = INQ_REPLY_LEN;
     memcpy(sicp->data, inqCmdBlk, INQ_CMD_LEN);

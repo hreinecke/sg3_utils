@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.20 20050808";
+static char * version_str = "0.21 20050904";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -357,7 +357,7 @@ void list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
     printf("\nOpcode  Service    CDB    Name\n");
     printf(  "(hex)   action(h)  size       \n");
     printf("-----------------------------------------------\n");
-    /* N.B. SPC-3 does _not_ requiring any ordering of response */
+    /* N.B. SPC-4 does _not_ requiring any ordering of response */
     if (! unsorted) {
         sort_arr = malloc(cd_len * sizeof(unsigned char *));
         if (NULL == sort_arr) {
@@ -568,6 +568,8 @@ int main(int argc, char * argv[])
             printf("    Target reset\n");
         if (rsoc_buff[0] & 0x1)
             printf("    Wakeup\n");
+        if (rsoc_buff[1] & 0x1)
+            printf("    I_T nexus reset\n");
     } else if (0 == rep_opts)    /* list all supported operation codes */
         list_all_codes(rsoc_buff, sizeof(rsoc_buff), do_unsorted, do_alpha);
     else {    /* asked about specific command */

@@ -46,7 +46,7 @@
    in this case) is transferred to or from the sg device in a single SCSI
    command.
 
-   This version uses memory-mapped IO (i.e. mmap() call from the user
+   This version uses memory-mapped transfers (i.e. mmap() call from the user
    space) to speed transfers. If both sides of copy are sg devices
    then only the read side will be mmap-ed, while the write side will
    use normal IO.
@@ -54,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.21 20050806";
+static char * version_str = "1.21 20050909";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -102,6 +102,7 @@ static long long in_full = 0;
 static int in_partial = 0;
 static long long out_full = 0;
 static int out_partial = 0;
+static int verbose = 0;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -172,21 +173,56 @@ int dd_filetype(const char * filename)
     return FT_OTHER;
 }
 
+static char * dd_filetype_str(int ft, char * buff)
+{
+    int off = 0;
+
+    if (FT_DEV_NULL & ft)
+        off += snprintf(buff + off, 32, "null device ");
+    if (FT_SG & ft)
+        off += snprintf(buff + off, 32, "SCSI generic (sg) device ");
+    if (FT_BLOCK & ft)
+        off += snprintf(buff + off, 32, "block device ");
+    if (FT_ST & ft)
+        off += snprintf(buff + off, 32, "SCSI tape device ");
+    if (FT_RAW & ft)
+        off += snprintf(buff + off, 32, "raw device ");
+    if (FT_OTHER & ft)
+        off += snprintf(buff + off, 32, "other (perhaps name file) ");
+    return buff;
+}
+
 void usage()
 {
     fprintf(stderr, "Usage: "
-           "sgm_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
-           "               [bs=<num>] [bpt=<num>] [count=<n>] [time=<n>]\n"
-           "               [cdbsz=6|10|12|16] [fua=0|1|2|3] [sync=0|1]\n"
-           "               [dio=0|1] [--version]\n"
-           " 'bs'  must be device block size (default 512)\n"
-           " 'bpt' is blocks_per_transfer (default is 128)\n"
-           " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
-           " 'fua' force unit access: 0->don't(def), 1->of, 2->if, 3->of+if\n"
-           " 'sync' 0->no sync(def), 1->SYNCHRONIZE CACHE after xfer\n"
-           " 'cdbsz' size of SCSI READ or WRITE command (default is 10)\n"
-           " 'dio'  0->indirect IO on write, 1->direct IO on write\n"
-           "        (only when read side is sg device (using mmap))\n");
+           "sgm_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>] "
+           "[bs=<num>]\n"
+           "               [count=<n>] [ibs=<n>] [obs=<n>] [bpt=<num>] "
+           "[cdbsz=6|10|12|16]\n"
+           "               [dio=0|1] [fua=0|1|2|3] [sync=0|1] [time=<n>] "
+           "[verbose=<n>]\n"
+           "               [--version]\n"
+           "  bpt     is blocks_per_transfer (default is 128)\n"
+           "  bs      must be device block size (default 512)\n"
+           "  cdbsz   size of SCSI READ or WRITE command (default is 10)\n"
+           "  dio     0->indirect IO on write, 1->direct IO on write\n"
+           "          (only when read side is sg device (using mmap))\n"
+           "  fua     force unit access: 0->don't(def), 1->of, 2->if, "
+           "3->of+if\n");
+    fprintf(stderr, 
+           "  ibs     input block size (if given must be same as 'bs')\n"
+           "  if      file or device to read from (def stdin)\n"
+           "  obs     output block size (if given must be same as 'bs')\n"
+           "  of      file or device to write to (def stdout), name '.' "
+           "translated to\n"
+           "          /dev/null\n"
+           "  seek    block position to start writing to 'of'\n"
+           "  skip    block position to start reading from 'if'\n"
+           "  sync    0->no sync(def), 1->SYNCHRONIZE CACHE after xfer\n"
+           "  time    0->no timing(def), 1->time plus calculate "
+           "throughput\n"
+           "  verbose  0->quiet(def), 1->some noise, 2->more noise, etc\n"
+           "  --version  print version information then exit\n");
 }
 
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
@@ -196,8 +232,11 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned char rcBuff[RCAP16_REPLY_LEN];
+   int verb;
 
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0, 0);
+    verb = (verbose ? verbose - 1: 0);
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0,
+                           verb);
     if (0 != res)
         return res;
 
@@ -205,7 +244,8 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         (0xff == rcBuff[3])) {
         long long ls;
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0, 0);
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
+                               verb);
         if (0 != res)
             return res;
         for (k = 0, ls = 0; k < 8; ++k) {
@@ -221,6 +261,9 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
                    (rcBuff[6] << 8) | rcBuff[7];
     }
+    if (verbose)
+        fprintf(stderr, "      number of blocks=%lld [0x%llx], block "
+                "size=%d\n", *num_sect, *num_sect, *sect_sz);
     return 0;
 }
 
@@ -242,6 +285,9 @@ int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
             return -1;
         }
         *num_sect = ((long long)ull / (long long)*sect_sz);
+        if (verbose)
+            fprintf(stderr, "      [bgs64] number of blocks=%lld [0x%llx], "
+                    "block size=%d\n", *num_sect, *num_sect, *sect_sz);
  #else
         unsigned long ul;
 
@@ -250,10 +296,15 @@ int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
             return -1;
         }
         *num_sect = (long long)ul;
+        if (verbose)
+            fprintf(stderr, "      [bgs] number of blocks=%lld [0x%llx], "
+                    " block size=%d\n", *num_sect, *num_sect, *sect_sz);
  #endif
     }
     return 0;
 #else
+    if (verbose)
+        fprintf(stderr, "      BLKSSZGET+BLKGETSIZE ioctl not available\n");
     *num_sect = 0;
     *sect_sz = 0;
     return -1;
@@ -360,6 +411,7 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
+    int k;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, 0)) {
         fprintf(stderr, ME "bad rd cdb build, from_block=%lld, blocks=%d\n",
@@ -380,6 +432,12 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
     io_hdr.pack_id = (int)from_block;
     if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
+    if (verbose > 2) {
+        fprintf(stderr, "    read cdb: ");
+        for (k = 0; k < cdbsz; ++k)
+            fprintf(stderr, "%02x ", rdCmd[k]);
+        fprintf(stderr, "\n");
+    }
 
 #if 1
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
@@ -405,16 +463,18 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
         return -1;
     }
 #endif
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Reading, continuing", &io_hdr, 0);
+        sg_chk_n_print3("Reading, continuing", &io_hdr, verbose);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("reading", &io_hdr, 0);
+        sg_chk_n_print3("reading", &io_hdr, verbose);
         return -1;
     }
     sum_of_resids += io_hdr.resid;
@@ -432,6 +492,7 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
+    int k;
 
     if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, 1, fua, 0)) {
         fprintf(stderr, ME "bad wr cdb build, to_block=%lld, blocks=%d\n",
@@ -455,6 +516,12 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
         io_hdr.flags |= SG_FLAG_MMAP_IO;
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
+    if (verbose > 2) {
+        fprintf(stderr, "    write cdb: ");
+        for (k = 0; k < cdbsz; ++k)
+            fprintf(stderr, "%02x ", wrCmd[k]);
+        fprintf(stderr, "\n");
+    }
 
 #if 1
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
@@ -480,16 +547,18 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
         return -1;
     }
 #endif
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Writing, continuing", &io_hdr, 0);
+        sg_chk_n_print3("Writing, continuing", &io_hdr, verbose);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("writing", &io_hdr, 0);
+        sg_chk_n_print3("writing", &io_hdr, verbose);
         return -1;
     }
     if (diop && *diop &&
@@ -622,6 +691,8 @@ int main(int argc, char * argv[])
             do_sync = sg_get_num(buf);
         else if (0 == strcmp(key,"dio"))
             do_dio = sg_get_num(buf);
+        else if (0 == strncmp(key, "verb", 4))
+            verbose = sg_get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
             fprintf(stderr, ME "for Linux sg version 3 driver: %s\n",
                     version_str);
@@ -663,6 +734,9 @@ int main(int argc, char * argv[])
     outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
         in_type = dd_filetype(inf);
+        if (verbose)
+            fprintf(stderr, " >> Input file type: %s\n",
+                    dd_filetype_str(in_type, ebuff));
 
         if (FT_ST == in_type) {
             fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
@@ -719,12 +793,18 @@ int main(int argc, char * argv[])
                     perror(ebuff);
                     return 1;
                 }
+                if (verbose)
+                    fprintf(stderr, "  >> skip: llseek SEEK_SET, "
+                            "byte offset=0x%llx\n", offset);
             }
         }
     }
 
     if (outf[0] && ('-' != outf[0])) {
         out_type = dd_filetype(outf);
+        if (verbose)
+            fprintf(stderr, " >> Output file type: %s\n",
+                    dd_filetype_str(out_type, ebuff));
 
         if (FT_ST == out_type) {
             fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
@@ -793,6 +873,9 @@ int main(int argc, char * argv[])
                     perror(ebuff);
                     return 1;
                 }
+                if (verbose)
+                    fprintf(stderr, "   >> seek: llseek SEEK_SET, "
+                            "byte offset=0x%llx\n", offset);
             }
         }
     }
@@ -949,6 +1032,11 @@ int main(int argc, char * argv[])
     }
     req_count = dd_count;
 
+    if (verbose && (dd_count > 0) && (0 == do_dio) &&
+        (FT_SG == in_type) && (FT_SG == out_type))
+        fprintf(stderr, "Since both 'if' and 'of' are sg devices, only do "
+                "mmap-ed transfers on 'if'\n");
+
     while (dd_count > 0) {
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG == in_type) {
@@ -973,6 +1061,9 @@ int main(int argc, char * argv[])
             while (((res = read(infd, wrkPos, blocks * bs)) < 0) &&
                    (EINTR == errno))
                 ;
+            if (verbose > 2)
+                fprintf(stderr, "read(unix): count=%d, res=%d\n",
+                        blocks * bs, res);
             if (res < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%lld ", skip);
                 perror(ebuff);
@@ -1021,6 +1112,9 @@ int main(int argc, char * argv[])
             while (((res = write(outfd, wrkPos, blocks * bs)) < 0)
                    && (EINTR == errno))
                 ;
+            if (verbose > 2)
+                fprintf(stderr, "write(unix): count=%d, res=%d\n",
+                        blocks * bs, res);
             if (res < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%lld ", seek);
                 perror(ebuff);
@@ -1092,7 +1186,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
                 sum_of_resids);
     if (num_dio_not_done)
-        fprintf(stderr, ">> dio requested but _not done %d times\n", 
+        fprintf(stderr, ">> dio requested but _not_ done %d times\n", 
                 num_dio_not_done);
     return res;
 }

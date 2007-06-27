@@ -54,7 +54,7 @@
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
-static char * version_str = "1.18 20050809";
+static char * version_str = "1.20 20050904";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -132,6 +132,7 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
+    unsigned char * up;
 
     if (cmddt)
         inqCmdBlk[1] |= 2;
@@ -148,6 +149,12 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
             fprintf(sg_warnings_str, "%02x ", inqCmdBlk[k]);
         fprintf(sg_warnings_str, "\n");
+    }
+    if (resp && (mx_resp_len > 0)) {
+        up = resp;
+        up[0] = 0x7f;   /* defensive prefill */
+        if (mx_resp_len > 4)
+            up[4] = 0;
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     memset(sense_b, 0, sizeof(sense_b));
@@ -230,6 +237,8 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
             fprintf(sg_warnings_str, "%02x ", inqCmdBlk[k]);
         fprintf(sg_warnings_str, "\n");
     }
+    memset(inq_resp, 0, sizeof(inq_resp));
+    inq_resp[0] = 0x7f; /* defensive prefill */
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
@@ -1865,6 +1874,8 @@ int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
                 "error: %s\n", safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:

@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "1.09 20050808";
+static char * version_str = "1.10 20050904";
 
 #define ME "sg_modes: "
 
@@ -117,6 +117,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x7, 0x0, "Verify error recovery"},
     {0x8, 0x0, "Caching"},
     {0xa, 0xf1, "Parallel ATA control (SAT)"},
+    {0xa, 0xf2, "Reserved (SATA control) (SAT)"},
     {0xb, 0x0, "Medium types supported (obsolete)"},
     {0xc, 0x0, "Notch and partition (obsolete)"},
     {0xd, 0x0, "Power condition (obsolete, moved to 0x1a)"},

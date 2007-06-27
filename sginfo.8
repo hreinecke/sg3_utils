@@ -1,4 +1,4 @@
-.TH SGINFO "8" "June 2005" "sg3_utils-1.15" SG3_UTILS
+.TH SGINFO "8" "September 2005" "sg3_utils-1.17" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -10,11 +10,14 @@ sginfo \- access mode page information for a SCSI (or ATAPI) device
 .\" Add any additional description here
 .PP
 sginfo is a port of the Linux scsiinfo program by Eric Youngdale. It 
-uses SCSI generic (sg) devices. In some cases the high level device 
-name (i.e. sd, sr, st, osst, or hd) can also be used. The primary role
-of this program is to access mode page information. If permitted,
+uses SCSI generic (sg) devices; however in some cases the high level
+device name (i.e. sd, sr, st, osst, or hd) can also be used. The primary
+role of this program is to access mode page information. If permitted,
 mode page information can be altered. In addition information from
 the INQUIRY and READ DEFECTS commands are also available.
+.PP
+Those interested in SCSI mode pages may find the sdparm utility
+easier use, especially for changing parameters. 
 .PP
 Four sets of values are maintained by a SCSI device for each mode
 page: current (active), default (manufacturer's supplied values),
@@ -25,9 +28,9 @@ shown. This can be overridden by "-M" (defaults), "-S" (saved)
 or "-m" (modifiable (i.e. changeable)).
 .PP
 Many mode pages are decoded: for disks (see SBC-2), for CD/DVDs (see
-MMC-2/3/4), for tapes (see SSC-2) and for enclosures (see SES-2).
+MMC-2/3/4/5), for tapes (see SSC-2) and for enclosures (see SES-2).
 Some mode pages common to all SCSI peripheral device types are defined
-in SPC-3 (primary commands). A decoded mode page has its field names
+in SPC-4 (primary commands). A decoded mode page has its field names
 in the first column and the corresponding value in the second column.
 A "hex" mode page (and subpage) has its byte position in the first 
 column (in hex and starting at 0x2) and the corresponding hex value
@@ -285,7 +288,7 @@ back when the mode page is written (i.e. via a MODE SELECT command).
 .PP
 .SH REFERENCES
 SCSI (draft) standards can be found at http://www.t10.org . The relevant
-documents are SPC-3 (mode pages common to all device types),
+documents are SPC-4 (mode pages common to all device types),
 SBC-2 (direct access devices [e.g. disks]), MMC-4 (CDs and DVDs) and
 SSC-2 (tapes).
 .PP
@@ -309,9 +312,9 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .B plscsi(internet), scsiinfo(internet), sg_modes(sg3_utils),
 .B sg_inq(sg3_utils), sdparm(sdparm)
 .PP
-plscsi can sent arbitrary (user supplied) SCSI commands; scsiinfo is the
+plscsi can send arbitrary (user supplied) SCSI commands; scsiinfo is the
 predecessor of this utility; sg_modes is a low level MODE SENSE based
-utility and sg_inq is specialised for the mandatory SCSI INQUIRY
+utility and sg_inq is specialized for the mandatory SCSI INQUIRY
 command which contains a lot of information about advanced devices.
 Users may find sdparm more convenient for getting and setting mode
 page parameters.
