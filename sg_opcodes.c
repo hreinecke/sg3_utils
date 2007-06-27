@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.19 20050601";
+static char * version_str = "0.20 20050808";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -142,7 +142,8 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Report supported operation codes", &io_hdr);
+        sg_chk_n_print3("Report supported operation codes", &io_hdr,
+                        verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -158,7 +159,7 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
             else
                 snprintf(ebuff, EBUFF_SZ, "RSOC error, rq_opcode=0x%x, "
                          "rq_sa=0x%x ", rq_opcode, rq_servact);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -206,7 +207,8 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Report supported task management fns", &io_hdr);
+        sg_chk_n_print3("Report supported task management fns", &io_hdr,
+                        verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -214,7 +216,7 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
         if (noisy | verbose) {
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "RSTMF error ");
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -234,7 +236,9 @@ static void usage()
             "       -u   output list of operation codes as is (unsorted)\n"
             "       -v   verbose\n"
             "       -V   output version string\n"
-            "       -?   output this usage message\n");
+            "       -?   output this usage message\n\n"
+            "Performs a REPORT SUPPORTED OPERATION CODES (or supported task "
+            "management\nfunctions) SCSI command\n");
 }
 
 static const char * scsi_ptype_strs[] = {

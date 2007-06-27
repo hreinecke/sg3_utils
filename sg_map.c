@@ -36,11 +36,13 @@
 #error "Need version 2 sg driver (linux kernel >= 2.2.6)"
 #endif
 
-static char * version_str = "1.02 20050511";
+static char * version_str = "1.04 20050810";
 
 static const char * devfs_id = "/dev/.devfsd";
 
 #define NUMERIC_SCAN_DEF 1   /* change to 0 to make alpha scan default */
+
+#define INQUIRY_RESP_INITIAL_LEN 36
 
 
 typedef struct my_map_info
@@ -55,8 +57,9 @@ typedef struct my_map_info
 } my_map_info_t;
 
 
-#define MAX_SG_DEVS 256
-#define MAX_SD_DEVS 26 + 26*26 + 26*26*26 /* sdX, sdXX, sdXXX */
+#define MAX_SG_DEVS 2048
+#define MAX_SD_DEVS (26 + 26*26 + 26*26*26) /* sdX, sdXX, sdXXX */
+                 /* (26 + 676 + 17576) = 18278 */
 #define MAX_SR_DEVS 128
 #define MAX_ST_DEVS 128
 #define MAX_OSST_DEVS 128
@@ -87,7 +90,7 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 
 static void usage()
 {
-    printf("Usage: 'sg_map [-a] [-h] [i] [-n] [-sd] [-scd or -sr] [-st] "
+    printf("Usage: 'sg_map [-a] [-h] [-i] [-n] [-sd] [-scd or -sr] [-st] "
            "[-V] [-x]'\n");
     printf("    where: -a   do alphabetic scan (ie sga, sgb, sgc)\n");
     printf("           -h or -?  show this usage message then exit\n");
@@ -244,7 +247,7 @@ int main(int argc, char * argv[])
             continue;
         }
         if (do_inquiry) {
-            char buff[36];
+            char buff[INQUIRY_RESP_INITIAL_LEN];
 
             if (0 == sg_ll_inquiry(sg_fd, 0, 0, 0, buff, sizeof(buff),
                                    1, 0)) {

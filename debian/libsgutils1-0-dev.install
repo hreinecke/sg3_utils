@@ -1,0 +1,5 @@
+usr/include/scsi
+usr/lib/*.so
+usr/lib/*.lo
+usr/lib/*.la
+usr/lib/*.a

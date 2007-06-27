@@ -45,7 +45,7 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.82 20050601";
+static char * version_str = "4.83 20050808";
 
 static void usage()
 {
@@ -60,7 +60,7 @@ static void usage()
     printf("                    max total size is 4000 MiB\n");
     printf("         -t       time the data transfer\n");
     printf("         -v       increase verbosity (more debug)\n");
-    printf("         -V       print version string then exit\n");
+    printf("         -V       print version string then exit\n\n");
     printf("Use SCSI READ BUFFER command (data mode, buffer id 0) "
            "repeatedly\n");
 }
@@ -216,12 +216,13 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr);
+        sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr,
+                        verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr);
+        sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, verbose);
         if (rawp) free(rawp);
         return 1;
     }
@@ -337,10 +338,10 @@ int main(int argc, char * argv[])
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr);
+            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr, verbose);
             break;
         default: /* won't bother decoding other categories */
-            sg_chk_n_print3("READ BUFFER data error", &io_hdr);
+            sg_chk_n_print3("READ BUFFER data error", &io_hdr, verbose);
             if (rawp) free(rawp);
             return 1;
         }

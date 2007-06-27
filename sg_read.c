@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.05 20050329";
+static const char * version_str = "1.06 20050806";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -292,14 +292,14 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose > 1)
-                sg_chk_n_print3("reading, continue", &io_hdr);
+                sg_chk_n_print3("reading, continue", &io_hdr, 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("reading", &io_hdr);
+        sg_chk_n_print3("reading", &io_hdr, verbose);
         return -1;
     }
     if (diop && *diop && 

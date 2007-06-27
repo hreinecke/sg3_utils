@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "3.72 20050601";
+static char * version_str = "3.74 20050808";
 
 #define ME "sg_readcap: "
 
@@ -39,21 +39,23 @@ static char * version_str = "3.72 20050601";
 
 void usage ()
 {
-    fprintf(stderr, "Usage:  sg_readcap [-16] [-h] [-lba=<block>] [-pmi] "
-            "[-v] [-V]"
-            " <device>\n"
-            " where    -16: use 16 byte read capacity command\n"
-            "          -h: output this usage message and exit\n"
-            "          -lba=<block>: yields the last block prior to (head "
+    fprintf(stderr, "Usage:  sg_readcap [-16] [-b] [-h] [-lba=<block>] "
+            "[-pmi] [-v] [-V] <device>\n"
+            " where  -16    use 16 byte read capacity command\n"
+            "        -b     brief, two hex numbers: number of blocks "
+            "and block size\n"
+            "        -h     output this usage message and exit\n"
+            "        -lba=<block>  yields the last block prior to (head "
             "movement) delay\n"
             "                        after <block> [in hex (def: 0) "
             "valid with -pmi]\n"
-            "          -pmi: partial medium indicator (without this switch "
+            "        -pmi   partial medium indicator (without this switch "
             "shows total\n"
             "                disk capacity)\n"
-            "          -v: increase verbosity\n"
-            "          -V: output version string and exit\n"
-            "          <device>: sg device (or block device in lk 2.6)\n");
+            "        -v   increase verbosity\n"
+            "        -V   output version string and exit\n"
+            "        <device>   sg device (or block device in lk 2.6)\n\n"
+            "Perform a READ CAPACITY SCSI command\n");
 }
 
 int main(int argc, char * argv[])
@@ -62,6 +64,7 @@ int main(int argc, char * argv[])
     unsigned int lba = 0;
     unsigned long long llba = 0;
     unsigned long long u, llast_blk_addr;
+    int brief = 0;
     int pmi = 0;
     int do16 = 0;
     int verbose = 0;
@@ -87,6 +90,9 @@ int main(int argc, char * argv[])
                         --plen;
                     } else
                         jmp_out = 1;
+                    break;
+                case 'b':
+                    brief = 1;
                     break;
                 case 'p':
                     if (0 == strncmp("pmi", cp, 3)) {
@@ -160,13 +166,17 @@ int main(int argc, char * argv[])
 
     if (! do16) {
         res = sg_ll_readcap_10(sg_fd, pmi, lba, resp_buff, RCAP_REPLY_LEN,
-                               verbose);
+                               1, verbose);
         if (0 == res) {
             last_blk_addr = ((resp_buff[0] << 24) | (resp_buff[1] << 16) |
                              (resp_buff[2] << 8) | resp_buff[3]);
             if (0xffffffff != last_blk_addr) {
                 block_size = ((resp_buff[4] << 24) | (resp_buff[5] << 16) |
                              (resp_buff[6] << 8) | resp_buff[7]);
+                if (brief) {
+                    printf("0x%x 0x%x\n", last_blk_addr + 1, block_size);
+                    goto good;
+                }
                 printf("Read Capacity results:\n");
                 if (pmi)
                     printf("   PMI mode: given lba=0x%x, last block before "
@@ -189,6 +199,7 @@ int main(int argc, char * argv[])
                     printf("   Device size: %llu bytes, %.1f MiB, %.2f GB\n",
                            total_sz, sz_mb, sz_gb);
                 }
+                goto good;
             } else {
                 printf("READ CAPACITY (10) indicates device capacity too "
                        "large\n  now trying 16 byte cdb variant\n");
@@ -208,12 +219,13 @@ int main(int argc, char * argv[])
                         "READ CAPACITY (16)\n");
         } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
-        else if (verbose)
-            fprintf(stderr, "READ CAPACITY (10) failed [res=%d]\n", res);
+        else if (! verbose)
+            fprintf(stderr, "READ CAPACITY (10) failed [res=%d], try "
+                    "with '-v'\n", res);
     }
     if (do16) {
         res = sg_ll_readcap_16(sg_fd, pmi, llba, resp_buff, RCAP16_REPLY_LEN,
-                               verbose);
+                               1, verbose);
         if (0 == res) {
             for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
                 llast_blk_addr <<= 8;
@@ -221,6 +233,10 @@ int main(int argc, char * argv[])
             }
             block_size = ((resp_buff[8] << 24) | (resp_buff[9] << 16) |
                           (resp_buff[10] << 8) | resp_buff[11]);
+            if (brief) {
+                printf("0x%llx 0x%x\n", llast_blk_addr + 1, block_size);
+                goto good;
+            }
             printf("Read Capacity results:\n");
             printf("   Protection: prot_en=%d, rto_en=%d\n",
                    !!(resp_buff[12] & 0x1), !!(resp_buff[12] & 0x2));
@@ -245,14 +261,22 @@ int main(int argc, char * argv[])
                 printf("   Device size: %llu bytes, %.1f MiB, %.2f GB\n",
                        total_sz, sz_mb, sz_gb);
             }
+            goto good;
         }
         else if (SG_LIB_CAT_INVALID_OP == res) 
             fprintf(stderr, "READ CAPACITY (16) not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
-        else if (verbose)
-            fprintf(stderr, "READ CAPACITY (16) failed [res=%d]\n", res);
+        else if (! verbose)
+            fprintf(stderr, "READ CAPACITY (16) failed [res=%d], try "
+                    "with '-v'\n", res);
     }
+    if (brief)
+        printf("0x0 0x0\n");
+    close(sg_fd);
+    return 1;
+
+good:
     close(sg_fd);
     return 0;
 }

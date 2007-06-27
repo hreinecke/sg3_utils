@@ -118,18 +118,18 @@ int main(int argc, char * argv[])
             file_name = argv[j];
     }
     if ((0 == file_name) || (count < 0) || (do_wr < 0) || (addr == ULONG_MAX)
-    	|| (skip < 0)) {
-	printf("Probabably missing parameter\n\n");
+        || (skip < 0)) {
+        printf("Probabably missing parameter\n\n");
         printf(
         "Usage: 'sg_bus_xfer -r|w -a=hex_num [-bs=num] -skip=num"
-	" <sg_device>'\n");
+        " <sg_device>'\n");
         printf("  where: -r|w         read from (or write to) sg device\n");
         printf("         -a=hex_num   memory address (virtual ?)\n");
         printf("         -bs=num      blocks size in bytes (default 512)\n");
         printf("         -skip=num    num is blocks to skip/seek on sg dev\n");
         printf("         -count=num   num of blocks to xfer\n");
         printf("\n BEWARE you could do damage with this command "
-	       "(needs root access)\n");
+               "(needs root access)\n");
         printf("\n bs, skip and count may take k,K,m,M etc multipliers\n");
         return 1;
     }
@@ -161,7 +161,7 @@ int main(int argc, char * argv[])
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = do_wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = bs * count;
-    // io_hdr.dxferp = malloc(1024 * 1024);	/* <<<<<<<<<<<<<<<< */
+    // io_hdr.dxferp = malloc(1024 * 1024);     /* <<<<<<<<<<<<<<<< */
     io_hdr.dxferp = (void *)addr;
     io_hdr.cmdp = rwCmdBlk;
     io_hdr.flags = SG_FLAG_BUS_ADDR;
@@ -187,7 +187,7 @@ int main(int argc, char * argv[])
         printf("Recovered error, continuing\n");
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("SG_IO error", &io_hdr);
+        sg_chk_n_print3("SG_IO error", &io_hdr, 1);
         return 1;
     }
     return 0;

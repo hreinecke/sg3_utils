@@ -50,10 +50,10 @@ int main(int argc, char * argv[])
                             0x33, 0x44, 0xa,
                             0x0, 0x0, 0, 0, 0x4, 0x1, 0, 0xcf, 0, 5,};
 
-    sg_print_sense("err1 test", err1, sizeof(err1));
-    sg_print_sense("\nerr2 test", err2, sizeof(err2));
-    sg_print_sense("\nerr3 test", err3, sizeof(err3));
-    sg_print_sense("\nerr4 test", err4, sizeof(err4));
-    sg_print_sense("\nerr5 test", err5, sizeof(err5));
+    sg_print_sense("err1 test", err1, sizeof(err1), 1);
+    sg_print_sense("\nerr2 test", err2, sizeof(err2), 1);
+    sg_print_sense("\nerr3 test", err3, sizeof(err3), 1);
+    sg_print_sense("\nerr4 test", err4, sizeof(err4), 1);
+    sg_print_sense("\nerr5 test", err5, sizeof(err5), 1);
     return 0;
 }

@@ -25,7 +25,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.05 20050309";
+static char * version_str = "1.06 20050808";
 
 #define READ_LONG_OPCODE 0x3E
 #define READ_LONG_CMD_LEN 10
@@ -64,7 +64,8 @@ static void usage()
           "         --version|-V               print version string and"
           " exit\n"
           "         --xfer_len=<num>|-x <num>  transfer length (< 10000)"
-          " default 520\n"
+          " default 520\n\n"
+          "Perform a READ LONG SCSI command\n"
           );
 }
 
@@ -162,17 +163,17 @@ static int sg_ll_read_long10(int sg_fd, int correct, unsigned long lba,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr);
+        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
         if (verbose > 1)
-            sg_chk_n_print3("READ LONG(10) command problem", &io_hdr);
+            sg_chk_n_print3("READ LONG(10) command problem", &io_hdr, 1);
         return res;
     default:
         if (verbose > 1)
-            sg_chk_n_print3("READ LONG(10) sense", &io_hdr);
+            sg_chk_n_print3("READ LONG(10) sense", &io_hdr, 1);
         if ((sg_normalize_sense(&io_hdr, &ssh)) &&
             (ssh.sense_key == ILLEGAL_REQUEST) &&
             ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {

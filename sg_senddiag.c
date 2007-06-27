@@ -22,7 +22,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.26 20050604";
+static char * version_str = "0.27 20050808";
 
 #define ME "sg_senddiag: "
 
@@ -260,13 +260,16 @@ static void usage()
            "       -uoff unit online (def: 0, only with '-t')\n"
            "       -v   increase verbosity (print issued SCSI cmds)\n"
            "       -V   output version string\n"
-           "       -?   output this usage message\n");
+           "       -?   output this usage message\n\n"
+           "Performs a SEND DIAGNOSTIC (and/or a RECEIVE DIAGNOSTIC RESULTS)"
+           " SCSI command\n"
+        );
 }
 
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, read_in_len, plen, jmp_out;
+    int sg_fd, k, num, rsp_len, plen, jmp_out;
     const char * file_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char rsp_buff[MX_ALLOC_LEN];
@@ -283,6 +286,7 @@ int main(int argc, char * argv[])
     int do_raw = 0;
     int verbose = 0;
     int oflags = O_RDWR | O_NONBLOCK;
+    int read_in_len = 0;
     const char * cp;
     unsigned char read_in[MX_ALLOC_LEN];
     int ret = 1;

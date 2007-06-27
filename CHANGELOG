@@ -2,6 +2,30 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.16 [20050810]
+  - sg_ident: new utility to report+set device identifier
+  - sg_map: increase MAX_SG_DEVS from 256 to 2048
+  - debian: new directory to support deb package builds
+  - sg_get_config: add '--current' option, same as '--rt=1'
+    - update for DVD+RW Dual Layer
+  - sg_inq: add notes in source about use of SCSI INQUIRY
+     - decode Management network addresses VPD page ('-m')
+     - decode Mode page policy VPD page ('-M')
+  - sginfo: increase device mapping capability (> 78 disks)
+     - add '-r' option to scan /dev/raw* device nodes [Tim Hunt]
+  - sg_dd: change bpt default value to 32 when bs >= 2048 bytes
+  - sg_ses: mention SAF-TE in man page
+  - sg_readcap: add '-b' option for brief output (2 hex numbers)
+  - sg_cmds: add sg_ll_start_stop_unit(), sg_ll_prevent_allow(),
+      sg_ll_report_dev_id() and sg_ll_set_dev_id()
+  - sg_lib: add extra argument to sense print functions to enable
+      the suppression of the raw output of the sense buffer
+      - resid > 0 warnings now includes number actually fetched
+  - sg_start: add '-load' and '-eject' options
+    - default to start action when no other indication given
+    - change -imm=0|1 option default to 0 (was 1)
+  - gcc 4.0: cleanup warnings (apart from sgp_dd: revisit later)
+
 Changelog for sg3_utils-1.15 [20050605]
   - sg_cmds: sg_get_mode_page_controls(): improve error processing,
      add double fetch
@@ -136,7 +160,7 @@ Changelog for sg3_utils-1.09 [20041022]
       - decode last n error events and last n deferred errors pages
       - add names of ADC log pages
   - sg_inq: update to SPC-3 rev 21
-      - decode Extended INQUIRY VPD page [0x86] {'-x'}
+      - decode Extended INQUIRY data VPD page [0x86] {'-x'}
       - decode Unit Path Report VPD page [0xc0] (EMC) {'-P'}
   - sginfo: decode SAS protocol specific lu mode page
   - sg_err: convert to sg_lib + update to SPC-3 rev 21

@@ -43,11 +43,11 @@
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
- * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC commands
- * tailored for SES (enclosure) devices.
+ * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
+ *commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.17 20050512";
+static char * version_str = "1.18 20050808";
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -103,7 +103,8 @@ static void usage()
           "for '-d'\n"
           "         --status|-s        fetch status information\n"
           "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n"
+          "         --version|-V       print version string and exit\n\n"
+          "Fetches status or sends control data to a SCSI enclosure\n"
           );
 }
 

@@ -47,13 +47,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.02 20050309";
-
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-
-#define PREVENT_REMOVAL_CMD    0x1e
-#define PREVENT_REMOVAL_CMDLEN   6
+static char * version_str = "1.03 20050808";
 
 #define ME "sg_prevent: "
 
@@ -82,68 +76,9 @@ static void usage()
           "persistent prevent\n"
           "         --verbose|-v          increase verbosity\n"
           "         --version|-V          print version string and exit\n\n"
-          "    performs a PREVENT ALLOW MEDIUM REMOVAL SCSI command\n"
+          "Performs a PREVENT ALLOW MEDIUM REMOVAL SCSI command\n"
           );
 
-}
-
-/* Invokes a SCSI PREVENT ALLOW MEDIUM REMOVAL command */
-/* Return of 0 -> success, -1 -> failure, SG_LIB_CAT_INVALID_OP -> 
-   command not supported */
-int sg_ll_prevent(int sg_fd, int prevent, int verbose)
-{
-    int k, res;
-    unsigned char pCmdBlk[PREVENT_REMOVAL_CMDLEN] = 
-                {PREVENT_REMOVAL_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    if ((prevent < 0) || (prevent > 3)) {
-        fprintf(stderr, "prevent argument should be 0, 1, 2 or 3\n");
-        return -1;
-    }
-    pCmdBlk[4] |= (prevent & 0x3);
-    if (verbose) {
-        fprintf(stderr, "    Prevent allow medium removal cdb: ");
-        for (k = 0; k < PREVENT_REMOVAL_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", pCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = PREVENT_REMOVAL_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.dxfer_len = 0;
-    io_hdr.dxferp = NULL;
-    io_hdr.cmdp = pCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(stderr, "prevent allow medium removal SG_IO error: %s\n",
-                safe_strerror(errno));
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Prevent allow medium removal", &io_hdr);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Prevent allow medium removal command problem",
-                            &io_hdr);
-        return res;
-    default:
-        sg_chk_n_print3("Prevent allow medium removal command problem",
-                        &io_hdr);
-        return -1;
-    }
 }
 
 int main(int argc, char * argv[])
@@ -226,14 +161,17 @@ int main(int argc, char * argv[])
         perror("");
         return 1;
     }
-    res = sg_ll_prevent(sg_fd, prevent, verbose);
+    res = sg_ll_prevent_allow(sg_fd, prevent, 1, verbose);
     if (0 == res)
         ret = 0;
     else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Prevent allow medium removal command not "
                 "supported\n");
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "Prevent allow medium removal, bad field in "
+                "command\n");
     else
-        fprintf(stderr, "Prevent allow medium removal failed\n");
+        fprintf(stderr, "Prevent allow medium removal command failed\n");
 
     res = close(sg_fd);
     if (res < 0) {

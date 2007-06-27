@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "1.08 20050601";
+static char * version_str = "1.09 20050808";
 
 #define ME "sg_modes: "
 
@@ -463,7 +463,8 @@ static void usage()
            "       -v   verbose\n"
            "       -V   output version string\n"
            "       -6   Use MODE SENSE(6), by default uses MODE SENSE(10)\n"
-           "       -?   output this usage message\n");
+           "       -?   output this usage message\n\n"
+           "Performs a SCSI MODE SENSE commmand\n");
 }
 
 

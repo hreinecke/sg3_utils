@@ -41,7 +41,8 @@ targeted the&nbsp; linux kernel 2.2 series with some support for the
 2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>&nbsp;
 for further information about sg_utils.&nbsp; This
 document describes
-version 1.15 of sg3_utils . <br>
+<span style="font-weight: bold;">version 1.16</span> of <span
+ style="font-weight: bold;">sg3_utils</span> . <br>
 <br>
 In the linux kernel 2.4 series most these utilities must be
 used with a SCSI generic (sg) driver device name (e.g. <span
@@ -56,8 +57,7 @@ still represents a cleaner interface than the primary device names
 since the drivers behind primary device names have their
 own policies, may interfere with error processing and in some cases
 run their own
-state machines (e.g. the cdrom driver interferes with attempts to
-prevent media removal with sg_prevent).<br>
+state machines.<br>
 <p>SCSI utility programs for Linux from other sources are listed and
 briefly described in
 the final section. </p>
@@ -157,7 +157,8 @@ time; now in own package, see <a href="sdparm.html">sdparm</a><br>
       <td style="vertical-align: top;">symbolic decoding (optional
 changing) of mode pages. Can also output (disk) defect lists. In lk 2.4
 can be given primary device nodes (e.g. /dev/sda) as well as sg device
-nodes.<br>
+nodes. See <span style="font-weight: bold;">scsiinfo</span> package
+notes below.<br>
       </td>
     </tr>
     <tr>
@@ -235,6 +236,18 @@ Clariion series<br>
       </td>
       <td style="vertical-align: top;">fetch features and profiles of a
 cd/dvd drive and/or its current media<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_ident<br>
+      </td>
+      <td style="vertical-align: top;">REPORT/SET DEVICE IDENTIFIER<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">default is to report (fetch) the
+device identifier. With the '--set' option a new identifier can be sent
+to the device.<br>
       </td>
     </tr>
     <tr>
@@ -605,12 +618,13 @@ nodes.]<br>
 <br>
 Irrespective of the Unix device node used to access a device, care
 should be taken not to interfere with a device while it is "active".
-Obviously invoking a "sg_format -F" utility a disk with mounted file
+For example invoking a "sg_format -F" utility on a disk with mounted
+file
 systems on it is going to cause damage.<br>
 <h2><a name="Changing_mode_page_settings"></a>Changing mode page
 settings</h2>
 SCSI devices store settings (metadata) that could possibly be changed
-by the user (called the "application client" in SCSI speak) in mode
+by the user (called the "application client" in SCSI jargon) in mode
 pages. It is a common requirement to find mode page settings and in
 some cases change them. An example is the Writeback Cache Enable (WCE)
 bit
@@ -619,7 +633,8 @@ default setting for WCE is set (on) but the user may want it off. <br>
 <br>
 Generic command line tools to change mode page settings tend to be
 difficult to use (which in some small part is due to the SCSI rules for
-manipulating mode pages). Here is a list of some utilities for changing
+manipulating mode pages). Here is a list of some linux utilities for
+changing
 mode pages followed by some notes:<br>
 <ul>
   <li><span style="font-weight: bold;">scsiinfo</span> (old utility):
@@ -649,7 +664,8 @@ page values but awkward for manipulating a specific mode page field.</li>
   <li><span style="font-weight: bold;">hdparm</span> (hdparm):
 abstracts over ATA (mainly) and SCSI (where convenient) disks. Write
 caching can be turned on and off but that is one of the few mode fields
-that can be changed.</li>
+that can be changed on a SCSI device.<br>
+  </li>
   <li><span style="font-weight: bold;">blktool</span> (blktool): much
 newer and cleaner version of hdparm which targets the lk 2.6 series.
 For SCSI devices only a relatively small (but important) number of mode
@@ -898,7 +914,21 @@ See&nbsp;<a class="moz-txt-link-freetext"
  href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
  style="font-family: monospace;"></span>www.scsifaq.org/RMiller_Tools/index.html</a>&nbsp;for
 more details. Both <b>scu</b> and <b>dt </b>are written by Robin
-T. Miller &lt;Robin.Miller at hp dot com&gt;
+T. Miller &lt;Robin.Miller at hp dot com&gt;<br>
+<h3>scsiinfo</h3>
+Older package that includes the <span style="font-weight: bold;">scsiinfo</span>
+and <span style="font-weight: bold;">scsiformat</span> utilities plus
+tcl/tk GUI interfaces for those utilities. The last update of the <span
+ style="font-weight: bold;">scsiinfo</span> package was in 1997. The
+function and syntax of the <span style="font-weight: bold;">scsiinfo</span>
+utility have inspired <span style="font-weight: bold;">sginfo</span>
+which now can be considered as a "drop in" replacement for <span
+ style="font-weight: bold;">scsiinfo</span> . Recent changes to SCSI
+standards (e.g. extra and extended mode pages) are reflected in <span
+ style="font-weight: bold;">sginfo</span> . In a similar way the <span
+ style="font-weight: bold;">sg_format</span> utility can be thought of
+as a modern replacement for the <span style="font-weight: bold;">scsiformat</span>
+utility.<br>
 <h3> scsidev</h3>
 Kurt Garloff &lt;garloff@suse.de&gt; describes this utility thus: "This
 program scans the SCSI bus and creates device nodes in /dev/scsi/,
@@ -997,10 +1027,18 @@ author's "to do" list. See <a href="http://www.lerhaupt.com/linux.html">http://w
 This utility allows arbitrary SCSI commands to be sent to a device. See
 <a href="http://members.aol.com/plscsi">http://members.aol.com/plscsi</a>
 . It is similar to FreeBSD's camcontrol command.<br>
+<h3>safte-monitor</h3>
+SAF-TE (SCSI Attached Fault-Tolerant Enclosure) is a SCSI command set
+for monitoring and controlling enclosures and RAIDs. SAF-TE devices
+report "processor" peripheral device type (0x3) in their INQUIRY
+responses. More recent products tend to use SES (drafts at
+http://www.t10.org ) which covers similar functionality. For a SAF-TE
+monitoring tool for linux see: <a
+ href="http://oss.metaparadigm.com/safte-monitor">http://oss.metaparadigm.com/safte-monitor</a><br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 5th June 2005<br>
+<p>Last updated: 5th August 2005<br>
 <br>
 </p>
 </center>

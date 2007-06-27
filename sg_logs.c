@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "0.41 20050601";
+static char * version_str = "0.43 20050808";
 
 #define ME "sg_logs: "
 
@@ -54,6 +54,12 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
         return -1;
     }
     actual_len = (resp[2] << 8) + resp[3] + 4;
+    if (verbose > 1) {
+        fprintf(stderr, "  Log sense (find length) response:\n");
+        dStrHex((const char *)resp, 4, 1);
+        fprintf(stderr, "  hence calculated response length=%d\n",
+                actual_len);
+    }
     /* Some HBAs don't like odd transfer lengths */
     if (actual_len % 2)
         actual_len += 1;
@@ -64,6 +70,10 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
         if ((SG_LIB_CAT_INVALID_OP == res) || (SG_LIB_CAT_ILLEGAL_REQ == res))
             return res;
         return -1;
+    }
+    if (verbose > 1) {
+        fprintf(stderr, "  Log sense response:\n");
+        dStrHex((const char *)resp, actual_len, 1);
     }
     return 0;
 }
@@ -83,15 +93,16 @@ static void usage()
            "       -l   list supported log page names\n"
            "       -p=<page_code> page code (in hex)\n"
            "       -paramp=<parameter_pointer> (in hex) (def: 0)\n"
-           "       -pcb show parameter control bytes (ignored if -h given)\n"
-           "       -ppc set the Parameter Pointer Control (PPC) bit (def: 0)\n"
+           "       -pcb show parameter control bytes (ignored if -h given)\n");
+    printf("       -ppc set the Parameter Pointer Control (PPC) bit (def: 0)\n"
            "       -r   reset all implemented parameters to target defined "
            "defaults\n"
            "       -sp  set the Saving Parameters (SP) bit (def: 0)\n"
            "       -t   outputs temperature log page (0xd)\n"
            "       -v   verbose: output cdbs prior to execution\n"
            "       -V   output version string\n"
-           "       -?   output this usage message\n");
+           "       -?   output this usage message\n\n"
+           "Performs a SCSI LOG SENSE command\n");
 }
 
 static void show_page_name(int page_no,
@@ -926,15 +937,15 @@ static void show_non_volatile_cache_page(unsigned char * resp, int len,
 }
 
 static const char * bms_status[] = {
-    "no scans active", 
-    "background medium scan is active", 
-    "pre-scan is active", 
-    "scan halted due to fatal error", 
-    "scan halted due to unusual pattern of error", 
-    "scan halted due to medium formatted without P-List", 
-    "scan halted - vendor specific cause", 
-    "scan halted due to temperature out of range", 
-    "scan suspended until BMS Interval Time expires", 
+    "no scans active",
+    "background medium scan is active",
+    "pre-scan is active",
+    "scan halted due to fatal error",
+    "scan halted due to unusual pattern of error",
+    "scan halted due to medium formatted without P-List",
+    "scan halted - vendor specific cause",
+    "scan halted due to temperature out of range",
+    "scan suspended until BMS Interval Time expires", /* 8 */
 };
 
 static const char * reassign_status[] = {
@@ -972,10 +983,10 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
                 printf("%s\n", bms_status[j]);
             else
                 printf("unknown [0x%x]\n", j);
-            printf("    Number of scan performed: %d\n",
+            printf("    Number of scans performed: %d\n",
                    (ucp[10] << 8) + ucp[11]);
-            printf("    Progress of medium scan: %d%%\n",
-                   ((ucp[12] << 8) + ucp[13]) * 100 / 65536);
+            printf("    Progress of medium scan: %.2f%%\n",
+                   (double)((ucp[12] << 8) + ucp[13]) * 100.0 / 65536.0);
 
             break;
         default:
@@ -1417,6 +1428,7 @@ int main(int argc, char * argv[])
     int oroflags = O_RDONLY | O_NONBLOCK;
     struct sg_simple_inquiry_resp inq_out;
 
+    memset(rsp_buff, 0, sizeof(rsp_buff));
     for (k = 1; k < argc; ++k) {
         cp = argv[k];
         plen = strlen(cp);

@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.15
+Version: 1.16
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -82,6 +82,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_reassign
 %attr(755,root,root) %{_bindir}/sg_format
 %attr(755,root,root) %{_bindir}/sg_rmsn
+%attr(755,root,root) %{_bindir}/sg_ident
 # Mandrake compresses man pages with bzip2, RedHat with gzip
 %attr(-,root,root) %doc %{_mandir}/man8/sg_dd.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sgp_dd.8*
@@ -117,9 +118,14 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_reassign.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_format.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_rmsn.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_ident.8*
  
 
 %changelog
+* Wed Aug 10 2005 - dgilbert at interlog dot com
+- add sg_ident, sg_inq VPD page extensions
+  * sg3_utils-1.16
+
 * Sun Jun 05 2005 - dgilbert at interlog dot com
 - use O_NONBLOCK on all fds that use SG_IO iotcl
   * sg3_utils-1.15

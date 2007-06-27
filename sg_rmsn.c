@@ -48,7 +48,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.00 20050329";
+static char * version_str = "1.01 20050808";
 
 #define ME "sg_rmsn: "
 
@@ -66,19 +66,19 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_rmsn   [--help] [--verbose] [--version] <scsi_device>\n"
-          "  where: --help|-h          print out usage message\n"
-          "         --raw|-r           output serial number to stdout\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n"
-          "Sends SCSI READ MEDIA SERIAL NUMBER command\n"
+          "sg_rmsn   [--help] [--raw] [--verbose] [--version] <scsi_device>\n"
+          "  where: --help|-h       print out usage message\n"
+          "         --raw|-r        output serial number to stdout "
+          "(potentially binary)\n"
+          "         --verbose|-v    increase verbosity\n"
+          "         --version|-V    print version string and exit\n\n"
+          "Performs a READ MEDIA SERIAL NUMBER SCSI command\n"
           );
-
 }
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, sn_len;
+    int sg_fd, res, c, sn_len, n;
     unsigned char rmsn_buff[4];
     unsigned char * ucp = NULL;
     int raw = 0;
@@ -145,55 +145,59 @@ int main(int argc, char * argv[])
     memset(rmsn_buff, 0x0, sizeof(rmsn_buff));
 
     res = sg_ll_read_media_serial_num(sg_fd, rmsn_buff, sizeof(rmsn_buff),
-				      1, verbose);
+                                      1, verbose);
     if (0 == res) {
         sn_len = (rmsn_buff[0] << 24) + (rmsn_buff[1] << 16) + 
-                     (rmsn_buff[2] << 8) + rmsn_buff[3] + 4;
-	if (! raw)
+                     (rmsn_buff[2] << 8) + rmsn_buff[3];
+        if (! raw)
             printf("Reported serial number length = %d\n", sn_len);
-	if (0 == sn_len) {
-	    fprintf(stderr, "    This implies the media has no serial "
-		    "number\n");
-	    goto err_out;
-	}
-	if (sn_len > SERIAL_NUM_SANITY_LEN) {
+        if (0 == sn_len) {
+            fprintf(stderr, "    This implies the media has no serial "
+                    "number\n");
+            goto err_out;
+        }
+        if (sn_len > SERIAL_NUM_SANITY_LEN) {
             fprintf(stderr, "    That length (%d) seems too long for a "
-		    "serial number\n", sn_len);
-	    goto err_out;
-	}
-	sn_len += 4;
-	ucp = malloc(sn_len);
-	if (NULL == ucp) {
+                    "serial number\n", sn_len);
+            goto err_out;
+        }
+        sn_len += 4;
+        ucp = malloc(sn_len);
+        if (NULL == ucp) {
             fprintf(stderr, "    Out of memory (ram)\n");
-	    goto err_out;
-	}
+            goto err_out;
+        }
         res = sg_ll_read_media_serial_num(sg_fd, ucp, sn_len, 1, verbose);
-	if (0 == res) {
+        if (0 == res) {
             sn_len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) +
-                     ucp[3] + 4;
-	    if (raw) {
-		if (sn_len > 0)
-		    fwrite(ucp + 4, 1, sn_len, stdout);
-	    } else {
+                     ucp[3];
+            if (raw) {
+                if (sn_len > 0)
+                    n = fwrite(ucp + 4, 1, sn_len, stdout);
+            } else {
                 printf("Serial number:\n");
-	        if (sn_len > 0)
+                if (sn_len > 0)
                     dStrHex((const char *)ucp + 4, sn_len, 0); 
-	        ret = 0;
-	    }
-	} else if (SG_LIB_CAT_INVALID_OP == res)
+            }
+            ret = 0;
+        }
+    }
+    if (0 != res) {
+        if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "Read Media Serial Number command not "
-		    "supported (b)\n");
+                    "supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Read Media Serial Number cdb "
-		    "(b)\n");
-    } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Read Media Serial Number command not supported\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "bad field in Read Media Serial Number cdb\n");
+            fprintf(stderr, "bad field in Read Media Serial Number cdb\n");
+        else {
+            fprintf(stderr, "Read Media Serial Number failed\n");
+            if (0 == verbose)
+                fprintf(stderr, "    try '-v' for more information\n");
+        }
+    }
 
 err_out:
     if (ucp)
-	free(ucp);
+        free(ucp);
     res = close(sg_fd);
     if (res < 0) {
         perror(ME "close error");

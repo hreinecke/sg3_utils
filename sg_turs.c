@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "3.16 20050603";
+static char * version_str = "3.17 20050808";
 
 #define EBUFF_SZ 256
 
@@ -39,8 +39,8 @@ static void usage()
            "       '-t'   outputs total duration and commands per "
            "second\n"
            "       '-v'   increase verbosity\n"
-           "       '-V'   print version string then exit\n"
-           "Send Test Unit Ready SCSI command(s)\n");
+           "       '-V'   print version string then exit\n\n"
+           "Performs a TEST UNIT READY SCSI command (or many of them)\n");
 }
 
 int main(int argc, char * argv[])

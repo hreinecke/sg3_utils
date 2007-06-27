@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.10 [20050521]
+/* Version 1.11 [20050806]
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
@@ -289,7 +289,8 @@ extern void sg_set_warnings_str(FILE * warnings_str);
    descriptor (default value is stderr) */
 extern void sg_print_command(const unsigned char * command);
 extern void sg_print_sense(const char * leadin,
-                           const unsigned char * sense_buffer, int sb_len);
+                           const unsigned char * sense_buffer, int sb_len,
+                           int raw_info);
 extern void sg_print_status(int masked_status);
 extern void sg_print_scsi_status(int scsi_status);
 extern void sg_print_host_status(int host_status);
@@ -300,14 +301,16 @@ extern void sg_print_driver_status(int driver_status);
    'sg_warnings_fd' and returns 0. */
 extern int sg_chk_n_print(const char * leadin, int masked_status,
                           int host_status, int driver_status,
-                          const unsigned char * sense_buffer, int sb_len);
+                          const unsigned char * sense_buffer, int sb_len,
+                          int raw_sinfo);
 
 /* The following function declaration is for the sg version 3 driver. */
 struct sg_io_hdr;
 /* sg_chk_n_print3() returns 1 quietly if there are no errors/warnings;
    else it prints errors/warnings (prefixed by 'leadin') to
    'sg_warnings_fd' and returns 0. */
-extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp);
+extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
+                           int raw_sinfo);
 
 /* Calls sg_scsi_normalize_sense() after obtaining the sense buffer and
    its length from the struct sg_io_hdr pointer. If these cannot be

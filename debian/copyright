@@ -1,0 +1,15 @@
+This package was debianized by Eric Schwartz <emschwar@debian.org> on
+Wed, 14 Nov 2001 17:05:56 -0700.
+
+It was downloaded from <URL:http://www.torque.net/sg/>
+
+Upstream Authors: Andries Brouwer, Remy Card, Douglas Gilbert <dgilbert@interlog.com>, P. Allworth, Eric Youngdale, Kurt Garloff <garloff@suse.de>, Michael Weller <eowmob@exp-math.uni-essen.de>
+
+Copyright:
+
+This software is copyright(c) 1994-2001 by the authors
+
+You are free to distribute this software under the terms of
+the GNU General Public License.
+On Debian systems, the complete text of the GNU General Public
+License can be found in /usr/share/common-licenses/GPL file.

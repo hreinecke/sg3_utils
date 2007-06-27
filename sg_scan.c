@@ -38,7 +38,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.03 20050603";
+static char * version_str = "4.04 20050806";
 
 #define ME "sg_scan: "
 
@@ -362,13 +362,13 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("Inquiry, continuing", &io_hdr);
+            sg_chk_n_print3("Inquiry, continuing", &io_hdr, 1);
             /* fall through */
         case SG_LIB_CAT_CLEAN:
             break;
         default: /* won't bother decoding other categories */
             ok = 0;
-            sg_chk_n_print3("INQUIRY command error", &io_hdr);
+            sg_chk_n_print3("INQUIRY command error", &io_hdr, 1);
             break;
         }
     }

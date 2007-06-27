@@ -54,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.20 20050511";
+static char * version_str = "1.21 20050806";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -197,7 +197,7 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
     int k, res;
     unsigned char rcBuff[RCAP16_REPLY_LEN];
 
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0);
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0, 0);
     if (0 != res)
         return res;
 
@@ -205,7 +205,7 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         (0xff == rcBuff[3])) {
         long long ls;
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0);
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0, 0);
         if (0 != res)
             return res;
         for (k = 0, ls = 0; k < 8; ++k) {
@@ -409,12 +409,12 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Reading, continuing", &io_hdr);
+        sg_chk_n_print3("Reading, continuing", &io_hdr, 0);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("reading", &io_hdr);
+        sg_chk_n_print3("reading", &io_hdr, 0);
         return -1;
     }
     sum_of_resids += io_hdr.resid;
@@ -484,12 +484,12 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Writing, continuing", &io_hdr);
+        sg_chk_n_print3("Writing, continuing", &io_hdr, 0);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("writing", &io_hdr);
+        sg_chk_n_print3("writing", &io_hdr, 0);
         return -1;
     }
     if (diop && *diop &&

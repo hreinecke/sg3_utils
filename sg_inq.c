@@ -27,15 +27,37 @@
         other improvements [20020814]
       - Lars Marowsky-Bree <lmb at suse dot de> contributed Unit Path Report
         VPD page decoding for EMC CLARiiON devices [20041016]
-
-From SPC-3 revision 16 the CmdDt bit in an INQUIRY is obsolete. There is
-now a REPORT SUPPORTED OPERATION CODES command that yields similar
-information [MAINTENANCE IN, service action = 0xc]. Support will be added
-in the future.
-   
 */
 
-static char * version_str = "0.51 20050602";
+/* INQUIRY notes:
+ * It is recommended that the initial allocation length given to a
+ * standard INQUIRY is 36 (bytes), especially if this is the first
+ * SCSI command sent to a logical unit. This is compliant with SCSI-2
+ * and another major operating system. There are devices out there
+ * that use one of the SCSI commands sets and lock up if they receive
+ * an allocation length other than 36. This technique is sometimes
+ * referred to as a "36 byte INQUIRY".
+ *
+ * A "standard" INQUIRY is one that has the EVPD and the CmdDt bits
+ * clear.
+ *
+ * When doing device discovery on a SCSI transport (e.g. bus scanning)
+ * the first SCSI command sent to a device should be a standard (36
+ * byte) INQUIRY.
+ *
+ * The allocation length field in the INQUIRY command was changed
+ * from 1 to 2 bytes in SPC-3, revision 9, 17 September 2002.
+ * Be careful using allocation lengths greater than 252 bytes, especially
+ * if the lower byte is 0x0 (e.g. a 512 byte allocation length may
+ * not be a good arbitrary choice (as 512 == 0x200) ).
+ *
+ * From SPC-3 revision 16 the CmdDt bit in an INQUIRY is obsolete. There
+ * is now a REPORT SUPPORTED OPERATION CODES command that yields similar
+ * information [MAINTENANCE IN, service action = 0xc]. Support will be
+ * added in the future.
+ */
+
+static char * version_str = "0.52 20050808";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -43,14 +65,18 @@ static char * version_str = "0.51 20050602";
 
 #define INQUIRY_CMD     0x12
 #define INQUIRY_CMDLEN  6
+
 #define SUPPORTED_VPDS_VPD 0x0
 #define UNIT_SERIAL_NUM_VPD 0x80
 #define DEV_ID_VPD  0x83
+#define MAN_NET_ADDR_VPD  0x85
 #define X_INQ_VPD  0x86
+#define MODE_PG_POLICY_VPD  0x87
 #define SCSI_PORTS_VPD  0x88
 #define UPR_EMC_VPD  0xc0
+
 #define DEF_ALLOC_LEN 252
-#define MX_ALLOC_LEN 4096
+#define MX_ALLOC_LEN (0xc000 + 0x80)
 
 #define EBUFF_SZ 256
 
@@ -69,7 +95,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
 static void usage()
 {
     fprintf(stderr,
-            "Usage:  sg_inq [-c] [-cl] [-d] [-e] [-h] [-H] [-i] "
+            "Usage:  sg_inq [-c] [-cl] [-d] [-e] [-h] [-H] [-i] [-m] "
             "[-o=<opcode_page>]\n"
             "               [-p=<vpd_page>] [-P] [-r] [-s] [-v] [-V] [-x] "
             "[-36] [-?]\n"
@@ -81,6 +107,9 @@ static void usage()
             "       -h   output in hex (ASCII to the right)\n"
             "       -H   output in hex (ASCII to the right) [same as '-h']\n"
             "       -i   decode device identification VPD page (0x83)\n"
+            "       -m   decode management network addresses VPD page "
+            "(0x85)\n"
+            "       -M   decode mode page policy VPD page (0x87)\n"
             "       -o=<opcode_page> opcode or page code in hex (def: 0)\n"
             "       -p=<vpd_page> vpd page code in hex (def: 0)\n"
             "       -P   decode Unit Path Report VPD page (0xc0) (EMC)\n"
@@ -88,11 +117,11 @@ static void usage()
             "       -s   decode SCSI Ports VPD page (0x88)\n"
             "       -v   verbose (output cdb and, if non-zero, resid)\n"
             "       -V   output version string\n"
-            "       -x   decode extented INQUIRY VPD page (0x86)\n"
-            "       -36  only perform a 36 byte INQUIRY\n"
+            "       -x   decode extented INQUIRY data VPD page (0x86)\n"
+            "       -36  perform standard INQUIRY with a 36 byte response\n"
             "       -?   output this usage message\n"
             "   If no optional switches given then does"
-            " a standard INQUIRY\n");
+            " a standard SCSI INQUIRY\n");
 }
 
 
@@ -108,7 +137,7 @@ static const char * scsi_ptype_strs[] = {
     /* 0 */ "disk",
     "tape",
     "printer",
-    "processor",
+    "processor",        /* often SAF-TE (seldom scanner) device */
     "write once optical disk",
     /* 5 */ "cd/dvd",
     "scanner",
@@ -144,16 +173,16 @@ struct vpd_name {
 };
 
 static struct vpd_name vpd_name_arr[] = {
-    {0x0, 0, "Supported VPD pages"},
-    {0x80, 0, "Unit serial number"},
+    {SUPPORTED_VPDS_VPD, 0, "Supported VPD pages"},
+    {UNIT_SERIAL_NUM_VPD, 0, "Unit serial number"},
     {0x81, 0, "Implemented operating definitions"},
     {0x82, 0, "ASCII implemented operating definition (obsolete)"},
-    {0x83, 0, "Device identification"},
+    {DEV_ID_VPD, 0, "Device identification"},
     {0x84, 0, "Software interface identification"},
-    {0x85, 0, "Management network addresses"},
-    {0x86, 0, "Extended INQUIRY data"},
-    {0x87, 0, "Mode page policy"},
-    {0x88, 0, "SCSI ports"},
+    {MAN_NET_ADDR_VPD, 0, "Management network addresses"},
+    {X_INQ_VPD, 0, "Extended INQUIRY data"},
+    {MODE_PG_POLICY_VPD, 0, "Mode page policy"},
+    {SCSI_PORTS_VPD, 0, "SCSI ports"},
     {0x89, 0, "ATA information"},
     {0xb0, 0, "Block limits (sbc2)"}, 
     {0xb0, 0x1, "SSC device capabilities (ssc3)"},
@@ -210,6 +239,105 @@ static void decode_id_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     decode_dev_ids("Device identification", buff + 4, len - 4, do_hex);
+}
+
+static const char * assoc_arr[] =
+{
+    "addressed logical unit",
+    "target port that received request",
+    "target device that contains addressed lu",
+    "reserved [0x3]",
+};
+        
+static const char * network_service_type_arr[] =
+{
+    "unspecified",
+    "storage configuration service",
+    "diagnostics",
+    "status",
+    "logging",
+    "code download",
+    "reserved[0x6]", "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
+    "reserved[0xa]", "reserved[0xb]", "reserved[0xc]", "reserved[0xd]",
+    "reserved[0xe]", "reserved[0xf]", "reserved[0x10]", "reserved[0x11]",
+    "reserved[0x12]", "reserved[0x13]", "reserved[0x14]", "reserved[0x15]",
+    "reserved[0x16]", "reserved[0x17]", "reserved[0x18]", "reserved[0x19]",
+    "reserved[0x1a]", "reserved[0x1b]", "reserved[0x1c]", "reserved[0x1d]",
+    "reserved[0x1e]", "reserved[0x1f]",
+};
+
+static void decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
+{
+    int k, bump, na_len;
+    unsigned char * ucp;
+
+    if (len < 4) {
+        fprintf(stderr, "Management network addresses VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    ucp = buff + 4;
+    for (k = 0; k < len; k += bump, ucp += bump) {
+        printf("  %s, Service type: %s\n", 
+               assoc_arr[(ucp[0] >> 5) & 0x3],
+               network_service_type_arr[ucp[0] & 0x1f]);
+        na_len = (ucp[2] << 8) + ucp[3];
+        bump = 4 + na_len;
+        if ((k + bump) > len) {
+            fprintf(stderr, "Management network addresses VPD page, short "
+                    "descriptor length=%d, left=%d\n", bump, (len - k));
+            return;
+        }
+        if (na_len > 0) {
+            if (do_hex) {
+                printf("    Network address:\n");
+                dStrHex((const char *)(ucp + 4), na_len, 0);
+            } else
+                printf("    %s\n", ucp + 4);
+        }
+    }
+}
+        
+static const char * mode_page_policy_arr[] =
+{
+    "shared",
+    "per target port",
+    "per initiator port",
+    "per I_T nexus",
+};
+
+static void decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
+{
+    int k, bump;
+    unsigned char * ucp;
+
+    if (len < 4) {
+        fprintf(stderr, "Mode page policy VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    len -= 4;
+    ucp = buff + 4;
+    for (k = 0; k < len; k += bump, ucp += bump) {
+        bump = 4;
+        if ((k + bump) > len) {
+            fprintf(stderr, "Mode page policy VPD page, short "
+                    "descriptor length=%d, left=%d\n", bump, (len - k));
+            return;
+        }
+        if (do_hex)
+            dStrHex((const char *)ucp, 4, 1);
+        else {
+            printf("  Policy page code: 0x%x", (ucp[0] & 0x3f));
+            if (ucp[1])
+                printf(",  subpage code: 0x%x\n", ucp[1]);
+            else
+                printf("\n");
+            printf("    MLUS=%d,  Policy: %s\n", !!(ucp[2] & 0x80),
+                   mode_page_policy_arr[ucp[2] & 0x3]);
+        }
+    }
 }
 
 static void decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
@@ -284,14 +412,6 @@ static const char * code_set_arr[] =
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
-static const char * assoc_arr[] =
-{
-    "addressed logical unit",
-    "target port that received request",
-    "target device that contains addressed lu",
-    "reserved [0x3]",
-};
-
 static const char * id_type_arr[] =
 {
     "vendor specific [0x0]",
@@ -322,7 +442,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
     for (k = 0, j = 1; k < len; k += id_len, ucp += id_len, ++j) {
         i_len = ucp[3];
         id_len = i_len + 4;
-        printf("  Identification descriptor number %d, "
+        printf("  Descriptor number %d, "
                "descriptor length: %d\n", j, id_len);
         if ((k + id_len) > len) {
             fprintf(stderr, "%s VPD page error: descriptor length longer "
@@ -651,8 +771,8 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
 static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
     if (len < 7) {
-        fprintf(stderr, "Extended INQUIRY VPD page length too short=%d\n",
-                len);
+        fprintf(stderr, "Extended INQUIRY data VPD page length too "
+                "short=%d\n", len);
         return;
     }
     if (do_hex) {
@@ -664,7 +784,7 @@ static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  GRP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d SIMPSUP=%d\n",
            !!(buff[5] & 0x10), !!(buff[5] & 0x8), !!(buff[5] & 0x4),
            !!(buff[5] & 0x2), !!(buff[5] & 0x1));
-    printf("  NV_SUP=%d V_SUP=%d", !!(buff[6] & 0x2), !!(buff[6] & 0x1));
+    printf("  NV_SUP=%d V_SUP=%d\n", !!(buff[6] & 0x2), !!(buff[6] & 0x1));
 }
 
 static const char * lun_state_arr[] =
@@ -1177,6 +1297,8 @@ int main(int argc, char * argv[])
     int do_cmdlst = 0;
     int do_di_vpd = 0;
     int do_hex = 0;
+    int do_man_net_vpd = 0;
+    int do_mode_policy_vpd = 0;
     int do_raw = 0;
     int do_scsi_ports_vpd = 0;
     int do_xtended = 0;
@@ -1225,6 +1347,12 @@ int main(int argc, char * argv[])
                     break;
                 case 'i':
                     do_di_vpd = 1;
+                    break;
+                case 'm':
+                    do_man_net_vpd = 1;
+                    break;
+                case 'M':
+                    do_mode_policy_vpd = 1;
                     break;
                 case 'P':
                     do_upr_c0_emc = 1;
@@ -1288,7 +1416,8 @@ int main(int argc, char * argv[])
         }
     }
     
-    decode = do_di_vpd + do_xtended + do_upr_c0_emc + do_scsi_ports_vpd;
+    decode = do_di_vpd + do_xtended + do_upr_c0_emc + do_scsi_ports_vpd +
+             do_man_net_vpd + do_mode_policy_vpd;
     if (do_raw && do_hex) {
         fprintf(stderr, "Can't do hex and raw at the same time\n");
         usage();
@@ -1372,9 +1501,63 @@ int main(int argc, char * argv[])
             else
                 decode_id_vpd(rsp_buff, len, do_hex);
         }
+    } else if (do_man_net_vpd) {
+        if (!do_raw)
+            printf("VPD INQUIRY: Management network addresses page\n");
+        if (0 == sg_ll_inquiry(sg_fd, 0, 1, MAN_NET_ADDR_VPD, rsp_buff,
+                               DEF_ALLOC_LEN, 1, do_verbose)) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            ret = 3;
+            if (MAN_NET_ADDR_VPD != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                goto err_out;
+            }
+            if (len > MX_ALLOC_LEN) {
+                fprintf(stderr, "response length too long: %d > %d\n", len,
+                       MX_ALLOC_LEN);
+                goto err_out;
+            } else if (len > DEF_ALLOC_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, MAN_NET_ADDR_VPD, rsp_buff,
+                                  len, 1, do_verbose))
+                    goto err_out;
+            }
+            ret = 0;
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else
+                decode_net_man_vpd(rsp_buff, len, do_hex);
+        }
+    } else if (do_mode_policy_vpd) {
+        if (!do_raw)
+            printf("VPD INQUIRY: Mode page policy\n");
+        if (0 == sg_ll_inquiry(sg_fd, 0, 1, MODE_PG_POLICY_VPD, rsp_buff,
+                               DEF_ALLOC_LEN, 1, do_verbose)) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            ret = 3;
+            if (MODE_PG_POLICY_VPD != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                goto err_out;
+            }
+            if (len > MX_ALLOC_LEN) {
+                fprintf(stderr, "response length too long: %d > %d\n", len,
+                       MX_ALLOC_LEN);
+                goto err_out;
+            } else if (len > DEF_ALLOC_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, MODE_PG_POLICY_VPD, rsp_buff,
+                                  len, 1, do_verbose))
+                    goto err_out;
+            }
+            ret = 0;
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else
+                decode_mode_policy_vpd(rsp_buff, len, do_hex);
+        }
     } else if (do_xtended) {
         if (!do_raw)
-            printf("VPD INQUIRY: extended INQUIRY page\n");
+            printf("VPD INQUIRY: extended INQUIRY data page\n");
         if (0 == sg_ll_inquiry(sg_fd, 0, 1, X_INQ_VPD, rsp_buff,
                                DEF_ALLOC_LEN, 1, do_verbose)) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;

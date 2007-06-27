@@ -25,6 +25,7 @@
  * -n    access notch parameters page.
  * -N    Negate (stop) storing to saved page (active with -R)
  * -P    access Power Condition Page.
+ * -r    list known raw scsi devices on the system
  * -s    display serial number (from INQUIRY VPD page)
  * -t <n[,spn]> access page number <n> [and subpage <spn>], try to decode
  * -u <n[,spn]> access page number <n> [and subpage <spn>] in hex.
@@ -109,7 +110,7 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * sginfo_version_str = "sginfo version 2.14 [20050412]";
+static const char * sginfo_version_str = "sginfo version 2.17 [20050806]";
 
 #include <stdio.h>
 #include <string.h>
@@ -119,9 +120,11 @@ static const char * sginfo_version_str = "sginfo version 2.14 [20050412]";
 #include <fcntl.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include "sg_include.h"
 
 #include "sg_lib.h"
@@ -133,6 +136,8 @@ static char *device_name;
 #define MAX_RESP6_SIZE 252
 #define MAX_RESP10_SIZE (4*1024)
 #define MAX_BUFFER_SIZE MAX_RESP10_SIZE
+
+#define INQUIRY_RESP_INITIAL_LEN 36
 
 #define MAX_HEADS 127 
 #define HEAD_SORT_TOKEN 0x55
@@ -414,7 +419,7 @@ static int do_scsi_io(struct scsi_cmnd_io * sio)
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("do_scsi_cmd, continuing", &io_hdr);
+        sg_chk_n_print3("do_scsi_cmd, continuing", &io_hdr, 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -423,7 +428,7 @@ static int do_scsi_io(struct scsi_cmnd_io * sio)
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "do_scsi_io: opcode=0x%x", sio->cmnd[0]);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, 1);
         }
         if (sg_normalize_sense(&io_hdr, &ssh)) {
             if (ILLEGAL_REQUEST == ssh.sense_key) {
@@ -2897,24 +2902,23 @@ static int do_inquiry(int * peri_type, int * resp_byte6,
                       int inquiry_verbosity)
 {
     int status;
-    const int inq_resp_len = 36;
     unsigned char cmd[6];
     unsigned char *pagestart;
     struct scsi_cmnd_io sci;
 
-    memset(cbuffer, 0, inq_resp_len);
+    memset(cbuffer, 0, INQUIRY_RESP_INITIAL_LEN);
 
     cmd[0] = 0x12;              /* INQUIRY */
     cmd[1] = 0x00;              /* evpd=0 */
     cmd[2] = 0x00;              /* page code = 0 */
     cmd[3] = 0x00;              /* (reserved) */
-    cmd[4] = inq_resp_len;      /* allocation length */
+    cmd[4] = INQUIRY_RESP_INITIAL_LEN;      /* allocation length */
     cmd[5] = 0x00;              /* control */
 
     sci.cmnd = cmd;
     sci.cmnd_len = sizeof(cmd);
     sci.dxfer_dir = DXFER_FROM_DEVICE;
-    sci.dxfer_len = inq_resp_len;
+    sci.dxfer_len = INQUIRY_RESP_INITIAL_LEN;
     sci.dxferp = cbuffer;
     status = do_scsi_io(&sci);
     if (status) {
@@ -2923,7 +2927,7 @@ static int do_inquiry(int * peri_type, int * resp_byte6,
     }
     if (trace_cmd > 1) {
         printf("  inquiry response:\n");
-        dump(cbuffer, inq_resp_len);
+        dump(cbuffer, INQUIRY_RESP_INITIAL_LEN);
     }
     pagestart = cbuffer;
     if (peri_type)
@@ -2932,7 +2936,7 @@ static int do_inquiry(int * peri_type, int * resp_byte6,
         *resp_byte6 = pagestart[6];
     if (0 == inquiry_verbosity)
         return 0;
-    if ((pagestart[4] + 5) < 36) {
+    if ((pagestart[4] + 5) < INQUIRY_RESP_INITIAL_LEN) {
         printf("INQUIRY response too short: expected 36 bytes, got %d\n",
                pagestart[4] + 5);
         return -EINVAL;
@@ -3106,65 +3110,77 @@ static void make_dev_name(char * fname, int k, int do_numeric)
     }
 }
 
-#define MAX_SG_DEVS 256
+#define MAX_SG_DEVS 1024
 
-char *ul_devices[] =
-{"/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd", "/dev/sde", "/dev/sdf", 
- "/dev/sdg", "/dev/sdh", "/dev/sdi", "/dev/sdj", "/dev/sdk", "/dev/sdl",
- "/dev/sdm", "/dev/sdn", "/dev/sdo", "/dev/sdp", "/dev/sdq", "/dev/sdr",
- "/dev/sds", "/dev/sdt", "/dev/sdu", "/dev/sdv", "/dev/sdw", "/dev/sdx",
- "/dev/sdy", "/dev/sdz",
- "/dev/sdaa", "/dev/sdab", "/dev/sdac", "/dev/sdad", "/dev/sdae",
- "/dev/sdaf", "/dev/sdag", "/dev/sdah", "/dev/sdai", "/dev/sdaj",
- "/dev/sdak", "/dev/sdal", "/dev/sdam", "/dev/sdan", "/dev/sdao",
- "/dev/sdap", "/dev/sdaq", "/dev/sdar", "/dev/sdas", "/dev/sdat",
- "/dev/sdau", "/dev/sdav", "/dev/sdaw", "/dev/sdax", "/dev/sday",
- "/dev/sdaz", "/dev/sdba", "/dev/sdbb", "/dev/sdbc", "/dev/sdbd",
- "/dev/sdbe", "/dev/sdbf", "/dev/sdbg", "/dev/sdbh", "/dev/sdbi",
- "/dev/sdbj", "/dev/sdbk", "/dev/sdbl", "/dev/sdbm", "/dev/sdbn",
- "/dev/sdbo", "/dev/sdbp", "/dev/sdbq", "/dev/sdbr", "/dev/sdbs",
- "/dev/sdbt", "/dev/sdbu", "/dev/sdbv", "/dev/sdbw", "/dev/sdbx",
- "/dev/sdby", "/dev/sdbz",
- "/dev/scd0", "/dev/scd1", "/dev/scd2", "/dev/scd3", "/dev/scd4", "/dev/scd5",
- "/dev/scd6", "/dev/scd7", "/dev/scd8", "/dev/scd9", "/dev/scd10", "/dev/scd11",
- "/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/sr3", "/dev/sr4", "/dev/sr5",
- "/dev/sr6", "/dev/sr7", "/dev/sr8", "/dev/sr9", "/dev/sr10", "/dev/sr11",
- "/dev/nst0", "/dev/nst1", "/dev/nst2", "/dev/nst3", "/dev/nst4", "/dev/nst5",
- "/dev/nosst0", "/dev/nosst1", "/dev/nosst2", "/dev/nosst3", "/dev/nosst4"
-};
-
-static const int ul_devices_num = (sizeof(ul_devices) / sizeof(char *));
-
-static Sg_map sg_map_arr[(sizeof(ul_devices) / sizeof(char *)) + 1];
+static Sg_map sg_map_arr[MAX_SG_DEVS];
 
 #define MAX_HOLES 4
 
 /* Print out a list of the known devices on the system */
-static void show_devices()
+static void show_devices(int raw)
 {
     int k, j, fd, err, bus;
     My_scsi_idlun m_idlun;
     char name[MDEV_NAME_SZ];
+    char dev_name[MDEV_NAME_SZ];
     char ebuff[EBUFF_SZ];
     int do_numeric = 1;
     int max_holes = MAX_HOLES;
+    DIR *dir_ptr;
+    struct dirent *entry;
+    char *tmpptr;
 
-    for (k = 0, j = 0; k < ul_devices_num; k++) {
-        fd = open(ul_devices[k], O_RDONLY | O_NONBLOCK);
+    dir_ptr=opendir("/dev");
+    if ( dir_ptr == NULL ) {
+        perror("/dev");
+        exit(1);
+    }
+
+    j=0;
+    while ( (entry=readdir(dir_ptr)) != NULL ) {
+        switch(entry->d_type) {
+        case DT_LNK:
+        case DT_CHR:
+        case DT_BLK:
+                break;
+        default:
+                continue;
+        }
+
+        switch(entry->d_name[0]) {
+        case 's':
+        case 'n':
+                break;
+        default:
+                continue;
+        }
+
+        if ( strncmp("sg",entry->d_name,2) == 0 ) {
+                continue;
+        }
+        if ( strncmp("sd",entry->d_name,2) == 0 && isdigit(entry->d_name[strlen(entry->d_name)-1]) ) {
+                continue;
+        }
+
+        snprintf(dev_name, sizeof(dev_name),"/dev/%s",entry->d_name);
+
+        fd = open(dev_name, O_RDONLY | O_NONBLOCK);
         if (fd < 0)
             continue;
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &(sg_map_arr[j].bus));
         if (err < 0) {
+#if 0
             snprintf(ebuff, EBUFF_SZ,
-                     "SCSI(1) ioctl on %s failed", ul_devices[k]);
+                     "SCSI(1) ioctl on %s failed", dev_name);
             perror(ebuff);
+#endif
             close(fd);
             continue;
         }
         err = ioctl(fd, SCSI_IOCTL_GET_IDLUN, &m_idlun);
         if (err < 0) {
             snprintf(ebuff, EBUFF_SZ, 
-                     "SCSI(2) ioctl on %s failed", ul_devices[k]);
+                     "SCSI(2) ioctl on %s failed", dev_name);
             perror(ebuff);
             close(fd);
             continue;
@@ -3172,20 +3188,32 @@ static void show_devices()
         sg_map_arr[j].channel = (m_idlun.mux4 >> 16) & 0xff;
         sg_map_arr[j].lun = (m_idlun.mux4 >> 8) & 0xff;
         sg_map_arr[j].target_id = m_idlun.mux4 & 0xff;
-        sg_map_arr[j].dev_name = ul_devices[k];
+        tmpptr=(char *)malloc(strlen(dev_name)+1);
+        strncpy(tmpptr,dev_name,strlen(dev_name)+1);
+        sg_map_arr[j].dev_name = tmpptr;
 #if 0
         printf("[scsi%d ch=%d id=%d lun=%d %s] ", sg_map_arr[j].bus,
         sg_map_arr[j].channel, sg_map_arr[j].target_id, sg_map_arr[j].lun,
         sg_map_arr[j].dev_name);
 #endif
         ++j;
-        printf("%s ", ul_devices[k]);
+        printf("%s ", dev_name);
         close(fd);
     };
+    closedir(dir_ptr);
+
     printf("\n"); /* <<<<<<<<<<<<<<<<<<<<< */
     for (k = 0; k < MAX_SG_DEVS; k++) {
-        make_dev_name(name, k, do_numeric);
-        fd = open(name, O_RDWR | O_NONBLOCK);
+        if ( raw ) {
+                sprintf(name,"/dev/raw/raw%d",k);
+                fd = open(name, O_RDWR | O_NONBLOCK);
+                if (fd < 0) {
+                        continue;
+                }
+        }
+        else {
+                make_dev_name(name, k, do_numeric);
+                fd = open(name, O_RDWR | O_NONBLOCK);
         if (fd < 0) {
             if ((ENOENT == errno) && (0 == k)) {
                 do_numeric = 0;
@@ -3208,18 +3236,23 @@ static void show_devices()
                 }
             }
         }
+        }
         max_holes = MAX_HOLES;
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &bus);
         if (err < 0) {
-            snprintf(ebuff, EBUFF_SZ, "SCSI(3) ioctl on %s failed", name);
-            perror(ebuff);
+            if ( ! raw ) {
+                snprintf(ebuff, EBUFF_SZ, "SCSI(3) ioctl on %s failed", name);
+                perror(ebuff);
+            }
             close(fd);
             continue;
         }
         err = ioctl(fd, SCSI_IOCTL_GET_IDLUN, &m_idlun);
         if (err < 0) {
-            snprintf(ebuff, EBUFF_SZ, "SCSI(3) ioctl on %s failed", name);
-            perror(ebuff);
+            if ( ! raw ) {
+                snprintf(ebuff, EBUFF_SZ, "SCSI(3) ioctl on %s failed", name);
+                perror(ebuff);
+            }
             close(fd);
             continue;
         }
@@ -3381,6 +3414,7 @@ static void usage(char *errtext)
           "\t-n    Access Notch and Partition Page.\n"
           "\t-N    Negate (stop) storing to saved page (active with -R).\n"
           "\t-P    Access Power Condition Page.\n"
+          "\t-r    List known raw scsi devices on the system\n"
           "\t-s    Display serial number (from INQUIRY VPD page).\n"
           "\t-t<pn[,sp]> Access mode page <pn> [subpage <sp>] and decode.\n"
           "\t-T    Trace commands (for debugging, double for more)\n"
@@ -3405,7 +3439,7 @@ static void usage(char *errtext)
 
 int main(int argc, char *argv[])
 {
-    int k, j;
+    int k, j, n;
     unsigned int unum, unum2;
     int decode_in_hex = 0;
     char c;
@@ -3413,13 +3447,13 @@ int main(int argc, char *argv[])
     long tmp;
     struct mpage_info mp_i;
     int inquiry_verbosity = 0;
-    int show_devs = 0;
+    int show_devs = 0, show_raw = 0;
     int found = 0;
 
     if (argc < 2)
         usage(NULL);
     memset(&mp_i, 0, sizeof(mp_i));
-    while ((k = getopt(argc, argv, "6aAcCdDeEfgGiIlmMnNPRsSTvVXzF:t:u:")) !=
+    while ((k = getopt(argc, argv, "6aAcCdDeEfgGiIlmMnNPrRsSTvVXzF:t:u:")) !=
            EOF) {
         c = (char)k;
         switch (c) {
@@ -3509,6 +3543,9 @@ int main(int argc, char *argv[])
             break;
         case 'P':
             mp_i.page = 0x1a;
+            break;
+        case 'r':
+            show_raw = 1;
             break;
         case 'R':
             replace = 1;
@@ -3608,13 +3645,17 @@ int main(int argc, char *argv[])
                 continue;
             }
             /* Using a tmp here is silly but the most clean approach */
-            sscanf(argv[optind + j], "%ld", &tmp);
-            replacement_values[j] = tmp;
+            n = sscanf(argv[optind + j], "%ld", &tmp);
+            replacement_values[j] = ((1 == n) ? tmp : 0);
         }
         n_replacement_values = argc - optind - 1;
     }
     if (show_devs) {
-        show_devices();
+        show_devices(0);
+        exit(0);
+    }
+    if (show_raw) {
+        show_devices(1);
         exit(0);
     }
     if (optind >= argc)

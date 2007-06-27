@@ -1,0 +1,61 @@
+sg3-utils (1.16-0.1) unstable; urgency=low
+
+  * New upstream version
+
+ -- Doug Gilbert <dgilbert@interlog.com>  Wed, 10 Aug 2005 14:20:00 +1000
+
+sg3-utils (1.15-0.1) unstable; urgency=low
+
+  * New upstream version
+
+ -- Martin Schwenke <martin@meltin.net>  Tue,  7 Jun 2005 13:22:44 +1000
+
+sg3-utils (1.08-1) unstable; urgency=low
+
+  * New upstream version
+  * Unified package description with list of tools actually installed
+    (closes: #271093)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Sun, 12 Sep 2004 21:22:42 -0600
+
+sg3-utils (1.05-1) unstable; urgency=low
+
+  * New upstream release
+  * updated description to match tools in package (closes: #221143)
+
+ -- Eric Schwartz <emschwar@debian.org>  Tue, 18 Nov 2003 22:22:29 -0700
+
+sg3-utils (1.03-1) unstable; urgency=low
+
+  * New upstream release (closes: #181999)
+
+ -- Eric Schwartz <emschwar@debian.org>  Tue, 29 Apr 2003 20:18:30 -0600
+
+sg3-utils (0.95-4) unstable; urgency=low
+
+  * Only warns if installed on a kernel version < 2.4 (closes: #136434)
+      
+ -- Eric Schwartz <emschwar@debian.org>  Tue, 28 May 2002 22:55:29 -0600
+
+sg3-utils (0.95-3) unstable; urgency=low
+
+  * Extended description to include descriptions of all tools included in
+    the package. (closes: #121968)
+
+ -- Eric Schwartz <emschwar@debian.org>  Sun, 13 Jan 2002 17:09:27 -0700
+
+sg3-utils (0.95-2) unstable; urgency=low
+
+  * Packaging manpages (closes: #122692)
+  * Conflicts with cdwrite (closes: #123779)
+
+ -- Eric Schwartz <emschwar@debian.org>  Wed,  2 Jan 2002 01:05:08 -0700
+
+sg3-utils (0.95-1) unstable; urgency=low
+
+  * Initial Release.
+  * Adjusted Makefile to include $DESTDIR
+
+ -- Eric Schwartz <emschwar@debian.org>  Wed, 14 Nov 2001 17:05:56 -0700
+
+
