@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "0.13 20001208";
+static char * version_str = "0.15 20011221";
 
 
 /* #define SG_DEBUG */
@@ -36,6 +36,9 @@ static char * version_str = "0.13 20001208";
 #define INQUIRY_CMDLEN  6
 #define MX_ALLOC_LEN 255
 
+#ifndef SCSI_IOCTL_GET_PCI
+#define SCSI_IOCTL_GET_PCI 0x5387
+#endif
 
 
 static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op, 
@@ -91,6 +94,7 @@ static void usage()
 	   "       -c   set CmdDt mode\n"
 	   "       -h   output in hex (ASCII to the right)\n"
 	   "       -o=<opcode_page> opcode or page code in hex\n"
+	   "       -p   output SCSI adapter PCI information\n"
 	   "       -V   output version string\n"
 	   "       -?   output this usage message\n"
 	   " If no optional switches given (or '-h') then does"
@@ -158,6 +162,8 @@ int main(int argc, char * argv[])
     int do_evpd = 0;
     int do_cmddt = 0;
     int do_hex = 0;
+    int do_pci = 0;
+    int oflags = O_RDONLY;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strncmp("-o=", argv[k], 3)) {
@@ -174,6 +180,8 @@ int main(int argc, char * argv[])
 	    do_hex = 1;
         else if (0 == strcmp("-c", argv[k]))
 	    do_cmddt = 1;
+	else if (0 == strcmp("-p", argv[k]))
+            do_pci = 1;
         else if (0 == strcmp("-?", argv[k])) {
 	    file_name = 0;
 	    break;
@@ -200,7 +208,9 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
+    if (do_pci)
+    	oflags = O_RDWR;
+    if ((sg_fd = open(file_name, oflags)) < 0) {
         sprintf(ebuff, "sg_inq: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
@@ -289,6 +299,24 @@ int main(int argc, char * argv[])
 	    	printf(" Only hex output supported\n");
 	    dStrHex((const char *)rsp_buff, len);
 	}
+    }
+
+    if (do_pci) {
+        unsigned char slot_name[16];
+
+	printf("\n");
+        memset(slot_name, '\0', sizeof(slot_name));
+        if (ioctl(sg_fd, SCSI_IOCTL_GET_PCI, slot_name) < 0) {
+            if (EINVAL == errno)
+                printf("ioctl(SCSI_IOCTL_GET_PCI) not supported by this "
+                       "kernel\n");
+            else if (ENXIO == errno)
+                printf("associated adapter not a PCI device?\n");
+            else
+                perror("ioctl(SCSI_IOCTL_GET_PCI) failed");
+        }
+        else
+            printf("PCI:slot_name: %s\n", slot_name);
     }
 
     close(sg_fd);

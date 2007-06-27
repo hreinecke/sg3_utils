@@ -1,10 +1,10 @@
-.TH SG_RBUF "8" "January 2001" "sg3_utils-0.92" SG_UTILS
+.TH SG_RBUF "5" "December 2001" "sg3_utils-0.96" SG_UTILS
 .SH NAME
 sg_rbuf \- reads data using SCSI READ BUFFER command
 .SH SYNOPSIS
 .B sg_rbuf
-[\fI-q\fR] [\fI-d\fR] [\fI-s=<num_MB>\fR] [\fI-b=<num_KB>\fR] 
-\fI<sg_device>\fR
+[[\fI-q\fR] | [\fI-d\fR] | [\fI-m\fR]] [\fI-t\fR] [\fI-s=<num_MB>\fR]
+[\fI-b=<num_KB>\fR] \fI<sg_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -25,6 +25,17 @@ to configure the DMA from the SCSI adapter to transfer directly
 into user memory. This will eliminate the copy via kernel buffers.
 If not available then this will be reported and indirect IO will
 be done instead.
+.TP
+-m
+use memory mapped IO if available. In this case the sg driver will attempt
+to configure the DMA from the SCSI adapter to transfer directly
+into user memory. This will eliminate the copy via kernel buffers.
+.TP
+-t
+times the bulk data transfer component of this command. The elapsed time
+is printed out plus a MB/sec calculation. In this case "MB" is 1,000,000
+bytes. The gettimeofday() system call is used internally for the time
+calculation.
 .TP
 -s=<num_MB>
 size of total transfer (in Megabytes == 1024^2). The default is

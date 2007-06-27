@@ -50,6 +50,7 @@ int main(int argc, char * argv[])
     unsigned char turCmdBlk [TUR_CMD_LEN] =
                                 {0x00, 0, 0, 0, 0, 0};
     unsigned char * inqBuff;
+    unsigned char * inqBuff2;
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
     char ebuff[128];
@@ -92,13 +93,17 @@ int main(int argc, char * argv[])
     
     /* since I know this program will only read from inqBuff then I use
        PROT_READ rather than PROT_READ | PROT_WRITE */
-    inqBuff = mmap(NULL, INQ_REPLY_LEN, PROT_READ, MAP_SHARED, sg_fd, 0);
+    inqBuff = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
     if (MAP_FAILED == inqBuff) {
         sprintf(ebuff, "sg_simple4: error using mmap() on file: %s", 
 		file_name);
         perror(ebuff);
         return 1;
     }
+    if (inqBuff[0])
+    	printf("non-null char at inqBuff[0]\n");
+    if (inqBuff[5000])
+    	printf("non-null char at inqBuff[5000]\n");
 
     /* Prepare INQUIRY command */
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
@@ -192,8 +197,36 @@ int main(int argc, char * argv[])
 	       "msg_status=%d\n",
                io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
 
+    /* munmap(inqBuff, 8000); */
     /* could call munmap(inqBuff, INQ_REPLY_LEN) here but following close()
        causes this too happen anyway */
+#if 1
+    inqBuff2 = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
+    if (MAP_FAILED == inqBuff2) {
+        sprintf(ebuff, "sg_simple4: error using mmap() 2 on file: %s", 
+		file_name);
+        perror(ebuff);
+        return 1;
+    }
+    if (inqBuff2[0])
+    	printf("non-null char at inqBuff2[0]\n");
+    if (inqBuff2[5000])
+    	printf("non-null char at inqBuff2[5000]\n");
+    {
+    	pid_t pid;
+	pid = fork();
+	if (pid) {
+	    inqBuff2[5000] = 33;
+	    munmap(inqBuff, 8000);
+	    sleep(3);
+	}
+	else {
+	    inqBuff[5000] = 0xaa;
+	    munmap(inqBuff, 8000);
+	    sleep(1);
+	}
+    }
+#endif
     close(sg_fd);
     return 0;
 }

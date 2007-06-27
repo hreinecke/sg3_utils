@@ -112,6 +112,11 @@ This assumes a valid partition is found on the SCSI disk at the given
 skip block address (past the 5 GB point of that disk) and that
 the partition goes to the end of the SCSI disk. An explicit count
 is probably a safer option.
+.SH NOTE
+For sg devices this command issues READ_10 and WRITE_10 SCSI commands which
+are appropriate for disks and CDROM players. Those commands are not
+formatted correctly for tape devices so sg_dd should not be used on
+tape devices.
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and
 SIGPIPE output the number of remaining blocks to be transferred and

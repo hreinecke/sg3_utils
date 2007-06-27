@@ -2,13 +2,20 @@ Each utility has its own version number, date of last changes and
 some description at the top of its ".c" file. "KG" indicates work by
 Kurt Garloff <garloff@suse.de>.
 
+Changelog for sg3_utils-0.97 [20011223]
+  - move isosize to archive since introduced unto util-linux-2.10s
 
-Changelog for sg3_utils-0.96 [20011123]
+Changelog for sg3_utils-0.96 [20011221]
 ----------------------------
+  - add '-p' switch to sg_inq to provode PCI slot_name
+  - add '-n' switch to scsi_inquiry for non-blocking open
   - new sgm_dd (dd variant) using mmap-ed IO
   - sg_rbuf now has a '-m' argument to select mmap-ed IO
-  - new sg_simple4 demonatrates mmap-ed IO on an INQUIRY response
+  - sg_rbuf now has a '-t' switch to do timing + throughput calculation
+  - add sg_simple4 to demonstrate mmap-ed IO on an INQUIRY response
+  - add sg_simple16 to do a READ_16 (16 byte SCSI READ command)
   - mmap-ed IO requires sg version 3.1.22 or later
+  - add sg_read to read multiple times starting at same offset
 
 Changelog for sg3_utils-0.95 [20010915]
 ----------------------------
