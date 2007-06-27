@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "3.69 20050211";
+static char * version_str = "3.71 20050426";
 
 #define ME "sg_readcap: "
 
@@ -39,8 +39,9 @@ static char * version_str = "3.69 20050211";
 
 void usage ()
 {
-    fprintf(stderr, "Usage:  sg_readcap [-h] [-lba=<block>] [-pmi] [-v] [-V]"
-            " [-?] <device>\n"
+    fprintf(stderr, "Usage:  sg_readcap [-16] [-h] [-lba=<block>] [-pmi] "
+            "[-v] [-V]"
+            " <device>\n"
             " where    -16: use 16 byte read capacity command\n"
             "          -h: output this usage message and exit\n"
             "          -lba=<block>: yields the last block prior to (head "
@@ -52,7 +53,6 @@ void usage ()
             "                disk capacity\n"
             "          -v: increase verbosity\n"
             "          -V: output version string and exit\n"
-            "          -?: output this usage message and exit\n"
             "          <device>: sg device (or block device in lk 2.6)\n"
             "                    with no other arguments reads device "
             "capacity\n");
@@ -91,6 +91,10 @@ int main(int argc, char * argv[])
         }
         else if (0 == strcmp("-v", argv[k]))
             ++verbose;
+        else if (0 == strcmp("-vv", argv[k]))
+            verbose += 2;
+        else if (0 == strcmp("-vvv", argv[k]))
+            verbose += 3;
         else if (0 == strcmp("-V", argv[k])) {
             printf("Version string: %s\n", version_str);
             exit(0);
@@ -155,9 +159,13 @@ int main(int argc, char * argv[])
                     sz_gb = ((double)(last_blk_addr + 1) * block_size) / 
                             (double)(1000000000L);
                     printf("Hence:\n");
-                    printf("   Device size: %llu bytes, %.1f MB, %.2f GB\n",
+                    printf("   Device size: %llu bytes, %.1f MiB, %.2f GB\n",
                            total_sz, sz_mb, sz_gb);
                 }
+            } else {
+                printf("READ CAPACITY (10) indicates device capacity too "
+                       "large\n  now trying 16 byte cdb variant\n");
+                do16 = 1;
             }
         } else if (SG_LIB_CAT_INVALID_OP == res) {
             do16 = 1;
@@ -207,7 +215,7 @@ int main(int argc, char * argv[])
                 sz_gb = ((double)(llast_blk_addr + 1) * block_size) / 
                         (double)(1000000000L);
                 printf("Hence:\n");
-                printf("   Device size: %llu bytes, %.1f MB, %.2f GB\n",
+                printf("   Device size: %llu bytes, %.1f MiB, %.2f GB\n",
                        total_sz, sz_mb, sz_gb);
             }
         }

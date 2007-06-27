@@ -49,7 +49,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.38 20050309";
+static char * version_str = "5.39 20050329";
 
 #define ME "sg_dd: "
 
@@ -604,6 +604,8 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         perror("reading (SG_IO) on sg device, error");
         return -2;
     }
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
@@ -623,6 +625,8 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         }
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
+        if (verbose > 1)
+            sg_chk_n_print3("reading", &io_hdr);
         return 2;
     case SG_LIB_CAT_MEDIUM_HARD:
         if (verbose > 1)
@@ -639,6 +643,7 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         }
         break;
     default:
+        ++unrecovered_errs;
         sg_chk_n_print3("reading", &io_hdr);
         return -1;
     }
@@ -646,8 +651,6 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     sum_of_resids += io_hdr.resid;
-    if (verbose > 3)
-        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     return 0;
 }
 
@@ -855,6 +858,9 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
         perror("writing (SG_IO) on sg device, error");
         return -1;
     }
+
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
@@ -874,6 +880,8 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
         }
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
+        if (verbose > 1)
+            sg_chk_n_print3("writing", &io_hdr);
         return -3;
     default:
         sg_chk_n_print3("writing", &io_hdr);
@@ -888,8 +896,6 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
     if (diop && *diop && 
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
-    if (verbose > 3)
-        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     return 0;
 }
 
@@ -1003,7 +1009,7 @@ static void print_scsi_dev_info(int sg_fd, int pdt)
                     "short, page len=%d\n", cur_mp[1]);
     else {
         fprintf(stderr, "  Caching mode page:\n");
-        print_mp_bit("    WRE:       ", smask, 2, 0x4, cur_mp, cha_mp,
+        print_mp_bit("    WCE:       ", smask, 2, 0x4, cur_mp, cha_mp,
                      def_mp, sav_mp);
         print_mp_bit("    RCD:       ", smask, 2, 0x1, cur_mp, cha_mp,
                      def_mp, sav_mp);
@@ -1397,13 +1403,16 @@ int main(int argc, char * argv[])
                     fprintf(stderr, "Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
             }
+            if (in_sect_sz != blk_sz)
+                fprintf(stderr, ">> warning: block size on %s confusion: "
+                        "bs=%d, device claims=%d\n", inf, blk_sz, in_sect_sz);
         } else if (FT_BLOCK & in_type) {
             if (0 != read_blkdev_capacity(infd, &in_num_sect, &in_sect_sz)) {
                 fprintf(stderr, "Unable to read block capacity on %s\n", inf);
                 in_num_sect = -1;
             }
             if (blk_sz != in_sect_sz) {
-                fprintf(stderr, "block size on %s confusion; bs=%d, "
+                fprintf(stderr, "block size on %s confusion: bs=%d, "
                         "device claims=%d\n", inf, blk_sz, in_sect_sz);
                 in_num_sect = -1;
             }
@@ -1427,6 +1436,10 @@ int main(int argc, char * argv[])
                     fprintf(stderr, "Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
             }
+            if (blk_sz != out_sect_sz)
+                fprintf(stderr, ">> warning: block size on %s confusion: "
+                        "bs=%d, device claims=%d\n", outf, blk_sz,
+                         out_sect_sz);
         } else if (FT_BLOCK & out_type) {
             if (0 != read_blkdev_capacity(outfd, &out_num_sect, 
                                           &out_sect_sz)) {

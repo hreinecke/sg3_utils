@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_MODES "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_modes \- reads SCSI MODE SENSE pages
 .SH SYNOPSIS
@@ -80,7 +80,8 @@ sub page code to fetch. Should be a hexadecimal number between 0 and
 0xff inclusive. The default value is 0.
 .TP
 -v
-verbose: output cdbs in hex before executing them.
+verbose: output cdbs in hex before executing them. '-vv'
+and '-vvv' are also accepted yielding greater verbosity.
 .TP
 -V
 print out version string

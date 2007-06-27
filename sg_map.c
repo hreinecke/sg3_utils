@@ -39,6 +39,8 @@
 #error "Need version 2 sg driver (linux kernel >= 2.2.6)"
 #endif
 
+static char * version_str = "1.01 20050424";
+
 static const char * devfs_id = "/dev/.devfsd";
 
 #define NUMERIC_SCAN_DEF 1   /* change to 0 to make alpha scan default */
@@ -88,16 +90,19 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 
 static void usage()
 {
-    printf("Usage: 'sg_map [-a] [-n] [-x] [-sd] [-scd or -sr] [-st]'\n");
+    printf("Usage: 'sg_map [-a] [i] [-h] [-n] [-sd] [-scd or -sr] [-st] "
+           "[-V] [-x]'\n");
     printf("    where: -a   do alphabetic scan (ie sga, sgb, sgc)\n");
-    printf("           -n   do numeric scan (ie sg0, sg1, sg2)\n");
-    printf("           -x   also show bus,chan,id,lun and type\n");
     printf("           -i   also show device INQUIRY strings\n");
-    printf("           -? or -h  show this usage message\n");
+    printf("           -h or -?  show this usage message then exit\n");
+    printf("           -n   do numeric scan (i.e. sg0, sg1, sg2) "
+           "(default)\n");
     printf("           -sd  show mapping to disks\n");
     printf("           -scd show mapping to cdroms (look for /dev/scd<n>\n");
     printf("           -sr  show mapping to cdroms (look for /dev/sr<n>\n");
     printf("           -st  show mapping to tapes (st and osst devices)\n");
+    printf("           -V   print version string then exit\n");
+    printf("           -x   also show bus,chan,id,lun and type\n");
     printf("    If no '-s*' arguments given then show all mappings\n");
 }
 
@@ -166,33 +171,30 @@ int main(int argc, char * argv[])
         else if (0 == strcmp("-sd", argv[k])) {
             do_sd = 1;
             do_all_s = 0;
-        }
-        else if (0 == strcmp("-st", argv[k])) {
+        } else if (0 == strcmp("-st", argv[k])) {
             do_st = 1;
             do_osst = 1;
             do_all_s = 0;
-        }
-        else if (0 == strcmp("-sr", argv[k])) {
+        } else if (0 == strcmp("-sr", argv[k])) {
             do_sr = 1;
             do_all_s = 0;
-        }
-        else if (0 == strcmp("-scd", argv[k])) {
+        } else if (0 == strcmp("-scd", argv[k])) {
             do_scd = 1;
             do_all_s = 0;
-        }
-        else if ((0 == strcmp("-?", argv[k])) ||
-                 (0 == strncmp("-h", argv[k], 2))) {
+        } else if (0 == strcmp("-V", argv[k])) {
+            fprintf(stderr, "Version string: %s\n", version_str);
+            exit(0);
+        } else if ((0 == strcmp("-?", argv[k])) ||
+                   (0 == strncmp("-h", argv[k], 2))) {
             printf(
             "Show mapping from sg devices to other scsi device names\n\n");
             usage();
             return 1;
-        }
-        else if (*argv[k] == '-') {
+        } else if (*argv[k] == '-') {
             printf("Unknown switch: %s\n", argv[k]);
             usage();
             return 1;
-        }
-        else if (*argv[k] != '-') {
+        } else if (*argv[k] != '-') {
             printf("Unknown argument\n");
             usage();
             return 1;
@@ -202,7 +204,7 @@ int main(int argc, char * argv[])
     if (stat(devfs_id, &stat_buf) == 0)
         printf("# Note: the devfs pseudo file system is present\n");
 
-    for (k = 0, res = 0; (k < MAX_SG_DEVS)  && (num_errors < MAX_ERRORS);
+    for (k = 0, res = 0; (k < MAX_SG_DEVS) && (num_errors < MAX_ERRORS);
          ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
@@ -245,7 +247,7 @@ int main(int argc, char * argv[])
             char buff[36];
 
             if (0 == sg_ll_inquiry(sg_fd, 0, 0, 0, buff, sizeof(buff),
-				   1, 0)) {
+                                   1, 0)) {
                 memcpy(map_arr[k].vendor, &buff[8], 8);
                 memcpy(map_arr[k].product, &buff[16], 16);
                 memcpy(map_arr[k].revision, &buff[32], 4);
@@ -274,10 +276,10 @@ int main(int argc, char * argv[])
                       last_sg_ind);
     if (do_all_s || do_st)
         scan_dev_type("/dev/nst", MAX_ST_DEVS, 1, LIN_DEV_TYPE_ST,
-		      last_sg_ind);
+                      last_sg_ind);
     if (do_all_s || do_osst)
         scan_dev_type("/dev/osst", MAX_OSST_DEVS, 1, LIN_DEV_TYPE_OSST,
-		      last_sg_ind);
+                      last_sg_ind);
 
     for (k = 0; k <= last_sg_ind; ++k) {
         make_dev_name(fname, "/dev/sg", k, do_numeric);

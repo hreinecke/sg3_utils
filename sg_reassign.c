@@ -50,7 +50,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.01 20050309";
+static char * version_str = "1.02 20050331";
 
 #define ME "sg_reassign: "
 
@@ -58,6 +58,8 @@ static char * version_str = "1.01 20050309";
 #define REASSIGN_BLKS_CMDLEN  6
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
+
+#define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
 #define MAX_NUM_ADDR 1024
 
@@ -68,6 +70,7 @@ static struct option long_options[] = {
         {"address", 1, 0, 'a'},
         {"dummy", 0, 0, 'd'},
         {"eight", 1, 0, 'e'},
+        {"grown", 0, 0, 'g'},
         {"help", 0, 0, 'h'},
         {"longlist", 1, 0, 'l'},
         {"verbose", 0, 0, 'v'},
@@ -79,38 +82,43 @@ static void usage()
 {
     fprintf(stderr, "Usage: "
           "sg_reassign --address=<n>[,<n>...] [--dummy] [--eight=0|1] "
-          " [--help]\n"
-          "                   [--longlist=0|1] [--verbose] [--version] "
-          "<scsi_device>\n"
-          "  where: --address=<n>[,<n>...]\n"
-          "           -a <n>[,<n>...]     comma separated logical block "
+          "[--grown]\n"
+          "                   [--help] [--longlist=0|1] [--verbose] "
+          "[--version]\n"
+          "                   <scsi_device>\n"
+          "  where:\n"
+          "      --address=<n>[,<n>...]\n"
+          "        -a <n>[,<n>...]     comma separated logical block "
           "addresses\n"
-          "                               (at least one required)\n"
-          "         --address=- | -a -    read stdin for logical block "
+          "                            (at least one required)\n"
+          "      --address=- | -a -    read stdin for logical block "
           "addresses\n"
-          "         --dummy | -d          prepare but do not execute "
+          "      --dummy | -d          prepare but do not execute "
           "REASSIGN BLOCKS\n"
-          "                               command\n"
-          "         --eight=0|1\n"
-          "           -e 0|1              force eight byte (64 bit) lbas "
+          "                            command\n"
+          "      --eight=0|1\n"
+          "        -e 0|1              force eight byte (64 bit) lbas "
           "when 1,\n"
-          "                               four byte (32 bit) lbas when 0\n"
-          "         --help | -h           print out usage message\n"
-          "         --longlist=0|1\n"
-          "           -l 0|1              use 4 byte list length when "
+          "                            four byte (32 bit) lbas when 0 "
+          "(def)\n"
+          "      --grown | -g          fetch grown defect list length, "
+          "don't reassign\n"
+          "      --help | -h           print out usage message\n"
+          "      --longlist=0|1\n"
+          "         -l 0|1             use 4 byte list length when "
           "'--longlist=1',\n"
-          "                               safe to ignore and use 2 byte "
+          "                            safe to ignore and use 2 byte "
           "list length\n"
-          "         --verbose | -v        increase verbosity\n"
-          "         --version | -V        print version string and exit\n\n"
+          "      --verbose | -v        increase verbosity\n"
+          "      --version | -V        print version string and exit\n\n"
           );
 }
 
 /* Invokes a SCSI REASSIGN BLOCKS command.  Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> invalid opcode,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
-int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
-                          int param_len, int noisy, int verbose, int dummy)
+int sg_ll_reassign_blocks(int sg_fd, int dummy, int longlba, int longlist,
+                          void * paramp, int param_len, int noisy, int verbose)
 {
     int res, k;
     unsigned char reassCmdBlk[REASSIGN_BLKS_CMDLEN] = 
@@ -176,6 +184,8 @@ int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
     }
 }
 
+/* Trying to decode multipliers as sg_get_llnum() [in sg_libs does] would
+ * only confuse things here, so use this local trimmed version */
 long long get_llnum(const char * buf)
 {
     int res;
@@ -305,23 +315,25 @@ static int build_lba_arr(const char * inp, unsigned long long * lba_arr,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, num, k, j, param_len;
+    int sg_fd, res, c, num, k, j;
     int dummy = 0;
     int got_addr = 0;
     int eight = -1;
     int addr_arr_len = 0;
+    int grown = 0;
     int longlist = 0;
     int verbose = 0;
     char device_name[256];
     unsigned long long addr_arr[MAX_NUM_ADDR];
     unsigned char param_arr[4 + (MAX_NUM_ADDR * 8)];
+    int param_len = 4;
     int ret = 1;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "a:de:hl:vV", long_options,
+        c = getopt_long(argc, argv, "a:de:ghl:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -347,6 +359,9 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "value for '--eight=' must be 0 or 1\n");
                 return 1;
             }
+            break;
+        case 'g':
+            grown = 1;
             break;
         case 'h':
         case '?':
@@ -392,47 +407,55 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    if ((0 == got_addr) || (addr_arr_len < 1)) {
+    if (grown) {
+        if (got_addr) {
+            fprintf(stderr, "can't have both '--grown' and '--address='\n");
+            usage();
+            return 1;
+        }
+    } else if ((0 == got_addr) || (addr_arr_len < 1)) {
         fprintf(stderr, "need at least one address (see '--address=')\n");
         usage();
         return 1;
     }
-    for (k = 0; k < addr_arr_len; ++k) {
-        if (addr_arr[k] >= ULONG_MAX) {
-            if (eight < 0) {
-                eight = 1;
-                break;
-            } else if (0 == eight) {
-                fprintf(stderr, "address number %d exceeds 32 bits so "
-                        "'--eight=0' invalid\n", k + 1);
-                return 1;
+    if (got_addr) {
+        for (k = 0; k < addr_arr_len; ++k) {
+            if (addr_arr[k] >= ULONG_MAX) {
+                if (eight < 0) {
+                    eight = 1;
+                    break;
+                } else if (0 == eight) {
+                    fprintf(stderr, "address number %d exceeds 32 bits so "
+                            "'--eight=0' invalid\n", k + 1);
+                    return 1;
+                }
             }
         }
-    }
-    if (eight < 0)
-        eight = 0;
+        if (eight < 0)
+            eight = 0;
 
-    k = 4;
-    for (j = 0; j < addr_arr_len; ++j) {
-        if (eight) {
-            param_arr[k++] = (addr_arr[j] >> 56) & 0xff;
-            param_arr[k++] = (addr_arr[j] >> 48) & 0xff;
-            param_arr[k++] = (addr_arr[j] >> 40) & 0xff;
-            param_arr[k++] = (addr_arr[j] >> 32) & 0xff;
+        k = 4;
+        for (j = 0; j < addr_arr_len; ++j) {
+            if (eight) {
+                param_arr[k++] = (addr_arr[j] >> 56) & 0xff;
+                param_arr[k++] = (addr_arr[j] >> 48) & 0xff;
+                param_arr[k++] = (addr_arr[j] >> 40) & 0xff;
+                param_arr[k++] = (addr_arr[j] >> 32) & 0xff;
+            }
+            param_arr[k++] = (addr_arr[j] >> 24) & 0xff;
+            param_arr[k++] = (addr_arr[j] >> 16) & 0xff;
+            param_arr[k++] = (addr_arr[j] >> 8) & 0xff;
+            param_arr[k++] = addr_arr[j] & 0xff;
         }
-        param_arr[k++] = (addr_arr[j] >> 24) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 16) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 8) & 0xff;
-        param_arr[k++] = addr_arr[j] & 0xff;
+        param_len = k;
+        k -= 4;
+        if (longlist) {
+            param_arr[0] = (k >> 24) & 0xff;
+            param_arr[1] = (k >> 16) & 0xff;
+        }
+        param_arr[2] = (k >> 8) & 0xff;
+        param_arr[3] = k & 0xff;
     }
-    param_len = k;
-    k -= 4;
-    if (longlist) {
-        param_arr[0] = (k >> 24) & 0xff;
-        param_arr[1] = (k >> 16) & 0xff;
-    }
-    param_arr[2] = (k >> 8) & 0xff;
-    param_arr[3] = k & 0xff;
 
     sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
@@ -441,19 +464,75 @@ int main(int argc, char * argv[])
         return 1;
     } 
 
-    res = sg_ll_reassign_blocks(sg_fd, eight, longlist, param_arr,
-                                param_len, 1, verbose, dummy);
-    if (SG_LIB_CAT_INVALID_OP == res) {
-        fprintf(stderr, "REASSIGN BLOCKS not supported\n");
-        goto err_out;
-    } else if (SG_LIB_CAT_INVALID_OP == res) {
-        fprintf(stderr, "bad field in REASSIGN BLOCKS cdb\n");
-        goto err_out;
-    } else if (0 != res) {
-        fprintf(stderr, "REASSIGN BLOCKS failed\n");
-        goto err_out;
+    if (got_addr) {
+        res = sg_ll_reassign_blocks(sg_fd, dummy, eight, longlist,
+                                    param_arr, param_len, 1, verbose);
+        if (SG_LIB_CAT_INVALID_OP == res) {
+            fprintf(stderr, "REASSIGN BLOCKS not supported\n");
+            goto err_out;
+        } else if (SG_LIB_CAT_INVALID_OP == res) {
+            fprintf(stderr, "bad field in REASSIGN BLOCKS cdb\n");
+            goto err_out;
+        } else if (0 != res) {
+            fprintf(stderr, "REASSIGN BLOCKS failed\n");
+            goto err_out;
+        }
+        ret = 0;
+    } else /* if (grown) */ {
+        int dl_format = DEF_DEFECT_LIST_FORMAT;
+        int div = 0;
+        int dl_len;
+
+        param_len = 4;
+        memset(param_arr, 0, param_len);
+        res = sg_ll_read_defect10(sg_fd, 0 /* req_plist */,
+                                  1 /* req_glist */, dl_format,
+                                  param_arr, param_len, 0, verbose);
+        if (SG_LIB_CAT_INVALID_OP == res) {
+            fprintf(stderr, "READ DEFECT DATA (10) not supported\n");
+            goto err_out;
+        } else if (SG_LIB_CAT_INVALID_OP == res) {
+            fprintf(stderr, "bad field in READ DEFECT DATA (10) cdb\n");
+            goto err_out;
+        } else if (0 != res) {
+            fprintf(stderr, "READ DEFECT DATA (10) failed\n");
+            goto err_out;
+        }
+
+        if (0x8 != (param_arr[1] & 0x18)) {
+            fprintf(stderr, "asked for grown defect list but didn't get it\n");
+            goto err_out;
+        }
+        if (verbose)
+            fprintf(stderr, "asked for defect list format %d, got %d\n",
+                    dl_format, (param_arr[1] & 0x7));
+        dl_format = (param_arr[1] & 0x7);
+        switch (dl_format) {
+            case 0:     /* short block */
+                div = 4;
+                break;
+            case 3:     /* long block */
+            case 4:     /* bytes from index */
+            case 5:     /* physical sector */
+                div = 8;
+                break;
+            default:
+                fprintf(stderr, "defect list format %d unknown\n", dl_format);
+                break;
+        }
+        dl_len = (param_arr[2] << 8) + param_arr[3];
+        if (0 == dl_len)
+            printf(">> Elements in grown defect list: 0\n");
+        else {
+            if (0 == div)
+                printf(">> Grown defect list length=%d bytes [unknown "
+                       "number of elements]\n", dl_len);
+            else
+                printf(">> Elements in grown defect list: %d\n",
+                       dl_len / div);
+        }
     }
-    ret = 0;
+
 err_out:
     res = close(sg_fd);
     if (res < 0) {

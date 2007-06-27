@@ -1,10 +1,10 @@
-.TH SG_MAP "8" "January 2001" "sg3_utils-0.92" SG3_UTILS
+.TH SG_MAP "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_map \- displays mapping between sg and other SCSI devices
 .SH SYNOPSIS
 .B sg_map
 [\fI-a\fR] [\fI-i\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR] [\fI-sr\fR]
-[\fI-st\fR] [\fI-x\fR]
+[\fI-st\fR] [\fI-V\fR] [\fI-x\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -40,6 +40,9 @@ display mappings to SCSI cdrom device names of the form
 .TP
 -st
 display mappings to SCSI tape device names
+.TP
+-V
+print out version string then exit (without further ado).
 .TP
 -x
 after each active sg device name is displayed there are

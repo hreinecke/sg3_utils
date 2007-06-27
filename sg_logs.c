@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "0.38 20050305";
+static char * version_str = "0.39 20050427";
 
 #define ME "sg_logs: "
 
@@ -84,9 +84,9 @@ static void usage()
            "       -paramp=<parameter_pointer> (in hex) (def: 0)\n"
            "       -pcb show parameter control bytes (ignored if -h given)\n"
            "       -ppc set the Parameter Pointer Control (PPC) bit (def: 0)\n"
-           "       -sp  set the Saving Parameters (SP) bit (def: 0)\n"
            "       -r   reset all implemented parameters to target defined "
            "defaults\n"
+           "       -sp  set the Saving Parameters (SP) bit (def: 0)\n"
            "       -t   outputs temperature log page (0xd)\n"
            "       -v   verbose: output cdbs prior to execution\n"
            "       -V   output version string\n"
@@ -183,6 +183,9 @@ static void show_page_name(int page_no,
                 break;
             case 0x14:
                 printf("    0x14    Device statistics (adc)\n");
+                break;
+            case 0x15:
+                printf("    0x14    DT device log information (adc)\n");
                 break;
             default:
                 done = 0;
@@ -1447,14 +1450,18 @@ int main(int argc, char * argv[])
             do_pcb = 1;
         else if (0 == strcmp("-ppc", argv[k]))
             do_ppc = 1;
-        else if (0 == strcmp("-sp", argv[k]))
-            do_sp = 1;
         else if (0 == strcmp("-r", argv[k]))
             do_pcreset = 1;
+        else if (0 == strcmp("-sp", argv[k]))
+            do_sp = 1;
         else if (0 == strcmp("-t", argv[k]))
             do_temp = 1;
         else if (0 == strcmp("-v", argv[k]))
             ++do_verbose;
+        else if (0 == strcmp("-vv", argv[k]))
+            do_verbose += 2;
+        else if (0 == strcmp("-vvv", argv[k]))
+            do_verbose += 3;
         else if (0 == strcmp("-V", argv[k])) {
             printf("Version string: %s\n", version_str);
             exit(0);

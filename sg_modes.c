@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "0.34 20050223";
+static char * version_str = "1.04 20050505";
 
 #define ME "sg_modes: "
 
@@ -116,16 +116,18 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x5, 0x0, "Flexible geometry (obsolete)"},
     {0x7, 0x0, "Verify error recovery"},
     {0x8, 0x0, "Caching"},
+    {0xa, 0xf1, "Parallel ATA control (SAT)"},
     {0xb, 0x0, "Medium types supported (obsolete)"},
     {0xc, 0x0, "Notch and partition (obsolete)"},
-    {0xd, 0x0, "Power condition (obsolete)"},
+    {0xd, 0x0, "Power condition (obsolete, moved to 0x1a)"},
     {0x10, 0x0, "XOR control"},
     {0x1c, 0x1, "Background control"},
 };
 
 static struct page_code_desc pc_desc_tape[] = {
     {0xf, 0x0, "Data Compression"},
-    {0x10, 0x0, "Device config"},
+    {0x10, 0x0, "Device configation"},
+    {0x10, 0x1, "Device configation extension"},
     {0x11, 0x0, "Medium Partition [1]"},
     {0x12, 0x0, "Medium Partition [2]"},
     {0x13, 0x0, "Medium Partition [3]"},
@@ -169,6 +171,10 @@ static struct page_code_desc pc_desc_rbc[] = {
 
 static struct page_code_desc pc_desc_adt[] = {
     {0xe, 0x0, "ADC device configuration"},
+    {0xe, 0x1, "Target device"},
+    {0xe, 0x2, "DT device primary port"},
+    {0xe, 0x3, "Logical unit"},
+    {0xe, 0x4, "Target device serial number"},
 };
 
 static struct page_code_desc * mode_page_cs_table(int scsi_ptype,
@@ -262,7 +268,8 @@ static struct page_code_desc * mode_page_transp_table(int t_proto,
 }
 
 static const char * find_page_code_desc(int page_num, int subpage_num,
-                                        int scsi_ptype, int t_proto)
+                                        int scsi_ptype, int inq_byte6,
+                                        int t_proto)
 {
     int k;
     int num;
@@ -290,6 +297,32 @@ static const char * find_page_code_desc(int page_num, int subpage_num,
                 break;
         }
     }
+    if ((0xd != scsi_ptype) && (inq_byte6 & 0x40)) {
+        /* check for attached enclosure services processor */
+        pcdp = mode_page_cs_table(0xd, &num);
+        if (pcdp) {
+            for (k = 0; k < num; ++k, ++pcdp) {
+                if ((page_num == pcdp->page_code) &&
+                    (subpage_num == pcdp->subpage_code))
+                    return pcdp->desc;
+                else if (page_num < pcdp->page_code)
+                    break;
+            }
+        }
+    }
+    if ((0x8 != scsi_ptype) && (inq_byte6 & 0x8)) {
+        /* check for attached medium changer device */
+        pcdp = mode_page_cs_table(0x8, &num);
+        if (pcdp) {
+            for (k = 0; k < num; ++k, ++pcdp) {
+                if ((page_num == pcdp->page_code) &&
+                    (subpage_num == pcdp->subpage_code))
+                    return pcdp->desc;
+                else if (page_num < pcdp->page_code)
+                    break;
+            }
+        }
+    }
     pcdp = mode_page_cs_table(-1, &num);
     for (k = 0; k < num; ++k, ++pcdp) {
         if ((page_num == pcdp->page_code) &&
@@ -301,7 +334,7 @@ static const char * find_page_code_desc(int page_num, int subpage_num,
     return NULL;
 }
 
-static void list_page_codes(int scsi_ptype, int t_proto)
+static void list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
 {
     int num, num_ptype, pg, spg, c, d, valid_transport;
     const struct page_code_desc * dp;
@@ -350,6 +383,34 @@ static void list_page_codes(int scsi_ptype, int t_proto)
         }
         if ((NULL == dp) && (NULL == pe_dp))
             break;
+    }
+    if ((0xd != scsi_ptype) && (inq_byte6 & 0x40)) {
+        /* check for attached enclosure services processor */
+        printf("\n    Attached enclosure services processor\n");
+        dp = mode_page_cs_table(0xd, &num);
+        while (dp) {
+            if (dp->subpage_code)
+                printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
+                       dp->subpage_code, dp->desc);   
+            else
+                printf(" 0x%02x            %s\n", dp->page_code,
+                       dp->desc);
+            dp = (--num <= 0) ? NULL : (dp + 1);
+        }
+    }
+    if ((0x8 != scsi_ptype) && (inq_byte6 & 0x8)) {
+        /* check for attached medium changer device */
+        printf("\n    Attached medium changer device\n");
+        dp = mode_page_cs_table(0x8, &num);
+        while (dp) {
+            if (dp->subpage_code)
+                printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
+                       dp->subpage_code, dp->desc);   
+            else
+                printf(" 0x%02x            %s\n", dp->page_code,
+                       dp->desc);
+            dp = (--num <= 0) ? NULL : (dp + 1);
+        }
     }
     if (valid_transport) {
         printf("\n    Transport protocol: %s\n",
@@ -424,7 +485,7 @@ int main(int argc, char * argv[])
     int do_raw = 0;
     int do_verbose = 0;
     int oflags = O_RDONLY | O_NONBLOCK;
-    int density_code_off, t_proto;
+    int density_code_off, t_proto, inq_pdt, inq_byte6;
     unsigned char * ucp;
     unsigned char uc;
     struct sg_simple_inquiry_resp inq_out;
@@ -491,6 +552,10 @@ int main(int argc, char * argv[])
                 pg_code = 0;
         } else if (0 == strcmp("-v", argv[k]))
             ++do_verbose;
+        else if (0 == strcmp("-vv", argv[k]))
+            do_verbose += 2;
+        else if (0 == strcmp("-vvv", argv[k]))
+            do_verbose += 3;
         else if (0 == strcmp("-V", argv[k])) {
             printf("Version string: %s\n", version_str);
             exit(0);
@@ -515,14 +580,14 @@ int main(int argc, char * argv[])
         if (do_list) {
             if ((pg_code < 0) || (pg_code > 0x1f)) {
                 printf("    Assume peripheral device type: disk\n");
-                list_page_codes(0, -1);
+                list_page_codes(0, 0, -1);
             } else {
                 printf("    peripheral device type: %s\n",
                        get_ptype_str(pg_code));
                 if (sub_pg_code_set)
-                    list_page_codes(pg_code, sub_pg_code);
+                    list_page_codes(pg_code, 0, sub_pg_code);
                 else
-                    list_page_codes(pg_code, -1);
+                    list_page_codes(pg_code, 0, -1);
             }
             return 0;
         }
@@ -549,17 +614,17 @@ int main(int argc, char * argv[])
         close(sg_fd);
         return 1;
     }
+    inq_pdt = inq_out.peripheral_type;
+    inq_byte6 = inq_out.byte_6;
     if (0 == do_raw)
         printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n", 
                inq_out.vendor, inq_out.product, inq_out.revision,
-               get_ptype_str(inq_out.peripheral_type),
-               inq_out.peripheral_type);
-
+               get_ptype_str(inq_pdt), inq_pdt);
     if (do_list) {
         if (sub_pg_code_set)
-            list_page_codes(inq_out.peripheral_type, sub_pg_code);
+            list_page_codes(inq_pdt, inq_pdt, sub_pg_code);
         else
-            list_page_codes(inq_out.peripheral_type, -1);
+            list_page_codes(inq_pdt, inq_pdt, -1);
         return 0;
     }
     if (PG_CODE_ALL == pg_code)
@@ -590,7 +655,7 @@ int main(int argc, char * argv[])
                     "switch for a 10 byte MODE SENSE command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in cdb (perhaps subpages "
-                    "not supported\n");
+                    "not supported)\n");
     } else {
         res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, do_dbd, pc, pg_code,
                          sub_pg_code, rsp_buff, rsp_buff_size, 1, do_verbose);
@@ -635,7 +700,7 @@ int main(int argc, char * argv[])
         }
         if (do_hex)
             dStrHex((const char *)rsp_buff, headerlen, 1);
-        if (0 == inq_out.peripheral_type)
+        if (0 == inq_pdt)
             printf("  Mode data length=%d, medium type=0x%.2x, WP=%d,"
                    " DpoFua=%d, longlba=%d\n", md_len, medium_type, 
                    !!(specific & 0x80), !!(specific & 0x10), longlba);
@@ -661,7 +726,7 @@ int main(int argc, char * argv[])
                     len = 16;
                     density_code_off = 8;
                 }
-                else if (0 == inq_out.peripheral_type) { 
+                else if (0 == inq_pdt) { 
                     printf("> Direct access device block descriptors:\n");
                     density_code_off = 4;
                 }
@@ -702,11 +767,10 @@ int main(int argc, char * argv[])
                 if ((0x18 == page_num) || (0x19 == page_num)) {
                     t_proto = (spf ? ucp[5] : ucp[2]) & 0xf;
                     descp = find_page_code_desc(page_num, (spf ? ucp[1] : 0),
-                                                inq_out.peripheral_type,
-                                                t_proto);
+                                                inq_pdt, inq_byte6, t_proto);
                 } else
                     descp = find_page_code_desc(page_num, (spf ? ucp[1] : 0),
-                                                inq_out.peripheral_type, -1);
+                                                inq_pdt, inq_byte6, -1);
                 if (NULL == descp) {
                     if (spf)
                         snprintf(ebuff, EBUFF_SZ, "0x%x, subpage_code: 0x%x",

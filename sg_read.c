@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.04 20050309";
+static const char * version_str = "1.05 20050329";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -52,8 +52,6 @@ static const char * version_str = "1.04 20050309";
 #ifndef SG_FLAG_MMAP_IO
 #define SG_FLAG_MMAP_IO 4
 #endif
-
-/* #define SG_DEBUG */
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 40000       /* 40,000 millisecs == 40 seconds */
@@ -74,6 +72,7 @@ static int in_full = 0;
 static int in_partial = 0;
 
 static int pack_id_count = 0;
+static int verbose = 0;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -145,7 +144,8 @@ void usage()
            "[bs=<num>]\n"
            "                [cdbsz=6|10|12|16] [dio=0|1] [mmap=0|1] "
            "[odir=0|1]\n"
-           "                [skip=<num>] [time=<num>] [--version]\n"
+           "                [skip=<num>] [time=<num>] [verbose=<n>] "
+           "[--version]\n"
            " blk_sgio 0->normal IO for block devices, 1->SCSI commands via "
            "SG_IO\n"
            " bpt      is blocks_per_transfer (default is 128, or 64 KiB for "
@@ -164,6 +164,7 @@ void usage()
            " skip     each transfer starts at this logical address (def=0)\n"
            " time     0->do nothing(def), 1->time from 1st cmd, 2->time "
            "from 2nd, ...\n"
+           " verbose  increase level of verbosity (def: 0)\n"
            " --version  print version number then exit\n");
 }
 
@@ -246,6 +247,7 @@ int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
 int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
              int bs, int cdbsz, int * diop, int do_mmap)
 {
+    int k;
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
@@ -271,6 +273,12 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
     else if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
+    if (verbose) {
+        fprintf(stderr, "    read cdb: ");
+        for (k = 0; k < cdbsz; ++k)
+            fprintf(stderr, "%02x ", rdCmd[k]);
+        fprintf(stderr, "\n");
+    }
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
         if (ENOMEM == errno)
@@ -279,9 +287,12 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
         return -1;
     }
 
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("reading, continuing", &io_hdr);
+        if (verbose > 1)
+                sg_chk_n_print3("reading, continue", &io_hdr);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
@@ -295,9 +306,6 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     sum_of_resids += io_hdr.resid;
-#if SG_DEBUG
-    fprintf(stderr, "duration=%u ms\n", io_hdr.duration);
-#endif
     return 0;
 }
 
@@ -387,6 +395,8 @@ int main(int argc, char * argv[])
             do_blk_sgio = sg_get_num(buf);
         else if (0 == strcmp(key,"odir"))
             do_odir = sg_get_num(buf);
+        else if (0 == strncmp(key, "verb", 4))
+            verbose = sg_get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
             fprintf(stderr, ME ": %s\n", version_str);
             return 0;
@@ -418,9 +428,6 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-#ifdef SG_DEBUG
-    fprintf(stderr, ME "if=%s skip=%d count=%d\n", inf, skip, dd_count);
-#endif
     install_handler (SIGINT, interrupt_handler);
     install_handler (SIGQUIT, interrupt_handler);
     install_handler (SIGPIPE, interrupt_handler);
@@ -531,10 +538,6 @@ int main(int argc, char * argv[])
     }
 
     blocks_per = bpt;
-#ifdef SG_DEBUG
-    fprintf(stderr, "Start of loop, count=%d, blocks_per=%d\n", 
-            dd_count, blocks_per);
-#endif
     start_tm.tv_sec = 0;   /* just in case start set condition not met */
     start_tm.tv_usec = 0;
 

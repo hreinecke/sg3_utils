@@ -18,7 +18,7 @@
    data transfer (and no REQUEST SENSE command iff the unit is ready)
    then this can be used for timing per SCSI command overheads.
 
-*  Copyright (C) 2000-2004 D. Gilbert
+*  Copyright (C) 2000-2008 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "3.13 20041029";
+static char * version_str = "3.14 20050328";
 
 #define EBUFF_SZ 256
 
@@ -55,6 +55,10 @@ int main(int argc, char * argv[])
             do_time = 1;
         else if (0 == strcmp("-v", argv[k]))
             ++verbose;
+        else if (0 == strcmp("-vv", argv[k]))
+            verbose += 2;
+        else if (0 == strcmp("-vvv", argv[k]))
+            verbose += 3;
         else if (0 == strcmp("-V", argv[k])) {
             fprintf(stderr, "Version string: %s\n", version_str);
             exit(0);
@@ -72,15 +76,15 @@ int main(int argc, char * argv[])
         }
     }
     if ((0 == file_name) || (num_turs <= 0)) {
-        printf("Usage: 'sg_turs [-t] [-n=<num_of_test_unit_readys>] "
-               "<sg_device>'\n"
+        printf("Usage: 'sg_turs [-n=<num_of_test_unit_readys>] [-t] "
+               "[-v] [-V] <scsi_device>'\n"
                " where '-n=<num>' number of test_unit_ready commands "
                "(def: 1)\n"
-               "                  can take k, K, m, M postfix multipliers\n"
                "       '-t'   outputs total duration and commands per "
                "second\n"
                "       '-v'   increase verbosity\n"
-               "       '-V'   print version string then exit\n");
+               "       '-V'   print version string then exit\n"
+               "Send Test Unit Ready SCSI command(s)\n");
         return 1;
     }
 

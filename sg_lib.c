@@ -68,7 +68,7 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.07 20050308";
+static char * version_str = "1.09 20050504";    /* spc-3 rev 22a */
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -184,7 +184,9 @@ static const struct value_name_t normal_opcodes[] = {
     {0x54, 0, "Send OPC information"},
     {0x55, 0, "Mode select(10)"},
     {0x56, 0, "Reserve(10)"},
+    {0x56, 8, "Reserve element(10)"},
     {0x57, 0, "Release(10)"},
+    {0x57, 8, "Release element(10)"},
     {0x58, 0, "Repair track"},
     {0x5a, 0, "Mode sense(10)"},
     {0x5b, 0, "Close track/session"},
@@ -199,6 +201,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0x82, 0, "Regenerate(16)"},
     {0x83, 0, "Extended copy"},
     {0x84, 0, "Receive copy results"},
+    {0x85, 0, "ATA command pass through(16)"},  /* was 0x98 in spc3 rev21c */
     {0x86, 0, "Access control in"},
     {0x87, 0, "Access control out"},
     {0x88, 0, "Read(16)"},
@@ -214,7 +217,6 @@ static const struct value_name_t normal_opcodes[] = {
     {0x92, 1, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, 1, "Erase(16)"},
-    {0x98, 0, "ATA command pass through(16)"},  /* was 0x85 */
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
     {0xa0, 0, "Report luns"},
@@ -276,7 +278,7 @@ static const struct value_name_t maint_in_arr[] = {
     {0xc, 0, "Report supported operation codes"},
     {0xd, 0, "Report supported task management functions"},
     {0xe, 0, "Report priority"},
-    {0xf, 0, "Report timeout"},
+    {0xf, 0, "Report timestamp"},
 };
 
 #define MAINT_IN_SZ \
@@ -287,7 +289,7 @@ static const struct value_name_t maint_out_arr[] = {
     {0xa, 0, "Set target port groups"},
     {0xb, 0, "Change aliases"},
     {0xe, 0, "Set priority"},
-    {0xf, 0, "Set timeout"},
+    {0xf, 0, "Set timestamp"},
 };
 
 #define MAINT_OUT_SZ \
@@ -308,15 +310,15 @@ static const struct value_name_t serv_out12_arr[] = {
         (int)(sizeof(serv_out12_arr) / sizeof(serv_in12_arr[0]))
 
 static const struct value_name_t serv_in16_arr[] = {
-    {0x10, 1, "Read capacity(16)"},
-    {0x11, 1, "Read long(16)"},
+    {0x10, 0, "Read capacity(16)"},
+    {0x11, 0, "Read long(16)"},
 };
 
 #define SERV_IN16_SZ  \
         (int)(sizeof(serv_in16_arr) / sizeof(serv_in16_arr[0]))
 
 static const struct value_name_t serv_out16_arr[] = {
-    {0x11, 1, "Write long(16)"},
+    {0x11, 0, "Write long(16)"},
     {0x1f, 0x12, "Notify data transfer device(16)"},
 };
 
@@ -561,6 +563,7 @@ static struct error_info additional[] =
     {0x0E,0x00,"Invalid information unit"},
     {0x0E,0x01,"Information unit too short"},
     {0x0E,0x02,"Information unit too long"},
+    {0x0E,0x03,"Invalid field in command information unit"},
     {0x10,0x00,"Id CRC or ECC error"},
     {0x10,0x01,"Data block guard check failed"},
     {0x10,0x02,"Data block application tag check failed"},
@@ -822,6 +825,7 @@ static struct error_info additional[] =
     {0x47,0x03,"Information unit CRC error detected"},
     {0x47,0x04,"Asynchronous information protection error detected"},
     {0x47,0x05,"Protocol service CRC error"},
+    {0x47,0x06,"Phy test function in progress"},
     {0x47,0x7F,"Some commands cleared by iSCSI protocol event"},
     {0x48,0x00,"Initiator detected error message received"},
     {0x49,0x00,"Invalid message error"},
@@ -1576,7 +1580,8 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
 static const char * linux_host_bytes[] = {
     "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT",
     "DID_BAD_TARGET", "DID_ABORT", "DID_PARITY", "DID_ERROR",
-    "DID_RESET", "DID_BAD_INTR", "DID_PASSTHROUGH", "DID_SOFT_ERROR"
+    "DID_RESET", "DID_BAD_INTR", "DID_PASSTHROUGH", "DID_SOFT_ERROR",
+    "DID_IMM_RETRY", "DID_REQUEUE"
 };
 
 #define LINUX_HOST_BYTES_SZ \
@@ -2000,7 +2005,7 @@ char * safe_strerror(int errnum)
    'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 16 ASCII-hex bytes
        = 0     in addition, the bytes are listed in ASCII to the right
-       < 0     only the ASCII-hex bytes are listed (up to 16 per line) */
+       < 0     only the ASCII-hex bytes are listed (i.e. without address) */
 void dStrHex(const char* str, int len, int no_ascii)
 {
     const char* p = str;

@@ -1,4 +1,4 @@
-.TH SG_SES "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_SES "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -17,6 +17,10 @@ The given <scsi_device> should be a SES device which may be a dedicated
 enclosure services processor (INQUIRY peripheral device type 0xd) or
 attached to another type of SCSI device (e.g. a disk) in which case
 the EncServ bit set in its INQUIRY response.
+.PP
+If no options are given (only the <scsi_device> name) then all
+diagnostic pages supported by the device (including SES pages)
+are listed.
 .TP
 --byte=<n> | -b <n>
 some control pages need byte 1 (i.e. the second byte) of the cdb set.
@@ -82,7 +86,12 @@ increase the level of verbosity, (i.e. debug output).
 print the version string and then exit.
 .PP
 Currently all status pages, control pages and element types defined in
-SES-2 revision 10 (29th January 2005) are decoded. 
+SES-2 revision 11 (12th March 2005) are decoded. 
+.PP
+This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
+pages (using the READ DIAGNOSTIC SCSI command). To this end the '--page='
+and '--hex' options would be appropriate. Arbitrary diagnostic pages can
+be sent to a device with the sg_senddiag utility.
 .SH EXAMPLE
 Changing a temperature threshold is possible, if a little awkward. The
 current thresholds can be shown with:
@@ -116,4 +125,4 @@ Copyright \(co 2004-2005 Douglas Gilbert
 This software is distributed under a FreeBSD liense. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq, sg_senddiag
+.B sg_inq, sg_senddiag (in sg3_utils package)

@@ -48,7 +48,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.03 20050309";
+static char * version_str = "1.04 20050314";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -260,7 +260,8 @@ int main(int argc, char * argv[])
                 decode_tpgs_state(ucp[0] & 0x0f);
             printf("\n");
 
-            printf("    U_SUP : %d, ", !!(ucp[1] & 0x08));
+            printf("    T_SUP : %d, ", !!(ucp[1] & 0x80));
+            printf("U_SUP : %d, ", !!(ucp[1] & 0x08));
             printf("S_SUP : %d, ", !!(ucp[1] & 0x04));
             printf("AN_SUP : %d, ", !!(ucp[1] & 0x02));
             printf("AO_SUP : %d\n", !!(ucp[1] & 0x01));

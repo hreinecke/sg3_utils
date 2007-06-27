@@ -1,4 +1,4 @@
-.TH SG_START "8" "November 2004" "sg3_utils-1.11" SG3_UTILS
+.TH SG_START "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_start \- starts (spins-up) or stops (spins down) SCSI devices
 .SH SYNOPSIS
@@ -50,7 +50,8 @@ a (hex == decimal 10) for FORCE_IDLE_0 and b (hex) for FORCE_STANDBY_0.
 See recent SBC-2 or SAS drafts at www.t10.org for more information.
 .TP
 -v
-verbose: outputs SCSI command in hex to console before with executing it.
+verbose: outputs SCSI command in hex to console before with executing
+it. '-vv' and '-vvv' are also accepted yielding greater verbosity.
 .TP
 -V
 print out version string then exit.
@@ -84,7 +85,7 @@ Written by K. Garloff and D. Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002-2004 Kurt Garloff, Douglas Gilbert
+Copyright \(co 2002-2005 Kurt Garloff, Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

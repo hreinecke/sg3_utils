@@ -46,7 +46,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.04 20050306";
+static char * version_str = "1.04 20050405";
 
 #define ME "sg_wr_mode: "
 
@@ -462,9 +462,9 @@ int main(int argc, char * argv[])
             fprintf(stderr, "contents length=%d too short\n", read_in_len);
             goto err_out;
         }
-        ref_md[0] = 0;
+        ref_md[0] = 0;  /* mode data length reserved for mode select */
         if (! mode_6)
-            ref_md[1] = 0;
+            ref_md[1] = 0;    /* mode data length reserved for mode select */
         if (md_len > alloc_len) {
             fprintf(stderr, "mode data length=%d exceeds allocation "
                     "length=%d\n", md_len, alloc_len);
@@ -482,6 +482,11 @@ int main(int argc, char * argv[])
             read_in_len = md_len - off;
         }
         if (! force) {
+            if ((! (ref_md[off] & 0x80)) && save) {
+                fprintf(stderr, "PS bit in existing mode page indicates that "
+                        "it is not savable\n    but '--save' option given\n");
+                goto err_out;
+            }
             read_in[0] &= 0x7f; /* mask out PS bit, reserved in mode select */
             if ((md_len - off) != read_in_len) {
                 fprintf(stderr, "contents length=%d but reference mode page "

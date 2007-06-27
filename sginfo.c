@@ -101,12 +101,15 @@
  *
  * Thomas Steudten (thomas at steudten dot com) 
  *    20040521  add -Fhead feature [version 2.04]
+ *
+ * Tim Hunt (tim at timhunt dot net)
+ *    20050427  increase number of mapped SCSI disks devices
  */
 
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * sginfo_version_str = "sginfo version 2.11 [20050309]";
+static const char * sginfo_version_str = "sginfo version 2.14 [20050412]";
 
 #include <stdio.h>
 #include <string.h>
@@ -157,6 +160,7 @@ struct mpage_info {
     int subpage;
     int page_control;
     int peri_type;
+    int inq_byte6;      /* EncServ and MChngr bits of interest */
     int resp_len;
 };
 
@@ -248,6 +252,7 @@ static struct mpage_name_func mpage_disk[] =
     { 6, 0, PC_DISK, "Optical memory", optical_memory},
     { 7, 0, PC_DISK, "Verify Error Recovery", disk_verify_error_recovery},
     { 8, 0, PC_DISK, "Caching", disk_cache},
+    { 0xa, 0xf1, PC_DISK, "Parallel ATA control (SAT)", NULL},
     { 0xb, 0, PC_DISK, "Medium Types Supported", NULL},
     { 0xc, 0, PC_DISK, "Notch and Partition", disk_notch_parameters},
     { 0x10, 0, PC_DISK, "XOR control", disk_xor_control},
@@ -278,6 +283,7 @@ static struct mpage_name_func mpage_tape[] =
     { 1, 0, PC_TAPE, "Read-Write Error Recovery", disk_error_recovery},
     { 0xf, 0, PC_TAPE, "Data compression", tape_data_compression},
     { 0x10, 0, PC_TAPE, "Device configuration", tape_dev_config},
+    { 0x10, 1, PC_TAPE, "Device configuration extension", NULL},
     { 0x11, 0, PC_TAPE, "Medium partition(1)", tape_medium_part1},
     { 0x12, 0, PC_TAPE, "Medium partition(2)", tape_medium_part2_4},
     { 0x13, 0, PC_TAPE, "Medium partition(3)", tape_medium_part2_4},
@@ -462,7 +468,7 @@ enum page_class get_page_class(struct mpage_info * mpi)
     case 1:
     case 2:
         return PC_TAPE;
-    case 8:     /* should be SMC */
+    case 8:
         return PC_SMC;
     case 5:
         return PC_CDVD;
@@ -502,6 +508,18 @@ struct mpage_name_func * get_mpage_name_func(struct mpage_info * mpi)
     case PC_COMMON:
         /* picked up it catch all next */
         break;
+    }
+    if (NULL == mpf) {
+        if ((PC_SES != get_page_class(mpi)) && (mpi->inq_byte6 & 0x40)) {
+            /* check for attached enclosure services processor */
+            mpf = get_mpage_info(mpi->page, mpi->subpage, mpage_ses,
+                                 mpage_ses_len);
+        }
+        if ((PC_SMC != get_page_class(mpi)) && (mpi->inq_byte6 & 0x8)) {
+            /* check for attached medium changer device */
+            mpf = get_mpage_info(mpi->page, mpi->subpage, mpage_smc,
+                                 mpage_smc_len);
+        }
     }
     if (NULL == mpf)
         mpf = get_mpage_info(mpi->page, mpi->subpage, mpage_common,
@@ -1172,7 +1190,7 @@ static int common_control(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 20, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 21, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -1198,6 +1216,7 @@ static int common_control(struct mpage_info * mpi, const char * prefix)
     bitfield(pagestart + 4, "UAAERP [obs.]", 1, 1);
     bitfield(pagestart + 4, "EAERP [obs.]", 1, 0);
     bitfield(pagestart + 5, "ATO", 1, 7);
+    bitfield(pagestart + 5, "TAS", 1, 6);
     bitfield(pagestart + 5, "AUTOLOAD MODE", 0x7, 0);
     intfield(pagestart + 6, 2, "Ready AER Holdoff Period [obs.]");
     intfield(pagestart + 8, 2, "Busy Timeout Period");
@@ -2816,6 +2835,7 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
     memset(&local_mp_i, 0, sizeof(local_mp_i));
     local_mp_i.page_control = mpi->page_control;
     local_mp_i.peri_type = mpi->peri_type;
+    local_mp_i.inq_byte6 = mpi->inq_byte6;
     local_mp_i.resp_len = mpi->resp_len;
 
     do {
@@ -2873,7 +2893,8 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
     return status;
 }
 
-static int do_inquiry(int * peri_type, int inquiry_level)
+static int do_inquiry(int * peri_type, int * resp_byte6,
+                      int inquiry_verbosity)
 {
     int status;
     const int inq_resp_len = 36;
@@ -2907,7 +2928,9 @@ static int do_inquiry(int * peri_type, int inquiry_level)
     pagestart = cbuffer;
     if (peri_type)
         *peri_type = pagestart[0] & 0x1f;
-    if (0 == inquiry_level)
+    if (resp_byte6)
+        *resp_byte6 = pagestart[6];
+    if (0 == inquiry_verbosity)
         return 0;
     if ((pagestart[4] + 5) < 36) {
         printf("INQUIRY response too short: expected 36 bytes, got %d\n",
@@ -2920,7 +2943,7 @@ static int do_inquiry(int * peri_type, int inquiry_level)
         printf("---------------------------\n");
     };
     bitfield(pagestart + 0, "Device Type", 0x1f, 0);
-    if (2 == inquiry_level) {
+    if (2 == inquiry_verbosity) {
         bitfield(pagestart + 0, "Peripheral Qualifier", 0x7, 5);
         bitfield(pagestart + 1, "Removable", 1, 7);
         bitfield(pagestart + 2, "Version", 0xff, 0);
@@ -3083,14 +3106,25 @@ static void make_dev_name(char * fname, int k, int do_numeric)
     }
 }
 
-#define MAX_SG_DEVS 48
+#define MAX_SG_DEVS 256
 
-char *devices[] =
+char *ul_devices[] =
 {"/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd", "/dev/sde", "/dev/sdf", 
  "/dev/sdg", "/dev/sdh", "/dev/sdi", "/dev/sdj", "/dev/sdk", "/dev/sdl",
  "/dev/sdm", "/dev/sdn", "/dev/sdo", "/dev/sdp", "/dev/sdq", "/dev/sdr",
  "/dev/sds", "/dev/sdt", "/dev/sdu", "/dev/sdv", "/dev/sdw", "/dev/sdx",
- "/dev/sdy", "/dev/sdz", "/dev/sdaa", "/dev/sdab", "/dev/sdac", "/dev/sdad",
+ "/dev/sdy", "/dev/sdz",
+ "/dev/sdaa", "/dev/sdab", "/dev/sdac", "/dev/sdad", "/dev/sdae",
+ "/dev/sdaf", "/dev/sdag", "/dev/sdah", "/dev/sdai", "/dev/sdaj",
+ "/dev/sdak", "/dev/sdal", "/dev/sdam", "/dev/sdan", "/dev/sdao",
+ "/dev/sdap", "/dev/sdaq", "/dev/sdar", "/dev/sdas", "/dev/sdat",
+ "/dev/sdau", "/dev/sdav", "/dev/sdaw", "/dev/sdax", "/dev/sday",
+ "/dev/sdaz", "/dev/sdba", "/dev/sdbb", "/dev/sdbc", "/dev/sdbd",
+ "/dev/sdbe", "/dev/sdbf", "/dev/sdbg", "/dev/sdbh", "/dev/sdbi",
+ "/dev/sdbj", "/dev/sdbk", "/dev/sdbl", "/dev/sdbm", "/dev/sdbn",
+ "/dev/sdbo", "/dev/sdbp", "/dev/sdbq", "/dev/sdbr", "/dev/sdbs",
+ "/dev/sdbt", "/dev/sdbu", "/dev/sdbv", "/dev/sdbw", "/dev/sdbx",
+ "/dev/sdby", "/dev/sdbz",
  "/dev/scd0", "/dev/scd1", "/dev/scd2", "/dev/scd3", "/dev/scd4", "/dev/scd5",
  "/dev/scd6", "/dev/scd7", "/dev/scd8", "/dev/scd9", "/dev/scd10", "/dev/scd11",
  "/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/sr3", "/dev/sr4", "/dev/sr5",
@@ -3099,7 +3133,9 @@ char *devices[] =
  "/dev/nosst0", "/dev/nosst1", "/dev/nosst2", "/dev/nosst3", "/dev/nosst4"
 };
 
-static Sg_map sg_map_arr[(sizeof(devices) / sizeof(char *)) + 1];
+static const int ul_devices_num = (sizeof(ul_devices) / sizeof(char *));
+
+static Sg_map sg_map_arr[(sizeof(ul_devices) / sizeof(char *)) + 1];
 
 #define MAX_HOLES 4
 
@@ -3113,14 +3149,14 @@ static void show_devices()
     int do_numeric = 1;
     int max_holes = MAX_HOLES;
 
-    for (k = 0, j = 0; k < (int)(sizeof(devices) / sizeof(char *)); k++) {
-        fd = open(devices[k], O_RDONLY | O_NONBLOCK);
+    for (k = 0, j = 0; k < ul_devices_num; k++) {
+        fd = open(ul_devices[k], O_RDONLY | O_NONBLOCK);
         if (fd < 0)
             continue;
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &(sg_map_arr[j].bus));
         if (err < 0) {
             snprintf(ebuff, EBUFF_SZ,
-                     "SCSI(1) ioctl on %s failed", devices[k]);
+                     "SCSI(1) ioctl on %s failed", ul_devices[k]);
             perror(ebuff);
             close(fd);
             continue;
@@ -3128,7 +3164,7 @@ static void show_devices()
         err = ioctl(fd, SCSI_IOCTL_GET_IDLUN, &m_idlun);
         if (err < 0) {
             snprintf(ebuff, EBUFF_SZ, 
-                     "SCSI(2) ioctl on %s failed", devices[k]);
+                     "SCSI(2) ioctl on %s failed", ul_devices[k]);
             perror(ebuff);
             close(fd);
             continue;
@@ -3136,14 +3172,14 @@ static void show_devices()
         sg_map_arr[j].channel = (m_idlun.mux4 >> 16) & 0xff;
         sg_map_arr[j].lun = (m_idlun.mux4 >> 8) & 0xff;
         sg_map_arr[j].target_id = m_idlun.mux4 & 0xff;
-        sg_map_arr[j].dev_name = devices[k];
+        sg_map_arr[j].dev_name = ul_devices[k];
 #if 0
         printf("[scsi%d ch=%d id=%d lun=%d %s] ", sg_map_arr[j].bus,
         sg_map_arr[j].channel, sg_map_arr[j].target_id, sg_map_arr[j].lun,
         sg_map_arr[j].dev_name);
 #endif
         ++j;
-        printf("%s ", devices[k]);
+        printf("%s ", ul_devices[k]);
         close(fd);
     };
     printf("\n"); /* <<<<<<<<<<<<<<<<<<<<< */
@@ -3376,7 +3412,7 @@ int main(int argc, char *argv[])
     int status = 0;
     long tmp;
     struct mpage_info mp_i;
-    int inquiry_level = 0;
+    int inquiry_verbosity = 0;
     int show_devs = 0;
     int found = 0;
 
@@ -3391,12 +3427,12 @@ int main(int argc, char *argv[])
             mode6byte = 1;
             break;
         case 'a':
-            inquiry_level = 1;
+            inquiry_verbosity = 1;
             serial_number = 1;
             mp_i.page = MP_LIST_PAGES;
             break;
         case 'A':
-            inquiry_level = 1;
+            inquiry_verbosity = 1;
             serial_number = 1;
             mp_i.page = MP_LIST_PAGES;
             mp_i.subpage = MP_LIST_SUBPAGES;
@@ -3445,7 +3481,7 @@ int main(int argc, char *argv[])
             grown_defect = 1;
             break;
         case 'i':       /* just vendor, product and revision for '-i -i' */
-            inquiry_level = (2 == inquiry_level) ? 1 : 2;
+            inquiry_verbosity = (2 == inquiry_verbosity) ? 1 : 2;
             break;
         case 'I':
             mp_i.page = 0x1c;
@@ -3601,14 +3637,15 @@ int main(int argc, char *argv[])
     if (!x_interface)
         printf("\n");
 #endif
-    if (! (found || mp_i.page || mp_i.subpage || inquiry_level ||
+    if (! (found || mp_i.page || mp_i.subpage || inquiry_verbosity ||
            serial_number)) {
         if (trace_cmd > 0)
             fprintf(stdout, "nothing selected so do a short INQUIRY\n");
-        inquiry_level = 1;
+        inquiry_verbosity = 1;
     }
 
-    status |= do_inquiry(&mp_i.peri_type, inquiry_level);
+    status |= do_inquiry(&mp_i.peri_type, &mp_i.inq_byte6,
+                         inquiry_verbosity);
     if (serial_number)
         do_serial_number();     /* ignore error */
     if (mp_i.page > 0)

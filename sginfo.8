@@ -1,4 +1,4 @@
-.TH SGINFO "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SGINFO "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -116,6 +116,12 @@ Only active when used together with '-R'.
 .TP
 -P
 Access information in the Power Condition mode page.
+.TP
+-r
+Display all raw (or primary) SCSI device names visible in the /dev
+directory. Examples are /dev/sda, /dev/st1 and /dev/scd2. Does not
+list sg device names so devices such as a SCSI enclosure which only
+have an sg device name are not listed.
 .TP
 -s
 Display information in the unit serial number page which is a
