@@ -26,7 +26,7 @@
  
 */
 
-static char * version_str = "0.49 20060406";
+static char * version_str = "0.50 20060623";
 
 
 void usage ()
@@ -78,6 +78,7 @@ int main(int argc, char * argv[])
         int fl_num = -1;
         int power_conds = 0;
         int verbose = 0;
+        int ret = 0;
         
         for (k = 1; k < argc; ++k) {
                 cp = argv[k];
@@ -103,7 +104,7 @@ int main(int argc, char * argv[])
                                         exit(0);
                                 case '?':
                                         usage();
-                                        return 1;
+                                        return 0;
                                 case '-':
                                         ++cp;
                                         --plen;
@@ -131,7 +132,7 @@ int main(int argc, char * argv[])
                                         fprintf(stderr, "Bad value after "
                                                 "'fl=' option\n");
                                         usage();
-                                        return 1;
+                                        return SG_LIB_SYNTAX_ERROR;
                                 }
                                 fl_num = u;
                         } else if (0 == strncmp("imm=", cp, 4)) {
@@ -140,7 +141,7 @@ int main(int argc, char * argv[])
                                         fprintf(stderr, "Bad value after "
                                                 "'imm=' option\n");
                                         usage();
-                                        return 1;
+                                        return SG_LIB_SYNTAX_ERROR;
                                 }
                                 immed = u;
                         } else if (0 == strncmp(cp, "load", 4)) {
@@ -157,7 +158,7 @@ int main(int argc, char * argv[])
                                         fprintf(stderr, "Bad value after "
                                                 "after 'pc=' option\n");
                                         usage();
-                                        return 1;
+                                        return SG_LIB_SYNTAX_ERROR;
                                 }
                                 power_conds = u;
                         } else if (0 == strncmp(cp, "start", 5)) {
@@ -174,7 +175,7 @@ int main(int argc, char * argv[])
                                 fprintf(stderr, "Unrecognized option: %s\n",
                                         cp);
                                 usage();
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                 } else if (0 == strcmp("0", cp)) {
                         if (startstop >= 0)
@@ -192,20 +193,20 @@ int main(int argc, char * argv[])
                         fprintf(stderr, "too many arguments, got: %s, not "
                                 "expecting: %s\n", file_name, cp);
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
                 if (ambigu) {
                         fprintf(stderr, "please, only one of 0, 1, --eject, "
                                 "--load, --start or --stop\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         }
     
         if (0 == file_name) {
                 fprintf(stderr, "No <scsi_device> argument given\n");
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
         }
 
         if (fl_num >= 0) {
@@ -213,13 +214,13 @@ int main(int argc, char * argv[])
                         fprintf(stderr, "Giving '--fl=<n>' and '--stop' (or "
                                 "'--eject') is invalid\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
                 if (power_conds > 0) {
                         fprintf(stderr, "Giving '--fl=<n>' and '--pc=<n>' "
                                 "when <n> is non-zero is invalid\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         } else {
                 if ((startstop == -1) && loej)
@@ -232,7 +233,7 @@ int main(int argc, char * argv[])
         if (fd < 0) {
                 fprintf(stderr, "Error trying to open %s: %s\n",
                         file_name, safe_strerror(-fd));
-                return 2;
+                return SG_LIB_FILE_ERROR;
         }
 
         res = 0;
@@ -247,15 +248,22 @@ int main(int argc, char * argv[])
         else if (startstop != -1)
                 res = sg_ll_start_stop_unit(fd, immed, 0, 0, 0, loej,
                                             startstop, 1, verbose);
+        ret = res;
         if (res) {
                 if (verbose < 2) {
                         if (SG_LIB_CAT_INVALID_OP == res)
                                 fprintf(stderr, "command not supported\n");
+                        else if (SG_LIB_CAT_NOT_READY == res)
+                                fprintf(stderr, "device not ready\n");
+                        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+                                fprintf(stderr, "unit attention\n");
                         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
                                 fprintf(stderr, "command malformed\n");
                 }
                 fprintf(stderr, "START STOP UNIT command failed\n");
         }
-        sg_cmds_close_device(fd);
-        return res ? 1 : 0;
+        res = sg_cmds_close_device(fd);
+        if ((res < 0) && (0 == ret))
+                return SG_LIB_FILE_ERROR;
+        return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

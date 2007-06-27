@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "5.28 20060403";
+static char * version_str = "5.31 20060704";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -184,6 +184,7 @@ static struct timeval start_tm;
 static long long dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
 static int do_sync = 0;
+static int exit_status = 0;
 
 
 static void calc_duration_throughput(int contin)
@@ -366,9 +367,7 @@ static void guarded_stop_both(Rq_coll * clp)
     guarded_stop_out(clp);
 }
 
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
- * SG_LIB_CAT_MEDIA_CHANGED -> media changed, SG_LIB_CAT_ILLEGAL_REQ
- * -> bad field in cdb, -1 -> other failure */
+/* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
 static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 {
     int k, res;
@@ -795,19 +794,28 @@ static void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
         if (0 != status) err_exit(status, "unlock in_mutex");
 
         res = sg_finish_io(rep->wr, rep, &clp->aux_mutex);
-        if (res < 0) {
-            if (clp->in_flags.coe) {
+        switch (res) {
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            /* try again with same addr, count info */
+            /* now re-acquire in mutex for balance */
+            /* N.B. This re-read could now be out of read sequence */
+            status = pthread_mutex_lock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "lock in_mutex");
+            break;
+        case SG_LIB_CAT_MEDIUM_HARD:
+            if (0 == clp->in_flags.coe) {
+                fprintf(stderr, "error finishing sg in command (medium)\n");
+                if (exit_status <= 0)
+                    exit_status = res;
+                guarded_stop_both(clp);
+                return;
+            } else {
                 memset(rep->buffp, 0, rep->num_blks * rep->bs);
                 fprintf(stderr, ">> substituted zeros for in blk=%lld for "
                         "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
             }
-            else {
-                fprintf(stderr, "error finishing sg in command\n");
-                guarded_stop_both(clp);
-                return;
-            }
-        }
-        if (res <= 0) { /* looks good, going to return */
+            /* fall through */
+        case 0:
             if (rep->dio_incomplete || rep->resid) {
                 status = pthread_mutex_lock(&clp->aux_mutex);
                 if (0 != status) err_exit(status, "lock aux_mutex");
@@ -822,12 +830,13 @@ static void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
             return;
+        default:
+            fprintf(stderr, "error finishing sg in command (%d)\n", res);
+            if (exit_status <= 0)
+                exit_status = res;
+            guarded_stop_both(clp);
+            return;
         }
-        /* else assume 1 == res so try again with same addr, count info */
-        /* now re-acquire read mutex for balance */
-        /* N.B. This re-read could now be out of read sequence */
-        status = pthread_mutex_lock(&clp->in_mutex);
-        if (0 != status) err_exit(status, "lock in_mutex");
     }
 }
 
@@ -854,17 +863,26 @@ static void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
         if (0 != status) err_exit(status, "unlock out_mutex");
 
         res = sg_finish_io(rep->wr, rep, &clp->aux_mutex);
-        if (res < 0) {
-            if (clp->out_flags.coe)
-                fprintf(stderr, ">> ignored error for out blk=%lld for "
-                        "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
-            else {
-                fprintf(stderr, "error finishing sg out command\n");
+        switch (res) {
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            /* try again with same addr, count info */
+            /* now re-acquire out mutex for balance */
+            /* N.B. This re-write could now be out of write sequence */
+            status = pthread_mutex_lock(&clp->out_mutex);
+            if (0 != status) err_exit(status, "lock out_mutex");
+            break;
+        case SG_LIB_CAT_MEDIUM_HARD:
+            if (0 == clp->out_flags.coe) {
+                fprintf(stderr, "error finishing sg out command (medium)\n");
+                if (exit_status <= 0)
+                    exit_status = res;
                 guarded_stop_both(clp);
                 return;
-            }
-        }
-        if (res <= 0) {
+            } else
+                fprintf(stderr, ">> ignored error for out blk=%lld for "
+                        "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
+            /* fall through */
+        case 0:
             if (rep->dio_incomplete || rep->resid) {
                 status = pthread_mutex_lock(&clp->aux_mutex);
                 if (0 != status) err_exit(status, "lock aux_mutex");
@@ -879,12 +897,13 @@ static void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
             return;
+        default:
+            fprintf(stderr, "error finishing sg out command (%d)\n", res);
+            if (exit_status <= 0)
+                exit_status = res;
+            guarded_stop_both(clp);
+            return;
         }
-        /* else assume 1 == res so try again with same addr, count info */
-        /* now re-acquire out mutex for balance */
-        /* N.B. This re-write could now be out of write sequence */
-        status = pthread_mutex_lock(&clp->out_mutex);
-        if (0 != status) err_exit(status, "lock out_mutex");
     }
 }
 
@@ -920,8 +939,6 @@ static int sg_start_io(Rq_elem * rep)
         fprintf(stderr, "sg_start_io: SCSI %s, blk=%lld num_blks=%d\n",
                rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
         sg_print_command(hp->cmdp);
-        fprintf(stderr, "dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n",
-                hp->dxfer_direction, hp->dxfer_len, hp->dxferp, hp->cmd_len);
     }
 
     while (((res = write(rep->wr ? rep->outfd : rep->infd, hp,
@@ -936,7 +953,8 @@ static int sg_start_io(Rq_elem * rep)
     return 0;
 }
 
-/* -1 -> unrecoverable error, 0 -> successful, 1 -> try again */
+/* 0 -> successful, SG_LIB_CAT_UNIT_ATTENTION -> try again,
+   SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, -1 other errors */
 static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 {
     int res, status;
@@ -964,15 +982,17 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
     memcpy(&rep->io_hdr, &io_hdr, sizeof(struct sg_io_hdr));
     hp = &rep->io_hdr;
 
-    switch (sg_err_category3(hp)) {
+    res = sg_err_category3(hp);
+    switch (res) {
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3((rep->wr ? "writing continuing":
                                        "reading continuing"), hp, 0);
             break;
-        case SG_LIB_CAT_MEDIA_CHANGED:
-            return 1;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            return res;
+        case SG_LIB_CAT_NOT_READY:
         default:
             {
                 char ebuff[EBUFF_SZ];
@@ -984,7 +1004,7 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
                 sg_chk_n_print3(ebuff, hp, 0);
                 status = pthread_mutex_unlock(a_mutp);
                 if (0 != status) err_exit(status, "unlock aux_mutex");
-                return -1;
+                return res;
             }
     }
 #if 0
@@ -1112,14 +1132,14 @@ int main(int argc, char * argv[])
             rcoll.bpt = sg_get_num(buf);
             if (-1 == rcoll.bpt) {
                 fprintf(stderr, ME "bad argument to 'bpt'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             bpt_given = 1;
         } else if (0 == strcmp(key,"bs")) {
             rcoll.bs = sg_get_num(buf);
             if (-1 == rcoll.bs) {
                 fprintf(stderr, ME "bad argument to 'bs'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"cdbsz")) {
             rcoll.cdbsz_in = sg_get_num(buf);
@@ -1132,7 +1152,7 @@ int main(int argc, char * argv[])
             dd_count = sg_get_llnum(buf);
             if (-1LL == dd_count) {
                 fprintf(stderr, ME "bad argument to 'count'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strncmp(key,"deb", 3))
             rcoll.debug = sg_get_num(buf);
@@ -1148,47 +1168,47 @@ int main(int argc, char * argv[])
             ibs = sg_get_num(buf);
             if (-1 == ibs) {
                 fprintf(stderr, ME "bad argument to 'ibs'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"if") == 0) {
             if ('\0' != inf[0]) {
                 fprintf(stderr, "Second 'if=' argument??\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             } else
                 strncpy(inf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &rcoll.in_flags)) {
                 fprintf(stderr, ME "bad argument to 'iflag'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"obs")) {
             obs = sg_get_num(buf);
             if (-1 == obs) {
                 fprintf(stderr, ME "bad argument to 'obs'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"of") == 0) {
             if ('\0' != outf[0]) {
                 fprintf(stderr, "Second 'of=' argument??\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             } else
                 strncpy(outf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &rcoll.out_flags)) {
                 fprintf(stderr, ME "bad argument to 'oflag'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"seek")) {
             seek = sg_get_llnum(buf);
             if (-1LL == seek) {
                 fprintf(stderr, ME "bad argument to 'seek'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if (-1LL == skip) {
                 fprintf(stderr, ME "bad argument to 'skip'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"sync"))
             do_sync = sg_get_num(buf);
@@ -1208,7 +1228,7 @@ int main(int argc, char * argv[])
         else {
             fprintf(stderr, "Unrecognized option '%s'\n", key);
             fprintf(stderr, "For more information use '--help'\n");
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (rcoll.bs <= 0) {
@@ -1219,19 +1239,19 @@ int main(int argc, char * argv[])
     if ((ibs && (ibs != rcoll.bs)) || (obs && (obs != rcoll.bs))) {
         fprintf(stderr, "If 'ibs' or 'obs' given must be same as 'bs'\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((skip < 0) || (seek < 0)) {
         fprintf(stderr, "skip and seek cannot be negative\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((rcoll.out_flags.append > 0) && (seek > 0)) {
         fprintf(stderr, "Can't use both append and seek switches\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (rcoll.bpt < 1) {
         fprintf(stderr, "bpt must be greater than 0\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
@@ -1241,7 +1261,7 @@ int main(int argc, char * argv[])
     if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
         fprintf(stderr, "too few or too many threads requested\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (rcoll.debug)
         fprintf(stderr, ME "if=%s skip=%lld of=%s seek=%lld count=%lld\n",
@@ -1259,10 +1279,10 @@ int main(int argc, char * argv[])
 
         if (FT_ERROR == rcoll.in_type) {
             fprintf(stderr, ME "unable to access %s\n", inf);
-            return 1;
+            return SG_LIB_FILE_ERROR;
         } else if (FT_ST == rcoll.in_type) {
             fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
-            return 1;
+            return SG_LIB_FILE_ERROR;
         } else if (FT_SG == rcoll.in_type) {
             flags = O_RDWR;
             if (rcoll.in_flags.direct)
@@ -1276,10 +1296,10 @@ int main(int argc, char * argv[])
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for sg reading", inf);
                 perror(ebuff);
-                return 1;
+                return SG_LIB_FILE_ERROR;
             }
             if (sg_prepare(rcoll.infd, rcoll.bs, rcoll.bpt))
-                return 1;
+                return SG_LIB_FILE_ERROR;
         }
         else {
             flags = O_RDONLY;
@@ -1294,7 +1314,7 @@ int main(int argc, char * argv[])
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for reading", inf);
                 perror(ebuff);
-                return 1;
+                return SG_LIB_FILE_ERROR;
             }
             else if (skip > 0) {
                 llse_loff_t offset = skip;
@@ -1304,7 +1324,7 @@ int main(int argc, char * argv[])
                     snprintf(ebuff, EBUFF_SZ,
                         ME "couldn't skip to required position on %s", inf);
                     perror(ebuff);
-                    return 1;
+                    return SG_LIB_FILE_ERROR;
                 }
             }
         }
@@ -1314,7 +1334,7 @@ int main(int argc, char * argv[])
 
         if (FT_ST == rcoll.out_type) {
             fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
-            return 1;
+            return SG_LIB_FILE_ERROR;
         }
         else if (FT_SG == rcoll.out_type) {
             flags = O_RDWR;
@@ -1329,11 +1349,11 @@ int main(int argc, char * argv[])
                 snprintf(ebuff,  EBUFF_SZ,
                          ME "could not open %s for sg writing", outf);
                 perror(ebuff);
-                return 1;
+                return SG_LIB_FILE_ERROR;
             }
 
             if (sg_prepare(rcoll.outfd, rcoll.bs, rcoll.bpt))
-                return 1;
+                return SG_LIB_FILE_ERROR;
         }
         else if (FT_DEV_NULL == rcoll.out_type)
             rcoll.outfd = -1; /* don't bother opening */
@@ -1353,7 +1373,7 @@ int main(int argc, char * argv[])
                     snprintf(ebuff, EBUFF_SZ,
                              ME "could not open %s for writing", outf);
                     perror(ebuff);
-                    return 1;
+                    return SG_LIB_FILE_ERROR;
                 }
             }
             else {      /* raw output file */
@@ -1361,7 +1381,7 @@ int main(int argc, char * argv[])
                     snprintf(ebuff, EBUFF_SZ,
                              ME "could not open %s for raw writing", outf);
                     perror(ebuff);
-                    return 1;
+                    return SG_LIB_FILE_ERROR;
                 }
             }
             if (seek > 0) {
@@ -1372,7 +1392,7 @@ int main(int argc, char * argv[])
                     snprintf(ebuff, EBUFF_SZ,
                         ME "couldn't seek to required position on %s", outf);
                     perror(ebuff);
-                    return 1;
+                    return SG_LIB_FILE_ERROR;
                 }
             }
         }
@@ -1381,7 +1401,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Can't have both 'if' as stdin _and_ 'of' as "
                 "stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (dd_count < 0) {
         in_num_sect = -1;
@@ -1394,8 +1414,11 @@ int main(int argc, char * argv[])
                                          &in_sect_sz);
             }
             if (0 != res) {
-               if (res == SG_LIB_CAT_INVALID_OP)
+                if (res == SG_LIB_CAT_INVALID_OP)
                     fprintf(stderr, "read capacity not supported on %s\n",
+                            inf);
+                else if (res == SG_LIB_CAT_NOT_READY)
+                    fprintf(stderr, "read capacity failed, %s not ready\n",
                             inf);
                 else
                     fprintf(stderr, "Unable to read capacity on %s\n", inf);
@@ -1426,8 +1449,11 @@ int main(int argc, char * argv[])
                                          &out_sect_sz);
             }
             if (0 != res) {
-               if (res == SG_LIB_CAT_INVALID_OP)
+                if (res == SG_LIB_CAT_INVALID_OP)
                     fprintf(stderr, "read capacity not supported on %s\n",
+                            outf);
+                else if (res == SG_LIB_CAT_NOT_READY)
+                    fprintf(stderr, "read capacity failed, %s not ready\n",
                             outf);
                 else
                     fprintf(stderr, "Unable to read capacity on %s\n", outf);
@@ -1464,7 +1490,7 @@ int main(int argc, char * argv[])
                 "out_num_sect=%lld\n", dd_count, in_num_sect, out_num_sect);
     if (dd_count < 0) {
         fprintf(stderr, "Couldn't calculate count, please give one\n");
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
     if (! cdbsz_given) {
         if ((FT_SG == rcoll.in_type) && (MAX_SCSI_CDBSZ != rcoll.cdbsz_in) &&
@@ -1556,9 +1582,9 @@ int main(int argc, char * argv[])
         if (FT_SG == rcoll.out_type) {
             fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
             res = sg_ll_sync_cache_10(rcoll.outfd, 0, 0, 0, 0, 0, 0, 0);
-            if (2 == res) {
+            if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 fprintf(stderr,
-                        "Unit attention, media changed(in), continuing\n");
+                        "Unit attention(out), continuing\n");
                 res = sg_ll_sync_cache_10(rcoll.outfd, 0, 0, 0, 0, 0, 0, 0);
             }
             if (0 != res)
@@ -1572,11 +1598,12 @@ int main(int argc, char * argv[])
         close(rcoll.infd);
     if ((STDOUT_FILENO != rcoll.outfd) && (FT_DEV_NULL != rcoll.out_type))
         close(rcoll.outfd);
-    res = 0;
+    res = exit_status;
     if (0 != rcoll.out_count) {
         fprintf(stderr, ">>>> Some error occurred, remaining blocks=%lld\n",
                rcoll.out_count);
-        res = 2;
+        if (0 == res)
+            res = SG_LIB_CAT_OTHER;
     }
     print_stats("");
     if (rcoll.dio_incomplete) {
@@ -1597,5 +1624,5 @@ int main(int argc, char * argv[])
     if (rcoll.sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                rcoll.sum_of_resids);
-    return res;
+    return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

@@ -44,7 +44,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.01 20060106";
+static char * version_str = "1.02 20060623";
 
 #define ME "sg_rmsn: "
 
@@ -80,7 +80,7 @@ int main(int argc, char * argv[])
     int raw = 0;
     int verbose = 0;
     char device_name[512];
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -108,7 +108,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -122,26 +122,27 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     memset(rmsn_buff, 0x0, sizeof(rmsn_buff));
 
     res = sg_ll_read_media_serial_num(sg_fd, rmsn_buff, sizeof(rmsn_buff),
                                       1, verbose);
+    ret = res;
     if (0 == res) {
         sn_len = (rmsn_buff[0] << 24) + (rmsn_buff[1] << 16) + 
                      (rmsn_buff[2] << 8) + rmsn_buff[3];
@@ -175,13 +176,18 @@ int main(int argc, char * argv[])
                 if (sn_len > 0)
                     dStrHex((const char *)ucp + 4, sn_len, 0); 
             }
-            ret = 0;
         }
     }
     if (0 != res) {
         if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "Read Media Serial Number command not "
                     "supported\n");
+        else if (SG_LIB_CAT_NOT_READY == res)
+            fprintf(stderr, "Read Media Serial Number failed, device not "
+                    "ready\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "Read Media Serial Number failed, unit "
+                    "attention\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in Read Media Serial Number cdb\n");
         else {
@@ -196,8 +202,9 @@ err_out:
         free(ucp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

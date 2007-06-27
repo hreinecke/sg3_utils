@@ -1,4 +1,4 @@
-.TH SG_GET_CONFIG "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_GET_CONFIG "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_get_config \- invoke SCSI GET CONFIGURATION command on a (cd/dvd) device
 .SH SYNOPSIS
@@ -101,6 +101,9 @@ can also be specified. For example "sg_get_config /dev/hdc"
 will work in the 2.6 series kernels as long as /dev/hdc is
 an ATAPI device. In the 2.6 series external DVD writers attached
 via USB could be queried with "sg_get_config /dev/scd1" for example.
+.SH EXIT STATUS
+The exit status of sg_get_config is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

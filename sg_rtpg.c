@@ -44,7 +44,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.06 20060106";
+static char * version_str = "1.07 20060623";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -156,7 +156,7 @@ int main(int argc, char * argv[])
     int hex = 0;
     int verbose = 0;
     char device_name[256];
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -187,7 +187,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -201,20 +201,20 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
@@ -227,6 +227,7 @@ int main(int argc, char * argv[])
     memcpy(reportTgtGrpBuff, dummy_resp, sizeof(dummy_resp));
     res = 0;
 #endif
+    ret = res;
     if (0 == res) {
         report_len = (reportTgtGrpBuff[0] << 24) +
                      (reportTgtGrpBuff[1] << 16) + 
@@ -242,7 +243,6 @@ int main(int argc, char * argv[])
             fprintf(stderr, "\nOutput response in hex\n");
             dStrHex((const char *)reportTgtGrpBuff,
                     (trunc ? (int)sizeof(reportTgtGrpBuff) : report_len), 1);
-            ret = 0;
             goto err_out;
         }
         printf("Report target port groups:\n");
@@ -284,11 +284,12 @@ int main(int argc, char * argv[])
             }
             off = 8 + j;
         }
-        ret = 0;
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Target Port Groups command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "bad field in Report Target Port Groups cdb\n");
+    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+        fprintf(stderr, "Report Target Port Groups, unit attention\n");
     else {
         fprintf(stderr, "Report Target Port Groups command failed\n");
         if (0 == verbose)
@@ -298,8 +299,9 @@ int main(int argc, char * argv[])
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

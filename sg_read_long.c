@@ -23,7 +23,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.07 20060106";
+static char * version_str = "1.09 20060623";
 
 #define MAX_XFER_LEN 10000
 
@@ -33,6 +33,7 @@ static char * version_str = "1.07 20060106";
 
 
 static struct option long_options[] = {
+        {"16", 0, 0, 'S'},
         {"correct", 0, 0, 'c'},
         {"help", 0, 0, 'h'},
         {"lba", 1, 0, 'l'},
@@ -46,14 +47,17 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_read_long [--correct] [--help] [--lba=<num>] [--out=<name>]\n"
+          "sg_read_long [--16] [--correct] [--help] [--lba=<num>] "
+          "[--out=<name>]\n"
           "                    [--verbose] [--version] [--xfer_len=<num>]"
           " <scsi_device>\n"
-          "  where: --correct|-c               use ECC to correct data "
+          "  where: --16|-S                    do READ LONG(16) (default: "
+          "READ LONG(10))\n"
+          "         --correct|-c               use ECC to correct data "
           "(default: don't)\n"
           "         --help|-h                  print out usage message\n"
           "         --lba=<num>|-l <num>       logical block address"
-          " (default 0)\n"
+          " (default: 0)\n"
           "         --out=<name>|-o <name>     output to file <name>\n"
           "         --verbose|-v               increase verbosity\n"
           "         --version|-V               print version string and"
@@ -64,31 +68,48 @@ static void usage()
           );
 }
 
-/* Returns 0 if successful, else -1 */
-static int process_read_long(int sg_fd, int correct, unsigned long lba,
-                             void * data_out, int xfer_len, int verbose)
+/* Returns 0 if successful */
+static int process_read_long(int sg_fd, int do_16, int correct,
+                             unsigned long long llba, void * data_out,
+                             int xfer_len, int verbose)
 {
     int offset, res;
 
-    res = sg_ll_read_long10(sg_fd, correct, lba, data_out, xfer_len,
-                            &offset, 1, verbose);
+    if (do_16)
+        res = sg_ll_read_long16(sg_fd, correct, llba, data_out, xfer_len,
+                                &offset, 1, verbose);
+    else
+        res = sg_ll_read_long10(sg_fd, correct, (unsigned long)llba,
+                                data_out, xfer_len, &offset, 1, verbose);
     switch (res) {
     case 0:
-        return 0;
+        break;
+    case SG_LIB_CAT_NOT_READY:
+        fprintf(stderr, "  SCSI READ LONG (%s) failed, device not ready\n",
+                (do_16 ? "16" : "10"));
+        break;
+    case SG_LIB_CAT_UNIT_ATTENTION:
+        fprintf(stderr, "  SCSI READ LONG (%s) failed, unit attention\n",
+                (do_16 ? "16" : "10"));
+        break;
     case SG_LIB_CAT_INVALID_OP:
-        fprintf(stderr, "  SCSI READ LONG (10) command not supported\n");
-        return -1;
+        fprintf(stderr, "  SCSI READ LONG (%s) command not supported\n",
+                (do_16 ? "16" : "10"));
+        break;
     case SG_LIB_CAT_ILLEGAL_REQ:
-        fprintf(stderr, "  SCSI READ LONG (10) command, bad field in cdb\n");
-        return -1;
+        fprintf(stderr, "  SCSI READ LONG (%s) command, bad field in cdb\n",
+                (do_16 ? "16" : "10"));
+        break;
     case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
         fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
                 ">>>\n", xfer_len - offset);
-        return -1;
+        break;
     default:
-        fprintf(stderr, "  SCSI READ LONG (10) command error\n");
-        return -1;
+        fprintf(stderr, "  SCSI READ LONG (%s) command error\n",
+                (do_16 ? "16" : "10"));
+        break;
     }
+    return res;
 }
 
 
@@ -99,20 +120,22 @@ int main(int argc, char * argv[])
     void * rawp = NULL;
     int correct = 0;
     int xfer_len = 520;
-    unsigned int lba = 0;
+    int do_16 = 0;
+    unsigned long long llba = 0;
     int verbose = 0;
+    long long ll;
     int got_stdout;
     char device_name[256];
     char out_fname[256];
     char ebuff[EBUFF_SZ];
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     memset(out_fname, 0, sizeof out_fname);
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "chl:o:vVx:", long_options,
+        c = getopt_long(argc, argv, "chl:o:SvVx:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -126,14 +149,18 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         case 'l':
-            lba = sg_get_num(optarg);
-            if ((unsigned int)(-1) == lba) {
+            ll = sg_get_llnum(optarg);
+            if (-1 == ll) {
                 fprintf(stderr, "bad argument to '--lba'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
+            llba = (unsigned long long)ll;
             break;
         case 'o':
             strncpy(out_fname, optarg, sizeof(out_fname));
+            break;
+        case 'S':
+            do_16 = 1;
             break;
         case 'v':
             ++verbose;
@@ -145,13 +172,13 @@ int main(int argc, char * argv[])
             xfer_len = sg_get_num(optarg);
            if (-1 == xfer_len) {
                 fprintf(stderr, "bad argument to '--xfer_len'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -165,42 +192,42 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (xfer_len >= MAX_XFER_LEN){
         fprintf(stderr, "xfer_len (%d) is out of range ( < %d)\n",
                 xfer_len, MAX_XFER_LEN);
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
         fprintf(stderr, ME "out of memory (query)\n");
         sg_cmds_close_device(sg_fd);
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     readLongBuff = rawp;
     memset(rawp, 0x0, MAX_XFER_LEN);
 
-    fprintf(stderr, ME "issue read long (10) to device %s\n\t\txfer_len=%d "
-            "(0x%x), lba=%d (0x%x), correct=%d\n", device_name, xfer_len,
-            xfer_len, lba, lba, correct);
+    fprintf(stderr, ME "issue read long (%s) to device %s\n    xfer_len=%d "
+            "(0x%x), lba=%llu (0x%llx), correct=%d\n", (do_16 ? "16" : "10"),
+            device_name, xfer_len, xfer_len, llba, llba, correct);
 
-    if (process_read_long(sg_fd, correct, lba, readLongBuff, xfer_len,
-                          verbose))
+    if (process_read_long(sg_fd, do_16, correct, llba, readLongBuff,
+                          xfer_len, verbose))
         goto err_out;
 
     if ('\0' == out_fname[0])
@@ -228,13 +255,13 @@ int main(int argc, char * argv[])
             close(outfd);
     }
 
-    ret = 0;
 err_out:
     if (rawp) free(rawp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

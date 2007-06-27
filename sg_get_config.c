@@ -45,7 +45,7 @@
 
 */
 
-static char * version_str = "0.25 20060315";
+static char * version_str = "0.26 20060623";
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -884,7 +884,7 @@ int main(int argc, char * argv[])
     char buff[64];
     const char * cp;
     struct sg_simple_inquiry_resp inq_resp;
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -919,14 +919,14 @@ int main(int argc, char * argv[])
             rt = sg_get_num(optarg);
             if ((rt < 0) || (rt > 3)) {
                 fprintf(stderr, "bad argument to '--rt'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 's':
             starting = sg_get_num(optarg);
             if ((starting < 0) || (starting > 0xffff)) {
                 fprintf(stderr, "bad argument to '--starting'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'v':
@@ -938,7 +938,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -952,7 +952,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
@@ -963,12 +963,12 @@ int main(int argc, char * argv[])
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */, verbose)) < 0) {
         fprintf(stderr, ME "error opening file: %s (ro): %s\n",
                  device_name, safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
         printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
@@ -982,20 +982,20 @@ int main(int argc, char * argv[])
     } else {
         fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
                 device_name);
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
     sg_cmds_close_device(sg_fd);
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error (rw): %s\n", safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     res = sg_ll_get_config(sg_fd, rt, starting, resp_buffer, 
                               sizeof(resp_buffer), 1, verbose);
+    ret = res;
     if (0 == res) {
-        ret = 0;
         len = (resp_buffer[0] << 24) + (resp_buffer[1] << 16) +
               (resp_buffer[2] << 8) + resp_buffer[3] + 4;
         if (hex) {
@@ -1009,6 +1009,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Get Configuration command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "field in Get Configuration command illegal\n");
+    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+        fprintf(stderr, "Get Configuration received unit attention\n");
     else {
         fprintf(stderr, "Get Configuration command failed\n");
         if (0 == verbose)
@@ -1017,9 +1019,9 @@ int main(int argc, char * argv[])
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
-

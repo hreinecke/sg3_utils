@@ -25,13 +25,13 @@
  *  any later version.
  */
 
-static char * version_str = "0.12 20051220";
+static char * version_str = "0.13 20060623";
 
 static int debug = 0;
 
 #define TRESPASS_PAGE           0x22
 
-static void do_trespass(int fd, int hr, int short_cmd)
+static int do_trespass(int fd, int hr, int short_cmd)
 {
         unsigned char long_trespass_pg[] =
                 { 0, 0, 0, 0, 0, 0, 0, 0x00, 
@@ -75,12 +75,19 @@ static void do_trespass(int fd, int hr, int short_cmd)
                         "'-s' option\n", short_cmd ? "short" : "long",
                         short_cmd ? "without" : "with");
                 break;
+        case SG_LIB_CAT_NOT_READY:
+                fprintf(stderr, "device not ready\n");
+                break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+                fprintf(stderr, "unit attention\n");
+                break;
         default:
                 if (debug)
                         fprintf(stderr, "%s trespass failed\n",
                                         short_cmd ? "short" : "long");
                 break;
         }
+        return res;
 }
 
 void usage ()
@@ -106,6 +113,7 @@ int main(int argc, char * argv[])
         int k, fd;
         int hr = 0;
         int short_cmd = 0;
+        int ret = 0;
         
         if (argc < 2) 
                 usage ();
@@ -137,7 +145,7 @@ int main(int argc, char * argv[])
         }
         if (0 == file_name) {
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
         }
                 
         fd = open(file_name, O_RDWR | O_NONBLOCK);
@@ -145,11 +153,11 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Error trying to open %s\n", file_name);
                 perror("");
                 usage();
-                return 2;
+                return SG_LIB_FILE_ERROR;
         }
        
-        do_trespass(fd, hr, short_cmd);
+        ret = do_trespass(fd, hr, short_cmd);
         
         close (fd);
-        return 0;
+        return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

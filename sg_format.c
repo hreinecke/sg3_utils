@@ -53,7 +53,7 @@
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.07 20060106";
+static char * version_str = "1.09 20060623";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -64,6 +64,7 @@ static struct option long_options[] = {
         {"pinfo", 0, 0, 'p'},
         {"resize", 0, 0, 'r'},
         {"rto_req", 0, 0, 'R'},
+        {"six", 0, 0, '6'},
         {"size", 1, 0, 's'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
@@ -71,7 +72,7 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-/* Return 0 on success, else -1 */
+/* Return 0 on success, else see sg_ll_format_unit() */
 static int
 scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
 {
@@ -86,7 +87,7 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
         fmt_hdr[3] = 0;         /* defect list length LSB */
 
         res = sg_ll_format_unit(fd, pinfo, rto_req, 0 /* longlist */,
-                                (!! immed) /* fmtdata */, 8 /* cmplist */,
+                                (!! immed) /* fmtdata */, 0 /* cmplist */,
                                 0 /* dlist_format */,
                                 (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
                                 fmt_hdr, (immed ? sizeof(fmt_hdr) : 0),
@@ -94,17 +95,25 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
 
         switch (res) {
         case 0:
-            break;
+                break;
+        case SG_LIB_CAT_NOT_READY:
+                fprintf(stderr, "Format command, device not ready\n");
+                break;
         case SG_LIB_CAT_INVALID_OP:
                 fprintf(stderr, "Format command not supported\n");
-                return -1;
+                break;
         case SG_LIB_CAT_ILLEGAL_REQ:
-                fprintf(stderr, "Format command illegal parameter\n");
-                return -1;
+                fprintf(stderr, "Format command, illegal parameter\n");
+                break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+                fprintf(stderr, "Format command, unit attention\n");
+                break;
         default:
                 fprintf(stderr, "Format command failed\n");
-                return -1;
+                break;
         }
+        if (res)
+                return res;
 
         if (! immed)
                 return 0;
@@ -112,8 +121,8 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
         printf("\nFormat has started\n");
         if (early) {
                 if (immed)
-                        printf("Format continuing, use request sense or "
-                               "test unit ready to monitor progress\n");
+                        printf("Format continuing, request sense or test "
+                               "unit ready can be used to monitor progress\n");
                 return 0;
         }
 
@@ -184,13 +193,16 @@ print_read_cap(int fd, int do_16, int verbose)
                         return (int)block_size;
                 }
         }
-        if (SG_LIB_CAT_INVALID_OP == res) 
+        if (SG_LIB_CAT_NOT_READY == res) 
+                fprintf(stderr, "READ CAPACITY (%d): device not ready\n",
+                        (do_16 ? 16 : 10));
+        else if (SG_LIB_CAT_INVALID_OP == res) 
                 fprintf(stderr, "READ CAPACITY (%d) not supported\n",
                         (do_16 ? 16 : 10));
-        if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
                 fprintf(stderr, "bad field in READ CAPACITY (%d) "
                         "cdb\n", (do_16 ? 16 : 10));
-        if (verbose)
+        else if (verbose)
                 fprintf(stderr, "READ CAPACITY (%d) failed "
                         "[res=%d]\n", (do_16 ? 16 : 10), res);
         return -1;
@@ -200,7 +212,8 @@ static void usage()
 {
         printf("usage: sg_format [--count=<block count>] [--early] [--format]"
                 " [--help]\n"
-                "                 [--long] [--pinfo] [--resize] [--rto_req]\n"
+                "                 [--long] [--pinfo] [--resize] [--rto_req] "
+                "[--six]\n"
                 "                 [--size=<block size>] [--verbose]"
                 " [--version] [--wait]\n"
                 "                 <scsi_disk>\n"
@@ -223,6 +236,7 @@ static void usage()
                 "value\n"
                 "    --rto_req | -R  set the RTO_REQ bit in format (only valid "
                 "with '--pinfo')\n"
+                "    --six | -6      use 6 byte MODE SENSE/SELECT\n"
                 "    --size=<block size> | -s <block size>\n"
                 "                   only needed to change block size"
                 " (default to\n"
@@ -262,14 +276,14 @@ int main(int argc, char **argv)
         char device_name[256];
         char pdt_name[64];
         struct sg_simple_inquiry_resp inq_out;
-        int ret = 1;
+        int ret = 0;
 
         device_name[0] = '\0';
         while (1) {
                 int option_index = 0;
-                char c;
+                int c;
 
-                c = getopt_long(argc, argv, "c:eFhlprRs:vVw",
+                c = getopt_long(argc, argv, "c:eFhlprRs:vVw6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -283,7 +297,7 @@ int main(int argc, char **argv)
                                 if (-1 == blk_count) {
                                         fprintf(stderr, "bad argument to "
                                                 "'--count'\n");
-                                        return 1;
+                                        return SG_LIB_SYNTAX_ERROR;
                                 }
                         }
                         break;
@@ -314,7 +328,7 @@ int main(int argc, char **argv)
                         if (blk_size <= 0) {
                                 fprintf(stderr, "bad argument to '--size', "
                                         "want arg > 0)\n");
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'v':
@@ -327,9 +341,12 @@ int main(int argc, char **argv)
                 case 'w':
                         fwait = 1;
                         break;
+                case '6':
+                        mode6 = 1;
+                        break;
                 default:
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         }
         if (optind < argc) {
@@ -345,29 +362,29 @@ int main(int argc, char **argv)
                         fprintf(stderr, "Unexpected extra argument: %s\n",
                                 argv[optind]);
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
         }
         if ('\0' == device_name[0]) {
                 fprintf(stderr, "no device name given\n");
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
         }
         if (resize) {
                 if (format) {
                         fprintf(stderr, "both '--format' and '--resize'"
                                 "not permitted\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 } else if (0 == blk_count) {
                         fprintf(stderr, "'--resize' needs a '--count' (other"
                                 " than 0)\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 } else if (0 != blk_size) {
                         fprintf(stderr, "'--resize' not compatible with "
                                 "'--size')\n");
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         }
 
@@ -379,12 +396,13 @@ int main(int argc, char **argv)
         if ((fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {
                 fprintf(stderr, "error opening device file: %s: %s\n",
                         device_name, safe_strerror(-fd));
-                return 1;
+                return SG_LIB_FILE_ERROR;
         }
 
         if (sg_simple_inquiry(fd, &inq_out, 1, verbose)) {
                 fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
                         device_name);
+                ret = SG_LIB_CAT_OTHER;
                 goto out;
         }
         printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
@@ -401,6 +419,7 @@ int main(int argc, char **argv)
             (0xe != inq_out.peripheral_type)) {
                 fprintf(stderr, "This format is only defined for disks "
                         "(using SBC-2 or RBC)\n");
+                ret = SG_LIB_CAT_MALFORMED;
                 goto out;
         }
 
@@ -414,11 +433,21 @@ int main(int argc, char **argv)
                                          0 /* current */, mode_page,
                                          0 /* subpage */, dbuff,
                                          MAX_BUFF_SZ, 1, verbose);
+        ret = res;
         if (res) {
-                if (SG_LIB_CAT_INVALID_OP == res)
+                if (SG_LIB_CAT_NOT_READY == res)
+                        fprintf(stderr, "MODE SENSE (%d) command, device "
+                                "not ready\n", (mode6 ? 6 : 10));
+                else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+                        fprintf(stderr, "MODE SENSE (%d) command, unit "
+                                "attention\n", (mode6 ? 6 : 10));
+                else if (SG_LIB_CAT_INVALID_OP == res) {
                         fprintf(stderr, "MODE SENSE (%d) command is not "
                                 "supported\n", (mode6 ? 6 : 10));
-                else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+                        fprintf(stderr, "    try again %s the '--six' "
+                                "option\n", (mode6 ? "without" : "with"));
+        
+                } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
                         if (long_lba && (! mode6)) 
                                 fprintf(stderr, "bad field in MODE SENSE "
                                         "(%d) [longlba flag not supported?]"
@@ -535,6 +564,7 @@ int main(int argc, char **argv)
                                 "change number or blocks or block length)\n");
                         fprintf(stderr, "but (single) block descriptor not "
                                 "found in earlier MODE SENSE\n");
+                        ret = SG_LIB_CAT_MALFORMED;
                         goto out;
                 }
                 if (blk_count != 0)  {
@@ -565,8 +595,15 @@ int main(int argc, char **argv)
                 else
                         res = sg_ll_mode_select10(fd, 1 /* PF */, 1 /* SP */,
                                                   dbuff, calc_len, 1, verbose);
+                ret = res;
                 if (res) {
-                        if (SG_LIB_CAT_INVALID_OP == res)
+                        if (SG_LIB_CAT_NOT_READY == res)
+                                fprintf(stderr, "MODE SELECT command, "
+                                        "device not ready\n");
+                        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+                                fprintf(stderr, "MODE SELECT command, "
+                                        "unit attention\n");
+                        else if (SG_LIB_CAT_INVALID_OP == res)
                                 fprintf(stderr, "MODE SELECT (%d) command is "
                                         "not supported\n", (mode6 ? 6 : 10));
                         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
@@ -575,19 +612,20 @@ int main(int argc, char **argv)
                         else
                                 fprintf(stderr, "MODE SELECT (%d) command "
                                         "failed\n", (mode6 ? 6 : 10));
-                                if (0 == verbose)
-                                        fprintf(stderr, "    try '-v' for "
-                                                "more information\n");
+                        if (0 == verbose)
+                                fprintf(stderr, "    try '-v' for "
+                                        "more information\n");
                         goto out;
                 }
         }
         if (resize) {
-                ret = 0;
                 printf("Resize operation seems to have been successful\n");
                 goto out;
         }
         else if (! format) {
                 res = print_read_cap(fd, do_rcap16, verbose);
+                if (res < 0)
+                        ret = -1;
                 if ((res > 0) && (bd_blk_len > 0) &&
                     (res != (int)bd_blk_len)) {
                         printf("  Warning: mode sense and read capacity "
@@ -597,7 +635,6 @@ int main(int argc, char **argv)
                 }
                 printf("No changes made. To format use '--format'. To "
                        "resize use '--resize'\n");
-                ret = 0;
                 goto out;
         }
 
@@ -613,6 +650,7 @@ int main(int argc, char **argv)
                 sleep(5);
                 res = scsi_format(fd, pinfo, rto_req, ! fwait, early,
                                   verbose);
+                ret = res;
                 if (res) {
                         fprintf(stderr, "FORMAT failed\n");
                         if (0 == verbose)
@@ -622,9 +660,13 @@ int main(int argc, char **argv)
 #else
                 fprintf(stderr, "FORMAT ignored, testing\n");
 #endif
-        ret = 0;
 
 out:
-        sg_cmds_close_device(fd);
-        return ret;
+        res = sg_cmds_close_device(fd);
+        if (res < 0) {
+                fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+                if (0 == ret)
+                        return SG_LIB_FILE_ERROR;
+        }
+        return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

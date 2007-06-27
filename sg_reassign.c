@@ -48,7 +48,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.05 20060312";
+static char * version_str = "1.06 20060623";
 
 #define ME "sg_reassign: "
 
@@ -259,7 +259,7 @@ int main(int argc, char * argv[])
     unsigned long long addr_arr[MAX_NUM_ADDR];
     unsigned char param_arr[4 + (MAX_NUM_ADDR * 8)];
     int param_len = 4;
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -276,7 +276,7 @@ int main(int argc, char * argv[])
             if (0 != build_lba_arr(optarg, addr_arr, &addr_arr_len,
                                    MAX_NUM_ADDR)) {
                 fprintf(stderr, "bad argument to '--address'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             got_addr = 1;
             break;
@@ -289,7 +289,7 @@ int main(int argc, char * argv[])
                 eight = res;
             else {
                 fprintf(stderr, "value for '--eight=' must be 0 or 1\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'g':
@@ -305,7 +305,7 @@ int main(int argc, char * argv[])
                 longlist = res;
             else {
                 fprintf(stderr, "value for '--longlist=' must be 0 or 1\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'v':
@@ -317,7 +317,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -331,24 +331,24 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (grown) {
         if (got_addr) {
             fprintf(stderr, "can't have both '--grown' and '--address='\n");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     } else if ((0 == got_addr) || (addr_arr_len < 1)) {
         fprintf(stderr, "need at least one address (see '--address=')\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (got_addr) {
         for (k = 0; k < addr_arr_len; ++k) {
@@ -359,7 +359,7 @@ int main(int argc, char * argv[])
                 } else if (0 == eight) {
                     fprintf(stderr, "address number %d exceeds 32 bits so "
                             "'--eight=0' invalid\n", k + 1);
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             }
         }
@@ -393,8 +393,7 @@ int main(int argc, char * argv[])
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        perror("");
-        return 1;
+        return SG_LIB_FILE_ERROR;
     } 
 
     if (got_addr) {
@@ -409,17 +408,23 @@ int main(int argc, char * argv[])
         }
         res = sg_ll_reassign_blocks(sg_fd, eight, longlist, param_arr,
                                     param_len, 1, verbose);
-        if (SG_LIB_CAT_INVALID_OP == res) {
-            fprintf(stderr, "REASSIGN BLOCKS not supported\n");
+        ret = res;
+        if (SG_LIB_CAT_NOT_READY == res) {
+            fprintf(stderr, "REASSIGN BLOCKS failed, device not ready\n");
+            goto err_out;
+        } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
+            fprintf(stderr, "REASSIGN BLOCKS, unit attention\n");
             goto err_out;
         } else if (SG_LIB_CAT_INVALID_OP == res) {
+            fprintf(stderr, "REASSIGN BLOCKS not supported\n");
+            goto err_out;
+        } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
             fprintf(stderr, "bad field in REASSIGN BLOCKS cdb\n");
             goto err_out;
         } else if (0 != res) {
             fprintf(stderr, "REASSIGN BLOCKS failed\n");
             goto err_out;
         }
-        ret = 0;
     } else /* if (grown) */ {
         int dl_format = DEF_DEFECT_LIST_FORMAT;
         int div = 0;
@@ -430,10 +435,15 @@ int main(int argc, char * argv[])
         res = sg_ll_read_defect10(sg_fd, 0 /* req_plist */,
                                   1 /* req_glist */, dl_format,
                                   param_arr, param_len, 0, verbose);
-        if (SG_LIB_CAT_INVALID_OP == res) {
-            fprintf(stderr, "READ DEFECT DATA (10) not supported\n");
+        ret = res;
+        if (SG_LIB_CAT_NOT_READY == res) {
+            fprintf(stderr, "READ DEFECT DATA (10) failed, device not "
+                    "ready\n");
             goto err_out;
         } else if (SG_LIB_CAT_INVALID_OP == res) {
+            fprintf(stderr, "READ DEFECT DATA (10) not supported\n");
+            goto err_out;
+        } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
             fprintf(stderr, "bad field in READ DEFECT DATA (10) cdb\n");
             goto err_out;
         } else if (0 != res) {
@@ -478,8 +488,9 @@ int main(int argc, char * argv[])
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

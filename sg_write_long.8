@@ -1,4 +1,4 @@
-.TH SG_WRITE_LONG "8" "Janauary 2006" "sg3_utils-1.19" SG3_UTILS
+.TH SG_WRITE_LONG "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_write_long \- send the SCSI command write long
 .SH SYNOPSIS
@@ -96,6 +96,9 @@ MEDIUM ERROR since the ECC and associated data will be well formed.
 The 10 byte WRITE LONG SCSI command is implemented (not the 16
 byte variant). This limits the logical block address to a 32 bit
 quantity.
+.SH EXIT STATUS
+The exit status of sg_write_long is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Saeed Bishara. Further work by Douglas Gilbert.
 .SH "REPORTING BUGS"

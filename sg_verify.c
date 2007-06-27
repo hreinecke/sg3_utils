@@ -42,7 +42,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.06 20060322";
+static char * version_str = "1.07 20060623";
 
 #define ME "sg_verify: "
 
@@ -91,7 +91,7 @@ int main(int argc, char * argv[])
     unsigned long long orig_lba;
     int verbose = 0;
     char device_name[256];
-    int ret = 1;
+    int ret = 0;
     unsigned long info = 0;
 
     memset(device_name, 0, sizeof device_name);
@@ -108,14 +108,14 @@ int main(int argc, char * argv[])
            bpc = sg_get_num(optarg);
            if (bpc < 1) {
                 fprintf(stderr, "bad argument to '--bpc'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'c':
            count = sg_get_llnum(optarg);
            if (count < 0) {
                 fprintf(stderr, "bad argument to '--count'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'd':
@@ -129,7 +129,7 @@ int main(int argc, char * argv[])
            ll = sg_get_llnum(optarg);
            if (-1 == ll) {
                 fprintf(stderr, "bad argument to '--lba'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             lba = (unsigned long long)ll;
             break;
@@ -142,7 +142,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -156,18 +156,18 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (bpc > 0xffff) {
         fprintf(stderr, "'bpc' cannot exceed 65535\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (lba > 0xffffffffLLU) {
         fprintf(stderr, "'lba' cannot exceed 32 bits\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     orig_count = count;
     orig_lba = lba;
@@ -175,13 +175,13 @@ int main(int argc, char * argv[])
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     for (; count > 0; count -= bpc, lba +=bpc) {
@@ -189,7 +189,14 @@ int main(int argc, char * argv[])
         res = sg_ll_verify10(sg_fd, dpo, bytechk, (unsigned long)lba, num,
                              NULL, 0, &info, 1, verbose);
         if (0 != res) {
+            ret = res;
             switch (res) {
+            case SG_LIB_CAT_NOT_READY:
+                fprintf(stderr, "Verify(10) failed, device not ready\n");
+                break;
+            case SG_LIB_CAT_UNIT_ATTENTION:
+                fprintf(stderr, "Verify(10), unit attention\n");
+                break;
             case SG_LIB_CAT_INVALID_OP:
                 fprintf(stderr, "Verify(10) command not supported\n");
                 break;
@@ -213,8 +220,6 @@ int main(int argc, char * argv[])
             break;
         }
     }
-    if (count <= 0)
-        ret = 0;
 
     if (verbose && (0 == ret) && (orig_count > 1))
         fprintf(stderr, "Verified %lld [0x%llx] blocks from lba %llu "
@@ -223,8 +228,9 @@ int main(int argc, char * argv[])
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-sg_fd));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

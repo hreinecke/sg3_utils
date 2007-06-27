@@ -1,0 +1,160 @@
+.TH SG3_UTILS "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.SH NAME
+sg3_utils \- a package of utilities for sending SCSI commands
+.SH SYNOPSIS
+.B sg_*
+[\fI--help\fR] [\fI--verbose\fR] [\fI--version\fR]
+\fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg3_utils is a package of utilities that send SCSI commands to
+the given <scsi_device> via a SCSI pass through interface
+provided by the host operating system.
+.PP
+The names of all utilities start with "sg" and most start with "sg_"
+often followed by the abbreviation of the name of the SCSI command
+that they send. For example the "sg_verify" utility sends the SCSI
+VERIFY command. A mapping between SCSI commands and the sg3_utils
+utilities that issue them is given in the COVERAGE file.
+.PP
+SCSI draft standards can be found at http://www.t10.org . The
+standards themselves can be purchased from ANSI and other
+standards organistions. A good overview of various SCSI
+standards can be seen at http://www.t10.org/scsi-3.htm with the
+SCSI command sets in the upper part of the diagram. SCSI commands
+in common with all device types can be found in SPC of which SPC-4
+is the latest major version. Block device specific commands (e.g.
+as used by disks) can be in SBC, those for tape drives in SSC
+and those for CD/DVD drives in MMC. 
+.PP
+There are two generations of command line option usage. The older utilities
+such as sg_inq have individual command line processing code (often
+found at the top of the main() function) based on a single "-" followed
+by one or more characters. If an argument is needed then it follows
+a "=" (e.g. '-p=1f' in sg_modes). Various options can be elided as long
+as it is not ambiguous (e.g. '-vv' to increase the verbosity). The
+<scsi_device> is any device that can receive SCSI commands and is shown
+after the options in the synopsis. It may appear between other options.
+.PP
+The second generation of newer utilties uses the getopt_long() function
+to parse command line options. With that function, each option has two
+representations: a short form (e.g. '-v') and a longer
+form (e.g. '--verbose'). If an argument is required then it follows a
+space in the short form and a "=" in the longer form (e.g. in the
+sg_verify utility '-l 2a6h' and '--lba=2a6h' are equivalent). Again
+the <scsi_device> argument may appear between or prior to other options.
+.PP
+Several sg3_utils utilities are based on the Unix dd command (e.g. sg_dd)
+and share its rather quirky command line interface.
+.SH EXIT STATUS
+To aid scripts that call these utilities, the exit status is set to
+indicate success (0) or failure (1 or more). Note that some of the
+lower values correspond to the SCSI sense key values to which they
+correspond. The exit status values are:
+.TP
+.B 0
+success
+.TP
+.B 1
+syntax error. Either illegal coomand line options, options with bad
+arguments or a combination of options that is not permitted.
+.TP
+.B 2
+the <scsi_device> reports that it is not ready for the operation
+requested. The device may be in the process of becoming ready (e.g.
+spinning up but not at speed) so the utility may work after a wait.
+.TP
+.B 3
+the <scsi_device> reports a medium or hardware error (or a blank
+check). For example an attempt to read a corrupted block on a disk
+will yield this value.
+.TP
+.B 5
+the <scsi_device> reports an "illegal request" with an additional
+sense code other than "invalid operation code". This is often a
+supported command with a field set requesting an unsupported
+capability. For commands that require a "service action" field
+this value can indicate that the command is not supported.
+.TP
+.B 6
+the <scsi_device> reports a "unit attention" condition. This usually
+indicates that something unrelated to the requested command has
+occurred (e.g. a device reset) potentially before the current SCSI
+command was sent. The requested command has not been executed by the
+device. Note that unit attention conditions are usually only reported
+once by a device.
+.TP
+.B 9
+the <scsi_device> reports an illegal request with an additional
+sense code of "invalid operation code" which means that it doesn't
+support the requested command.
+.TP
+.B 10
+the <scsi_device> reports it has a check condition but "no sense".
+Some polling commands (e.g. REQUEST SENSE) can react this way.
+It is unlikely that this value will occur as an exit status.
+.TP
+.B 11
+the <scsi_device> reports a "recovered error". The requested command
+was successful. Most likely a utility will report a recovered error
+to stderr and continue, probably leaving the utility with an exit
+status of 0 .
+.TP
+.B 15
+the utility is unable to open, close or use the given <scsi_device>.
+The given file name could be incorrect or there may be permission
+problems. Adding the '-v' option may give more information.
+.TP
+.B 33
+the command sent to <scsi_device> has timed out.
+.TP
+.B 97
+the response to a SCSI command failed sanity checks.
+.TP
+.B 98
+the <scsi_device> reports it has a check condition but the error
+doesn't fit into any of the above categories.
+.TP
+.B 99
+any errors that can't be categorized into values 1 to 98 may yield
+this value. This includes transport and operating system errors
+after the command has been sent to the device.
+.PP
+Most of the error conditions reported above will be repeatable (an
+example of one that is not is "unit attention") so the utility can
+be run again with the '-v' option (or several) to obtain more
+information.
+.SH COMMON OPTIONS
+.TP
+--help | -h | -?
+output the usage message then exit. In a few older utilities the '-h'
+option request hexadecimal output. In these cases the '-?' option will
+output the usage message then exit.
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output). Such extra output
+is usually sent to stderr.
+.TP
+--version | -V
+print the version string and then exit. Each utility has its own version
+number and date of last code change.
+.PP
+Notice that the '--verbose' option can be used multiple times for more
+verbose output. Obviously the short form ('-vv') is more convenient than
+the longer form ('--verbose --verbose').
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 1999-2006 Douglas Gilbert
+.br
+Some utilities are distributed under a GPL version 2 license while
+others, usually more recent ones, are under a FreeBSD license. The files
+that are common to almost all utilities and thus have the most reusable
+code, namely sg_lib.[hc] and sg_cmds.[hc] are under a FreeBSD license.
+There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sdparm(sdparm)

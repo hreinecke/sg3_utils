@@ -1,11 +1,11 @@
-.TH SG_READ_LONG "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_READ_LONG "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
-sg_read_long \- send the scsi command read long
+sg_read_long \- calls a READ LONG command on a SCSI device
 .SH SYNOPSIS
 .B sg_read_long
-[\fI--correct\fR] [\fI--help\fR] [\fI--lba=<num>\fR] [\fI--out=<name>\fR]
-[\fI--verbose\fR] [\fI--version\fR] [\fI--xfer_len=<num>\fR]
-\fI<scsi_device>\fR
+[\fI--16\fR] [\fI--correct\fR] [\fI--help\fR] [\fI--lba=<num>\fR]
+[\fI--out=<name>\fR] [\fI--verbose\fR] [\fI--version\fR]
+[\fI--xfer_len=<num>\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -14,7 +14,12 @@ buffer is output in hex and ASCII to stdout or placed in a file.
 Note that the data returned includes the logical block data (typically
 512 bytes for a disk) plus ECC information (whose format is proprietary)
 plus optionally other proprietary data.
-.P
+.TP
+--16 | -S
+attempts a READ LONG(16) SCSI command. The default action is to attempt
+a READ LONG(10) SCSI command. The READ LONG(10) command has a 32 bit
+field for the lba while READ LONG(16) has a 64 bit field.
+.TP
 --correct | -c
 sets the 'CORRCT' bit in the READ LONG SCSI command. When set the data is
 corrected by the ECC before being transferred back to this utility. The
@@ -67,6 +72,9 @@ given, multipliers cannot be used.
 As a data point, Fujitsu uses a 54 byte ECC (per block) which is capable
 of correcting up to a single burst error or 216 bits "on the
 fly". [Information obtained from MAV20xxrc product manual.]
+.SH EXIT STATUS
+The exit status of sg_read_long is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

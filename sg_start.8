@@ -1,4 +1,4 @@
-.TH SG_START "8" "April 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_START "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_start \- starts (spins-up) or stops (spins down) device, load or
 eject medium
@@ -101,9 +101,6 @@ are equivalent. The single "-" form is for backward compatibility.
 To avoid confusion, only one of "0", "1", "--load", "--eject", "--start"
 and "--stop" can be given.
 .PP
-If this utility succeeds then its process exits with a status of 0;
-otherwise it exits with a non-zero status.
-.PP
 There is an associated "power condition" mode page (0x1a) in which timer
 values can be set for transitioning to either idle or standby state after
 a period of inactivity. The sdparm utility can be used to view the
@@ -129,6 +126,9 @@ Earlier versions had a '-s' option to perform a SYNCHRONIZE CACHE command
 before the START STOP UNIT command was issued. According to recent SBC-2
 drafts this is done implicitly if required. Hence the "-s" option has been
 dropped.
+.SH EXIT STATUS
+The exit status of sg_start is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHOR
 Written by K. Garloff and D. Gilbert
 .SH "REPORTING BUGS"

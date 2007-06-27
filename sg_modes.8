@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_MODES "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_modes \- reads SCSI MODE SENSE pages
 .SH SYNOPSIS
@@ -133,13 +133,13 @@ type of the device (e.g. 0 -> Direct Access Device (disk)) prior to
 sending a MODE SENSE command. This helps in decoding the block
 descriptor and mode pages.
 .PP
-When this utility succeeds its process exits with a status of 0;
-if problems are encountered the process status is 1 .
-.PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and SCSI DVDs) can also be specified. For example "sg_modes -a /dev/sda"
 will work in the 2.6 series kernels.
+.SH EXIT STATUS
+The exit status of sg_modes is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"

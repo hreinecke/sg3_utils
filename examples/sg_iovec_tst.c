@@ -24,7 +24,7 @@
    normal file. The purpose is to test the sg_iovec mechanism within the
    sg_io_hdr structure.
 
-   Version 0.10 (20030529)
+   Version 0.11 (20060622)
 */
 
 
@@ -91,8 +91,8 @@ int sg_read(int sg_fd, unsigned char * buff, int num_blocks, int from_block,
         fprintf(stderr, "Recovered error while reading block=%d, num=%d\n",
                from_block, num_blocks);
         break;
-    case SG_LIB_CAT_MEDIA_CHANGED:
-        fprintf(stderr, "Media changed\n");
+    case SG_LIB_CAT_UNIT_ATTENTION:
+        fprintf(stderr, "Unit attention\n");
         return -1;
     default:
         sg_chk_n_print3("reading", &io_hdr, 1);

@@ -17,6 +17,7 @@ Here is a list of utilities that have been ported:
     sg_modes
     sg_persist
     sg_prevent
+    sg_rdac
     sg_read_long
     sg_readcap
     sg_reassign
@@ -29,6 +30,7 @@ Here is a list of utilities that have been ported:
     sg_sync
     sg_turs
     sg_verify
+    sg_vpd
     sg_wr_mode
     sg_write_long
 
@@ -37,8 +39,8 @@ that they execute.  Some utilities are slightly higher level, for
 example sg_ses fetches SCSI Enclosure Services (SES) status pages and
 can send control pages. Each utility has a man page (placed in
 section 8). An overview of sg3_utils can be found at:
-http://www.torque.net/sg/u_index.html .
-A copy of the "u_index.html" file is in the "doc" subdirectory.
+http://www.torque.net/sg/sg3_utils.html .
+A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 
 See the INSTALL file (at the end) for instructions on how to build
@@ -70,4 +72,4 @@ drive and an ATAPI CD drive.
 
 
 Doug Gilbert
-24th January 2006
+29th May 2006

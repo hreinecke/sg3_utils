@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.23 20060315";
+static char * version_str = "0.24 20060623";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -92,7 +92,7 @@ static unsigned char dummy_rsmft_r0 = 0xff;
 
 
 /* Report Supported Operation Codes */
-/* Returns 0 when successful, else -1 */
+/* Returns 0 when successful */
 static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact, 
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
@@ -161,12 +161,12 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
                          "rq_sa=0x%x ", rq_opcode, rq_servact);
             sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
         }
-        return -1;
+        return res;
     }
 }
 
 /* Report Supported Task Management Function */
-/* Returns 0 when successful, else -1 */
+/* Returns 0 when successful */
 static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
                     int verbose)
 {
@@ -218,7 +218,7 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
             snprintf(ebuff, EBUFF_SZ, "RSTMF error ");
             sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
         }
-        return -1;
+        return res;
     }
 }
 
@@ -359,7 +359,7 @@ void list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, cd_len, plen, jmp_out;
+    int sg_fd, k, num, cd_len, plen, jmp_out, res;
     const char * file_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char rsoc_buff[MX_ALLOC_LEN];
@@ -372,7 +372,6 @@ int main(int argc, char * argv[])
     int do_unsorted = 0;
     int do_taskman = 0;
     int rep_opts = 0;
-    int ret = 0;
     const char * cp;
     char buff[48];
     struct sg_simple_inquiry_resp inq_resp;
@@ -403,7 +402,7 @@ int main(int argc, char * argv[])
                 case 'h':
                 case '?':
                     usage();
-                    return 1;
+                    return 0;
                 default:
                     jmp_out = 1;
                     break;
@@ -418,19 +417,19 @@ int main(int argc, char * argv[])
                 if ((1 != num) || (do_opcode > 255)) {
                     fprintf(stderr, "Bad number after 'o=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             } else if (0 == strncmp("s=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", (unsigned int *)&do_servact);
                 if (1 != num) {
                     fprintf(stderr, "Bad number after 's=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             } else if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == file_name)
             file_name = cp;
@@ -438,19 +437,19 @@ int main(int argc, char * argv[])
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
                     "%s\n", file_name, cp);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     
     if (0 == file_name) {
         fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((-1 != do_servact) && (-1 == do_opcode)) {
         fprintf(stderr, "When '-s' is chosen, so must '-o' be chosen\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (do_unsorted && do_alpha)
         fprintf(stderr, "warning: unsorted ('-u') and alpha ('-a') options "
@@ -465,7 +464,7 @@ int main(int argc, char * argv[])
         snprintf(ebuff, EBUFF_SZ, "sg_opcodes: error opening file: %s (ro)",
                  file_name);
         perror(ebuff);
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, do_verbose)) {
         printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
@@ -478,7 +477,7 @@ int main(int argc, char * argv[])
             printf("  Peripheral device type: 0x%x\n", peri_type);
     } else {
         printf("sg_opcodes: %s doesn't respond to a SCSI INQUIRY\n", file_name);
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
     close(sg_fd);
 #ifndef TEST_CODE
@@ -489,7 +488,7 @@ int main(int argc, char * argv[])
         else
             printf("'Report supported operation codes' command not "
                    "supported for CD/DVD devices\n");
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
 #endif
 
@@ -497,23 +496,25 @@ int main(int argc, char * argv[])
         snprintf(ebuff, EBUFF_SZ, "sg_opcodes: error opening file: %s (rw)",
                  file_name);
         perror(ebuff);
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     if (do_opcode >= 0)
         rep_opts = ((do_servact >= 0) ? 2 : 1);
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
 #ifndef TEST_CODE
     if (do_taskman) {
-        if (0 != do_rstmf(sg_fd, rsoc_buff, sizeof(rsoc_buff), 0,
-                          do_verbose)) {
+        res = do_rstmf(sg_fd, rsoc_buff, sizeof(rsoc_buff), 0,
+                       do_verbose);
+        if (res) {
             fprintf(stderr, "Report supported task management functions failed\n");
-            return 1;
+            return res;
         }
     } else {
-        if (0 != do_rsoc(sg_fd, rep_opts, do_opcode, do_servact, rsoc_buff,
-                         sizeof(rsoc_buff), 0, do_verbose)) {
+        res = do_rsoc(sg_fd, rep_opts, do_opcode, do_servact, rsoc_buff,
+                      sizeof(rsoc_buff), 0, do_verbose);
+        if (res) {
             fprintf(stderr, "Report supported operation codes failed\n");
-            return 1;
+            return res;
         }
     }
 #else
@@ -581,5 +582,5 @@ int main(int argc, char * argv[])
         }
     }
     close(sg_fd);
-    return ret;
+    return 0;
 }

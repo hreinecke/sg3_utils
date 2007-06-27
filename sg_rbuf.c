@@ -45,7 +45,7 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.84 20060311";
+static char * version_str = "4.85 20060623";
 
 static void usage()
 {
@@ -119,7 +119,7 @@ int main(int argc, char * argv[])
                     exit(0);
                 case '?':
                     usage();
-                    return 1;
+                    return 0;
                 default:
                     jmp_out = 1;
                     break;
@@ -135,7 +135,7 @@ int main(int argc, char * argv[])
                 if ((1 != num) || (buf_size <= 0)) {
                     printf("Couldn't decode number after 'b=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 buf_size *= 1024;
             }
@@ -145,12 +145,12 @@ int main(int argc, char * argv[])
                 if (1 != num) {
                     printf("Couldn't decode number after 's=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             } else if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == file_name)
             file_name = cp;
@@ -158,19 +158,19 @@ int main(int argc, char * argv[])
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
                     "%s\n", file_name, cp);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (0 == file_name) {
         fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     sg_fd = open(file_name, O_RDONLY | O_NONBLOCK);
     if (sg_fd < 0) {
         perror(ME "open error");
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     /* Don't worry, being very careful not to write to a none-sg file ... */
     if (do_mmap) {
@@ -179,7 +179,7 @@ int main(int argc, char * argv[])
     }
     if (NULL == (rawp = malloc(512))) {
         printf(ME "out of memory (query)\n");
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
     rbBuff = rawp;
 
@@ -208,13 +208,14 @@ int main(int argc, char * argv[])
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
         perror(ME "SG_IO READ BUFFER descriptor error");
         if (rawp) free(rawp);
-        return 1;
+        return SG_LIB_CAT_OTHER;
     }
 
     if (verbose > 2)
         fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     /* now for the error processing */
-    switch (sg_err_category3(&io_hdr)) {
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
     case SG_LIB_CAT_RECOVERED:
         sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr,
                         verbose > 1);
@@ -224,7 +225,7 @@ int main(int argc, char * argv[])
     default: /* won't bother decoding other categories */
         sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, verbose > 1);
         if (rawp) free(rawp);
-        return 1;
+        return (res >= 0) ? res : SG_LIB_CAT_OTHER;
     }
 
     buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
@@ -237,7 +238,7 @@ int main(int argc, char * argv[])
         printf("Requested buffer size=%d exceeds reported capacity=%d\n",
                buf_size, buf_capacity);
         if (rawp) free(rawp);
-        return 1;
+        return SG_LIB_CAT_MALFORMED;
     }
     if (rawp) {
         free(rawp);
@@ -258,17 +259,19 @@ int main(int argc, char * argv[])
         if (MAP_FAILED == rbBuff) {
             if (ENOMEM == errno)
                 printf(ME "mmap() out of memory, try a smaller "
-                       "buffer size than %d KiB\n", buf_size / 1024);
+                       "buffer size than %d KiB\n"
+                       "    [with '-b=<n>' where <n> is in KB]\n",
+                       buf_size / 1024);
             else
                 perror(ME "error using mmap()");
-            return 1;
+            return SG_LIB_CAT_OTHER;
         }
     }
     else { /* non mmap-ed IO */
         rawp = malloc(buf_size + (do_dio ? psz : 0));
         if (NULL == rawp) {
             printf(ME "out of memory (data)\n");
-            return 1;
+            return SG_LIB_CAT_OTHER;
         }
         if (do_dio)    /* align to page boundary */
             rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
@@ -323,18 +326,21 @@ int main(int argc, char * argv[])
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
             if (ENOMEM == errno)
                 printf(ME "SG_IO data; out of memory, try a smaller "
-                       "buffer size than %d KiB\n", buf_size / 1024);
+                       "buffer size than %d KiB\n"
+                       "    [with '-b=<n>' where <n> is in KB]\n",
+                       buf_size / 1024);
             else
                 perror(ME "SG_IO READ BUFFER data error");
             if (rawp) free(rawp);
-            return 1;
+            return SG_LIB_CAT_OTHER;
         }
 
         if (verbose > 2)
             fprintf(stderr, "      duration=%u ms\n",
                     io_hdr.duration);
         /* now for the error processing */
-        switch (sg_err_category3(&io_hdr)) {
+        res = sg_err_category3(&io_hdr);
+        switch (res) {
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
@@ -344,7 +350,7 @@ int main(int argc, char * argv[])
         default: /* won't bother decoding other categories */
             sg_chk_n_print3("READ BUFFER data error", &io_hdr, verbose > 1);
             if (rawp) free(rawp);
-            return 1;
+            return (res >= 0) ? res : SG_LIB_CAT_OTHER;
         }
         if (do_dio &&  
             ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
@@ -392,7 +398,7 @@ int main(int argc, char * argv[])
     res = close(sg_fd);
     if (res < 0) {
         perror(ME "close error");
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 #ifdef SG_DEBUG
     if (clear)
@@ -400,5 +406,5 @@ int main(int argc, char * argv[])
     else
         printf("read buffer non-zero\n");
 #endif
-    return 0;
+    return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

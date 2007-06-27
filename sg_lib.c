@@ -68,7 +68,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.20 20060418";    /* spc-4 rev 04 */
+static char * version_str = "1.24 20060630";    /* spc-4 rev 5a */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -546,8 +546,8 @@ static struct error_info additional[] =
     {0x0B,0x01,"Warning - specified temperature exceeded"},
     {0x0B,0x02,"Warning - enclosure degraded"},
     {0x0B,0x03,"Warning - background self-test failed"},
-    {0x0B,0x04,"Warning - background pre-scan failed"},
-    {0x0B,0x05,"Warning - background medium scan failed"},
+    {0x0B,0x04,"Warning - background pre-scan detected medium error"},
+    {0x0B,0x05,"Warning - background medium scan detected medium error"},
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -566,9 +566,9 @@ static struct error_info additional[] =
     {0x0D,0x00,"Error detected by third party temporary initiator"},
     {0x0D,0x01,"Third party device failure"},
     {0x0D,0x02,"Copy target device not reachable"},
-    {0x0D,0x03,"Incorrect copy target device"},
-    {0x0D,0x04,"Copy target device underrun"},
-    {0x0D,0x05,"Copy target device overrun"},
+    {0x0D,0x03,"Incorrect copy target device type"},
+    {0x0D,0x04,"Copy target device data underrun"},
+    {0x0D,0x05,"Copy target device data overrun"},
     {0x0E,0x00,"Invalid information unit"},
     {0x0E,0x01,"Information unit too short"},
     {0x0E,0x02,"Information unit too long"},
@@ -650,9 +650,9 @@ static struct error_info additional[] =
     {0x20,0x00,"Invalid command operation code"},
     {0x20,0x01,"Access denied - initiator pending-enrolled"},
     {0x20,0x02,"Access denied - no access rights"},
-    {0x20,0x03,"Access denied - no mgmt id key"},
+    {0x20,0x03,"Access denied - invalid mgmt id key"},
     {0x20,0x04,"Illegal command while in write capable state"},
-    {0x20,0x05,"Obsolete"},
+    {0x20,0x05,"Write type operation while in read capable state (obs)"},
     {0x20,0x06,"Illegal command while in explicit address mode"},
     {0x20,0x07,"Illegal command while in implicit address mode"},
     {0x20,0x08,"Access denied - enrollment conflict"},
@@ -666,6 +666,8 @@ static struct error_info additional[] =
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
     {0x24,0x00,"Invalid field in cdb"},
     {0x24,0x01,"CDB decryption error"},
+    {0x24,0x02,"Invalid cdb field while in explicit block model (obs)"},
+    {0x24,0x03,"Invalid cdb field while in implicit block model (obs)"},
     {0x24,0x04,"Security audit value frozen"},
     {0x24,0x05,"Security working key frozen"},
     {0x24,0x06,"Nonce not unique"},
@@ -686,7 +688,10 @@ static struct error_info additional[] =
     {0x26,0x0C,"Invalid operation for copy source or destination"},
     {0x26,0x0D,"Copy segment granularity violation"},
     {0x26,0x0E,"Invalid parameter while port is enabled"},
-    {0x26,0x0F,"Invalid data-out buffer integrity"},
+    {0x26,0x0F,"Invalid data-out buffer integrity check value"},
+    {0x26,0x10,"Data decryption key fail limit reached"},
+    {0x26,0x11,"Incomplete key-associated data set"},
+    {0x26,0x12,"Vendor specific key reference not found"},
     {0x27,0x00,"Write protected"},
     {0x27,0x01,"Hardware write protected"},
     {0x27,0x02,"Logical unit software write protected"},
@@ -716,6 +721,9 @@ static struct error_info additional[] =
     {0x2A,0x08,"Priority changed"},
     {0x2A,0x09,"Capacity data has changed"},
     {0x2A,0x10,"Timestamp changed"},
+    {0x2A,0x11,"Data encryption parameters changed by another i_t nexus"},
+    {0x2A,0x12,"Data encryption parameters changed by vendor specific event"},
+    {0x2A,0x13,"Data encryption key instance counter has changed"},
     {0x2B,0x00,"Copy cannot execute since host cannot disconnect"},
     {0x2C,0x00,"Command sequence error"},
     {0x2C,0x01,"Too many windows specified"},
@@ -745,8 +753,8 @@ static struct error_info additional[] =
     {0x30,0x09,"Current session not fixated for append"},
     {0x30,0x0A,"Cleaning request rejected"},
     {0x30,0x0B,"Cleaning tape expired"},
-    {0x30,0x0C,"WORM medium, overwrite attempted"},
-    {0x30,0x0D,"Cleaning completed"},
+    {0x30,0x0C,"WORM medium - overwrite attempted"},
+    {0x30,0x0D,"WORM medium - integrity check"},
     {0x30,0x10,"Medium not formatted"},
     {0x31,0x00,"Medium format corrupted"},
     {0x31,0x01,"Format command failed"},
@@ -761,7 +769,7 @@ static struct error_info additional[] =
     {0x35,0x03,"Enclosure services transfer failure"},
     {0x35,0x04,"Enclosure services transfer refused"},
     {0x35,0x05,"Enclosure services checksum error"},
-    {0x36,0x00,"Ribbon,ink,or toner failure"},
+    {0x36,0x00,"Ribbon, ink, or toner failure"},
     {0x37,0x00,"Rounded parameter"},
     {0x38,0x00,"Event status notification"},
     {0x38,0x02,"Esn - power management class event"},
@@ -776,7 +784,7 @@ static struct error_info additional[] =
     {0x3B,0x00,"Sequential positioning error"},
     {0x3B,0x01,"Tape position error at beginning-of-medium"},
     {0x3B,0x02,"Tape position error at end-of-medium"},
-    {0x3B,0x03,"Tape or electronic vertical forms unit not ready, "},
+    {0x3B,0x03,"Tape or electronic vertical forms unit not ready"},
     {0x3B,0x04,"Slew failure"},
     {0x3B,0x05,"Paper jam"},
     {0x3B,0x06,"Failed to sense top-of-form"},
@@ -841,7 +849,7 @@ static struct error_info additional[] =
     {0x47,0x00,"SCSI parity error"},
     {0x47,0x01,"Data phase CRC error detected"},
     {0x47,0x02,"SCSI parity error detected during st data phase"},
-    {0x47,0x03,"Information unit CRC error detected"},
+    {0x47,0x03,"Information unit iuCRC error detected"},
     {0x47,0x04,"Asynchronous information protection error detected"},
     {0x47,0x05,"Protocol service CRC error"},
     {0x47,0x06,"Phy test function in progress"},
@@ -884,6 +892,7 @@ static struct error_info additional[] =
     {0x55,0x05,"Insufficient access control resources"},
     {0x55,0x06,"Auxiliary memory out of space"},
     {0x55,0x07,"Quota error"},
+    {0x55,0x08,"Maximum number of supplemental decryption keys exceeded"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
@@ -1016,6 +1025,7 @@ static struct error_info additional[] =
     {0x67,0x08,"Assign failure occurred"},
     {0x67,0x09,"Multiply assigned logical unit"},
     {0x67,0x0A,"Set target port groups command failed"},
+    {0x67,0x0B,"ATA device feature not enabled"},
     {0x68,0x00,"Logical unit not configured"},
     {0x69,0x00,"Data loss on logical unit"},
     {0x69,0x01,"Multiple logical unit failures"},
@@ -1057,10 +1067,17 @@ static struct error_info additional[] =
     {0x73,0x03,"Power calibration area error"},
     {0x73,0x04,"Program memory area update failure"},
     {0x73,0x05,"Program memory area is full"},
-    {0x73,0x06,"RMA/PMA is full"},
+    {0x73,0x06,"RMA/PMA is almost full"},
     {0x73,0x10,"Current power calibration area almost full"},
     {0x73,0x11,"Current power calibration area is full"},
     {0x73,0x17,"RDZ is full"},
+    {0x74,0x00,"Security error"},
+    {0x74,0x01,"Unable to decrypt data"},
+    {0x74,0x02,"Unencrypted data encountered while decrypting"},
+    {0x74,0x03,"Incorrect data encryption key"},
+    {0x74,0x04,"Cryptographic integrity validation failed"},
+    {0x74,0x05,"Error decrypting data"},
+    {0x74,0x71,"Logical unit access not authorized"},
     {0, 0, NULL}
 };
 
@@ -1428,7 +1445,7 @@ static void sg_get_sense_descriptors_str(const unsigned char * sense_buffer,
             processed = 0;
             break;
         case 9:
-            n += sprintf(b + n, "ATA return\n");
+            n += sprintf(b + n, "ATA Status Return\n");
             if (add_len >= 12) {
                 int extended, sector_count;
 
@@ -1673,7 +1690,7 @@ void sg_get_sense_str(const char * leadin,
 
         r += sprintf(b + r, "Non-extended sense class %d code 0x%0x ", 
                      (sense_buffer[0] >> 4) & 0x07, sense_buffer[0] & 0xf);
-        n += snprintf(buff + n, buff_len - n, "%s", b);
+        n += snprintf(buff + n, buff_len - n, "%s\n", b);
         if (n >= buff_len)
             return;
         len = 4;
@@ -1743,13 +1760,15 @@ int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             return SG_LIB_CAT_NO_SENSE;
         case SPC_SK_RECOVERED_ERROR:
             return SG_LIB_CAT_RECOVERED;
+        case SPC_SK_NOT_READY:
+            return SG_LIB_CAT_NOT_READY;
         case SPC_SK_MEDIUM_ERROR: 
         case SPC_SK_HARDWARE_ERROR: 
+        case SPC_SK_BLANK_CHECK: 
             return SG_LIB_CAT_MEDIUM_HARD;
         case SPC_SK_UNIT_ATTENTION:
-            if (0x28 == ssh.asc)
-                return SG_LIB_CAT_MEDIA_CHANGED;
-            break;
+            return SG_LIB_CAT_UNIT_ATTENTION;
+            /* used to return SG_LIB_CAT_MEDIA_CHANGED when ssh.asc==0x28 */
         case SPC_SK_ILLEGAL_REQUEST:
             if ((0x20 == ssh.asc) && (0x0 == ssh.ascq))
                 return SG_LIB_CAT_INVALID_OP;
@@ -1910,6 +1929,32 @@ void sg_get_opcode_name(unsigned char cmd_byte0, int peri_type,
         snprintf(buff, buff_len, "Opcode=0x%x", (int)cmd_byte0);
         break;
     }
+}
+
+int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc,
+                       int page_len, int * off, int m_assoc,
+                       int m_desig_type, int m_code_set)
+{
+    const unsigned char * ucp;
+    int k, c_set, assoc, desig_type;
+
+    for (k = *off, ucp = initial_desig_desc ; (k + 3) < page_len; ) {
+        k = (k < 0) ? 0 : (k + ucp[k + 3] + 4);
+        if ((k + 4) > page_len)
+            break;
+        c_set = (ucp[k] & 0xf);
+        if ((m_code_set >= 0) && (m_code_set != c_set))
+            continue;
+        assoc = ((ucp[k + 1] >> 4) & 0x3);
+        if ((m_assoc >= 0) && (m_assoc != assoc))
+            continue;
+        desig_type = (ucp[k + 1] & 0xf);
+        if ((m_desig_type >= 0) && (m_desig_type != desig_type))
+            continue;
+        *off = k;
+        return 0;
+    }
+    return (k == page_len) ? -1 : -2;
 }
 
 
@@ -2343,6 +2388,37 @@ long long sg_get_llnum(const char * buf)
             return -1LL;
         }
     }
+}
+
+/* Extract character sequence from ATA words as in the model string
+   in a IDENTIFY DEVICE response. Returns number of characters
+   written to 'ochars' before 0 character is found or 'num' words
+   are processed. */
+int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
+                     int num_words, int is_big_endian, char * ochars)
+{
+    int k;
+    unsigned short s;
+    char a, b;
+    char * op = ochars;
+
+    for (k = start_word; k < (start_word + num_words); ++k) {
+        s = word_arr[k];
+        if (is_big_endian) {
+            a = s & 0xff;
+            b = (s >> 8) & 0xff;
+        } else {
+            a = (s >> 8) & 0xff;
+            b = s & 0xff;
+        }
+        if (a == 0)
+            break;
+        *op++ = a;
+        if (b == 0)
+            break;
+        *op++ = b;
+    }
+    return op - ochars;
 }
 
 const char * sg_lib_version()

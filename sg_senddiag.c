@@ -19,16 +19,14 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.28 20060314";
+static char * version_str = "0.29 20060623";
 
 #define ME "sg_senddiag: "
 
 #define MX_ALLOC_LEN (1024 * 4)
 
 
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
- * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other
- * failure */
+/* Return of 0 -> success, otherwise see sg_ll_send_diag() */
 static int do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
                        int devofl_bit, int unitofl_bit, void * outgoing_pg, 
                        int outgoing_len, int noisy, int verbose)
@@ -59,6 +57,12 @@ static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
                 (mode6 ? "6" : "10"));
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "bad field in Mode sense (%s) command\n",
+                (mode6 ? "6" : "10"));
+    else if (SG_LIB_CAT_NOT_READY == res)
+        fprintf(stderr, "Mode sense (%s) failed, device not ready\n",
+                (mode6 ? "6" : "10"));
+    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+        fprintf(stderr, "Mode sense (%s) failed, unit attention\n",
                 (mode6 ? "6" : "10"));
     return res;
 }
@@ -265,7 +269,7 @@ static void usage()
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, plen, jmp_out;
+    int sg_fd, k, num, rsp_len, plen, jmp_out, res;
     const char * file_name = 0;
     unsigned char rsp_buff[MX_ALLOC_LEN];
     int rsp_buff_size = MX_ALLOC_LEN;
@@ -283,7 +287,7 @@ int main(int argc, char * argv[])
     int read_in_len = 0;
     const char * cp;
     unsigned char read_in[MX_ALLOC_LEN];
-    int ret = 1;
+    int ret = 0;
 
     for (k = 1; k < argc; ++k) {
         cp = argv[k];
@@ -338,7 +342,7 @@ int main(int argc, char * argv[])
                     exit(0);
                 case '?':
                     usage();
-                    return 1;
+                    return 0;
                 default:
                     jmp_out = 1;
                     break;
@@ -353,7 +357,7 @@ int main(int argc, char * argv[])
                                     sizeof(read_in))) {
                     printf("Bad sequence after 'raw=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 do_raw = 1;
             } else if (0 == strncmp("s=", cp, 2)) {
@@ -361,13 +365,13 @@ int main(int argc, char * argv[])
                 if ((1 != num) || (u > 7)) {
                     printf("Bad page code after 's=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 self_test_code = u;
             } else if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == file_name)
             file_name = cp;
@@ -375,26 +379,26 @@ int main(int argc, char * argv[])
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
                     "%s\n", file_name, cp);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     
     if ((do_doff || do_uoff) && (! do_def_test)) {
         printf("setting -doff or -uoff only useful when -t is set\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((self_test_code > 0) && do_def_test) {
         printf("either set -s=<num> or -t (not both)\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (do_raw) {
         if ((self_test_code > 0) || do_def_test || do_ext_time || do_list) {
             printf("'--raw=' cannot be used with self tests, '-e' or "
                    "'-l'\n");
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         if (! do_pf)
             printf(">>> warning, '-pf' probably should be used with "
@@ -407,16 +411,17 @@ int main(int argc, char * argv[])
         }
         fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     if ((sg_fd = sg_cmds_open_device(file_name, 0 /* rw */, verbose)) < 0) {
         fprintf(stderr, ME "error opening file: %s: %s\n", file_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     if (do_ext_time) {
-        if (0 == do_modes_0a(sg_fd, rsp_buff, 32, 1, 0, verbose)) {
+        res = do_modes_0a(sg_fd, rsp_buff, 32, 1, 0, verbose);
+        if (0 == res) {
             /* Assume mode sense(10) response without block descriptors */
             num = (rsp_buff[0] << 8) + rsp_buff[1] - 6;
             if (num >= 0xc) {
@@ -428,13 +433,15 @@ int main(int argc, char * argv[])
             } else
                 printf("Extended self-test duration not available\n");
         } else {
+            ret = res;
             printf("Extended self-test duration (mode page 0xa) failed\n");
             goto err_out9;
         }
     } else if (do_list) {
         memset(rsp_buff, 0, sizeof(rsp_buff));
-        if (0 == do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4, 1,
-                             verbose)) {
+        res = do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4, 1,
+                          verbose);
+        if (0 == res) {
             if (0 == sg_ll_receive_diag(sg_fd, 0, 0, rsp_buff,
                                         rsp_buff_size, 1, verbose)) {
                 printf("Supported diagnostic pages response:\n");
@@ -449,31 +456,53 @@ int main(int argc, char * argv[])
                     }
                 }
             } else {
+                ret = res;
                 fprintf(stderr, "RECEIVE DIAGNOSTIC command failed\n");
                 goto err_out9;
             }
-        } else
+        } else {
+            ret = res;
             goto err_out;
+        }
     } else if (do_raw) {
-        if (do_senddiag(sg_fd, 0, do_pf, 0, 0, 0, read_in, read_in_len, 1,
-                        verbose))
+        res = do_senddiag(sg_fd, 0, do_pf, 0, 0, 0, read_in, read_in_len, 1,
+                          verbose);
+        if (res) {
+            ret = res;
             goto err_out;
-    } else if (0 == do_senddiag(sg_fd, self_test_code, do_pf, do_def_test,
-                                do_doff, do_uoff, NULL, 0, 1, verbose)) {
-        if ((5 == self_test_code) || (6 == self_test_code))
-            printf("Foreground self test returned GOOD status\n");
-        else if (do_def_test && (! do_doff) && (! do_uoff))
-            printf("Default self test returned GOOD status\n");
-    } else
-        goto err_out;
-    sg_cmds_close_device(sg_fd);
-    return 0;
+        }
+    } else {
+        res = do_senddiag(sg_fd, self_test_code, do_pf, do_def_test,
+                          do_doff, do_uoff, NULL, 0, 1, verbose);
+        if (0 == res) {
+            if ((5 == self_test_code) || (6 == self_test_code))
+                printf("Foreground self test returned GOOD status\n");
+            else if (do_def_test && (! do_doff) && (! do_uoff))
+                printf("Default self test returned GOOD status\n");
+        } else {
+            ret = res;
+            goto err_out;
+        }
+    }
+    res = sg_cmds_close_device(sg_fd);
+    if ((res < 0) && (0 == ret))
+        return SG_LIB_SYNTAX_ERROR;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 
 err_out:
     fprintf(stderr, "SEND DIAGNOSTIC command failed\n");
+    if (SG_LIB_CAT_UNIT_ATTENTION == res)
+        fprintf(stderr, "SEND DIAGNOSTIC RESULTS, unit attention\n");
+    else if (SG_LIB_CAT_NOT_READY == res)
+        fprintf(stderr, "SEND DIAGNOSTIC RESULTS, device not "
+                "ready\n");
+    else
+        fprintf(stderr, "SEND DIAGNOSTIC RESULTS, failed\n");
 err_out9:
     if (verbose < 2)
         fprintf(stderr, "  try again with '-vv' for more information\n");
-    sg_cmds_close_device(sg_fd);
-    return ret;
+    res = sg_cmds_close_device(sg_fd);
+    if ((res < 0) && (0 == ret))
+        return SG_LIB_FILE_ERROR;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

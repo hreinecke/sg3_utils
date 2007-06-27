@@ -46,7 +46,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.03 20060125";
+static char * version_str = "1.04 20060623";
 
 #define ME "sg_prevent: "
 
@@ -87,7 +87,7 @@ int main(int argc, char * argv[])
     int prevent = -1;
     int verbose = 0;
     char device_name[256];
-    int ret = 1;
+    int ret = 0;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -110,7 +110,7 @@ int main(int argc, char * argv[])
            prevent = sg_get_num(optarg);
            if ((prevent < 0) || (prevent > 3)) {
                 fprintf(stderr, "bad argument to '--prevent'\n");
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'v':
@@ -122,7 +122,7 @@ int main(int argc, char * argv[])
         default:
             fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
@@ -136,18 +136,18 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (allow && (prevent >= 0)) {
         fprintf(stderr, "can't give both '--allow' and '--prevent='\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (allow)
         prevent = 0;
@@ -158,11 +158,16 @@ int main(int argc, char * argv[])
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
     res = sg_ll_prevent_allow(sg_fd, prevent, 1, verbose);
+    ret = res;
     if (0 == res)
-        ret = 0;
+        ;
+    else if (SG_LIB_CAT_NOT_READY == res)
+        fprintf(stderr, "Device not ready\n");
+    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+        fprintf(stderr, "Unit attention\n");
     else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Prevent allow medium removal command not "
                 "supported\n");
@@ -174,8 +179,9 @@ int main(int argc, char * argv[])
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
-        return 1;
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
     }
-    return ret;
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

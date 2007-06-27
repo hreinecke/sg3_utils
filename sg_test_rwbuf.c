@@ -35,7 +35,7 @@
 #include "sg_io_linux.h"
 
 
-static char * version_str = "1.03 20051220";
+static char * version_str = "1.03 20060623";
 
 #define BPI (signed)(sizeof(int))
 
@@ -82,7 +82,7 @@ int find_out_about_buffer (int sg_fd)
         unsigned char rbBuff[RB_DESC_LEN];
         unsigned char sense_buffer[32];
         struct sg_io_hdr io_hdr;
-        int k;
+        int k, res;
 
         rbCmdBlk[1] = RB_MODE_DESC;
         rbCmdBlk[8] = RB_DESC_LEN;
@@ -105,10 +105,11 @@ int find_out_about_buffer (int sg_fd)
         }
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
                 perror(ME "SG_IO READ BUFFER descriptor error");
-                return 1;
+                return -1;
         }
         /* now for the error processing */
-        switch (sg_err_category3(&io_hdr)) {
+        res = sg_err_category3(&io_hdr);
+        switch (res) {
         case SG_LIB_CAT_RECOVERED:
                 sg_chk_n_print3("READ BUFFER descriptor, continuing",
                                 &io_hdr, 1);
@@ -117,7 +118,7 @@ int find_out_about_buffer (int sg_fd)
                 break;
         default: /* won't bother decoding other categories */
                 sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, 1);
-                return 1;
+                return res;
         }
     
         buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
@@ -140,6 +141,7 @@ int mymemcmp (unsigned char *bf1, unsigned char *bf2, int len)
         return 0;
 }
 
+/* return 0 if good, else 2222 */
 int do_checksum (int *buf, int len, int quiet)
 {
         int sum = base;
@@ -162,7 +164,7 @@ int do_checksum (int *buf, int len, int quiet)
                                         ((unsigned char*)buf)[i+diff]);
                         printf ("\n");
                 }
-                return 2;
+                return 2222;
         }
         else {
                 if (verbose > 1)
@@ -214,7 +216,7 @@ int read_buffer (int sg_fd, unsigned size)
         struct sg_io_hdr io_hdr;
 
         if (NULL == rbBuff)
-                return 1;
+                return -1;
         rbCmdBlk[1] = RWB_MODE_DATA;
         rbCmdBlk[6] = 0xff & (bufSize >> 16);
         rbCmdBlk[7] = 0xff & (bufSize >> 8);
@@ -240,10 +242,11 @@ int read_buffer (int sg_fd, unsigned size)
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
                 perror(ME "SG_IO READ BUFFER data error");
                 free(rbBuff);
-                return 1;
+                return -1;
         }
         /* now for the error processing */
-        switch (sg_err_category3(&io_hdr)) {
+        res = sg_err_category3(&io_hdr);
+        switch (res) {
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr, 1);
             /* fall through */
@@ -252,7 +255,7 @@ int read_buffer (int sg_fd, unsigned size)
         default: /* won't bother decoding other categories */
                 sg_chk_n_print3("READ BUFFER data error", &io_hdr, 1);
                 free(rbBuff);
-                return 1;
+                return res;
         }
 
         res = do_checksum ((int*)rbBuff, size, 0);
@@ -267,10 +270,10 @@ int write_buffer (int sg_fd, unsigned size)
         unsigned char * wbBuff = malloc(bufSize);
         unsigned char sense_buffer[32];
         struct sg_io_hdr io_hdr;
-        int k;
+        int k, res;
 
         if (NULL == wbBuff)
-                return 1;
+                return -1;
         memset(wbBuff, 0, bufSize);
         do_fill_buffer ((int*)wbBuff, size);
         wbCmdBlk[1] = RWB_MODE_DATA;
@@ -298,10 +301,11 @@ int write_buffer (int sg_fd, unsigned size)
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
                 perror(ME "SG_IO WRITE BUFFER data error");
                 free(wbBuff);
-                return 1;
+                return -1;
         }
         /* now for the error processing */
-        switch (sg_err_category3(&io_hdr)) {
+        res = sg_err_category3(&io_hdr);
+        switch (res) {
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3("WRITE BUFFER data, continuing", &io_hdr, 1);
             /* fall through */
@@ -310,10 +314,10 @@ int write_buffer (int sg_fd, unsigned size)
         default: /* won't bother decoding other categories */
                 sg_chk_n_print3("WRITE BUFFER data error", &io_hdr, 1);
                 free(wbBuff);
-                return 1;
+                return res;
         }
         free(wbBuff);
-        return 0;
+        return res;
 }
 
 void usage ()
@@ -360,7 +364,7 @@ int main (int argc, char * argv[])
         device_name[0] = '\0';
         while (1) {
                 int option_index = 0;
-                char c;
+                int c;
 
                 c = getopt_long(argc, argv, "hqr:s:t:w:vV",
                                 long_options, &option_index);
@@ -378,21 +382,21 @@ int main (int argc, char * argv[])
                         addread = sg_get_num(optarg);
                         if (-1 == addread) {
                                 fprintf(stderr, "bad argument to '--addrd'\n");
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 's':
                         size = sg_get_num(optarg);
                         if (-1 == size) {
                                 fprintf(stderr, "bad argument to '--size'\n");
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 't':
                         times = sg_get_num(optarg);
                         if (-1 == times) {
                                 fprintf(stderr, "bad argument to '--times'\n");
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'v':
@@ -406,12 +410,12 @@ int main (int argc, char * argv[])
                         addwrite = sg_get_num(optarg);
                         if (-1 == addwrite) {
                                 fprintf(stderr, "bad argument to '--addwr'\n");
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 default:
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         }
         if (optind < argc) {
@@ -428,14 +432,14 @@ int main (int argc, char * argv[])
                         if (-1 == size) {
                                 fprintf(stderr, "bad <sz>\n");
                                 usage();
-                                return 1;
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         if (++optind < argc) {
                                 addwrite = sg_get_num(argv[optind]);
                                 if (-1 == addwrite) {
                                         fprintf(stderr, "bad [addwr]\n");
                                         usage();
-                                        return 1;
+                                        return SG_LIB_SYNTAX_ERROR;
                                 }
                                 if (++optind < argc) {
                                         addread = sg_get_num(argv[optind]);
@@ -443,7 +447,7 @@ int main (int argc, char * argv[])
                                                 fprintf(stderr,
                                                         "bad [addrd]\n");
                                                 usage();
-                                                return 1;
+                                                return SG_LIB_SYNTAX_ERROR;
                                         }
                                 }
                         }
@@ -454,30 +458,29 @@ int main (int argc, char * argv[])
                                 fprintf(stderr, "Unexpected extra argument"
                                         ": %s\n", argv[optind]);
                         usage();
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                 }
         }
         if ('\0' == device_name[0]) {
                 fprintf(stderr, "no device name given\n");
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
         }
         if ((size <= 0) && (! do_quick)) {
                 fprintf(stderr, "must give '--size' or '--quick' options "
                         "or <sz> argument\n");
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
         }
    
         sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
         if (sg_fd < 0) {
                 perror("sg_test_rwbuf: open error");
-                return 1;
+                return SG_LIB_FILE_ERROR;
         }
-        if (find_out_about_buffer (sg_fd)) {
-                ret = 1;
+        ret = find_out_about_buffer(sg_fd);
+        if (ret)
                 goto err_out;
-        }
         if (do_quick) {
                 printf ("READ BUFFER read descriptor reports a buffer "
                         "of %d bytes [%d KiB]\n", buf_capacity,
@@ -487,19 +490,20 @@ int main (int argc, char * argv[])
         if (size > buf_capacity) {
                 fprintf (stderr, ME "sz=%i > buf_capacity=%i\n",
                         size, buf_capacity);
-                ret = 2;
+                ret = SG_LIB_CAT_OTHER;
                 goto err_out;
         }
         
         cmpbuf = malloc (size);
         for (k = 0; k < times; ++k) {
-                if (write_buffer (sg_fd, size)) {
-                        ret = 3;
+                ret = write_buffer (sg_fd, size);
+                if (ret) {
                         goto err_out;
                 }
-                res = read_buffer (sg_fd, size);
-                if (res) {
-                        ret = res + 4;
+                ret = read_buffer (sg_fd, size);
+                if (ret) {
+                        if (2222 == ret)
+                                ret = SG_LIB_CAT_MALFORMED;
                         goto err_out;
                 }
         }
@@ -510,11 +514,12 @@ err_out:
         res = close(sg_fd);
         if (res < 0) {
                 perror(ME "close error");
-                ret = 6;
+                if (0 == ret)
+                        ret = SG_LIB_FILE_ERROR;
         }
         if ((0 == ret) && (! do_quick))
                 printf ("Success\n");
         else if (times > 1)
                 printf ("Failed after %d succesful cycles\n", k);
-        return ret;
+        return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

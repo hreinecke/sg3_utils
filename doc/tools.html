@@ -1,0 +1,312 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title>Storage and SCSI tools</title>
+  <meta http-equiv="Content-Type"
+ content="text/html; charset=iso-8859-1">
+  <meta name="keywords" content="tool, storgae, SCSI, linux">
+  <meta name="GENERATOR"
+ content="Mozilla/4.79 [en] (X11; U; Linux 2.5.31 i686) [Netscape]">
+</head>
+<body alink="#ff0000" background="paper.jpg" bgcolor="#ffffff"
+ link="#0000ff" text="#000000" vlink="#000080">
+<center>
+<h1><a class="mozTocH1" name="mozTocId697451"></a> Tools for storage
+and SCSI<br>
+</h1>
+</center>
+<a href="#intro"></a>
+<ol id="mozToc">
+<!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6--><li><a href="#mozTocId697451">
+Tools for storage
+and SCSI </a>
+    <ol>
+      <li><a href="#mozTocId746876"> Introduction</a></li>
+      <li><a href="#mozTocId520511">blktool</a></li>
+      <li><a href="#mozTocId212850"> ddrescue</a></li>
+      <li><a href="#mozTocId264328"> devlabel</a></li>
+      <li><a href="#mozTocId668788"> dt</a></li>
+      <li><a href="#mozTocId231383">fio</a></li>
+      <li><a href="#mozTocId851510">hdparm</a></li>
+      <li><a href="#mozTocId777351">lsscsi</a></li>
+      <li><a href="#mozTocId380766"> mapscsi</a></li>
+      <li><a href="#mozTocId295637">plscsi</a></li>
+      <li><a href="#mozTocId325127">safte-monitor</a></li>
+      <li><a href="#mozTocId222172">scsiadd</a></li>
+      <li><a href="#mozTocId550034"> scsidev</a></li>
+      <li><a href="#mozTocId520455">scsi_id</a></li>
+      <li><a href="#mozTocId673853">scsiinfo</a></li>
+      <li><a href="#mozTocId108175"> scsimap</a></li>
+      <li><a href="#mozTocId974127">scsirastools</a></li>
+      <li><a href="#mozTocId348388"> scu</a></li>
+      <li><a href="#mozTocId382975">sdparm</a></li>
+      <li><a href="#mozTocId783871">SeaTools</a></li>
+      <li><a href="#mozTocId847247">sg3_utils</a></li>
+      <li><a href="#mozTocId705237">sg_utils</a></li>
+      <li><a href="#mozTocId535090">smartmontools</a></li>
+      <li><a href="#mozTocId143073"> smartsuite</a></li>
+      <li><a href="#mozTocId53551">smp_utils</a></li>
+      <li><a href="#mozTocId440267">spew</a></li>
+      <li><a href="#mozTocId708282">udev</a></li>
+      <li><a href="#mozTocId728109">Conclusion</a></li>
+    </ol>
+  </li>
+</ol>
+<h2><a class="mozTocH2" name="mozTocId746876"></a> Introduction</h2>
+The page is a resource for those looking for tools for storage devices
+with an emphasis on SCSI devices. These tools are user space prorams
+rather than kernel drivers. The entries are brief abstracts with links
+to pages that have more information. The entries are in alphabetical
+order.<br>
+<h2><a class="mozTocH2" name="mozTocId520511"></a>blktool</h2>
+This is a utility for fetching and changing parameters in the linux
+block susbsystem. It supports ATA and SCSI disks with some support for
+cd/dvd drives. See this <a
+ href="http://sourceforge.net/projects/gkernel/">site</a> . For finer
+grain control of SCSI devices (and SATA(PI) devices connected via a
+SCSI
+transport) see the <a href="#mozTocId382975">sdparm</a> utility below.<br>
+<h2><a class="mozTocH3" name="mozTocId212850"></a> ddrescue</h2>
+This is another utility from&nbsp; Kurt Garloff &lt;garloff@suse.de&gt;
+for rescuing damaged media. It is a variant of dd that will continue
+passed errors on the input file. It is applicable to any device that
+can be read by dd (e.g. IDE and SCSI disks, cds and tapes). For more
+information see: <a href="http://www.garloff.de/kurt/linux/ddrescue">www.garloff.de/kurt/linux/ddrescue</a><br>
+<br>
+There is also a GNU program of the same name that has a similar
+function. See <a href="http://ftp.gnu.org/gnu/ddrescue/">
+http://ftp.gnu.org/gnu/ddrescue/</a> . John Gilmour has some
+information on disk recovery utilities at&nbsp; <a
+ href="http://www.toad.com/gnu/sysadmin/">http://www.toad.com/gnu/sysadmin/</a>
+.<br>
+<h2><a class="mozTocH3" name="mozTocId264328"></a> devlabel</h2>
+Devlabel is "a small userspace app which maps symlinks to underlying
+disk names. It uses [INQUIRY VPD] Page83/Page80 data to track the
+true locations of disks even if their hd/sd name changes and simply
+updates the symlink to point to the right place." Sysfs support for the
+lk 2.6 series and support for multi-path configurations is on the
+author's "to do" list. See <a href="http://www.lerhaupt.com/linux.html">http://www.lerhaupt.com/linux.html</a>
+. Probably better to use scsi_id/udev in the lk 2.6 series kernels<br>
+<h2><a class="mozTocH3" name="mozTocId668788"></a> dt</h2>
+The Data Test (DT) program is modelled on dd's syntax but <b>dt </b>can
+do a lot more than sequential copies. It is a comprehensive data test
+program for SCSI devices such as disks, tapes and cdrom/dvds. It is
+available on several Unix platforms (and NT), and its source is
+available (unlike its stable mate <b>scu</b> discussed earlier).
+See&nbsp;<a class="moz-txt-link-freetext"
+ href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
+ style="font-family: monospace;"></span>www.scsifaq.org/RMiller_Tools/index.html</a>&nbsp;for
+more details. dt is written by Robin
+T. Miller &lt;Robin.Miller at netapp dot com&gt;<br>
+<h2><a class="mozTocH2" name="mozTocId231383"></a>fio</h2>
+This utility tests the performance of Linux/Unix block devices or file<span
+ style="font-family: monospace;"> </span>systems. <a
+ href="http://brick.kernel.dk/snaps/">fio</a> is a tool that will spawn
+a number of threads doing a<span style="font-family: monospace;"> </span>particular
+type of io action as specified by the user in a defined job<span
+ style="font-family: monospace;"> </span>file. <a
+ href="http://brick.kernel.dk/snaps/">fio</a> supports various types of
+io backends, such as regular sync<span style="font-family: monospace;">
+</span>io, linux aio, posix aio, and sg v3 io (SG_IO and queued
+read/write).<span style="font-family: monospace;"> </span>fio can be
+used for both performance testing, data/media verification,<span
+ style="font-family: monospace;"> </span>etc.<br>
+<h2><a class="mozTocH2" name="mozTocId851510"></a>hdparm</h2>
+This utility gets and sets ATA drive parameters under Linux. Can also
+get transport parameters for ATAPI devices. There is also limited
+support for SCSI devices. See this <a
+ href="http://sourceforge.net/projects/hdparm/">site</a> . Overlaps in
+functionality with blktool (see <a href="#mozTocId520511">above</a> ).<br>
+<h2><a class="mozTocH2" name="mozTocId777351"></a>lsscsi</h2>
+This utility lists SCSI devices (or hosts) that are present in the
+linux kernel 2.6 series. It is a passive tools in the sense that it
+"data mines" the linux sysfs file system rather than attempting to
+query devices. See <a href="../scsi/lsscsi.html">lsscsi</a>&nbsp; .<br>
+<h2><a class="mozTocH3" name="mozTocId380766"></a> mapscsi</h2>
+Michael Clark &lt;michael@metaparadigm.com&gt; describes his utility
+thus: "mapscsi is a small utility that creates a consistent mapping
+to Linux scsi devices. mapscsi achieves this by creating symbolic
+links to linux scsi disk devices after scanning all scsi disk devices,
+finding out their host, channel, id, lun, pci location (if available),
+Fibre Channel world wide node and port names, loop and port ids (with
+qla2x00 v4.46.5 driver) vendor, product and serial number details and
+using this information plus a mapping rules file containing device
+templates to dynamically create link names". For more information see: <a
+ href="http://gort.metaparadigm.com/mapscsi">http://gort.metaparadigm.com/mapscsi</a>
+. In the linux 2.6 series the scsi_id/udev pair is probably appropriate.<br>
+<h2><a class="mozTocH3" name="mozTocId295637"></a>plscsi</h2>
+This utility allows arbitrary SCSI commands to be sent to a device. See
+<a href="http://members.aol.com/plscsi">http://members.aol.com/plscsi</a>
+. It is similar to FreeBSD's camcontrol command.<br>
+<h2><a class="mozTocH3" name="mozTocId325127"></a>safte-monitor</h2>
+SAF-TE (SCSI Attached Fault-Tolerant Enclosure) is a SCSI command set
+for monitoring and controlling enclosures and RAIDs. SAF-TE devices
+report "processor" peripheral device type (0x3) in their INQUIRY
+responses. More recent products tend to use SES (drafts at
+http://www.t10.org ) which covers similar functionality. For a SAF-TE
+monitoring tool for linux see: <a
+ href="http://oss.metaparadigm.com/safte-monitor">http://oss.metaparadigm.com/safte-monitor</a>
+.<br>
+<h2><a class="mozTocH2" name="mozTocId222172"></a>scsiadd</h2>
+This utility permits a user to add and remove scsi devices from the
+Linux scsi subsystem on the
+fly. See scsiadd on this <a href="http://llg.cubic.org/tools/">page</a>
+.
+<h2><a class="mozTocH3" name="mozTocId550034"></a> scsidev</h2>
+Kurt Garloff &lt;garloff@suse.de&gt; describes this utility thus: "This
+program scans the SCSI bus and creates device nodes in /dev/scsi/,
+which have a naming corresponding to their SCSI IDs and LUNs, just
+like with devfs. (The devfs has no notion of host adapter IDs,
+scsidev is better here.) Furthermore, the devices are inquired to
+tell their names and serial numbers. Those can be compared with the
+entries in a database /etc/scsi.alias and device nodes corresponding
+to these entries are being built. So,this will even work if you change
+the SCSI IDs of a device, where the devfs approach would fail". For
+more information see: <a
+ href="http://www.garloff.de/kurt/linux/scsidev">www.garloff.de/kurt/linux/scsidev</a>
+. He also has the useful <b>rescan-scsi-bus.sh</b> script at the same
+location.<br>
+<h2><a class="mozTocH2" name="mozTocId520455"></a>scsi_id</h2>
+This utility is used by various linux 2.6 series distributions together
+udev to dynamically add and remove scsi device nodes. See <a
+ href="http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev.html">udev</a>
+'s page.<br>
+<h2><a class="mozTocH3" name="mozTocId673853"></a>scsiinfo</h2>
+Older package that includes the <span style="font-weight: bold;">scsiinfo</span>
+and <span style="font-weight: bold;">scsiformat</span> utilities plus
+tcl/tk GUI interfaces for those utilities. The last update of the <span
+ style="font-weight: bold;">scsiinfo</span> package was in 1997. The
+function and syntax of the <span style="font-weight: bold;">scsiinfo</span>
+utility have inspired <span style="font-weight: bold;">sginfo</span>
+which now can be considered as a "drop in" replacement for <span
+ style="font-weight: bold;">scsiinfo</span> . Recent changes to SCSI
+standards (e.g. extra and extended mode pages) are reflected in <span
+ style="font-weight: bold;">sginfo</span> . In a similar way the <span
+ style="font-weight: bold;">sg_format</span> utility can be thought of
+as a modern replacement for the <span style="font-weight: bold;">scsiformat</span>
+utility. <span style="font-weight: bold;">sdparm</span> can do most of
+the things that scsiinfo and sginfo can.<br>
+<h2><a class="mozTocH3" name="mozTocId108175"></a> scsimap</h2>
+Steve Cameron &lt;smcameron@yahoo.com&gt; has the following description
+at his site:
+<p>This is a utility to create and maintain symbolic links mapping a
+predictable set of names to the rather unpredictable names used by
+linux for disk devices. For example, you might map: <br>
+<tt>/dev/mydisk1 -&gt; /dev/sda1</tt> <br>
+<tt>/dev/mydisk2 -&gt; /dev/sdb1</tt> <br>
+<tt>/dev/mydisk3 -&gt; /dev/sdc1</tt> <br>
+If you removed the disk corresponding to /dev/sdb1, then on reboot,
+/dev/sdc1 will become /dev/sdb1, and /dev/sdc1 will be gone. and your
+fstab will be wrong, etc. (Especially problematic on a SAN). <b>scsimap</b>
+will maintain the mapping so that after the reboot, /dev/mydisk3 -&gt;
+will point to /dev/sdb1 and /dev/mydisk2 will be gone. scsimap also
+handles later generation Compaq array controllers (those which use
+the cciss driver.) </p>
+<p>See: <a href="http://www.geocities.com/smcameron">www.geocities.com/smcameron</a>
+.<br>
+</p>
+<h2><a class="mozTocH3" name="mozTocId974127"></a>scsirastools</h2>
+"This project includes changes that enhance the Reliability,
+Availability and Serviceability (RAS) of the drivers that are
+commonly used in a Linux software RAID-1 configuration. Other
+efforts have been made to enable various common hardware RAID
+adapters and their drivers on Linux." See <a
+ href="http://scsirastools.sourceforge.net/">http://scsirastools.sourceforge.net</a>
+. The package contains some low level scsi utilities including <b>sgdskfl</b>
+to load disk firmware, <b>sgmode</b> to get and set mode pages, <b>sgdefects</b>
+to read primary and grown defect lists and <b>sgdiag</b> to perform
+format and other test functions.
+<h2><a class="mozTocH3" name="mozTocId348388"></a> scu</h2>
+The SCSI Command Utility (SCU) implements various SCSI commands
+necessary for normal maintenance and diagnostics of SCSI
+peripherals. Some of its features include: formatting, scanning for
+(and reassigning) bad blocks, downloading new firmware, executing
+diagnostics and obtaining performance information. It is available on
+several Unix platforms (and NT), however it is only currently available
+in binary form. See&nbsp;<a class="moz-txt-link-freetext"
+ href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
+ style="font-family: monospace;"> </span>www.scsifaq.org/RMiller_Tools/index.html</a>
+for more details. scu is written by Robin
+T. Miller &lt;Robin.Miller at netapp dot com&gt;
+<h2><a class="mozTocH2" name="mozTocId382975"></a>sdparm</h2>
+This utility allows information from SCSI mode pages to be fetched and
+potentially modified. <a href="sdparm.html">sdparm</a> also decodes
+Vital Product Data pages. It was written for the Linux 2.4 and 2.6
+series and has been ported to FreeBSD and Tru64.<br>
+<h2><a class="mozTocH3" name="mozTocId783871"></a>SeaTools</h2>
+SeaTools is a freely available (binary, not source) utility for disk
+diagnostics from Seagate which is a disk manufacturer. It can be found
+at <a href="http://www.seagate.com/">http://www.seagate.com</a> under
+the support tab. They have both a command line and a graphical utility.
+&nbsp;Some of the facilities will work on any SCSI disks while others
+are Seagate specific. Self tests, mode page settings and formats (to
+different block sizes) are amongst the facilities available. Other disk
+vendors have similar tools.<br>
+<h2><a class="mozTocH2" name="mozTocId847247"></a>sg3_utils</h2>
+This is a package of utilities that send SCSI commands and decodes the
+response. It also includes slightly higher level utilities such as
+sg_dd which permits a finer level of control over SCSI devices involved
+in copies compared to the standard Unix dd command. <a
+ href="sg3_utils.html">sg3_utils</a> is written for the Linux 2.4 and
+2.6
+series and a large subset of its utilities have been ported to FreeBSD
+and Tru64 .<br>
+<h2><a class="mozTocH2" name="mozTocId705237"></a>sg_utils</h2>
+This package is the precursor of sg3_utils. <a href="uu_index.html">sg_utils</a>
+was written for the Linux 2.2 series with some support for the linux
+2.0 series.<br>
+<br>
+<h2><a class="mozTocH3" name="mozTocId535090"></a>smartmontools</h2>
+This project has taken over from the aforementioned
+smartsuite which is currently not actively maintained. See <a
+ href="http://smartmontools.sourceforge.net/">http://smartmontools.sourceforge.net</a>
+. The author is a maintainer of the SCSI component of this project.
+[The lead maintainer is Bruce Allen.]<br>
+<p> </p>
+<h2><a class="mozTocH3" name="mozTocId143073"></a> smartsuite</h2>
+This is a package that supports S.M.A.R.T. capabilities built into
+modern IDE and SCSI-3 disks. Self-Monitoring, Analysis and Reporting
+Technology (S.M.A.R.T.) is described at <a
+ href="http://www.pc.ibm.com/us/infobrf/ibsmart.html">www.pc.ibm.com/us/infobrf/ibsmart.html</a>.
+For smartsuite see <a href="http://sourceforge.net/projects/smartsuite">sourceforge.net/projects/smartsuite</a>
+.<br>
+<h2><a class="mozTocH2" name="mozTocId53551"></a>smp_utils</h2>
+This is a package of utilities that sends Serial Attached SCSI (SAS)
+Management Protocol (SMP) requests to a device (typically a SAS
+expander) and decodes the response. See the <a href="smp_utils.html">smp_utils</a>
+page.<br>
+<h2><a class="mozTocH2" name="mozTocId440267"></a>spew<span
+ style="font-weight: bold;"></span></h2>
+This utility is used to measure I/O performance of character devices,
+block devices, and regular files. It can also be used to generate high
+I/O loads to stress systems while verifying data integrity. It is easy
+to use and is flexible. No configuration files or complicated
+client/server configurations are needed. Spew also generates its own
+data patterns that are designed to make it easy to find and debug data
+integrity problems. See <a href="http://spew.berlios.de">spew.berlios.de</a>
+.
+<h2><a class="mozTocH2" name="mozTocId708282"></a>udev</h2>
+<a href="http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev.html">udev</a>
+provides a dynamic device directory containing only the files for
+actually present devices in linux 2.6 series kernels. It creates or
+removes device node files usually located in the /dev directory,
+or it renames network interfaces.<br>
+<h2><a class="mozTocH2" name="mozTocId728109"></a>Conclusion</h2>
+If readers have corrections or suggested additions to this list of
+tools, please contact the author.<br>
+<br>
+<a href="http://oss.metaparadigm.com/safte-monitor"></a><br>
+<p>Return to <a href="index.html">main</a> page.<br>
+</p>
+<div style="text-align: center;"><a
+ href="mailto:dgilbert%20at%20interlog%20dot%20com">Douglas
+Gilbert</a> can
+be emailed at this address (also at dougg at torque dot net). <br>
+</div>
+<center>
+<p>Last updated: 11th June 2006<br>
+<br>
+</p>
+</center>
+</body>
+</html>

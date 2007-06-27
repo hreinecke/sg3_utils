@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "3.75 20060106";
+static char * version_str = "3.76 20060623";
 
 #define ME "sg_readcap: "
 
@@ -63,6 +63,7 @@ int main(int argc, char * argv[])
     int pmi = 0;
     int do16 = 0;
     int verbose = 0;
+    int ret = 0;
     unsigned int last_blk_addr, block_size;
     const char * file_name = 0;
     const char * cp;
@@ -105,7 +106,7 @@ int main(int argc, char * argv[])
                 case '?':
                 case 'h':
                     usage();
-                    return 1;
+                    return 0;
                 default:
                     jmp_out = 1;
                     break;
@@ -120,7 +121,7 @@ int main(int argc, char * argv[])
                 if (1 != num) {
                     printf("Bad value after 'lba=' option\n");
                     usage();
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 llba = u;
                 if (llba > 0xfffffffeULL)
@@ -129,7 +130,7 @@ int main(int argc, char * argv[])
             } else if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == file_name)
             file_name = cp;
@@ -137,30 +138,31 @@ int main(int argc, char * argv[])
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
                     "%s\n", file_name, cp);
             usage();
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     
     if (0 == file_name) {
         fprintf(stderr, "No <device> argument given\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((0 == pmi) && (lba > 0)) {
         fprintf(stderr, ME "lba can only be non-zero when pmi is set\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     if ((sg_fd = sg_cmds_open_device(file_name, 
                                      (do16 ? 0 /* rw */ : 1), verbose)) < 0) {
         fprintf(stderr, ME "error opening file: %s: %s\n", file_name,
                 safe_strerror(-sg_fd));
-        return 1;
+        return SG_LIB_FILE_ERROR;
     }
 
     if (! do16) {
         res = sg_ll_readcap_10(sg_fd, pmi, lba, resp_buff, RCAP_REPLY_LEN,
                                0, verbose);
+        ret = res;
         if (0 == res) {
             last_blk_addr = ((resp_buff[0] << 24) | (resp_buff[1] << 16) |
                              (resp_buff[2] << 8) | resp_buff[3]);
@@ -206,13 +208,15 @@ int main(int argc, char * argv[])
                 < 0) {
                 fprintf(stderr, ME "error re-opening file: %s (rw): %s\n",
                         file_name, safe_strerror(-sg_fd));
-                return 1;
+                return SG_LIB_FILE_ERROR;
             }
             if (verbose)
                 fprintf(stderr, "READ CAPACITY (10) not supported, trying "
                         "READ CAPACITY (16)\n");
         } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
+        else if (SG_LIB_CAT_NOT_READY == res)
+            fprintf(stderr, "READ CAPACITY (10) failed, device not ready\n");
         else if (! verbose)
             fprintf(stderr, "READ CAPACITY (10) failed [res=%d], try "
                     "with '-v'\n", res);
@@ -220,6 +224,7 @@ int main(int argc, char * argv[])
     if (do16) {
         res = sg_ll_readcap_16(sg_fd, pmi, llba, resp_buff, RCAP16_REPLY_LEN,
                                0, verbose);
+        ret = res;
         if (0 == res) {
             for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
                 llast_blk_addr <<= 8;
@@ -259,6 +264,8 @@ int main(int argc, char * argv[])
         }
         else if (SG_LIB_CAT_INVALID_OP == res) 
             fprintf(stderr, "READ CAPACITY (16) not supported\n");
+        else if (SG_LIB_CAT_NOT_READY == res) 
+            fprintf(stderr, "READ CAPACITY (16) failed, device not ready\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
         else if (! verbose)
@@ -267,10 +274,13 @@ int main(int argc, char * argv[])
     }
     if (brief)
         printf("0x0 0x0\n");
-    sg_cmds_close_device(sg_fd);
-    return 1;
 
 good:
-    sg_cmds_close_device(sg_fd);
-    return 0;
+    res = sg_cmds_close_device(sg_fd);
+    if (res < 0) {
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
+    }
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

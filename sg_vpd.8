@@ -1,0 +1,97 @@
+.TH SG_VPD "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.SH NAME
+sg_vpd \- outputs information retrieved from a Vital Product Data (VPD)
+page held by a SCSI device
+.SH SYNOPSIS
+.B sg_vpd
+[\fI--enumerate\fR] [\fI--help\fR] [\fI--hex\fR] [\fI--ident\fR]
+[\fI--long\fR] [\fI--page=<vpd_page>\fR] [\fI--quiet\fR] [\fI--raw\fR]
+[\fI--verbose\fR] [\fI--version\fR] \fI<device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility fetches a Vital Product Data page and decodes it or
+outputs it in ASCII hexadecimal or binary. VPD pages are fetched
+from SCSI devices by the INQUIRY command.
+.PP
+Probably the most important page is the Device Identification
+VPD page (page number: 0x83). Since SPC-3, support for this page
+has been flagged as mandatory. This page can be fetched by
+using the '--ident' (or '-i') option.
+.PP
+When no options are given, other than a '<device>', then the "Supported
+VPD pages" (0x0) VPD page is fetched and decoded.
+.TP
+--enumerate | -e
+list the names of the known VPD pages, first the standard
+pages, then the vendor specific pages. Each group is sorted
+in abbreviation order. The '<device>' and other options
+are ignored and this utility exits after listing the VPD page
+names.
+.TP
+--help | -h
+outputs the usage message summarizing command line options
+then exits. Ignores <device> if given.
+.TP
+--hex | -H
+outputs the request VPD page in ASCII hexadecimal.
+.TP
+--ident | -i
+decode the device identification (0x83) VPD page. When used
+once this option has the same effect as '--page=di'.
+When use twice then the short form of the device identification
+VPD page's logical unit designator is decoded. In the latter
+case this option has the same effect as '--quiet --page=di_lu'.
+.TP
+--long | -l
+when decoding some VPD pages, give a little more output.
+For example the ATA Information VPD page only shows the
+signature (in hex) and the IDENTIFY (PACKET) DEVICE (in hex)
+when this option is given.
+.TP
+--page=<vpd_page> | -p <vpd_page>
+specifies the VPD page to be decoded or output. The '<vpd_page>'
+argument can either be an abbreviation, a number or a pair or
+numbers separated by a comma. The VPD page abbreviations can be
+seen by using the '--list' option. If a number is given it is
+assumed to be decimal unless it has a hexadecimal indicator which
+is either a leading '0x' or a trailing 'h'. If one number is given
+then it is assumed to be a VPD page number. If two numbers are given
+the second number indicates which vendor specific VPD page to
+decode when several pages share the same VPD page number.
+If this option is not given (nor '-i', '-l' or '-V') then the "Supported
+VPD pages" (0x0) VPD page is fetched and decoded.
+.TP
+--quiet | -q
+suppress the amount of decoding output.
+.TP
+--raw | -r
+output requested VPD page in binary. The output should be piped to a
+file or another utility when this option is used. The binary is
+sent to stdout, and errors are sent to stderr.
+.TP
+--verbose | -v
+increases the level or verbosity.
+.TP
+--version | -V
+print out version string
+.PP
+In the 2.4 series of Linux kernels the given device must be
+a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
+and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
+will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
+device names may be used as well (e.g. "/dev/st0m").
+.SH EXIT STATUS
+The exit status of sg_vpd is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2006 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq(sg3_utils), sdparm(sdparm), hdparm(hdparm)

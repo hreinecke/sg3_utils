@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
+.TH SG_PERSIST "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
 .SH NAME
 sg_persist \- use the Persistent Reserve In and Out SCSI commands
 to manipulate registrations and reservations
@@ -10,10 +10,17 @@ to manipulate registrations and reservations
 .PP
 This utility allows Persistent reservations and registrations to be
 queried and changed. Persistent reservations and registrations are
-queried by sub-commands (called "service actions" in SPC-3) of the Persistent
+queried by sub-commands (called "service actions" in SPC-4) of the Persistent
 Reserve In (PRIN) SCSI command. Persistent reservations and
 registrations are changed by sub-commands of the Persistent Reserve
 Out (PROUT) SCSI command.
+.PP
+There is a two stage process to obtain a persistent reservation. First an
+application (an I_T nexus in standard's jargon) must register a reservation
+key. If that is accepted (and it should be unless some other I_T nexus has
+registered that key) then the application can try and reserve
+the device. The reserve operation must specify the reservation
+key and a "type" (see the '--prout-type=' option).
 .PP
 It is relatively safe to query the state of Persistent reservations and
 registrations. With no options this utility defaults to the READ KEYS
@@ -22,15 +29,17 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing! The relevant sections of the
-SCSI Primary Commands document (SPC-3 most recent draft revision 21d
-dated 14th February 2005) are sections 5.6 (general information), 6.11 (for
+SCSI Primary Commands document (SPC-4 most recent draft revision 5a
+dated 14th June 2006) are sections 5.6 (general information), 6.11 (for
 PRIN) and 6.12 (for PROUT). To safeguard against accidental use,
 the '--out' option must be given when a PROUT sub-command (e.g. '--register')
 is used.
 .PP
 The older SCSI Reserve and Release commands (both 6 and 10 byte variants)
 are not supported by this utility. In SPC-3, Reserve and Release are 
-deprecated, replaced by Persistent Reservations. See a utility
+deprecated, replaced by Persistent Reservations. Reserve and Release
+have been removed from SPC-4 and Annex B is provided showing how to
+convert to persistent reservation commands. See a utility
 called 'scsires' for support of the SCSI Reserve and Release commands.
 .PP
 The <scsi_device> is required by all variants of this utility apart
@@ -38,7 +47,7 @@ from '--help' ('-h'). The <scsi_device> can be given either as an
 argument (typically but not necessarily the last one) or via
 the '--device=<scsi_device>' (or '-d <scsi_device') option.
 .PP
-SPC-3 does not use the term "sub-command". It uses the term "service action"
+SPC-4 does not use the term "sub-command". It uses the term "service action"
 for this and for part of a field's name in the parameter block associated
 with the PROUT command (i.e. "service action reservation key"). To lessen
 the potential confusion the term "sub-command" has been introduced. 
@@ -61,7 +70,7 @@ output a usage message.
 --hex | -H
 the response to a valid PRIN sub-command will be output in hexadecimal.
 Normally if the PRIN sub-command is recognised then the response
-will be decoded as per SPC-3.
+will be decoded as per SPC-4.
 .TP
 --in | -i
 specify that a Persistent Reserve In SCSI command is required. This
@@ -117,7 +126,9 @@ sub-commands. Valid arguments: 1-> write exclusive, 3->
 exclusive access, 5-> write exclusive - registrants only, 6-> 
 exclusive access - registrants only, 7-> write exclusive - all registrants,
 8-> exclusive access - all registrants. Default value is 0 (which is
-an invalid type).
+an invalid type). Each "persistent reservation type" is explained in more
+detail in a subsection of that name in the read reservation section of
+the PRIN command (section 6.11.3.4 of SPC-4 revision 5a). 
 .TP
 --read-full-status | -s
 Read Full Status is a sub-command of the PRIN command. For each registration
@@ -234,7 +245,7 @@ For example "sg_persist --read-keys /dev/sda"
 will work in the 2.6 series kernels.
 .PP
 The only scope for PROUT commands supported in the current draft of 
-SPC-3 is "LU_SCOPE". Hence there seems to be no point in offering an
+SPC-4 is "LU_SCOPE". Hence there seems to be no point in offering an
 option to set scope to another value.
 .PP
 Most errors with the PROUT sub-commands (e.g. missing or 
@@ -297,6 +308,9 @@ unregister examples above.
 An example file that is suitably formatted to pass transportIDs via
 the '-transport-id=-' option can be found in the examples sub-directory
 of the sg3_utils package. That file is called 'transport_ids.txt'.
+.SH EXIT STATUS
+The exit status of sg_persist is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"

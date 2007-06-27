@@ -17,33 +17,16 @@ sg3_utils package</h1>
 <a href="#intro"></a>
 <ol id="mozToc">
 <!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6--><li><a href="#mozTocId697451">
-The&nbsp; Linux sg3_utils package</a>
+The&nbsp; Linux
+sg3_utils package</a>
     <ol>
       <li><a href="#mozTocId746876"> Introduction</a></li>
-      <li><a href="#mozTocId764860"> Contents of sg3_utils</a></li>
+      <li><a href="#mozTocId832900"> Contents of sg3_utils</a></li>
       <li><a href="#mozTocId143590">Changing mode page
 settings</a></li>
       <li><a href="#mozTocId301018">Examples</a></li>
       <li><a href="#mozTocId585558"> Notes</a></li>
       <li><a href="#mozTocId479511"> Download</a></li>
-      <li><a href="#mozTocId185822"> Programs from other sources</a>
-        <ol>
-          <li><a href="#mozTocId348388"> scu</a></li>
-          <li><a href="#mozTocId668788"> dt</a></li>
-          <li><a href="#mozTocId673853">scsiinfo</a></li>
-          <li><a href="#mozTocId550034"> scsidev</a></li>
-          <li><a href="#mozTocId212850"> ddrescue</a></li>
-          <li><a href="#mozTocId380766"> mapscsi</a></li>
-          <li><a href="#mozTocId108175"> scsimap</a></li>
-          <li><a href="#mozTocId143073"> smartsuite</a></li>
-          <li><a href="#mozTocId535090">smartmontools</a></li>
-          <li><a href="#mozTocId974127">scsirastools</a></li>
-          <li><a href="#mozTocId783871">SeaTools</a></li>
-          <li><a href="#mozTocId264328"> devlabel</a></li>
-          <li><a href="#mozTocId295637">plscsi</a></li>
-          <li><a href="#mozTocId325127">safte-monitor</a></li>
-        </ol>
-      </li>
     </ol>
   </li>
 </ol>
@@ -59,9 +42,9 @@ examples of devices that use SCSI command sets.<br>
 <br>
 SCSI command sets are divided into a common set and several device
 class specific sets. The common set of commands is referred to as the
-SCSI Primary Commands (SPC) with SPC-3 being the most recent standard
-(or soon will be). The SCSI INQUIRY command whose support is mandatory
-for all SCSI devices is defined in SPC-3. The SCSI Block Commands (SBC)
+SCSI Primary Commands (SPC) with SPC-3 being the most recent standard.
+The mandatory SCSI INQUIRY command is defined in SPC-3. The SCSI Block
+Commands (SBC)
 cover direct access devices such as disks. The MultiMedia Commands
 (MMC) cover CD and DVD drives and the media within them. SCSI
 command sets and transport
@@ -77,16 +60,16 @@ targeted the linux kernel 2.2 series with some support for the
 2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>
 for further information about sg_utils.&nbsp; This
 document describes
-<span style="font-weight: bold;">version 1.20</span> of <span
+<span style="font-weight: bold;">version 1.21</span> of <span
  style="font-weight: bold;">sg3_utils</span> .&nbsp; A subset of these
 utilities have been ported to the FreeBSD and Tru64 operating systems.<br>
 <br>
-In the linux kernel 2.4 series most these utilities must be
+In the linux kernel 2.4 series most of these utilities must be
 used with a SCSI generic (sg) driver device name (e.g. <span
  style="font-family: monospace;">/dev/sg0</span>). In
 the lk 2.6 series almost all of these utilities can be used with the
 primary device names as well (e.g. <span
- style="font-family: monospace;">/dev/sda, /dev/sdc0, /dev/st0</span>
+ style="font-family: monospace;">/dev/sda, /dev/scd0, /dev/st0</span>
 and
 <span style="font-family: monospace;">/dev/hdd</span> (if it is an
 ATAPI device)). The SCSI generic (sg) interface
@@ -95,10 +78,11 @@ since the drivers behind primary device names have their
 own policies, may interfere with error processing and, in some cases,
 run their own
 state machines.<br>
-<p>SCSI utility programs from other sources are listed and
-briefly described in
-the final <a href="#mozTocId185822">section</a>. </p>
-<h2><a class="mozTocH2" name="mozTocId764860"></a> Contents of sg3_utils</h2>
+<p>A list of SCSI and storage utility programs that was at the bottom
+of this page has been moved to the <a href="tools.html">tools</a> page.<span
+ style="font-weight: bold;"><br>
+</span></p>
+<h2><a class="mozTocH2" name="mozTocId832900"></a> Contents of sg3_utils</h2>
 Here is a listing in alphabetical order of the utilities in the
 sg3_utils package:<br>
 <br>
@@ -198,6 +182,19 @@ SCSI_IOCTL_SEND_COMMAND ioctl<br>
 time; now in own package, see <a href="sdparm.html">sdparm</a> .
 sdparm manipulates mode pages, reads VPD pages and sends simple
 commands.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_chk_asc<br>
+      </td>
+      <td style="vertical-align: top;">-<br>
+      </td>
+      <td style="vertical-align: top;">utils<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">check asc/ascq codes from
+www.t10.org page against sg3_utils table<br>
       </td>
     </tr>
     <tr>
@@ -329,7 +326,8 @@ to the device.<br>
       <td style="vertical-align: top;">fb,t64 </td>
       <td style="vertical-align: top;">fetch standard response, VPD
 pages (including device identification) or version descriptors. Also
-can perform IDENTIFY (PACKET) DEVICE ATA command.<br>
+can perform IDENTIFY (PACKET) DEVICE ATA command. VPD page decoding now
+also performed by sg_vpd .<br>
       </td>
     </tr>
     <tr>
@@ -448,6 +446,18 @@ Typically for testing the SCSI transport (for throughput or errors)<br>
       </td>
     </tr>
     <tr>
+      <td style="vertical-align: top;">sg_rdac<br>
+      </td>
+      <td style="vertical-align: top;">MODE SENSE/SELECT<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fb,t64</td>
+      <td style="vertical-align: top;">display or modify RDAC redundant
+controller mode page<br>
+      </td>
+    </tr>
+    <tr>
       <td style="vertical-align: top;">sg_read<br>
       </td>
       <td style="vertical-align: top;">READ<br>
@@ -548,6 +558,20 @@ outputs it in hex (default) or binary.<br>
       <td style="vertical-align: top;">Specialized for multi-ported
 SCSI devices where one port (or a group of them) is preferred for IO
 over another (or others).<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_sat_identify<br>
+      </td>
+      <td style="vertical-align: top;">ATA PASS THROUGH<br>
+      </td>
+      <td style="vertical-align: top;">examples<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Sends IDENTIFY (PACKET) DEVICE
+ATA command via the SAT ATA PASS THROUGH SCSI command. Also
+sg_sat_chk_power and sg_sat_smart_rd_data .<br>
       </td>
     </tr>
     <tr>
@@ -679,6 +703,19 @@ disks, stops on the first error found. Does not yield any data. Useful
 for media scans.</td>
     </tr>
     <tr>
+      <td style="vertical-align: top;">sg_vpd<br>
+      </td>
+      <td style="vertical-align: top;">INQUIRY<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fb,t64<br>
+      </td>
+      <td style="vertical-align: top;">Decodes standard and some vendor
+Vital Product Data (VPD) pages.<br>
+      </td>
+    </tr>
+    <tr>
       <td style="vertical-align: top;">sg_write_long<br>
       </td>
       <td style="vertical-align: top;">WRITE LONG<br>
@@ -714,9 +751,11 @@ commands" column. For example many utilities issue a SCSI INQUIRY
 command to find out the peripheral device type of the given SCSI
 device. Some SCSI commands listed above are only relevant to a specific
 device type (e.g. FORMAT UNIT) and should not be sent to a device
-belonging to other peripheral device types (and in some cases the logic
-blocks inappropriate attempts). See the COVERAGE file in the main
-directory of the tarball for a more exhaustive list of SCSI commands
+belonging to other peripheral device types (and in some cases these
+utilities will
+block inappropriate attempts). See the COVERAGE file in the main
+directory of the tarball for a more exhaustive list of SCSI (and ATA)
+commands
 issued by the sg3_utils utilities.<br>
 <br>
 If the "subdirectory"
@@ -727,14 +766,14 @@ directory have "man" pages and some in the subdirectories have "man"
 pages. <br>
 <br>
 If the "Ported" column is empty then the utility is only found in
-linux. At this time the other ports are to FreeBSD, indicated by "fb"
-in the "ported" column, and to Tru64, indicated by "t64" in the
-"ported" column. See the README.freebsd and the README.tru64 files
+Linux. At this time the other ports are to FreeBSD, indicated by "fb"
+in the "Ported" column, and to Tru64, indicated by "t64" in the
+"Ported" column. See the README.freebsd and the README.tru64 files
 for more information.<br>
 <br>
 In the above table all utilities in the main directory except sgp_dd
 issue SG_IO ioctls when they want to send SCSI commands to the given
-device. The sgp_dd utility will only issue SCSI commands using the sg
+device. The sgp_dd utility issues SCSI commands using the sg
 driver's asynchronous ( write()/read() ) interface to device nodes that
 have the sg driver's major device number (i.e. "char" major 21). This
 means that all utilities in the main directory are "safe" with any
@@ -752,9 +791,68 @@ For example invoking a "sg_format -F" utility on a disk with mounted
 file
 systems on it is going to cause damage.<br>
 <br>
-These command line utilities exit with process status 0 when
-successful. In most cases if an error is detected the process exits
-with a status value of 1 .<br>
+Each process containing one of these command line utilities completes
+with an exit status 0 when
+successful. Prior to version 1.21 all errors yielded an exit status of
+1. From version 1.21 the exit status is one of:<br>
+<ul>
+  <li><span style="font-weight: bold;">1</span>&nbsp;&nbsp; syntax
+error in command line options or their arguments, or an illegal
+combination of options.</li>
+  <li><span style="font-weight: bold;">2</span>&nbsp;&nbsp; the device
+reports that it is not ready for the operation requested. The device
+may be in the process of becoming ready (e.g. spinning up but not at
+speed) so the utility may work a little while later.</li>
+  <li><span style="font-weight: bold;">3</span>&nbsp;&nbsp; the device
+reports a medium or hardware error (or a blank check). For example an
+attempt to read a corrupted block on a disk will yield this value. <br>
+  </li>
+  <li><span style="font-weight: bold;">5</span>&nbsp;&nbsp; the device
+reports an "illegal request" with an additional sense code other than
+"invalid operation code". This is often a supported command with a
+field set requesting an unsupported capability. For commands that
+require a "service action" field (e.g. READ CAPACITY(16) ) this value
+can indicate that the
+command is not supported.</li>
+  <li><span style="font-weight: bold;">6</span>&nbsp;&nbsp; the device
+reports a "unit attention" condition. This usually indicates that
+something unrelated to the requested command has occurred (e.g. a
+device reset) potentially before the current SCSI command was sent. The
+requested command has not been executed by the device. Note that unit
+attention conditions are usually only reported once by a device.</li>
+  <li><span style="font-weight: bold;">9</span>&nbsp;&nbsp; the device
+reports an illegal request with an additional sense code of "invalid
+operation code" which means that it doesn't support the requested
+command.</li>
+  <li><span style="font-weight: bold;">10</span>&nbsp;&nbsp; the
+&lt;scsi_device&gt; reports it has a check condition but "no sense".
+Some polling commands (e.g. REQUEST SENSE) can react this way. It is
+unlikely that this value will occur as an exit status.</li>
+  <li><span style="font-weight: bold;">11</span>&nbsp;&nbsp; the device
+reports a "recovered error". The requested command was successful. Most
+likely a utility will report a recovered error to stderr and continue,
+probably leaving the utility with an exit status of 0 .</li>
+  <li><span style="font-weight: bold;">15</span> &nbsp; the utility is
+unable to open, close or use the given device. The given file name
+could be incorrect or there may be permission problems. Adding the '-v'
+option may give more information.</li>
+  <li><span style="font-weight: bold;">33</span>&nbsp;&nbsp; the
+command sent to the device has timed out.</li>
+  <li><span style="font-weight: bold;">97</span>&nbsp;&nbsp; the
+response to a SCSI command failed sanity checks.</li>
+  <li><span style="font-weight: bold;">98</span>&nbsp;&nbsp; the device
+reports it has a check condition but the error doesn't fit into any of
+the above categories.</li>
+  <li><span style="font-weight: bold;">99</span>&nbsp;&nbsp; any errors
+that can't be categorized into values 1 to 98 may yield this value.
+This includes transport and operating system errors.<br>
+  </li>
+</ul>
+Many of the above exit statuses will be repeatable so executing the
+utility again with one or more '-v' options may yield more information.
+Unit attentions (exit status 6) are only reported once per condition.
+Notice that some of the lower exit status values correspond to the SCSI
+sense key values that they correspond to.<br>
 <h2><a class="mozTocH2" name="mozTocId143590"></a>Changing mode page
 settings</h2>
 SCSI devices store settings (metadata) that could possibly be changed
@@ -923,6 +1021,47 @@ Peripheral device type: disk]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;
 0x83&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Device identification</span><br>
 <br>
+For displaying VPD pages, sg_vpd (or sdparm) may be a better choice
+than sg_inq as sg_vpd has a simpler, less cluttered command line
+interface and additional support for vendor specific VPD pages.<br>
+<br>
+<span style="font-family: monospace;"># sg_vpd /dev/sdh</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Supported VPD pages VPD page:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Supported VPD pages [sv]</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Unit serial number [sn]</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Implemented operating
+definition (obs) [iod]</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Device identification [di]</span><br>
+<br>
+The following displays a subset of the device identification VPD page,
+namely the designators for the target port:<br>
+<br>
+<span style="font-family: monospace;"># sg_vpd --page=di_port /dev/sdh</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Device Identification VPD page:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Target port:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; desig_type:
+NAA,&nbsp; code_set: Binary</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;
+transport: Serial Attached SCSI (SAS)</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0x5000c500005208ee</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; desig_type:
+Relative target port,&nbsp; code_set: Binary</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;
+transport: Serial Attached SCSI (SAS)</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Relative target port: 0x2</span><br>
+<br>
 The sg_scan and sg_map utilities show the relationships between sg
 devices and their &lt;bus, channel, target, lun&gt; tuples and their
 primary device node names:<br>
@@ -1023,167 +1162,19 @@ devices and support the SG_IO ioctl from lk 2.6.6 onwards.<br>
 each package. </p>
 <h2><a class="mozTocH2" name="mozTocId479511"></a> Download</h2>
 Various tarballs that include the source, a README, CHANGELOG, INSTALL
-and a Makefile can be found in the <span
- style="text-decoration: underline;">table 2</span> on the main
-page (link at the bottom of this page). There are also source,
+and a Makefile can be found in the <a
+ href="http://www.torque.net/sg/index.html#mozTocId566194"><span
+ style="text-decoration: underline;">table 2</span></a> on the <a
+ href="index.html">main</a>
+page. There are also source,
 i386 binary rpm and deb packages available. Both sg3_utils and the
 older sg_utils packages can
-be found on http://freshmeat.net .
-<h2><a class="mozTocH2" name="mozTocId185822"></a> Programs from other
-sources</h2>
-<h3><a class="mozTocH3" name="mozTocId348388"></a> scu</h3>
-The SCSI Command Utility (SCU) implements various SCSI commands
-necessary for normal maintenance and diagnostics of SCSI
-peripherals. Some of its features include: formatting, scanning for
-(and reassigning) bad blocks, downloading new firmware, executing
-diagnostics and obtaining performance information. It is available on
-several Unix platforms (and NT), however it is only currently available
-in binary form. See&nbsp;<a class="moz-txt-link-freetext"
- href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
- style="font-family: monospace;"> </span>www.scsifaq.org/RMiller_Tools/index.html</a>
-for more details.
-<h3><a class="mozTocH3" name="mozTocId668788"></a> dt</h3>
-The Data Test (DT) program is modelled on dd's syntax but <b>dt </b>can
-do a lot more than sequential copies. It is a comprehensive data test
-program for SCSI devices such as disks, tapes and cdrom/dvds. It is
-available on several Unix platforms (and NT), and its source is
-available (unlike its stable mate <b>scu</b> discussed earlier).
-See&nbsp;<a class="moz-txt-link-freetext"
- href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
- style="font-family: monospace;"></span>www.scsifaq.org/RMiller_Tools/index.html</a>&nbsp;for
-more details. Both <b>scu</b> and <b>dt </b>are written by Robin
-T. Miller &lt;Robin.Miller at netapp dot com&gt;<br>
-<h3><a class="mozTocH3" name="mozTocId673853"></a>scsiinfo</h3>
-Older package that includes the <span style="font-weight: bold;">scsiinfo</span>
-and <span style="font-weight: bold;">scsiformat</span> utilities plus
-tcl/tk GUI interfaces for those utilities. The last update of the <span
- style="font-weight: bold;">scsiinfo</span> package was in 1997. The
-function and syntax of the <span style="font-weight: bold;">scsiinfo</span>
-utility have inspired <span style="font-weight: bold;">sginfo</span>
-which now can be considered as a "drop in" replacement for <span
- style="font-weight: bold;">scsiinfo</span> . Recent changes to SCSI
-standards (e.g. extra and extended mode pages) are reflected in <span
- style="font-weight: bold;">sginfo</span> . In a similar way the <span
- style="font-weight: bold;">sg_format</span> utility can be thought of
-as a modern replacement for the <span style="font-weight: bold;">scsiformat</span>
-utility.<br>
-<h3><a class="mozTocH3" name="mozTocId550034"></a> scsidev</h3>
-Kurt Garloff &lt;garloff@suse.de&gt; describes this utility thus: "This
-program scans the SCSI bus and creates device nodes in /dev/scsi/,
-which have a naming corresponding to their SCSI IDs and LUNs, just
-like with devfs. (The devfs has no notion of host adapter IDs,
-scsidev is better here.) Furthermore, the devices are inquired to
-tell their names and serial numbers. Those can be compared with the
-entries in a database /etc/scsi.alias and device nodes corresponding
-to these entries are being built. So,this will even work if you change
-the SCSI IDs of a device, where the devfs approach would fail". For
-more information see: <a
- href="http://www.garloff.de/kurt/linux/scsidev">www.garloff.de/kurt/linux/scsidev</a>
-. He also has the useful <b>rescan-scsi-bus.sh</b> script at the same
-location.
-<h3><a class="mozTocH3" name="mozTocId212850"></a> ddrescue</h3>
-This is another utility from&nbsp; Kurt Garloff &lt;garloff@suse.de&gt;
-for rescuing damaged media. It is a variant of dd that will continue
-passed errors on the input file. It is applicable to any device that
-can be read by dd (e.g. IDE and SCSI disks, cds and tapes). For more
-information see: <a href="http://www.garloff.de/kurt/linux/ddrescue">www.garloff.de/kurt/linux/ddrescue</a><br>
-<br>
-There is also a GNU program of the same name that has a similar
-function. See <a href="http://ftp.gnu.org/gnu/ddrescue/">
-http://ftp.gnu.org/gnu/ddrescue/</a> . John Gilmour has some
-information on disk recovery utilities at&nbsp; <a
- href="http://www.toad.com/gnu/sysadmin/">http://www.toad.com/gnu/sysadmin/</a>
-.<br>
-<h3><a class="mozTocH3" name="mozTocId380766"></a> mapscsi</h3>
-Michael Clark &lt;michael@metaparadigm.com&gt; describes his utility
-thus: "mapscsi is a small utility that creates a consistent mapping
-to Linux scsi devices. mapscsi achieves this by creating symbolic
-links to linux scsi disk devices after scanning all scsi disk devices,
-finding out their host, channel, id, lun, pci location (if available),
-Fibre Channel world wide node and port names, loop and port ids (with
-qla2x00 v4.46.5 driver) vendor, product and serial number details and
-using this information plus a mapping rules file containing device
-templates to dynamically create link names". For more information see: <a
- href="http://gort.metaparadigm.com/mapscsi">http://gort.metaparadigm.com/mapscsi</a>
-.
-<h3><a class="mozTocH3" name="mozTocId108175"></a> scsimap</h3>
-Steve Cameron &lt;smcameron@yahoo.com&gt; has the following description
-at his site:
-<p>This is a utility to create and maintain symbolic links mapping a
-predictable set of names to the rather unpredictable names used by
-linux for disk devices. For example, you might map: <br>
-<tt>/dev/mydisk1 -&gt; /dev/sda1</tt> <br>
-<tt>/dev/mydisk2 -&gt; /dev/sdb1</tt> <br>
-<tt>/dev/mydisk3 -&gt; /dev/sdc1</tt> <br>
-If you removed the disk corresponding to /dev/sdb1, then on reboot,
-/dev/sdc1 will become /dev/sdb1, and /dev/sdc1 will be gone. and your
-fstab will be wrong, etc. (Especially problematic on a SAN). <b>scsimap</b>
-will maintain the mapping so that after the reboot, /dev/mydisk3 -&gt;
-will point to /dev/sdb1 and /dev/mydisk2 will be gone. scsimap also
-handles later generation Compaq array controllers (those which use
-the cciss driver.) </p>
-<p>See: <a href="http://www.geocities.com/smcameron">www.geocities.com/smcameron</a>
-. </p>
-<h3><a class="mozTocH3" name="mozTocId143073"></a> smartsuite</h3>
-This is a package that supports S.M.A.R.T. capabilities built into
-modern IDE and SCSI-3 disks. Self-Monitoring, Analysis and Reporting
-Technology (S.M.A.R.T.) is described at <a
- href="http://www.pc.ibm.com/us/infobrf/ibsmart.html">www.pc.ibm.com/us/infobrf/ibsmart.html</a>.
-For smartsuite see <a href="http://sourceforge.net/projects/smartsuite">sourceforge.net/projects/smartsuite</a>
-. <br>
-<br>
-<h3><a class="mozTocH3" name="mozTocId535090"></a>smartmontools</h3>
-This project has taken over from the aforementioned
-smartsuite which is currently not actively maintained. See <a
- href="http://smartmontools.sourceforge.net">http://smartmontools.sourceforge.net</a>
-. The author is a maintainer of the SCSI component of this project.
-[The lead maintainer is Bruce Allen.]<br>
-<br>
-<h3><a class="mozTocH3" name="mozTocId974127"></a>scsirastools</h3>
-"This project includes changes that enhance the Reliability,
-Availability and Serviceability (RAS) of the drivers that are
-commonly used in a Linux software RAID-1 configuration. Other
-efforts have been made to enable various common hardware RAID
-adapters and their drivers on Linux." See <a
- href="http://scsirastools.sourceforge.net">http://scsirastools.sourceforge.net</a>
-. The package contains some low level scsi utilities including <b>sgdskfl</b>
-to load disk firmware, <b>sgmode</b> to get and set mode pages, <b>sgdefects</b>
-to read primary and grown defect lists and <b>sgdiag</b> to perform
-format and other test functions.<br>
-&nbsp;<br>
-<h3><a class="mozTocH3" name="mozTocId783871"></a>SeaTools</h3>
-SeaTools is a freely available (binary, not source) utility for disk
-diagnostics from Seagate which is a disk manufacturer. It can be found
-at <a href="http://www.seagate.com">http://www.seagate.com</a> under
-the support tab. They have both a command line and a graphical utility.
-&nbsp;Some of the facilities will work on any SCSI disks while others
-are Seagate specific. Self tests, mode page settings and formats (to
-different block sizes) are amongst the facilities available.<br>
-<h3><a class="mozTocH3" name="mozTocId264328"></a> devlabel</h3>
-Devlabel is "a small userspace app which maps symlinks to underlying
-disk names. It uses [INQUIRY VPD] Page83/Page80 data to track the
-true locations of disks even if their hd/sd name changes and simply
-updates the symlink to point to the right place." Sysfs support for the
-lk 2.6 series and support for multi-path configurations is on the
-author's "to do" list. See <a href="http://www.lerhaupt.com/linux.html">http://www.lerhaupt.com/linux.html</a>
-.<br>
-<br>
-<h3><a class="mozTocH3" name="mozTocId295637"></a>plscsi</h3>
-This utility allows arbitrary SCSI commands to be sent to a device. See
-<a href="http://members.aol.com/plscsi">http://members.aol.com/plscsi</a>
-. It is similar to FreeBSD's camcontrol command.<br>
-<h3><a class="mozTocH3" name="mozTocId325127"></a>safte-monitor</h3>
-SAF-TE (SCSI Attached Fault-Tolerant Enclosure) is a SCSI command set
-for monitoring and controlling enclosures and RAIDs. SAF-TE devices
-report "processor" peripheral device type (0x3) in their INQUIRY
-responses. More recent products tend to use SES (drafts at
-http://www.t10.org ) which covers similar functionality. For a SAF-TE
-monitoring tool for linux see: <a
- href="http://oss.metaparadigm.com/safte-monitor">http://oss.metaparadigm.com/safte-monitor</a><br>
+be found on http://freshmeat.net .<a
+ href="http://oss.metaparadigm.com/safte-monitor"></a><br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 11th April 2006<br>
+<p>Last updated: 6th July 2006<br>
 <br>
 </p>
 </center>

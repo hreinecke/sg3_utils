@@ -1,21 +1,21 @@
-%define	name	sg3_utils
-%define	version	1.20
-%define	release	1
+%define name    sg3_utils
+%define version 1.21
+%define release 1
 
-%define	major	1
-%define	minor	0
-%define libname	%{_lib}sgutils-%{major}_%{minor}
+%define major   1
+%define minor   0
+%define libname %{_lib}sgutils-%{major}_%{minor}
 
-Summary:	Utilities for SCSI devices in Linux
-Name:		%{name}
-Version:	%{version}
-Release:	%{release}
-License:	GPL/FreeBSD
-Group:		Utilities/System
-URL:		http://www.torque.net/sg/u_index.html
-Source0:	http://www.torque.net/sg/p/%{name}-%{version}.tgz
-BuildRoot:	%{_tmppath}/%{name}-%{version}-root
-Packager:	Douglas Gilbert <dgilbert at interlog dot com>
+Summary:        Utilities for SCSI devices in Linux
+Name:           %{name}
+Version:        %{version}
+Release:        %{release}
+License:        GPL/FreeBSD
+Group:          Utilities/System
+URL:            http://www.torque.net/sg/sg3_utils.html
+Source0:        http://www.torque.net/sg/p/%{name}-%{version}.tgz
+BuildRoot:      %{_tmppath}/%{name}-%{version}-root
+Packager:       Douglas Gilbert <dgilbert at interlog dot com>
 
 %description
 Collection of Linux utilities for devices that use the SCSI command set.
@@ -31,22 +31,22 @@ well (e.g. /dev/sda).
 Warning: Some of these tools access the internals of your system
 and the incorrect usage of them may render your system inoperable.
 
-%package -n	%{libname}
-Summary:	Shared library for %{name}
+%package -n     %{libname}
+Summary:        Shared library for %{name}
 Group:          System/Libraries
 
-%description -n	%{libname}
+%description -n %{libname}
 This package contains the shared library for %{name}.
 
-%package -n	%{libname}-devel
-Summary:	Static library and header files for the sgutils library
-Group:		Development/C
-Obsoletes:	%{name}-devel
-Provides:	%{name}-devel
-Provides:	libsgutils-devel
-Requires:	%{libname} = %{version}-%{release}
+%package -n     %{libname}-devel
+Summary:        Static library and header files for the sgutils library
+Group:          Development/C
+Obsoletes:      %{name}-devel
+Provides:       %{name}-devel
+Provides:       libsgutils-devel
+Requires:       %{libname} = %{version}-%{release}
 
-%description -n	%{libname}-devel
+%description -n %{libname}-devel
 This package contains the static sgutils library and its header
 files.
 
@@ -64,12 +64,12 @@ make \
 [ "%{buildroot}" != "/" ] && rm -rf %{buildroot}
 
 make install \
- 	PREFIX=%{_prefix} \
- 	LIBDIR=%{buildroot}/%{_libdir} \
- 	INSTDIR=%{buildroot}/%{_bindir} \
- 	MANDIR=%{buildroot}/%{_mandir} \
-	INCLUDEDIR=%{buildroot}/%{_includedir} \
-	LIB_VINFO=1:0:0
+        PREFIX=%{_prefix} \
+        LIBDIR=%{buildroot}/%{_libdir} \
+        INSTDIR=%{buildroot}/%{_bindir} \
+        MANDIR=%{buildroot}/%{_mandir} \
+        INCLUDEDIR=%{buildroot}/%{_includedir} \
+        LIB_VINFO=1:0:0
 
 %post -n %{libname} -p /sbin/ldconfig
 
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Thu Jul 06 2006 - dgilbert at interlog dot com
+- add sg_vpd and sg_rdac, uniform exit statuses
+  * sg3_utils-1.21
+
 * Tue Apr 18 2006 - dgilbert at interlog dot com
 - sg_logs: sas port specific page decoding, sg*_dd updates
   * sg3_utils-1.20
