@@ -3,7 +3,7 @@
 
 /* Feel free to copy and modify this GPL-ed code into your applications. */
 
-/* Version 0.84 (20010115) 
+/* Version 0.87 (20020616) 
 	- all output now sent to stderr rather thatn stdout
 	- remove header files included in this file
 */
@@ -14,6 +14,22 @@
    reach the user. They are placed here for completeness. What appears
    here is copied from drivers/scsi/scsi.h which is not visible in
    the user space. */
+
+#ifndef SCSI_CHECK_CONDITION
+/* Following are the "true" SCSI status codes. Linux has traditionally
+   used a 1 bit right and masked version of these. So now CHECK_CONDITION
+   and friends (in <scsi/scsi.h>) are deprecated. */
+#define SCSI_CHECK_CONDITION 0x2
+#define SCSI_CONDITION_MET 0x4
+#define SCSI_BUSY 0x8
+#define SCSI_IMMEDIATE 0x10
+#define SCSI_IMMEDIATE_CONDITION_MET 0x14
+#define SCSI_RESERVATION_CONFLICT 0x18
+#define SCSI_COMMAND_TERMINATED 0x22
+#define SCSI_TASK_SET_FULL 0x28
+#define SCSI_ACA_ACTIVE 0x30
+#define SCSI_TASK_ABORTED 0x40
+#endif
 
 /* The following are 'host_status' codes */
 #ifndef DID_OK
@@ -102,6 +118,7 @@ extern void sg_print_command(const unsigned char * command);
 extern void sg_print_sense(const char * leadin,
                            const unsigned char * sense_buffer, int sb_len);
 extern void sg_print_status(int masked_status);
+extern void sg_print_scsi_status(int scsi_status);
 extern void sg_print_host_status(int host_status);
 extern void sg_print_driver_status(int driver_status);
 
@@ -130,11 +147,18 @@ extern int sg_err_category(int masked_status, int host_status,
                int driver_status, const unsigned char * sense_buffer,
                int sb_len);
 
+extern int sg_err_category_new(int scsi_status, int host_status,
+               int driver_status, const unsigned char * sense_buffer,
+               int sb_len);
+
 /* The following function declaration is for the sg version 3 driver. 
    Only version 3 sg_err.c defines it. */
 extern int sg_err_category3(struct sg_io_hdr * hp);
 
 /* Returns length of SCSI command given the opcode (first byte) */
-int sg_get_command_size(unsigned char opcode);
+extern int sg_get_command_size(unsigned char opcode);
+
+extern void sg_get_command_name(unsigned char opcode, int buff_len, 
+				char * buff);
 
 #endif

@@ -48,7 +48,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "0.55 20020509";
+static char * version_str = "0.54 20020223";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -217,16 +217,16 @@ void usage()
     fprintf(stderr, "Usage: "
            "sgq_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>] "
            "[bs=<num>]\n"
-           "            [bpt=<num>] [count=<n>] [dio=0|1] [thr=<n>] "
-	   "[coe=0|1] [gen=<n>]\n"
-           "            [time=0|1] [deb=<n>] [--version]\n"
+           "            [bpt=<num>] [count=<n>] [dio=<n>] [thr=<n>] "
+	   "[coe=<n>] [gen=<n>]\n"
+           "            [dio=<n>] [thr=<n>] [coe=<n>] [gen=<n>] "
+           "[deb=<n>] [--version]\n"
            "         usually either 'if' or 'of' is a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
            " 'thr' is number of queues, must be > 0, default 4, max 32\n");
     fprintf(stderr, " 'coe' continue on sg error, 0->exit (def), "
     	   "1->zero + continue\n"
-	   " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
            " 'gen' 0-> 1 file is special(def), 1-> any files allowed\n"
            " 'deb' is debug, 0->none (def), > 0->varying degrees of debug\n");
 }
@@ -475,8 +475,8 @@ int sg_start_io(Rq_elem * rep)
         fprintf(stderr, "sg_start_io: SCSI %s, blk=%d num_blks=%d\n",
                rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
         sg_print_command(hp->cmdp);
-        fprintf(stderr, " len=%d, dxfrp=%p, cmd_len=%d\n",
-                hp->dxfer_len, hp->dxferp, hp->cmd_len);
+        fprintf(stderr, "dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n",
+                hp->dxfer_direction, hp->dxfer_len, hp->dxferp, hp->cmd_len);
     }
 
     while (((res = write(rep->wr ? rep->outfd : rep->infd, hp,
@@ -549,8 +549,7 @@ int sg_finish_io(int wr, Rq_elem * rep)
         rep->dio_incomplete = 0;
     rep->resid = hp->resid;
     if (rep->debug > 8)
-        fprintf(stderr, "sg_finish_io: completed %s, blk=%d\n", 
-		wr ? "WRITE" : "READ", rep->blk);
+        fprintf(stderr, "sg_finish_io: completed %s\n", wr ? "WRITE" : "READ");
     return 0;
 }
 
@@ -692,13 +691,6 @@ int decider(Rq_coll * clp, int first_xfer, int * req_indexp)
 	    *req_indexp = lowest_blk_index;
 	return QS_IN_FINISHED;
     }
-#if 0
-    if (try_poll) {
-	res = do_poll(clp, 2, req_indexp);
-	if (0 != res)
-	    return res;
-    }
-#endif
     if (req_indexp)
     	*req_indexp = first_idle_index;
     return QS_IDLE;
@@ -1021,8 +1013,7 @@ int main(int argc, char * argv[])
 	case QS_IDLE:
 	    if ((NULL == rep) || (rcoll.in_count <= 0)) {
 	    	/* usleep(1000); */
-		/* do_poll(&rcoll, 10, NULL); */
-		/* do_poll(&rcoll, 0, NULL); */
+		do_poll(&rcoll, 10, NULL);
 		break;
 	    }
 	    if (rcoll.debug > 8)
@@ -1065,10 +1056,7 @@ int main(int argc, char * argv[])
 				"req_index=%d\n", req_index);
 	    if ((rep->blk + seek_skip) != rcoll.out_blk) {
 		/* if write would be out of sequence then wait */
-		if (rcoll.debug > 4)
-		    fprintf(stderr, "    sgq_dd: QS_IN_FINISHED, "
-			    "out of sequence\n");
-		usleep(200);
+		usleep(1000);
 		break;
 	    }
             rep->wr = 1;
