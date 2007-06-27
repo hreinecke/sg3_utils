@@ -2,6 +2,28 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.12 [20050121]
+  - sg_wr_mode: new utility to modify (i.e. write to) mode pages
+  - sg_reassign: new utility: issues Reassign Blocks command
+  - sg_rtpg: new utility: issues Report Target Port Groups command
+             [Christophe Varoqui]
+  - ATA IDENTIFY command misspelt as "IDENTITY" in several places
+  - sginfo: tweak SAS mode pages to match sas 1.1 rev 07
+        - add NV_DIS bit to disk caching mode page
+  - sg_map: open /dev/nst* rather than /dev/st* (to stop spurious rewinds)
+  - sg_lib: ATA return sense descriptor
+        - add sg_get_sense_info_fld() to fetch info field from sense data
+        - fix bug in sg_scsi_sense_desc_find()
+	- add sense key specific decoding for fixed format sense data
+  - sg_modes: extend '-p' option to allow '-p=<page_code>,<subpage_code>'
+        - add '-A' option to output all mode pages and subpages
+        - extend '-l' option to show subpages, selected command set pages
+  - sg_inq: fix LUN WWN output in unit path report VPD page (emc)
+	    [Hergen Lange]
+  - sg_get_config: some additions for DVD-R dual layer
+  - sg_modes: show write protect (WP) and DpoFua flags for disks
+  - sg_cmds: add llbaa argument to sg_ll_mode_sense10()
+
 Changelog for sg3_utils-1.11 [20041126]
   - sg_sync: new utility: invokes the synchronize cache command
   - sg_prevent: new utility: invokes the prevent allow medium removal command
@@ -88,7 +110,7 @@ Changelog for sg3_utils-1.07 [20040708]
   - add sg_opcodes utility to list supported operation codes
   - add sg_persist utility to support persistent reservations
   - add '-i' option to sg_inq to decode device identification VPD page (0x83)
-  - sg_inq tries an ATA IDENTITY if SCSI INQUIRY fails
+  - sg_inq tries an ATA IDENTIFY if SCSI INQUIRY fails
   - sg_dd, sgm_dd and sgp_dd calculate block device sizes (if count not given)
   - drop SG_GET_VERSION_NUM ioctl guard in most utilities
 

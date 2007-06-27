@@ -13,7 +13,7 @@
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2004 D. Gilbert
+*  Copyright (C) 2000-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -35,7 +35,7 @@ in the future.
    
 */
 
-static char * version_str = "0.42 20041126";
+static char * version_str = "0.45 20050114";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -120,9 +120,11 @@ static const char * scsi_ptype_strs[] = {
     "enclosure services device",
     "simplified direct access device",
     "optical card reader/writer device",
-    /* 0x10 */ "bridging expander",
+    /* 0x10 */ "bridge controller commands",
     "object based storage",
     "automation/driver interface",
+    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
+    "0x19", "0x1a", "0x1b", "0x1c", "0x1d", 
 };
 
 static const char * get_ptype_str(int scsi_ptype)
@@ -261,13 +263,13 @@ static void decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
 static const char * transport_proto_arr[] =
 {
     "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-5)",
+    "Parallel SCSI (SPI-4)",
     "SSA (SSA-S3P)",
     "IEEE 1394 (SBP-3)",
     "Remote Direct Memory Access (RDMA)",
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface Transport Protocol (ADT)",
+    "Automation/Drive Interface (ADT)",
     "ATA Packet Interface (ATA/ATAPI-7)",
     "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"
@@ -322,13 +324,14 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
     for (k = 0, j = 1; k < len; k += id_len, ucp += id_len, ++j) {
         i_len = ucp[3];
         id_len = i_len + 4;
-        if ((k + id_len) > len) {
-            fprintf(stderr, "%s VPD page, short descriptor length=%d, "
-                    "left=%d\n", leadin, id_len, (len - k));
-            return;
-        }
         printf("  Identification descriptor number %d, "
                "descriptor length: %d\n", j, id_len);
+        if ((k + id_len) > len) {
+            fprintf(stderr, "%s VPD page error: descriptor length longer "
+                    "than\n     remaining response length=%d\n", leadin,
+                    (len - k));
+            return;
+        }
         ip = ucp + 4;
         p_id = ((ucp[0] >> 4) & 0xf);
         c_set = (ucp[0] & 0xf);
@@ -692,7 +695,7 @@ static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     }
     printf("  LUN WWN: ");
     for (k = 0; k < 16; ++k)
-        printf("%hhx", buff[10 + k]);
+        printf("%02hhx", buff[10 + k]);
     printf("\n");
     printf("  Array Serial Number: ");
     dStrRaw((const char *)&buff[50], buff[49]);
@@ -730,7 +733,7 @@ static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     else {
         printf("  SP IPv6 address: ");
         for (k = 0; k < 16; ++k)
-            printf("%hhx", buff[32 + k]);
+            printf("%02hhx", buff[32 + k]);
         printf("\n");
     }
 
@@ -946,7 +949,7 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
         /* Try an ATA Identity command */
         res = try_ata_identity(sg_fd, do_raw);
         if (0 != res) {
-            fprintf(stderr, "Both SCSI INQUIRY and ATA IDENTITY failed "
+            fprintf(stderr, "Both SCSI INQUIRY and ATA IDENTIFY failed "
                     "on %s with this error:\n\t%s\n", file_name, 
                     safe_strerror(res));
             return 1;
@@ -1387,7 +1390,7 @@ err_out:
 }
 
 
-/* Following code permits ATA IDENTITY commands to be performed on
+/* Following code permits ATA IDENTIFY commands to be performed on
    ATA non "Packet Interface" devices (e.g. ATA disks).
    GPL-ed code borrowed from smartmontools (smartmontools.sf.net).
    Copyright (C) 2002-4 Bruce Allen 
@@ -1488,12 +1491,12 @@ static void printswap(char *output, char *in, unsigned int n)
         printf("%.*s   ", (int)n, "[No Information Found]\n");
 }
 
-#define ATA_IDENTITY_BUFF_SZ  sizeof(struct ata_identify_device)
+#define ATA_IDENTIFY_BUFF_SZ  sizeof(struct ata_identify_device)
 
 static int ata_command_interface(int device, char *data)
 {
     const int HDIO_DRIVE_CMD_OFFSET = 4;
-    unsigned char buff[ATA_IDENTITY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
+    unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     int retval; 
 
     buff[0] = ATA_IDENTIFY_DEVICE;
@@ -1503,7 +1506,7 @@ static int ata_command_interface(int device, char *data)
         return errno;
 
     /* if the command returns data, copy it back */
-    memcpy(data, buff + HDIO_DRIVE_CMD_OFFSET, ATA_IDENTITY_BUFF_SZ);
+    memcpy(data, buff + HDIO_DRIVE_CMD_OFFSET, ATA_IDENTIFY_BUFF_SZ);
     return 0;
 }
 
@@ -1551,6 +1554,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x62, "SAM-3 T10/1561-D revision 7"},
     {0x75, "SAM-3 T10/1561-D revision 13"},
     {0x76, "SAM-3 T10/1561-D revision 14"},
+    {0x77, "SAM-3 ANSI INCITS.402:2005"},
     {0x80, "SAM-4 (no version claimed)"},
     {0x120, "SPC (no version claimed)"},
     {0x13b, "SPC T10/0995-D revision 11a"},
@@ -1616,6 +1620,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x343, "OSD T10/1355-D revision 8"},
     {0x344, "OSD T10/1355-D revision 9"},
     {0x355, "OSD T10/1355-D revision 10"},
+    {0x356, "OSD ANSI INCITS.400:2004"},
     {0x360, "SSC-2 (no version claimed)"},
     {0x374, "SSC-2 T10/1434-D revision 7"},
     {0x375, "SSC-2 T10/1434-D revision 9"},
@@ -1624,9 +1629,11 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x3a0, "MMC-4 (no version claimed)"},
     {0x3bd, "MMC-4 T10/1545-D revision 3"},
     {0x3be, "MMC-4 T10/1545-D revision 3d"},
+    {0x3bf, "MMC-4 ANSI INCITS.401:2005"},
     {0x3c0, "ADC (no version claimed)"},
     {0x3d5, "ADC T10/1558-D revision 6"},
     {0x3d6, "ADC T10/1558-D revision 7"},
+    {0x3d7, "ADC ANSI INCITS.403:2005"},
     {0x3e0, "SES-2 (no version claimed)"},
     {0x400, "SSC-3 (no version claimed)"},
     {0x420, "MMC-5 (no version claimed)"},

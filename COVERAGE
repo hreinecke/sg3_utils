@@ -9,12 +9,12 @@ SCSI command        sg3_utils utilities that use this SCSI command
 GET CONFIGURATION   sg_get_config
 INQUIRY             sg_inq, sginfo, sg_logs, sg_map('-i'), sg_modes,
                     sg_opcodes, sg_persist, sg_scan, sg_ses
-LOG SELECT          sg_logs
+LOG SELECT          sg_logs('-r')
 LOG SENSE           sg_logs
-MODE SELECT(6)      sginfo, sg_emc_trespass
-MODE SELECT(10)     sginfo, sg_emc_trespass
-MODE SENSE(6)       sginfo, sg_modes, sg_senddiag('-e')
-MODE SENSE(10)      sginfo, sg_modes, sg_senddiag('-e')
+MODE SELECT(6)      sg_wr_mode, sginfo, sg_emc_trespass
+MODE SELECT(10)     sg_wr_mode, sginfo, sg_emc_trespass
+MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_senddiag('-e')
+MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_senddiag('-e')
 PERSISTENT IN       sg_persist
 PERSISTENT OUT      sg_persist
 PREVENT ALLOW MEDIUM REMOVAL            sg_prevent
@@ -28,10 +28,12 @@ READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd
 READ DEFECT(10)     sginfo
 READ DEFECT(12)     sginfo
 READ LONG           sg_read_long
+REASSIGN BLOCKS     sg_reassign
 RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses
 REPORT LUNS         sg_luns
 REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
+REPORT TARGET PORT GROUPS       sg_rtpg
 REQUEST SENSE       sg_requests
 SEND DIAGNOSTIC     sg_senddiag, sg_ses
 START STOP          sg_start
@@ -48,8 +50,8 @@ WRITE LONG          sg_write_long
 
 ATA command         sg3_utils utilities that use this SCSI command
 -----------         ----------------------------------------------
-IDENTITY            sg_inq, sg_scan
+IDENTIFY            sg_inq, sg_scan
 
 
 Doug Gilbert
-14th November 2004
+8th January 2005

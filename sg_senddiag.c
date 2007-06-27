@@ -12,7 +12,7 @@
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2003-2004 D. Gilbert
+*  Copyright (C) 2003-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -22,7 +22,7 @@
    command.
 */
 
-static char * version_str = "0.20 20041106";
+static char * version_str = "0.21 20050120";
 
 #define ME "sg_senddiag: "
 
@@ -154,8 +154,8 @@ static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
         res = sg_ll_mode_sense6(sg_fd, 1 /* dbd */, 0 /* pc */, 0xa /* page */,
                                 0, resp, mx_resp_len, noisy, verbose);
     else
-        res = sg_ll_mode_sense10(sg_fd, 1, 0, 0xa, 0, resp, mx_resp_len,
-                                 noisy, verbose);
+        res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, 1 /* dbd */, 0, 0xa, 0,
+                                 resp, mx_resp_len, noisy, verbose);
     if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Mode sense (%s) command not supported\n",
                 (mode6 ? "6" : "10"));

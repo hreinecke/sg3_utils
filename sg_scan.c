@@ -38,7 +38,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.00 20040622";
+static char * version_str = "4.00 20041130";
 
 #define ME "sg_scan: "
 
@@ -378,7 +378,7 @@ int scsi_inq(int sg_fd, unsigned char * inqBuff)
     return res;
 }
 
-/* Following code permits ATA IDENTITY commands to be performed on
+/* Following code permits ATA IDENTIFY commands to be performed on
    ATA non "Packet Interface" devices (e.g. ATA disks).
    GPL-ed code borrowed from smartmontools (smartmontools.sf.net).
    Copyright (C) 2002-4 Bruce Allen
@@ -479,12 +479,12 @@ void printswap(char *output, char *in, unsigned int n)
         printf("%.*s   ", (int)n, "[No Information Found]\n");
 }
 
-#define ATA_IDENTITY_BUFF_SZ  sizeof(struct ata_identify_device)
+#define ATA_IDENTIFY_BUFF_SZ  sizeof(struct ata_identify_device)
 
 int ata_command_interface(int device, char *data)
 {
     const int HDIO_DRIVE_CMD_OFFSET = 4;
-    unsigned char buff[ATA_IDENTITY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
+    unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     int retval; 
 
     buff[0] = ATA_IDENTIFY_DEVICE;
@@ -494,7 +494,7 @@ int ata_command_interface(int device, char *data)
         return retval;
 
     /* if the command returns data, copy it back */
-    memcpy(data, buff + HDIO_DRIVE_CMD_OFFSET, ATA_IDENTITY_BUFF_SZ);
+    memcpy(data, buff + HDIO_DRIVE_CMD_OFFSET, ATA_IDENTIFY_BUFF_SZ);
     return 0;
 }
 

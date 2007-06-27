@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004 Douglas Gilbert.
+ * Copyright (c) 2004-2005 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -128,9 +128,15 @@ extern int sg_scsi_normalize_sense(const unsigned char * sensep,
 extern const unsigned char * sg_scsi_sense_desc_find(
                 const unsigned char * sensep, int sense_len, int desc_type);
 
-/* Yield string associated with ASC/ASCQ values. */
-extern void sg_get_asc_ascq_str(int asc, int ascq, int buff_len,
-                                char * buff);
+/* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
+extern char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len,
+                                  char * buff);
+
+/* Returns 1 if information field valid in sense data and places data
+   where info_outp points. If information field is not available (valid)
+   returns 0. Handles both fixed and descriptor sense formats. */
+extern int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
+				 unsigned long long * info_outp);
 
 
 /* <<< General purpose (i.e. not SCSI specific) utility functions >>> */
@@ -154,14 +160,14 @@ extern void dStrHex(const char* str, int len, int no_ascii);
    multiplier suffix. Recognised multipliers: c C  *1;  b  B *512;
    k  *1,024;  K  *1,000;  m  *1,048,576;  M *1,000,000;  g *1,073,741,824;
    G *1,000,000,000 . */
-extern int sg_get_num(char * buf);
+extern int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
    then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
    multiplier suffix.  In addition to supporting the multipliers of
    sg_get_num(), this function supports: t *1,099,511,627,776 and
    T *1,000,000,000,000 . */
-extern long long sg_get_llnum(char * buf);
+extern long long sg_get_llnum(const char * buf);
 
 extern const char * sg_lib_version();
 

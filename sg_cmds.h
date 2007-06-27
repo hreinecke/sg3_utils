@@ -25,9 +25,9 @@ extern int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code,
                              int sub_pg_code, void * resp, int mx_resp_len,
                              int noisy, int verbose);
 
-extern int sg_ll_mode_sense10(int sg_fd, int dbd, int pc, int pg_code,
-                              int sub_pg_code, void * resp, int mx_resp_len,
-                              int noisy, int verbose);
+extern int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc,
+                              int pg_code, int sub_pg_code, void * resp,
+                              int mx_resp_len, int noisy, int verbose);
 
 extern int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
                               int param_len, int noisy, int verbose);
@@ -40,6 +40,9 @@ extern int sg_ll_request_sense(int sg_fd, int desc, void * resp,
 
 extern int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
                              int mx_resp_len, int noisy, int verbose);
+
+extern int sg_ll_report_tgt_grp(int sg_fd, void * resp,
+                                int mx_resp_len, int noisy, int verbose);
 
 extern int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                            int paramp, unsigned char * resp, int mx_resp_len,

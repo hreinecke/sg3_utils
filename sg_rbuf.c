@@ -13,13 +13,12 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/time.h>
-#include <linux/fs.h>
 #include "sg_include.h"
 #include "sg_lib.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999-2004 D. Gilbert
+*  Copyright (C) 1999-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -56,7 +55,7 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.77 20041011";
+static char * version_str = "4.78 20050106";
 
 static void usage()
 {
@@ -130,8 +129,8 @@ int main(int argc, char * argv[])
         else if (0 == strcmp("-v", argv[j]))
             ++verbose;
         else if (0 == strcmp("-V", argv[j])) {
-	    fprintf(stderr, ME "version: %s\n", version_str);
-	    return 0;
+            fprintf(stderr, ME "version: %s\n", version_str);
+            return 0;
         } else if (*argv[j] == '-') {
             printf("Unrecognized switch: %s\n", argv[j]);
             file_name = 0;
@@ -141,7 +140,7 @@ int main(int argc, char * argv[])
             file_name = argv[j];
     }
     if (0 == file_name) {
-	usage();
+        usage();
         return 1;
     }
 

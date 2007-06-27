@@ -26,14 +26,14 @@ Any device names associated with the Linux SCSI subsystem (e.g. /dev/sda
 and /dev/st0m) are suitable. Devices names associated with ATAPI
 devices (e.g. most CD/DVD drives and ATAPI tape drives) are also suitable.
 If the device does not fall into the above categories then an ATA
-IDENTITY command is tried.
+IDENTIFY command is tried.
 .TP
 -a
 do alphabetical scan (i.e. sga, sgb, sgc)
 .TP
 -i
 do a SCSI INQUIRY, output results in a second (indented) line. If the device
-is an ATA disk then output information from an ATA IDENTITY command
+is an ATA disk then output information from an ATA IDENTIFY command
 .TP
 -n
 do numeric scan (i.e. sg0, sg1...) [default]

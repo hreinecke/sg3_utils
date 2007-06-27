@@ -1,4 +1,4 @@
-.TH SG_READ_LONG "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
+.TH SG_READ_LONG "8" "January 2005" "sg3_utils-1.12" SG3_UTILS
 .SH NAME
 sg_read_long \- send the scsi command read long
 .SH SYNOPSIS
@@ -22,7 +22,9 @@ not corrected.
 output the usage message then exit.
 .TP
 --lba=<num> | -l <num>
-the logical block address of the sector to read. Defaults to lba 0.
+the logical block address of the sector to read. Assumed to be in
+decimal unless prefixed with '0x'. Defaults to lba 0. Only 32 bit
+lbas currently supported.
 .TP
 --out=<name> | -o <name>
 instead of outputting ASCII hex to stdout, try to send it to the file

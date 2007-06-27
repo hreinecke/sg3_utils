@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.15 20041012";
+static char * version_str = "0.16 20041210";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -91,7 +91,7 @@ static unsigned char dummy_rsmft_r0 = 0xff;
 // <<<<<<<<<<<<<<< end of test code
 
 
-
+/* Report Supported Operation Codes */
 /* Returns 0 when successful, else -1 */
 static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact, 
                   void * resp, int mx_resp_len, int noisy, int verbose)
@@ -143,18 +143,24 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
     case SG_LIB_CAT_RECOVERED:
         return 0;
     default:
-        if (noisy) {
+        if (noisy | verbose) {
             char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "RSOC error, rep_opts=%d, "
-                     "rq_opc=%d, rq_sa=%x ", rep_opts, 
-                     ((rq_opcode > 0) ? rq_opcode : 0), 
-                     ((rq_servact > 0) ? rq_servact : 0));
+
+            if (0 == rep_opts)
+                snprintf(ebuff, EBUFF_SZ, "RSOC error, rep_opts=0 (all) ");
+            else if (1 == rep_opts)
+                snprintf(ebuff, EBUFF_SZ, "RSOC error, rq_opcode=0x%x ",
+                         rq_opcode);
+            else
+                snprintf(ebuff, EBUFF_SZ, "RSOC error, rq_opcode=0x%x, "
+                         "rq_sa=0x%x ", rq_opcode, rq_servact);
             sg_chk_n_print3(ebuff, &io_hdr);
         }
         return -1;
     }
 }
 
+/* Report Supported Task Management Function */
 /* Returns 0 when successful, else -1 */
 static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
                     int verbose)
@@ -197,7 +203,7 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
     case SG_LIB_CAT_RECOVERED:
         return 0;
     default:
-        if (noisy) {
+        if (noisy | verbose) {
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "RSTMF error ");
             sg_chk_n_print3(ebuff, &io_hdr);
@@ -240,9 +246,11 @@ static const char * scsi_ptype_strs[] = {
     "enclosure services device",
     "simplified direct access device",
     "optical card reader/writer device",
-    /* 0x10 */ "bridging expander",
+    /* 0x10 */ "bridge controller commands",
     "object based storage",
     "automation/driver interface",
+    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
+    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
