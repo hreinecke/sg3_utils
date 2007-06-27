@@ -8,9 +8,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
+#include "sg_err.h"  /* needed for INQUIRY, if problematic then remove */
 
-/* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
-   device driver.
+/* Utility program for the Linux OS SCSI generic ("sg") device driver.
 *  Copyright (C) 2000,2001 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
@@ -22,13 +22,14 @@
    Options: -n   numeric scan: scan /dev/sg0,1,2, .... [default]
             -a   alphabetical scan: scan /dev/sga,b,c, ....
             -x   also show bus,chan,id,lun and type
-            -sd  only scan for sd devices (disks)
-            -st  only scan for st devices (tapes)
-            -scd (or -sr)  only scan for scd devices (cdroms)
+            -i   also show device INQUIRY information
+            -sd  only scan for sd devices [disks]
+            -st  only scan for st (and osst) devices [tapes]
+            -scd (or -sr)  only scan for scd devices [cdroms]
 
    Note: This program requires sg version 2 or better.
 
-   Version 0.13 20010419
+   Version 0.15 20010819
 	- additions for osst [Kurt Garloff <garloff@suse.de>]
 */
 
@@ -48,6 +49,9 @@ typedef struct my_map_info
     int lin_dev_type;
     int oth_dev_num;
     struct sg_scsi_id sg_dat;
+    char vendor[8];
+    char product[16];
+    char revision[4];
 } my_map_info_t;
 
 
@@ -80,6 +84,8 @@ static char ebuff[EBUFF_LEN];
 
 static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                           int lin_dev_type, int last_sg_ind);
+static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op,
+                  void * resp, int mx_resp_len, int noisy);
 
 static void usage()
 {
@@ -87,10 +93,12 @@ static void usage()
     printf("    where: -a   do alphabetic scan (ie sga, sgb, sgc)\n");
     printf("           -n   do numeric scan (ie sg0, sg1, sg2)\n");
     printf("           -x   also show bus,chan,id,lun and type\n");
+    printf("           -i   also show device INQUIRY strings\n");
+    printf("           -? or -h  show this usage message\n");
     printf("           -sd  show mapping to disks\n");
     printf("           -scd show mapping to cdroms (look for /dev/scd<n>\n");
     printf("           -sr  show mapping to cdroms (look for /dev/sr<n>\n");
-    printf("           -st  show mapping to tapes\n");
+    printf("           -st  show mapping to tapes (st and osst devices)\n");
     printf("    If no '-s*' arguments given then show all mappings\n");
 }
 
@@ -139,6 +147,7 @@ int main(int argc, char * argv[])
     int do_sr = 0;
     int do_scd = 0;
     int do_extra = 0;
+    int do_inquiry = 0;
     char fname[64];
     int num_errors = 0;
     int num_silent = 0;
@@ -153,6 +162,8 @@ int main(int argc, char * argv[])
             do_numeric = 0;
         else if (0 == strcmp("-x", argv[k]))
             do_extra = 1;
+        else if (0 == strcmp("-i", argv[k]))
+            do_inquiry = 1;
         else if (0 == strcmp("-sd", argv[k])) {
             do_sd = 1;
             do_all_s = 0;
@@ -230,6 +241,15 @@ int main(int argc, char * argv[])
             ++num_errors;
             continue;
         }
+	if (do_inquiry) {
+	    char buff[36];
+
+	    if (0 == do_inq(sg_fd, 0, 0, 0, buff, sizeof(buff), 1)) {
+		memcpy(map_arr[k].vendor, &buff[8], 8);
+		memcpy(map_arr[k].product, &buff[16], 16);
+		memcpy(map_arr[k].revision, &buff[32], 4);
+	    }
+	}
         map_arr[k].active = 1;
         map_arr[k].oth_dev_num = -1;
         last_sg_ind = k;
@@ -300,6 +320,9 @@ int main(int argc, char * argv[])
             default:
                 break;
             }
+            if (do_inquiry)
+	    	printf("  %.8s  %.16s  %.4s", map_arr[k].vendor, 
+		       map_arr[k].product, map_arr[k].revision);
             break;
         default:
             printf("  bad logic\n");
@@ -413,5 +436,56 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
         else
             printf("Strange, could not find device %s mapped to sg device??\n", 
                    fname);
+    }
+}
+
+#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
+
+#define INQUIRY_CMD     0x12
+#define INQUIRY_CMDLEN  6
+
+static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op, 
+		  void * resp, int mx_resp_len, int noisy)
+{
+    int res;
+    unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    sg_io_hdr_t io_hdr;
+
+    if (cmddt)
+    	inqCmdBlk[1] |= 2;
+    if (evpd)
+    	inqCmdBlk[1] |= 1;
+    inqCmdBlk[2] = (unsigned char)pg_op;
+    inqCmdBlk[4] = (unsigned char)mx_resp_len;
+    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(inqCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = mx_resp_len;
+    io_hdr.dxferp = resp;
+    io_hdr.cmdp = inqCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        perror("SG_IO (inquiry) error");
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_ERR_CAT_CLEAN:
+    case SG_ERR_CAT_RECOVERED:
+	return 0;
+    default:
+	if (noisy) {
+	    char ebuff[256];
+	    sprintf(ebuff, "Inquiry error, CmdDt=%d, EVPD=%d, page_opcode=%x ",
+		    cmddt, evpd, pg_op);
+            sg_chk_n_print3(ebuff, &io_hdr);
+	}
+	return -1;
     }
 }

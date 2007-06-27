@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "January 2001" "sg3_utils-0.92" SG3_UTILS
+.TH SGP_DD "8" "September 2001" "sg3_utils-0.95" SG3_UTILS
 .SH NAME
 copies data to and from sg and raw devices
 .SH SYNOPSIS
@@ -41,7 +41,8 @@ increases so does the amount of debug (max debug output when NUM is 9)
 dio=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
-at completion
+at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
+has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
 gen=0 | 1
 when 0 (default) either input or output must be a sg or raw device.

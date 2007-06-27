@@ -47,7 +47,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "0.51 20010114";
+static char * version_str = "0.52 20010819";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -136,6 +136,8 @@ static Rq_coll rcoll;
 static struct pollfd in_pollfd_arr[MAX_NUM_THREADS];
 static struct pollfd out_pollfd_arr[MAX_NUM_THREADS];
 static int dd_count = -1;
+
+static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 int sg_fin_in_operation(Rq_coll * clp, Rq_elem * rep);
 int sg_fin_out_operation(Rq_coll * clp, Rq_elem * rep);
@@ -1112,9 +1114,21 @@ int main(int argc, char * argv[])
 	res = 2;
     }
     print_stats();
-    if (rcoll.dio_incomplete)
+    if (rcoll.dio_incomplete) {
+        int fd;
+        char c;
+
         fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
-               rcoll.dio_incomplete);
+                rcoll.dio_incomplete);
+        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+            if (1 == read(fd, &c, 1)) {
+                if ('0' == c)
+                    fprintf(stderr, ">>> %s set to '0' but should be set "
+                            "to '1' for direct IO\n", proc_allow_dio);
+            }
+            close(fd);
+        }
+    }
     if (rcoll.sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                rcoll.sum_of_resids);

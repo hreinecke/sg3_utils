@@ -44,7 +44,7 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
    This version should compile with Linux sg drivers with version numbers
    >= 30000 .
 
-   Version 5.12 20010307
+   Version 5.13 20010819
 */
 
 #define DEF_BLOCK_SIZE 512
@@ -71,6 +71,8 @@ static int in_full = 0;
 static int in_partial = 0;
 static int out_full = 0;
 static int out_partial = 0;
+
+static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 static void install_handler (int sig_num, void (*sig_handler) (int sig))
 {
@@ -749,9 +751,21 @@ int main(int argc, char * argv[])
 	res = 2;
     }
     print_stats();
-    if (dio_incomplete)
+    if (dio_incomplete) {
+    	int fd;
+	char c;
+
         fprintf(stderr, ">> Direct IO requested but incomplete %d times\n", 
                 dio_incomplete);
+	if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+	    if (1 == read(fd, &c, 1)) {
+	    	if ('0' == c)
+		    fprintf(stderr, ">>> %s set to '0' but should be set "
+		    	    "to '1' for direct IO\n", proc_allow_dio);
+	    }
+	    close(fd);
+	}
+    }
     if (sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
 		sum_of_resids);

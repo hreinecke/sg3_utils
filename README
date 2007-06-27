@@ -2,13 +2,16 @@
                       ====================
 Introduction
 ------------
-In this directory are some utilities and test programs for the Linux
-sg (version 3) device driver. This driver is found in latter lk 2.3
-series and in lk 2.4 series kernels. If you have problems or questions
- about them please contact me at dgilbert@interlog.com .
-The home site for the Linux sg device drivers is: 
-http://www.torque.net/sg .
+In this directory are some utilities and test programs for the Linux sg 
+(version 3) device driver. This driver is found in the lk 2.4 series kernels.
+If you have problems or questions about them please contact me.
+The home site for the Linux sg device drivers is: http://www.torque.net/sg .
 Documentation for the driver can be found at:
+http://www.torque.net/sg/p/sg_v3_ho.html .
+This is written in DocBook and the original sgml (soon to become xml) can
+be found in the same directory with the ".sgml" extension. Postscript and
+pdf renderings are also in that directory.
+Older documentation for the sg version 3 driver can be found at:
 http://www.torque.net/sg/p/scsi_generic_v3.txt .
 
 All programs are "GPL"-ed so you can incorporate all or part of them
@@ -74,7 +77,8 @@ used (on sg devices) if appropriate. [Note that READ CAPACITY often
 gives a 2 block overestimate for iso9660 file systems on CD-ROMs. 
 See the "isosize" command below.]  Disk partition information can
 be found with a command like "fdisk -ul /dev/sda". The 'dio' argument
-requests direct IO (only functions in 2.3/2.4 kernels with some patches).
+requests direct IO (only functions in 2.4 kernels). A warning is issued 
+if direct IO is requested and /proc/scsi/sg/allow_dio == 0 .
 
 "sgp_dd" uses POSIX threads and attempts to run multiple IO operations
 in parallel. The user can control the amount of parallelism from 
@@ -191,9 +195,9 @@ source:
 
 If glibc and the kernel on a machine are of the same vintage then it is
 probably sufficient to use the simple includes listed at the start of this
-section. Another technique is to rely on the fact that
-/usr/include/linux is a symbolic link to /usr/src/linux/include/linux . 
-That will cause the following:
+section. Another technique that used to work was to rely on
+/usr/include/linux being a symbolic link to /usr/src/linux/include/linux . 
+That caused the following:
 #include <linux/../scsi/sg.h> 
 #include <linux/../scsi/scsi.h>
 to find the kernel supplied header files. However recent versions of
@@ -205,4 +209,4 @@ The include file path issues are now all addressed in one file called
 
 
 Doug Gilbert
-19th April 2001
+15th September 2001

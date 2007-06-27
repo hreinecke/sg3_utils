@@ -26,7 +26,7 @@
    this is a good idea on a disk while it is mounted is debatable.
    No detrimental effects when this was tested ...]
 
-Version 0.12 20010415
+Version 0.13 20010715
 */
         
 
@@ -64,7 +64,8 @@ int main(int argc, char * argv[])
     }
     if (0 == file_name) {
         printf("Usage: 'scsi_inquiry <scsi_device>'\n");
-        printf("    For example: scsi_inquiry /dev/sg0\n");
+        printf("    For example: scsi_inquiry /dev/sda\n");
+        printf("    another example: scsi_inquiry /dev/sg0\n");
         return 1;
     }
     

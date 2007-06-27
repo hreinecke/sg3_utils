@@ -1,4 +1,4 @@
-.TH SG_DD "8" "January 2001" "sg3_utils-0.92" SG3_UTILS
+.TH SG_DD "8" "September 2001" "sg3_utils-0.95" SG3_UTILS
 .SH NAME
 copies data to and from sg and raw devices
 .SH SYNOPSIS
@@ -32,7 +32,8 @@ return from READ CAPACITY (if that works) or 0
 dio=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
-at completion
+at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
+has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
 ibs=BYTES
 if given must be the same as bs

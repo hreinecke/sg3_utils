@@ -46,7 +46,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "5.03 20010307";
+static char * version_str = "5.04 20010819";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -127,6 +127,8 @@ typedef struct request_element
 
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
+
+static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 void sg_in_operation(Rq_coll * clp, Rq_elem * rep);
 void sg_out_operation(Rq_coll * clp, Rq_elem * rep);
@@ -1078,9 +1080,21 @@ int main(int argc, char * argv[])
     fprintf(stderr, "%d+%d records in\n", infull, rcoll.in_partial);
     outfull = count - rcoll.out_done_count - rcoll.out_partial;
     fprintf(stderr, "%d+%d records out\n", outfull, rcoll.out_partial);
-    if (rcoll.dio_incomplete)
+    if (rcoll.dio_incomplete) {
+        int fd;
+        char c;
+
         fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
-               rcoll.dio_incomplete);
+                rcoll.dio_incomplete);
+        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+            if (1 == read(fd, &c, 1)) {
+                if ('0' == c)
+                    fprintf(stderr, ">>> %s set to '0' but should be set "
+                            "to '1' for direct IO\n", proc_allow_dio);
+            }
+            close(fd);
+        }
+    } 
     if (rcoll.sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                rcoll.sum_of_resids);
