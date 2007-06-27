@@ -1,0 +1,112 @@
+.TH SG_DD "8" "December 2000" "sg_utils-0.90" SG_UTILS
+.SH NAME
+sg_dd \- variant of 
+.B dd 
+that copies data to and from sg and raw devices
+.SH SYNOPSIS
+.B sg_dd
+[\fIOPTION\fR]...
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Copy data to and from Linux sg and raw devices. Similar syntax and semantics
+to 
+.B dd(1) 
+but does not perform any conversions.
+.TP
+bpt=BLOCKS
+each IO transaction will be made using this number of blocks (or less if 
+near the end of count). Default is 128.
+.TP
+bs=BYTES
+this must be the block size of the physical device. Default is 512 which 
+is usually correct for disks but incorrect for cdroms (which are usually
+2048 byte blocks).
+.TP
+count=BLOCKS
+copy this number of blocks. Default is minimum number that sg devices
+return from READ CAPACITY (if that works) or 0
+.TP
+ibs=BYTES
+if given must be the same as bs
+.TP
+if=FILE
+read from FILE instead of stdin. A file name of - is taken to be stdin
+.TP
+obs=BYTES
+if given must be the same as bs
+.TP
+of=FILE
+write to FILE instead of stdout. A file name of - is taken to be stdout
+.TP
+seek=BLOCKS
+skip BLOCKS bs-sized blocks at start of output
+.TP
+skip=BLOCKS
+skip BLOCKS bs-sized blocks at start of input
+.PP
+Either the input file or the output file must be a sg or raw device.
+A raw device must be bound to a block device prior to using sg_dd.
+See
+.B raw(8)
+for more information about binding raw devices. To be safe, the sg device
+mapping to SCSI block devices should be checked with "cat /proc/scsi/scsi"
+before use.
+.PP
+The count is only deduced for sg devices (minimum > 0 if both input and
+output are sg devices) otherwise it defaults to 0. This is for safety!
+Raw device partition information can often be found with
+.B fdisk(8)
+[the "-ul" argument is useful in this respect].
+.PP
+BYTES and BLOCKS may be followed by the following multiplicative suffixes:
+c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
+g *1,073,741,824; and G *1,000,000,000
+.PP
+All informative, warning and error output is sent to stderr so that
+the output file can be stdout and remain unpolluted.
+.SH EXAMPLES
+.PP
+Looks quite similar in usage to dd:
+.PP
+   sg_dd if=/dev/sg0 of=t bs=512 count=1M
+.PP
+This will copy 1 million 512 byte blocks from the device associated with
+/dev/sg0 (which should have 512 byte blocks) to a file called t.
+Assuming /dev/sda and /dev/sg0 are the same device then the above is
+equivalent to:
+.PP
+   dd if=/dev/sda of=t bs=512 count=1000000
+.PP
+although dd\'s speed may improve if bs was larger and count was suitably
+reduced. Using a raw device to do something similar on a IDE disk:
+.PP
+   raw /dev/raw/raw1 /dev/hda
+.br
+   sg_dd if=/dev/raw/raw1 of=t bs=512 count=1M
+.PP
+To copy a SCSI disk partition to an IDE disk partition:
+.PP
+   raw /dev/raw/raw2 /dev/hda3
+.br
+   sg_dd if=/dev/sg0 skip=10123456 of=/dev/raw/raw2 bs=512
+.PP
+This assumes a valid partition is found on the SCSI disk at the given
+skip block address (past the 5 GB point of that disk) and that
+the partition goes to the end of the SCSI disk. An explicit count
+is probably a safer option.
+.SH AUTHORS
+Written by Doug Gilbert and Peter Allworth.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert@interlog.com>.
+.SH COPYRIGHT
+Copyright \(co 2000 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+A POSIX threads version of this command called
+.B sgp_dd
+in the sg_utils package. The lmbench package contains
+.B lmdd
+which is also interesting.

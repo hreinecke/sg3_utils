@@ -1,0 +1,5 @@
+make
+make install
+
+Unless overridden or edited in the Makefile INSTDIR places the executables
+in /usr/local/bin while MANDIR places the man pages in /usr/local/man .

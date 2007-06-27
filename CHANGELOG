@@ -1,0 +1,29 @@
+Each utility has its own version number, date of last changes and
+some description at the top of its ".c" file.
+
+
+Changelog for sg3_utils-0.90
+---------------------------
+  - switch from dated versioning. Previous version was sg3_utils001012.
+    Arbitrarily start at package version 0.90 . Start Changelog.
+  - incorporate Kurt Garloff's patches from Suse scsi.spm source rpm
+    compilation:
+    - add Kurt's sg_test_rwbuf utility to read and write to disk buffer
+    - clean up Makefile to include a "make install" (and also add a
+      "make uninstall").
+    - add "-uno" switch to sginfo
+  - make raw and sg devices equally acceptable to sg_dd and sgp_dd.
+    [Raw devices still not as fast as sg devices doing disk to disk
+    copies in sgp_dd but this may be improved soon. Still faster than
+    using dd!]
+  - change lseek() in sg_dd and sgp_dd to _llseek() [using code borrowed
+    from fdisk] so big disks can be properly offset with 'skip' and
+    'seek' arguments. [This change is significant for raw devices and
+    normal files since sg devices already use 31 bit block addressing.]
+  - rename sg_s3_inq to sg_inq. This utility allows the INQUIRY response
+    to be decoded as per SCSI 3 and 4. Also can probe EVPD and CmdDt pages.
+  - change multiplier suffixes on sg_dd, sgp_dd and sg_turs so lower case
+    "k, m, g" are powers of 2 while "K, M, G" are powers of 10. This idea
+    borrowed from lmdd (lmbench suite)
+  - retire a few more less used utilities into the archive directory.
+  - add man pages for sg_dd and sgp_dd

@@ -1,0 +1,14 @@
+This archive directory contains programs the use the Linux SCSI
+subsystem and typically use the SCSI generic interface (sg) as
+well.
+
+The programs in this directory are fully functional but have been
+"retired" from the main sg_utils directory most likely because
+their functionality is done in another (perhaps better) way.
+
+The last time I checked these programs compiled and built and
+didn't depend on too many other things (see the Makefile in the
+parent directory for ideas).
+
+Doug Gilbert
+8th December 2000
