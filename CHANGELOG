@@ -1,6 +1,13 @@
 Each utility has its own version number, date of last changes and
-some description at the top of its ".c" file.
+some description at the top of its ".c" file. "KG" indicates work by
+Kurt Garloff <garloff@suse.de>.
 
+
+Changelog for sg3_utils-0.94 [20010419]
+----------------------------
+  - add sg_start, documented in README.sg_start [KG]
+  - add osst suport in sg_map [KG]
+  - improvements to sginfo [KG]
 
 Changelog for sg3_utils-0.93 [20010415]
 ----------------------------
@@ -30,9 +37,8 @@ Changelog for sg3_utils-0.90
 ----------------------------
   - switch from dated versioning. Previous version was sg3_utils001012.
     Arbitrarily start at package version 0.90 . Start Changelog.
-  - incorporate Kurt Garloff's patches from Suse scsi.spm source rpm
-    compilation:
-    - add Kurt's sg_test_rwbuf utility to read and write to disk buffer
+  - incorporate KG's patches from Suse scsi.spm source rpm compilation:
+    - add KG's sg_test_rwbuf utility to read and write to disk buffer
     - clean up Makefile to include a "make install" (and also add a
       "make uninstall").
     - add "-uno" switch to sginfo
