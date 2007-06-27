@@ -1,6 +1,7 @@
-.TH SG_TEST_RWBUF "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.TH SG_TEST_RWBUF "8" "November 2003" "sg3_utils-1.05" SG3_UTILS
 .SH NAME
-sg_test_rwbuf \- Tests the SCSI host adapter by issueing write and read operations on a device's buffer and calculating checksums.
+sg_test_rwbuf \- Tests the SCSI host adapter by issueing write and read 
+operations on a device's buffer and calculating checksums.
 .SH SYNOPSIS
 .B sg_test_rwbuf
 <\fIgeneric device\fR>
@@ -11,17 +12,33 @@ sg_test_rwbuf \- Tests the SCSI host adapter by issueing write and read operatio
 .\" Add any additional description here
 .PP
 sg_test_rwbuf writes and reads back sz bytes to the internal buffer of
-device /dev/sgX. For testing purposes, you can ask it to write
-(addwr) or read (addrd) some more bytes.
+device <\fIgeneric device\fR> (e.g. /dev/sg0). A pseudo random pattern is
+written to the data buffer on the device then read back. If the same pattern
+is found 'Success' is reported. If they do not match (checksums unequal) then
+this is reported and up to 24 bytes from the first point of mismatch are
+reported; the first line shows what was written and the second line shows
+what was received. For testing purposes, you can ask it to write (addwr) or
+read (addrd) additional bytes.
+.PP
+The microcode in a SCSI device is _not_ modified by doing a WRITE BUFFER
+command with its mode set to "data" (0x2) as done by this utility. Therefore
+this utility is safe in that respect. [Mode values 0x4, 0x5, 0x6 and 0x7
+are the dangerous ones :-)]
 .PP
 \fBWARNING\fR: If you access the device at the same time, e.g. because it's a
 mounted hard disk, the device's buffer may be used by the device
 itself for other data at the same time, and overwriting it may or may
-not cause data corruption!  
+not cause data corruption! \fBHOWEVER\fR the SPC-3 draft standard does state
+in its WRITE BUFFER command: "This command shall not alter any medium of the
+logical unit when data mode ... is specified". This implies that it _is_ safe
+to use this utility with devices that have mounted file systems on them.
+Following this theme further, a disk with active mounted file systems may cause
+the data read back to be different (due to caching activity) to what was written
+and hence a checksum error.
 .SH AUTHORS
 Written by D. Gilbert and K. Garloff
 .SH COPYRIGHT
-Copyright \(co 2000 Douglas Gilbert, Kurt Garloff
+Copyright \(co 2000-2003 Douglas Gilbert, Kurt Garloff
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

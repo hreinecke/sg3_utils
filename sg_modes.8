@@ -1,10 +1,10 @@
-.TH SG_MODES "8" "April 2003" "sg3_utils-1.04" SG3_UTILS
+.TH SG_MODES "8" "April 2004" "sg3_utils-1.06" SG3_UTILS
 .SH NAME
 sg_modes \- reads SCSI MODE SENSE pages
 .SH SYNOPSIS
 .B sg_modes
 [\fI-a\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-h\fR] [\fI-l\fR]
-[\fI-p=<page_code>\fR] [\fI-subp=<sub_page_code>\fR] [\fI-V\fR] 
+[\fI-p=<page_code>\fR] [\fI-subp=<sub_page_code>\fR] [\fI-v\fR] [\fI-V\fR] 
 [\fI-6\fR] [\fI-?\fR] [\fI<sg_device>\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -12,6 +12,7 @@ sg_modes \- reads SCSI MODE SENSE pages
 This utility sends a MODE SENSE SCSI command (the 10 byte variant
 by default) to the given device and then outputs the response. There
 is no facility to change the page or descriptor data with this utility.
+If no page is given (and '-l' is not selected) then '-a' is assumed.
 .TP
 -a
 lists all the mode pages supported by the device.
@@ -44,6 +45,9 @@ inclusive. The default value is 0.
 sub page code to fetch. Should be a hexadecimal number between 0 and 
 0xff inclusive. The default value is 0.
 .TP
+-v
+verbose: output cdb in hex before executing them.
+.TP
 -V
 print out version string
 .TP
@@ -65,15 +69,15 @@ sending a MODE SENSE command. This helps in decoding the block
 descriptor and mode pages.
 .PP
 In the 2.4 series of Linux kernels the given device must be
-a SCSI generic (sg) device. In the 2.5 series block devices (e.g. disks
+a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and SCSI DVDs) can also be specified. For example "sg_modes -a /dev/sda"
-will work in the 2.5 series kernels.
+will work in the 2.6 series kernels.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
-Report bugs to <dgilbert@interlog.com>.
+Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2003 Douglas Gilbert
+Copyright \(co 2000-2004 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

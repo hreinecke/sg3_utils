@@ -3,7 +3,7 @@
 
 /* Feel free to copy and modify this GPL-ed code into your applications. */
 
-/* Version 0.90 (20030519) 
+/* Version 0.93 (20040708) 
 */
 
 
@@ -131,6 +131,16 @@ extern int sg_chk_n_print(const char * leadin, int masked_status,
 struct sg_io_hdr;
 extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp);
 
+/* If no sense data returns 0 and places 0 in *response_code (if non-NULL)
+   and *sense_key (if non-NULL). If sense data found returns 1 and outputs
+   to *response_code, *sense_key, *asc and *ascq (those that are non-NULL).
+   Understands both descriptor and fixed sense data format. */
+extern int sg_decode_sense(const struct sg_io_hdr * hp, 
+                           unsigned char * response_code,
+                           unsigned char * sense_key,
+                           unsigned char * asc,
+                           unsigned char * ascq);
+
 
 /* The following "category" function returns one of the following */
 #define SG_ERR_CAT_CLEAN 0      /* No errors or other information */
@@ -153,10 +163,21 @@ extern int sg_err_category_new(int scsi_status, int host_status,
    Only version 3 sg_err.c defines it. */
 extern int sg_err_category3(struct sg_io_hdr * hp);
 
-/* Returns length of SCSI command given the opcode (first byte) */
+/* Returns length of SCSI command given the opcode (first byte). 
+   Yields the wrong answer for variable length commands (opcode=0x7f)
+   and potentially some vendor specific commands. */
 extern int sg_get_command_size(unsigned char opcode);
 
-extern void sg_get_command_name(unsigned char opcode, int buff_len, 
-                                char * buff);
+/* Command name given pointer to command bytes. Certain command names
+   depend on the service action within the command as well. */
+extern void sg_get_command_name(const unsigned char * cmdp, int peri_type,
+                                int buff_len, char * buff);
 
+/* Opcode name given only the first byte (byte 0) of a command */
+extern void sg_get_opcode_name(unsigned char cmd_byte0, int peri_type,
+                               int buff_len, char * buff);
+
+/* Command name given opcode (byte 0) and service action of a command */
+extern void sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
+                                  int peri_type, int buff_len, char * buff);
 #endif

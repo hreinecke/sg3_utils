@@ -1,4 +1,6 @@
 #ifdef SG_KERNEL_INCLUDES
+  #define __user
+  typedef unsigned char u8;
   #include "/usr/src/linux/include/scsi/sg.h"
   #include "/usr/src/linux/include/scsi/scsi.h"
 #else
@@ -38,5 +40,5 @@
   Sorry about the inconvenience. Typically neither SG_KERNEL_INCLUDES
   nor SG_TRICK_GNU_INCLUDES is defined.
 
-  dpg 20010415
+  dpg 20010415, 20030522
 */

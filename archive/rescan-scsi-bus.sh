@@ -1,7 +1,7 @@
 #!/bin/bash
 # Skript to rescan SCSI bus, using the 
 # scsi add-single-device mechanism
-# (w) 98/03/19 Kurt Garloff <kurt@garloff.de> (c) GNU GPL
+# (w) 98/03/19 Kurt Garloff <kurt at garloff dot de> (c) GNU GPL
 
 # Return hosts. /proc/scsi/HOSTADAPTER/? must exist
 findhosts ()

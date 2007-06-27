@@ -2,8 +2,34 @@
                       ====================
 Introduction
 ------------
-In this directory are some utilities and test programs for the Linux sg 
-(version 3) device driver. This driver is found in the lk 2.4 series kernels.
+This package contains utilities and test programs for the Linux SCSI
+subsystem. In the Linux 2.6 kernel series almost all of these programs 
+will work on any devices that use the SCSI command set. Apart from SCSI 
+parallel devices, ATAPI devices (CD/DVDs and tapes), USB mass storage 
+devices, Fibre Channel disks and IEEE 1394 storage devices (that use 
+the "SBP" protocol) use the SCSI command set.
+
+In the Linux 2.4 kernel series these programs need to use the SCSI generic
+(sg) driver to access SCSI devices. The name of this package (i.e.
+sg3_utils) refers to version 3 of the SCSI generic (sg) driver which
+was introduced at the beginning of the 2.4 linux kernel series. Significantly
+this added a new SCSI command interface structure (i.e. struct sg_io_hdr)
+that is more flexible than the older "sg_header" structure found in the
+sg driver in the 2.2 and earlier linux kernel series. The sg_io_hdr structure
+is also more flexible than the awkward (and limiting) interface to the
+SCSI_IOCTL_SEND_COMMAND ioctl supportd by the linux SCSI mid level.
+Also added in the version 3 sg driver was the SG_IO ioctl that is synchronous
+(i.e. it issues the requested SCSI command and waits for the response
+(or a timeout) before the ioctl returns to the user space program that
+invoked it). The SG_IO ioctl is now found in other parts of the linux
+kernel in the 2.6 series.
+
+Utilities that wish to use the asynchronous SCSI command interface
+(i.e. via a write() read() sequence) or issue special "commands"
+(e.g. bus and device resets) still need to use the sg driver. Note
+that various drivers (e.g. cdrom/sr) have different open() flag and
+permissions policies that the user may need to take into account.
+
 If you have problems or questions about them please contact me.
 The home site for the Linux sg device drivers is: http://www.torque.net/sg .
 Documentation for the driver can be found at:
@@ -17,7 +43,8 @@ http://www.torque.net/sg/p/scsi_generic_v3.txt .
 All programs are "GPL"-ed so you can incorporate all or part of them
 in your applications as you please. The "sg_err.[hc]" files contain
 ASCII text corresponding to most of the error and warning conditions
-defined by the SCSI 2 standard. They are used by most other programs.
+defined in recent drafts at www.t10.org (SCSI standards home site). 
+They are used by most other programs.
 
 Additional information (including a version number) can be found
 towards the top of each ".c" file corresponding to each utility and
@@ -31,17 +58,30 @@ The sg driver in Linux can be seen as having 3 distinct versions:
    v1   lk < 2.2.6     sg_header based relatively unchanged since 1992
    v2   lk >= 2.2.6    enhanced sg_header interface structure
    v3   lk >= 2.4      additional sg_io_hdr interface structure.
+   v3   lk >= 2.6      same interface as found in lk 2.4
 
 This package is targeted as "v3" only. Another package called "sg_utils"
 is targeted at "v2" and to a lesser extent "v1". The "sg_utils"
-package has essentially the same utilities.
+package has a subset of the utilities found in this package.
 
-Some sg ioctls (noteably SG_IO) are defined for all block devices
-from lk 2.5.48 . This version of sg3_utils (1.02 and later) allows
-some utilities that use SG_IO to just work for block devices
-(e.g. sg_inq). It guards some others that formerly assumed that any
-device that answers one of sg's ioctls was automatically an sg device
-(e.g. sginfo).
+Some sg ioctls (noteably SG_IO) are defined for many block devices
+in lk 2.6 . In practice this means all SCSI block devices, ATAPI block devices
+(mainly CD and DVD players) but _not_ ATA disks (currently). Support for
+the SG_IO as been added to the scsi tape driver (st) in lk 2.6.6 (and
+support for osst will soon follow).
+
+No utilities in the main directory use the sg driver's older "sg_header"
+interface; instead they use the newer "sg_io_hdr" interface. The "sg_io_hdr"
+interface can be accessed two ways:
+  - using the SG_IO ioctl [for synchronous access]
+  - using a write()/read() sequence that convey instances of "sg_io_hdr"
+
+All utilities in the main directory use the SG_IO ioctl except for sgp_dd.
+This is due to the asynchronous nature of sgp_dd. Note that sgp_dd does _not_
+support the "blk_sgio" switch found in sg_dd. This is important since block
+devices often identify themselves (programmatically) as sg devices in lk 2.6
+and it would cause serious damage to do a write() of the sg driver's "sg_io_hdr"
+metadata (i.e. disk corruption).  
 
 
 Utilities
@@ -51,14 +91,17 @@ in this package:
   1) dd variants: sg_dd, sgp_dd, sgm_dd and sgq_dd
   2) scanning and mapping: sg_scan, sg_map and scsi_devfs_scan
   3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
-     sg_modes, sg_logs, sg_senddiag and sg_reset
+     sg_modes, sg_logs, sg_senddiag, sg_reset, sg_opcodes and sg_persist
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
      and sg_simple16
-  6) miscellaneous programs: isosize
+  6) miscellaneous programs: isosize, hxascdmp
 
 There is a brief description of each utility in the following sections.
+All utilities in the main directory have a "man" page in section 8
+which is a category for administration and privileged commands. Some
+utilities in the other (sub-)directories have man pages.
 
   
 1) dd variants
@@ -89,7 +132,8 @@ Extra options:
    		 1, output sent to stderr. Default is 0
    coe=0|1       continue on error (only on sg devices) when 1. Default is 0.
 
-All numeric arguments can take multiplier suffixes:
+Numeric arguments can be given in decimal or hexadecimal. Hex arguments should
+be prefixed with "0x" or "0X". Decimal arguments can take multiplier suffixes:
   "c", "C"        * 1
   "b", "B"        * 512
   "k"             * 1024           [2 ^ 10]
@@ -98,6 +142,8 @@ All numeric arguments can take multiplier suffixes:
   "M"             * 1000000        [10 ^ 6]
   "g"             * 1073741824     [2 ^ 30]
   "G"             * 1000000000     [10 ^ 9]
+  "t"             * 1099511627776  [2 ^ 40]
+  "T"             * 1000000000000  [10 ^ 12]
 The 'skip' and 'seek' options lead to the use of the system command
 lseek() to a byte offset when used on raw devices and normal files.
 [For sg devices 32 bit block addresses are used thus limiting accesses
@@ -106,7 +152,8 @@ normal lseek() is limited to a signed 32 bit byte offset (i.e. 2 GB).
 "sg_dd" bypasses this limit by using Linux's _llseek() [while modern
 "dd" commands use read loops to "walk" around the limit].
 If 'count' is not given then the SCSI READ CAPACITY command will be
-used (on sg devices) if appropriate. [Note that READ CAPACITY often
+used (on sg devices) if appropriate. Block devices are querie for their
+length if 'count' is not given. [Note that READ CAPACITY often
 gives a 2 block overestimate for iso9660 file systems on CD-ROMs. 
 See the "isosize" command below.]  Disk partition information can
 be found with a command like "fdisk -ul /dev/sda". The 'dio' argument
@@ -114,21 +161,22 @@ requests direct IO (only functions in 2.4 kernels). A warning is issued
 if direct IO is requested and /proc/scsi/sg/allow_dio == 0 . 
 "of=/dev/null" causes writes to be skipped, and "of=." is accepted as
 an alias for "of=/dev/null" (convenient shorthand).
-The "sg_dd" command has a "man" page [section 8].
 
 "sgp_dd" uses POSIX threads and attempts to run multiple IO operations
 in parallel. The user can control the amount of parallelism from 
 1 worker (i.e. single threaded) through to 16 worker threads. This is
 done via the "thr=<n>" option (default 4). Copies from one sg device to
 another can be considerably faster due to this parallelism. There is
-also some speed benefit when raw devices are used. This command has a 
-"man" page [section 8].
+also some speed benefit when raw devices are used. To obtain fine level 
+SCSI command level control, sg devices should be used rather than block
+devices which will be interpreted as normal Unix files.
 
 "sgm_dd" is very similar to sg_dd but it uses mmap-ed IO on one of its
 given sg device names. If both "if" and "of" are sg devices then mmap-ed
 IO is selected on "if" while normal IO is selected on "of". Direct IO
-cannot be selected with this command. The "sgm_dd" command has a "man"
-page [section 8].
+cannot be selected with this command. To obtain fine level SCSI command
+level control, sg devices should be used rather than block devices which
+will be interpreted as normal Unix files. 
 
 "sgq_dd" is yet another implementation found in the archive directory.
 From the user point of view it is very similar to sgp_dd but uses a
@@ -137,66 +185,76 @@ non-blocking state machine rather then POSIX threads for parallelism.
 
 2) Scanning and mapping
 -----------------------
-"sg_scan" does a SCSI bus scan and prints the results to standard output.
-With no arguments only read permissions are needed on the sg devices
-but if "-i" is given (to do a SCSI Inquiry command on the device) then
-write permissions are also needed. This command has a "man" page
-[section 8].
+"sg_scan" does a scan of all sg device and prints the results to 
+standard output. Alternatively one or more device names can be
+given (e.g. 'sg_scan -i /dev/scd[01]') and these will be scanned instead
+of the sg devices. Additional information from the INQUIRY command can
+be obtained by using the "-i" option.
 
 "sg_map" shows the mapping between sg device names and those of the
 sd, sr and st device names. Some devices such as scanners have no
-corresponding sd, sr nor st device names. This command has a "man"
-page [section 8].
+corresponding sd, sr nor st device names.
 
 "scsi_devfs_scan" is a utility for doing a directory scan on a system
 running devfs to identify SCSI (and optionally IDE) devices. Various
 information (including an INQUIRY) can be listed for each found device.
- This command has a "man" page [section 8].
 
 
 3) SCSI support
 ---------------
-"sg_inq" is a utility for poking around the INQUIRY command which
+"sg_inq" is a utility for examining the INQUIRY command which
 contains much interesting information. It is based on SCSI 3's SPC-2
-document. Has switches to output "command support" and "vital product
-data" pages. It can output in formatted ASCII, hex or binary. This 
-command is applicable to SCSI 2 (and perhaps SCSI 1) devices as well.
-The "sg_inq" command has a "man" page [section 8].
+document. Has switches to output "vital product data" and "command support"
+(now obsolete) pages. It can output in formatted ASCII, hex or binary. 
+Has '-i' to decode the now mandatory device identification VPD page (0x83).
+This command is applicable to SCSI 2 (and perhaps SCSI 1) devices as well.
 
 The "scsi_inquiry" program shows the use of the SCSI_IOCTL_SEND_COMMAND
 ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the 
 SCSI sub system mid level and so is common to all sd, sr, st and sg devices. 
 This program has been placed in the "examples" subdirectory.
 
-"sginfo" is a re-porting of the "scsiinfo" program by Eric Youngdale to
-use the sg devices (rather than the sd, sr or st block devices). This
-program outputs "mode sense" information. Amongst other things it outputs
-the full defect list of a disk (which was truncated at 4096 bytes in
-the original). The "sginfo" command has a "man" page [section 8].
+"sginfo" is a port of the "scsiinfo" program by Eric Youngdale to use the sg
+devices. It can still take other SCSI device nodes (e.g. /dev/sda, /dev/st0 
+or /dev/hdc (if "hdc" is an ATAPI device)). This program outputs mode
+page (and subpage) information and allows it to be modified. Additionally 
+defect lists (for disks) can be output and information from the SCSI INQUIRY
+command is available.
 
 "sg_readcap" call a READ CAPACITY command on the given device. Now also
 supports "partial medium indicator" (PMI) flag that indicates where the
 next significant delay will be on the media (after a given address).
-The "sg_readcap" command has a "man" page [section 8].
 
-"sg_start" has been provided by Kurt Garloff <garloff@suse.de> for spinning
-up (or down) disks. The "sg_start" command has a "man" page [section 8] and
+"sg_start" has been provided by Kurt Garloff <garloff at suse dot de> 
+for spinning up (or down) disks.
 see the README.sg_start file.
 
 "sg_modes" and "sg_logs" print out mode sense pages and log sense pages 
-respectively.  The "sg_modes" and "sg_logs" commands have a "man" pages 
-[section 8].
+respectively.
 
 "sg_senddiag" permits various device self tests to be run. It can also
-list the diagnostic pages support by a device. The "sg_senddiag" command 
-has a "man" page [section 8].
+list the diagnostic pages support by a device.
 
 "sg_reset" exercises the SCSI device/bus/host reset capability. It is
 supported by the sg driver in lk 2.2.16 and beyond but associated
 SCSI middle level driver changes have not been accepted into the
 standard kernel at this time. Many distributions contain the patch to
-the mid-level that activates this feature. The "sg_reset" command has 
-a "man" page [section 8].
+the mid-level that activates this feature. Thi patch is in later
+lk 2.4 vesrions and in the lk 2.6 series. This utility will only
+work on sg device names.
+
+"sg_opcodes" lists available opcode names. It uses the REPORT SUPPORTED
+OPERATION CODES SCSI command which was introduced in February 2002
+(and replaced the Cmd modes (CmdDt bit) in the INQUIRY command). Opcode
+names include various SCSI commands with service actions (e.g.
+the Maintenance In command) and variable length commands.
+
+"sg_persist" accesses the Persistent Reservation In and Out commands.
+These are relatively complex commands and potential users are referred
+to the SPC-3 document at http://www.t10.org . That said, it is
+relatively safe to query the state of existing registrations and
+reservations with the PR In command (use the switch "--in" with
+sg_persist to enforce this).
 
 
 4) Timing and testing
@@ -205,12 +263,12 @@ a "man" page [section 8].
 bus bandwidth and the SCSI sub-system throughput to be measured.
 This can be done in 4 modes: normal transfer to user space, no
 transfer to user space, direct IO or mmap-ed IO. The latter one wins
-on my hardware. This command has a "man" page [section 8].
+on my hardware.
 
-"sg_test_rwbuf" is a program by Kurt Garloff <garloff@suse.de> that has
-the following description:  Program to test the SCSI host adapter by 
+"sg_test_rwbuf" is a program by Kurt Garloff <garloff at suse dot de> that
+has the following description:  Program to test the SCSI host adapter by 
 issueing write and read operations on a device's buffer and calculating 
-checksums. The "sg_test_rwbuf" command has a "man" page [section 8].
+checksums. 
 
 "sg_read" reads multiple blocks of data starting at the same logical
 address. It can time the transfers (potentially ignoring the first
@@ -219,11 +277,10 @@ disk manuafacturers, "MB" is 1,000,000 bytes in this context.] Its
 command line syntax is modelled on "sg_dd". It allows SCSI device,
 SCSI bus bandwidth and the SCSI sub-system throughput to be measured.
 This can be done in 3 modes: normal transfer to user space, direct
-IO or mmap-ed IO.  The "sg_read" command has a "man" page [section 8].
+IO or mmap-ed IO.
 
 "sg_turs" executes a user specified number of TEST UNIT READY commands on
 the given device. This can be used to time SCSI command overhead.
-The "sg_turs" command has a "man" page [section 8].
 
 "sg_debug" is effectively defunct now. The user can instead do:
 $ cat /proc/scsi/sg/debug . This command has been placed in the
@@ -255,7 +312,7 @@ All these example programs (plus scsi_inquiry) have been placed in the
 6) Miscellaneous
 ----------------
 "isosize" is a utility that gives the number of bytes in an iso9660
-file system. It is a rewrite by Andries Brouwer<Andries.Brouwer@cwi.nl>
+file system. It is a rewrite by Andries Brouwer<Andries.Brouwer at cwi dot nl>
 of a utility that first appeared in the cdwrite package but is now
 difficult to obtain. Note that the value given by isosize is usually
 2 or more blocks less than the READ CAPACITY SCSI command yields on
@@ -315,4 +372,4 @@ in scsirastools are:
   - sgdiag to perform format and other test functions
 
 Doug Gilbert
-13th May 2003
+8th July 2004

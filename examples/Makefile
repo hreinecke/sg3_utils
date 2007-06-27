@@ -8,14 +8,17 @@ CC = gcc
 LD = gcc
 
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
-	scsi_inquiry
+	sg_iovec_tst scsi_inquiry sg_excl
+
+# EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
+# 	  sg_simple_aio sg_iovec_tst scsi_inquiry sg_excl
 
 MAN_PGS = 
 MAN_PREF = man8
 
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
-CFLAGS = -g -O2 -Wall -D_REENTRANT $(LARGE_FILE_FLAGS)
+CFLAGS = -g -O2 -W -Wall -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -Wall -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -Wall -pedantic -D_REENTRANT $(LARGE_FILE_FLAGS)
 
@@ -45,8 +48,17 @@ sg_simple4: sg_simple4.o ../sg_err.o
 sg_simple16: sg_simple16.o ../sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
+sg_simple_aio: sg_simple_aio.o ../sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^ -l aio
+
+sg_iovec_tst: sg_iovec_tst.o ../sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
 scsi_inquiry: scsi_inquiry.o
 	$(LD) -o $@ $(LDFLAGS) $^ 
+
+sg_excl: sg_excl.o ../sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)
 	install -d $(INSTDIR)

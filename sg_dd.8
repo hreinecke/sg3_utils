@@ -1,41 +1,50 @@
-.TH SG_DD "8" "April 2003" "sg3_utils-1.04" SG3_UTILS
+.TH SG_DD "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
 .SH NAME
-sg_dd \- copies data to and from sg and raw devices
+sg_dd \- copies data to and from files and devices. Specialised for
+devices that understand the SCSI command set.
 .SH SYNOPSIS
 .B sg_dd
 [\fIappend=0|1\fR] [\fIblk_sgio=0|1\fR] [\fIbpt=<n>\fR] [\fIbs=<n>\fR]
-[\fIcdbsz=6|10|12|16\fR] [\fIcoe=0|1\fR] [\fIcount=<n>\fR] [dio=0|1]
+[\fIcdbsz=6|10|12|16\fR] [\fIcoe=0|1\fR] [\fIcount=<n>\fR] [\fIdio=0|1\fR]
 [\fIfua=0|1|2|3\fR] [\fIibs=<n>\fR] [\fIif=<ifile>\fR] [\fIobs=<n>\fR]
 [\fIodir=0|1\fR] [\fIof=<ofile>\fR] [\fIseek=<n>\fR] [\fIskip=<n>\fR]
 [\fIsync=0|1\fR] [\fItime=0|1\fR] [\fI--version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Copy data to and from Linux SCSI generic (sg) devices, raw devices and 
-those block devices that support the SG_IO ioctl (which are only found
-in the lk 2.5 series). Data may be copied to and from normal files
-as well.
-Similar syntax and semantics to 
+Copy data to and from any files. Specialised for "files" that are
+Linux SCSI generic (sg) devices, raw devices and those block devices
+that support the SG_IO ioctl (which are only found in the lk 2.6
+series). Similar syntax and semantics to
 .B dd(1) 
 but does not perform any conversions.
 .TP
 append=0 | 1
 when set to 1 the output will be appended to the normal file given
 to the "of=<name>" argument. Appending only takes place to normal files:
-not pipes nor raw files nor sg devices. Error message produced if
-append=1 and seek=<n> where <n> > 0. Default is 0 which starts
-output at offset  of a normal file (subject to the "seek=" argument).
+not to pipes nor raw files nor sg devices nor block devices. Error
+message produced if append=1 and seek=<n> where <n> > 0. Default is 0
+which starts output at offset  of a normal file (subject to the "seek="
+argument).
 .TP
 blk_sgio=0 | 1
-when set to 0 block devices (e.g. /dev/sda) are treated like
-normal files. When set to 1 the block device is assumed to accept the
-SG_IO ioctl; this is only appropriate for kernels later than lk 2.5.48 .
+when set to 0, block devices (e.g. /dev/sda) are treated like normal
+files (i.e. 
+.B read(2)
+and 
+.B write(2)
+are used for IO). When set to 1, block 
+devices are assumed to accept the SG_IO ioctl and SCSI commands are
+issued for IO. This is only supported for 2.6 series kernels. Note
+that ATAPI devices (e.g. cd/dvd players) use the SCSI command set
+but ATA disks do not.
 Default is 0.
 .TP
 bpt=BLOCKS
 each IO transaction will be made using this number of blocks (or less if 
-near the end of count). Default is 128. So for an sg file and bs=512 each
-SCSI command conveys 64KB of data by default.
+near the end of count). Default is 128. So for bs=512 the reads and writes
+will each convey 64KB of data by default (less if near the end of the
+transfer or memory restrictions).
 .TP
 bs=BYTES
 this
@@ -47,18 +56,31 @@ is usually correct for disks but incorrect for cdroms (which normally
 have 2048 byte blocks).
 .TP
 cdbsz=6 | 10 | 12 | 16
-size of SCSI READ and/or WRITE commands issued on sg device names.
-Default is 10 byte SCSI command blocks
+size of SCSI READ and/or WRITE commands issued on sg device 
+names (or block devices when "blk_sgio=1" is given).
+Default is 10 byte SCSI command blocks (unless calculations indicate
+that a 4 byte block number may be exceeded, in which case it defaults
+to 16 byte SCSI commands).
 .TP
 coe=0 | 1
 set to 1 for continue on error: if reading assume zeros read, if writing 
 then ignore and continue. Only applies to errors on sg devices (e.g. 
 errors on normal files will stop sg_dd). Error messages are still sent to
-stderr.  Default is 0 for do not continue on error
+stderr. Similar to "conv=noerror" in the
+.B dd(1) 
+command. Default is 0 which implies stop on error.
 .TP
 count=BLOCKS
-copy this number of blocks. Default is minimum number that sg devices
-return from READ CAPACITY (if that works) or 0
+copy this number of blocks from 'if' to 'of'. Default is the 
+minimum (of 'if' and 'of') number of blocks that sg devices return from
+READ CAPACITY SCSI commands or that block devices report.
+Normal files are not probed for their size. If 'skip'
+or 'seek' are given and the count is derived (i.e. not explicitly given)
+then the derived count is scaled back so that the copy will not overrun the
+device. If the file name is a block device partition and count is not given
+then the size of the partition rather than the size of the whole device is
+used. If count is not given and cannot be derived then an error message
+is issued and no copy takes place.
 .TP
 dio=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
@@ -68,15 +90,16 @@ has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
 fua=0 | 1 | 2 | 3
 force unit access bit. When 3, fua is set on both "if" and "of", when 2, fua
-is set on "if", when 1, fua is set on "of", when 0, fua is cleared on both.
-6 byte SCSI READ and WRITE commands (cdbsz=6) do not support the fua bit.
-Only active for sg device file names
+is set on "if", when 1, fua is set on "of", when 0 (default), fua is cleared
+on both. 6 byte SCSI READ and WRITE commands (cdbsz=6) do not support the 
+fua bit. Only active for sg device file names
 .TP
 ibs=BYTES
 if given must be the same as bs
 .TP
 if=FILE
-read from FILE instead of stdin. A file name of - is taken to be stdin
+read from FILE instead of stdin. A file name of - is taken to be stdin.
+Starts reading at the beginning of FILE unless "skip" is given.
 .TP
 obs=BYTES
 if given must be the same as bs
@@ -92,17 +115,21 @@ of=FILE
 write to FILE instead of stdout. A file name of - is taken to be stdout.
 If FILE is /dev/null then no actual writes are performed. If FILE is .
 (period) then it is treated the same way as /dev/null (this is a
-shorthand notation)
+shorthand notation). If FILE exists then it is _not_ truncated; it is
+overwritten from the start of FILE unless "append=1" or "seek" is given.
 .TP
 seek=BLOCKS
-skip BLOCKS bs-sized blocks at start of output
+start writing BLOCKS bs-sized blocks from the start of the output file.
+Default is block 0 (i.e. start of file).
 .TP
 skip=BLOCKS
-skip BLOCKS bs-sized blocks at start of input
+start reading BLOCKS bs-sized blocks from the start of input file.
+Default is block 0 (i.e. start of file).
 .TP
 sync=0 | 1
 when 1, does SYNCHRONIZE CACHE command on "of" at the end of the transfer.
-Only active when "of" is a sg device file name
+Only active when "of" is a sg device file name or a block device 
+and "blk_sgio=1" is given.
 .TP
 time=0 | 1
 when 1, times transfer and does throughput calculation, outputting the
@@ -120,13 +147,23 @@ or sg_map before use.
 .PP
 The count is only deduced for sg devices (minimum > 0 if both input and
 output are sg devices) otherwise it defaults to 0. This is for safety!
-Raw device partition information can often be found with
+Raw disk partition information can often be found with
 .B fdisk(8)
 [the "-ul" argument is useful in this respect].
 .PP
 BYTES and BLOCKS may be followed by the following multiplicative suffixes:
 c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
-g *1,073,741,824; and G *1,000,000,000
+g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
+T *1,000,000,000,000 (the latter two can only be used for count, skip
+and seek values).
+.PP
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X". When hex numbers are given multipliers cannot be
+used.
+.PP
+The count, skip and seek parameters can take 64 bit values (i.e. very 
+big numbers). Other values are limited to what can fit in a signed
+32 bit number.
 .PP
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
@@ -169,21 +206,31 @@ To copy a SCSI disk partition to an IDE disk partition:
 This assumes a valid partition is found on the SCSI disk at the given
 skip block address (past the 5 GB point of that disk) and that
 the partition goes to the end of the SCSI disk. An explicit count
-is probably a safer option.
+is probably a safer option. The partition is copied to /dev/hda3 which
+is an offset into the IDE disk /dev/hda . The exact number of blocks
+read from /dev/sg0 are written to /dev/hda (i.e. no padding).
 .PP
-To time a streaming read of the first 1 GB on a disk this command
-could be used:
+To time a streaming read of the first 1 GB (2 ** 30 bytes) on a disk
+this command could be used:
 .PP
    sg_dd if=/dev/sg0 of=/dev/null bs=512 count=2m time=1
 .PP
 On completion this will output a line like:
 "time to transfer data was 18.779506 secs, 57.18 MB/sec". The "MB/sec"
 in this case is 1,000,000 bytes per second.
-.SH NOTE
+.SH NOTES
 For sg devices this command issues READ_10 and WRITE_10 SCSI commands which
 are appropriate for disks and CDROM players. Those commands are not
 formatted correctly for tape devices so sg_dd should not be used on
-tape devices.
+tape devices. If the largest block address of the requested transfer
+exceeds a 32 bit block number (i.e 0xffff) then a warning is issued and
+the sg device is accessed via READ_16 and WRITE_16 SCSI commands.
+.PP
+The attributes of a block device (partition) are ignored when 'blk_sgio=1'
+is used. Hence the whole device is read (rather than just the second
+partition) by this invocation:
+.PP
+   sg_dd if=/dev/sdb2 blk_sgio=1 of=t bs=512
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and
 SIGPIPE output the number of remaining blocks to be transferred and
@@ -193,9 +240,9 @@ All output caused by signals is sent to stderr.
 .SH AUTHORS
 Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
-Report bugs to <dgilbert@interlog.com>.
+Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2003 Douglas Gilbert
+Copyright \(co 2000-2004 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -207,5 +254,7 @@ is in the sg3_utils package. Another version from that package is called
 and it uses memory mapped IO to speed transfers from sg devices.
 The lmbench package contains
 .B lmdd
-which is also interesting.
+which is also interesting. For moving data to and from tapes see
+.B dt
+which is found at http://www.bit-net.com/~rmiller/dt.html. See also
 .B raw(8), dd(1)

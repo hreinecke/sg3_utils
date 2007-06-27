@@ -15,7 +15,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999-2002 D. Gilbert
+*  Copyright (C) 1999-2004 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -35,7 +35,7 @@
    The ability to time transfers internally (based on gettimeofday()) has
    been added with the '-t' option.
 
-   Version 4.73 (20020520)
+   Version 4.75 (20040608)
 */
 
 
@@ -73,7 +73,7 @@ int main(int argc, char * argv[])
     char * file_name = 0;
     size_t psz = getpagesize();
     int dio_incomplete = 0;
-    sg_io_hdr_t io_hdr;
+    struct sg_io_hdr io_hdr;
     struct timeval start_tm, end_tm;
 #ifdef SG_DEBUG
     int clear = 1;
@@ -117,7 +117,7 @@ int main(int argc, char * argv[])
     }
     if (0 == file_name) {
         printf("Usage: sg_rbuf [[-q] | [-d] | [-m]] [-t] [-b=num] [-s=num] "
-	       "<generic_device>\n");
+               "<generic_device>\n");
         printf("  where: -q       quick, don't xfer to user space\n");
         printf("         -d       requests dio ('-q' overrides it)\n");
         printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
@@ -135,18 +135,13 @@ int main(int argc, char * argv[])
         return 1;
     }
     /* Don't worry, being very careful not to write to a none-sg file ... */
-    res = ioctl(sg_fd, SG_GET_VERSION_NUM, &k);
-    if ((res < 0) || (k < 30000)) {
-        printf(ME "not a sg device, or driver prior to 3.x\n");
-        return 1;
-    }
     if (do_mmap) {
-    	do_dio = 0;
-    	do_quick = 0;
+        do_dio = 0;
+        do_quick = 0;
     }
     if (NULL == (rawp = malloc(512))) {
-	printf(ME "out of memory (query)\n");
-	return 1;
+        printf(ME "out of memory (query)\n");
+        return 1;
     }
     rbBuff = rawp;
 
@@ -154,7 +149,7 @@ int main(int argc, char * argv[])
     rbCmdBlk[0] = RB_OPCODE;
     rbCmdBlk[1] = RB_MODE_DESC;
     rbCmdBlk[8] = RB_DESC_LEN;
-    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(rbCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_buffer);
@@ -198,48 +193,48 @@ int main(int argc, char * argv[])
         return 1;
     }
     if (rawp) {
-	free(rawp);
-	rawp = NULL;
+        free(rawp);
+        rawp = NULL;
     }
 
     if (! do_dio) {
-    	k = buf_size;
-	if (do_mmap && (0 != (k % psz)))
-	    k = ((k / psz) + 1) * psz;  /* round up to page size */
+        k = buf_size;
+        if (do_mmap && (0 != (k % psz)))
+            k = ((k / psz) + 1) * psz;  /* round up to page size */
         res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &k);
         if (res < 0)
             perror(ME "SG_SET_RESERVED_SIZE error");
     }
 
     if (do_mmap) {
-	rbBuff = mmap(NULL, buf_size, PROT_READ, MAP_SHARED, sg_fd, 0);
-	if (MAP_FAILED == rbBuff) {
-	    if (ENOMEM == errno)
-	    	printf(ME "mmap() out of memory, try a smaller "
-		       "buffer size than %d KB\n", buf_size / 1024);
-	    else
-		perror(ME "error using mmap()");
-	    return 1;
-	}
+        rbBuff = mmap(NULL, buf_size, PROT_READ, MAP_SHARED, sg_fd, 0);
+        if (MAP_FAILED == rbBuff) {
+            if (ENOMEM == errno)
+                printf(ME "mmap() out of memory, try a smaller "
+                       "buffer size than %d KB\n", buf_size / 1024);
+            else
+                perror(ME "error using mmap()");
+            return 1;
+        }
     }
     else { /* non mmap-ed IO */
-	rawp = malloc(buf_size + (do_dio ? psz : 0));
-	if (NULL == rawp) {
-	    printf(ME "out of memory (data)\n");
-	    return 1;
-	}
-	if (do_dio)    /* align to page boundary */
-	    rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
-				      (~(psz - 1)));
-	else
-	    rbBuff = rawp;
+        rawp = malloc(buf_size + (do_dio ? psz : 0));
+        if (NULL == rawp) {
+            printf(ME "out of memory (data)\n");
+            return 1;
+        }
+        if (do_dio)    /* align to page boundary */
+            rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
+                                      (~(psz - 1)));
+        else
+            rbBuff = rawp;
     }
 
     num = (total_size_mb * 1024U * 1024U) / (unsigned int)buf_size;
     if (do_time) {
-	start_tm.tv_sec = 0;
-	start_tm.tv_usec = 0;
-	gettimeofday(&start_tm, NULL);
+        start_tm.tv_sec = 0;
+        start_tm.tv_usec = 0;
+        gettimeofday(&start_tm, NULL);
     }
     /* main data reading loop */
     for (k = 0; k < num; ++k) {
@@ -253,14 +248,14 @@ int main(int argc, char * argv[])
         memset(rbBuff, 0, buf_size);
 #endif
 
-        memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+        memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
         io_hdr.interface_id = 'S';
         io_hdr.cmd_len = sizeof(rbCmdBlk);
         io_hdr.mx_sb_len = sizeof(sense_buffer);
         io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
         io_hdr.dxfer_len = buf_size;
-	if (! do_mmap)
-	    io_hdr.dxferp = rbBuff;
+        if (! do_mmap)
+            io_hdr.dxferp = rbBuff;
         io_hdr.cmdp = rbCmdBlk;
         io_hdr.sbp = sense_buffer;
         io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
@@ -273,11 +268,11 @@ int main(int argc, char * argv[])
             io_hdr.flags |= SG_FLAG_NO_DXFER;
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-	    if (ENOMEM == errno)
-	    	printf(ME "SG_IO data; out of memory, try a smaller "
-		       "buffer size than %d KB\n", buf_size / 1024);
+            if (ENOMEM == errno)
+                printf(ME "SG_IO data; out of memory, try a smaller "
+                       "buffer size than %d KB\n", buf_size / 1024);
             else
-	    	perror(ME "SG_IO READ BUFFER data error");
+                perror(ME "SG_IO READ BUFFER data error");
             if (rawp) free(rawp);
             return 1;
         }
@@ -310,31 +305,31 @@ int main(int argc, char * argv[])
 #endif
     }
     if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
-	struct timeval res_tm;
-	double a, b;
+        struct timeval res_tm;
+        double a, b;
 
         gettimeofday(&end_tm, NULL);
-	res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
-	res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
-	if (res_tm.tv_usec < 0) {
-	    --res_tm.tv_sec;
-	    res_tm.tv_usec += 1000000;
-	}
-	a = res_tm.tv_sec;
-	a += (0.000001 * res_tm.tv_usec);
-	b = (double)buf_size * num;
-	printf("time to read data from buffer was %d.%06d secs", 
-	       (int)res_tm.tv_sec, (int)res_tm.tv_usec);
-	if ((a > 0.00001) && (b > 511))
-	    printf(", %.2f MB/sec\n", b / (a * 1000000.0));
-	else
-	    printf("\n");
+        res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
+        res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
+        if (res_tm.tv_usec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_usec += 1000000;
+        }
+        a = res_tm.tv_sec;
+        a += (0.000001 * res_tm.tv_usec);
+        b = (double)buf_size * num;
+        printf("time to read data from buffer was %d.%06d secs", 
+               (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+        if ((a > 0.00001) && (b > 511))
+            printf(", %.2f MB/sec\n", b / (a * 1000000.0));
+        else
+            printf("\n");
     }
     if (dio_incomplete)
         printf(">> direct IO requested but not done\n");
     printf("Read %u MBytes (actual %u MB, %u bytes), buffer size=%d KBytes\n",
-	   total_size_mb, (num * buf_size) / 1048576, num * buf_size,
-	   buf_size / 1024);
+           total_size_mb, (num * buf_size) / 1048576, num * buf_size,
+           buf_size / 1024);
 
     if (rawp) free(rawp);
     res = close(sg_fd);

@@ -22,8 +22,8 @@ been set up which builds:
 The sg_err.h and llseek.h headers have simply been copied from the parent
 directory.
 
-The very useful rescan-scsi-bus.sh script from Kurt Garloff<kurt@garloff.de>
-is included in this directory.
+The very useful rescan-scsi-bus.sh script from Kurt Garloff
+<kurt at garloff dot de> is included in this directory.
 
 A test program called sg_bus_xfer.c exercises a patch that adds a
 SG_FLAG_BUS_ADDR capability. This allows a bus address (e.g. PCI

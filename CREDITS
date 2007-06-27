@@ -1,33 +1,39 @@
 The author of sg3_utils would like to thank the following people who
 have made contributions:
 
-Andries Brouwer <aebr@win.tue.nl> rewrite of isosize (original written
-	by Joerg Schilling). isosize is now found in the util-linux
+Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
+	written by Joerg Schilling). isosize is now found in the util-linux
 	package and in the archive directory of this package.
 
-Eric Schwartz <emschwar@debian.org> who wrote these man pages:
+Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
 	sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
 	sg_turs and sginfo
 
-Eric Youngdale <eric@andante.org> author of scsi_info on which sginfo
+Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
 	is based.
 
 F. Jansen: additions to sg_scan
 
-Heiko Eissfeldt <heiko@colossus.escape.de> sg based example programs for
-	the original sg driver
+Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example 
+	programs for the original sg driver
 
-Kurt Garloff <garloff@suse.de> original sg_start and sg_test_rwbuf.
+Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
 	Additions to sginfo and sg_map.
 
-Martin Schwenke <martin@meltin.net> added the raw switch "-r" to sg_inq
+Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
-Peter Allworth <linsol@zeta.org.au> original dd clone design used by
+Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
+        values in sg_dd (and friends); also problems when reading /dev/null
+
+Peter Allworth <linsol at zeta dot org dot au> original dd clone design used by
 	sg3_utils's dd variants (e.g. sg_dd).
 
-Trent Piepho <xyzzy@speakeasy.org> print out some "sense key specific" data
-	and "-6" switch for sg_modes
+Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
+	to sort defect list by head.
+
+Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific" 
+	data and "-6" switch for sg_modes
 
 
 Doug Gilbert
-6th May 2003
+8th July 2004

@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "April 2003" "sg3_utils-1.04" SG3_UTILS
+.TH SG_SENDDIAG "8" "November 2003" "sg3_utils-1.05" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -21,7 +21,7 @@ when '-t' option is set for the default self test. In this sense the 'Device'
 is a target (with all contained logical units potentially impacted).
 .TP
 -e
-outputs the time taken for the previous extended self test. The duration
+outputs the expected extended self test duration. The duration
 is given in seconds (and minutes in parentheses). This figure is obtained
 from mode page 0xa (control page).
 .TP
@@ -66,7 +66,7 @@ minutes with my disks). The foreground self test codes wait until they
 are completed while the background self test codes return immediately.
 The results of both foreground and background self test codes are
 placed in the 'self test results' log page (see sg_logs). The SCSI command
-timeout for this utility is set to 40 minutes to allow for slow foreground
+timeout for this utility is set to 60 minutes to allow for slow foreground
 extended self tests.
 .PP
 If the given device is a disk then no file systems residing on that disk
@@ -75,13 +75,13 @@ other SCSI commands may become queued behind the foreground self test and
 timeout.
 .PP
 In the 2.4 series of Linux kernels the given device must be
-a SCSI generic (sg) device. In the 2.5 series block devices (e.g. disks
+a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and SCSI DVDs) can also be specified. For example 'sg_senddiag -t /dev/sda'
-will work in the 2.5 series kernels.
+will work in the 2.6 series kernels.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
-Report bugs to <dgilbert@interlog.com>.
+Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
 Copyright \(co 2003 Douglas Gilbert
 .br

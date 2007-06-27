@@ -1,0 +1,184 @@
+.TH SG_PERSIST "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
+.SH NAME
+sg_persist \- use the Persistent Reservation In and Out SCSI commands
+to manipulate registrations and reservations
+.SH SYNOPSIS
+.B sg_persist
+[\fI<options>\fR] [\fI<scsi_device>\fR] [\fI<extra_args>\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility allows Persistent reservations and registrations to be
+queried and changed. Persistent reservations and registrations are
+queried by the Persistent Reservation In (PRIN) SCSI command with an
+appropriate service action. Persistent reservations and registrations 
+are changed by the Persistent Reservation Out (PROUT) SCSI command.
+.PP
+It is relatively safe to query the state of Persistent reservations and
+registrations. With no options this utility defaults to a PRIN command
+with a READ KEYS service action. Other PRIN service actions are
+READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
+.PP
+Before trying to change Persistent reservations and registrations users
+should be aware of what they are doing! The relevant sections of the
+SCSI Primary Commands document (SPC-3 most recent draft revision 19
+dated 30th May 2004) are sections 5.6 (general information), 6.11 (for
+PRIN) and 6.12 (for PROUT). To safeguard against accidental use 
+the '--out' option together with a relevant service 
+action (e.g. '--register') must be given.
+.PP
+The older SCSI Reserve and Release commands (both 6 and 10 byte variants)
+are not supported by this utility. In SPC-3 Reserve and Release are 
+deprecated, replaced by Persistent Reservations. See a utility called
+scsires for support of the SCSI Reserve and Release commands.
+.SH OPTIONS
+.TP
+--clear | -C
+Clear is a service action of the PROUT command. It releases the
+persistent reservation (if any) and clears all registrations from the
+device.
+.TP
+--device=<scsi_device> | -d <scsi_device>
+This utility needs to have a scsi_device to be specified. This can either
+be as an argument to '--device' or '-d' or just the first non-option
+argument.
+.TP
+--help | -h
+output a usage message.
+.TP
+--hex | -H
+the response to a valid PRIN command will be output in hexadecimal.
+Normally if the PRIN service action is recognised then the response
+will be decoded as per SPC-3.
+.TP
+--in | -i
+specify that a Persistent Reservation In SCSI command is required. This
+is the default.
+.TP
+--out | -o
+specify that a Persistent Reservation Out SCSI command is required.
+.TP
+--no-inquiry | -n
+the default action is to do a standard INQUIRY SCSI command and output
+make, product and revision strings plus the peripheral device type
+prior to executing a PR In or Out command. With this option the
+INQUIRY command is skipped.
+.TP
+--param-alltgpt | -Y
+set the 'all target ports' (ALL_TG_PT) flag in the parameter block of the
+PROUT command. Only relevant to register and register and ignore existing
+key service actions.
+.TP
+--param-aptpl | -Z
+set the 'activate persist through power loss' (APTPL) flag in the parameter
+block of the PROUT command. Only relevant to register and register and
+ignore existing key service actions.
+.TP
+--param-rk=<h> | -K <h>
+specify the reservation key found in the parameter block of the PROUT
+command. Argument is assumed to be hex (up to 8 bytes long). Default value
+is 0.
+.TP
+--param-sark=<h> | -S <h>
+specify the service action reservation key found in the parameter block
+of the PROUT command. Argument is assumed to be hex (up to 8 bytes long).
+Default value is 0.
+.TP
+--preempt | -P
+Preempt and Abort is a service action of the PROUT command. Preempts
+the existing persistent reservation (identified by '--param-sark') with
+the current I_T_L nexus (identified by '--param-rk').
+.TP
+--preempt-abort | -A
+Preempt and Abort is a service action of the PROUT command. Preempts
+the existing persistent reservation (identified by '--param-sark') with
+the current I_T_L nexus (identified by '--param-rk'). ACA and other
+pending tasks are aborted.
+.TP
+--prout-type=<h> | -T <h>
+specify the PROUT command's 'type' argument. Used in the reserve and
+release service actions. Valid arguments: 1-> write exclusive, 3->
+exclusive access, 5-> write exclusive - registrants only, 6-> 
+exclusive access - registrants only, 7-> write exclusive - all registrants,
+8-> exclusive access - all registrants. Default value is 0 (which is
+an invalid type).
+.TP
+--read-full-status | -s
+for each registration with the given SCSI device, list the reservation key
+and associated information.
+.TP
+--read-keys | -k
+list all the reservation keys registered with the given SCSI device. This
+is the default service action for the PRIN SCSI command.
+.TP
+--read-reservation | -r
+list information about the current holder of the reservation on the given
+device. If there is no current reservation this will be noted. Information
+about the current holder of the reservation includes its reservation key,
+scope and type.
+.TP
+--read-status | -s
+same as 'read-full-status'.
+.TP
+--register | -G
+register is a service action of the PROUT command. It has 3 different
+actions depending on associated parameters. 1) add a new registration 
+with '--param-rk=0' and '--param-sark=<new_rk>'. 2) Change an existing
+registration with '--param-rk=<old_rk>' and '--param-sark=<new_rk>'.
+3) Delete an existing registration with '--param-rk=<old_rk>' 
+and '--param-sark=0'.
+.TP
+--register-ignore | -I
+register and ignore existing key is a service action of the PROUT command.
+Similar to '--register' except that when changing a reservation key the
+old key is not specified.
+.TP
+--release | -L
+release is a service action of the PROUT command. It releases the
+current persistent reservation.
+.TP
+--report-capabilities | -c
+list information about the aspects of persistent reservations that the
+given device supports. Support for "transport IDs" is incomplete;
+the '--hex' option may help if they are available.
+.TP
+--reserve | -R
+reserve is a service action of the PROUT command. It creates a new
+persistent reservation (if permitted).
+.TP
+--verbose | -v
+print out cdb of issued commands prior to execution. If used twice
+prints out the parameter block of the PROUT command.
+.TP
+--version | -V
+print out version string. Ignore all other parameters.
+.TP
+-?
+output usage message. Ignore all other parameters.
+.PP
+In the 2.4 series of Linux kernels the given device must be
+a SCSI generic (sg) device. In the 2.6 series any SCSI device 
+name (e.g. /dev/sdc, /dev/st1m or /dev/sg3) can be specified. 
+For example "sg_persist --read-keys /dev/sda"
+will work in the 2.6 series kernels.
+.SH NOTES
+Transport IDs appended to the end of the parameter block for the PROUT
+command are not supported. Accordingly there is not option to set
+the 'SPEC_I_PT' flag in the parameter block. However Transport ID
+descriptors returned by PRIN Read Full Status service action are
+decoded.
+.PP
+The only scope for PROUT commands supported in the current draft of 
+SPC-3 is "LU_SCOPE". Hence there seems to be no point in offering a
+switch to set scope to another value.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B scsires(internet)

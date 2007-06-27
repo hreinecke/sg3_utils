@@ -6,14 +6,14 @@ MANDIR=/usr/local/man
 CC = gcc
 LD = gcc
 
-EXECS = sgq_dd sg_poll sg_bus_xfer sg_hold sg_debug isosize
+EXECS = sgq_dd sg_poll sg_bus_xfer sg_hold sg_debug isosize scsi_devfs_scan
 
 COMMON = isosize
 
 MAN_PGS = isosize.8
 MAN_PREF = man8
 
-CFLAGS = -g -O2 -Wall -D_REENTRANT
+CFLAGS = -g -O2 -W -Wall -D_REENTRANT
 # CFLAGS = -g -O2 -Wall -pedantic -D_REENTRANT
 
 LDFLAGS =
@@ -42,6 +42,9 @@ sg_hold: sg_hold.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 isosize: isosize.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+scsi_devfs_scan: scsi_devfs_scan.o ../sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_debug: sg_debug.o

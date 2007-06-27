@@ -2,4 +2,27 @@ make
 make install
 
 Unless overridden or edited in the Makefile, INSTDIR places the executables
-in /usr/local/bin while MANDIR places the man pages in /usr/local/man .
+in the /usr/local/bin directory while MANDIR places the man pages in the
+/usr/local/man directory.
+
+Other Makefile targets that might be useful:
+make clean	# remove .o, executables, core and .depend file
+make depend	# generate dependency hierarchy in .depend file
+make dep   	# same as 'make depend'
+make sg_scan   	# build a specific executable (e.g. 'sg_scan')
+make uninstall
+
+Note that the main Makefile does _not_ call the Makefiles in the
+subdirectories (i.e. archive, examples and utils directories).
+
+
+A "spec" file is included for building rpm packages. Place a copy of
+the tarball in the "SOURCES" directory and place a copy of sg3_utils.spec
+in the "SPEC" directory. Then from the "SPEC" directory execute 
+"rpmbuild -ba sg3_utils.spec". If all goes well a source rpm should be 
+found in the SRPMS directory and a binary rpm in the RPMS/i386 directory
+(for i386 architecture). Note the spec file will only build those utilities
+in the main directory. When the binary rpm is installed the executables
+and their associated man pages should be placed in appropriate places.
+
+10th December 2003
