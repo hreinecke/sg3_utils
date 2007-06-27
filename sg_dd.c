@@ -51,7 +51,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.61 20070318";
+static char * version_str = "5.62 20070606";
 
 #define ME "sg_dd: "
 
@@ -78,6 +78,7 @@ static char * version_str = "5.61 20070318";
 #define RCAP16_REPLY_LEN 32
 #define READ_LONG_OPCODE 0x3E
 #define READ_LONG_CMD_LEN 10
+#define READ_LONG_DEF_BLK_INC 8
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
@@ -114,6 +115,7 @@ static long long in_full = 0;
 static int in_partial = 0;
 static long long out_full = 0;
 static int out_partial = 0;
+static long long out_sparse = 0;
 static int recovered_errs = 0;
 static int unrecovered_errs = 0;
 static int read_longs = 0;
@@ -128,6 +130,9 @@ static int max_uas = MAX_UNIT_ATTENTIONS;
 static int max_aborted = MAX_ABORTED_CMDS;
 static int coe_limit = 0;
 static int coe_count = 0;
+
+static unsigned char * zeros_buff = NULL;
+static int read_long_blk_inc = READ_LONG_DEF_BLK_INC;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -144,6 +149,7 @@ struct flags_t {
     int pdt;
     int cdbsz;
     int retries;
+    int sparse;
 };
 
 static struct flags_t iflag;
@@ -172,6 +178,8 @@ static void print_stats(const char * str)
             in_partial);
     fprintf(stderr, "%s%lld+%d records out\n", str, out_full - out_partial, 
             out_partial);
+    if (oflag.sparse)
+        fprintf(stderr, "%s%lld bypassed records out\n", str, out_sparse);
     if (recovered_errs > 0)
         fprintf(stderr, "%s%d recovered errors\n", str, recovered_errs);
     if (num_retries > 0)
@@ -291,7 +299,7 @@ static void usage()
            "    if          file or device to read from (def: stdin)\n"
            "    iflag       comma separated list from: [coe,dio,direct,"
            "dpo,dsync,excl,\n"
-           "                fua,sgio]\n"
+           "                fua,null, sgio]\n"
            "    obs         output block size (if given must be same as "
            "'bs=')\n"
            "    odir        1->use O_DIRECT when opening block dev, "
@@ -301,8 +309,8 @@ static void usage()
     fprintf(stderr,
            "                treated as /dev/null\n"
            "    oflag       comma separated list from: [append,coe,dio,"
-           "direct,dpo,dsync,\n"
-           "                excl,fua,sgio]\n"
+           "direct,dpo,\n"
+           "                dsync,excl,fua,null,sgio,sparse]\n"
            "    retries     retry sgio errors RETR times (def: 0)\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
@@ -766,7 +774,8 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             }
             corrct = (ifp->coe > 2) ? 1 : 0;
             res = sg_ll_read_long10(sg_fd, /* pblock */0, corrct, lba, buffp,
-                                    bs + 8, &offset, 1, verbose);
+                                    bs + read_long_blk_inc, &offset, 1,
+                                    verbose);
             ok = 0;
             switch (res) {
             case 0:
@@ -774,12 +783,15 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                 ++read_longs;
                 break;
             case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
-                nl = bs + 8 - offset;
+                nl = bs + read_long_blk_inc - offset;
                 if ((nl < 32) || (nl > (bs * 2))) {
                     fprintf(stderr, ">> read_long(10) len=%d unexpected\n",
                             nl);
                     break;
                 }
+                /* remember for next read_long attempt, if required */
+                read_long_blk_inc = nl - bs;
+                
                 if (verbose)
                     fprintf(stderr, "read_long(10): adjusted len=%d\n", nl);
                 r = sg_ll_read_long10(sg_fd, 0, corrct, lba, buffp, nl,
@@ -1005,8 +1017,12 @@ static int process_flags(const char * arg, struct flags_t * fp)
             fp->excl = 1;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = 1;
+        else if (0 == strcmp(cp, "null"))
+            ;
         else if (0 == strcmp(cp, "sgio"))
             fp->sgio = 1;
+        else if (0 == strcmp(cp, "sparse"))
+            ++fp->sparse;
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
@@ -1036,8 +1052,9 @@ int main(int argc, char * argv[])
     int cdbsz_given = 0;
     int do_sync = 0;
     int verb = 0;
+    int blocks = 0;
     int res, k, t, buf_sz, dio_tmp, flags, fl, first;
-    int infd, outfd, blocks, retries_tmp, blks_read;
+    int infd, outfd, retries_tmp, blks_read;
     unsigned char * wrkBuff;
     unsigned char * wrkPos;
     long long in_num_sect = -1;
@@ -1046,6 +1063,9 @@ int main(int argc, char * argv[])
     char ebuff[EBUFF_SZ];
     int blocks_per;
     struct sg_simple_inquiry_resp sir;
+    int sparse_skip = 0;
+    int penult_sparse_skip = 0;
+    int penult_blocks = 0;
     int ret = 0;
 
     inf[0] = '\0';
@@ -1204,6 +1224,9 @@ int main(int argc, char * argv[])
         fprintf(stderr, "bpt must be greater than 0\n");
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (iflag.sparse)
+        fprintf(stderr, "sparse flag ignored for iflag\n");
+
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
        SG_IO ioctl. So reduce it in that case. */
@@ -1424,6 +1447,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (oflag.sparse) {
+        if (STDOUT_FILENO == outfd) {
+            fprintf(stderr, "oflag=sparse needs seekable output file\n"); 
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
 
     if ((dd_count < 0) || ((verbose > 0) && (0 == dd_count))) {
         in_num_sect = -1;
@@ -1573,6 +1602,9 @@ int main(int argc, char * argv[])
 
     /* <<< main loop that does the copy >>> */
     while (dd_count > 0) {
+        penult_sparse_skip = sparse_skip;
+        penult_blocks = penult_sparse_skip ? blocks : 0;
+        sparse_skip = 0;
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG & in_type) {
             dio_tmp = iflag.dio;
@@ -1636,7 +1668,50 @@ int main(int argc, char * argv[])
         if (0 == blocks)
             break;      /* nothing read so leave loop */
 
-        if (FT_SG & out_type) {
+        if ((oflag.sparse) && (dd_count > blocks) &&
+            (! (FT_DEV_NULL & out_type))) {
+            if (NULL == zeros_buff) {
+                zeros_buff = (unsigned char *)malloc(blocks * blk_sz);
+                if (NULL == zeros_buff) {
+                    fprintf(stderr, "zeros_buff malloc failed\n");
+                    ret = -1;
+                    break;
+                }
+                memset(zeros_buff, 0, blocks * blk_sz);
+            }
+            if (0 == memcmp(wrkPos, zeros_buff, blocks * blk_sz))
+                sparse_skip = 1;
+        }
+        if (sparse_skip) {
+            if (FT_SG & out_type) {
+                out_sparse += blocks;
+                if (verbose > 2)
+                    fprintf(stderr, "sparse bypassing sg_write: seek "
+                            "blk=%lld, offset blks=%d\n", seek, blocks);
+            } else if (FT_DEV_NULL & out_type)
+                ;
+            else {
+                off64_t offset = blocks * blk_sz;
+                off64_t off_res;
+
+                if (verbose > 2)
+                    fprintf(stderr, "sparse bypassing write: "
+                            "seek=%lld, rel offset=%lld\n", (seek * blk_sz),
+                            (long long)offset);
+                off_res = lseek64(outfd, offset, SEEK_CUR);
+                if (off_res < 0) {
+                    fprintf(stderr, "sparse tried to bypass write: "
+                            "seek=%lld, rel offset=%lld but ...\n",
+                            (seek * blk_sz), (long long)offset);
+                    perror("lseek64 on output");
+                    ret = SG_LIB_FILE_ERROR;
+                    break;
+                } else if (verbose > 4)
+                    fprintf(stderr, "oflag=sparse lseek64 result=%lld\n",
+                           (long long)off_res);
+                out_sparse += blocks;
+            }
+        } else if (FT_SG & out_type) {
             dio_tmp = oflag.dio;
             retries_tmp = oflag.retries;
             first = 1;
@@ -1729,6 +1804,25 @@ int main(int argc, char * argv[])
         skip += blocks;
         seek += blocks;
     } /* end of main loop that does the copy ... */
+    if (ret && penult_sparse_skip && (penult_blocks > 0)) {
+        /* if error and skipped last output due to sparse ... */
+        if ((FT_SG & out_type) || (FT_DEV_NULL & out_type))
+            ;
+        else {
+            /* ... try writing to extend ofile to length prior to error */
+            while (((res = write(outfd, zeros_buff, penult_blocks * blk_sz))
+                    < 0) && (EINTR == errno))
+                ;
+            if (verbose > 2)
+                fprintf(stderr, "write(unix, sparse after error): count=%d, "
+                        "res=%d\n", penult_blocks * blk_sz, res);
+            if (res < 0) {
+                snprintf(ebuff, EBUFF_SZ, ME "writing(sparse after error), "
+                        "seek=%lld ", seek);
+                perror(ebuff);
+            }
+        }
+    }
 
     if (do_time)
         calc_duration_throughput(0);

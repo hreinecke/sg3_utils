@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.24
+Version: 1.25
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -137,6 +137,10 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Wed Jun 06 2007 - dgilbert at interlog dot com
+- sg_dd oflag=sparse,null
+  * sg3_utils-1.25
+
 * Mon May 07 2007 - dgilbert at interlog dot com
 - add sg_raw; sg_rtpg, sg_log, sg_inq and sg_format updates
   * sg3_utils-1.24
