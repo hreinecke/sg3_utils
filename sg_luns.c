@@ -47,7 +47,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.02 20041229";
+static char * version_str = "1.03 20050808";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -78,7 +78,8 @@ static void usage()
           "logical unit numbers\n"
           "                               2 -> all luns\n"
           "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n"
+          "         --version|-V       print version string and exit\n\n"
+          "Performs a REPORT LUNS SCSI command\n"
           );
 
 }
@@ -298,6 +299,11 @@ int main(int argc, char * argv[])
                 "mandatory in SPC-3)\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "Report Luns command has bad fields in cdb\n");
+    else {
+        fprintf(stderr, "Report Luns command failed\n");
+        if (0 == verbose)
+            fprintf(stderr, "    try '-v' option for more information\n");
+    }
 
     res = close(sg_fd);
     if (res < 0) {

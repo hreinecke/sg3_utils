@@ -31,10 +31,12 @@ extern int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc,
                               int mx_resp_len, int noisy, int verbose);
 
 extern int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
-                            void * resp, int mx_resp_len, int verbose);
+                            void * resp, int mx_resp_len, int noisy,
+                            int verbose);
 
 extern int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
-                            void * resp, int mx_resp_len, int verbose);
+                            void * resp, int mx_resp_len, int noisy,
+                            int verbose);
 
 extern int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
                                int dl_format, void * resp, int mx_resp_len,
@@ -54,7 +56,7 @@ extern int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
                                     int mx_resp_len, int noisy, int verbose);
 
 extern int sg_ll_request_sense(int sg_fd, int desc, void * resp,
-                               int mx_resp_len, int verbose);
+                               int mx_resp_len, int noisy, int verbose);
 
 extern int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
                            int devofl_bit, int unitofl_bit, int long_duration,
@@ -67,6 +69,18 @@ extern int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
 
 extern int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy,
                                  int verbose);
+
+extern int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
+                                 int loej, int start, int noisy, int verbose);
+
+extern int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy,
+                               int verbose);
+
+extern int sg_ll_report_dev_id(int sg_fd, void * resp, int max_resp_len,
+                               int noisy, int verbose);
+
+extern int sg_ll_set_dev_id(int sg_fd, void * paramp, int param_len,
+                               int noisy, int verbose);
 
 
 struct sg_simple_inquiry_resp {

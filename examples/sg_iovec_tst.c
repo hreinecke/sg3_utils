@@ -34,7 +34,7 @@
 #define IOVEC_ELEMS 2048
 
 #define SENSE_BUFF_LEN 32
-#define DEF_TIMEOUT 40000	/* 40,000 milliseconds */
+#define DEF_TIMEOUT 40000       /* 40,000 milliseconds */
 
 struct sg_iovec iovec[IOVEC_ELEMS];
 
@@ -57,15 +57,15 @@ int sg_read(int sg_fd, unsigned char * buff, int num_blocks, int from_block,
 
     for (k = 0, pos = 0, rem = dxfer_len; k < IOVEC_ELEMS; ++k) {
         iovec[k].iov_base = buff + pos;
-	iovec[k].iov_len = (rem > A_PRIME) ? A_PRIME : rem;
-	if (rem <= A_PRIME)
-	    break;
+        iovec[k].iov_len = (rem > A_PRIME) ? A_PRIME : rem;
+        if (rem <= A_PRIME)
+            break;
         pos += A_PRIME;
         rem -= A_PRIME;
     }
     if (k >= IOVEC_ELEMS) {
         fprintf(stderr, "Can't fit dxfer_len=%d bytes in iovec\n", dxfer_len);
-	return -1;
+        return -1;
     }
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
@@ -95,7 +95,7 @@ int sg_read(int sg_fd, unsigned char * buff, int num_blocks, int from_block,
         fprintf(stderr, "Media changed\n");
         return -1;
     default:
-        sg_chk_n_print3("reading", &io_hdr);
+        sg_chk_n_print3("reading", &io_hdr, 1);
         return -1;
     }
     return 0;
@@ -146,7 +146,7 @@ int main(int argc, char * argv[])
     }
     if ((NULL == sg_file_name) || (NULL == out_file_name) || (0 == count)) {
         printf("Usage: sg_iovec_tst [-h] [-b=num] -c=num <generic_device> "
-	       "<output_filename>\n");
+               "<output_filename>\n");
         printf("  where: -h       this usage message\n");
         printf("         -b=num   block size (default 512 Bytes)\n");
         printf("         -c=num   count of blocks to transfer\n");
@@ -174,10 +174,10 @@ int main(int argc, char * argv[])
     buffp = malloc(dxfer_len);
     if (buffp) {
         if (0 == sg_read(sg_fd, buffp, count, 0, blk_size)) {
-	    if (write(fd, buffp, dxfer_len) < 0)
-		perror(ME "output write failed");
+            if (write(fd, buffp, dxfer_len) < 0)
+                perror(ME "output write failed");
         }
-	free(buffp);
+        free(buffp);
     }
     res = close(fd);
     if (res < 0) {

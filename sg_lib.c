@@ -68,7 +68,7 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.10 20050521";    /* spc-3 rev 23+ */
+static char * version_str = "1.11 20050807";    /* spc-3 rev 23+ */
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -1040,7 +1040,9 @@ static struct error_info additional[] =
 };
 
 static const char *sense_key_desc[] = {
-    "No Sense",                 /* There is no sense information */
+    "No Sense",                 /* Filemark, ILI and/or EOM; progress
+                                   indication (during FORMAT); power
+                                   condition sensing (REQUEST SENSE) */
     "Recovered Error",          /* The last command completed successfully
                                    but used error correction */
     "Not Ready",                /* The addressed target is not ready */
@@ -1410,7 +1412,7 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
 
 /* Print sense information */
 void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
-                    int sb_len)
+                    int sb_len, int raw_sinfo)
 {
     int len, valid, progress;
     unsigned int info;
@@ -1482,7 +1484,8 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                 else if (info > 0)
                     fprintf(sg_warnings_str, "  Valid=0, Info fld=0x%x [%u] ",
                             info, info);
-            }
+            } else
+                info = 0;
             if (sense_buffer[2] & 0xe0) {
                 if (sense_buffer[2] & 0x80)
                    fprintf(sg_warnings_str, " FMK");
@@ -1494,7 +1497,8 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                    fprintf(sg_warnings_str, " ILI");
                             /* incorrect block length requested */
                 fprintf(sg_warnings_str, "\n");
-            }
+            } else if (valid || (info > 0))
+                fprintf(sg_warnings_str, "\n");
             if ((len >= 14) && sense_buffer[14])
                 fprintf(sg_warnings_str, "  Field replaceable unit code: "
                         "%d\n", sense_buffer[14]);
@@ -1549,7 +1553,7 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
     } else {    /* non-extended sense data */
 
          /*
-          * Standard says:
+          * A (very old) Standard says:
           *    sense_buffer[0] & 0200 : address valid
           *    sense_buffer[0] & 0177 : vendor-specific error code
           *    sense_buffer[1] & 0340 : vendor-specific
@@ -1574,9 +1578,10 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                 (sense_buffer[0] >> 4) & 0x07, sense_buffer[0] & 0xf);
         len = 4;
     }
-
-    fprintf(sg_warnings_str, " Raw sense data (in hex):\n");
-    dStrHexErr((const char *)sense_buffer, len);
+    if (raw_sinfo) {
+        fprintf(sg_warnings_str, " Raw sense data (in hex):\n");
+        dStrHexErr((const char *)sense_buffer, len);
+    }
 }
 
 static const char * linux_host_bytes[] = {
@@ -1639,9 +1644,10 @@ void sg_print_driver_status(int driver_status)
 
 /* Returns 1 if no errors found and thus nothing printed; otherwise
    prints error/warning (prefix by 'leadin') and returns 0. */
-static int sg_sense_print(const char * leadin, int scsi_status,
-                          int host_status, int driver_status,
-                          const unsigned char * sense_buffer, int sb_len)
+static int sg_linux_sense_print(const char * leadin, int scsi_status,
+                                int host_status, int driver_status,
+                                const unsigned char * sense_buffer,
+                                int sb_len, int raw_sinfo)
 {
     int done_leadin = 0;
     int done_sense = 0;
@@ -1661,7 +1667,7 @@ static int sg_sense_print(const char * leadin, int scsi_status,
         if (sense_buffer && ((scsi_status == SCSI_CHECK_CONDITION) ||
                              (scsi_status == SCSI_COMMAND_TERMINATED))) {
             /* SCSI_COMMAND_TERMINATED is obsolete */
-            sg_print_sense(0, sense_buffer, sb_len);
+            sg_print_sense(0, sense_buffer, sb_len, raw_sinfo);
             done_sense = 1;
         }
     }
@@ -1686,7 +1692,7 @@ static int sg_sense_print(const char * leadin, int scsi_status,
         fprintf(sg_warnings_str, "\n");
         if (sense_buffer && (! done_sense) &&
             (SG_LIB_DRIVER_SENSE == (SG_LIB_DRIVER_MASK & driver_status)))
-            sg_print_sense(0, sense_buffer, sb_len);
+            sg_print_sense(0, sense_buffer, sb_len, raw_sinfo);
     }
     return 0;
 }
@@ -1740,10 +1746,12 @@ int sg_normalize_sense(const struct sg_io_hdr * hp,
 
 /* Returns 1 if no errors found and thus nothing printed; otherwise
    returns 0. */
-int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp)
+int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
+                    int raw_sinfo)
 {
-    return sg_sense_print(leadin, hp->status, hp->host_status,
-                          hp->driver_status, hp->sbp, hp->sb_len_wr);
+    return sg_linux_sense_print(leadin, hp->status, hp->host_status,
+                                hp->driver_status, hp->sbp, hp->sb_len_wr,
+                                raw_sinfo);
 }
 #endif
 
@@ -1751,12 +1759,14 @@ int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp)
    returns 0. */
 int sg_chk_n_print(const char * leadin, int masked_status,
                    int host_status, int driver_status,
-                   const unsigned char * sense_buffer, int sb_len)
+                   const unsigned char * sense_buffer, int sb_len,
+                   int raw_sinfo)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
 
-    return sg_sense_print(leadin, scsi_status, host_status, driver_status,
-                          sense_buffer, sb_len);
+    return sg_linux_sense_print(leadin, scsi_status, host_status,
+                                driver_status, sense_buffer, sb_len,
+                                raw_sinfo);
 }
 
 #ifdef SG_IO

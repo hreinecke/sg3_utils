@@ -54,11 +54,12 @@
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
-static char * version_str = "1.13 20050523";
+static char * version_str = "1.18 20050809";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
+#define START_TIMEOUT 120000    /* 120,000 millisecs == 2 minutes */
 #define LONG_TIMEOUT 7200000    /* 7,200,000 millisecs == 120 minutes */
 #define EBUFF_SZ 256
 
@@ -85,7 +86,11 @@ static char * version_str = "1.13 20050523";
 #define REPORT_LUNS_CMDLEN 12
 #define MAINTENANCE_IN_CMD 0xa3
 #define MAINTENANCE_IN_CMDLEN 12
-#define REPORT_TGT_PRT_GRP_SA 0x0a
+#define REPORT_TGT_PRT_GRP_SA 0xa
+#define REPORT_DEVICE_IDENTIFIER_SA 0x5
+#define MAINTENANCE_OUT_CMD 0xa4
+#define MAINTENANCE_OUT_CMDLEN 12
+#define SET_DEVICE_IDENTIFIER_SA 0x6
 #define LOG_SENSE_CMD     0x4d
 #define LOG_SENSE_CMDLEN  10
 #define LOG_SELECT_CMD     0x4c
@@ -101,10 +106,16 @@ static char * version_str = "1.13 20050523";
 #define SERVICE_ACTION_IN_12_CMD 0xab
 #define SERVICE_ACTION_IN_12_CMDLEN 12
 #define READ_MEDIA_SERIAL_NUM_SA 0x1
+#define START_STOP_CMD          0x1b
+#define START_STOP_CMDLEN       6
+#define PREVENT_ALLOW_CMD    0x1e
+#define PREVENT_ALLOW_CMDLEN   6
 
 #define MODE6_RESP_HDR_LEN 4
 #define MODE10_RESP_HDR_LEN 8
 #define MODE_RESP_ARB_LEN 1024
+
+#define INQUIRY_RESP_INITIAL_LEN 36
 
 
 const char * sg_cmds_version()
@@ -117,7 +128,7 @@ const char * sg_cmds_version()
 int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, 
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
-    int res, k;
+    int res, k, got;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
@@ -162,11 +173,19 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Inquiry", &io_hdr);
+            sg_chk_n_print3("Inquiry", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
+        got = io_hdr.dxfer_len - io_hdr.resid;
+        if (got < 4) {
+            if (verbose)
+                fprintf(sg_warnings_str, "inquiry: got too few (%d) "
+                        "bytes\n", got);
+            return -2;
+        }
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    inquiry: resid=%d\n", io_hdr.resid);
+            fprintf(sg_warnings_str, "    inquiry: resid=%d (got %d "
+                    "bytes)\n", io_hdr.resid, got);
         return 0;
     default:
         if (noisy || verbose) {
@@ -180,7 +199,7 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
                          pg_op);
             else
                 snprintf(ebuff, EBUFF_SZ, "Inquiry error, [standard]");
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -2;
     }
@@ -191,11 +210,11 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
 int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                       int noisy, int verbose)
 {
-    int res, k;
+    int res, k, got;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
-    unsigned char inq_resp[36];
+    unsigned char inq_resp[INQUIRY_RESP_INITIAL_LEN];
 
     if (inq_data) {
         memset(inq_data, 0, sizeof(* inq_data));
@@ -235,9 +254,16 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Inquiry", &io_hdr);
+            sg_chk_n_print3("Inquiry", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
+        got = io_hdr.dxfer_len - io_hdr.resid;
+        if (got < 4) {
+            if (verbose)
+                fprintf(sg_warnings_str, "inquiry: got too few (%d) "
+                        "bytes\n", got);
+            return -2;
+        }
         if (inq_data) {
             inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
             inq_data->peripheral_type = inq_resp[0] & 0x1f;
@@ -252,14 +278,15 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
             memcpy(inq_data->revision, inq_resp + 32, 4);
         }
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    inquiry: resid=%d\n", io_hdr.resid);
+            fprintf(sg_warnings_str, "    inquiry: resid=%d (got %d "
+                    "bytes)\n", io_hdr.resid, got);
         return 0;
     default:
-        if (noisy) {
+        if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "Inquiry error ");
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -2;
     }
@@ -310,7 +337,7 @@ int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
         return 0;
     default:
         if (noisy || verbose)
-            sg_chk_n_print3("test unit ready", &io_hdr);
+            sg_chk_n_print3("test unit ready", &io_hdr, verbose);
         return -1;
     }
 }
@@ -380,11 +407,11 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("synchronize cache", &io_hdr);
+            sg_chk_n_print3("synchronize cache", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose)
-            sg_chk_n_print3("synchronize cache", &io_hdr);
+            sg_chk_n_print3("synchronize cache", &io_hdr, verbose);
         return -1;
     }
     return 0;
@@ -395,7 +422,7 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
  * -1 -> failure, SG_LIB_CAT_MEDIA_CHANGED -> repeat, SG_LIB_CAT_INVALID_OP
  *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb */
 int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba, 
-                     void * resp, int mx_resp_len, int verbose)
+                     void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int k, res;
     unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] = 
@@ -452,21 +479,24 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Read capacity (16)", &io_hdr);
+            sg_chk_n_print3("Read capacity (16)", &io_hdr, 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    read_capacity16: resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    read_capacity16: resid=%d (got"
+                    " %d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
     case SG_LIB_CAT_MEDIA_CHANGED:
         if (verbose > 1)
-            sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr);
+            sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr, 1);
         return res;
     default:
-        sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr);
+        if (noisy || verbose)
+            sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr,
+                            verbose);
         return -1;
     }
 }
@@ -476,7 +506,7 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
  * -> media changed, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * -1 -> other failure */
 int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, 
-                     void * resp, int mx_resp_len, int verbose)
+                     void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int k, res;
     unsigned char rcCmdBlk[READ_CAPACITY_10_CMDLEN] =
@@ -523,21 +553,24 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Read capacity (10)", &io_hdr);
+            sg_chk_n_print3("Read capacity (10)", &io_hdr, 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    read_capacity10: resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    read_capacity10: resid=%d (got"
+                    " %d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
     case SG_LIB_CAT_MEDIA_CHANGED:
         if (verbose > 1)
-            sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr);
+            sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr, 1);
         return res;
     default:
-        sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr);
+        if (noisy || verbose)
+            sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr,
+                            verbose);
         return -1;
     }
 }
@@ -595,12 +628,13 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode sense (6)", &io_hdr);
+            sg_chk_n_print3("Mode sense (6)", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    mode sense (6): resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    mode sense (6): resid=%d (got "
+                    "%d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         if (verbose > 2) {
             k = mx_resp_len - io_hdr.resid;
             if (k > 0) {
@@ -613,7 +647,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("Mode sense (6) error", &io_hdr);
+            sg_chk_n_print3("Mode sense (6) error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
@@ -622,7 +656,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
             snprintf(ebuff, EBUFF_SZ, "Mode sense (6) error, dbd=%d "
                     "pc=%d page_code=%x sub_page_code=%x\n     ", dbd,
                     pc, pg_code, sub_pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -683,12 +717,13 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode sense (10)", &io_hdr);
+            sg_chk_n_print3("Mode sense (10)", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    mode sense (10): resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    mode sense (10): resid=%d (got "
+                    "%d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         if (verbose > 2) {
             k = mx_resp_len - io_hdr.resid;
             if (k > 0) {
@@ -701,7 +736,7 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("Mode sense (10) error", &io_hdr);
+            sg_chk_n_print3("Mode sense (10) error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
@@ -710,7 +745,7 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
             snprintf(ebuff, EBUFF_SZ, "Mode sense (10) error, dbd=%d "
                     "pc=%d page_code=%x sub_page_code=%x\n     ", dbd,
                     pc, pg_code, sub_pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -771,14 +806,14 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode select (6)", &io_hdr);
+            sg_chk_n_print3("Mode select (6)", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("Mode select (6) error", &io_hdr);
+            sg_chk_n_print3("Mode select (6) error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
@@ -786,7 +821,7 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
 
             snprintf(ebuff, EBUFF_SZ, "Mode select (6) error, pf=%d "
                     "sp=%d\n     ", pf, sp);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -848,14 +883,14 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Mode select (10)", &io_hdr);
+            sg_chk_n_print3("Mode select (10)", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("Mode select (10) error", &io_hdr);
+            sg_chk_n_print3("Mode select (10) error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
@@ -863,7 +898,7 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
 
             snprintf(ebuff, EBUFF_SZ, "Mode select (10) error, pf=%d "
                     "sp=%d\n     ", pf, sp);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -1033,7 +1068,7 @@ int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
  * SG_LIB_CAT_INVALID_OP -> Request Sense not * supported??,
  * SG_LIB_CAT_ILEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
-                        int verbose)
+                        int noisy, int verbose)
 {
     int k, res;
     unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] = 
@@ -1084,24 +1119,28 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (verbose)
-            sg_chk_n_print3("Request sense", &io_hdr);
+            sg_chk_n_print3("Request sense", &io_hdr, 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if ((mx_resp_len >= 8) && (io_hdr.resid > (mx_resp_len - 8))) {
-            fprintf(sg_warnings_str, "    request sense: resid=%d "
-                    "indicates response too short\n", io_hdr.resid);
+            if (verbose)
+                fprintf(sg_warnings_str, "    request sense: resid=%d "
+                        "indicates response too short\n", io_hdr.resid);
             return -1;
         } else if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    request sense: resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    request sense: resid=%d (got "
+                    "%d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr);
+            sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr, 1);
         return res;
     default:
-        sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr);
+        if (noisy || verbose)
+            sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr,
+                            verbose);
         return -1;
     }
 }
@@ -1155,23 +1194,24 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Report luns", &io_hdr);
+            sg_chk_n_print3("Report luns", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    report_luns: resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    report luns: resid=%d (got "
+                    "%d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("REPORTS LUNS command error", &io_hdr);
+            sg_chk_n_print3("REPORTS LUNS command error", &io_hdr, 1);
         return res;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
         if (noisy || verbose)
-            sg_chk_n_print3("REPORT LUNS command error", &io_hdr);
+            sg_chk_n_print3("REPORT LUNS command error", &io_hdr, verbose);
         return -1;
     }
 }
@@ -1232,17 +1272,18 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Log sense", &io_hdr);
+            sg_chk_n_print3("Log sense", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    log_sense: resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    log sense: resid=%d (got "
+                    "%d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("log_sense error", &io_hdr);
+            sg_chk_n_print3("log_sense error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
@@ -1250,7 +1291,7 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
             snprintf(ebuff, EBUFF_SZ, "log_sense: ppc=%d, sp=%d, "
                      "pc=%d, page_code=%x, paramp=%x\n    ", ppc, sp, pc, 
                      pg_code, paramp);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -1315,24 +1356,21 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Log select", &io_hdr);
+            sg_chk_n_print3("Log select", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    log_select: resid=%d\n",
-                    io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("log_select error", &io_hdr);
+            sg_chk_n_print3("log_select error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "log_select: pcr=%d, sp=%d, "
                      "pc=%d\n    ", pcr, sp, pc);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -1387,21 +1425,23 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Report target port groups", &io_hdr);
+            sg_chk_n_print3("Report target port groups", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    report_tgt_prt_grp: resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    report_tgt_prt_grp: resid=%d (got "
+                    "%d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("REPORT TARGET PORT GROUPS", &io_hdr);
+            sg_chk_n_print3("REPORT TARGET PORT GROUPS", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose)
-            sg_chk_n_print3("REPORT TARGET PORT GROUPS command error", &io_hdr);
+            sg_chk_n_print3("REPORT TARGET PORT GROUPS command error",
+                            &io_hdr, verbose);
         return -1;
     }
 }
@@ -1463,21 +1503,21 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Send diagnostic, continuing", &io_hdr);
+            sg_chk_n_print3("Send diagnostic, continuing", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("SEND DIAGNOSTIC", &io_hdr);
+            sg_chk_n_print3("SEND DIAGNOSTIC", &io_hdr, 1);
         return res;
     default:
-        if (noisy) {
+        if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "Send diagnostic error, sf_code=0x%x, "
                      "pf_bit=%d, sf_bit=%d ", sf_code, pf_bit, sf_bit);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -1533,21 +1573,21 @@ int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
             sg_chk_n_print3("Receive diagnostics results, continuing",
-                            &io_hdr);
+                            &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("RECEIVE DIAGNOSTICS RESULTS", &io_hdr);
+            sg_chk_n_print3("RECEIVE DIAGNOSTICS RESULTS", &io_hdr, 1);
         return res;
     default:
         if (noisy) {
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "Receive diagnostics results error, "
                      "pcv=%d, page_code=%x ", pcv, pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -1607,12 +1647,13 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Read defect (10)", &io_hdr);
+            sg_chk_n_print3("Read defect (10)", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    read defect (10): resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    report defect(10): resid=%d (got "
+                    "%d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
         if (verbose > 2) {
             k = mx_resp_len - io_hdr.resid;
             if (k > 0) {
@@ -1625,7 +1666,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("Read defect (10) error", &io_hdr);
+            sg_chk_n_print3("Read defect (10) error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
@@ -1634,7 +1675,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
             snprintf(ebuff, EBUFF_SZ, "Read defect (10) error, req_plist=%d "
                     "req_glist=%d dl_format=%x\n     ", req_plist, req_glist,
                     dl_format);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -1643,8 +1684,8 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
 /* Invokes a SCSI READ MEDIA SERIAL NUMBER command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
-int sg_ll_read_media_serial_num(int sg_fd, void * resp,
-                                int mx_resp_len, int noisy, int verbose)
+int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
+                                int noisy, int verbose)
 {
     int k, res;
     unsigned char rmsnCmdBlk[SERVICE_ACTION_IN_12_CMDLEN] =
@@ -1689,22 +1730,308 @@ int sg_ll_read_media_serial_num(int sg_fd, void * resp,
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         if (noisy || verbose)
-            sg_chk_n_print3("Read media serial number", &io_hdr);
+            sg_chk_n_print3("Read media serial number", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    read_media_serial_num: resid=%d\n",
-                    io_hdr.resid);
+            fprintf(sg_warnings_str, "    read_media_serial_num: resid=%d ("
+                    "got %d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
+        if (verbose > 2) {
+            k = mx_resp_len - io_hdr.resid;
+            if (k > 0) {
+                fprintf(sg_warnings_str, "    report media serial number: "
+                        "response%s\n", (k > 256 ? ", first 256 bytes" : ""));
+                dStrHex(resp, (k > 256 ? 256 : k), -1);
+            }
+        }
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("READ MEDIA SERIAL NUMBER", &io_hdr);
+            sg_chk_n_print3("READ MEDIA SERIAL NUMBER", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose)
             sg_chk_n_print3("READ MEDIA SERIAL NUMBER command error",
-                            &io_hdr);
+                            &io_hdr, verbose);
+        return -1;
+    }
+}
+
+/* Invokes a SCSI START STOP UNIT command (MMC + SBC).
+ * Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Start stop unit not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
+                          int loej, int start, int noisy, int verbose)
+{
+    unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+    int k, res;
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    ssuBlk[1] = immed & 1;
+    ssuBlk[4] = ((power_cond & 0xf) << 4) | ((loej & 1) << 1) |
+                (start & 1);
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_str, "    Start stop unit command:");
+        for (k = 0; k < (int)sizeof(ssuBlk); ++k)
+                fprintf (stderr, " %02x", ssuBlk[k]);
+        fprintf(stderr, "\n");
+    }
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(ssuBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_NONE;
+    io_hdr.dxfer_len = 0;
+    io_hdr.dxferp = NULL;
+    io_hdr.cmdp = ssuBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = START_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        if (verbose)
+            fprintf(sg_warnings_str, "start_stop_unit (SG_IO) error:"
+                    " %s\n", safe_strerror(errno));
+        return -1;
+    }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (verbose)
+            sg_chk_n_print3("Start stop unit", &io_hdr, verbose);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("START STOP UNIT", &io_hdr, 1);
+        return res;
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("START STOP UNIT command error", &io_hdr,
+                            verbose);
+        return -1;
+    }
+}
+
+/* Invokes a SCSI PREVENT ALLOW MEDIUM REMOVAL command (SPC-3) 
+ * prevent==0 allows removal, prevent==1 prevents removal ...
+ * Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> command not supported 
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
+{
+    int k, res;
+    unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] = 
+                {PREVENT_ALLOW_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if ((prevent < 0) || (prevent > 3)) {
+        fprintf(sg_warnings_str, "prevent argument should be 0, 1, 2 or 3\n");
+        return -1;
+    }
+    pCmdBlk[4] |= (prevent & 0x3);
+    if (verbose) {
+        fprintf(sg_warnings_str, "    Prevent allow medium removal cdb: ");
+        for (k = 0; k < PREVENT_ALLOW_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", pCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = PREVENT_ALLOW_CMDLEN;
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_NONE;
+    io_hdr.dxfer_len = 0;
+    io_hdr.dxferp = NULL;
+    io_hdr.cmdp = pCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        fprintf(sg_warnings_str, "prevent allow medium removal SG_IO "
+                "error: %s\n", safe_strerror(errno));
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (verbose)
+            sg_chk_n_print3("Prevent allow medium removal", &io_hdr, verbose);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("Prevent allow medium removal command problem",
+                            &io_hdr, 1);
+        return res;
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("Prevent allow medium removal command problem",
+                            &io_hdr, verbose);
+        return -1;
+    }
+}
+
+/* Invokes a SCSI REPORT DEVICE IDENTIFIER command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_report_dev_id(int sg_fd, void * resp, int mx_resp_len,
+                               int noisy, int verbose)
+{
+    int k, res;
+    unsigned char rdiCmdBlk[MAINTENANCE_IN_CMDLEN] =
+                         {MAINTENANCE_IN_CMD, REPORT_DEVICE_IDENTIFIER_SA,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    rdiCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
+    rdiCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
+    rdiCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
+    rdiCmdBlk[9] = mx_resp_len & 0xff;
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_str, "    Report device identifier cdb: ");
+        for (k = 0; k < MAINTENANCE_IN_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", rdiCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(rdiCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = mx_resp_len;
+    io_hdr.dxferp = resp;
+    io_hdr.cmdp = rdiCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "report_device_idenifier (SG_IO) error:"
+                    " %s\n", safe_strerror(errno));
+        return -1;
+    }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Report device identifier", &io_hdr, verbose);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        if (verbose && io_hdr.resid)
+            fprintf(sg_warnings_str, "    report_device_identifier: resid=%d ("
+                    "got %d bytes)\n", io_hdr.resid,
+                    io_hdr.dxfer_len - io_hdr.resid);
+        if (verbose > 2) {
+            k = mx_resp_len - io_hdr.resid;
+            if (k > 0) {
+                fprintf(sg_warnings_str, "    report device identifier: "
+                        "response%s\n", (k > 256 ? ", first 256 bytes" : ""));
+                dStrHex(resp, (k > 256 ? 256 : k), -1);
+            }
+        }
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("REPORT DEVICE IDENTIFIER", &io_hdr, 1);
+        return res;
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("REPORT DEVICE IDENTIFIER command error",
+                            &io_hdr, verbose);
+        return -1;
+    }
+}
+
+/* Invokes a SCSI SET DEVICE IDENTIFIER command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_set_dev_id(int sg_fd, void * paramp, int param_len,
+                     int noisy, int verbose)
+{
+    int k, res;
+    unsigned char sdiCmdBlk[MAINTENANCE_OUT_CMDLEN] =
+                         {MAINTENANCE_OUT_CMD, SET_DEVICE_IDENTIFIER_SA,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    sdiCmdBlk[6] = (param_len >> 24) & 0xff;
+    sdiCmdBlk[7] = (param_len >> 16) & 0xff;
+    sdiCmdBlk[8] = (param_len >> 8) & 0xff;
+    sdiCmdBlk[9] = param_len & 0xff;
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_str, "    Set device identifier cdb: ");
+        for (k = 0; k < MAINTENANCE_OUT_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", sdiCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_str, "    Set device identifier parameter "
+                    "block:\n");
+            dStrHex(paramp, param_len, -1);
+        }
+    }
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(sdiCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
+    io_hdr.dxfer_len = param_len;
+    io_hdr.dxferp = paramp;
+    io_hdr.cmdp = sdiCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "set_device_idenifier (SG_IO) error:"
+                    " %s\n", safe_strerror(errno));
+        return -1;
+    }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Set device identifier", &io_hdr, verbose);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("SET DEVICE IDENTIFIER", &io_hdr, 1);
+        return res;
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("SET DEVICE IDENTIFIER command error",
+                            &io_hdr, verbose);
         return -1;
     }
 }

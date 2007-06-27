@@ -50,7 +50,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.02 20050331";
+static char * version_str = "1.03 20050808";
 
 #define ME "sg_reassign: "
 
@@ -111,6 +111,7 @@ static void usage()
           "list length\n"
           "      --verbose | -v        increase verbosity\n"
           "      --version | -V        print version string and exit\n\n"
+          "Perform a REASSIGN BLOCKS SCSI command\n"
           );
 }
 
@@ -163,14 +164,14 @@ int sg_ll_reassign_blocks(int sg_fd, int dummy, int longlba, int longlist,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Reassign blocks, continuing", &io_hdr);
+        sg_chk_n_print3("Reassign blocks, continuing", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("Reassign blocks error", &io_hdr);
+            sg_chk_n_print3("Reassign blocks error", &io_hdr, 1);
         return res;
     default:
         if (noisy || verbose) {
@@ -178,7 +179,7 @@ int sg_ll_reassign_blocks(int sg_fd, int dummy, int longlba, int longlist,
 
             snprintf(ebuff, EBUFF_SZ, "Reassign blocks error, longlba=%d "
                     "longlist=%d\n     ", longlba, longlist);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }

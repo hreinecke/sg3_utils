@@ -47,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.07 20050511";
+static char * version_str = "1.09 20050808";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 
@@ -71,7 +71,8 @@ static void usage()
           "format\n"
           "         --help|-h          print out usage message\n"
           "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n"
+          "         --version|-V       print version string and exit\n\n"
+          "Perform a REQUEST SENSE SCSI command\n"
           );
 
 }
@@ -144,11 +145,11 @@ int main(int argc, char * argv[])
     memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
 
     res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
-                              sizeof(requestSenseBuff), verbose);
+                              sizeof(requestSenseBuff), 1, verbose);
     if (0 == res) {
         resp_len = requestSenseBuff[7] + 8;
         fprintf(stderr, "Decode response as sense data:\n");
-        sg_print_sense(NULL, requestSenseBuff, resp_len);
+        sg_print_sense(NULL, requestSenseBuff, resp_len, verbose);
         if (verbose) {
             fprintf(stderr, "\nOutput response in hex\n");
             dStrHex((const char *)requestSenseBuff, resp_len, 1);
@@ -158,9 +159,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Request Sense command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "bad field in Request Sense cdb\n");
-    else
+    else {
         fprintf(stderr, "Request Sense command failed\n");
-
+        if (0 == verbose)
+            fprintf(stderr, "    try the '-v' option for "
+                    "more information\n");
+    }
     res = close(sg_fd);
     if (res < 0) {
         perror(ME "close error");

@@ -1,4 +1,4 @@
-.TH SG_SES "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
+.TH SG_SES "8" "July 2005" "sg3_utils-1.16" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -92,6 +92,11 @@ This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
 pages (using the READ DIAGNOSTIC SCSI command). To this end the '--page='
 and '--hex' options would be appropriate. Arbitrary diagnostic pages can
 be sent to a device with the sg_senddiag utility.
+.PP
+There is a related command set called SAF-TE (SCSI attached fault-tolerant
+enclosure) for enclosure (including RAID) status and control. SCSI devices
+that support SAF-TE report "Processor" peripheral device type (0x3) in their
+INQUIRY reponse. See safte-monitor on the internet.
 .SH EXAMPLE
 Changing a temperature threshold is possible, if a little awkward. The
 current thresholds can be shown with:
@@ -125,4 +130,4 @@ Copyright \(co 2004-2005 Douglas Gilbert
 This software is distributed under a FreeBSD liense. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq, sg_senddiag (in sg3_utils package)
+.B sg_inq, sg_senddiag (in sg3_utils package); safte-monitor (internet)

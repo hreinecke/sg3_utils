@@ -67,7 +67,7 @@ static unsigned char sbuff[MAX_SENSE_SZ];
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.04 20050511";
+static char * version_str = "1.05 20050808";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -177,23 +177,23 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
         res = sg_err_category3(&io_hdr);
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("Format, continuing", &io_hdr);
+            sg_chk_n_print3("Format, continuing", &io_hdr, verbose);
             /* fall through */
         case SG_LIB_CAT_CLEAN:
                 break;
         case SG_LIB_CAT_INVALID_OP:
                 fprintf(stderr, "Format command not supported\n");
                 if (verbose > 1)
-                        sg_chk_n_print3("Format", &io_hdr);
+                        sg_chk_n_print3("Format", &io_hdr, 1);
                 return -1;
         case SG_LIB_CAT_ILLEGAL_REQ:
                 fprintf(stderr, "Format command illegal parameter\n");
                 if (verbose > 1)
-                        sg_chk_n_print3("Format", &io_hdr);
+                        sg_chk_n_print3("Format", &io_hdr, 1);
                 return -1;
         default:
                 if (verbose > 1)
-                        sg_chk_n_print3("Format", &io_hdr);
+                        sg_chk_n_print3("Format", &io_hdr, 1);
                 return -1;
         }
         if (! immed)
@@ -251,11 +251,11 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
                                         progress * 100 / 65536);
                                 if (verbose > 1)
                                         sg_print_sense("tur", sbuff,
-                                                       io_hdr.sb_len_wr);
+                                                       io_hdr.sb_len_wr, 1);
                                 continue;
                         } else {
                                 sg_print_sense("tur: unexpected sense", sbuff,
-                                               io_hdr.sb_len_wr);
+                                               io_hdr.sb_len_wr, verbose);
                                 continue;
                         }
                 } else
@@ -277,7 +277,7 @@ print_read_cap(int fd, int do_16, int verbose)
 
         if (do_16) {
                 res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
-                                       resp_buff, 32, verbose);
+                                       resp_buff, 32, 0, verbose);
                 if (0 == res) {
                         for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
                                 llast_blk_addr <<= 8;
@@ -298,7 +298,7 @@ print_read_cap(int fd, int do_16, int verbose)
                 }
         } else {
                 res = sg_ll_readcap_10(fd, 0 /* pmi */, 0 /* lba */,
-                                       resp_buff, 8, verbose);
+                                       resp_buff, 8, 0, verbose);
                 if (0 == res) {
                         last_blk_addr = ((resp_buff[0] << 24) |
                                          (resp_buff[1] << 16) |
@@ -364,8 +364,9 @@ static void usage()
                 "    --version | -V print version details and exit\n"
                 "    --wait | -w    format command waits till complete (def: "
                 "poll)\n\n"
-                "\tExample: sg_format --format /dev/sdc\n");
-        printf("\nWARNING: This program will destroy all the data on the "
+                "\tExample: sg_format --format /dev/sdc\n\n"
+                "This utility formats or resizes SCSI disks.\n");
+        printf("WARNING: This utility will destroy all the data on the "
                 "target device when\n\t '--format' is given. Check that you "
                 "have the correct device.\n");
 }
@@ -559,6 +560,9 @@ int main(int argc, char **argv)
                 } else
                         fprintf(stderr, "MODE SENSE (%d) command failed\n",
                                 (mode6 ? 6 : 10));
+                        if (0 == verbose)
+                                fprintf(stderr, "    try '-v' for more "
+                                        "information\n");
                 goto out;
         }
         if (mode6) {
@@ -701,6 +705,9 @@ int main(int argc, char **argv)
                         else
                                 fprintf(stderr, "MODE SELECT (%d) command "
                                         "failed\n", (mode6 ? 6 : 10));
+                                if (0 == verbose)
+                                        fprintf(stderr, "    try '-v' for "
+                                                "more information\n");
                         goto out;
                 }
         }
@@ -734,7 +741,14 @@ int main(int argc, char **argv)
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
                 sleep(5);
-                scsi_format(fd, pinfo, rto_req, ! fwait, early, verbose);
+                res = scsi_format(fd, pinfo, rto_req, ! fwait, early,
+                                  verbose);
+                if (res) {
+                        fprintf(stderr, "FORMAT failed\n");
+                        if (0 == verbose)
+                                fprintf(stderr, "    try '-v' for more "
+                                        "information\n");
+                }
 #else
                 fprintf(stderr, "FORMAT ignored, testing\n");
 #endif

@@ -91,12 +91,12 @@ int main(int argc, char * argv[])
 #if 0
     if ((sg_fd2 = open(file_name, O_RDWR | O_EXCL)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-		 ME "error opening file: %s a second time", file_name);
+                 ME "error opening file: %s a second time", file_name);
         perror(ebuff);
         return 1;
     } else {
-	printf(ME "second open of %s in violation of O_EXCL\n", file_name);
-	close(sg_fd2);
+        printf(ME "second open of %s in violation of O_EXCL\n", file_name);
+        close(sg_fd2);
     }
 #endif
 
@@ -133,7 +133,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("INQUIRY command error", &io_hdr);
+        sg_chk_n_print3("INQUIRY command error", &io_hdr, 1);
         break;
     }
 
@@ -178,7 +178,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("Test Unit Ready command error", &io_hdr);
+        sg_chk_n_print3("Test Unit Ready command error", &io_hdr, 1);
         break;
     }
 

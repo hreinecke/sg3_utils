@@ -35,12 +35,14 @@ READ LONG           sg_read_long, sg_dd
 READ MEDIA SERIAL NUMBER        sg_rmsn
 REASSIGN BLOCKS     sg_reassign
 RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses
+REPORT DEVICE IDENTIFIER     sg_ident
 REPORT LUNS         sg_luns
 REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REPORT TARGET PORT GROUPS       sg_rtpg
 REQUEST SENSE       sg_requests
 SEND DIAGNOSTIC     sg_senddiag, sg_ses
+SET DEVICE IDENTIFIER        sg_ident
 START STOP          sg_start
 SYNCHRONIZE CACHE   sg_sync, sg_dd, sgm_dd, sgp_dd
 TEST UNIT READY     sg_turs, sg_format
@@ -61,4 +63,4 @@ IDENTIFY            sg_inq, sg_scan
 ** sdparm is now in its own package called sdparm (rather than sg3_utils)
 
 Doug Gilbert
-18th April 2005
+5th August 2005

@@ -1,4 +1,4 @@
-.TH SG_REASSIGN "8" "March 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_REASSIGN "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
 .SH NAME
 sg_reassign \- reassign defective blocks on the given (disk) device
 .SH SYNOPSIS
@@ -93,7 +93,7 @@ a reasonable metric of its health. If the grown list starts growing
 quickly that is an ominous sign. The best grown defect lists are empty
 ones. The number of elements in the grown defect list can be viewed with
 the '--grown' option. The contents of the grown defect list can be
-viewed with 'sginfo -G' utility.
+viewed with the 'sginfo -G' utility.
 .PP
 If an unrecoverable error is detected at a logical block address then
 REASSIGN BLOCKS is needed to reassign the block. Also if the ARRE and/or

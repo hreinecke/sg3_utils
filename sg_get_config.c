@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.16 20050324";
+static char * version_str = "0.19 20050806";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -71,6 +71,7 @@ static char ebuff[EBUFF_SZ];
 
 static struct option long_options[] = {
         {"brief", 0, 0, '1'},
+        {"current", 0, 0, 'c'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"inner-hex", 0, 0, 'i'},
@@ -136,7 +137,7 @@ static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Get config, continuing", &io_hdr);
+        sg_chk_n_print3("Get config, continuing", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -145,13 +146,13 @@ static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("get config error", &io_hdr);
+            sg_chk_n_print3("get config error", &io_hdr, 1);
         return res;
     default:
         if (verbose | noisy) {
             snprintf(ebuff, EBUFF_SZ, "get config error, rt=%d, "
                      "starting=0x%x ", rt, starting);
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -160,20 +161,22 @@ static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
 static void usage()
 {
     fprintf(stderr,
-            "Usage: 'sg_get_config [--brief] [--help] [--hex] [--inner-hex] "
-            "[--list]\n"
-            "                      [--rt=<num>] [--starting=<num>] "
+            "Usage: 'sg_get_config [--brief] [--current] [--help] [--hex] "
+            "[--inner-hex]\n"
+            "                      [--list] [--rt=<num>] [--starting=<num>] "
             "[--verbose]\n"
             "                      [--version] <device>'\n"
             " where --brief | -b     only give feature names of <device> "
             "(don't decode)\n"
             "       --help | -h      output usage message\n"
+            "       --current | -c   equivalent to '--rt=1' (show "
+            "current)\n"
             "       --hex | -H       output response in hex\n"
             "       --inner-hex | -i  decode to feature name, then output "
             "features in hex\n"
             "       --list | -l      list all known features + profiles "
             "(ignore <device>)\n"
-            "       --rt=<num> | -r <num>\n"
+            "       --rt=<num> | -r <num>     default value is 0\n"
             "                 0 -> all feature descriptors (regardless "
             "of currency)\n"
             "                 1 -> all current feature descriptors\n"
@@ -182,7 +185,8 @@ static void usage()
             "       --starting=<num> | -s <num>  starting from feature "
             "<num>\n"
             "       --verbose | -v   verbose\n"
-            "       --version | -V   output version string\n");
+            "       --version | -V   output version string\n\n"
+            "Get configuration information for MMC drive and/or media\n");
 }
 
 static const char * scsi_ptype_strs[] = {
@@ -245,6 +249,7 @@ static struct code_desc profile_desc_arr[] = {
         {0x20, "DDCD-ROM"},
         {0x21, "DDCD-R"},
         {0x22, "DDCD-RW"},
+        {0x2a, "DVD+RW double layer"},
         {0x2b, "DVD+R double layer"},
         {0x40, "BD-ROM"},
         {0x41, "BD-R sequential recording (SRM)"},
@@ -300,6 +305,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x33, "Layer jump recording"},
         {0x37, "CD-RW media write support"},
         {0x38, "BD-R pseudo-overwrite (POW)"},
+        {0x3a, "DVD+RW double layer"},
         {0x3b, "DVD+R double layer"},
         {0x40, "BD read"},
         {0x41, "BD write"},
@@ -633,6 +639,17 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      CD-RW media sub-type support (bitmask)=0x%x\n", ucp[5]);
         break;
+    case 0x3a:     /* DVD+RW double layer */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      write=%d, quick_start=%d, close_only=%d\n",
+               !!(ucp[4] & 0x1), !!(ucp[5] & 0x2), !!(ucp[5] & 0x1));
+        break;
     case 0x3b:     /* DVD+R double layer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -641,7 +658,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      Write=%d\n", !!(ucp[4] & 0x1));
+        printf("      write=%d\n", !!(ucp[4] & 0x1));
         break;
     case 0x40:     /* BD Read */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -905,7 +922,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bhHilr:s:vV", long_options,
+        c = getopt_long(argc, argv, "bchHilr:s:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -913,6 +930,9 @@ int main(int argc, char * argv[])
         switch (c) {
         case 'b':
             brief = 1;
+            break;
+        case 'c':
+            rt = 1;
             break;
         case 'h':
         case '?':
@@ -1021,8 +1041,11 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Get Configuration command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "field in Get Configuration command illegal\n");
-    else
+    else {
         fprintf(stderr, "Get Configuration command failed\n");
+        if (0 == verbose)
+            fprintf(stderr, "    try '-v' option for more information\n");
+    }
 
     res = close(sg_fd);
     if (res < 0) {

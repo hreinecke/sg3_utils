@@ -1,5 +1,5 @@
 %define	name	sg3_utils
-%define	version	1.15
+%define	version	1.16
 %define	release	1
 
 %define	major	1
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Wed Aug 10 2005 - dgilbert at interlog dot com
+- add sg_ident, sg_inq VPD page extensions
+  * sg3_utils-1.16
+
 * Sun Jun 05 2005 - dgilbert at interlog dot com
 - use O_NONBLOCK on all fds that use SG_IO ioctl
   * sg3_utils-1.15

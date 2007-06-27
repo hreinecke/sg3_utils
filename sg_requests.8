@@ -1,4 +1,4 @@
-.TH SG_REQUESTS "8" "November 2004" "sg3_utils-1.11" SG3_UTILS
+.TH SG_REQUESTS "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
 .SH NAME
 sg_requests \- send the scsi command request sense
 .SH SYNOPSIS
@@ -24,23 +24,34 @@ output the usage message then exit.
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output).
+Additionally the response (if received) is output in ASCII-HEX. Use
+this option multiple times for greater verbosity.
 .TP
 --version | -V
 print the version string and then exit.
 .PP
-Some time ago the REQUEST SENSE command was very important for error
+In SCSI 1 and 2 the REQUEST SENSE command was very important for error
 and warning processing in SCSI. The autosense capability rendered this
-command almost superfluous. However recent SCSI drafts (e.g. SBC-2 rev
-16) increase the utility of the REQUEST SENSE command. Idle and standby
-power conditions can now be detected with this command. Interestingly
-the sense key is set to "no sense" while the asc/ascq code convey the
-information (e.g. 0x5e/0x4 "Standby condition activated by command").
+command almost superfluous.
+.PP
+However recent SCSI drafts (e.g. SPC rev 23 and SBC-2 rev 16) increase
+the utility of the REQUEST SENSE command. Idle and standby power
+conditions can now be detected with this command; a progress indication
+is given during FORMAT (when that command was started with with IMMED=1
+in its parameter header); and the Filemark, ILI and EOM bits may be
+set (e.g. by a tape drive). Interestingly the sense key is set 
+to "no sense" while the asc/ascq code convey the information (e.g.
+0x5e/0x4 "Standby condition activated by command").
+.PP
+The REQUEST SENSE command is not marked as mandatory in SPC-3 (i.e. for
+all SCSI devices) but is marked as mandatory in SBC-2 (i.e. for disks),
+SSC-3 (i.e. for tapes) and MMC-4 (i.e. for CD/DVD drives).
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004 Douglas Gilbert
+Copyright \(co 2004-2005 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

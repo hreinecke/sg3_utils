@@ -27,7 +27,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.05 20050309";
+static char * version_str = "1.06 20050808";
 
 #define WRITE_LONG_OPCODE 0x3F
 #define WRITE_LONG_CMD_LEN 10
@@ -69,7 +69,8 @@ static void usage()
           "count=1\n"
           " To write to a defected sector use:\n"
           "    sg_dd of=<scsi_device> seek=<lba> if=/dev/zero bs=512 "
-          "count=1\n"       
+          "count=1\n\n"       
+          "Performs a WRITE LONG SCSI command\n"
           );
 }
 
@@ -283,7 +284,7 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("WRITE LONG, continuing", &io_hdr);
+        sg_chk_n_print3("WRITE LONG, continuing", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
@@ -292,7 +293,7 @@ int main(int argc, char * argv[])
             (ssh.sense_key == ILLEGAL_REQUEST) &&
             ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {
             if (verbose)
-                sg_chk_n_print3("WRITE LONG command problem", &io_hdr);
+                sg_chk_n_print3("WRITE LONG command problem", &io_hdr, 1);
             fprintf(stderr, "<<< nothing written to device >>>\n");
             fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
                     ">>>\n", xfer_len - offset);
@@ -301,7 +302,7 @@ int main(int argc, char * argv[])
                         "expected but not found]\n");
             goto err_out;
         }
-        sg_chk_n_print3("WRITE LONG problem error", &io_hdr);
+        sg_chk_n_print3("WRITE LONG problem error", &io_hdr, verbose);
         goto err_out;
     }
 

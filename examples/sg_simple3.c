@@ -87,7 +87,7 @@ int main(int argc, char * argv[])
     /* N.B. An access mode of O_RDWR is required for some SCSI commands */
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-		 "sg_simple3: error opening file: %s", file_name);
+                 "sg_simple3: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
@@ -141,7 +141,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("INQUIRY command error", &io_hdr);
+        sg_chk_n_print3("INQUIRY command error", &io_hdr, 1);
         break;
     }
 
@@ -186,7 +186,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("Test Unit Ready command error", &io_hdr);
+        sg_chk_n_print3("Test Unit Ready command error", &io_hdr, 1);
         break;
     }
 

@@ -1,4 +1,4 @@
-.TH SG_READCAP "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_READCAP "8" "July 2005" "sg3_utils-1.16" SG3_UTILS
 .SH NAME
 sg_readcap \- calls a READ CAPACITY command on a SCSI device
 .SH SYNOPSIS
@@ -30,6 +30,13 @@ block address to (2**32 - 2). When a 10 byte cdb READ CAPACITY command
 is used on a device whose size is too large then a last block address
 of 0xffffffff is returned (if the device complies with SBC-2).
 .TP
+-b
+utility outputs two hex numbers (prefixed with '0x' and space separated)
+to stdout. The first number is the maximum number of blocks on the
+device (which is one plus the lba of the last accessible block). The
+second number is the size of each block. If the operation fails
+then "0x0 0x0" is writtent to stdout.
+.TP
 -h
 output the usage message then exit.
 .TP
@@ -51,6 +58,9 @@ and '-vvv' are also accepted yielding greater verbosity.
 .TP
 -V
 outputs version string then exits.
+.PP
+On exit this utility returns 0 if it succeeded otherwise a process status
+value of 1 is returned.
 .PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks

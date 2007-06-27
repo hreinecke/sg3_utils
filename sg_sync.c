@@ -49,7 +49,7 @@
  * (e.g. disks)
  */
 
-static char * version_str = "1.02 20050210";
+static char * version_str = "1.03 20050808";
 
 
 #define ME "sg_sync: "
@@ -89,7 +89,8 @@ static void usage()
           "(if distinct\n"
           "                             from medium)\n"
           "         --verbose|-v        increase verbosity\n"
-          "         --version|-V        print version string and exit\n"
+          "         --version|-V        print version string and exit\n\n"
+          "Performs a SYNCHRONIZE CACHE SCSI command\n"
           );
 
 }

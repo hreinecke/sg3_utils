@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.22 20050309";
+static char * version_str = "0.23 20050808";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -153,17 +153,17 @@ static int do_prin(int sg_fd, int rq_servact, void * resp, int mx_resp_len,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("PRIN, continuing", &io_hdr);
+        sg_chk_n_print3("PRIN, continuing", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     default:
-        if (noisy) {
+        if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
             snprintf(ebuff, EBUFF_SZ, "PRIN error, service_action: %s",
                      ((rq_servact < num_prin_sa_strs) ? 
                         prin_sa_strs[rq_servact] : "??"));
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -216,7 +216,7 @@ static int do_prout(int sg_fd, int rq_servact, int rq_scope,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("PROUT, continuing", &io_hdr);
+        sg_chk_n_print3("PROUT, continuing", &io_hdr, verbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -226,7 +226,7 @@ static int do_prout(int sg_fd, int rq_servact, int rq_scope,
             snprintf(ebuff, EBUFF_SZ, "PROUT error, service_action: %s",
                      ((rq_servact < num_prout_sa_strs) ? 
                         prout_sa_strs[rq_servact] : "??"));
-            sg_chk_n_print3(ebuff, &io_hdr);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose);
         }
         return -1;
     }
@@ -276,7 +276,8 @@ static void usage()
             "       --unreg|-U     optional with PR Out Register and Move\n"
             "       --verbose|-v   output additional debug information\n"
             "       --version|-V   output version string\n"
-            "       -?   output this usage message\n");
+            "       -?   output this usage message\n\n"
+            "Performs a PERSISTENT RESERVATION (IN or OUT) SCSI command\n");
 }
 
 static const char * scsi_ptype_strs[] = {

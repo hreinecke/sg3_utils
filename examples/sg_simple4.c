@@ -36,7 +36,7 @@
 
 #ifndef SG_FLAG_MMAP_IO
 #define SG_FLAG_MMAP_IO 4
-#endif	/* since /usr/include/scsi/sg.h doesn't know about this yet */
+#endif  /* since /usr/include/scsi/sg.h doesn't know about this yet */
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -83,7 +83,7 @@ int main(int argc, char * argv[])
     /* N.B. An access mode of O_RDWR is required for some SCSI commands */
     if ((sg_fd = open(file_name, O_RDWR)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-		 "sg_simple4: error opening file: %s", file_name);
+                 "sg_simple4: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
@@ -100,14 +100,14 @@ int main(int argc, char * argv[])
     inqBuff = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
     if (MAP_FAILED == inqBuff) {
         snprintf(ebuff, EBUFF_SZ, "sg_simple4: error using mmap() on "
-		 "file: %s", file_name);
+                 "file: %s", file_name);
         perror(ebuff);
         return 1;
     }
     if (inqBuff[0])
-    	printf("non-null char at inqBuff[0]\n");
+        printf("non-null char at inqBuff[0]\n");
     if (inqBuff[5000])
-    	printf("non-null char at inqBuff[5000]\n");
+        printf("non-null char at inqBuff[5000]\n");
 
     /* Prepare INQUIRY command */
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
@@ -142,7 +142,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("INQUIRY command error", &io_hdr);
+        sg_chk_n_print3("INQUIRY command error", &io_hdr, 1);
         break;
     }
 
@@ -187,7 +187,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("Test Unit Ready command error", &io_hdr);
+        sg_chk_n_print3("Test Unit Ready command error", &io_hdr, 1);
         break;
     }
 
@@ -198,7 +198,7 @@ int main(int argc, char * argv[])
 
     if (do_extra)
         printf("TEST UNIT READY duration=%u millisecs, resid=%d, " 
-	       "msg_status=%d\n",
+               "msg_status=%d\n",
                io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
 
     /* munmap(inqBuff, 8000); */
@@ -208,27 +208,27 @@ int main(int argc, char * argv[])
     inqBuff2 = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
     if (MAP_FAILED == inqBuff2) {
         snprintf(ebuff, EBUFF_SZ, "sg_simple4: error using mmap() 2 on "
-		 "file: %s", file_name);
+                 "file: %s", file_name);
         perror(ebuff);
         return 1;
     }
     if (inqBuff2[0])
-    	printf("non-null char at inqBuff2[0]\n");
+        printf("non-null char at inqBuff2[0]\n");
     if (inqBuff2[5000])
-    	printf("non-null char at inqBuff2[5000]\n");
+        printf("non-null char at inqBuff2[5000]\n");
     {
-    	pid_t pid;
-	pid = fork();
-	if (pid) {
-	    inqBuff2[5000] = 33;
-	    munmap(inqBuff, 8000);
-	    sleep(3);
-	}
-	else {
-	    inqBuff[5000] = 0xaa;
-	    munmap(inqBuff, 8000);
-	    sleep(1);
-	}
+        pid_t pid;
+        pid = fork();
+        if (pid) {
+            inqBuff2[5000] = 33;
+            munmap(inqBuff, 8000);
+            sleep(3);
+        }
+        else {
+            inqBuff[5000] = 0xaa;
+            munmap(inqBuff, 8000);
+            sleep(1);
+        }
     }
 #endif
     close(sg_fd);

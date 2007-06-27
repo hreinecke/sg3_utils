@@ -101,9 +101,9 @@ void sg_sa_handler(int sig, siginfo_t *si, void * data)
 {
     signo = sig;
     if (SIGRTMIN != sig)
-    	fprintf(stderr, "Unexpected signal, signum=%d\n", sig);
+        fprintf(stderr, "Unexpected signal, signum=%d\n", sig);
     if (sg_fd != si->si_fd)
-    	fprintf(stderr, "Unexpected fd, fd=%d\n", si->si_fd);
+        fprintf(stderr, "Unexpected fd, fd=%d\n", si->si_fd);
     ++hand_count;
     if (do_poll()) {
         struct sembuf a_sembuf;
@@ -314,7 +314,7 @@ printf("Usage: 'sg_poll [-deb] <generic_device>'  eg: sg_poll /dev/sg0\n");
     }
     sg_chk_n_print("after read(rd)", rsghp->target_status, 
                    rsghp->host_status, rsghp->driver_status, 
-                   rsghp->sense_buffer, SG_MAX_SENSE);
+                   rsghp->sense_buffer, SG_MAX_SENSE, 1);
 
     }
     printf("\treq_len=%d, dma_count=%d\n", rsghp->reply_len, rsghp->pack_len);

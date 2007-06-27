@@ -35,7 +35,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.02 20050511";
+static char * version_str = "1.03 20050806";
 
 #define BPI (signed)(sizeof(int))
 
@@ -110,12 +110,13 @@ int find_out_about_buffer (int sg_fd)
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr);
-            /* fall through */
+                sg_chk_n_print3("READ BUFFER descriptor, continuing",
+                                &io_hdr, 1);
+                /* fall through */
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
-                sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr);
+                sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, 1);
                 return 1;
         }
     
@@ -244,12 +245,12 @@ int read_buffer (int sg_fd, unsigned size)
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr);
+            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr, 1);
             /* fall through */
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
-                sg_chk_n_print3("READ BUFFER data error", &io_hdr);
+                sg_chk_n_print3("READ BUFFER data error", &io_hdr, 1);
                 free(rbBuff);
                 return 1;
         }
@@ -302,12 +303,12 @@ int write_buffer (int sg_fd, unsigned size)
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("WRITE BUFFER data, continuing", &io_hdr);
+            sg_chk_n_print3("WRITE BUFFER data, continuing", &io_hdr, 1);
             /* fall through */
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
-                sg_chk_n_print3("WRITE BUFFER data error", &io_hdr);
+                sg_chk_n_print3("WRITE BUFFER data error", &io_hdr, 1);
                 free(wbBuff);
                 return 1;
         }

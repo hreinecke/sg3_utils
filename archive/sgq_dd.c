@@ -61,7 +61,7 @@ static char * version_str = "0.55 20020509";
 
 #define SGP_READ10 0x28
 #define SGP_WRITE10 0x2a
-#define DEF_NUM_THREADS 4	/* actually degree of concurrency */
+#define DEF_NUM_THREADS 4       /* actually degree of concurrency */
 #define MAX_NUM_THREADS 32
 
 #ifndef RAW_MAJOR
@@ -72,10 +72,10 @@ static char * version_str = "0.55 20020509";
 #define FT_SG 1                 /* filetype is sg char device */
 #define FT_RAW 2                /* filetype is raw char device */
 
-#define QS_IDLE 0		/* ready to start a copy cycle */
-#define QS_IN_STARTED 1		/* commenced read */
-#define QS_IN_FINISHED 2	/* finished read, ready for write */
-#define QS_OUT_STARTED 3	/* commenced write */
+#define QS_IDLE 0               /* ready to start a copy cycle */
+#define QS_IN_STARTED 1         /* commenced read */
+#define QS_IN_FINISHED 2        /* finished read, ready for write */
+#define QS_OUT_STARTED 3        /* commenced write */
 
 #define QS_IN_POLL 11
 #define QS_OUT_POLL 12
@@ -118,7 +118,7 @@ typedef struct request_collection
 
 typedef struct request_element
 {       /* one instance per worker thread */
-    int qstate;			/* "QS" state */
+    int qstate;                 /* "QS" state */
     int infd;
     int outfd;
     int wr;
@@ -218,15 +218,15 @@ void usage()
            "sgq_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>] "
            "[bs=<num>]\n"
            "            [bpt=<num>] [count=<n>] [dio=0|1] [thr=<n>] "
-	   "[coe=0|1] [gen=<n>]\n"
+           "[coe=0|1] [gen=<n>]\n"
            "            [time=0|1] [deb=<n>] [--version]\n"
            "         usually either 'if' or 'of' is a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
            " 'thr' is number of queues, must be > 0, default 4, max 32\n");
     fprintf(stderr, " 'coe' continue on sg error, 0->exit (def), "
-    	   "1->zero + continue\n"
-	   " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
+           "1->zero + continue\n"
+           " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
            " 'gen' 0-> 1 file is special(def), 1-> any files allowed\n"
            " 'deb' is debug, 0->none (def), > 0->varying degrees of debug\n");
 }
@@ -237,40 +237,40 @@ int do_poll(Rq_coll * clp, int timeout, int * req_indexp)
     int k, res;
 
     if (FT_SG == clp->out_type) {
-	while (((res = poll(out_pollfd_arr, clp->num_rq_elems, timeout)) < 0)
-	       && (EINTR == errno))
-	    ;
-	if (res < 0) {
-	    perror("poll error on output fds");
-	    return -1;
-	}
-	else if (res > 0) {
-	    for (k = 0; k < clp->num_rq_elems; ++k) {
-		if (out_pollfd_arr[k].revents & POLLIN) {
-		    if (req_indexp)
-			*req_indexp = k;
-		    return QS_OUT_POLL;
-		}
-	    }
-	}
+        while (((res = poll(out_pollfd_arr, clp->num_rq_elems, timeout)) < 0)
+               && (EINTR == errno))
+            ;
+        if (res < 0) {
+            perror("poll error on output fds");
+            return -1;
+        }
+        else if (res > 0) {
+            for (k = 0; k < clp->num_rq_elems; ++k) {
+                if (out_pollfd_arr[k].revents & POLLIN) {
+                    if (req_indexp)
+                        *req_indexp = k;
+                    return QS_OUT_POLL;
+                }
+            }
+        }
     }
     if (FT_SG == clp->in_type) {
-	while (((res = poll(in_pollfd_arr, clp->num_rq_elems, timeout)) < 0)
-	       && (EINTR == errno))
-	    ;
-	if (res < 0) {
-	    perror("poll error on input fds");
-	    return -1;
-	}
-	else if (res > 0) {
-	    for (k = 0; k < clp->num_rq_elems; ++k) {
-		if (in_pollfd_arr[k].revents & POLLIN) {
-		    if (req_indexp)
-			*req_indexp = k;
-		    return QS_IN_POLL;
-		}
-	    }
-	}
+        while (((res = poll(in_pollfd_arr, clp->num_rq_elems, timeout)) < 0)
+               && (EINTR == errno))
+            ;
+        if (res < 0) {
+            perror("poll error on input fds");
+            return -1;
+        }
+        else if (res > 0) {
+            for (k = 0; k < clp->num_rq_elems; ++k) {
+                if (in_pollfd_arr[k].revents & POLLIN) {
+                    if (req_indexp)
+                        *req_indexp = k;
+                    return QS_IN_POLL;
+                }
+            }
+        }
     }
     return 0;
 }
@@ -304,7 +304,7 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
     if (SG_LIB_CAT_MEDIA_CHANGED == res)
         return 2; /* probably have another go ... */
     else if (SG_LIB_CAT_CLEAN != res) {
-        sg_chk_n_print3("read capacity", &io_hdr);
+        sg_chk_n_print3("read capacity", &io_hdr, 1);
         return -1;
     }
     *num_sect = 1 + ((rcBuff[0] << 24) | (rcBuff[1] << 16) |
@@ -327,13 +327,13 @@ int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     rep->qstate = QS_IN_STARTED;
     if (rep->debug > 8) 
         fprintf(stderr, "normal_in_operation: start blk=%d num_blks=%d\n",
-		rep->blk, rep->num_blks);
+                rep->blk, rep->num_blks);
     while (((res = read(rep->infd, rep->buffp,
                         blocks * rep->bs)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
         fprintf(stderr, "sgq_dd: reading, in_blk=%d, errno=%d\n", rep->blk, 
-		errno);
+                errno);
         return -1;
     }
     if (res < blocks * rep->bs) {
@@ -364,13 +364,13 @@ int normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     rep->qstate = QS_OUT_STARTED;
     if (rep->debug > 8) 
         fprintf(stderr, "normal_out_operation: start blk=%d num_blks=%d\n",
-		rep->blk, rep->num_blks);
+                rep->blk, rep->num_blks);
     while (((res = write(rep->outfd, rep->buffp,
                  rep->num_blks * rep->bs)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
         fprintf(stderr, "sgq_dd: output, out_blk=%d, errno=%d\n", rep->blk,
-		errno);
+                errno);
         return -1;
     }
     if (res < blocks * rep->bs) {
@@ -394,23 +394,23 @@ int sg_fin_in_operation(Rq_coll * clp, Rq_elem * rep)
     rep->qstate = QS_IN_FINISHED;
     res = sg_finish_io(rep->wr, rep);
     if (res < 0) {
-	if (clp->coe) {
-	    memset(rep->buffp, 0, rep->num_blks * rep->bs);
-	    fprintf(stderr, ">> substituted zeros for in blk=%d for "
-		    "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
-	    res = 0;
-	}
-	else {
-	    fprintf(stderr, "error finishing sg in command\n");
-	    return res;
-	}
+        if (clp->coe) {
+            memset(rep->buffp, 0, rep->num_blks * rep->bs);
+            fprintf(stderr, ">> substituted zeros for in blk=%d for "
+                    "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
+            res = 0;
+        }
+        else {
+            fprintf(stderr, "error finishing sg in command\n");
+            return res;
+        }
     }
     if (0 == res) { /* looks good, going to return */
-	if (rep->dio_incomplete || rep->resid) {
-	    clp->dio_incomplete += rep->dio_incomplete;
-	    clp->sum_of_resids += rep->resid;
-	}
-	clp->in_done_count -= rep->num_blks;
+        if (rep->dio_incomplete || rep->resid) {
+            clp->dio_incomplete += rep->dio_incomplete;
+            clp->sum_of_resids += rep->resid;
+        }
+        clp->in_done_count -= rep->num_blks;
     }
     return res;
 }
@@ -423,22 +423,22 @@ int sg_fin_out_operation(Rq_coll * clp, Rq_elem * rep)
     rep->qstate = QS_IDLE;
     res = sg_finish_io(rep->wr, rep);
     if (res < 0) {
-	if (clp->coe) {
-	    fprintf(stderr, ">> ignored error for out blk=%d for "
-		    "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
-	    res = 0;
-	}
-	else {
-	    fprintf(stderr, "error finishing sg out command\n");
-	    return res;
-	}
+        if (clp->coe) {
+            fprintf(stderr, ">> ignored error for out blk=%d for "
+                    "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
+            res = 0;
+        }
+        else {
+            fprintf(stderr, "error finishing sg out command\n");
+            return res;
+        }
     }
     if (0 == res) {
-	if (rep->dio_incomplete || rep->resid) {
-	    clp->dio_incomplete += rep->dio_incomplete;
-	    clp->sum_of_resids += rep->resid;
-	}
-	clp->out_done_count -= rep->num_blks;
+        if (rep->dio_incomplete || rep->resid) {
+            clp->dio_incomplete += rep->dio_incomplete;
+            clp->sum_of_resids += rep->resid;
+        }
+        clp->out_done_count -= rep->num_blks;
     }
     return res;
 }
@@ -515,8 +515,8 @@ int sg_finish_io(int wr, Rq_elem * rep)
     }
     if (rep != (Rq_elem *)io_hdr.usr_ptr) {
         fprintf(stderr, 
-		"sg_finish_io: bad usr_ptr, request-response mismatch\n");
-	exit(1);
+                "sg_finish_io: bad usr_ptr, request-response mismatch\n");
+        exit(1);
     }
     memcpy(&rep->io_hdr, &io_hdr, sizeof(sg_io_hdr_t));
     hp = &rep->io_hdr;
@@ -534,8 +534,8 @@ int sg_finish_io(int wr, Rq_elem * rep)
             {
                 char ebuff[EBUFF_SZ];
                 snprintf(ebuff, EBUFF_SZ, "%s blk=%d", 
-			 rep->wr ? "writing": "reading", rep->blk);
-                sg_chk_n_print3(ebuff, hp);
+                         rep->wr ? "writing": "reading", rep->blk);
+                sg_chk_n_print3(ebuff, hp, 1);
                 return -1;
             }
     }
@@ -550,7 +550,7 @@ int sg_finish_io(int wr, Rq_elem * rep)
     rep->resid = hp->resid;
     if (rep->debug > 8)
         fprintf(stderr, "sg_finish_io: completed %s, blk=%d\n", 
-		wr ? "WRITE" : "READ", rep->blk);
+                wr ? "WRITE" : "READ", rep->blk);
     return 0;
 }
 
@@ -576,8 +576,8 @@ int sg_prepare(int fd, int sz)
 #endif
     res = ioctl(fd, SG_GET_SCSI_ID, &info);
     if (res < 0) {
-	perror("sgq_dd: SG_SET_SCSI_ID error");
-	return -1;
+        perror("sgq_dd: SG_SET_SCSI_ID error");
+        return -1;
     }
     else
         return info.scsi_type;
@@ -595,63 +595,63 @@ int prepare_rq_elems(Rq_coll * clp, const char * inf, const char * outf)
 
     clp->req_arr = malloc(sizeof(Rq_elem) * clp->num_rq_elems);
     if (NULL == clp->req_arr)
-    	return 1;
+        return 1;
     for (k = 0; k < clp->num_rq_elems; ++k) {
-    	rep = &clp->req_arr[k];
-	memset(rep, 0, sizeof(Rq_elem));
-	psz = getpagesize();
-	if (NULL == (rep->alloc_bp = malloc(sz + psz)))
-	    return 1;
-	rep->buffp = (unsigned char *)
-		(((unsigned long)rep->alloc_bp + psz - 1) & (~(psz - 1)));
-	rep->qstate = QS_IDLE;
-	rep->bs = clp->bs;
-	rep->dio = clp->dio;
-	rep->debug = clp->debug;
-	rep->out_scsi_type = clp->out_scsi_type;
-	if (FT_SG == clp->in_type) {
-	    if (0 == k)
-		rep->infd = clp->infd;
-	    else {
-		if ((rep->infd = open(inf, O_RDWR)) < 0) {
+        rep = &clp->req_arr[k];
+        memset(rep, 0, sizeof(Rq_elem));
+        psz = getpagesize();
+        if (NULL == (rep->alloc_bp = malloc(sz + psz)))
+            return 1;
+        rep->buffp = (unsigned char *)
+                (((unsigned long)rep->alloc_bp + psz - 1) & (~(psz - 1)));
+        rep->qstate = QS_IDLE;
+        rep->bs = clp->bs;
+        rep->dio = clp->dio;
+        rep->debug = clp->debug;
+        rep->out_scsi_type = clp->out_scsi_type;
+        if (FT_SG == clp->in_type) {
+            if (0 == k)
+                rep->infd = clp->infd;
+            else {
+                if ((rep->infd = open(inf, O_RDWR)) < 0) {
                     snprintf(ebuff, EBUFF_SZ, 
-			     "sgq_dd: could not open %s for sg reading", inf);
+                             "sgq_dd: could not open %s for sg reading", inf);
                     perror(ebuff);
                     return 1;
                 }
-	    }
-	    in_pollfd_arr[k].fd = rep->infd;
-	    in_pollfd_arr[k].events = POLLIN;
-	    if ((scsi_type = sg_prepare(rep->infd, sz)) < 0)
-		return 1;
-	    if (0 == k)
-		clp->in_scsi_type = scsi_type;
-	    rep->in_scsi_type = clp->in_scsi_type;
-	}
-	else
-	    rep->infd = clp->infd;
+            }
+            in_pollfd_arr[k].fd = rep->infd;
+            in_pollfd_arr[k].events = POLLIN;
+            if ((scsi_type = sg_prepare(rep->infd, sz)) < 0)
+                return 1;
+            if (0 == k)
+                clp->in_scsi_type = scsi_type;
+            rep->in_scsi_type = clp->in_scsi_type;
+        }
+        else
+            rep->infd = clp->infd;
 
-	if (FT_SG == clp->out_type) {
-	    if (0 == k)
-		rep->outfd = clp->outfd;
-	    else {
-		if ((rep->outfd = open(outf, O_RDWR)) < 0) {
+        if (FT_SG == clp->out_type) {
+            if (0 == k)
+                rep->outfd = clp->outfd;
+            else {
+                if ((rep->outfd = open(outf, O_RDWR)) < 0) {
                     snprintf(ebuff, EBUFF_SZ, 
-			     "sgq_dd: could not open %s for sg writing", outf);
+                             "sgq_dd: could not open %s for sg writing", outf);
                     perror(ebuff);
                     return 1;
                 }
-	    }
-	    out_pollfd_arr[k].fd = rep->outfd;
-	    out_pollfd_arr[k].events = POLLIN;
-	    if ((scsi_type = sg_prepare(rep->outfd, sz)) < 0)
-		return 1;
-	    if (0 == k)
-		clp->out_scsi_type = scsi_type;
-	    rep->out_scsi_type = clp->out_scsi_type;
-	}
-	else
-	    rep->outfd = clp->outfd;
+            }
+            out_pollfd_arr[k].fd = rep->outfd;
+            out_pollfd_arr[k].events = POLLIN;
+            if ((scsi_type = sg_prepare(rep->outfd, sz)) < 0)
+                return 1;
+            if (0 == k)
+                clp->out_scsi_type = scsi_type;
+            rep->out_scsi_type = clp->out_scsi_type;
+        }
+        else
+            rep->outfd = clp->outfd;
     }
     return 0;
 }
@@ -670,37 +670,37 @@ int decider(Rq_coll * clp, int first_xfer, int * req_indexp)
 
     times = first_xfer ? 1 : clp->num_rq_elems;
     for (k = 0; k < times; ++k) {
-	rep = &clp->req_arr[k];
-	if ((QS_IN_STARTED == rep->qstate) ||
-	    (QS_OUT_STARTED == rep->qstate))
-	    try_poll = 1;
-	else if ((QS_IN_FINISHED == rep->qstate) && (rep->blk < lowest_blk)) {
-	    lowest_blk = rep->blk;
-	    lowest_blk_index = k;
-	}
-	else if ((QS_IDLE == rep->qstate) && (first_idle_index < 0))
-	    first_idle_index = k;
+        rep = &clp->req_arr[k];
+        if ((QS_IN_STARTED == rep->qstate) ||
+            (QS_OUT_STARTED == rep->qstate))
+            try_poll = 1;
+        else if ((QS_IN_FINISHED == rep->qstate) && (rep->blk < lowest_blk)) {
+            lowest_blk = rep->blk;
+            lowest_blk_index = k;
+        }
+        else if ((QS_IDLE == rep->qstate) && (first_idle_index < 0))
+            first_idle_index = k;
     }
     if (try_poll) {
-	res = do_poll(clp, 0, req_indexp);
-	if (0 != res)
-	    return res;
+        res = do_poll(clp, 0, req_indexp);
+        if (0 != res)
+            return res;
     }
 
     if (lowest_blk_index >= 0) {
-	if (req_indexp)
-	    *req_indexp = lowest_blk_index;
-	return QS_IN_FINISHED;
+        if (req_indexp)
+            *req_indexp = lowest_blk_index;
+        return QS_IN_FINISHED;
     }
 #if 0
     if (try_poll) {
-	res = do_poll(clp, 2, req_indexp);
-	if (0 != res)
-	    return res;
+        res = do_poll(clp, 2, req_indexp);
+        if (0 != res)
+            return res;
     }
 #endif
     if (req_indexp)
-    	*req_indexp = first_idle_index;
+        *req_indexp = first_idle_index;
     return QS_IDLE;
 }
 
@@ -780,7 +780,7 @@ int main(int argc, char * argv[])
             do_time = sg_get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
             fprintf(stderr, "sgq_dd for sg version 3 driver: %s\n", 
-	    	    version_str);
+                    version_str);
             return 0;
         }
         else {
@@ -819,12 +819,12 @@ int main(int argc, char * argv[])
     rcoll.infd = STDIN_FILENO;
     rcoll.outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
-    	rcoll.in_type = dd_filetype(inf);
+        rcoll.in_type = dd_filetype(inf);
 
         if (FT_SG == rcoll.in_type) {
             if ((rcoll.infd = open(inf, O_RDWR)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-			 "sgq_dd: could not open %s for sg reading", inf);
+                         "sgq_dd: could not open %s for sg reading", inf);
                 perror(ebuff);
                 return 1;
             }
@@ -832,7 +832,7 @@ int main(int argc, char * argv[])
         if (FT_SG != rcoll.in_type) {
             if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-			 "sgq_dd: could not open %s for reading", inf);
+                         "sgq_dd: could not open %s for reading", inf);
                 perror(ebuff);
                 return 1;
             }
@@ -850,27 +850,27 @@ int main(int argc, char * argv[])
         }
     }
     if (outf[0] && ('-' != outf[0])) {
-	rcoll.out_type = dd_filetype(outf);
+        rcoll.out_type = dd_filetype(outf);
 
         if (FT_SG == rcoll.out_type) {
-	    if ((rcoll.outfd = open(outf, O_RDWR)) < 0) {
+            if ((rcoll.outfd = open(outf, O_RDWR)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-			"sgq_dd: could not open %s for sg writing", outf);
+                        "sgq_dd: could not open %s for sg writing", outf);
                 perror(ebuff);
                 return 1;
             }
         }
-	else {
-	    if (FT_OTHER == rcoll.out_type) {
-		if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
+        else {
+            if (FT_OTHER == rcoll.out_type) {
+                if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                             "sgq_dd: could not open %s for writing", outf);
                     perror(ebuff);
                     return 1;
                 }
-	    }
-	    else {
-		if ((rcoll.outfd = open(outf, O_WRONLY)) < 0) {
+            }
+            else {
+                if ((rcoll.outfd = open(outf, O_WRONLY)) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                             "sgq_dd: could not open %s for raw writing", outf);
                     perror(ebuff);
@@ -881,14 +881,14 @@ int main(int argc, char * argv[])
                 llse_loff_t offset = seek;
 
                 offset *= rcoll.bs;       /* could exceed 32 bits here! */
-		if (llse_llseek(rcoll.outfd, offset, SEEK_SET) < 0) {
+                if (llse_llseek(rcoll.outfd, offset, SEEK_SET) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                 "sgq_dd: couldn't seek to required position on %s", outf);
                     perror(ebuff);
                     return 1;
                 }
             }
-	}
+        }
     }
     if ((STDIN_FILENO == rcoll.infd) && (STDOUT_FILENO == rcoll.outfd)) {
         fprintf(stderr, "Disallow both if and of to be stdin and stdout");
@@ -959,12 +959,12 @@ int main(int argc, char * argv[])
     rcoll.out_blk = seek;
 
     if ((FT_SG == rcoll.in_type) || (FT_SG == rcoll.out_type))
-    	rcoll.num_rq_elems = num_threads;
+        rcoll.num_rq_elems = num_threads;
     else
-    	rcoll.num_rq_elems = 1;
+        rcoll.num_rq_elems = 1;
     if (prepare_rq_elems(&rcoll, inf, outf)) {
         fprintf(stderr, "Setup failure, perhaps no memory\n");
-	return 1;
+        return 1;
     }
 
     first_xfer = 1;
@@ -978,123 +978,123 @@ int main(int argc, char * argv[])
     }
     while (rcoll.out_done_count > 0) { /* >>>>>>>>> main loop */
         req_index = -1;
-	qstate = decider(&rcoll, first_xfer, &req_index);
-	rep = (req_index < 0) ? NULL : (rcoll.req_arr + req_index);
-	switch (qstate) {
-	case QS_IDLE:
-	    if ((NULL == rep) || (rcoll.in_count <= 0)) {
-	    	/* usleep(1000); */
-		/* do_poll(&rcoll, 10, NULL); */
-		/* do_poll(&rcoll, 0, NULL); */
-		break;
-	    }
-	    if (rcoll.debug > 8)
-	    	fprintf(stderr, "    sgq_dd: non-sleeping QS_IDLE state, "
-				"req_index=%d\n", req_index);
-	    if (first_xfer >= 2)
-	    	first_xfer = 0;
-	    else if (1 == first_xfer)
-	    	++first_xfer;
-	    if (stop_after_write) {
-		terminate = 1;
-		break;
-	    }
-	    blocks = (rcoll.in_count > rcoll.bpt) ? rcoll.bpt : rcoll.in_count;
-	    rep->wr = 0;
-	    rep->blk = rcoll.in_blk;
-	    rep->num_blks = blocks;
-	    rcoll.in_blk += blocks;
-	    rcoll.in_count -= blocks;
+        qstate = decider(&rcoll, first_xfer, &req_index);
+        rep = (req_index < 0) ? NULL : (rcoll.req_arr + req_index);
+        switch (qstate) {
+        case QS_IDLE:
+            if ((NULL == rep) || (rcoll.in_count <= 0)) {
+                /* usleep(1000); */
+                /* do_poll(&rcoll, 10, NULL); */
+                /* do_poll(&rcoll, 0, NULL); */
+                break;
+            }
+            if (rcoll.debug > 8)
+                fprintf(stderr, "    sgq_dd: non-sleeping QS_IDLE state, "
+                                "req_index=%d\n", req_index);
+            if (first_xfer >= 2)
+                first_xfer = 0;
+            else if (1 == first_xfer)
+                ++first_xfer;
+            if (stop_after_write) {
+                terminate = 1;
+                break;
+            }
+            blocks = (rcoll.in_count > rcoll.bpt) ? rcoll.bpt : rcoll.in_count;
+            rep->wr = 0;
+            rep->blk = rcoll.in_blk;
+            rep->num_blks = blocks;
+            rcoll.in_blk += blocks;
+            rcoll.in_count -= blocks;
 
-	    if (FT_SG == rcoll.in_type) {
-	    	res = sg_start_io(rep);
-		if (0 != res) {
-		    if (1 == res)
-			fprintf(stderr, "Out of memory starting sg io\n");
-		    terminate = 1;
-		}
-	    }
-	    else {
-		res = normal_in_operation(&rcoll, rep, blocks);
-		if (res < 0)
-		    terminate = 1;
-		else if (res > 0)
-		    stop_after_write = 1;
-	    }
-	    break;
-	case QS_IN_FINISHED:
-	    if (rcoll.debug > 8)
-	    	fprintf(stderr, "    sgq_dd: state is QS_IN_FINISHED, "
-				"req_index=%d\n", req_index);
-	    if ((rep->blk + seek_skip) != rcoll.out_blk) {
-		/* if write would be out of sequence then wait */
-		if (rcoll.debug > 4)
-		    fprintf(stderr, "    sgq_dd: QS_IN_FINISHED, "
-			    "out of sequence\n");
-		usleep(200);
-		break;
-	    }
+            if (FT_SG == rcoll.in_type) {
+                res = sg_start_io(rep);
+                if (0 != res) {
+                    if (1 == res)
+                        fprintf(stderr, "Out of memory starting sg io\n");
+                    terminate = 1;
+                }
+            }
+            else {
+                res = normal_in_operation(&rcoll, rep, blocks);
+                if (res < 0)
+                    terminate = 1;
+                else if (res > 0)
+                    stop_after_write = 1;
+            }
+            break;
+        case QS_IN_FINISHED:
+            if (rcoll.debug > 8)
+                fprintf(stderr, "    sgq_dd: state is QS_IN_FINISHED, "
+                                "req_index=%d\n", req_index);
+            if ((rep->blk + seek_skip) != rcoll.out_blk) {
+                /* if write would be out of sequence then wait */
+                if (rcoll.debug > 4)
+                    fprintf(stderr, "    sgq_dd: QS_IN_FINISHED, "
+                            "out of sequence\n");
+                usleep(200);
+                break;
+            }
             rep->wr = 1;
             rep->blk = rcoll.out_blk;
-	    blocks = rep->num_blks;
+            blocks = rep->num_blks;
             rcoll.out_blk += blocks;
             rcoll.out_count -= blocks;
 
-	    if (FT_SG == rcoll.out_type) {
-	    	res = sg_start_io(rep);
-		if (0 != res) {
-		    if (1 == res)
-			fprintf(stderr, "Out of memory starting sg io\n");
-		    terminate = 1;
-		}
-	    }
-	    else {
-		if (normal_out_operation(&rcoll, rep, blocks) < 0)
-		    terminate = 1;
-	    }
-	    break;
-	case QS_IN_POLL:
-	    if (rcoll.debug > 8)
-	    	fprintf(stderr, "    sgq_dd: state is QS_IN_POLL, "
-				"req_index=%d\n", req_index);
-	    res = sg_fin_in_operation(&rcoll, rep);
-	    if (res < 0)
-	    	terminate = 1;
-	    else if (res > 1) {
-	    	if (first_xfer) {
-		    /* only retry on first xfer */
-		    if (0 != sg_start_io(rep))
-		    	terminate = 1;
-		}
-		else
-		    terminate = 1;
-	    }
-	    break;
-	case QS_OUT_POLL:
-	    if (rcoll.debug > 8)
-	    	fprintf(stderr, "    sgq_dd: state is QS_OUT_POLL, "
-				"req_index=%d\n", req_index);
-	    res = sg_fin_out_operation(&rcoll, rep);
-	    if (res < 0)
-	    	terminate = 1;
-	    else if (res > 1) {
-	    	if (first_xfer) {
-		    /* only retry on first xfer */
-		    if (0 != sg_start_io(rep))
-		    	terminate = 1;
-		}
-		else
-		    terminate = 1;
-	    }
-	    break;
-	default:
-	    if (rcoll.debug > 8)
-		fprintf(stderr, "    sgq_dd: state is ?????\n");
-	    terminate = 1;
-	    break;
-	}
-	if (terminate)
-	    break;
+            if (FT_SG == rcoll.out_type) {
+                res = sg_start_io(rep);
+                if (0 != res) {
+                    if (1 == res)
+                        fprintf(stderr, "Out of memory starting sg io\n");
+                    terminate = 1;
+                }
+            }
+            else {
+                if (normal_out_operation(&rcoll, rep, blocks) < 0)
+                    terminate = 1;
+            }
+            break;
+        case QS_IN_POLL:
+            if (rcoll.debug > 8)
+                fprintf(stderr, "    sgq_dd: state is QS_IN_POLL, "
+                                "req_index=%d\n", req_index);
+            res = sg_fin_in_operation(&rcoll, rep);
+            if (res < 0)
+                terminate = 1;
+            else if (res > 1) {
+                if (first_xfer) {
+                    /* only retry on first xfer */
+                    if (0 != sg_start_io(rep))
+                        terminate = 1;
+                }
+                else
+                    terminate = 1;
+            }
+            break;
+        case QS_OUT_POLL:
+            if (rcoll.debug > 8)
+                fprintf(stderr, "    sgq_dd: state is QS_OUT_POLL, "
+                                "req_index=%d\n", req_index);
+            res = sg_fin_out_operation(&rcoll, rep);
+            if (res < 0)
+                terminate = 1;
+            else if (res > 1) {
+                if (first_xfer) {
+                    /* only retry on first xfer */
+                    if (0 != sg_start_io(rep))
+                        terminate = 1;
+                }
+                else
+                    terminate = 1;
+            }
+            break;
+        default:
+            if (rcoll.debug > 8)
+                fprintf(stderr, "    sgq_dd: state is ?????\n");
+            terminate = 1;
+            break;
+        }
+        if (terminate)
+            break;
     } /* >>>>>>>>>>>>> end of main loop */
 
     if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
@@ -1126,7 +1126,7 @@ int main(int argc, char * argv[])
     res = 0;
     if (0 != rcoll.out_count) {
         fprintf(stderr, ">>>> Some error occurred,\n");
-	res = 2;
+        res = 2;
     }
     print_stats();
     if (rcoll.dio_incomplete) {

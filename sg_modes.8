@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
+.TH SG_MODES "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
 .SH NAME
 sg_modes \- reads SCSI MODE SENSE pages
 .SH SYNOPSIS
@@ -116,13 +116,12 @@ tape drives). This parameter forces the use of 6 byte MODE SENSE commands.
 output usage message. Ignore all other parameters.
 .PP
 If the normal sg_modes utility fails with "illegal command
-operation code" then try the "-6" parameter. To alter page settings
-see the program listed in the "See Also" section below.
+operation code" then try the "-6" parameter.
 .PP
 Mode pages cannot be modified with this utility. Mode pages (and subpages)
 can be modified with the sg_wr_mode and sginfo utilities in the sg3_utils
-package. Some other utilities for displaying and modifying mode pages are
-listed in the "see also" section below.
+package. See this sdparm utility and those other utilities that are
+listed in the "SEE ALSO" section below.
 .PP
 This utility performs a SCSI INQUIRY command to determine the peripheral
 type of the device (e.g. 0 -> Direct Access Device (disk)) prior to
@@ -138,13 +137,14 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2004 Douglas Gilbert
+Copyright \(co 2000-2005 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_wr_mode(sg3_utils), sginfo(sg3_utils), sgmode(scsirastools),
-.B scsiinfo(see net), scu(see net), seatools(see seagate)
+.B sdparm(net), sg_wr_mode(sg3_utils), sginfo(sg3_utils),
+.B sgmode(scsirastools), scsiinfo(net), scu(net),
+.B seatools(seagate)
 .PP
 All these utilities offer some facility to change mode page (or block
 descriptor) parameters.

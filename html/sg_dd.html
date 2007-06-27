@@ -57,9 +57,9 @@ transport is ATAPI (i.e. the ATA packet interface) is irrelevant, to
 the
 sg_dd utility they are SCSI devices.<br>
 <br>
-This page outlines the features of the sg_dd utility version 5.41 found
-in the <a href="u_index.html">sg3_utils</a> version 1.15 package. This
-was released on the 5th June 2005.<br>
+This page outlines the features of the sg_dd utility version 5.42 found
+in the <a href="u_index.html">sg3_utils</a> version 1.16 package. This
+was released on the 9th August 2005.<br>
 <h2><a name="dd_like_features"></a> dd like features</h2>
 The basic syntax of the sg_dd utility is the same as the dd command in
 Unix. That said, the syntax of the dd command in Unix is different from
@@ -276,10 +276,11 @@ commands (SG_IO ioctl)<br>
     <tr>
       <td style="vertical-align: top;">bpt<br>
       </td>
-      <td style="vertical-align: top;">128<br>
+      <td style="vertical-align: top;">128 or 32<br>
       </td>
       <td style="vertical-align: top;">blocks_per_transfer (granularity
-of each IO). Default may be too large for cd/dvd drives<br>
+of each IO). Default is 128 when bs &lt; 2048 (bytes) else the default
+is 32<br>
       </td>
     </tr>
     <tr>
@@ -388,8 +389,6 @@ method</span><br>
       </td>
       <td style="vertical-align: top;"><span style="font-weight: bold;">Notes</span><br>
       </td>
-      <td style="vertical-align: top;"><br>
-      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">normal<br>
@@ -405,8 +404,6 @@ method</span><br>
       <td style="vertical-align: top;">Add O_DIRECT if<br>
 'odir=1'<br>
       </td>
-      <td style="vertical-align: top;"><br>
-      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">stdin or stdout<br>
@@ -416,8 +413,6 @@ method</span><br>
       <td style="vertical-align: top;">[do nothing]<br>
       </td>
       <td style="vertical-align: top;">Unix read() write()<br>
-      </td>
-      <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -432,8 +427,6 @@ method</span><br>
       </td>
       <td style="vertical-align: top;">if output then no IO<br>
       </td>
-      <td style="vertical-align: top;"><br>
-      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">block device<br>
@@ -444,8 +437,6 @@ method</span><br>
       <td style="vertical-align: top;">Unix read() write()</td>
       <td style="vertical-align: top;">Add O_DIRECT if<br>
 'odir=1'</td>
-      <td style="vertical-align: top;"><br>
-      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">block device [blk_sgio=1]<br>
@@ -456,8 +447,6 @@ method</span><br>
       <td style="vertical-align: top;">Opens input O_RDONLY <br>
 if O_RDWR fails. Adds <br>
 O_DIRECT if 'odir=1' </td>
-      <td style="vertical-align: top;"><br>
-      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">sg device<br>
@@ -470,8 +459,6 @@ O_DIRECT if 'odir=1' </td>
       </td>
       <td style="vertical-align: top;">Opens input O_RDONLY<br>
 if O_RDWR fails</td>
-      <td style="vertical-align: top;"><br>
-      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">raw device<br>
@@ -480,8 +467,6 @@ if O_RDWR fails</td>
       <td style="vertical-align: top;">O_WRONLY<br>
       </td>
       <td style="vertical-align: top;">Unix read() write()<br>
-      </td>
-      <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -497,8 +482,6 @@ if O_RDWR fails</td>
       </td>
       <td style="vertical-align: top;">error reported<br>
       </td>
-      <td style="vertical-align: top;"><br>
-      </td>
     </tr>
   </tbody>
 </table>
@@ -507,7 +490,12 @@ Some of the above combinations are not sensible (e.g. 'append=1' on a
 block device). Raw devices were introduced in the lk 2.4 series and are
 still available in the lk 2.6 series but opening a block device or a
 normal file with O_DIRECT (in sg_dd using the option 'odir=1') is
-preferred.<br>
+preferred in the lk 2.6 series. If either the input or output file is a
+raw device, or 'odir=1' is given then the internal buffers used by
+sg_dd are aligned to a memory page boundary. A memory page is 4
+kilobytes in the i386 architecture. This memory alignment is a
+technical requirement of both raw devices and normal block devices that
+implement O_DIRECT.<br>
 <br>
 The 'blk_sgio=1' option is only valid in the lk 2.6 series. This option
 instructs the sg_dd utility to use the SG_IO ioctl to issue SCSI
@@ -520,12 +508,12 @@ sg_dd utility expects direct access devices (whereas tapes are
 sequential access) so sg_dd generates an error if a st device is
 detected. When the input or output file is a sg device then the
 'blk_sgio' option is ignored as IO with that file is always via SCSI
-commands. When 'blk_sgio=1' is used on an ATAPI dvd/cd drive the
-combination of 2048 byte block size and the default 'bpt' value of 128
-may cause read errors. The solution is to reduce the 'bpt' value (try
-64 first) so the number of bytes transferred per SCSI command is below
-a limit imposed of the native device node (e.g. /dev/hdd). [When 'bpt'
-is to high the first read will report an EIO (input/output) error.]<br>
+commands. When 'blk_sgio=1' is used with a block device and the value
+given to 'bpt'
+is too high then the first read will report an EIO (input/output)
+error; the solution is to lower the 'bpt' value. [The EIO error
+occurred often with CD/DVD drives which have 2048 bytes sectors, so the
+'bpt' default value was reduced for block size &gt;= 2048 bytes.]<br>
 <br>
 If a partition of block device is accessed (e.g. /dev/sda2) when
 'blk_sgio=0' (or is not given) then logical block address 0 for the
@@ -719,7 +707,15 @@ will automatically reallocate a logical block address (to another
 sector)
 if a recoverable error is detected on a WRITE operation. RECOVERED
 ERRORs are only report on read and write operations when the PER [Post
-Error] bit is set.<br>
+Error] bit is set. The values shown in brackets are:<br>
+<ul>
+  <li>whether the field is changeable (i.e. "cha: y" for yes it is
+changeable)</li>
+  <li>its default value (i.e. "def:") which is supplied by the vendor</li>
+  <li>the saved value (i.e. "sav:") which will become current <span
+ style="font-style: italic;">after</span> the next device power cycle
+or reset</li>
+</ul>
 <br>
 <span style="font-family: monospace;">$ sg_dd if=/dev/sda of=. bs=512
 verbose=1 count=0 blk_sgio=0</span><br style="font-family: monospace;">
@@ -751,39 +747,39 @@ ST39173LC&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1234&nbsp;
 <span style="font-family: monospace;">&nbsp; Read write error recovery
 mode page:</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-AWRE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [Changeable: y, def: 1,
-saved: 1]</span><br style="font-family: monospace;">
+AWRE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [cha: y, def: 1,
+sav: 1]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-ARRE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [Changeable: y, def: 1,
-saved: 1]</span><br style="font-family: monospace;">
+ARRE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [cha: y, def: 1,
+sav: 1]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-RC:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [Changeable: y,
-def: 0, saved: 0]</span><br style="font-family: monospace;">
+RC:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [cha: y,
+def: 0, sav: 0]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-EER:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [Changeable: y, def:
-0, saved: 1]</span><br style="font-family: monospace;">
+EER:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [cha: y, def:
+0, sav: 1]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-PER:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [Changeable: y, def:
-0, saved: 1]</span><br style="font-family: monospace;">
+PER:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [cha: y, def:
+0, sav: 1]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-DTE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [Changeable: y, def:
-0, saved: 0]</span><br style="font-family: monospace;">
+DTE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [cha: y, def:
+0, sav: 0]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-DCR:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [Changeable: y, def:
-0, saved: 0]</span><br style="font-family: monospace;">
+DCR:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [cha: y, def:
+0, sav: 0]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp; Caching mode page:</span><br
  style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-WRE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [Changeable: y, def:
-1, saved: 1]</span><br style="font-family: monospace;">
+WRE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1&nbsp; [cha: y, def:
+1, sav: 1]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-RCD:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [Changeable: y, def:
-0, saved: 0]</span><br style="font-family: monospace;">
+RCD:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [cha: y, def:
+0, sav: 0]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp; Control mode page:</span><br
  style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;
-SWP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [Changeable: n, def:
-0, saved: 0]</span><br style="font-family: monospace;">
+SWP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp; [cha: n, def:
+0, sav: 0]</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&gt;&gt; Output file type:
 null device</span><br style="font-family: monospace;">
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -795,6 +791,9 @@ number of blocks=17781521 [0x10f5311], block size=512</span><br
 <br>
 Some of the output above is out of order, the "number of blocks" line
 relates to the input file.<br>
+<br>
+Mode page settings can be examined and changed with a utility like <a
+ href="sdparm.html">sdparm</a> .<br>
 <h2><a name="Conclusion"></a>Conclusion</h2>
 The sg_dd utility maintains syntactic and semantic compatibility with
 the Unix dd command while allowing precise control over SCSI devices
@@ -802,10 +801,9 @@ such as SCSI disks and CD/DVD drives. Amongst other uses it can copy
 data from failing media, continuing as best it can when medium errors
 are encountered.<br>
 <br>
-<br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 5th June 2005<br>
+<p>Last updated: 8th August 2005<br>
 <br>
 </p>
 </center>

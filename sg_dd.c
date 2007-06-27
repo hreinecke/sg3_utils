@@ -49,7 +49,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.41 20050523";
+static char * version_str = "5.42 20050807";
 
 #define ME "sg_dd: "
 
@@ -61,6 +61,7 @@ static char * version_str = "5.41 20050523";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
+#define DEF_BLOCKS_PER_2048TRANSFER 32
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
 
@@ -233,7 +234,8 @@ static void usage()
            " where:\n"
            "  append  1->append output to normal <ofile>, (default is 0)\n"
            "  blk_sgio  0->block device use normal I/O(def), 1->use SG_IO\n"
-           "  bpt     is blocks_per_transfer (default is 128)\n"
+           "  bpt     is blocks_per_transfer (default is 128 or 32 when bs="
+           "2048)\n"
            "  bs      block size (default is 512)\n");
     fprintf(stderr,
            "  cdbsz   size of SCSI READ or WRITE command (default is 10)\n"
@@ -269,7 +271,7 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
     int verb;
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, verb);
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0, verb);
     if (0 != res)
         return res;
 
@@ -277,7 +279,8 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         (0xff == rcBuff[3])) {
         long long ls;
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, verb);
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
+                               verb);
         if (0 != res)
             return res;
         for (k = 0, ls = 0; k < 8; ++k) {
@@ -438,17 +441,17 @@ static int sg_ll_read_long10(int sg_fd, int correct, unsigned long lba,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr);
+        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr, vverbose);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
         if (vverbose > 1)
-            sg_chk_n_print3("READ LONG(10) command problem", &io_hdr);
+            sg_chk_n_print3("READ LONG(10) command problem", &io_hdr, 1);
         return res;
     default:
         if (vverbose > 1)
-            sg_chk_n_print3("READ LONG(10) sense", &io_hdr);
+            sg_chk_n_print3("READ LONG(10) sense", &io_hdr, 1);
         if ((sg_normalize_sense(&io_hdr, &ssh)) &&
             (ssh.sense_key == ILLEGAL_REQUEST) &&
             ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {
@@ -617,20 +620,20 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
             fprintf(stderr, "    lba of last recovered error in this "
                     "READ=0x%llx\n", *io_addrp);
             if (verbose > 1)
-                sg_chk_n_print3("reading", &io_hdr);
+                sg_chk_n_print3("reading", &io_hdr, 1);
         } else {
             fprintf(stderr, "Recovered error: [no info] reading from "
                     "block=0x%llx, num=%d\n", from_block, blocks);
-            sg_chk_n_print3("reading", &io_hdr);
+            sg_chk_n_print3("reading", &io_hdr, verbose);
         }
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         if (verbose > 1)
-            sg_chk_n_print3("reading", &io_hdr);
+            sg_chk_n_print3("reading", &io_hdr, 1);
         return 2;
     case SG_LIB_CAT_MEDIUM_HARD:
         if (verbose > 1)
-            sg_chk_n_print3("reading", &io_hdr);
+            sg_chk_n_print3("reading", &io_hdr, 1);
         ++unrecovered_errs;
         info_valid = sg_get_sense_info_fld(io_hdr.sbp, io_hdr.sb_len_wr,
                                            io_addrp);
@@ -644,7 +647,7 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         break;
     default:
         ++unrecovered_errs;
-        sg_chk_n_print3("reading", &io_hdr);
+        sg_chk_n_print3("reading", &io_hdr, verbose);
         return -1;
     }
     if (diop && *diop && 
@@ -872,19 +875,19 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
             fprintf(stderr, "    lba of last recovered error in this "
                     "WRITE=0x%llx\n", io_addr);
             if (verbose > 1)
-                sg_chk_n_print3("writing", &io_hdr);
+                sg_chk_n_print3("writing", &io_hdr, 1);
         } else {
             fprintf(stderr, "Recovered error: [no info] writing to "
                     "block=0x%llx, num=%d\n", to_block, blocks);
-            sg_chk_n_print3("writing", &io_hdr);
+            sg_chk_n_print3("writing", &io_hdr, verbose);
         }
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         if (verbose > 1)
-            sg_chk_n_print3("writing", &io_hdr);
+            sg_chk_n_print3("writing", &io_hdr, 1);
         return -3;
     default:
-        sg_chk_n_print3("writing", &io_hdr);
+        sg_chk_n_print3("writing", &io_hdr, verbose);
         if (do_coe) {
             fprintf(stderr, ">> ignored errors for out blk=%lld for "
                     "%d bytes\n", to_block, bs * blocks);
@@ -935,7 +938,7 @@ static void print_mp_bit(const char * pre, int smask, int byte_off,
     if (smask & 0xe) {
         fprintf(stderr, "  [");
         if (smask & 2) {
-            fprintf(stderr, "Changeable: %s",
+            fprintf(stderr, "cha: %s",
                     (cha_mp[byte_off] & bit_mask) ? "y" : "n");
             sep = 1;
         }
@@ -945,7 +948,7 @@ static void print_mp_bit(const char * pre, int smask, int byte_off,
             sep = 1;
         }
         if (smask & 8)
-            fprintf(stderr, "%ssaved: %d", (sep ? ", " : " "),
+            fprintf(stderr, "%ssav: %d", (sep ? ", " : " "),
                     !!(sav_mp[2] & bit_mask));
         fprintf(stderr, "]\n");
     } else
@@ -1049,6 +1052,7 @@ int main(int argc, char * argv[])
     int ibs = 0;
     int obs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
+    int bpt_given = 0;
     char str[STR_SZ];
     char * key;
     char * buf;
@@ -1125,6 +1129,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'bpt'\n");
                 return 1;
             }
+            bpt_given = 1;
         } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if (-1LL == skip) {
@@ -1196,6 +1201,11 @@ int main(int argc, char * argv[])
         fprintf(stderr, "bpt must be greater than 0\n");
         return 1;
     }
+    /* defaulting transfer size to 128*2048 for CD/DVDs is too large
+       for the block layer in lk 2.6 and results in an EIO on the
+       SG_IO ioctl. So reduce it in that case. */
+    if ((blk_sz >= 2048) && (0 == bpt_given))
+        bpt = DEF_BLOCKS_PER_2048TRANSFER;
 #ifdef SG_DEBUG
     fprintf(stderr, ME "if=%s skip=%lld of=%s seek=%lld count=%lld\n",
            inf, skip, outf, seek, dd_count);

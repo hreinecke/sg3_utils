@@ -34,7 +34,7 @@ int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
     unsigned char r16CmdBlk [READ16_CMD_LEN] =
-		{0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
+                {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
@@ -62,7 +62,7 @@ int main(int argc, char * argv[])
 
     if ((sg_fd = open(file_name, O_RDWR)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-		 "sg_simple16: error opening file: %s", file_name);
+                 "sg_simple16: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
@@ -107,13 +107,13 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("READ_16 command error", &io_hdr);
+        sg_chk_n_print3("READ_16 command error", &io_hdr, 1);
         break;
     }
 
     if (ok) { /* output result if it is available */
-	printf("READ_16 duration=%u millisecs, resid=%d, msg_status=%d\n",
-	       io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
+        printf("READ_16 duration=%u millisecs, resid=%d, msg_status=%d\n",
+               io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
     }
 
     close(sg_fd);

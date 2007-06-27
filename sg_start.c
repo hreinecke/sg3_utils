@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_cmds.h"
 
 /*
  *  Copyright (C) 1999-2005 D. Gilbert
@@ -28,95 +29,39 @@
  
 */
 
-static char * version_str = "0.43 20050603";
+static char * version_str = "0.45 20050810";
 
-#define START_STOP_CMD          0x1b
-#define START_STOP_CMDLEN       6
-#define DEF_TIMEOUT 120000       /* 120,000 millisecs == 2 minutes */
-
-
-/* Returns 0 if successful, else -1. */
-static int do_start_stop(int fd, int start, int immed, int loej,
-                         int power_conditions, int verbose)
-{
-        unsigned char cmdblk[START_STOP_CMDLEN] = { 
-                START_STOP,     /* Command */
-                0,              /* Resvd/Immed */
-                0,              /* Reserved */
-                0,              /* Reserved */
-                0,              /* PowCond/Resvd/LoEj/Start */
-                0 };            /* Reserved/Flag/Link */
-        unsigned char sense_b[32];
-        struct sg_io_hdr io_hdr;
-        int k, res;
-
-        memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-        cmdblk[1] = immed & 1;
-        cmdblk[4] = ((power_conditions & 0xf) << 4) | 
-                    ((loej & 1) << 1) | (start & 1);
-        io_hdr.interface_id = 'S';
-        io_hdr.cmd_len = sizeof(cmdblk);
-        io_hdr.mx_sb_len = sizeof(sense_b);
-        io_hdr.dxfer_direction = SG_DXFER_NONE;
-        io_hdr.dxfer_len = 0;
-        io_hdr.dxferp = NULL;
-        io_hdr.cmdp = cmdblk;
-        io_hdr.sbp = sense_b;
-        io_hdr.timeout = DEF_TIMEOUT;
-        if (verbose) {
-                printf("  Start/Stop command:");
-                for (k = 0; k < (int)sizeof(cmdblk); ++k)
-                        printf (" %02x", cmdblk[k]);
-                printf("\n");
-        }
-        
-        if (ioctl(fd, SG_IO, &io_hdr) < 0) {
-                perror("start_stop (SG_IO) error");
-                return -1;
-        }
-        if (verbose > 2)
-                fprintf(stderr, "      duration=%u ms\n",
-                        io_hdr.duration);
-        res = sg_err_category3(&io_hdr);
-        if (SG_LIB_CAT_MEDIA_CHANGED == res) {
-                fprintf(stderr, "media change report, try start_stop again\n");
-                if (ioctl(fd, SG_IO, &io_hdr) < 0) {
-                        perror("start_stop (SG_IO) error");
-                        return -1;
-                }
-                res = sg_err_category3(&io_hdr);
-        }
-        if (SG_LIB_CAT_CLEAN != res) {
-                sg_chk_n_print3("start_stop", &io_hdr);
-                return -1;
-        }
-        return 0;
-}
 
 void usage ()
 {
-        fprintf(stderr, "Usage:  sg_start [0|-stop|1|-start] [-imm=0|1] "
-                "[-loej] [-pc=<n>] [-v] [-V]\n"
-                "                 <scsi_device>\n"
+        fprintf(stderr, "Usage:  sg_start [0|-stop|1|-start] [-eject] "
+                "[-imm=0|1] [-load]\n"
+                "                 [-loej] [-pc=<n>] [-v] [-V] "
+                "<scsi_device>\n"
                 " where: 0        stop unit (e.g. spin down a disk or a "
                 "cd/dvd)\n"
                 "        1        start unit (e.g. spin up a disk or a "
                 "cd/dvd)\n"
-                "        -imm=0|1   0->await completion, 1->return "
-                "immediately(def)\n"
+                "        -eject   stop then eject the medium\n"
+                "        -imm=0|1   0->await completion(def), 1->return "
+                "immediately\n"
+                "        -load    load then start the medium\n"
                 "        -loej    load the medium if '-start' option is "
                 "also given\n"
                 "                 or stop unit and eject\n"
                 "        -pc=<n>  power conditions (in hex, default 0 -> no "
                 "power condition)\n"
-                "                 1 -> active, 2 -> idle, 3 -> standby\n"
+                "                 1 -> active, 2 -> idle, 3 -> standby, "
+                "5 -> sleep (MMC)\n"
                 "        -start   start unit (same as '1')\n"
                 "        -stop    stop unit (same as '0')\n"
                 "        -v       verbose (print out SCSI commands)\n"
                 "        -V       print version string then exit\n\n"
-                "    Example: 'sg_start -stop /dev/sdb'   stops unit\n"
-                "             'sg_start -loej /dev/scd0'  stops unit and "
-                "ejects media\n");
+                "    Example: 'sg_start -stop /dev/sdb'    stops unit\n"
+                "             'sg_start -eject /dev/scd0'  stops unit and "
+                "ejects medium\n\n"
+                "Performs a START STOP UNIT SCSI command\n"
+                );
         exit (1);
 }
 
@@ -127,14 +72,11 @@ int main(int argc, char * argv[])
         const char * cp;
         int k, fd, num, res, plen, jmp_out;
         unsigned int u;
-        int immed = 1;
+        int immed = 0;
         int loej = 0;
         int power_conds = 0;
         int verbose = 0;
         
-        if (argc < 2) 
-                usage ();
-
         for (k = 1; k < argc; ++k) {
                 cp = argv[k];
                 plen = strlen(cp);
@@ -144,9 +86,24 @@ int main(int argc, char * argv[])
                         for (--plen, ++cp, jmp_out = 0; plen > 0;
                              --plen, ++cp) {
                                 switch (*cp) {
+                                case 'e':
+                                        if (0 == strncmp(cp, "eject", 5)) {
+                                                loej = 1;
+                                                startstop = 0;
+                                                cp += 4;
+                                                plen -= 4;
+                                        } else
+                                                jmp_out = 1;
+                                        break;
                                 case 'l':
                                         if (0 == strncmp(cp, "loej", 4)) {
                                                 loej = 1;
+                                                cp += 3;
+                                                plen -= 3;
+                                        } else if (0 == 
+                                                   strncmp(cp, "load", 4)) {
+                                                loej = 1;
+                                                startstop = 1;
                                                 cp += 3;
                                                 plen -= 3;
                                         } else
@@ -248,12 +205,8 @@ int main(int argc, char * argv[])
 
         if ((startstop == -1) && loej)
                 startstop = 0;
-        if ((startstop == -1) && (0 == power_conds)) {
-                fprintf(stderr, "need either -start|-stop indication or"
-                        " non-zero power condition\n");
-                usage ();
-                return 1;
-        }
+        if ((startstop == -1) && (0 == power_conds))
+                startstop = 1;
                 
         fd = open(file_name, O_RDWR | O_NONBLOCK);
         if (fd < 0) {
@@ -264,10 +217,20 @@ int main(int argc, char * argv[])
         
         res = 0;
         if (power_conds > 0)
-                res = do_start_stop(fd, 0, immed, 0, power_conds, verbose);
+                res = sg_ll_start_stop_unit(fd, immed, power_conds, 0, 0,
+                                            1, verbose);
         else if (startstop != -1)
-                res = do_start_stop(fd, startstop, immed, loej, 0, verbose);
-        
+                res = sg_ll_start_stop_unit(fd, immed, 0, loej, startstop,
+                                            1, verbose);
+        if (res) {
+                if (verbose < 2) {
+                        if (SG_LIB_CAT_INVALID_OP == res)
+                                fprintf(stderr, "command not supported\n");
+                        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                                fprintf(stderr, "command malformed\n");
+                }
+                fprintf(stderr, "START STOP UNIT command failed\n");
+        }
         close (fd);
         return res ? 1 : 0;
 }

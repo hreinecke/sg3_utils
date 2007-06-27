@@ -135,7 +135,7 @@ static int do_inquiry(int sg_fd, void * resp, int mx_resp_len)
     case SG_LIB_CAT_RECOVERED:
         return 0;
     default:
-        sg_chk_n_print3("Failed INQUIRY", &io_hdr);
+        sg_chk_n_print3("Failed INQUIRY", &io_hdr, 1);
         return -1;
     }
 }

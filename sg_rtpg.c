@@ -48,7 +48,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.04 20050314";
+static char * version_str = "1.05 20050808";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -103,7 +103,8 @@ static void usage()
           "         --help|-h          print out usage message\n"
           "         --hex|-H           print out response in hex\n"
           "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n"
+          "         --version|-V       print version string and exit\n\n"
+          "Performs a REPORT TARGET PORT GROUPS SCSI command\n"
           );
 
 }
@@ -292,6 +293,11 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Report Target Port Groups command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "bad field in Report Target Port Groups cdb\n");
+    else {
+        fprintf(stderr, "Report Target Port Groups command failed\n");
+        if (0 == verbose)
+            fprintf(stderr, "    try '-v' for more information\n");
+    }
 
 err_out:
     res = close(sg_fd);

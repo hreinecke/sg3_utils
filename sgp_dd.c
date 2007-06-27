@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "5.23 20050309";
+static char * version_str = "5.24 20050806";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -266,7 +266,7 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
     int k, res;
     unsigned char rcBuff[RCAP16_REPLY_LEN];
 
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0);
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0, 0);
     if (0 != res)
         return res;
 
@@ -274,7 +274,7 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         (0xff == rcBuff[3])) {
         long long ls;
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0);
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0, 0);
         if (0 != res)
             return res;
         for (k = 0, ls = 0; k < 8; ++k) {
@@ -858,7 +858,7 @@ int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
             break;
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3((rep->wr ? "writing continuing":
-                                       "reading continuing"), hp);
+                                       "reading continuing"), hp, 0);
             break;
         case SG_LIB_CAT_MEDIA_CHANGED:
             return 1;
@@ -870,7 +870,7 @@ int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
                          "%s blk=%d", rep->wr ? "writing": "reading", rep->blk);
                 status = pthread_mutex_lock(a_mutp);
                 if (0 != status) err_exit(status, "lock aux_mutex");
-                sg_chk_n_print3(ebuff, hp);
+                sg_chk_n_print3(ebuff, hp, 0);
                 status = pthread_mutex_unlock(a_mutp);
                 if (0 != status) err_exit(status, "unlock aux_mutex");
                 return -1;

@@ -35,24 +35,29 @@ directory. If an executable cannot find the libsgutils shared library
 (check with 'ldd sg_inq' for example) then the addition of "/usr/local/lib"
 to the /etc/ld.so.conf file may be required in some distributions.
 
-A "spec" file is included for building rpm packages. To build binary and
+A "spec" file is included for building rpm packages. It is called
+sg3_utils.spec and is in the "rpm" subdirectory. To build binary and
 source rpms place a copy of the gzipped tarball in the "SOURCES" directory
-and place a copy of sg3_utils.spec in the "SPEC" directory. This directories
-are found under /usr/src/redhat on redhat distributions. Then from the
-"SPEC" directory execute "rpmbuild -ba sg3_utils.spec". If all goes well
-a source rpm should be found in the SRPMS directory and a binary rpm in the
-RPMS/i386 directory (for i386 architecture). Note the spec file will only
-build those utilities in the main directory. When the binary rpm is
-installed the executables and their associated man pages should be placed
-in appropriate places. The sg3_utils.spec file also builds an
-sg3-utils-devel rpm that contains the libsgutils static library and
-the sg_lib.h and sg_cmds.h header files.
+and place a copy of sg3_utils.spec in the "SPEC" directory. These
+directories are found under /usr/src/redhat on redhat distributions. Then
+from the "SPEC" directory execute "rpmbuild -ba sg3_utils.spec". If all
+goes well a source rpm should be found in the SRPMS directory and binary
+rpms in the RPMS/i386 directory (for i386 architecture). Note the spec
+file will only build those utilities in the main directory. When the
+sg3_utils binary rpm is installed the executables and their associated man
+pages should be placed in appropriate places. The sg3_utils.spec file also
+builds a libsgutils shared object (shared library) and a libsgutils-*-devel
+shared object with a static library and the sg_lib.h and sg_cmds.h header
+files.
 
 Binary rpms (at least in the RedHat distribution) tend to install
 executables in /usr/bin and libraries in /usr/lib .
 
-If the libsgutils.so shared library is troublesome or unwanted
-then "no_lib" versions of the Makefile and the sg3_utils.spec file
+If the shared object (library) is troublesome or unwanted then
+a "no_lib" version of the Makefile and the sg3_utils.spec file
 can be found in the "lib_no_lib" subdirectory.
 
-26th November 2004
+There is also infrastructure in the debian subdirectory to build
+deb packages.
+
+8th June 2005

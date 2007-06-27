@@ -1,26 +1,31 @@
-.TH SG_START "8" "June 2005" "sg3_utils-1.15" SG3_UTILS
+.TH SG_START "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
 .SH NAME
-sg_start \- starts (spins-up) or stops (spins down) SCSI devices
+sg_start \- starts (spins-up) or stops (spins down) SCSI device, load or
+eject medium
 .SH SYNOPSIS
 .B sg_start
-[\fI-imm=0|1\fR] [\fI-loej\fR] [\fI-pc=<n>\fR]
-[\fI-start\fR] [\fI-start\fR] [\fI-v\fR] [\fI-V\fR] [\fI0|1\fR]
+[\fI-eject\fR] [\fI-imm=0|1\fR] [\fI-load\fR] [\fI-loej\fR] [\fI-pc=<n>\fR]
+[\fI-start\fR] [\fI-stop\fR] [\fI-v\fR] [\fI-V\fR] [\fI0|1\fR]
 \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 sg_start sends a START STOP UNIT SCSI command to the given device with
-the selected options. The most used options are "-stop" to spin down a disk
-and "-start" to spin up a disk. Using "sg_start -start /dev/sda" on a disk
+the selected options. The most used options are '-stop' to spin down a disk
+and '-start' to spin up a disk. Using 'sg_start -start /dev/sda' on a disk
 that is already spinning is harmless. There is also finer grain control
 with "power conditions": active, idle and standby. In some contexts
 the "stop" state can be considered an additional power condition. 
 .PP
 Devices that contain removable media such as cd/dvds can use the '-loej'
-flag to load the media when used in conjunction with "-start" (i.e. load
-media then spin up). Alternatively '-loej' may be used to eject the media
-when used alone or when used in conjunction with "-stop" (i.e. spin down
-then eject media).
+flag to load the medium when used in conjunction with '-start' (i.e. load
+medium then spin up). Alternatively '-loej' may be used to eject the medium
+when used alone or when used in conjunction with '-stop' (i.e. spin down
+then eject medium). More simply the loading and ejecting of a removable 
+medium can be requested with the '-load' and '-eject' options.
+.PP
+If no option or argument is given that implies some action, a '-start'
+is assumed.
 .TP
 0
 stop (spin-down) given device.
@@ -31,11 +36,19 @@ start (spin-up) given device.
 Active when '-pc=" is not given or '-pc=0'. Harmless if device has
 already started (or is in the process of starting).
 .TP
+-eject
+stop the medium and eject it from the drive. Only appropriate for a
+removable medium.
+.TP
 -imm=0|1
-when the immediate bit is 1 (default) then this command (and hence this
-utility) return immediately after the device has received the command.
-When this option is 0 then the command returns when the action it
-requests has been completed.
+when the immediate bit is 1 then this utility returns immediately after
+the device has received the command. When this option is 0 (the default)
+then the utility returns once the command has completed its action
+(i.e. it waits until the device is started or stopped).
+.TP
+-load
+load the medium in the drive and start it. Only appropriate for a
+removable medium.
 .TP
 -loej
 load the media when the unit is started or eject it when the unit is
@@ -48,13 +61,15 @@ stop and eject action is assumed.
 set the 'power conditions' value (in hex); 0 to f (inclusive) are valid.
 Default value is 0.
 When '-pc=0' then '-start', '-stop' and '-loej' are active.
-Some common values are 1 for the active power condition; 2 for the idle
-power condition; 3 for the standby power condition, 7 for LU_CONTROL,
-a (hex == decimal 10) for FORCE_IDLE_0 and b (hex) for FORCE_STANDBY_0.
-See recent SBC-2 or SAS drafts at www.t10.org for more information.
+Some common values are 1 for the active power condition (SBC); 2 for the
+idle power condition; 3 for the standby power condition; 5 for sleep
+power condition (MMC); 7 for LU_CONTROL (SBC), 0xa (decimal 10) for
+FORCE_IDLE_0 (SBC) and 0xb (decimal 11) for FORCE_STANDBY_0 (SBC).
+See recent SBC-2, MMC-4 and SAS drafts at www.t10.org for more information.
 .TP
 -start
-start (spin-up) given device. Same meaning as "1" argument.
+start (spin-up) given device. Using this option on an already started
+device is harmless. Same meaning as "1" argument.
 .TP
 -stop
 stop (spin-down) given device. Same meaning as "0" argument.
@@ -66,7 +81,11 @@ it. '-vv' and '-vvv' are also accepted yielding greater verbosity.
 -V
 print out version string then exit.
 .PP
-Only one of "0", "1", "-start" and "-stop" is accepted to avoid confusion.
+To avoid confusion, only one of "0", "1", "-start" and "-stop" can
+be given.
+.PP
+If this utility succeeds then its process exits with a status of 0;
+otherwise it exits with a non-zero status.
 .PP
 There is an associated "power condition" mode page (0x1a) in which timer
 values can be set for transitioning to either idle or standby state after
@@ -77,7 +96,7 @@ a REQUEST SENSE command (see the sg_requests utility) should yield
 a sense key of "no sense" and an additional sense code of "Low
 power condition on".
 .PP
-Ejection of removable media (e.g. 'sg_start 0 -loej /dev/hdd' where
+Ejection of removable media (e.g. 'sg_start -eject /dev/hdd' where
 the device is an ATAPI cd/dvd drive) may be prevented by a prior
 PREVENT ALLOW MEDIUM REMOVAL SCSI command (see sg_prevent). In this
 case this utility should fail with an error generated by the device:

@@ -46,7 +46,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.04 20050405";
+static char * version_str = "1.04 20050722";
 
 #define ME "sg_wr_mode: "
 
@@ -280,7 +280,7 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, num, read_in_len, alloc_len, off;
+    int sg_fd, res, c, num, alloc_len, off;
     int k, md_len, hdr_len, bd_len, mask_in_len;
     unsigned u, uu;
     int dbd = 0;
@@ -292,6 +292,7 @@ int main(int argc, char * argv[])
     int sub_pg_code = 0;
     int save = 0;
     int verbose = 0;
+    int read_in_len = 0;
     char device_name[256];
     unsigned char read_in[MX_ALLOC_LEN];
     unsigned char mask_in[MX_ALLOC_LEN];
