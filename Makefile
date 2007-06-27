@@ -1,30 +1,39 @@
 SHELL = /bin/sh
 
 PREFIX=/usr/local
+LIBDIR=$(DESTDIR)/$(PREFIX)/lib
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
+INCLUDEDIR=$(DESTDIR)/$(PREFIX)/include
 
 CC = gcc
 LD = gcc
 
 EXECS = sg_dd sgp_dd sgm_dd sg_read sg_map sg_scan sg_rbuf \
-	sginfo sg_readcap sg_turs sg_inq sg_test_rwbuf \
-	sg_start sg_reset sg_modes sg_logs sg_senddiag sg_opcodes \
-	sg_persist sg_write_long sg_read_long
+ 	sginfo sg_readcap sg_turs sg_inq sg_test_rwbuf \
+ 	sg_start sg_reset sg_modes sg_logs sg_senddiag sg_opcodes \
+ 	sg_persist sg_write_long sg_read_long sg_requests sg_ses \
+	sg_verify sg_emc_trespass
 
 MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sginfo.8 sg_readcap.8 sg_turs.8 sg_inq.8 sg_test_rwbuf.8 \
 	sg_start.8 sg_reset.8 sg_modes.8 sg_logs.8 sg_senddiag.8 \
-	sg_opcodes.8 sg_persist.8 sg_write_long.8 sg_read_long.8
+	sg_opcodes.8 sg_persist.8 sg_write_long.8 sg_read_long.8 \
+	sg_requests.8 sg_ses.8 sg_verify.8 sg_emc_trespass.8
 MAN_PREF = man8
+
+HEADERS = sg_lib.h sg_cmds.h
+
 
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
+# CFLAGS = -O2 -Wall -W -D_REENTRANT $(LARGE_FILE_FLAGS)
 CFLAGS = -g -O2 -Wall -W -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -W -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -Wall -pedantic -std=c99 -D_REENTRANT $(LARGE_FILE_FLAGS)
 
-LDFLAGS =
+LDFLAGS = 
+# LDFLAGS = -v -lm
 
 all: $(EXECS)
 
@@ -33,89 +42,124 @@ depend dep:
 	done > .depend
 
 clean:
-	/bin/rm -f *.o $(EXECS) core* .depend
+	/bin/rm -f *.o $(EXECS) core* .depend *.a *.la *.lo
+	/bin/rm -rf .libs
 
-sg_dd: sg_dd.o sg_err.o llseek.o
-	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_scan: sg_scan.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^ 
+sg_lib.lo: sg_lib.o
+	libtool --mode=compile $(CC) -c sg_lib.c
 
-sginfo: sginfo.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_cmds.lo: sg_cmds.o
+	libtool --mode=compile $(CC) -c sg_cmds.c
 
-sg_start: sg_start.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^ 
+libsgutils.la: sg_lib.lo sg_cmds.lo
+	libtool --mode=link $(LD) -o libsgutils.la sg_lib.lo sg_cmds.lo \
+	-rpath $(LIBDIR) -version-info 1:0:0
 
-sg_rbuf: sg_rbuf.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_inq: sg_inq.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ 
 
-sg_readcap: sg_readcap.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_dd: sg_dd.o llseek.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sgp_dd: sgp_dd.o sg_err.o llseek.o
-	$(LD) -o $@ $(LDFLAGS) $^ -lpthread
+sg_scan: sg_scan.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ 
 
-sgm_dd: sgm_dd.o sg_err.o llseek.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sginfo: sginfo.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_map: sg_map.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_start: sg_start.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ 
 
-sg_turs: sg_turs.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_rbuf: sg_rbuf.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_test_rwbuf: sg_test_rwbuf.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_readcap: sg_readcap.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_inq: sg_inq.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sgp_dd: sgp_dd.o llseek.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ -lpthread
 
-sg_read: sg_read.o sg_err.o llseek.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sgm_dd: sgm_dd.o llseek.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_map: sg_map.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_turs: sg_turs.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_test_rwbuf: sg_test_rwbuf.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_read: sg_read.o llseek.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_reset: sg_reset.o
-	$(LD) -o $@ $(LDFLAGS) $^
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_modes: sg_modes.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_modes: sg_modes.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_logs: sg_logs.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_logs: sg_logs.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_senddiag: sg_senddiag.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_senddiag: sg_senddiag.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_opcodes: sg_opcodes.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_opcodes: sg_opcodes.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_persist: sg_persist.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_persist: sg_persist.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_write_long: sg_write_long.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_write_long: sg_write_long.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_read_long: sg_read_long.o sg_err.o
-	$(LD) -o $@ $(LDFLAGS) $^
+sg_read_long: sg_read_long.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_requests: sg_requests.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_ses: sg_ses.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_verify: sg_verify.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_emc_trespass: sg_emc_trespass.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)
 	install -d $(INSTDIR)
+	install -d $(LIBDIR)
+	libtool --mode=install install -c libsgutils.la $(LIBDIR)/libsgutils.la
 	for name in $^; \
-	 do install -s -o root -g root -m 755 $$name $(INSTDIR); \
+	 do libtool --mode=install install -s -o root -g root -m 755 \
+		$$name $(INSTDIR); \
 	done
 	install -d $(MANDIR)/$(MAN_PREF)
 	for mp in $(MAN_PGS); \
 	 do install -o root -g root -m 644 $$mp $(MANDIR)/$(MAN_PREF); \
 	 gzip -9f $(MANDIR)/$(MAN_PREF)/$$mp; \
 	done
+	install -d $(INCLUDEDIR)/scsi
+	for hdr in $(HEADERS); \
+	 do install -o root -g root -m 644 $$hdr $(INCLUDEDIR)/scsi ; \
+	done
 
 uninstall:
+	libtool --mode=uninstall rm -f $(LIBDIR)/libsgutils.la
 	dists="$(EXECS)"; \
 	for name in $$dists; do \
 	 rm -f $(INSTDIR)/$$name; \
 	done
 	for mp in $(MAN_PGS); do \
 	 rm -f $(MANDIR)/$(MAN_PREF)/$$mp.gz; \
+	done
+	for hdr in $(HEADERS); do \
+	 rm -f $(INCLUDEDIR)/scsi/$$hdr ; \
 	done
 
 ifeq (.depend,$(wildcard .depend))

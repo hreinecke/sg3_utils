@@ -8,7 +8,8 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
+#include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
 *  Copyright (C) 2000-2004 D. Gilbert
@@ -23,22 +24,11 @@
    
 */
 
-static char * version_str = "0.26 20040602";
+static char * version_str = "0.28 20041012";
 
 #define ME "sg_modes: "
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-
-#define MODE_SENSE6_CMD      0x1a
-#define MODE_SENSE6_CMDLEN   6
-#define MODE_SENSE10_CMD     0x5a
-#define MODE_SENSE10_CMDLEN  10
-#define INQUIRY_CMD     0x12
-#define INQUIRY_CMDLEN  6
-#define INQUIRY_RESPLEN  36
 #define MX_ALLOC_LEN (1024 * 4)
-
 #define PG_CODE_ALL 0x3f
 #define PG_CODE_MASK 0x3f
 #define PG_CODE_MAX 0x3f
@@ -46,160 +36,6 @@ static char * version_str = "0.26 20040602";
 
 #define EBUFF_SZ 256
 
-struct simple_inquiry_t {
-    unsigned char peripheral_qualifier;
-    unsigned char peripheral_type;
-    unsigned char rmb;
-    unsigned char version;      /* as per recent drafts: whole of byte 2 */
-    unsigned char byte_3;
-    unsigned char byte_5;
-    unsigned char byte_6;
-    unsigned char byte_7;
-    char vendor[9];
-    char product[17];
-    char revision[5];
-};
-
-/* Returns 0 when successful, else -1 */
-static int do_simple_inq(int sg_fd, int noisy, 
-	                 struct simple_inquiry_t * inq_data, int verbose)
-{
-    int res, k;
-    unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-    unsigned char inq_resp[INQUIRY_RESPLEN];
-
-    if (inq_data) {
-	memset(inq_data, 0, sizeof(* inq_data));
-	inq_data->peripheral_qualifier = 0x3;
-	inq_data->peripheral_type = 0x1f;
-    }
-    inqCmdBlk[4] = (unsigned char)sizeof(inq_resp);
-    if (verbose) {
-        fprintf(stderr, "        inquiry cdb: ");
-        for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", inqCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(inqCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = sizeof(inq_resp);
-    io_hdr.dxferp = inq_resp;
-    io_hdr.cmdp = inqCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (inquiry) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_ERR_CAT_CLEAN:
-    case SG_ERR_CAT_RECOVERED:
-	if (inq_data) {
-	    inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
-	    inq_data->peripheral_type = inq_resp[0] & 0x1f;
-	    inq_data->rmb = (inq_resp[1] & 0x80) ? 1 : 0;
-	    inq_data->version = inq_resp[2];
-	    inq_data->byte_3 = inq_resp[3];
-	    inq_data->byte_5 = inq_resp[5];
-	    inq_data->byte_6 = inq_resp[6];
-	    inq_data->byte_7 = inq_resp[7];
-	    memcpy(inq_data->vendor, inq_resp + 8, 8);
-	    memcpy(inq_data->product, inq_resp + 16, 16);
-	    memcpy(inq_data->revision, inq_resp + 32, 4);
-        }
-        return 0;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "Inquiry error ");
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
-        return -1;
-    }
-}
-
-static int do_modes(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
-                    void * resp, int mx_resp_len, int noisy, int mode6,
-		    int verbose)
-{
-    int res, k;
-    unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] = 
-        {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-    int cmd_len;
-
-    cmd_len = mode6 ? MODE_SENSE6_CMDLEN : MODE_SENSE10_CMDLEN;
-    modesCmdBlk[1] = (unsigned char)(dbd ? 0x8 : 0);
-    modesCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | 
-				     (pg_code & PG_CODE_MASK));
-    modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
-    if (mx_resp_len > (mode6 ? 0xff : 0xffff)) {
-        printf( ME "mx_resp_len too big\n");
-        return -1;
-    }
-    if (mode6) {
-        modesCmdBlk[0] = MODE_SENSE6_CMD;
-        modesCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
-    } else {
-        modesCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-        modesCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
-    }
-    if (verbose) {
-        fprintf(stderr, "        mode sense cdb: ");
-        for (k = 0; k < cmd_len; ++k)
-            fprintf(stderr, "%02x ", modesCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = cmd_len;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = modesCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (mode sense) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_ERR_CAT_CLEAN:
-    case SG_ERR_CAT_RECOVERED:
-        return 0;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "Mode sense error, dbd=%d "
-                     "pc=%d page_code=%x sub_page_code=%x\n     ", dbd, pc, 
-                     pg_code, sub_pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
-        if ((0x70 == (0x7f & sense_b[0])) && (0x20 == sense_b[12]) &&
-            (0x0 == sense_b[13])) {
-            if (mode6)
-                fprintf(stderr, ">>>>>> try again without the '-6' switch "
-                                "for a 10 byte MODE SENSE command\n");
-            else
-                fprintf(stderr, ">>>>>> try again with a '-6' switch "
-                                "for a 6 byte MODE SENSE command\n");
-        }
-        return -1;
-    }
-}
 
 const char * scsi_ptype_strs[] = {
     "disk",
@@ -229,72 +65,74 @@ const char * get_ptype_str(int scsi_ptype)
 
 struct page_code_desc {
     int page_code;
+    int subpage_code;
     const char * desc;
 };
 
 static struct page_code_desc pc_desc_all[] = {
-    {0x0, "Unit Attention condition [vendor: page format not required]"},
-    {0x2, "Disconnect-Reconnect"},
-    {0xa, "Control"},
-    {0x15, "Extended"},
-    {0x16, "Extended device-type specific"},
-    {0x18, "Protocol specific LUN"},
-    {0x19, "Protocol specific port"},
-    {0x1a, "Power condition"},
-    {0x1c, "Informational exceptions control"},
-    {PG_CODE_ALL, "[yields all supported pages]"},
+    {0x0, 0x0, "Unit Attention condition [vendor: page format not required]"},
+    {0x2, 0x0, "Disconnect-Reconnect"},
+    {0xa, 0x0, "Control"},
+    {0xa, 0x1, "Control extension"},
+    {0x15, 0x0, "Extended"},
+    {0x16, 0x0, "Extended device-type specific"},
+    {0x18, 0x0, "Protocol specific LUN"},
+    {0x19, 0x0, "Protocol specific port"},
+    {0x1a, 0x0, "Power condition"},
+    {0x1c, 0x0, "Informational exceptions control"},
+    {PG_CODE_ALL, 0x0, "[yields all supported pages]"},
 };
 
 static struct page_code_desc pc_desc_disk[] = {
-    {0x1, "Read-Write error recovery"},
-    {0x3, "Format"},
-    {0x4, "Rigid disk geometry"},
-    {0x5, "Flexible geometry"},
-    {0x7, "Verify error recovery"},
-    {0x8, "Caching"},
-    {0x9, "Peripheral device (spc-2 ?)"},
-    {0xb, "Medium types supported"},
-    {0xc, "Notch and partition"},
-    {0xd, "Power condition (obsolete)"},
-    {0x10, "XOR control"},
+    {0x1, 0x0, "Read-Write error recovery"},
+    {0x3, 0x0, "Format"},
+    {0x4, 0x0, "Rigid disk geometry"},
+    {0x5, 0x0, "Flexible geometry"},
+    {0x7, 0x0, "Verify error recovery"},
+    {0x8, 0x0, "Caching"},
+    {0x9, 0x0, "Peripheral device (spc-2 ?)"},
+    {0xb, 0x0, "Medium types supported"},
+    {0xc, 0x0, "Notch and partition"},
+    {0xd, 0x0, "Power condition (obsolete)"},
+    {0x10, 0x0, "XOR control"},
 };
 
 static struct page_code_desc pc_desc_tape[] = {
-    {0xf, "Data Compression"},
-    {0x10, "Device config"},
-    {0x11, "Medium Partition [1]"},
-    {0x12, "Medium Partition [2]"},
-    {0x13, "Medium Partition [3]"},
-    {0x14, "Medium Partition [4]"},
-    {0x1c, "Informational exceptions control (tape version)"},
+    {0xf, 0x0, "Data Compression"},
+    {0x10, 0x0, "Device config"},
+    {0x11, 0x0, "Medium Partition [1]"},
+    {0x12, 0x0, "Medium Partition [2]"},
+    {0x13, 0x0, "Medium Partition [3]"},
+    {0x14, 0x0, "Medium Partition [4]"},
+    {0x1c, 0x0, "Informational exceptions control (tape version)"},
 };
 
 static struct page_code_desc pc_desc_cddvd[] = {
-    {0x1, "Read-Write error recovery"},
-    {0x3, "MRW"},
-    {0x5, "Write parameters"},
-    {0x7, "Verify error recovery"},
-    {0x8, "Caching"},
-    {0xd, "CD device parameters (obsolete)"},
-    {0xe, "CD audio"},
-    {0x1a, "Power condition"},
-    {0x1c, "Fault/failure reporting control"},
-    {0x1d, "Timeout and protect"},
-    {0x2a, "MM capabilities and mechanical status (obsolete)"},
+    {0x1, 0x0, "Read-Write error recovery"},
+    {0x3, 0x0, "MRW"},
+    {0x5, 0x0, "Write parameters"},
+    {0x7, 0x0, "Verify error recovery"},
+    {0x8, 0x0, "Caching"},
+    {0xd, 0x0, "CD device parameters (obsolete)"},
+    {0xe, 0x0, "CD audio"},
+    {0x1a, 0x0, "Power condition"},
+    {0x1c, 0x0, "Fault/failure reporting control"},
+    {0x1d, 0x0, "Timeout and protect"},
+    {0x2a, 0x0, "MM capabilities and mechanical status (obsolete)"},
 };
 
 static struct page_code_desc pc_desc_smc[] = {
-    {0x1d, "Element address assignment"},
-    {0x1e, "Transport geometry parameters"},
-    {0x1f, "Device capabilities"},
+    {0x1d, 0x0, "Element address assignment"},
+    {0x1e, 0x0, "Transport geometry parameters"},
+    {0x1f, 0x0, "Device capabilities"},
 };
 
 static struct page_code_desc pc_desc_scc[] = {
-    {0x1b, "LUN mapping"},
+    {0x1b, 0x0, "LUN mapping"},
 };
 
 static struct page_code_desc pc_desc_ses[] = {
-    {0x14, "Enclosure services management"},
+    {0x14, 0x0, "Enclosure services management"},
 };
 
 struct page_code_desc * find_mode_page_table(int scsi_ptype, int * size)
@@ -328,7 +166,8 @@ struct page_code_desc * find_mode_page_table(int scsi_ptype, int * size)
     return NULL;
 }
 
-const char * find_page_code_desc(int page_num, int scsi_ptype)
+const char * find_page_code_desc(int page_num, int subpage_num,
+                                 int scsi_ptype)
 {
     int k;
     int num;
@@ -337,7 +176,8 @@ const char * find_page_code_desc(int page_num, int scsi_ptype)
     pcdp = find_mode_page_table(scsi_ptype, &num);
     if (pcdp) {
         for (k = 0; k < num; ++k, ++pcdp) {
-            if (page_num == pcdp->page_code)
+            if ((page_num == pcdp->page_code) &&
+                (subpage_num == pcdp->subpage_code))
                 return pcdp->desc;
             else if (page_num < pcdp->page_code)
                 break;
@@ -346,7 +186,8 @@ const char * find_page_code_desc(int page_num, int scsi_ptype)
     pcdp = &pc_desc_all[0];
     num = sizeof(pc_desc_all) / sizeof(pc_desc_all[0]);
     for (k = 0; k < num; ++k, ++pcdp) {
-        if (page_num == pcdp->page_code)
+        if ((page_num == pcdp->page_code) &&
+            (subpage_num == pcdp->subpage_code))
             return pcdp->desc;
         else if (page_num < pcdp->page_code)
             break;
@@ -417,63 +258,9 @@ static void usage()
 }
 
 
-static void dStrHex(const char* str, int len, int no_ascii)
-{
-    const char* p = str;
-    unsigned char c;
-    char buff[82];
-    int a = 0;
-    const int bpstart = 5;
-    const int cpstart = 60;
-    int cpos = cpstart;
-    int bpos = bpstart;
-    int i, k;
-    
-    if (len <= 0) return;
-    memset(buff,' ',80);
-    buff[80]='\0';
-    k = sprintf(buff + 1, "%.2x", a);
-    buff[k + 1] = ' ';
-    if (bpos >= ((bpstart + (9 * 3))))
-        bpos++;
-
-    for(i = 0; i < len; i++)
-    {
-        c = *p++;
-        bpos += 3;
-        if (bpos == (bpstart + (9 * 3)))
-            bpos++;
-        sprintf(&buff[bpos], "%.2x", (int)(unsigned char)c);
-        buff[bpos + 2] = ' ';
-        if (no_ascii)
-            buff[cpos++] = ' ';
-        else {
-            if ((c < ' ') || (c >= 0x7f))
-                c='.';
-            buff[cpos++] = c;
-        }
-        if (cpos > (cpstart+15))
-        {
-            printf("%s\n", buff);
-            bpos = bpstart;
-            cpos = cpstart;
-            a += 16;
-            memset(buff,' ',80);
-            k = sprintf(buff + 1, "%.2x", a);
-            buff[k + 1] = ' ';
-        }
-    }
-    if (cpos > cpstart)
-    {
-        printf("%s\n", buff);
-    }
-}
-
-
-
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, len, md_len, bd_len, longlba, page_num;
+    int sg_fd, k, num, len, res, md_len, bd_len, longlba, page_num, spf;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     const char * descp;
@@ -493,7 +280,7 @@ int main(int argc, char * argv[])
     int density_code_off;
     unsigned char * ucp;
     unsigned char uc;
-    struct simple_inquiry_t inq_out;
+    struct sg_simple_inquiry_resp inq_out;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strncmp("-p=", argv[k], 3)) {
@@ -513,8 +300,8 @@ int main(int argc, char * argv[])
                 break;
             }
             sub_pg_code = u;
-	    if (-1 == pg_code)
-		pg_code = 0;
+            if (-1 == pg_code)
+                pg_code = 0;
         }
         else if (0 == strncmp("-c=", argv[k], 3)) {
             num = sscanf(argv[k] + 3, "%x", &u);
@@ -570,10 +357,10 @@ int main(int argc, char * argv[])
 
     /* The 6 bytes command only allows up to 252 bytes of response data */
     if (do_mode6) 
-	rsp_buff_size = 252;
+        rsp_buff_size = 252;
     /* If no pages or list selected than treat as 'a' */
     if (! ((pg_code >= 0) || do_all || do_list))
-	do_all = 1;
+        do_all = 1;
 
     if ((sg_fd = open(file_name, oflags)) < 0) {
         snprintf(ebuff, EBUFF_SZ, ME "error opening file: %s", file_name);
@@ -581,13 +368,13 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    if (do_simple_inq(sg_fd, 1, &inq_out, do_verbose)) {
+    if (sg_simple_inquiry(sg_fd, &inq_out, 1, do_verbose)) {
         printf(ME "%s doesn't respond to a SCSI INQUIRY\n", file_name);
         close(sg_fd);
         return 1;
     }
     printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n", 
-	   inq_out.vendor, inq_out.product, inq_out.revision,
+           inq_out.vendor, inq_out.product, inq_out.revision,
            get_ptype_str(inq_out.peripheral_type), inq_out.peripheral_type);
 
     if (do_list) {
@@ -599,8 +386,20 @@ int main(int argc, char * argv[])
     else if (do_all)
         pg_code = PG_CODE_ALL;
 
-    if (0 == do_modes(sg_fd, do_dbd, pc, pg_code, sub_pg_code, 
-                      rsp_buff, rsp_buff_size, 1, do_mode6, do_verbose)) {
+    if (do_mode6) {
+        res = sg_ll_mode_sense6(sg_fd, do_dbd, pc, pg_code, sub_pg_code,
+				rsp_buff, rsp_buff_size, 1, do_verbose);
+	if (SG_LIB_CAT_INVALID_OP == res)
+	    fprintf(stderr, ">>>>>> try again without the '-6' "
+		    "switch for a 10 byte MODE SENSE command\n");
+    } else {
+        res = sg_ll_mode_sense10(sg_fd, do_dbd, pc, pg_code, sub_pg_code,
+				 rsp_buff, rsp_buff_size, 1, do_verbose);
+	if (SG_LIB_CAT_INVALID_OP == res)
+	    fprintf(stderr, ">>>>>> try again with a '-6' "
+		    "switch for a 6 byte MODE SENSE command\n");
+    }
+    if (0 == res) {
         int medium_type, specific, headerlen;
 
         printf("Mode parameter header from %s byte MODE SENSE:\n",
@@ -667,40 +466,34 @@ int main(int argc, char * argv[])
                 break;
             }
             uc = *ucp;
+            spf = ((uc & 0x40) ? 1 : 0);
+            len = (spf ? ((ucp[2] << 8) + ucp[3] + 4) : (ucp[1] + 2));
             page_num = ucp[0] & PG_CODE_MASK;
-            if (do_hex)
-                descp = NULL;
-            else {
-                descp = find_page_code_desc(page_num, inq_out.peripheral_type);
-                if (NULL == descp)
-                    snprintf(ebuff, EBUFF_SZ, "vendor[0x%x]", page_num);
-            }
-            if (uc & 0x40) {
-                len = (ucp[2] << 8) + ucp[3] + 4;
-                if (do_hex)
+            if (do_hex) {
+                if (spf)
                     printf(">> page_code=0x%x, subpage_code=0x%x, "
                            "page_control=%d\n", page_num, ucp[1], pc);
                 else
-                    printf(">> page_code: %s, subpage_code=0x%x, "
-                           "page_control: %s\n",
-                           (descp ? descp: ebuff), ucp[1],
-                           pg_control_str_arr[pc]);
-            }
-            else {
-                len = ucp[1] + 2;
-                if (do_hex)
                     printf(">> page_code=0x%x, page_control=%d\n", page_num,
                            pc);
-                else
-                    printf(">> page_code: %s, page_control: %s\n", 
-                           (descp ? descp: ebuff), pg_control_str_arr[pc]);
+            } else {
+                descp = find_page_code_desc(page_num, (spf ? ucp[1] : 0),
+                                            inq_out.peripheral_type);
+                if (NULL == descp) {
+                    if (spf)
+                        snprintf(ebuff, EBUFF_SZ, "0x%x, subpage_code: 0x%x",
+                                 page_num, ucp[1]);
+                    else
+                        snprintf(ebuff, EBUFF_SZ, "0x%x", page_num);
+                }
+                printf(">> page_code: %s, page_control: %s\n", 
+                       (descp ? descp: ebuff), pg_control_str_arr[pc]);
             }
             dStrHex((const char *)ucp, ((len > md_len) ? md_len : len) , 1);
             ucp += len;
             md_len -= len;
         }
     }
-
     close(sg_fd);
     return 0;
 }

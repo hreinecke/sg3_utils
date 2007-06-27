@@ -2,6 +2,30 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.09 [20041022]
+  - sg_ses: new utility to get status and set control on SES devices
+  - sg_verify: new utility to verify block devices
+  - sg_emc_trespass: new utility for EMC specific trespass mode page
+  - sg_request: new utility that sends a REQUEST SENSE command
+  - sg_logs: '-r' to reset to manufacturer's defaults
+      - decode last n error events and last n deferred errors pages
+      - add names of ADC log pages
+  - sg_inq: update to SPC-3 rev 21
+      - decode Extended INQUIRY VPD page [0x86]
+      - decode Unit Path Report VPD page [0xc0] (EMC)
+  - sginfo: decode SAS protocol specific lu mode page
+  - sg_err: convert to sg_lib + update to SPC-3 rev 21
+      - change GPL to FreeBSD license
+      - flag vendor specific asc/ascq ranges
+  - libsgutils: library made from sg_lib.c and sg_cmds.c
+    - rpm "spec" file additionally builds a "-devel" rpm with
+      static libsgutils.a and sg_lib.h and sg_cmds.h
+  - utils/hxascdmp.c: add FreeBSD license
+  - sg_persist: additions to man page
+      - add sg_persist_tst.sh example script to examples directory
+  - sg_turs: add '-v' and '-V' options
+  - sg_senddiag: add '-v' option
+
 Changelog for sg3_utils-1.08 [20040831]
   - sg_inq: fix noisy message when EVPD and raw modes set
       - for VPD page 0, list supported page names if known

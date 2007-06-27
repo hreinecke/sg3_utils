@@ -1,0 +1,116 @@
+.TH SG_SES "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
+.SH NAME
+sg_ses \- send controls and fetch status from SES a (enclosure) device
+.SH SYNOPSIS
+.B sg_ses
+[\fI--byte1=<n>\fR] [\fI--control\fR] [\fI--data=<h>,<h>...\fR]
+[\fI--filter\fR] [\fI--help\fR] [\fI--hex\fR] [\fI--inner-hex\fR]
+[\fI--list\fR] [\fI--page=<page_code>\fR] [\fI--raw\fR]
+[\fI--status\fR] [\fI--verbose\fR] [\fI--version\fR] \fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send controls to a SES device (via a SCSI SEND DIAGNOSTIC command)
+or fetch status (via a SCSI RECEIVE DIAGNOSTIC command). The SES
+device is a <scsi_device> which may be dedicated enclosure
+services processor (INQUIRY peripheral device type 0xd) or attached
+to another type of SCSI device (e.g. a disk) which will have the
+EncServ bit set in its INQUIRY.
+.TP
+--byte=<n> | -b <n>
+some control pages need byte 1 (i.e. the second byte) of the cdb set.
+Default is 0; <n> is in decimal unless it is prefixed by 0x.
+.TP
+--control | -c
+will send control information to the given device via a SCSI SEND
+DIAGNOSTIC command. Cannot both give this option and '--status'.
+The Enclosure control, String Out, Threshold Out, Array control (obsolete
+in SES-2) and Subenclosure String Out diagnostic pages can be set currently.
+.TP
+--data=<h>,<h>... | -d <h>,<h>...
+permits a string of comma separated (ASCII) hex digits to be 
+specified (limit 512). This allows the parameters to a control diagnostic
+page to be specified. The string given should not include the first 4
+bytes (i.e. page code and length). See next entry for using stdin.
+.TP
+--data=- | -d -
+reads a data string from stdin. Space, tabs and line feeds additionally
+are permitted as separators.
+.TP
+--filter | -f
+cuts down on the amount of output from the enclosure status diagnostic
+page. When this option is given any line which has all its binary flags
+cleared (i.e. 0) is filtered out (i.e. ignored). If a line has some other
+value on it (e.g. a temperature) then it is output.
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--hex | -H
+output the response in hexadecimal.
+.TP
+--inner-hex | -i
+in outer level of a status page are decoded and printed out but the
+innermost level (e.g. element status descriptor) is output in hex.
+.TP
+--list | -l
+list all known diagnostic page names and SES elements. <scsi_device>
+is ignored and utility exits.
+.TP
+--page=<page_code> | -p <page_code>
+Supply a <page_code>. Assumed to be in decimal unless prefixed by 0x for
+hex. Valid range is 0 to 255 (0x0 to 0xff) inclusive. Default is 
+page_code 0 (i.e. "Supported diagnostic pages").
+.TP
+--raw | -r
+outputs the chosen status page in (ASCII) hex in a format suitable for
+a later invocation using the '--data=" option. The status page less its
+first 4 bytes (page code and length) is output.
+.TP
+--status | -s
+will fetch status information from the given device via a SCSI RECEIVE
+DIAGNOSTIC command. If this option is not given and '--control' is not
+given then fetch status mode is assumed.
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output).
+.TP
+--version | -V
+print the version string and then exit.
+.PP
+Currently all status pages, control pages and element types defined in
+SES-2 revision 9 (22nd July 2004) are decoded. 
+.SH EXAMPLE
+Changing a temperature threshold is possible, if a little awkward. The
+current thresholds can be shown with:
+.PP
+   sg_ses --page=5 /dev/sda
+.PP
+The threshold to be changed can be chosen. Then output the threshold page
+in hex (suitable for editing) with:
+.PP
+   sg_ses --page=5 --raw /dev/sda > t
+.PP
+Then with the aid of the SES-2 document (in revision 9: section 6.1.8)
+use your favourite editor to change t. The change can be sent to the
+device with:
+.PP
+   sg_ses --control --page=5 --data=- /dev/sda < t
+.PP
+If the above is successful, the threshold should have been changed. To
+check try:
+.PP
+   sg_ses --page=5 /dev/sda
+.PP
+again.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD liense. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq, sg_senddiag

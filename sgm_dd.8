@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
+.TH SGM_DD "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -111,7 +111,7 @@ Raw device partition information can often be found with
 .B fdisk(8)
 [the "-ul" argument is useful in this respect].
 .PP
-BYTES and BLOCKS may be followed by the following multiplicative suffixes:
+BYTES and BLOCKS may be followed by one of these multiplicative suffixes:
 c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
 g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
 T *1,000,000,000,000 (the latter two can only be used for count, skip
@@ -144,10 +144,10 @@ are given, then the usage message is output and nothing else happens.
 See the examples given in the man page for 
 .B sg_dd(8).
 .SH NOTE
-For sg devices this command issues READ_10 and WRITE_10 SCSI commands which
-are appropriate for disks and CDROM players. Those commands are not
-formatted correctly for tape devices so sgm_dd should not be used on
-tape devices.
+For sg devices this utility issues READ and WRITE (SBC) SCSI commands
+which are appropriate for disks and reading from CD/DVD drives. Those
+commands are not formatted correctly for tape devices so sgm_dd should
+not be used on tape devices.
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and
 SIGPIPE output the number of remaining blocks to be transferred and
@@ -164,9 +164,9 @@ Copyright \(co 2000-2004 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-The simplest variant of this command is called
+The simplest variant of this utility is called
 .B sg_dd.
-A POSIX threads version of this command called
+A POSIX threads version of this utility called
 .B sgp_dd
 is in the sg3_utils package. The lmbench package contains
 .B lmdd

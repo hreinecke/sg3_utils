@@ -1,42 +1,53 @@
-.TH SG_PERSIST "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
+.TH SG_PERSIST "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
 .SH NAME
 sg_persist \- use the Persistent Reservation In and Out SCSI commands
 to manipulate registrations and reservations
 .SH SYNOPSIS
 .B sg_persist
-[\fI<options>\fR] [\fI<scsi_device>\fR] [\fI<extra_args>\fR]
+[\fI<options>\fR] [\fI<scsi_device>\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 This utility allows Persistent reservations and registrations to be
 queried and changed. Persistent reservations and registrations are
-queried by the Persistent Reservation In (PRIN) SCSI command with an
-appropriate service action. Persistent reservations and registrations 
-are changed by the Persistent Reservation Out (PROUT) SCSI command.
+queried by sub-commands (called "service actions" in SPC-3) of the Persistent
+Reservation In (PRIN) SCSI command. Persistent reservations and
+registrations are changed by sub-commands of the Persistent Reservation
+Out (PROUT) SCSI command.
 .PP
 It is relatively safe to query the state of Persistent reservations and
-registrations. With no options this utility defaults to a PRIN command
-with a READ KEYS service action. Other PRIN service actions are
+registrations. With no options this utility defaults to the READ KEYS
+sub-command of the PRIN command. Other PRIN sub-commands are
 READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing! The relevant sections of the
-SCSI Primary Commands document (SPC-3 most recent draft revision 19
-dated 30th May 2004) are sections 5.6 (general information), 6.11 (for
-PRIN) and 6.12 (for PROUT). To safeguard against accidental use 
-the '--out' option together with a relevant service 
-action (e.g. '--register') must be given.
+SCSI Primary Commands document (SPC-3 most recent draft revision 20a
+dated 17th August 2004) are sections 5.6 (general information), 6.11 (for
+PRIN) and 6.12 (for PROUT). To safeguard against accidental use,
+the '--out' option must be given when a PROUT sub-command (e.g. '--register')
+is used.
 .PP
 The older SCSI Reserve and Release commands (both 6 and 10 byte variants)
-are not supported by this utility. In SPC-3 Reserve and Release are 
-deprecated, replaced by Persistent Reservations. See a utility called
-scsires for support of the SCSI Reserve and Release commands.
+are not supported by this utility. In SPC-3, Reserve and Release are 
+deprecated, replaced by Persistent Reservations. See a utility
+called 'scsires' for support of the SCSI Reserve and Release commands.
+.PP
+The <scsi_device> is required by all variants of this utility apart
+from '--help' ('-h'). The <scsi_device> can be given either as an
+argument (typically but not necessarily the last one) or via
+the '--device=<scsi_device>' (or '-d <scsi_device') option.
+.PP
+SPC-3 does not use the term "sub-command". It uses the term "service action"
+for this and for part of a field's name in the parameter block associated
+with the PROUT command (i.e. "service action reservation key"). To lessen
+the potential confusion the term "sub-command" has been introduced. 
 .SH OPTIONS
 .TP
 --clear | -C
-Clear is a service action of the PROUT command. It releases the
+Clear is a sub-command of the PROUT command. It releases the
 persistent reservation (if any) and clears all registrations from the
-device.
+device. [Typically also requires the --param-rk=<h> option.]
 .TP
 --device=<scsi_device> | -d <scsi_device>
 This utility needs to have a scsi_device to be specified. This can either
@@ -47,8 +58,8 @@ argument.
 output a usage message.
 .TP
 --hex | -H
-the response to a valid PRIN command will be output in hexadecimal.
-Normally if the PRIN service action is recognised then the response
+the response to a valid PRIN sub-command will be output in hexadecimal.
+Normally if the PRIN sub-command is recognised then the response
 will be decoded as per SPC-3.
 .TP
 --in | -i
@@ -66,62 +77,68 @@ INQUIRY command is skipped.
 .TP
 --param-alltgpt | -Y
 set the 'all target ports' (ALL_TG_PT) flag in the parameter block of the
-PROUT command. Only relevant to register and register and ignore existing
-key service actions.
+PROUT command. Only relevant for 'register' and 'register and ignore existing
+key' sub-commands.
 .TP
 --param-aptpl | -Z
 set the 'activate persist through power loss' (APTPL) flag in the parameter
-block of the PROUT command. Only relevant to register and register and
-ignore existing key service actions.
+block of the PROUT command. Relevant for 'register', 'register and ignore
+existing key' and 'register and move' sub-commands.
 .TP
 --param-rk=<h> | -K <h>
 specify the reservation key found in the parameter block of the PROUT
 command. Argument is assumed to be hex (up to 8 bytes long). Default value
-is 0.
+is 0. This option is needed by most PROUT sub-commands.
 .TP
 --param-sark=<h> | -S <h>
 specify the service action reservation key found in the parameter block
 of the PROUT command. Argument is assumed to be hex (up to 8 bytes long).
-Default value is 0.
+Default value is 0. This option is needed by some PROUT sub-commands.
 .TP
 --preempt | -P
-Preempt and Abort is a service action of the PROUT command. Preempts
+Preempt is a sub-command of the PROUT command. Preempts
 the existing persistent reservation (identified by '--param-sark') with
-the current I_T_L nexus (identified by '--param-rk').
+the current I_T_L nexus (identified by '--param-rk'). The 
+associated '--prout-type<h>' option needs to match the type of the
+reservation.
 .TP
 --preempt-abort | -A
-Preempt and Abort is a service action of the PROUT command. Preempts
+Preempt and Abort is a sub-command of the PROUT command. Preempts
 the existing persistent reservation (identified by '--param-sark') with
-the current I_T_L nexus (identified by '--param-rk'). ACA and other
-pending tasks are aborted.
+the current I_T_L nexus (identified by '--param-rk'). The
+associated '--prout-type<h>' option needs to match the type of the
+reservation. ACA and other pending tasks are aborted.
 .TP
 --prout-type=<h> | -T <h>
-specify the PROUT command's 'type' argument. Used in the reserve and
-release service actions. Valid arguments: 1-> write exclusive, 3->
+specify the PROUT command's 'type' argument. Required by 
+the 'register-move', 'reserve', 'release' and 'preempt (and abort)'
+sub-commands. Valid arguments: 1-> write exclusive, 3->
 exclusive access, 5-> write exclusive - registrants only, 6-> 
 exclusive access - registrants only, 7-> write exclusive - all registrants,
 8-> exclusive access - all registrants. Default value is 0 (which is
 an invalid type).
 .TP
 --read-full-status | -s
-for each registration with the given SCSI device, list the reservation key
-and associated information.
+Read Full Status is a sub-command of the PRIN command. For each registration
+with the given SCSI device, it lists the reservation key and associated
+information. TransportIDs, if supplied in the reponse, are decoded.
 .TP
 --read-keys | -k
-list all the reservation keys registered with the given SCSI device. This
-is the default service action for the PRIN SCSI command.
+Read Keys is a sub-command of the PRIN command. Lists all the reservation
+keys registered (i.e. registrations) with the given SCSI device. This is
+the default sub-command for the PRIN SCSI command.
 .TP
 --read-reservation | -r
-list information about the current holder of the reservation on the given
-device. If there is no current reservation this will be noted. Information
-about the current holder of the reservation includes its reservation key,
-scope and type.
+Read Reservation is a sub-command of the PRIN command. List information
+about the current holder of the reservation on the given device. If there
+is no current reservation this will be noted. Information about the current
+holder of the reservation includes its reservation key, scope and type.
 .TP
 --read-status | -s
 same as 'read-full-status'.
 .TP
 --register | -G
-register is a service action of the PROUT command. It has 3 different
+Register is a sub-command of the PROUT command. It has 3 different
 actions depending on associated parameters. 1) add a new registration 
 with '--param-rk=0' and '--param-sark=<new_rk>'. 2) Change an existing
 registration with '--param-rk=<old_rk>' and '--param-sark=<new_rk>'.
@@ -129,48 +146,155 @@ registration with '--param-rk=<old_rk>' and '--param-sark=<new_rk>'.
 and '--param-sark=0'.
 .TP
 --register-ignore | -I
-register and ignore existing key is a service action of the PROUT command.
+Register and Ignore Existing Key is a sub-command of the PROUT command.
 Similar to '--register' except that when changing a reservation key the
-old key is not specified.
+old key is not specified. The '--prout-sark=<new_rk>' option should also
+be given.
+.TP
+--register-move | -M
+register (another initiator) and move (the reservation held by the current
+initiator to that other initiator) is a sub-command of the PROUT command.
+It requires the transportID of the other initiator. [The standard uses the
+term I_T nexus but the point to stress is that there are two initiators
+(the one sending this command and another one) but only one target.]
+The '--param-type=<h>' and '--param-rk=<h>' options need to match that of
+the existing reservation while '--param-sark=<h>' option specifies the
+reservation key of the new (i.e. destination) registration.
+.TP
+--relative-target-port=<h> | -Q <h>
+relative target port number that reservation is to be moved to by 
+PROUT 'register and move' sub-command. <h> is assumed to be hex in the
+range 0 to ffff inclusive. Defaults to 0 .
 .TP
 --release | -L
-release is a service action of the PROUT command. It releases the
-current persistent reservation.
+Release is a sub-command of the PROUT command. It releases the
+current persistent reservation. The '--prout-type=<h>' 
+and '--prout-rk=<h>' options, matching the reservation, must also be
+specified.
 .TP
 --report-capabilities | -c
-list information about the aspects of persistent reservations that the
-given device supports. Support for "transport IDs" is incomplete;
-the '--hex' option may help if they are available.
+Report Capabilities is a sub-command of the PRIN command. It lists
+information about the aspects of persistent reservations that the
+given device supports.
 .TP
 --reserve | -R
-reserve is a service action of the PROUT command. It creates a new
-persistent reservation (if permitted).
+Reserve is a sub-command of the PROUT command. It creates a new
+persistent reservation (if permitted). The '--prout-type=<h>'
+and '--prout-rk=<h>' options must also be specified.
+.TP
+--transport-id=<h>,<h>... | -X <h>,<h>...
+a transportID is required for the PROUT 'register and move' sub-command
+and is optional for the PROUT 'register' and 'register and ignore
+existing key' sub-commands. The latter two sub-commands can take multiple
+transportIDs in a list but only one is supported on the command line.
+The argument is a comma separated list of hex numbers representing
+the bytes of the transportID. The list of hex numbers will be padded
+out with zeroes to 24 bytes which is the minimum length of a
+transportID. A transportID longer than 24 bytes (e.g. for iSCSI) is
+padded with zeroes so its length is a multiple of 4.
+.TP
+--transport-id=- | -X -
+a transportID is required for the PROUT 'register and move' sub-command
+and is optional for the PROUT 'register' and 'register and ignore
+existing key' sub-commands. The latter two sub-commands can take multiple
+transportIDs in a list. The argument is '-' which indicates
+stdin should be read for the transportID(s). Empty lines and those starting
+with '#' are ignored. Leading spaces and tabs are ignored. All numbers
+are assumed to be hexadecimal and can be separated by space, comma or
+tab. There can be one transportID per line. TranportIDs will be padded
+out with zeroes to 24 bytes which is the minimum length of a
+transportID. A transportID longer than 24 bytes (e.g. for iSCSI) is
+padded with zeroes so its length is a multiple of 4.
+.TP
+--unreg | -U
+optional when the PROUT register and move sub-command is invoked. If given
+it will unregister the current initiator (I_T nexus) after the other initiator
+has been registered and the reservation moved to it. When not given the
+initiator (I_T nexus) that sent the PROUT command remains registered.
 .TP
 --verbose | -v
 print out cdb of issued commands prior to execution. If used twice
-prints out the parameter block of the PROUT command.
+prints out the parameter block associated with the PROUT command prior
+to its execution as well. If used thrice decodes given transportID(s)
+as well. To see the response to a PRIN command in low level form use
+the '--hex' option.
 .TP
 --version | -V
 print out version string. Ignore all other parameters.
 .TP
 -?
 output usage message. Ignore all other parameters.
-.PP
+.SH NOTES
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series any SCSI device 
 name (e.g. /dev/sdc, /dev/st1m or /dev/sg3) can be specified. 
 For example "sg_persist --read-keys /dev/sda"
 will work in the 2.6 series kernels.
-.SH NOTES
-Transport IDs appended to the end of the parameter block for the PROUT
-command are not supported. Accordingly there is not option to set
-the 'SPEC_I_PT' flag in the parameter block. However Transport ID
-descriptors returned by PRIN Read Full Status service action are
-decoded.
 .PP
 The only scope for PROUT commands supported in the current draft of 
-SPC-3 is "LU_SCOPE". Hence there seems to be no point in offering a
-switch to set scope to another value.
+SPC-3 is "LU_SCOPE". Hence there seems to be no point in offering an
+option to set scope to another value.
+.PP
+Most errors with the PROUT sub-commands (e.g. missing or 
+mismatched '--prout-type=<h>' option) will result in a RESERVATION
+CONFLICT status. This can be a bit confusing when you know there is
+only one (active) initiator: the "conflict" is with the SPC standard, not
+another initiator.
+.SH EXAMPLES
+.PP
+Due to defaults the simplest example executes the 'read keys' sub-command
+of the PRIN command:
+.PP
+   sg_persist /dev/sda
+.PP
+This is the same as the following (long-winded) command:
+.PP
+   sg_persist --in --read-keys --device=/dev/sda
+.PP
+To read the current reservation either the '--read-reservation' form or
+the shorter '-r' can be used:
+.PP
+   sg_persist -r /dev/sda
+.PP
+To
+.B register
+the new reservation key 0x123abc the following could be used:
+.PP
+   sg_persist --out --register --param-sark=123abc /dev/sda
+.PP
+Given the above registration succeeds, to
+.B reserve
+the given device (with type 'write exclusive') the following
+could be used:
+.PP
+   sg_persist --out --reserve --param-rk=123abc
+.br
+              --prout-type=1 /dev/sda
+.PP
+To
+.B release
+the reservation the following can be given (note that
+the --param-rk and --prout-type arguments must match those of the
+reservation):
+.PP
+   sg_persist --out --release --param-rk=123abc
+.br
+              --prout-type=1 /dev/sda
+.PP
+Finally to
+.B unregister
+a reservation key (and not effect other
+registrations which is what '--clear' would do) the command
+is a little surprising:
+.PP
+   sg_persist --out --register --param-rk=123abc /dev/sda
+.PP
+Now have a close look at the difference between the register and
+unregister examples above.
+.PP
+An example file that is suitably formatted to pass transportIDs via
+the '-transport-id=-' option can be found in the examples sub-directory
+of the sg3_utils package. That file is called 'transport_ids.txt'.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
@@ -181,4 +305,4 @@ Copyright \(co 2004 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B scsires(internet)
+.B scsires(internet), examples/sg_persist_tst.sh(sg3_utils tarball)

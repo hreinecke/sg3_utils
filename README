@@ -47,7 +47,7 @@ Older documentation for the sg version 3 driver can be found at:
 http://www.torque.net/sg/p/scsi_generic_v3.txt .
 
 All programs are "GPL"-ed so you can incorporate all or part of them
-in your applications as you please. The "sg_err.[hc]" files contain
+in your applications as you please. The "sg_lib.[hc]" files contain
 ASCII text corresponding to most of the error and warning conditions
 defined in recent drafts at www.t10.org which is the home site of
 SCSI (draft) standards. 
@@ -98,7 +98,8 @@ in this package:
   2) scanning and mapping: sg_scan, sg_map and scsi_devfs_scan
   3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
      sg_modes, sg_logs, sg_senddiag, sg_reset, sg_opcodes, sg_persist,
-     sg_write_long and sg_read_long
+     sg_write_long, sg_read_long, sg_requests, sg_ses, sg_verify
+     and sg_emc_trespass
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
@@ -109,6 +110,9 @@ There is a brief description of each utility in the following sections.
 All utilities in the main directory have a "man" page in section 8
 which is a category for administration and privileged commands. Some
 utilities in the other (sub-)directories have man pages.
+
+To see which SCSI commands (and ATA commands) are used by these
+utilities see the COVERAGE file.
 
   
 1) dd variants
@@ -275,6 +279,21 @@ and other vendor specific information.
 "sg_read_long" can be used to read a "long" block from the given device
 (typically a disk).
 
+"sg_requests" issues a REQUEST SENSE SCSI command. One SPC-3 addition
+supported by this utility is the 'DESC' flag to request sense data in
+descriptor format.
+
+"sg_ses" issues SEND and RECEIVE DIAGNOSTIC PAGE commands to the
+given device which is assumed to be either an enclosure or another
+type of device (e.g. disk) that supports emclosure services. The
+latter case is indicated by a device setting the "EncServ" bit in
+a standard INQUIRY response.
+
+"sg_verify" verifies media by invoking SCSI VERIFY commands.
+
+"sg_emc_trespass" permits modification of EMC specific trespass
+mode page.
+
 
 4) Timing and testing
 ---------------------
@@ -310,7 +329,7 @@ archive directory.
 -------------------
 "sg_simple1" and "sg_simple2" are simple example programs demonstrating
 calls to the SCSI INQUIRY and TEST UNIT READY commands. They only differ
-in their error processing: sg_simple1 uses sg_err.[hc] for error
+in their error processing: sg_simple1 uses sg_lib.[hc] for error
 processing while sg_simple2 does its own more primitive checks.
 
 "sg_simple3" tests out user space scatter gather added to the version 3
@@ -389,5 +408,12 @@ in scsirastools are:
   - sgdefects: list primary and grown defect lists
   - sgdiag to perform format and other test functions
 
+plscsi
+======
+The author is considering implementing FreeBSD's camcontrol utility
+which can issue arbitrary SCSI commands (i.e. supplied by user). There is
+a similar utility called "plscsi" which is available for Linux and other
+operating systems. See http://members.aol.com/plscsi .
+
 Doug Gilbert
-31st August 2004
+20th October 2004

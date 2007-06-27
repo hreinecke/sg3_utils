@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 #define BPI (signed)(sizeof(int))
 
@@ -87,9 +87,9 @@ int find_out_about_buffer (int sg_fd)
         }
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
-        case SG_ERR_CAT_CLEAN:
+        case SG_LIB_CAT_CLEAN:
                 break;
-        case SG_ERR_CAT_RECOVERED:
+        case SG_LIB_CAT_RECOVERED:
                 printf("Recovered error on READ BUFFER descriptor, "
                        "continuing\n");
                 break;
@@ -209,9 +209,9 @@ int read_buffer (int sg_fd, unsigned size)
         }
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
-        case SG_ERR_CAT_CLEAN:
+        case SG_LIB_CAT_CLEAN:
                 break;
-        case SG_ERR_CAT_RECOVERED:
+        case SG_LIB_CAT_RECOVERED:
                 printf("Recovered error in READ BUFFER read data, "
                        "continuing\n");
                 break;
@@ -261,9 +261,9 @@ int write_buffer (int sg_fd, unsigned size)
         }
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
-        case SG_ERR_CAT_CLEAN:
+        case SG_LIB_CAT_CLEAN:
                 break;
-        case SG_ERR_CAT_RECOVERED:
+        case SG_LIB_CAT_RECOVERED:
                 printf("Recovered error in READ BUFFER write data, continuing\n");
                 break;
         default: /* won't bother decoding other categories */

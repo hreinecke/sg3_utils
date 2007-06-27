@@ -1,42 +1,68 @@
-.TH SG_OPCODES "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
+.TH SG_OPCODES "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
 .SH NAME
-sg_opcodes \- reports information about supported SCSI commands
+sg_opcodes \- reports information supported SCSI commands or
+task management functions supported by the given device
 .SH SYNOPSIS
 .B sg_opcodes
-[\fI-o=<opcode>\fR [\fI-s=<service_action>\fR ] ]
-[\fI-v\fR] [\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
+[\fI-a\fR] [\fI-o=<opcode>\fR [\fI-s=<service_action>\fR ] ] [\fI-u\fR]
+[\fI-u\fR] [\fI-v\fR] [\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility sends a SCSI REPORT SUPPORTED OPERATION CODES command to the
-given device and then outputs the response. It will either list all
-supported commands or give detailed information on a specific command
-identified by the "-o" option (perhaps with additional information
-from the "-s" option).
+This utility sends a REPORT SUPPORTED OPERATION CODES or a
+REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS SCSI command to the
+given device and then outputs the response. The default action is
+to report supported operation codes. In this mode it will either
+list all supported commands or give detailed information on a specific
+command identified by the "-o" option (perhaps with additional
+information from the "-s" option).
 .PP
 The name of a SCSI command depends on its peripheral device type (e.g.
 a disk) which is obtained from a standard SCSI INQUIRY command. Further
-the REPORT SUPPORTED OPERATION CODES command is not supported in
-the MMC command set for CD and DVD devices. So this utility does an
-INQUIRY to obtain the peripheral device type and prints out the
-vendor, product and revision strings.
+the REPORT SUPPORTED OPERATION CODES and REPORT SUPPORTED TASK
+MANAGEMENT FUNCTIONS commands are not supported in the MMC command set
+for CD and DVD devices. This utility does an INQUIRY to obtain the
+peripheral device type and prints out the vendor, product and revision
+strings.
 .PP
-A similar facility used to be available via the CmdDt bit in the SCSI
-INQUIRY command (see sg_inq(8)). However that facility was made obsolete
-and replaced by the REPORT SUPPORTED OPERATION CODES SCSI command in 
-SPC-3 (revision 4) in February 2002.
+A similar facility to query supported operation codes used to be available
+via the CmdDt bit in the SCSI INQUIRY command (see sg_inq(8)). However that
+facility was made obsolete and replaced by the REPORT SUPPORTED OPERATION
+CODES SCSI command in SPC-3 (revision 4) in February 2002.
+.TP
+-a
+when all supported commands are being listed there is no requirement for
+the device server (i.e. the target) to sort the list of commands. When
+this option is given the list of supported commands is sorted by
+name (alphabetically). When this option and the '-u' option are
+both _not_ given then the list of supported commands is sorted
+numerically (first by operation code and then by service action).
 .TP
 -o=<opcode>
 the given device will be queried for the given operation code ("opcode")
 which is the first byte of a SCSI command. Argument
 is hexadecimal and expected to be in the range 0 to ff inclusive.
+When this option is not given then all available SCSI commands supported
+by the target are listed.
 .TP
 -s=<service_action>
-the given device will be queried for the given operation code ("opcode")
-which is assumed to be 0 if this option is not accompanied by a "-o"
-option with a service action given as the argument to this option.
-The argument is hexadecimal and expected to be in the range 0 to ffff 
-inclusive.
+the given device will be queried for a command with the given service 
+action ("service_action"). Used in conjunction with the '-o=<opcode>'
+option. If '-s' is not given, '-o' is given and the command in question
+does have a service action then a value of 0 will be assumed.
+The "<service_action>" argument is hexadecimal and expected to be in the
+range 0 to ffff inclusive.
+.TP
+-t
+list supported task management functions. When this option is chosen
+the '-a', '-o' and '-u' options are ignored.
+.TP
+-u
+when all supported commands are being listed there is no requirement for
+the device server (i.e. the target) to sort the list of commands. When
+this option is given the list of supported commands is in the order
+given by the target. When this option is not given the supported commands
+are sorted numerically (first by operation code and then by service action). 
 .TP
 -v
 verbose: print out cdb of issued commands prior to execution

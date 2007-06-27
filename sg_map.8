@@ -3,8 +3,8 @@
 sg_map \- displays mapping between sg and other SCSI devices
 .SH SYNOPSIS
 .B sg_map
-[\fI-a\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR] [\fI-sr\fR] [\fI-st\fR]
-[\fI-x\fR]
+[\fI-a\fR] [\fI-i\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR] [\fI-sr\fR]
+[\fI-st\fR] [\fI-x\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -18,6 +18,10 @@ name.
 -a
 assume the sg devices have alphabetical device names and loop
 through /dev/sga, /dev/sgb, etc. Default is numeric scan
+.TP
+-i
+in addition do a standard INQUIRY and output vendor, product and revision
+strings for devices that are found.
 .TP
 -n
 assume the sg devices have numeric device names and loop

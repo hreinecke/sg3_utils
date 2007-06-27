@@ -1,0 +1,88 @@
+.TH SG_VERIFY "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
+.SH NAME
+sg_verify \- invoke SCSI VERIFY command(s) on a block device
+.SH SYNOPSIS
+.B sg_verify
+[\fI--bpc=<n>\fR] [\fI--count=<n>\fR] [\fI--dpo\fR] [\fI--help\fR]
+[\fI--lba=<n>\fR] [\fI--verbose\fR] [\fI--version\fR]
+\fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends one or more SCSI VERIFY commands to the given Linux SCSI device.
+It is a 10 byte VERIFY command defined for block devices (see SBC-2
+at http://www.t10.org). Verify starts at the logical block address
+given by the '--lba=<n>' option and continues for '--count=<n>'
+blocks. No more than '--bpc=<n>' blocks are verified by each VERIFY
+command so if necessary multiple VERIFY commands are sent.
+No news is good news (i.e. if there are no verfy errors detected
+no messages are sent to stderr and the Unix return status is 0).
+.TP
+--bpc=<n> | -b <n>
+specifies the maximum number of blocks that will be verified by a
+single SCSI VERIFY command. The default value is 128 blocks which
+equates to 64 KB for a disk with 512 byte blocks. If the value <n>
+is less than the value given to --count then multiple SCSI VERIFY
+commands are sent to the device. For recent block devices (disks)
+this value may be constrained by the maximum transfer length field
+in the block limits VPD page.
+.TP
+--dpo | -d
+disable page out changes the cache retension policy of blocks read on
+the device's cache to the lowest priority. This means that blocks read by
+other commands are more likely to remain in the device's cache.
+.TP
+--count=<n> | -c <n>
+specifies the number of blocks to verify. The default value is 1 .
+If <n> is greater than the value associated with '--bpc' (or its default
+value of 128) then multiple SCSI VERIFY commands are sent to the
+device. The
+.B sg_readcap
+utility can be used to find the maximum number of blocks that a block
+device (e.g. a disk) has.
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--lba=<n> | -l <n>
+specifies the logical block address on the device to start the verify
+operation. The default value is 0 (i.e. the start of the device).
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output).
+.TP
+--version | -V
+print the version string and then exit.
+.PP
+The arguments to --bpc, --count and --lba may be followed by one of these
+multiplicative suffixes:
+c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
+g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
+T *1,000,000,000,000 (the latter two can only be used for --count
+and --lba).
+.PP
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X". When hex numbers are given multipliers cannot be
+used.
+.PP
+The amount of error correction and the number of retries attempted
+before a block is considered defective are controlled in part by the
+Verify Error Recovery mode page.  A note in the SBC-2 (draft)
+standard advises that to minimize the number of checks (and hence
+have the most "sensitive" verify check) do the following in that
+mode page. Set the EER bit to 0, the PER bit to 1, the DTE bit to 1,
+the DCR bit to 1, the verify retry count to 0 and the verify error
+recovery timeout to 0. Mode pages can be modified with the
+.B sginfo
+utility.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sginfo, sg_modes, sg_readcap, sg_inq

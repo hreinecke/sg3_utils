@@ -2,27 +2,52 @@ make
 make install
 
 Unless overridden or edited in the Makefile, INSTDIR places the executables
-in the /usr/local/bin directory while MANDIR places the man pages in the
-/usr/local/man directory.
+in the /usr/local/bin directory, LIBDIR places libraries in the
+/usr/local/lib directory, MANDIR places the man pages in the
+/usr/local/man directory and INCLUDEDIR places header files in the
+/usr/local/include/scsi directory.
 
 Other Makefile targets that might be useful:
 make clean	# remove .o, executables, core and .depend file
 make depend	# generate dependency hierarchy in .depend file
 make dep   	# same as 'make depend'
-make sg_scan   	# build a specific executable (e.g. 'sg_scan')
-make uninstall
+make sg_inq   	# build a specific executable (e.g. 'sg_inq')
+make uninstall  # removes executables, libraries and build remnants
 
 Note that the main Makefile does _not_ call the Makefiles in the
 subdirectories (i.e. archive, examples and utils directories).
 
+By default, this package now builds a shared library called
+libsgutils.so and the corresponding static library: libsgutils.a .
+The 'make' will build those libraries and executables and put them
+in the ".libs" subdirectory (as GNU's libtool requires/enforces).
+The 'make' puts scripts in the main directory with the same names as
+the utilities (e.g. sg_dd, sg_inq etc) which set up an appropriate
+environment and call the "real" executable "hiding" in the ".libs"
+subdirectory.
+The "make install" will install the libraries in the /usr/local/lib
+directory. If an executable cannot find the libsgutils shared library
+(check with 'ldd sg_inq' for example) then the addition of "/usr/local/lib"
+to the /etc/ld.so.conf file may be required in some distributions.
 
-A "spec" file is included for building rpm packages. Place a copy of
-the tarball in the "SOURCES" directory and place a copy of sg3_utils.spec
-in the "SPEC" directory. Then from the "SPEC" directory execute 
-"rpmbuild -ba sg3_utils.spec". If all goes well a source rpm should be 
-found in the SRPMS directory and a binary rpm in the RPMS/i386 directory
-(for i386 architecture). Note the spec file will only build those utilities
-in the main directory. When the binary rpm is installed the executables
-and their associated man pages should be placed in appropriate places.
+A "spec" file is included for building rpm packages. To build binary and
+source rpms place a copy of the gzipped tarball in the "SOURCES" directory
+and place a copy of sg3_utils.spec in the "SPEC" directory. This directories
+are found under /usr/src/redhat on redhat distributions. Then from the
+"SPEC" directory execute "rpmbuild -ba sg3_utils.spec". If all goes well
+a source rpm should be found in the SRPMS directory and a binary rpm in the
+RPMS/i386 directory (for i386 architecture). Note the spec file will only
+build those utilities in the main directory. When the binary rpm is
+installed the executables and their associated man pages should be placed
+in appropriate places. The sg3_utils.spec file also builds an
+sg3-utils-devel rpm that contains the libsgutils static library and
+the sg_lib.h and sg_cmds.h header files.
 
-10th December 2003
+Binary rpms (at least in the RedHat distribution) tend to install
+executables in /usr/bin and libraries in /usr/lib .
+
+If the libsgutils.so shared library is troublesome or unwanted
+then "no_lib" versions of the Makefile and the sg3_utils.spec file
+can be found in the "lib_no_lib" subdirectory.
+
+21st October 2004

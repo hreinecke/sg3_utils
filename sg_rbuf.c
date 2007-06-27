@@ -1,3 +1,6 @@
+#define _XOPEN_SOURCE 500
+#define _GNU_SOURCE  
+
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -10,8 +13,9 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <linux/fs.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -25,24 +29,22 @@
    device, first to find out how big it is and then to read that
    buffer. The '-q' option skips the data transfer from the kernel
    DMA buffers to the user space. The '-b=num' option allows the
-   buffer size (in KBytes) to be specified (default is to use the
+   buffer size (in KiB) to be specified (default is to use the
    number obtained from READ BUFFER (descriptor) SCSI command).
    The '-s=num' option allows the total size of the transfer to be
-   set (in megabytes, the default is 200 MB). The '-d' option requests
+   set (in megabytes, the default is 200 MiB). The '-d' option requests
    direct io (and is overridden by '-q').
    The '-m' option request mmap-ed IO (and overrides the '-q' and '-d'
    options if they are also given).
    The ability to time transfers internally (based on gettimeofday()) has
    been added with the '-t' option.
-
-   Version 4.75 (20040608)
 */
 
 
 #define RB_MODE_DESC 3
 #define RB_MODE_DATA 2
 #define RB_DESC_LEN 4
-#define RB_MB_TO_READ 200
+#define RB_MIB_TO_READ 200
 #define RB_OPCODE 0x3C
 #define RB_CMD_LEN 10
 
@@ -54,6 +56,23 @@
 
 #define ME "sg_rbuf: "
 
+static char * version_str = "4.77 20041011";
+
+static void usage()
+{
+    printf("Usage: sg_rbuf [-b=num] [[-q] | [-d] | [-m]] [-s=num] [-t] "
+           "[-v] [-V]\n               <generic_device>\n");
+    printf("  where  -b=num   num is buffer size to use (in KiB)\n");
+    printf("         -d       requests dio ('-q' overrides it)\n");
+    printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
+    printf("         -q       quick, don't xfer to user space\n");
+    printf("         -s=num   num is total size to read (in MiB)\n");
+    printf("                    default total size is 200 MiB\n");
+    printf("                    max total size is 4000 MiB\n");
+    printf("         -t       time the data transfer\n");
+    printf("         -v       increase verbosity (more debug)\n");
+    printf("         -V       print version string then exit\n");
+}
 
 int main(int argc, char * argv[])
 {
@@ -68,8 +87,9 @@ int main(int argc, char * argv[])
     int do_dio = 0;
     int do_mmap = 0;
     int do_time = 0;
+    int verbose = 0;
     int buf_size = 0;
-    unsigned int total_size_mb = RB_MB_TO_READ;
+    unsigned int total_size_mib = RB_MIB_TO_READ;
     char * file_name = 0;
     size_t psz = getpagesize();
     int dio_incomplete = 0;
@@ -92,7 +112,7 @@ int main(int argc, char * argv[])
         }
         else if (0 == strncmp("-s=", argv[j], 3)) {
             m = 3;
-            num = sscanf(argv[j] + m, "%u", &total_size_mb);
+            num = sscanf(argv[j] + m, "%u", &total_size_mib);
             if (1 != num) {
                 printf("Couldn't decode number after '-s' switch\n");
                 file_name = 0;
@@ -107,7 +127,12 @@ int main(int argc, char * argv[])
             do_mmap = 1;
         else if (0 == strcmp("-t", argv[j]))
             do_time = 1;
-        else if (*argv[j] == '-') {
+        else if (0 == strcmp("-v", argv[j]))
+            ++verbose;
+        else if (0 == strcmp("-V", argv[j])) {
+	    fprintf(stderr, ME "version: %s\n", version_str);
+	    return 0;
+        } else if (*argv[j] == '-') {
             printf("Unrecognized switch: %s\n", argv[j]);
             file_name = 0;
             break;
@@ -116,16 +141,7 @@ int main(int argc, char * argv[])
             file_name = argv[j];
     }
     if (0 == file_name) {
-        printf("Usage: sg_rbuf [[-q] | [-d] | [-m]] [-t] [-b=num] [-s=num] "
-               "<generic_device>\n");
-        printf("  where: -q       quick, don't xfer to user space\n");
-        printf("         -d       requests dio ('-q' overrides it)\n");
-        printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
-        printf("         -t       time the data transfer\n");
-        printf("         -b=num   num is buffer size to use (in KBytes)\n");
-        printf("         -s=num   num is total size to read (in MBytes)\n");
-        printf("                    default total size is 200 MBytes\n");
-        printf("                    max total size is 4000 MBytes\n");
+	usage();
         return 1;
     }
 
@@ -169,9 +185,9 @@ int main(int argc, char * argv[])
 
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error on READ BUFFER descriptor, continuing\n");
         break;
     default: /* won't bother decoding other categories */
@@ -211,7 +227,7 @@ int main(int argc, char * argv[])
         if (MAP_FAILED == rbBuff) {
             if (ENOMEM == errno)
                 printf(ME "mmap() out of memory, try a smaller "
-                       "buffer size than %d KB\n", buf_size / 1024);
+                       "buffer size than %d KiB\n", buf_size / 1024);
             else
                 perror(ME "error using mmap()");
             return 1;
@@ -230,7 +246,7 @@ int main(int argc, char * argv[])
             rbBuff = rawp;
     }
 
-    num = (total_size_mb * 1024U * 1024U) / (unsigned int)buf_size;
+    num = (total_size_mib * 1024U * 1024U) / (unsigned int)buf_size;
     if (do_time) {
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
@@ -270,7 +286,7 @@ int main(int argc, char * argv[])
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
             if (ENOMEM == errno)
                 printf(ME "SG_IO data; out of memory, try a smaller "
-                       "buffer size than %d KB\n", buf_size / 1024);
+                       "buffer size than %d KiB\n", buf_size / 1024);
             else
                 perror(ME "SG_IO READ BUFFER data error");
             if (rawp) free(rawp);
@@ -279,9 +295,9 @@ int main(int argc, char * argv[])
 
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
-        case SG_ERR_CAT_CLEAN:
+        case SG_LIB_CAT_CLEAN:
             break;
-        case SG_ERR_CAT_RECOVERED:
+        case SG_LIB_CAT_RECOVERED:
             printf("Recovered error on READ BUFFER data, continuing\n");
             break;
         default: /* won't bother decoding other categories */
@@ -327,8 +343,8 @@ int main(int argc, char * argv[])
     }
     if (dio_incomplete)
         printf(">> direct IO requested but not done\n");
-    printf("Read %u MBytes (actual %u MB, %u bytes), buffer size=%d KBytes\n",
-           total_size_mb, (num * buf_size) / 1048576, num * buf_size,
+    printf("Read %u MiB (actual %u MiB, %u bytes), buffer size=%d KiB\n",
+           total_size_mib, (num * buf_size) / 1048576, num * buf_size,
            buf_size / 1024);
 
     if (rawp) free(rawp);

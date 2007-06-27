@@ -1,0 +1,40 @@
+.TH SG_REQUESTS "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
+.SH NAME
+sg_requests \- send the scsi command request sense
+.SH SYNOPSIS
+.B sg_requests
+[\fI--desc\fR] [\fI--help\fR] [\fI--verbose\fR] [\fI--version\fR]
+\fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send REQUEST SENSE command to a Linux SCSI device and output the response
+which is expected to be in sense data format. Both fixed and descriptor
+format are supported.
+.TP
+--desc | -d
+sets the 'DESC' bit in the REQUEST SENSE SCSI command. The given device
+should return sense data in descriptor (rather than fixed) format. This
+will only occur if the given device recognizes descriptor format (SPC-3
+and later). If the device is pre SPC-3 then setting a bit in a reserved
+field may cause a check condition status with an illegal request sense key.
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output).
+.TP
+--version | -V
+print the version string and then exit.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq

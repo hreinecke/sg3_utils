@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* This program sends a user specified number of TEST UNIT READY commands
    to the given sg device. Since TUR is a simple command involing no
@@ -23,53 +23,11 @@
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   Invocation: sg_turs [-t] [-n=<number_of_turs>] <sg_device>
-   The value give to "-n=" can have the following multipliers:
-     'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
-     'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
-
-   Version 03.11 (20040602)
 */
 
+static char * version_str = "3.12 20041011";
+
 #define TUR_CMD_LEN 6
-
-int get_num(char * buf)
-{
-    int res, num;
-    char c;
-
-    res = sscanf(buf, "%d%c", &num, &c);
-    if (1 == res)
-        return num;
-    else if (2 != res)
-        return -1;
-    else {
-        switch (c) {
-        case 'c':
-        case 'C':
-            return num;
-        case 'b':
-        case 'B':
-            return num * 512;
-        case 'k':
-            return num * 1024;
-        case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
-        case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
-        case 'G':
-            return num * 1000000000;
-        default:
-            fprintf(stderr, "unrecognized multiplier\n");
-            return -1;
-        }
-    }
-}
-
 #define EBUFF_SZ 256
 
 
@@ -85,11 +43,12 @@ int main(int argc, char * argv[])
     int num_turs = 1;
     int num_errs = 0;
     int do_time = 0;
+    int verbose = 0;
     struct timeval start_tm, end_tm;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strncmp("-n=", argv[k], 3)) {
-            num_turs = get_num(argv[k] + 3);
+            num_turs = sg_get_num(argv[k] + 3);
             if (num_turs < 0) {
                 printf("Couldn't decode number after '-n' switch\n");
                 file_name = 0;
@@ -98,7 +57,12 @@ int main(int argc, char * argv[])
         }
         else if (0 == strcmp("-t", argv[k]))
             do_time = 1;
-        else if (*argv[k] == '-') {
+        else if (0 == strcmp("-v", argv[k]))
+            ++verbose;
+        else if (0 == strcmp("-V", argv[k])) {
+            fprintf(stderr, "Version string: %s\n", version_str);
+            exit(0);
+        } else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
             break;
@@ -118,7 +82,9 @@ int main(int argc, char * argv[])
                "(def: 1)\n"
                "                  can take k, K, m, M postfix multipliers\n"
                "       '-t'   outputs total duration and commands per "
-               "second\n");
+               "second\n"
+               "       '-v'   increase verbosity\n"
+               "       '-V'   print version string then exit\n");
         return 1;
     }
 
@@ -137,6 +103,12 @@ int main(int argc, char * argv[])
     io_hdr.cmdp = turCmdBlk;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
+    if (verbose) {
+        fprintf(stderr, "    Test unit ready cmd: ");
+        for (k = 0; k < TUR_CMD_LEN; ++k)
+            fprintf(stderr, "%02x ", turCmdBlk[k]);
+        fprintf(stderr, "\n");
+    }
     if (do_time) {
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
@@ -152,7 +124,7 @@ int main(int argc, char * argv[])
         if (io_hdr.info & SG_INFO_OK_MASK) {
             ++num_errs;
             if (1 == num_turs) {        /* then print out the error message */
-                if (SG_ERR_CAT_CLEAN != sg_err_category3(&io_hdr))
+                if (SG_LIB_CAT_CLEAN != sg_err_category3(&io_hdr))
                     sg_chk_n_print3("tur", &io_hdr);
             }
         }

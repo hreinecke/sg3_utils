@@ -8,10 +8,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"  /* needed for INQUIRY, if problematic then remove */
+#include "sg_lib.h"
+#include "sg_cmds.h"
 
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2002 D. Gilbert
+*  Copyright (C) 2000-2004 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -84,8 +85,6 @@ static char ebuff[EBUFF_SZ];
 
 static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                           int lin_dev_type, int last_sg_ind);
-static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op,
-                  void * resp, int mx_resp_len, int noisy);
 
 static void usage()
 {
@@ -245,7 +244,8 @@ int main(int argc, char * argv[])
         if (do_inquiry) {
             char buff[36];
 
-            if (0 == do_inq(sg_fd, 0, 0, 0, buff, sizeof(buff), 1)) {
+            if (0 == sg_ll_inquiry(sg_fd, 0, 0, 0, buff, sizeof(buff),
+				   1, 0)) {
                 memcpy(map_arr[k].vendor, &buff[8], 8);
                 memcpy(map_arr[k].product, &buff[16], 16);
                 memcpy(map_arr[k].revision, &buff[32], 4);
@@ -444,53 +444,3 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
     }
 }
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-
-#define INQUIRY_CMD     0x12
-#define INQUIRY_CMDLEN  6
-
-static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op, 
-                  void * resp, int mx_resp_len, int noisy)
-{
-    int res;
-    unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    if (cmddt)
-        inqCmdBlk[1] |= 2;
-    if (evpd)
-        inqCmdBlk[1] |= 1;
-    inqCmdBlk[2] = (unsigned char)pg_op;
-    inqCmdBlk[4] = (unsigned char)mx_resp_len;
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(inqCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = inqCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (inquiry) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_ERR_CAT_CLEAN:
-    case SG_ERR_CAT_RECOVERED:
-        return 0;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt=%d, "
-                     "EVPD=%d, page_opcode=%x ", cmddt, evpd, pg_op);
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
-        return -1;
-    }
-}

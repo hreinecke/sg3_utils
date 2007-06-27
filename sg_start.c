@@ -7,12 +7,13 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
+#include "sg_cmds.h"
 
 /* This program is modeled on the example code in the SCSI Programming
    HOWTO V1.5 by Heiko Eissfeldt dated 7 May 1996.
 *
-*  Copyright (C) 1999-2003 D. Gilbert
+*  Copyright (C) 1999-2004 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,17 +31,14 @@
  
 */
 
-static char * version_str = "0.37 20040602";
-
-static int debug = 0;
+static char * version_str = "0.38 20041011";
 
 #define START_STOP              0x1b
-#define SYNCHRONIZE_CACHE       0x35
 
 #define DEF_TIMEOUT 120000       /* 120,000 millisecs == 2 minutes */
 
 static void do_start_stop(int fd, int start, int immed, int loej,
-                          int power_conditions)
+                          int power_conditions, int verbose)
 {
         unsigned char cmdblk [6] = { 
                 START_STOP,     /* Command */
@@ -66,9 +64,9 @@ static void do_start_stop(int fd, int start, int immed, int loej,
         io_hdr.cmdp = cmdblk;
         io_hdr.sbp = sense_b;
         io_hdr.timeout = DEF_TIMEOUT;
-        if (debug) {
+        if (verbose) {
                 printf("  Start/Stop command:");
-                for (k = 0; k < 6; ++k)
+                for (k = 0; k < (int)sizeof(cmdblk); ++k)
                         printf (" %02x", cmdblk[k]);
                 printf("\n");
         }
@@ -78,76 +76,32 @@ static void do_start_stop(int fd, int start, int immed, int loej,
                 return;
         }
         res = sg_err_category3(&io_hdr);
-        if (SG_ERR_CAT_MEDIA_CHANGED == res) {
+        if (SG_LIB_CAT_MEDIA_CHANGED == res) {
                 fprintf(stderr, "media change report, try start_stop again\n");
                 if (ioctl(fd, SG_IO, &io_hdr) < 0) {
                         perror("start_stop (SG_IO) error");
                         return;
                 }
         }
-        if (SG_ERR_CAT_CLEAN != res) {
+        if (SG_LIB_CAT_CLEAN != res) {
                 sg_chk_n_print3("start_stop", &io_hdr);
                 return;
         }
-        if (debug)
+        if (verbose)
                 fprintf(stderr, "start_stop [%s] successful\n",
                         start ? "start" : "stop");
 }
 
-static void do_sync_cache(int fd)
-{
-        unsigned char cmdblk [ 10 ] = {
-                SYNCHRONIZE_CACHE,      /* Command */
-                0,                      /* Immed (2) */
-                0, 0, 0, 0,             /* LBA */
-                0,                      /* Reserved */
-                0, 0,                   /* No of blocks */
-                0 };                    /* Reserved/Flag/Link */
-        unsigned char sense_b[32];
-        struct sg_io_hdr io_hdr;
-        int res;
-
-        memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-        io_hdr.interface_id = 'S';
-        io_hdr.cmd_len = sizeof(cmdblk);
-        io_hdr.mx_sb_len = sizeof(sense_b);
-        io_hdr.dxfer_direction = SG_DXFER_NONE;
-        io_hdr.dxfer_len = 0;
-        io_hdr.dxferp = NULL;
-        io_hdr.cmdp = cmdblk;
-        io_hdr.sbp = sense_b;
-        io_hdr.timeout = DEF_TIMEOUT;
-        
-        if (ioctl(fd, SG_IO, &io_hdr) < 0) {
-                perror("sync_cache (SG_IO) error");
-                return;
-        }
-        res = sg_err_category3(&io_hdr);
-        if (SG_ERR_CAT_MEDIA_CHANGED == res) {
-                fprintf(stderr, "media change report, try sync_cache again\n");
-                if (ioctl(fd, SG_IO, &io_hdr) < 0) {
-                        perror("sync_cache (SG_IO) error");
-                        return;
-                }
-        }
-        if (SG_ERR_CAT_CLEAN != res) {
-                sg_chk_n_print3("sync_cache", &io_hdr);
-                return;
-        }
-        if (debug)
-                fprintf(stderr, "synchronize cache successful\n");
-}
-
 void usage ()
 {
-        fprintf(stderr, "Usage:  sg_start [-d] [-imm=0|1] [-loej] [-pc=<n>] "
-                        "[-s] [0|1] <device>\n"
-               "    -d: output debug\n"
+        fprintf(stderr, "Usage:  sg_start [-imm=0|1] [-loej] [-pc=<n>] "
+                        "[-s] [-v] [-V] 0|1 <device>\n"
                "    -imm=0|1: 0->await completion, 1->return "
                "immediately(def)\n"
                "    -loej: load on start, eject of stop\n"
                "    -pc=<n>: power conditions (in hex, default 0)\n"
                "    -s: send the synchronize cache command before start/stop\n"
+               "    -v: verbose (print out SCSI commands)\n"
                "    -V: print version string then exit\n"
                "     0: stop (spin-down)\n"
                "     1: start (spin-up)\n"
@@ -166,15 +120,14 @@ int main(int argc, char * argv[])
         int immed = 1;
         int loej = 0;
         int power_conds = 0;
+        int verbose = 0;
         
         if (argc < 2) 
                 usage ();
 
         for (k = 1; k < argc; ++k) {
                 argptr = argv + k;
-                if (!strcmp (*argptr, "-d"))
-                        debug = 1;
-                else if (!strcmp (*argptr, "-loej"))
+                if (!strcmp (*argptr, "-loej"))
                         loej = 1;
                 else if (!strcmp (*argptr, "-s"))
                         synccache = 1;
@@ -199,7 +152,8 @@ int main(int argc, char * argv[])
                 else if (!strcmp (*argptr, "-V")) {
                         printf("Version string: %s\n", version_str);
                         exit(0);
-                }
+                } else if (!strcmp (*argptr, "-v"))
+			++verbose;
                 else if (!strcmp (*argptr, "0"))
                         startstop = 0;
                 else if (!strcmp (*argptr, "1"))
@@ -228,17 +182,16 @@ int main(int argc, char * argv[])
         if (fd < 0) {
                 fprintf(stderr, "Error trying to open %s\n", file_name);
                 perror("");
-                usage();
                 return 2;
         }
         
         if (synccache)
-                do_sync_cache(fd);
+                sg_ll_sync_cache(fd, 0, 0, verbose);
         
         if (power_conds > 0)
-                do_start_stop(fd, 0, immed, 0, power_conds);
+                do_start_stop(fd, 0, immed, 0, power_conds, verbose);
         else if (startstop != -1)
-                do_start_stop(fd, startstop, immed, loej, 0);
+                do_start_stop(fd, startstop, immed, loej, 0, verbose);
         
         close (fd);
         return 0;

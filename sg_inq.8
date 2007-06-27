@@ -1,10 +1,12 @@
-.TH SG_INQ "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
+.TH SG_INQ "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
 .SH NAME
 sg_inq \- outputs data retrieved from the SCSI INQUIRY command
 .SH SYNOPSIS
 .B sg_inq
-[\fI-c\fR] [\fI-cl>\fR] [\fI-e\fR] [\fI-h\fR] [\fI-i\fR] [\fI-o=<vpd_page>\fR]
-[\fI-r\fR] [\fI-v\fR] [\fI-V\fR] [\fI-36\fR] [\fI-?\fR] \fI<scsi_device>\fR
+[\fI-c\fR] [\fI-cl\fR] [\fI-d\fR] [\fI-e\fR] [\fI-h\fR] [\fI-i\fR]
+[\fI-o=<opcode_page>\fR] [\fI-p=<vpd_page>\fR] [\fI-P\fR]
+[\fI-r\fR] [\fI-v\fR] [\fI-V\fR] [\fI-x\fR] [\fI-36\fR] [\fI-?\fR]
+\fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -25,7 +27,7 @@ device identification strings are output. If the "-r" option is given
 then the 256 byte IDENTITY block is output in binary.
 .PP
 The reference document used for interpreting an INQUIRY is T10/1416-D Revision 
-19 (30th May 2004) found at http://www.t10.org . Obsolete items in the
+21 (22nd September 2004) found at http://www.t10.org . Obsolete items in the
 INQUIRY response are displayed in brackets.
 .TP
 -c
@@ -43,11 +45,19 @@ lists the command data for all supported commands (followed by the command
 name) by looping through all 256 opcodes. This option uses the CmdDt bit
 which is now obsolete. See the sg_opcodes utility.
 .TP
+-d
+lists version descriptors. There are up to 8 version descriptors in the
+upper bytes of a standard INQUIRY, If the code is recognised then the
+corresponding string is output. Version descriptors are versions of
+standards and drafts that the device claims to comply with (e.g. SAM,
+SPC, SBC, SAS etc).
+.TP
 -e
 enable (i.e. sets) the Vital Product Data (EVPD) bit (defaults to clear(0)).
-Used in conjunction with the '-o=<vpd_page>' option to specify the VPD page
-to fetch. Support for VPD page 0 (list supported VPD pages) and page
-0x83 (device identification) have been made mandatory in recent SPC-3 drafts.
+Used in conjunction with the '-p=<vpd_page>' option to specify the VPD page
+to fetch. If '-p' is not given then VPD page 0 (list supported VPD pages)
+is assumed. Support for VPD page 0 and page 0x83 (device identification)
+have been made mandatory in recent SPC-3 drafts.
 .TP
 -h
 outputs INQUIRY response in hex rather than trying to decode it. When
@@ -59,20 +69,33 @@ outputs the Device Identification Vital Product Data (VPD) [0x83] page.
 If '-r' is not given then attempts to decode the response which can be made
 up of several "identification descriptors". If '-h' is given then each
 descriptor header is decoded and the identifier itself is output in hex.
-To see the whole VPD 0x83 page response in hex use '-o=83 -h'. Recent SPC-3
+To see the whole VPD 0x83 page response in hex use '-p=83 -h'. Recent SPC-3
 drafts have made support of the device identification VPD page mandatory.
 .TP
--o=<vpd_page>
+-o=<opcode_page>
 used in conjunction with the '-e' or '-c' option. If neither given then
 the '-e' option assumed. When the '-e' option is also given (or assumed)
 then the argument to this option is the VPD page number. The argument
 is interpreted as hexadecimal and is expected to be in the range 0 to ff 
-inclusive. Only VPD page 0 is decoded and lists supported VPD pages. To
-decode the mandatory device identification page (0x83) use the '-i' option.
+inclusive. Only VPD page 0 is decoded and lists supported VPD pages and
+their names (if known). To decode the mandatory device identification
+page (0x83) use the '-i' option.
 A now obsolete usage is when the '-c' option is given in which
 case the argument to this option is assumed to be a command opcode number. 
 Recent SCSI draft standards have moved this facility (see sg_opcodes).
 Defaults to 0 so if '-e' is given without '-o=' then VPD page 0 is output.
+.TP
+-p=<vpd_page>
+same action as '-o=<opcode_page>' option described above. Since the
+opcode value with the CmdDt is now obsolete, the main use of this
+option is to specify the VPD page number. The argument is interpreted as
+hexadecimal and is expected to be in the range 0 to ff inclusive.
+Defaults to 0 so if '-e' is given without '-p=' then VPD page 0 is output.
+.TP
+-P
+outputs the Unit Path Report Vital Product Data (VPD) [0xc0] page,
+which is specific to selected EMC devices. To see the whole VPD 0xc0
+page response in hex use '-o=c0 -h'.
 .TP
 -r
 outputs the INQUIRY response in binary. If the SCSI INQUIRY has failed
@@ -85,6 +108,12 @@ verbose: print out cdb of issued commands prior to execution
 .TP
 -V
 print out version string
+.TP
+-i
+outputs the Extended INQUIRY Vital Product Data (VPD) [0x86] page.
+If '-r' is not given then attempts to decode the response.
+If '-h' is given then prints out VPD page in hex which is similar to
+using '-p=86 -h'.
 .TP
 -36
 only requires 36 bytes of response data for an INQUIRY. Furthermore even
@@ -118,4 +147,4 @@ This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sgdiag(scsirastools), sg_opcodes(sg3_utils), sg_modes(sg3_utils),
-.B sg_logs(sg3_utils)
+.B sg_logs(sg3_utils), blktool(internet)

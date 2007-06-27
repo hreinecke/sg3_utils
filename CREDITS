@@ -22,6 +22,10 @@ Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example
 Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
 	Additions to sginfo and sg_map.
 
+Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
+	page decoding in sg_inq (vendor specific: EMC) and sg_emc_trespass
+        utility
+
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
 Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
@@ -40,4 +44,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-10th July 2004
+19th October 2004

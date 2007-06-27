@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* This program performs a READ_16 command as scsi mid-level support
    16 byte commands from lk 2.4.15
@@ -99,10 +99,10 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     ok = 0;
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         ok = 1;
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error on READ_16, continuing\n");
         ok = 1;
         break;

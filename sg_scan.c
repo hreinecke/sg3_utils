@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <scsi/scsi_ioctl.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -330,8 +330,8 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
     } else {
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
-        case SG_ERR_CAT_CLEAN:
-        case SG_ERR_CAT_RECOVERED:
+        case SG_LIB_CAT_CLEAN:
+        case SG_LIB_CAT_RECOVERED:
             break;
         default: /* won't bother decoding other categories */
             ok = 0;

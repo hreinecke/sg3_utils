@@ -8,10 +8,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* This is a simple program that tests the sense data descriptor format
-   printout function in sg_err.c
+   printout function in sg_lib.c
 
 *  Copyright (C) 2004 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify

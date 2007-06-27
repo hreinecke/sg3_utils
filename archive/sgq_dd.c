@@ -18,7 +18,7 @@
 #include <sys/time.h>
 typedef unsigned char u_char;   /* horrible, for scsi.h */
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
@@ -301,9 +301,9 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
         return -1;
     }
     res = sg_err_category3(&io_hdr);
-    if (SG_ERR_CAT_MEDIA_CHANGED == res)
+    if (SG_LIB_CAT_MEDIA_CHANGED == res)
         return 2; /* probably have another go ... */
-    else if (SG_ERR_CAT_CLEAN != res) {
+    else if (SG_LIB_CAT_CLEAN != res) {
         sg_chk_n_print3("read capacity", &io_hdr);
         return -1;
     }
@@ -522,13 +522,13 @@ int sg_finish_io(int wr, Rq_elem * rep)
     hp = &rep->io_hdr;
 
     switch (sg_err_category3(hp)) {
-        case SG_ERR_CAT_CLEAN:
+        case SG_LIB_CAT_CLEAN:
             break;
-        case SG_ERR_CAT_RECOVERED:
+        case SG_LIB_CAT_RECOVERED:
             fprintf(stderr, "Recovered error on block=%d, num=%d\n",
                     rep->blk, rep->num_blks);
             break;
-        case SG_ERR_CAT_MEDIA_CHANGED:
+        case SG_LIB_CAT_MEDIA_CHANGED:
             return 1;
         default:
             {
@@ -704,43 +704,6 @@ int decider(Rq_coll * clp, int first_xfer, int * req_indexp)
     return QS_IDLE;
 }
 
-int get_num(char * buf)
-{
-    int res, num;
-    char c;
-
-    res = sscanf(buf, "%d%c", &num, &c);
-    if (0 == res)
-        return -1;
-    else if (1 == res)
-        return num;
-    else {
-        switch (c) {
-        case 'c':
-        case 'C':
-            return num;
-        case 'b':
-        case 'B':
-            return num * 512;
-        case 'k':
-            return num * 1024;
-        case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
-        case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
-        case 'G':
-            return num * 1000000000;
-        default:
-            fprintf(stderr, "unrecognized multiplier\n");
-            return -1;
-        }
-    }
-}
-
 
 int main(int argc, char * argv[])
 {
@@ -790,31 +753,31 @@ int main(int argc, char * argv[])
         else if (strcmp(key,"of") == 0)
             strncpy(outf, buf, INOUTF_SZ);
         else if (0 == strcmp(key,"ibs"))
-            ibs = get_num(buf);
+            ibs = sg_get_num(buf);
         else if (0 == strcmp(key,"obs"))
-            obs = get_num(buf);
+            obs = sg_get_num(buf);
         else if (0 == strcmp(key,"bs"))
-            rcoll.bs = get_num(buf);
+            rcoll.bs = sg_get_num(buf);
         else if (0 == strcmp(key,"bpt"))
-            rcoll.bpt = get_num(buf);
+            rcoll.bpt = sg_get_num(buf);
         else if (0 == strcmp(key,"skip"))
-            skip = get_num(buf);
+            skip = sg_get_num(buf);
         else if (0 == strcmp(key,"seek"))
-            seek = get_num(buf);
+            seek = sg_get_num(buf);
         else if (0 == strcmp(key,"count"))
-            dd_count = get_num(buf);
+            dd_count = sg_get_num(buf);
         else if (0 == strcmp(key,"dio"))
-            rcoll.dio = get_num(buf);
+            rcoll.dio = sg_get_num(buf);
         else if (0 == strcmp(key,"thr"))
-            num_threads = get_num(buf);
+            num_threads = sg_get_num(buf);
         else if (0 == strcmp(key,"coe"))
-            rcoll.coe = get_num(buf);
+            rcoll.coe = sg_get_num(buf);
         else if (0 == strcmp(key,"gen"))
-            gen = get_num(buf);
+            gen = sg_get_num(buf);
         else if (0 == strncmp(key,"deb", 3))
-            rcoll.debug = get_num(buf);
+            rcoll.debug = sg_get_num(buf);
         else if (0 == strcmp(key,"time"))
-            do_time = get_num(buf);
+            do_time = sg_get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
             fprintf(stderr, "sgq_dd for sg version 3 driver: %s\n", 
 	    	    version_str);

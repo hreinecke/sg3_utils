@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -90,9 +90,9 @@ int read_capacity(int sg_fd, int * num_sect, int * sect_sz)
         return -1;
     }
     res = sg_err_category3(&io_hdr);
-    if (SG_ERR_CAT_MEDIA_CHANGED == res)
+    if (SG_LIB_CAT_MEDIA_CHANGED == res)
         return 2; /* probably have another go ... */
-    else if (SG_ERR_CAT_CLEAN != res) {
+    else if (SG_LIB_CAT_CLEAN != res) {
         sg_chk_n_print3("read capacity", &io_hdr);
         return -1;
     }
@@ -150,13 +150,13 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, int from_block)
         return -1;
     }
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error while reading block=%d, num=%d\n",
                from_block, blocks);
         break;
-    case SG_ERR_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
         sg_chk_n_print3("reading", &io_hdr);
@@ -211,46 +211,19 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, int to_block)
         return -1;
     }
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error while writing block=%d, num=%d\n",
                to_block, blocks);
         break;
-    case SG_ERR_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
         sg_chk_n_print3("writing", &io_hdr);
         return -1;
     }
     return 0;
-}
-
-int get_num(char * buf)
-{
-    int res, num;
-    char c, cc;
-
-    res = sscanf(buf, "%d%c", &num, &c);
-    if (0 == res)
-        return -1;
-    else if (1 == res)
-        return num;
-    else {
-        cc = (char)toupper(c);
-        if ('B' == cc)
-            return num * 512;
-        else if ('C' == cc)
-            return num;
-        else if ('K' == cc)
-            return num * 1024;
-        else if ('M' == cc)
-            return num * 1024 * 1024;
-        else {
-            printf("unrecognized multiplier\n");
-            return -1;
-        }
-    }
 }
 
 
@@ -303,25 +276,25 @@ int main(int argc, char * argv[])
         else if (strcmp(key,"of") == 0)
             strcpy(outf, buf);
         else if (0 == strcmp(key,"ibs")) {
-            if (BLOCK_SIZE != get_num(buf))
+            if (BLOCK_SIZE != sg_get_num(buf))
                 bs_bad = 1;
         }
         else if (0 == strcmp(key,"obs")) {
-            if (BLOCK_SIZE != get_num(buf))
+            if (BLOCK_SIZE != sg_get_num(buf))
                 bs_bad = 1;
         }
         else if (0 == strcmp(key,"bs")) {
-            if (BLOCK_SIZE != get_num(buf))
+            if (BLOCK_SIZE != sg_get_num(buf))
                 bs_bad = 1;
         }
         else if (0 == strcmp(key,"skip"))
-            skip = get_num(buf);
+            skip = sg_get_num(buf);
         else if (0 == strcmp(key,"seek"))
-            seek = get_num(buf);
+            seek = sg_get_num(buf);
         else if (0 == strcmp(key,"count"))
-            count = get_num(buf);
+            count = sg_get_num(buf);
         else if (0 == strcmp(key,"tq"))
-            tq = get_num(buf);
+            tq = sg_get_num(buf);
         else {
             printf("Unrecognized argument '%s'\n", key);
             usage();

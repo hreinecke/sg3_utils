@@ -12,7 +12,7 @@
 /* This is a simple program executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver.
    There is another variant of this program called "sg_simple1"
-   which includes the sg_err.h header and logic and so has more
+   which includes the sg_lib.h header and logic and so has more
    advanced error processing.
    This version demonstrates the "sg3" interface.
 

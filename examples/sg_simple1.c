@@ -8,12 +8,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* This is a simple program executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver
    There is another variant of this program called "sg_simple2"
-   which does not include the sg_err.h header and logic and so has
+   which does not include the sg_lib.h header and logic and so has
    simpler but more primitive error processing.
 
 *  Copyright (C) 1999 D. Gilbert
@@ -115,10 +115,10 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     ok = 0;
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         ok = 1;
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error on INQUIRY, continuing\n");
         ok = 1;
         break;
@@ -160,10 +160,10 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     ok = 0;
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         ok = 1;
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error on Test Unit Ready, continuing\n");
         ok = 1;
         break;

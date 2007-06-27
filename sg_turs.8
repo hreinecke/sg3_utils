@@ -1,4 +1,4 @@
-.TH SG_TURS "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.TH SG_TURS "8" "SEptember 2004" "sg3_utils-1.09" SG3_UTILS
 .SH NAME
 sg_turs \- executes a user specified number of TEST UNIT READY commands on
 the given device
@@ -17,7 +17,8 @@ returned SCSI status value.
 -n=<num>
 performs TEST UNIT READY "<num>" times. If not given defaults to 1.
 Postfix multipliers "k" (1024), "K" (1000), "m" (1048576) or "M" (1000000)
-may be applied to "<num>".
+may be applied to "<num>". Alternatively a hex number may
+be given, prefixed by either 0x or 0X.
 .TP
 -t
 after completing the requested number of TEST UNIT READY commands, outputs

@@ -1,4 +1,4 @@
-.TH SG_READ "8" "February 2002" "sg3_utils-0.98" SG3_UTILS
+.TH SG_READ "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
 .SH NAME
 sg_read \- read blocks of data continually from same offset
 .SH SYNOPSIS
@@ -61,7 +61,8 @@ for more information about binding raw devices.
 .PP
 BYTES and BLOCKS may be followed by the following multiplicative suffixes:
 c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
-g *1,073,741,824; and G *1,000,000,000
+g *1,073,741,824; and G *1,000,000,000 . Alternatively a hex number may
+be given, prefixed by either 0x or 0X.
 .PP
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
@@ -83,7 +84,7 @@ This command will continually read 128 512 byte blocks from block 0.
 The "128" is the default value for "bpt" while "block 0" is chosen 
 because the "skip" argument was not given. This will continue until 
 1,000,000 blocks are read. The idea behind using "time=2" is that the 
-first 64 KB read operation will involve reading the magnetic media
+first 64 KiB read operation will involve reading the magnetic media
 while the remaining read operations will "hit" the disk's cache. The 
 output of thid command will look like this:
 .PP

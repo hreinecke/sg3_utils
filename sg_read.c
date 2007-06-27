@@ -1,4 +1,5 @@
 #define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -16,11 +17,11 @@
 #include <sys/time.h>
 #include <linux/major.h> 
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2003 D. Gilbert
+*  Copyright (C) 2001 - 2004 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -39,7 +40,7 @@
 
    The "bpt" (blocks per transfer) argument controls the maximum number
    of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16KB
+   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
    in this case) is read from the sg device in a single SCSI command.
 
    This version should compile with Linux sg drivers with version numbers
@@ -47,7 +48,7 @@
 
 */
 
-static const char * version_str = "0.99 20040708";
+static const char * version_str = "1.01 20041011";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -155,7 +156,7 @@ void usage()
            "(def=512)\n"
            " 'skip' each transfer starts at this logical address (def=0)\n"
            " 'count' total bytes read will be 'bs'*'count' (if no error)\n"
-           " 'bpt' is blocks_per_transfer (default is 128, or 64KB for "
+           " 'bpt' is blocks_per_transfer (default is 128, or 64 KiB for "
            "def 'bs')\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
            " 'mmap' is mmap-ed IO, 1->perform, 0->indirect IO (def)\n"
@@ -278,13 +279,13 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
     }
 
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         fprintf(stderr, "Recovered error while reading block=%d, num=%d\n",
                from_block, blocks);
         break;
-    case SG_ERR_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
         sg_chk_n_print3("reading", &io_hdr);
@@ -298,43 +299,6 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
     fprintf(stderr, "duration=%u ms\n", io_hdr.duration);
 #endif
     return 0;
-}
-
-int get_num(char * buf)
-{
-    int res, num;
-    char c;
-
-    res = sscanf(buf, "%d%c", &num, &c);
-    if (1 == res)
-        return num;
-    else if (2 != res)
-        return -1;
-    else {
-        switch (c) {
-        case 'c':
-        case 'C':
-            return num;
-        case 'b':
-        case 'B':
-            return num * 512;
-        case 'k':
-            return num * 1024;
-        case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
-        case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
-        case 'G':
-            return num * 1000000000;
-        default:
-            fprintf(stderr, "unrecognized multiplier\n");
-            return -1;
-        }
-    }
 }
 
 #define STR_SZ 1024
@@ -387,21 +351,21 @@ int main(int argc, char * argv[])
         if (strcmp(key,"if") == 0)
             strncpy(inf, buf, INF_SZ);
         else if (0 == strcmp(key,"bs"))
-            bs = get_num(buf);
+            bs = sg_get_num(buf);
         else if (0 == strcmp(key,"bpt"))
-            bpt = get_num(buf);
+            bpt = sg_get_num(buf);
         else if (0 == strcmp(key,"skip"))
-            skip = get_num(buf);
+            skip = sg_get_num(buf);
         else if (0 == strcmp(key,"count"))
-            dd_count = get_num(buf);
+            dd_count = sg_get_num(buf);
         else if (0 == strcmp(key,"dio"))
-            do_dio = get_num(buf);
+            do_dio = sg_get_num(buf);
         else if (0 == strcmp(key,"mmap"))
-            do_mmap = get_num(buf);
+            do_mmap = sg_get_num(buf);
         else if (0 == strcmp(key,"time"))
-            do_time = get_num(buf);
+            do_time = sg_get_num(buf);
         else if (0 == strcmp(key,"cdbsz"))
-            scsi_cdbsz = get_num(buf);
+            scsi_cdbsz = sg_get_num(buf);
         else {
             fprintf(stderr, "Unrecognized argument '%s'\n", key);
             usage();
