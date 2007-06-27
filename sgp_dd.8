@@ -1,16 +1,16 @@
-.TH SGP_DD "8" "July 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SGP_DD "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sgp_dd \- copies data to and from files and devices. Specialised for
+sgp_dd \- copies data to and from files and devices. Specialized for
 devices that understand the SCSI command set.
 .SH SYNOPSIS
 .B sgp_dd
-[\fIbs=<n>\fR] [\fIcount=<n>\fR] [\fIibs=<n>\fR] [\fIif=<ifile>\fR]
-[\fIiflag=<flags>\fR] [\fIobs=<n>\fR] [\fIof=<ofile>\fR]
-[\fIoflag=<flags>\fR] [\fIseek=<n>\fR] [\fIskip=<n>\fR]
-[\fI--help\fR] [\fI--version\fR]
+[\fIbs=BS\fR] [\fIcount=COUNT\fR] [\fIibs=BS\fR] [\fIif=IFILE\fR]
+[\fIiflag=FLAGS\fR] [\fIobs=BS\fR] [\fIof=OFILE\fR] [\fIoflag=FLAGS\fR]
+[\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR] [\fI\-\-version\fR]
 .PP
-[\fIbpt=<n>\fR] [\fIcdbsz=6|10|12|16\fR] [\fIdeb=<n>\fR] [\fIdio=0|1\fR]
-[\fIsync=0|1\fR] [\fIthr=<n>\fR] [\fItime=0|1\fR] [\fIverbose=<n>\fR]
+[\fIbpt=BPT\fR] [\fIcoe=\fR0|1] [\fIcdbsz=\fR6|10|12|16] [\fIdeb=VERB\fR]
+[\fIdio=\fR0|1] [\fIsync=\fR0|1] [\fIthr=THR\fR] [\fItime=\fR0|1]
+[\fIverbose=VERB\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -22,129 +22,137 @@ the amount of parallelism. This improves speed in some cases.
 .PP
 The first group in the synopsis above are "standard" Unix
 .B dd(1)
-arguments. The second group are extra arguments added by this utility.
+operands. The second group are extra options added by this utility.
 Both groups are defined below.
+.SH OPTIONS
 .TP
-bpt=BLOCKS
-each IO transaction will be made using this number of blocks (or less if
-near the end of count). Default is 128 for block sizes less that 2048
+\fBbpt\fR=\fIBPT\fR
+each IO transaction will be made using \fIBPT\fR blocks (or less if
+near the end of the copy). Default is 128 for block sizes less that 2048
 bytes, otherwise the default is 32. So for bs=512 the reads and writes
 will each convey 64 KiB of data by default (less if near the end of the
 transfer or memory restrictions). When cd/dvd drives are accessed, the
 block size is typically 2048 bytes and bpt defaults to 32 which again
 implies 64 KiB transfers.
 .TP
-bs=BYTES
-this 
-.B must 
+\fBbs\fR=\fIBS\fR
+where \fIBS\fR
+.B must
 be the block size of the physical device. Note that this differs from
 .B dd(1) 
 which permits 'bs' to be an integral multiple of the actual device block
 size. Default is 512 which is usually correct for disks but incorrect for
 cdroms (which normally have 2048 byte blocks).
 .TP
-cdbsz=6 | 10 | 12 | 16
+\fBcdbsz\fR=6 | 10 | 12 | 16
 size of SCSI READ and/or WRITE commands issued on sg device names.
 Default is 10 byte SCSI command blocks (unless calculations indicate
 that a 4 byte block number may be exceeded, in which case it defaults
 to 16 byte SCSI commands).
 .TP
-count=BLOCKS
-copy this number of blocks from 'if' to 'of'. Default is the minimum (
-of 'if' and 'of') number of blocks that sg devices return from READ
-CAPACITY SCSI commands or that block devices (or their partitions) report.
-Normal files are not probed for their size. If 'skip'
-or 'seek' are given and the count is deduced (i.e. not explicitly given)
-then that count is scaled back so that the copy will not overrun the
-device. If the file name is a block device partition and count is not given
-then the size of the partition rather than the size of the whole device is
-used. If count is not given and cannot be deduced then an error message
-is issued and no copy takes place.
+\fBcoe\fR=0 | 1 
+set to 1 for continue on error. Only applies to errors on sg devices.
+Thus errors on other files will stop sgp_dd. Default is 0 which
+implies stop on any error. See the 'coe' flag for more information.
 .TP
-deb=NUM
-outputs debug information. If NUM is 0 (default) then none and as NUM
-increases so does the amount of debug (max debug output when NUM is 9)
+\fBcount\fR=\fICOUNT\fR
+copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the
+minimum (of \fIIFILE\fR and \fIOFILE\fR) number of blocks that sg devices
+report from SCSI READ CAPACITY commands or that block devices (or their
+partitions) report. Normal files are not probed for their size. If
+\fIskip=SKIP\fR or \fIskip=SEEK\fR are given and the count is deduced (i.e.
+not explicitly given) then that count is scaled back so that the copy will
+not overrun the device. If the file name is a block device partition and
+\fICOUNT\fR is not given then the size of the partition rather than the
+size of the whole device is used. If \fICOUNT\fR is not given and cannot be
+deduced then an error message is issued and no copy takes place.
 .TP
-dio=0 | 1
+\fBdeb\fR=\fIVERB\fR
+outputs debug information. If \fIVERB\fR is 0 (default) then there is
+minimal debug information and as \fIVERB\fR increases so does the amount
+of debug (max debug output when \fIVERB\fR is 9).
+.TP
+\fBdio\fR=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
 at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
-ibs=BYTES
-if given must be the same value as 'bs'.
+\fBibs\fR=\fIBS\fR
+if given must be the same as \fIBS\fR given to 'bs=' option.
 .TP
-if=FILE
-read from FILE instead of stdin. A file name of - is taken to be stdin.
-Starts reading at the beginning of FILE unless 'skip=<n>' is given.
+\fBif\fR=\fIIFILE\fR
+read from \fIIFILE\fR instead of stdin. If \fIIFILE\fR is '\-' then stdin
+is read. Starts reading at the beginning of \fIIFILE\fR unless \fISKIP\fR
+is given.
 .TP
-iflag=FLAGS
-where FLAGS is a comma separated list of one or more flags outlined below.
-These flags are associated with <ifile> and are ignored when <ifile> is
-stdin.
+\fBiflag\fR=\fIFLAGS\fR
+where \fIFLAGS\fR is a comma separated list of one or more flags outlined
+below.  These flags are associated with \fIIFILE\fR and are ignored when
+\fIIFILE\fR is stdin.
 .TP
-obs=BYTES
-if given must be the same as 'bs'.
+\fBobs\fR=\fIBS\fR
+if given must be the same as \fIBS\fR given to 'bs=' option.
 .TP
-of=FILE
-write to FILE instead of stdout. A file name of - is taken to be stdout.
-If FILE is /dev/null then no actual writes are performed. If FILE is .
-(period) then it is treated the same way as /dev/null (this is a
-shorthand notation). Starts (over-)writing at the beginning of FILE
-unless either 'seek=<n>' or 'oflag=append' is given (it is not permitted
-to give both).
+\fBof\fR=\fIOFILE\fR
+write to \fIOFILE\fR instead of stdout. If \fIOFILE\fR is '\-' then writes
+to stdout.  If \fIOFILE\fR is /dev/null then no actual writes are performed.
+If \fIOFILE\fR is '.' (period) then it is treated the same way as
+/dev/null (this is a shorthand notation). If \fIOFILE\fR exists then it
+is _not_ truncated; it is overwritten from the start of \fIOFILE\fR
+unless 'oflag=append' or \fISEEK\fR is given.
 .TP
-oflag=FLAGS
-where FLAGS is a comma separated list of one or more flags outlined below.
-These flags are associated with <ofile> and are ignored when <ofile>
-is /dev/null, . (period), or stdout.
+\fBoflag\fR=\fIFLAGS\fR
+where \fIFLAGS\fR is a comma separated list of one or more flags outlined
+below.  These flags are associated with \fIOFILE\fR and are ignored when
+\fIOFILE\fR is /dev/null, '.' (period), or stdout.
 .TP
-seek=BLOCKS
-start writing BLOCKS bs-sized blocks from the start of the output file.
+\fBseek\fR=\fISEEK\fR
+start writing \fISEEK\fR bs\-sized blocks from the start of \fIOFILE\fR.
 Default is block 0 (i.e. start of file).
 .TP
-skip=BLOCKS
-start reading BLOCKS bs-sized blocks from the start of input file.
+\fBskip\fR=\fISKIP\fR
+start reading \fISKIP\fR bs\-sized blocks from the start of \fIIFILE\fR.
 Default is block 0 (i.e. start of file).
 .TP
-sync=0 | 1
-when 1, does SYNCHRONIZE CACHE command on 'of' at the end of the transfer.
-Only active when 'of' is a sg device file name
+\fBsync\fR=0 | 1
+when 1, does SYNCHRONIZE CACHE command on \fIOFILE\fR at the end of the
+transfer. Only active when \fIOFILE\fR is a sg device file name.
 .TP
-thr=NUM
-this is the number or worker threads (default 4) that attempt to
-copy in parallel. Minimum is 0 and maximum is 16
+\fBthr\fR=\fITHR\fR
+where \fITHR\fR is the number or worker threads (default 4) that attempt to
+copy in parallel. Minimum is 1 and maximum is 16.
 .TP
-time=0 | 1
+\fBtime\fR=0 | 1
 when 1, the transfer is timed and throughput calculation is
 performed, outputting the results (to stderr) at completion. When
 0 (default) no timing is performed.
 .TP
-verbose=NUM
-increase verbosity. Same as 'deb=NUM'. Added for compatibility with
+\fBverbose\fR=\fIVERB\fR
+increase verbosity. Same as \fIdeb=VERB\fR. Added for compatibility with
 sg_dd and sgm_dd.
 .TP
---help
-outputs usage message and exits
+\fB\-\-help\fR
+outputs usage message and exits.
 .TP
---version
-outputs version number information and exits
+\fB\-\-version\fR
+outputs version number information and exits.
 .SH FLAGS
 Here is a list of flags and their meanings:
 .TP
 append
-causes the O_APPEND flag to be added to the open of <ofile>. For normal
+causes the O_APPEND flag to be added to the open of \fIOFILE\fR. For normal
 files this will lead to data appended to the end of any existing data.
-Cannot be used together with the 'seek=<n>' option as they conflict.
+Cannot be used together with the \fIseek=SEEK\fR option as they conflict.
 The default action of this utility is to overwrite any existing data
-from the beginning of the file or, if 'seek=<n>' is given, starting at
-block <n>. Note that attempting to "append" to a device file will
-usually be ignored or may cause an error to be reported.
+from the beginning of the file or, if \fISEEK\fR is given, starting at
+block \fISEEK\fR. Note that attempting to 'append' to a device file (e.g.
+a disk) will usually be ignored or may cause an error to be reported.
 .TP
 coe
 continue on error. When given with 'iflag=', an error that is detected
 in a single SCSI command (typically 'bpt' blocks) is noted (by an error
-message sent to stderr), then zeroes are substituted into the buffer
+message sent to stderr), then zeros are substituted into the buffer
 for the corresponding write operation and the copy continues. Note that the 
 .B sg_dd
 utility is more sophisticated in such error situations when 'iflag=coe'.
@@ -152,30 +160,32 @@ When given with 'oflag=', any error reported by a SCSI WRITE command is
 reported to stderr and the copy continues (as if nothing went wrong).
 .TP
 direct
-causes the O_DIRECT flag to be added to the open of <ifile> and/or <ofile>.
-This flag requires some memory alignment on IO. Hence user memory buffers
-are aligned to the page size. Has no effect on sg, normal or raw files.
+causes the O_DIRECT flag to be added to the open of \fIIFILE\fR and/or
+\fIOFILE\fR. This flag requires some memory alignment on IO. Hence user
+memory buffers are aligned to the page size. Has no effect on sg, normal
+or raw files.
 .TP
 dpo
-set the DPO bit (disable page out) in READ and WRITE SCSI commands. Not
+set the DPO bit (disable page out) in SCSI READ and WRITE commands. Not
 supported for 6 byte cdb variants of READ and WRITE. Indicates that
 data is unlikely to be required to stay in device (e.g. disk) cache.
 May speed media copy and/or cause a media copy to have less impact
 on other device users.
 .TP
 dsync
-causes the O_SYNC flag to be added to the open of <ifile> and/or <ofile>.
-The "d" is prepended to lower confusion with the 'sync=0|1' option which
-has another action (i.e. a synchronisation to media at the end of the
-transfer).
+causes the O_SYNC flag to be added to the open of \fIIFILE\fR and/or
+\fIOFILE\fR. The 'd' is prepended to lower confusion with the 'sync=0|1'
+option which has another action (i.e. a synchronisation to media at the
+end of the transfer).
 .TP
 excl
-causes the O_EXCL flag to be added to the open of <ifile> and/or <ofile>.
+causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
+\fIOFILE\fR.
 .TP
 fua
-causes the FUA (force unit access) bit to be set in READ and/or WRITE
-SCSI commands. This only has effect with sg devices. The 6 byte variants
-of the READ and WRITE SCSI commands do not support the FUA bit.
+causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
+commands. This only has effect with sg devices. The 6 byte variants
+of the SCSI READ and WRITE commands do not support the FUA bit.
 Only active for sg device file names.
 .SH RETIRED OPTIONS
 Here are some retired options that are still present:
@@ -188,10 +198,11 @@ above.  Similar to 'conv=noerror' in
 utility. Default is 0 which implies stop on error. More advanced
 coe=1 processing on reads is performed by the sg_dd utility.
 .TP
+.TP
 fua=0 | 1 | 2 | 3
-force unit access bit. When 3, fua is set on both 'if' and 'of'; when 2, fua
-is set on 'if'; when 1, fua is set on 'of'; when 0 (default), fua is cleared
-on both. See the 'fua' flag.
+force unit access bit. When 3, fua is set on both \fIIFILE\fR and
+\fIOFILE\fR; when 2, fua is set on \fIIFILE\fR;, when 1, fua is set on
+\fIOFILE\fR; when 0 (default), fua is cleared on both. See the 'fua' flag.
 .SH NOTES
 A raw device must be bound to a block device prior to using sgp_dd.
 See
@@ -202,23 +213,24 @@ before use.
 .PP
 Raw device partition information can often be found with
 .B fdisk(8)
-[the "-ul" argument is useful in this respect].
+[the "\-ul" argument is useful in this respect].
 .PP
-BYTES and BLOCKS may be followed by one of these multiplicative suffixes:
+\fICOUNT\fR, \fISKIP\fR, \fISEEK\fR, \fIBPT\fR and \fIBS\fR may include one
+of these multiplicative suffixes:
 c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
 MB *1,000,000 . This pattern continues for "G", "T" and "P". The latter two
-suffixes can only be used for count, skip and seek values). Also a suffix of
-the form "x<n>" multiplies the leading number by <n>. These multiplicative
-suffixes are compatible with GNU's dd command (since 2002) which claims
-compliance with SI and with IEC 60027-2.
+suffixes can only be used for \fICOUNT\fR, \fISKIP\fR and \fISEEK\fR.
+Also a suffix of the form "x<n>" multiplies the leading number by <n>.
+These multiplicative suffixes are compatible with GNU's dd command (since
+2002) which claims compliance with SI and with IEC 60027\-2.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X". When hex numbers are given, multipliers cannot be
 used.
 .PP
-The count, skip and seek parameters can take 64 bit values (i.e. very
-big numbers). Other values are limited to what can fit in a signed
-32 bit number.
+The \fICOUNT\fR, \fISKIP\fR and \fISEEK\fR arguments can take 64 bit
+values (i.e. very big numbers). Other values are limited to what can fit in
+a signed 32 bit number.
 .PP
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
@@ -289,12 +301,12 @@ Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2006 Douglas Gilbert
+Copyright \(co 2000\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-A simpler, non-threaded version of this utility but with more
+A simpler, non\-threaded version of this utility but with more
 advanced "continue on error" logic is called
 .B sg_dd
 and is also found in the sg3_utils package. The lmbench package contains

@@ -1,5 +1,7 @@
 #define _XOPEN_SOURCE 500
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE     /* resolves u_char typedef in scsi/scsi.h [lk 2.4] */
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -21,12 +23,11 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
-#include "llseek.h"
 
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2006 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2007 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -50,7 +51,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.56 20061012";
+static char * version_str = "5.60 20070124";
 
 #define ME "sg_dd: "
 
@@ -103,6 +104,7 @@ static char * version_str = "5.56 20061012";
 #define MIN_RESERVED_SIZE 8192
 
 #define MAX_UNIT_ATTENTIONS 10
+#define MAX_ABORTED_CMDS 256
 
 static int sum_of_resids = 0;
 
@@ -123,6 +125,7 @@ static int start_tm_valid = 0;
 static struct timeval start_tm;
 static int blk_sz = 0;
 static int max_uas = MAX_UNIT_ATTENTIONS;
+static int max_aborted = MAX_ABORTED_CMDS;
 static int coe_limit = 0;
 static int coe_count = 0;
 
@@ -253,55 +256,65 @@ static char * dd_filetype_str(int ft, char * buff)
 static void usage()
 {
     fprintf(stderr, "Usage: "
-           "sg_dd  [bs=<n>] [count=<n>] [ibs=<n>] [if=<ifile>]"
-           " [iflag=<flags>]\n"
-           "              [obs=<n>] [of=<ofile>] [oflag=<flags>]"
-           "[seek=<n>] [skip=<n>]\n"
+           "sg_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
+           " [iflag=FLAGS]\n"
+           "              [obs=BS] [of=OFILE] [oflag=FLAGS] "
+           "[seek=SEEK] [skip=SKIP]\n"
            "              [--help] [--version]\n\n"
-           "              [append=0|1] [blk_sgio=0|1] [bpt=<n>]"
-           " [cdbsz=6|10|12|16]\n"
-           "              [coe=0|1|2|3] [coe_limit=<n>] [dio=0|1] "
-           "[fua=0|1|2|3]\n"
-           "              [odir=0|1] [sync=0|1] [time=0|1] [verbose=<n>]\n"
-           " where:\n"
-           "  append  1->append output to normal <ofile>, (default is 0)\n"
-           "  blk_sgio  0->block device use normal I/O(def), 1->use SG_IO\n"
-           "  bpt     is blocks_per_transfer (default is 128 or 32 when bs="
-           "2048)\n"
-           "  bs      block size (default is 512)\n");
+           "              [blk_sgio=0|1] [bpt=BPT] [cdbsz=6|10|12|16] "
+           "[coe=0|1|2|3]\n"
+           "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
+           "[retries=RETR] [sync=0|1]\n"
+           "              [time=0|1] [verbose=VERB]\n"
+           "  where:\n"
+           "    blk_sgio    0->block device use normal I/O(def), 1->use "
+           "SG_IO\n"
+           "    bpt         is blocks_per_transfer (default is 128 or 32 "
+           "when BS>=2048)\n"
+           "    bs          block size (default is 512)\n");
     fprintf(stderr,
-           "  cdbsz   size of SCSI READ or WRITE command (default is 10)\n"
-           "  coe     0->exit on error (def), 1->continue on sg error (zero\n"
-           "          fill), 2->also try read_long on unrecovered reads,\n"
-           "          3->and set the CORRCT bit on the read long\n"
-           "  coe_limit   limit when reading of consecutive 'bad' blocks "
-           "allowed\n"
-           "              when 'coe > 0' (default: 0 which is no limit)\n"
-           "  dio     for direct IO, 1->attempt, 0->indirect IO (def)\n"
-           "  fua     force unit access: 0->don't(def), 1->of, 2->if, "
-           "3->of+if\n"
-           "  ibs     input block size (if given must be same as 'bs')\n"
-           "  if      file or device to read from (def stdin)\n"
-           "  iflag   comma separated list from: [coe,direct,dpo,dsync,excl,"
-           "fua,sgio]\n"
-           "  obs     output block size (if given must be same as 'bs')\n"
-           "  odir    1->use O_DIRECT when opening block dev, 0->don't(def)\n"
-           "  of      file or device to write to (def stdout), name '.' "
-           "translated\n");
+           "    cdbsz       size of SCSI READ or WRITE cdb (default is "
+           "10)\n"
+           "    coe         0->exit on error (def), 1->continue on sg "
+           "error (zero\n"
+           "                fill), 2->also try read_long on unrecovered "
+           "reads,\n"
+           "                3->and set the CORRCT bit on the read long\n"
+           "    coe_limit   limit consecutive 'bad' blocks on reads to CL "
+           "times\n"
+           "                when COE>1 (default: 0 which is no limit)\n"
+           "    count       number of blocks to copy (def: device size)\n"
+           "    dio         for direct IO, 1->attempt, 0->indirect IO (def)\n"
+           "    ibs         input block size (if given must be same as "
+           "'bs=')\n"
+           "    if          file or device to read from (def: stdin)\n"
+           "    iflag       comma separated list from: [coe,direct,dpo,"
+           "dsync,excl,fua,\n"
+           "                sgio]\n"
+           "    obs         output block size (if given must be same as "
+           "'bs=')\n"
+           "    odir        1->use O_DIRECT when opening block dev, "
+           "0->don't(def)\n"
+           "    of          file or device to write to (def: stdout), "
+           "OFILE of '.'\n");
     fprintf(stderr,
-           "          to /dev/null\n"
-           "  oflag   comma separated list from: [append,coe,direct,dpo,"
-           "dsync,excl,\n"
-           "          fua,sgio]\n"
-           "  retries number of times to retry sgio errors (def: 0)\n"
-           "  seek    block position to start writing to 'of'\n"
-           "  skip    block position to start reading from 'if'\n"
-           "  sync    0->no sync(def), 1->SYNCHRONIZE CACHE after "
-           "xfer\n"
-           "  time    0->no timing(def), 1->time plus calculate throughput\n"
-           "  verbose    0->quiet(def), 1->some noise, 2->more noise, etc\n"
-           "  --help     print out this usage message then exit\n"
-           "  --version  print version information then exit\n");
+           "                treated as /dev/null\n"
+           "    oflag       comma separated list from: [append,coe,direct"
+           ",dpo,dsync,excl,\n"
+           "                fua,sgio]\n"
+           "    retries     retry sgio errors RETR times (def: 0)\n"
+           "    seek        block position to start writing to OFILE\n"
+           "    skip        block position to start reading from IFILE\n"
+           "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on "
+           "OFILE after copy\n"
+           "    time        0->no timing(def), 1->time plus calculate "
+           "throughput\n"
+           "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
+           "etc\n"
+           "    --help      print out this usage message then exit\n"
+           "    --version   print version information then exit\n\n"
+           "copy from IFILE to OFILE, similar to dd command; "
+           "specialized for SCSI devices\n");
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
@@ -626,14 +639,20 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             fprintf(stderr, "Device (r) not ready\n");
             return res;
         case SG_LIB_CAT_ABORTED_COMMAND:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            if (--max_uas > 0) {
-                fprintf(stderr, "Unit attention or aborted command, "
-                        "continuing (r)\n");
+            if (--max_aborted > 0) {
+                fprintf(stderr, "Aborted command, continuing (r)\n");
                 repeat = 1;
             } else {
-                fprintf(stderr, "Unit attention or aborted command, "
-                        "too many (r)\n");
+                fprintf(stderr, "Aborted command, too many (r)\n");
+                return res;
+            }
+            break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            if (--max_uas > 0) {
+                fprintf(stderr, "Unit attention, continuing (r)\n");
+                repeat = 1;
+            } else {
+                fprintf(stderr, "Unit attention, too many (r)\n");
                 return res;
             }
             break;
@@ -739,7 +758,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             unsigned char * buffp;
             int offset, nl, r, ok, corrct;
 
-            buffp = malloc(bs * 2);
+            buffp = (unsigned char*)malloc(bs * 2);
             if (NULL == buffp) {
                 fprintf(stderr, ">> heap problems\n");
                 return -1;
@@ -915,8 +934,7 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
             fprintf(stderr, ">> ignored errors for out blk=%lld for "
                     "%d bytes\n", to_block, bs * blocks);
             return 0; /* fudge success */
-        }
-        else
+        } else
             return res;
     }
     if (diop && *diop && 
@@ -929,8 +947,10 @@ static void calc_duration_throughput(int contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
+    long long blks;
 
     if (start_tm_valid && (start_tm.tv_sec || start_tm.tv_usec)) {
+        blks = (in_full > out_full) ? in_full : out_full;
         gettimeofday(&end_tm, NULL);
         res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
         res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
@@ -940,7 +960,7 @@ static void calc_duration_throughput(int contin)
         }
         a = res_tm.tv_sec;
         a += (0.000001 * res_tm.tv_usec);
-        b = (double)blk_sz * (req_count - dd_count);
+        b = (double)blk_sz * blks;
         fprintf(stderr, "time to transfer data%s: %d.%06d secs",
                 (contin ? " so far" : ""), (int)res_tm.tv_sec,
                 (int)res_tm.tv_usec);
@@ -1032,7 +1052,7 @@ int main(int argc, char * argv[])
     oflag.cdbsz = DEF_SCSI_CDBSZ;
     if (argc < 2) {
         fprintf(stderr, 
-                "Can't have both 'if' as stdin _and_ 'of' as stdout\n");
+                "Won't default both IFILE to stdin _and_ OFILE to stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -1041,8 +1061,7 @@ int main(int argc, char * argv[])
         if (argv[k]) {
             strncpy(str, argv[k], STR_SZ);
             str[STR_SZ - 1] = '\0';
-        }
-        else
+        } else
             continue;
         for (key = str, buf = key; *buf && *buf != '=';)
             buf++;
@@ -1057,14 +1076,14 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key, "bpt")) {
             bpt = sg_get_num(buf);
             if (-1 == bpt) {
-                fprintf(stderr, ME "bad argument to 'bpt'\n");
+                fprintf(stderr, ME "bad argument to 'bpt='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             bpt_given = 1;
         } else if (0 == strcmp(key, "bs")) {
             blk_sz = sg_get_num(buf);
             if (-1 == blk_sz) {
-                fprintf(stderr, ME "bad argument to 'bs'\n");
+                fprintf(stderr, ME "bad argument to 'bs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "cdbsz")) {
@@ -1077,13 +1096,13 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key, "coe_limit")) {
             coe_limit = sg_get_num(buf);
             if (-1 == coe_limit) {
-                fprintf(stderr, ME "bad argument to 'coe_limit'\n");
+                fprintf(stderr, ME "bad argument to 'coe_limit='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "count")) {
             dd_count = sg_get_llnum(buf);
             if (-1LL == dd_count) {
-                fprintf(stderr, ME "bad argument to 'count'\n");
+                fprintf(stderr, ME "bad argument to 'count='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "dio"))
@@ -1096,13 +1115,13 @@ int main(int argc, char * argv[])
             ibs = sg_get_num(buf);
         else if (strcmp(key, "if") == 0) {
             if ('\0' != inf[0]) {
-                fprintf(stderr, "Second 'if=' argument??\n");
+                fprintf(stderr, "Second IFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else 
                 strncpy(inf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &iflag)) {
-                fprintf(stderr, ME "bad argument to 'iflag'\n");
+                fprintf(stderr, ME "bad argument to 'iflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "obs"))
@@ -1112,32 +1131,32 @@ int main(int argc, char * argv[])
             oflag.direct = iflag.direct;
         } else if (strcmp(key, "of") == 0) {
             if ('\0' != outf[0]) {
-                fprintf(stderr, "Second 'of=' argument??\n");
+                fprintf(stderr, "Second OFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else 
                 strncpy(outf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oflag)) {
-                fprintf(stderr, ME "bad argument to 'oflag'\n");
+                fprintf(stderr, ME "bad argument to 'oflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "retries")) {
             iflag.retries = sg_get_num(buf);
             oflag.retries = iflag.retries;
             if (-1 == iflag.retries) {
-                fprintf(stderr, ME "bad argument to 'retries'\n");
+                fprintf(stderr, ME "bad argument to 'retries='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "seek")) {
             seek = sg_get_llnum(buf);
             if (-1LL == seek) {
-                fprintf(stderr, ME "bad argument to 'seek'\n");
+                fprintf(stderr, ME "bad argument to 'seek='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "skip")) {
             skip = sg_get_llnum(buf);
             if (-1LL == skip) {
-                fprintf(stderr, ME "bad argument to 'skip'\n");
+                fprintf(stderr, ME "bad argument to 'skip='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "sync"))
@@ -1258,8 +1277,7 @@ int main(int argc, char * argv[])
                     return SG_LIB_FILE_ERROR;
                 }
             }
-        }
-        else {
+        } else {
             flags = O_RDONLY;
             if (iflag.direct)
                 flags |= O_DIRECT;
@@ -1273,24 +1291,24 @@ int main(int argc, char * argv[])
                          ME "could not open %s for reading", inf);
                 perror(ebuff);
                 return SG_LIB_FILE_ERROR;
-            }
-            else {
+            } else {
                 if (verbose)
                     fprintf(stderr, "        open input, flags=0x%x\n",
                             flags);
                 if (skip > 0) {
-                    llse_loff_t offset = skip;
+                    off64_t offset = skip;
 
                     offset *= blk_sz;       /* could exceed 32 bits here! */
-                    if (llse_llseek(infd, offset, SEEK_SET) < 0) {
+                    if (lseek64(infd, offset, SEEK_SET) < 0) {
                         snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
                                  "required position on %s", inf);
                         perror(ebuff);
                         return SG_LIB_FILE_ERROR;
                     }
                     if (verbose)
-                        fprintf(stderr, "  >> skip: llseek SEEK_SET, "
-                                "byte offset=0x%llx\n", offset);
+                        fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
+                                "byte offset=0x%llx\n",
+                                (unsigned long long)offset);
                 }
             }
         }
@@ -1308,8 +1326,7 @@ int main(int argc, char * argv[])
         if (FT_ST & out_type) {
             fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
             return SG_LIB_FILE_ERROR;
-        }
-        else if (FT_SG & out_type) {
+        } else if (FT_SG & out_type) {
             flags = O_RDWR | O_NONBLOCK;
             if (oflag.direct)
                 flags |= O_DIRECT;
@@ -1345,8 +1362,7 @@ int main(int argc, char * argv[])
                     return SG_LIB_FILE_ERROR;
                 }
             }
-        }
-        else if (FT_DEV_NULL & out_type)
+        } else if (FT_DEV_NULL & out_type)
             outfd = -1; /* don't bother opening */
         else {
             if (! (FT_RAW & out_type)) {
@@ -1365,8 +1381,7 @@ int main(int argc, char * argv[])
                     perror(ebuff);
                     return SG_LIB_FILE_ERROR;
                 }
-            }
-            else {
+            } else {
                 flags = O_WRONLY;
                 if (oflag.direct)
                     flags |= O_DIRECT;
@@ -1384,18 +1399,19 @@ int main(int argc, char * argv[])
             if (verbose)
                 fprintf(stderr, "        open output, flags=0x%x\n", flags);
             if (seek > 0) {
-                llse_loff_t offset = seek;
+                off64_t offset = seek;
 
                 offset *= blk_sz;       /* could exceed 32 bits here! */
-                if (llse_llseek(outfd, offset, SEEK_SET) < 0) {
+                if (lseek64(outfd, offset, SEEK_SET) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                         ME "couldn't seek to required position on %s", outf);
                     perror(ebuff);
                     return SG_LIB_FILE_ERROR;
                 }
                 if (verbose)
-                    fprintf(stderr, "   >> seek: llseek SEEK_SET, "
-                            "byte offset=0x%llx\n", offset);
+                    fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
+                            "byte offset=0x%llx\n",
+                            (unsigned long long)offset);
             }
         }
     }
@@ -1496,8 +1512,7 @@ int main(int argc, char * argv[])
                                                            in_num_sect;
                 else
                     dd_count = in_num_sect;
-            }
-            else
+            } else
                 dd_count = out_num_sect;
         }
     }
@@ -1524,16 +1539,15 @@ int main(int argc, char * argv[])
     if (dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
         (FT_RAW & out_type)) {
         size_t psz = getpagesize();
-        wrkBuff = malloc(blk_sz * bpt + psz);
+        wrkBuff = (unsigned char*)malloc(blk_sz * bpt + psz);
         if (0 == wrkBuff) {
             fprintf(stderr, "Not enough user memory for raw\n");
             return SG_LIB_CAT_OTHER;
         }
         wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                                    (~(psz - 1)));
-    }
-    else {
-        wrkBuff = malloc(blk_sz * bpt);
+    } else {
+        wrkBuff = (unsigned char*)malloc(blk_sz * bpt);
         if (0 == wrkBuff) {
             fprintf(stderr, "Not enough user memory\n");
             return SG_LIB_CAT_OTHER;
@@ -1593,8 +1607,7 @@ int main(int argc, char * argv[])
                 if (dio && (0 == dio_tmp))
                     dio_incomplete++;
             }
-        }
-        else {
+        } else {
             while (((res = read(infd, wrkPos, blocks * blk_sz)) < 0) &&
                    (EINTR == errno))
                 ;
@@ -1606,8 +1619,7 @@ int main(int argc, char * argv[])
                 perror(ebuff);
                 ret = -1;
                 break;
-            }
-            else if (res < blocks * blk_sz) {
+            } else if (res < blocks * blk_sz) {
                 dd_count = 0;
                 blocks = res / blk_sz;
                 if ((res % blk_sz) > 0) {
@@ -1656,7 +1668,7 @@ int main(int argc, char * argv[])
                         break;
                     }
                 } else if ((SG_LIB_CAT_ABORTED_COMMAND == ret) && first) {
-                    if (--max_uas > 0)
+                    if (--max_aborted > 0)
                         fprintf(stderr, "Aborted command, continuing (w)\n");
                     else {
                         fprintf(stderr, "Aborted command, too many (w)\n");
@@ -1679,8 +1691,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "sg_write failed,%s seek=%lld\n", 
                         ((-2 == ret) ? " try reducing bpt," : ""), seek);
                 break;
-            }
-            else {
+            } else {
                 out_full += blocks;
                 if (dio && (0 == dio_tmp))
                     dio_incomplete++;
@@ -1699,8 +1710,7 @@ int main(int argc, char * argv[])
                 perror(ebuff);
                 ret = -1;
                 break;
-            }
-            else if (res < blocks * blk_sz) {
+            } else if (res < blocks * blk_sz) {
                 fprintf(stderr, "output file probably full, seek=%lld ", seek);
                 blocks = res / blk_sz;
                 out_full += blocks;
@@ -1708,8 +1718,7 @@ int main(int argc, char * argv[])
                     out_partial++;
                 ret = -1;
                 break;
-            }
-            else
+            } else
                 out_full += blocks;
         }
         if (dd_count > 0)

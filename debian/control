@@ -2,12 +2,12 @@ Source: sg3-utils
 Section: admin
 Priority: optional
 Maintainer: Eric Schwartz (Skif) <emschwar@debian.org>
-Build-Depends: debhelper (>> 4.0.0)
-Standards-Version: 3.6.1
+Build-Depends: debhelper (>> 4.0.0), chrpath, libtool
+Standards-Version: 3.7.2
 
 Package: sg3-utils
 Architecture: any
-Depends: ${shlibs:Depends}, libsgutils1-0
+Depends: ${shlibs:Depends}
 Conflicts: sg-utils, cdwrite
 Replaces: sg-utils
 Description: Collection of Linux utilities for devices that use the
@@ -38,6 +38,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_rbuf - tests SCSI bus speed
      * sg_rdac - vendor specific for RDAC hardware
      * sg_read - reads multiple blocks, useful for timing
+     * sg_read_buffer - READ BUFFER
      * sg_read_long - read a "long" block from the given device
      * sg_readcap - prints the output of a READ CAPACITY command
      * sg_reassign - issues a REASSIGN BLOCKS command (map out bad sectors)
@@ -49,29 +50,31 @@ Description: Collection of Linux utilities for devices that use the
      * sg_scan - displays the SCSI bus on stdout
      * sg_senddiag - runs SCSI self tests
      * sg_ses - fetches status and send control to a SES device
-     * sg_start - spins up (or down) disks and cd/dvds
+     * sg_start - spins up (or down) disks and optical drives
      * sg_sync - issues a SYNCHRONIZE CACHE command
      * sg_test_rwbuf - tests the SCSI host adapter
      * sg_turs - execute a TEST UNIT READY command on the given device
      * sg_verify - issues VERIFY command on SCSI disks
-     * sg_vpd - decode VPD pages
+     * sg_vpd - utility for decoding VPD pages
+     * sg_write_buffer - WRITE BUFFER, may be used to load firmware
      * sg_write_long - write a "long" block to the given device
      * sg_wr_mode - low level utility to change mode pages
  .
  It also includes source code for some example programs that demonstrate
  how to use the scsi generic driver.
 
-Package: libsgutils1-0
-Section: libraries
+Package: libsgutils1
+Section: libs
+Depends: ${shlibs:Depends}
 Architecture: any
 Recommends: sg3-utils
 Description: Utilities for working with generic SCSI devices (shared libraries)
- This package contains the shared libraries.
+ This package contains the shared libraries that allow other programs to use it.
 
-Package: libsgutils1-0-dev
+Package: libsgutils1-dev
 Section: devel
 Architecture: any
-Depends: libsgutils1-0
+Depends: libsgutils1, ${shlibs:Depends}
 Recommends: sg3-utils
 Description: Utilities for working with generic SCSI devices (developer files)
  This package contains the <scsi/sg_cmds.h> , <scsi/sg_lib.h> ,

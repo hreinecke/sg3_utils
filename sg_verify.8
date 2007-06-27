@@ -1,68 +1,67 @@
-.TH SG_VERIFY "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_VERIFY "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
 .B sg_verify
-[\fI--bpc=<n>\fR] [\fI--count=<n>\fR] [\fI--dpo\fR] [\fI--help\fR]
-[\fI--lba=<n>\fR] [\fI--verbose\fR] [\fI--version\fR]
-\fI<scsi_device>\fR
+[\fI\-\-bpc=BPC\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR] [\fI\-\-help\fR]
+[\fI\-\-lba=LBA\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends one or more SCSI VERIFY commands to the given SCSI device.
-It is a 10 byte VERIFY command defined for block devices (see SBC-2
-at http://www.t10.org). Verify starts at the logical block address
-given by the '--lba=<n>' option and continues for '--count=<n>'
-blocks. No more than '--bpc=<n>' blocks are verified by each VERIFY
-command so if necessary multiple VERIFY commands are sent.
-No news is good news (i.e. if there are no verify errors detected
-no messages are sent to stderr and the Unix return status is 0).
+Sends one or more SCSI VERIFY commands to \fIDEVICE\fR. It is the 10 byte
+VERIFY command defined for block devices (see SBC\-2 at http://www.t10.org).
+Verify starts at the logical block address given by the \fI\-\-lba=LBA\fR
+option and continues for \fI\-\-count=COUNT\fR blocks. No more than
+\fI\-\-bpc=BPC\fR blocks are verified by each VERIFY command so if necessary
+multiple VERIFY commands are sent. No news is good news (i.e. if there are
+no verify errors detected no messages are sent to stderr and the Unix return
+status is 0).
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---bpc=<n> | -b <n>
-specifies the maximum number of blocks that will be verified by a
-single SCSI VERIFY command. The default value is 128 blocks which
-equates to 64 KB for a disk with 512 byte blocks. If the value <n>
-is less than the value given to --count then multiple SCSI VERIFY
-commands are sent to the device. For recent block devices (disks)
-this value may be constrained by the maximum transfer length field
-in the block limits VPD page.
+\fB\-b\fR, \fB\-\-bpc\fR=\fIBPC\fR
+where \fIBPC\fR specifies the maximum number of blocks that will be verified
+by a single SCSI VERIFY command. The default value is 128 blocks which
+equates to 64 KB for a disk with 512 byte blocks. If \fIBPC\fR is less than
+\fICOUNT\fR then multiple SCSI VERIFY commands are sent to the device. For
+recent block devices (disks) this value may be constrained by the maximum
+transfer length field in the block limits VPD page.
 .TP
---dpo | -d
-disable page out changes the cache retention priority of blocks read on
-the device's cache to the lowest priority. This means that blocks read by
-other commands are more likely to remain in the device's cache.
-.TP
---count=<n> | -c <n>
-specifies the number of blocks to verify. The default value is 1 .
-If <n> is greater than the value associated with '--bpc' (or its default
-value of 128) then multiple SCSI VERIFY commands are sent to the
-device. The
+\fB\-c\fR, \fB\-\-count\fR=\fICOUNT\fR
+where \fICOUNT\fR specifies the number of blocks to verify. The default value
+is 1 . If \fICOUNT\fR is greater than \fIBPC\fR (or its default value of 128)
+then multiple SCSI VERIFY commands are sent to the device. The
 .B sg_readcap
 utility can be used to find the maximum number of blocks that a block
 device (e.g. a disk) has.
 .TP
---help | -h
+\fB\-d\fR, \fB\-\-dpo\fR
+disable page out changes the cache retention priority of blocks read on
+the device's cache to the lowest priority. This means that blocks read by
+other commands are more likely to remain in the device's cache.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
---lba=<n> | -l <n>
-specifies the logical block address on the device to start the verify
-operation. <n> is assumed to be decimal unless prefixed by '0x' or
-a trailing 'h' (see below). The default value is 0 (i.e. the start of the
-device).
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR specifies the logical block address of the first block to
+start the verify operation. \fILBA\fR is assumed to be decimal unless prefixed
+by '0x' or a trailing 'h' (see below). The default value is 0 (i.e. the start
+of the device).
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
-.PP
-The arguments to --bpc, --count and --lba may be followed by one of these
-multiplicative suffixes:
+.SH NOTES
+The \fIBPC\fR, \fICOUNT\fR and \fILBA\fR arguments may be followed by one of
+these multiplicative suffixes:
 c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
 MB *1,000,000; g G GiB *1,073,741,824; GB *1,000,000,000; t T TiB *(2**40);
 TB *(10**12); p P PiB *(2**50) and PB *(10**15). The "T" and "P" based
-suffixes can only be used for --count and --lba. Also a suffix of the
-form "x<n>" multiplies the leading number by <n>.
+suffixes can only be used for \fICOUNT\fR and \fILBA\fR. Also a suffix of
+the form "x<n>" multiplies the leading number by <n>.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or has a trailing "h" or "H"). When hex numbers are
@@ -70,7 +69,7 @@ given, multipliers cannot be used.
 .PP
 The amount of error correction and the number of retries attempted
 before a block is considered defective are controlled in part by the
-Verify Error Recovery mode page.  A note in the SBC-2 (draft)
+Verify Error Recovery mode page.  A note in the SBC\-2 (draft)
 standard advises that to minimize the number of checks (and hence
 have the most "sensitive" verify check) do the following in that
 mode page. Set the EER bit to 0, the PER bit to 1, the DTE bit to 1,
@@ -86,7 +85,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2006 Douglas Gilbert
+Copyright \(co 2004\-2007 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,3 +1,9 @@
+sg3-utils (1.23-0.1) unstable; urgency=low
+
+  * New upstream version
+
+ -- Doug Gilbert <dgilbert@interlog.com>  Wed, 31 Jan 2007 11:00:00 -0500
+
 sg3-utils (1.22-0.1) unstable; urgency=low
 
   * New upstream version

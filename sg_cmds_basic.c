@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2006 Douglas Gilbert.
+ * Copyright (c) 1999-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,14 +40,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
-#include <sys/ioctl.h>
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
 
-static char * version_str = "1.35 20061012";
+static char * version_str = "1.38 20070124";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -244,7 +242,7 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
         fprintf(sg_warnings_strm, "\n");
     }
     if (resp && (mx_resp_len > 0)) {
-        up = resp;
+        up = (unsigned char *)resp;
         up[0] = 0x7f;   /* defensive prefill */
         if (mx_resp_len > 4)
             up[4] = 0;
@@ -256,7 +254,7 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
     }
     set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -570,7 +568,7 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
     }
     set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "read capacity (16)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -636,7 +634,7 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
     }
     set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "read capacity (10)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -703,7 +701,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "mode sense (6)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -730,7 +728,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    mode sense (6): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -777,7 +775,7 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "mode sense (10)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -804,7 +802,7 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    mode sense (10): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -852,7 +850,7 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "mode select (6)", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
@@ -923,7 +921,7 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "mode select (10)", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1008,7 +1006,7 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other failure.
- * If success_mask pointer is not NULL then zeroes it then sets bit 0, 1,
+ * If success_mask pointer is not NULL then zeros it then sets bit 0, 1,
  * 2 and/or 3 if the current, changeable, default and saved values
  * respectively have been fetched. If error on current page
  * then stops and returns that error; otherwise continues if an error is
@@ -1152,7 +1150,7 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     }
     set_scsi_pt_cdb(ptvp, rsCmdBlk, sizeof(rsCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "request sense", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -1190,7 +1188,8 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
 /* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Luns not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
+ * SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
 int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
                       int mx_resp_len, int noisy, int verbose)
 {
@@ -1221,7 +1220,7 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
     }
     set_scsi_pt_cdb(ptvp, rlCmdBlk, sizeof(rlCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "report luns", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -1232,13 +1231,13 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
         case SG_LIB_CAT_INVALID_OP:
         case SG_LIB_CAT_ILLEGAL_REQ:
         case SG_LIB_CAT_ABORTED_COMMAND:
+        case SG_LIB_CAT_NOT_READY:      /* shouldn't happen ?? */
             ret = sense_cat;
             break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
-        case SG_LIB_CAT_NOT_READY:      /* shouldn't happen ?? */
         default:
             ret = -1;
             break;

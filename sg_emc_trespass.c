@@ -25,7 +25,7 @@
  *  any later version.
  */
 
-static char * version_str = "0.14 20060907";
+static char * version_str = "0.15 20070102";
 
 static int debug = 0;
 
@@ -93,7 +93,7 @@ static int do_trespass(int fd, int hr, int short_cmd)
 void usage ()
 {
         fprintf(stderr, "Usage:  sg_emc_trespass [-d] [-hr] [-s] "
-                        " [-V] <device>\n"
+                        " [-V] DEVICE\n"
                "  Change ownership of a LUN from another SP to this one.\n"
                "  EMC CLARiiON CX-/AX-family + FC5300/FC4500/FC4700.\n"
                "    -d : output debug\n"
@@ -101,7 +101,7 @@ void usage ()
                "    -s : Send Short Trespass Command page (default: long)\n"
                "         (for FC series)\n"
                "    -V: print version string then exit\n"
-               "     <device> sg or block device (latter in lk 2.6.*)\n"
+               "     DEVICE   sg or block device (latter in lk 2.6.*)\n"
                "        Example: sg_emc_trespass /dev/sda\n");
         exit (1);
 }

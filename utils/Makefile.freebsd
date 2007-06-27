@@ -30,7 +30,7 @@ hxascdmp: hxascdmp.o
 	$(LD) -o $@ $(LDFLAGS) $@.o
 
 sg_chk_asc: sg_chk_asc.o ../sg_lib.o
-	$(LD) -o $@ $(LDFLAGS) $@.o sg_lib.o
+	$(LD) -o $@ $(LDFLAGS) $@.o ../sg_lib.o
 
 
 install: $(EXECS)

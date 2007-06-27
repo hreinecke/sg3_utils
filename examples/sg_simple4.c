@@ -97,7 +97,8 @@ int main(int argc, char * argv[])
     
     /* since I know this program will only read from inqBuff then I use
        PROT_READ rather than PROT_READ | PROT_WRITE */
-    inqBuff = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
+    inqBuff = (unsigned char *)mmap(NULL, 8000, PROT_READ | PROT_WRITE,
+                                    MAP_SHARED, sg_fd, 0);
     if (MAP_FAILED == inqBuff) {
         snprintf(ebuff, EBUFF_SZ, "sg_simple4: error using mmap() on "
                  "file: %s", file_name);
@@ -205,7 +206,8 @@ int main(int argc, char * argv[])
     /* could call munmap(inqBuff, INQ_REPLY_LEN) here but following close()
        causes this too happen anyway */
 #if 1
-    inqBuff2 = mmap(NULL, 8000, PROT_READ | PROT_WRITE, MAP_SHARED, sg_fd, 0);
+    inqBuff2 = (unsigned char *)mmap(NULL, 8000, PROT_READ | PROT_WRITE,
+                                     MAP_SHARED, sg_fd, 0);
     if (MAP_FAILED == inqBuff2) {
         snprintf(ebuff, EBUFF_SZ, "sg_simple4: error using mmap() 2 on "
                  "file: %s", file_name);

@@ -1,12 +1,13 @@
-.TH SG_READ "8" "July 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_READ "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_read \- read blocks of data continually from same offset
 .SH SYNOPSIS
 .B sg_read
-[\fIblk_sgio=0|1\fR] [\fIbpt=<n>\fR] [\fIbs=<n>\fR] [\fIcdbsz=6|10|12|16\fR]
-\fIcount=<n>\fR [\fIdio=0|1\fR] [\fIdpo=0|1\fR] [\fIfua=0|1\fR]
-\fIif=<ifile>\fR [\fImmap=0|1\fR] [\fIno_dxfer=0|1\fR] [\fIodir=0|1\fR]
-[\fIskip=<n>\fR] [\fItime=<n>\fR] [\fI--help\fR] [\fI--version\fR]
+[\fIblk_sgio=\fR0|1] [\fIbpt=BPT\fR] [\fIbs=BS\fR] [\fIcdbsz=\fR6|10|12|16]
+\fIcount=COUNT\fR [\fIdio=\fR0|1] [\fIdpo=\fR0|1] [\fIfua=\fR0|1]
+\fIif=IFILE\fR [\fImmap=\fR0|1] [\fIno_dxfer=\fR0|1] [\fIodir=\fR0|1]
+[\fIskip=SKIP\fR] [\fItime=TI\fR] [\fIverbose=VERB\fR] [\fI\-\-help\fR]
+[\fI\-\-version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -16,92 +17,95 @@ logical block address (lba). This can be used to test (or time) disk
 caching, SCSI (or some other) transport throughput, and/or SCSI
 command overhead.
 .PP
-When the 'count' argument is positive, then up to 'bpt' blocks are read
-at a time, until the 'count' is exhausted. Each read operation
-starts at the same lba which, if 'skip' is not given, is the beginning
-of the file or device.
+When the \fICOUNT\fR value is positive, then up to \fIBPT\fR blocks are
+read at a time, until the \fICOUNT\fR is exhausted. Each read operation
+starts at the same lba which, if \fISKIP\fR is not given, is the
+beginning of the file or device.
 .PP
-The 'count' argument may be negative when '<ifile>' is a sg device
-or is a block device with 'blk_sgio=1' set. Alternatively 'bpt=0'
-may be given. In these cases |'count'| "zero block" SCSI READ commands
+The \fICOUNT\fR value may be negative when \fIIFILE\fR is a sg device
+or is a block device with 'blk_sgio=1' set. Alternatively 'bpt=0' may
+be given. In these cases |\fICOUNT\fR| "zero block" SCSI READ commands
 are issued. "Zero block" means "do nothing" for SCSI READ 10, 12 and
 16 byte commands (but not for the 6 byte variant). In practice "zero
 block" SCSI READ commands have low latency and so are one way to measure
 SCSI command overhead.
+.SH OPTIONS
 .TP
-blk_sgio=0 | 1
+\fBblk_sgio\fR=0 | 1
 The default action of this utility is to use the Unix read() command when
-the <ifile> is a block device. In lk 2.6 many block devices can handle
+the \fIIFILE\fR is a block device. In lk 2.6 many block devices can handle
 SCSI commands issued via the SG_IO ioctl. So when this option is set
-the SG_IO ioctl sends SCSI READ commands to <ifile> if it is a block
+the SG_IO ioctl sends SCSI READ commands to \fIIFILE\fR if it is a block
 device.
 .TP
-bpt=BLOCKS
-each read operation will be made using this number of blocks (or less if 
-near the end of 'count'). Default is 128. Note also that each read
-operation starts at the same lba (as given by 'skip=<n>' or 0). If 'bpt=0'
-then the 'count' is interpreted as the number of zero block READ SCSI
-commands to issue.
+\fBbpt\fR=\fIBPT\fR
+where \fIBPT\fR is the maximum number of blocks each read operation fetches.
+Fewer blocks will be fetched when the remaining \fICOUNT\fR is less than
+\fIBPT\fR. The default value for \fIBPT\fR is 128. Note that each read
+operation starts at the same lba (as given by \fIskip=SKIP\fR or 0).
+If 'bpt=0' then the \fICOUNT\fR is interpreted as the number of zero
+block SCSI READ commands to issue.
 .TP
-bs=BYTES
-this
+\fBbs\fR=\fIBS\fR
+where \fIBS\fR is the size (in bytes) of each block read. This
 .B must
 be the block size of the physical device (defaults to 512) if SCSI commands
-are being issued to <ifile>.
+are being issued to \fIIFILE\fR.
 .TP
-cdbsz=6 | 10 | 12 | 16
+\fBcdbsz\fR=6 | 10 | 12 | 16
 size of SCSI READ commands issued on sg device names, or block devices
 if 'blk_sgio=1' is given. Default is 10 byte SCSI READ cdbs.
 .TP
-count=BLOCKS
-read this number of blocks when BLOCKS is a positive number. When BLOCKS is
-negative then |BLOCKS| SCSI READ commands are performed requesting zero blocks
-to be transferred. The 'count=' argument must be given.
+\fBcount\fR=\fICOUNT\fR
+when \fICOUNT\fR is a positive number, read that number of blocks,
+typically with multiple read operations. When \fICOUNT\fR is negative then
+|\fICOUNT\fR| SCSI READ commands are performed requesting zero blocks
+to be transferred. This option is mandatory.
 .TP
-dio=0 | 1
+\fBdio\fR=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
-at completion. This option is only active if <ifile> is an sg device.
+at completion. This option is only active if \fIIFILE\fR is an sg device.
 If direct IO is selected and /proc/scsi/sg/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
-dpo=0 | 1
+\fBdpo\fR=0 | 1
 when set the disable page out (DPO) bit in SCSI READ commands is set.
 Otherwise the DPO bit is cleared (default).
 .TP
-fua=0 | 1
+\fBfua\fR=0 | 1
 when set the force unit access (FUA) bit in SCSI READ commands is set.
 Otherwise the FUA bit is cleared (default).
 .TP
-if=<ifile>
-read from this <ifile>. This argument must be given. If the <ifile> is a
-normal file then it must be seekable (if ('count' > 'bpt') or 'skip' is
-given). Hence stdin is not acceptable (and giving "-" as the <ifile>
-argument is reported as an error).
+\fBif\fR=\fIIFILE\fR
+read from this \fIIFILE\fR. This argument must be given. If the \fIIFILE\fR
+is a normal file then it must be seekable (if (\fICOUNT\fR > \fIBPT\fR) or
+\fIskip=SKIP\fR is given). Hence stdin is not acceptable (and giving "\-"
+as the \fIIFILE\fR argument is reported as an error).
 .TP
-mmap= 0 | 1
+\fBmmap\fR=0 | 1
 default is 0 which selects indirect IO. Value of 1 causes memory mapped
 IO to be performed. Selecting both dio and mmap is an error. This option
-is only active if <ifile> is an sg device.
+is only active if \fIIFILE\fR is an sg device.
 .TP
-no_dxfer= 0 | 1
+\fBno_dxfer\fR=0 | 1
 when set then DMA transfers from the device are made into kernel buffers
 but no further (i.e. there is no second copy into the user space). The
 default value is 0 in which case transfers are made into the user space.
 When neither mmap nor dio is set then data transfer are copied via
 kernel buffers (i.e. a double copy). Mainly for testing.
 .TP
-odir= 0 | 1
-when set opens an <ifile> which is a block device with an additional
+\fBodir\fR=0 | 1
+when set opens an \fIIFILE\fR which is a block device with an additional
 O_DIRECT flag. The default value is 0 (i.e. don't open block devices
 O_DIRECT).
 .TP
-skip=BLOCKS
-all read operations will start offset by BLOCKS bs-sized blocks 
-from the start of input file (or device).
+\fBskip\fR=\fISKIP\fR
+all read operations will start offset by \fISKIP\fR bs\-sized blocks 
+from the start of the input file (or device).
 .TP
-time=<n>
-When 0 (default) doesn't perform timing.
+\fBtime\fR=\fITI\fR
+When \fITI\fR is 0 (default) doesn't perform timing.
 When 1, times transfer and does throughput calculation, starting at the
 first issued command until completion. When 2, times transfer and does 
 throughput calculation, starting at the second issued command until 
@@ -109,18 +113,23 @@ completion. When 3 times from third command, etc. An average number of
 commands (SCSI READs or Unix read()s) executed per second is also
 output.
 .TP
---help
+\fBverbose\fR=\fIVERB\fR
+as \fIVERB\fR increases so does the amount of debug output sent to stderr.
+Default value is zero which yields the minimum amount of debug output.
+A value of 1 reports extra information that is not repetitive.
+.TP
+\fB\-\-help\fR
 Output the usage message then exit.
 .TP
---version
+\fB\-\-version\fR
 Output the version string then exit.
-.PP
+.SH NOTES
 BYTES and BLOCKS may be followed by one of these multiplicative suffixes:
 c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
 MB *1,000,000; g G Gib *(2**30); GB *(10**9). Also a suffix of
 the form "x<n>" multiplies the leading number by <n>. These multiplicative
 suffixes are compatible with GNU's dd command (since 2002) which claims
-compliance with SI and with IEC 60027-2.
+compliance with SI and with IEC 60027\-2.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
@@ -169,7 +178,7 @@ Written by Doug Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2006 Douglas Gilbert
+Copyright \(co 2000\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

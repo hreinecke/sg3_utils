@@ -47,6 +47,7 @@ Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
 
 Luben Tuikov <ltuikov at yahoo dot com>
         help with documentation and other suggestions [20061014]
+        contribution sg_read_buffer and sg_write_buffer [20061103]
 
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
@@ -58,9 +59,6 @@ Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
 
 Peter Allworth <linsol at zeta dot org dot au> original dd clone design used
         by sg3_utils's dd variants (e.g. sg_dd).
-
-Remy Card has his copyright notice on llseek.c which is borrowed from the
-        util-linux package.
 
 Saeed Bishara contributed sg_write_long
 
@@ -75,4 +73,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-14th October 2006
+31st October 2006

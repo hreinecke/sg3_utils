@@ -1,101 +1,104 @@
-.TH SG_GET_CONFIG "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_GET_CONFIG "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_get_config \- invoke SCSI GET CONFIGURATION command on a (cd/dvd) device
+sg_get_config \- sends a SCSI GET CONFIGURATION command
 .SH SYNOPSIS
 .B sg_get_config
-[\fI--brief\fR] [\fI--current\fR] [\fI--help\fR] [\fI--hex\fR]
-[\fI--inner-hex\fR] [\fI--list\fR] [\fI--rt=<n>\fR] [\fI--starting=<n>\fR]
-[\fI--verbose\fR] [\fI--version\fR] \fI<device>\fR
+[\fI\-\-brief\fR] [\fI\-\-current\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-inner\-hex\fR] [\fI\-\-list\fR] [\fI\-\-rt=RT\fR]
+[\fI\-\-starting=FC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends a SCSI GET CONFIGURATION command to the given device and
-decodes the response. The response includes the features and profiles
-of the device. Typically these devices are CD and DVD players that
-may (but not necessarily) have media in them. These devices may well
-be connected via ATAPI, USB or IEEE 1394 transports. In such
-cases they are "SCSI" devices only in the sense that they use
-the "Multi-Media command" set (MMC). MMC is a specialized SCSI
-command set whose definition can be found at http://www.t10.org .
+Sends a SCSI GET CONFIGURATION command to \fIDEVICE\fR and decodes the
+response. The response includes the features and profiles of the device.
+Typically these devices are CD and DVD players that may (but not
+necessarily) have media in them. These devices may well be connected via
+ATAPI, USB or IEEE 1394 transports. In such cases they are "SCSI" devices
+only in the sense that they use the "Multi\-Media command" set (MMC).
+MMC is a specialized SCSI command set whose definition can be found
+at http://www.t10.org .
 .PP
-This utility is based on the MMC-4 and MMC-5 draft standards. See
+This utility is based on the MMC\-4 and MMC\-5 draft standards. See
 section 5 on "Features and Profile for Multi_Media devices" for more
 information on specific feature parameters and profiles. The manufacturer's
 product manual may also be useful.
 .PP
 Since modern DVD writers support many features and profiles, the decoded
 output from this utility can be large. There are various ways to cut down
-the output. If the '--brief' option is used only the feature names are shown
-and the feature parameters are not decoded. Alternatively if only one
-feature is of interest then this combination of options is
-appropriate: "--rt=2 --starting=<feature_code>". Another possibility is to
-show only the features that are relevant to the media in the
-drive (i.e. "current") with the "--rt=1" option.
+the output. If the \fI\-\-brief\fR option is used only the feature names
+are shown and the feature parameters are not decoded. Alternatively if only
+one feature is of interest then this combination of options is
+appropriate: "\-\-rt=2 \-\-starting=\fIFC\fR". Another possibility is to show
+only the features that are relevant to the media in the drive (i.e. "current")
+with the "\-\-rt=1" option.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---brief | -b
+\fB\-b\fR, \fB\-\-brief\fR
 show the feature names but don't decode the parameters of those features.
-When used with '--list' outputs known feature names but not known profile
-names.
+When used with \fI\-\-list\fR outputs known feature names but not known
+profile names.
 .TP
---current | -c
-output features marked as current. This option is equivalent to '--rt=1'.
+\fB\-c\fR, \fB\-\-current\fR
+output features marked as current. This option is equivalent to '\-\-rt=1'.
 .TP
---help | -h
+\fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
---hex | -H
+\fB\-H\fR, \fB\-\-hex\fR
 output the response in hex (don't decode response).
 .TP
---inner-hex | -i
+\fB\-i\fR, \fB\-\-inner\-hex\fR
 decode to the feature name level then output each feature's data in hex.
 .TP
---list | -l
+\fB\-l\fR, \fB\-\-list\fR
 list all known feature and profile names. Ignore the device name (if given).
 Simply lists the feature names and profiles (followed by their hex values)
-that this utility knows about. If '--brief' is also given then only feature
-names are listed.
+that this utility knows about. If \fI\-\-brief\fR is also given then only
+feature names are listed.
 .TP
---rt=<n> | -r <n>
-RT value given to GET CONFIGURATION command. Allowable values are 0,
-1, 2, or 3 . The command's action also depends on the value given
-to '--starting='.  The default value is 0.
-When <n> is 0 then all features, regardless of currency, are returned (whose
-feature code is greater than or equal to the value given to '--starting=').
-When <n> is 1 then all current features are returned (whose
-feature code is greater than or equal to the value given to '--starting=').
-When <n> is 2 then the feature whose feature code is equal to the value
-given to '--starting=', if any, is returned.
-When <n> is 3 the response is reserved (probably yields an "illegal
-field in cdb" error).
+\fB\-r\fR, \fB\-\-rt\fR=\fIRT\fR
+where \fIRT\fR is the field of that name in the GET CONFIGURATION cdb.
+Allowable values are 0, 1, 2, or 3 . The command's action also depends on
+the value given to the \fI\-\-starting=FC\fR option. The default value is 0.
+When \fIRT\fR is 0 then all features, regardless of currency, are
+returned (whose feature code is greater than or equal to \fIFC\fR given
+to \fI\-\-starting=\fR). When \fIRT\fR is 1 then all current features are
+returned (whose feature code is greater than or equal to \fIFC\fR). When
+\fIRT\fR is 2 then the feature whose feature code is equal to \fIFC\fR,
+if any, is returned.  When \fIRT\fR is 3 the response is reserved (probably
+yields an "illegal field in cdb" error).
 .TP
---starting=<n> | -s <n>
-this option works closely with the --rt option. Its value is a feature
-code in the range 0 to 0xffff (inclusive). Its default value is 0. A value
-prefixed with "0x" is interpreted as hexadecimal.
+\fB\-s\fR, \fB\-\-starting\fR=\fIFC\fR
+where \fIFC\fR is the feature code value. This option works closely with
+the \fI\-\-rt=RT\fR option. The \fIFC\fR value is in the range 0 to
+65535 (0xffff) inclusive. Its default value is 0. A value prefixed
+with "0x" (or a trailing 'h') is interpreted as hexadecimal.
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
-.PP
+.SH NOTES
 There are multiple versions of the MMC (draft) standards: MMC [1997],
-MMC-2 [2000],  MMC-3 [2002], MMC-4 and MMC-5. The first three are now
+MMC\-2 [2000],  MMC\-3 [2002], MMC\-4 and MMC\-5. The first three are now
 ANSI INCITS standards with the year they became standards shown in
 brackets. The draft immediately prior to standardization can
 be found at http://www.t10.org . In the initial MMC standard there
 was no GET CONFIGURATION command and the relevant information was
 obtained from the "CD capabilities and mechanical status mode
 page" (mode page 0x2a). It was later renamed the "MM capabilities and 
-mechanical status mode page" and has been made obsolete in MMC-4 and
-MMC-5. The GET CONFIGURATION command was introduced in MMC-2 and has
+mechanical status mode page" and has been made obsolete in MMC\-4 and
+MMC\-5. The GET CONFIGURATION command was introduced in MMC\-2 and has
 become a replacement for that mode page. New features such as support
 for "BD" (blue ray) media type can only be found by using the
 GET CONFIGURATION command. Hence older CD players may not support
 the GET CONFIGURATION command in which case the "MM capabilities ..."
 mode page can be checked with sdpar, sginfo or sg_modes.
 .PP
-In the 2.4 series of Linux kernels the given device must be
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series block devices
 can also be specified. For example "sg_get_config /dev/hdc"
 will work in the 2.6 series kernels as long as /dev/hdc is
@@ -109,10 +112,10 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2006 Douglas Gilbert
+Copyright \(co 2004\-2007 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sginfo, sg_modes, sg_inq, sg_prevent, sg_start (all in sg3_utils)
+.B sginfo, sg_modes, sg_inq, sg_prevent, sg_start (all in sg3_utils),
 .B sdparm

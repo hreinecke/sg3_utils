@@ -5,13 +5,15 @@
 #include <string.h>
 #include <getopt.h>
 #include <errno.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2006 D. Gilbert
+   *  Copyright (C) 2004-2007 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +26,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.12 20061012";
+static char * version_str = "1.14 20070129";
 
 #define MAX_XFER_LEN 10000
 
@@ -49,26 +51,27 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_read_long [--16] [--correct] [--help] [--lba=<num>] "
-          "[--out=<name>]\n"
+          "sg_read_long [--16] [--correct] [--help] [--lba=LBA] "
+          "[--out=OF]\n"
           "                    [--pblock] [--verbose] [--version] "
-          "[--xfer_len=<num>]\n"
-          "                    <scsi_device>\n"
+          "[--xfer_len=BTL]\n"
+          "                    DEVICE\n"
           "  where:\n"
-          "    --16|-S                    do READ LONG(16) (default: "
+          "    --16|-S              do READ LONG(16) (default: "
           "READ LONG(10))\n"
-          "    --correct|-c               use ECC to correct data "
+          "    --correct|-c         use ECC to correct data "
           "(default: don't)\n"
-          "    --help|-h                  print out usage message\n"
-          "    --lba=<num>|-l <num>       logical block address"
+          "    --help|-h            print out usage message\n"
+          "    --lba=LBA|-l LBA     logical block address"
           " (default: 0)\n"
-          "    --out=<name>|-o <name>     output to file <name>\n"
-          "    --verbose|-v               increase verbosity\n"
-          "    --version|-V               print version string and"
+          "    --out=OF|-o OF       output in binary to file named OF\n"
+          "    --pblock|-p          fetch physical block containing LBA\n"
+          "    --verbose|-v         increase verbosity\n"
+          "    --version|-V         print version string and"
           " exit\n"
-          "    --xfer_len=<num>|-x <num>  transfer length (< 10000)"
+          "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000)"
           " default 520\n\n"
-          "Perform a READ LONG (10 or 16) SCSI command\n"
+          "Perform a SCSI READ LONG (10 or 16) command\n"
           );
 }
 
@@ -78,7 +81,7 @@ static int process_read_long(int sg_fd, int do_16, int pblock, int correct,
                              int xfer_len, int verbose)
 {
     int offset, res;
-    char * ten_or;
+    const char * ten_or;
 
     if (do_16)
         res = sg_ll_read_long16(sg_fd, pblock, correct, llba, data_out,
@@ -228,23 +231,24 @@ int main(int argc, char * argv[])
     }
 
     if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
-        fprintf(stderr, ME "out of memory (query)\n");
+        fprintf(stderr, ME "out of memory\n");
         sg_cmds_close_device(sg_fd);
         return SG_LIB_SYNTAX_ERROR;
     }
-    readLongBuff = rawp;
+    readLongBuff = (unsigned char *)rawp;
     memset(rawp, 0x0, MAX_XFER_LEN);
 
     fprintf(stderr, ME "issue read long (%s) to device %s\n    xfer_len=%d "
-            "(0x%x), lba=%llu (0x%llx), correct=%d\n", (do_16 ? "16" : "10"),
-            device_name, xfer_len, xfer_len, llba, llba, correct);
+            "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 "), correct=%d\n",
+            (do_16 ? "16" : "10"), device_name, xfer_len, xfer_len, llba,
+            llba, correct);
 
     if (process_read_long(sg_fd, do_16, pblock, correct, llba, readLongBuff,
                           xfer_len, verbose))
         goto err_out;
 
     if ('\0' == out_fname[0])
-        dStrHex(rawp, xfer_len, 0);
+        dStrHex((const char *)rawp, xfer_len, 0);
     else {
         got_stdout = (0 == strcmp(out_fname, "-")) ? 1 : 0;
         if (got_stdout)

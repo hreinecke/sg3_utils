@@ -3,7 +3,7 @@
  *
  * Retrieve / set RDAC options.
  *
- * Copyright (C) 2006 Hannes Reinecke <hare@suse.de>
+ * Copyright (C) 2006-2007 Hannes Reinecke <hare@suse.de>
  *
  * Based on sg_modes.c and sg_emc_trespass.c; credits from there apply.
  *
@@ -17,15 +17,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
 
-static char * version_str = "1.05 20061015";
+static char * version_str = "1.06 20070101";
 
 unsigned char mode6_hdr[] = {
     75, /* Length */
@@ -294,13 +291,14 @@ static void print_rdac_mode( unsigned char *ptr )
 
 static void usage()
 {
-    printf("Usage:  sg_rdac [-a] [-f=<lun>] [-v] [-V] <scsi_device>\n"
-           " where -a       transfer all devices to the controller\n"
-           "                serving <scsi_device>.\n"
-           "       -f=<lun> transfer the device with LUN <lun> to the\n"
-           "                controller serving <scsi_device>\n"
-           "       -v       verbose\n"
-           "       -V       print version then exit\n\n"
+    printf("Usage:  sg_rdac [-a] [-f=LUN] [-v] [-V] DEVICE\n"
+           "  where:\n"
+           "    -a        transfer all devices to the controller\n"
+           "              serving DEVICE.\n"
+           "    -f=LUN    transfer the device at LUN to the\n"
+           "              controller serving DEVICE\n"
+           "    -v        verbose\n"
+           "    -V        print version then exit\n\n"
            " Display/Modify RDAC Redundant Controller Page 0x2c.\n"
            " If [-a] or [-f] is not specified the current settings"
            " are displayed.\n");
@@ -353,15 +351,15 @@ int main(int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
-                
-        fd = open(file_name, O_RDWR | O_NONBLOCK);
+
+        fd = sg_cmds_open_device(file_name, 0 /* rw */, do_verbose);
         if (fd < 0) {
-                fprintf(stderr, "Error trying to open %s\n", file_name);
-                perror("");
+                fprintf(stderr, "open error: %s: %s\n", file_name,
+                        safe_strerror(-fd));
                 usage();
                 return SG_LIB_FILE_ERROR;
         }
-
+                
         if (fail_all) {
                 res = fail_all_paths(fd);
         } else if (fail_path) {
@@ -389,7 +387,7 @@ int main(int argc, char * argv[])
         else if (res)
                 fprintf(stderr," mode sense failed\n");
 
-        res = close(fd);
+        res = sg_cmds_close_device(fd);
         if (res < 0) {
                 fprintf(stderr, "close error: %s\n", safe_strerror(-res));
                 if (0 == ret)

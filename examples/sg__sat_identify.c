@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Douglas Gilbert.
+ * Copyright (c) 2006-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,7 +56,7 @@
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
-#define SAT_STATUS_RETURN_DESC 9  /* ATA status return (sense) descriptor */
+#define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
 
 #define ATA_IDENTIFY_DEVICE 0xec
 #define ATA_IDENTIFY_PACKET_DEVICE 0xa1
@@ -64,7 +64,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.01 20061014";
+static char * version_str = "1.02 20070130";
 
 static void usage()
 {
@@ -179,11 +179,11 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     case SG_LIB_CAT_RECOVERED:
-        /* check for ATA status return descriptor */
         if (verbose)
             sg_chk_n_print3(">>> ATA_16 command", &io_hdr, 1);
+        /* check for ATA Return Descriptor */
         cucp = sg_scsi_sense_desc_find(io_hdr.sbp, io_hdr.sb_len_wr,
-                                       SAT_STATUS_RETURN_DESC);
+                                       SAT_ATA_RETURN_DESC);
         if (cucp && (cucp[3])) {
             if (cucp[3] & 0x4) {
                 printf("error in returned FIS: aborted command\n");

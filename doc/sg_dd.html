@@ -17,12 +17,13 @@ sg_dd utility<br>
 </center>
 <a href="#Conclusion"></a>
 <ol id="mozToc">
-<!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6--><li><a href="#mozTocId228087">
-The&nbsp; Linux
-sg_dd utility </a>
+<!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6-->
+  <li><a href="#mozTocId228087"> The&nbsp; Linux
+sg_dd utility
+    </a>
     <ol>
       <li><a href="#mozTocId370866">Introduction</a></li>
-      <li><a href="#mozTocId352668">&nbsp;dd like features</a></li>
+      <li><a href="#mozTocId352668">dd like features</a></li>
       <li><a href="#mozTocId703997">sg_dd extras</a></li>
       <li><a href="#mozTocId657084">Retries</a></li>
       <li><a href="#mozTocId437677">Continue on error
@@ -45,7 +46,8 @@ found in the <a href="sg3_utils.html">sg3_utils</a> package which
 targets the linux kernel 2.4 and
 2.6 series and has ports to various other operating systems.<br>
 <br>
-Not all SCSI device types are supported by the sg_dd utility. Obviously
+Only block oriented SCSI peripheral device types are supported by the
+sg_dd utility. Obviously
 those device types that deal with enclosures and medium changers don't
 have addressable blocks and are not supported. The supported device
 types are direct access devices (e.g. disks) and cd/dvd devices. The
@@ -62,7 +64,7 @@ as SCSI devices to an operating system via a protocol conversion in an
 external enclosure and via some transport such as USB or IEEE 1394. The
 sg_dd utility should work with most of these devices as it tends to use
 exactly the same SCSI commands that the normal block layer would use.
-However, advanced options (e.g. using the 'cdbsz' and 'iflag=fua') most
+However, advanced options (e.g. using the cdbsz=16 and iflag=fua) most
 likely will be ignored. Apart from CD players over 10 years old, almost
 all CD/DVD players use the Multi Media Command set (MMC or&nbsp;
 MMC-2,3,4,5) as their native command set. The fact that the most common
@@ -71,16 +73,16 @@ irrelevant to
 the
 sg_dd utility; they use SCSI command sets.<br>
 <br>
-This page outlines the features of the sg_dd utility version 5.56 found
-in the <a href="sg3_utils.html">sg3_utils</a> version 1.22 package.<br>
-<h2><a class="mozTocH2" name="mozTocId352668"></a>&nbsp;dd like features</h2>
+This page outlines the features of the sg_dd utility version 5.60 found
+in the <a href="sg3_utils.html">sg3_utils</a> version 1.23 package.<br>
+<h2><a class="mozTocH2" name="mozTocId352668"></a>dd like features</h2>
 The basic syntax of the sg_dd utility is the same as the dd command in
 Unix. That said, the syntax of the dd command in Unix is different from
 almost all other standard Unix commands. Those familiar with the dd
 command
 should not be too surprised by the syntax and semantics of the sg_dd
 utility. Those not familiar with the dd syntax should be very careful,
-especially with the 'of' and 'seek' options, both with dd and sg_dd.
+especially with the 'of=' and 'seek=' options, both with dd and sg_dd.
 The recent GNU implementation of the dd command is used as a reference
 point.<br>
 <br>
@@ -100,34 +102,40 @@ description</span><br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">bs=&lt;block_size&gt;<br>
+      <td style="vertical-align: top;">bs=<span
+ style="font-style: italic;">BS</span><br>
       </td>
       <td style="vertical-align: top;">512<br>
       </td>
-      <td style="vertical-align: top;">Number of bytes in each block<br>
+      <td style="vertical-align: top;">Number of bytes in each block.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">count=&lt;count_of_blocks&gt;</td>
-      <td style="vertical-align: top;">blocks in input file<br>
+      <td style="vertical-align: top;">count=<span
+ style="font-style: italic;">COUNT</span></td>
+      <td style="vertical-align: top;">blocks in <span
+ style="font-style: italic;">IFILE</span><br>
       </td>
-      <td style="vertical-align: top;">Number of blocks to copy<br>
+      <td style="vertical-align: top;">Number of blocks to copy.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">if=&lt;input_file&gt;</td>
+      <td style="vertical-align: top;">if=<span
+ style="font-style: italic;">IFILE</span></td>
       <td style="vertical-align: top;">stdin<br>
       </td>
-      <td style="vertical-align: top;">file (or device) to read from<br>
+      <td style="vertical-align: top;">file (or device) to read from.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">of=&lt;output_file&gt;</td>
+      <td style="vertical-align: top;">of=<span
+ style="font-style: italic;">OFILE</span></td>
       <td style="vertical-align: top;">stdout<br>
       </td>
       <td style="vertical-align: top;">file (or device) to write to.
-sg_dd doesn't bother writing anything if &lt;output_file&gt; is
-/dev/null or
+sg_dd doesn't bother writing anything if <span
+ style="font-style: italic;">OFILE</span> is <span
+ style="font-family: monospace;">/dev/null</span> or
 . (period).<br>
       </td>
     </tr>
@@ -137,28 +145,39 @@ sg_dd doesn't bother writing anything if &lt;output_file&gt; is
 <br>
 When either dd or sg_dd are given these options with suitable
 arguments, they will copy
-(&lt;block_size&gt; *&lt;count_of_blocks&gt;) bytes from the beginning
-of &lt;input_file&gt; to the
-beginning of &lt;output_file&gt;. One restriction that sg_dd imposes
-when either the &lt;input_file&gt; or &lt;output_file&gt; are accessed
-via SCSI commands is that &lt;block_size&gt; must match that of the
-device. Further, if both the &lt;input_file&gt; and &lt;output_file&gt;
-are accessed via SCSI commands then &lt;block_size&gt; must match that
+(<span style="font-style: italic;">BS</span> * <span
+ style="font-style: italic;">COUNT</span>) bytes from the beginning
+of <span style="font-style: italic;">IFILE</span> to the
+beginning of <span style="font-style: italic;">OFILE</span>. One
+restriction that sg_dd imposes
+when either the <span style="font-style: italic;">IFILE</span> or <span
+ style="font-style: italic;">OFILE</span> are accessed
+via SCSI commands is that <span style="font-style: italic;">BS</span>
+(i.e. the block size) must match that of the
+device. Further, if both the <span style="font-style: italic;">IFILE</span>
+and <span style="font-style: italic;">OFILE</span>
+are accessed via SCSI commands then <span style="font-style: italic;">BS</span>
+must match that
 of both devices. <br>
 <br>
-The following extensions are found in sg_dd. An &lt;input_file&gt; of
-"-" is interpreted as stdin; an &lt;output_file&gt; of "-" is
-interpreted as stdout while an &lt;output_file&gt; of "." is
+The following extensions are found in sg_dd. An <span
+ style="font-style: italic;">IFILE</span> of
+"-" is interpreted as stdin; an <span style="font-style: italic;">OFILE</span>
+of "-" is
+interpreted as stdout while an <span style="font-style: italic;">OFILE</span>
+of "." is
 interpreted as <span style="font-family: monospace;">/dev/null</span>.
 [dd interprets input and output file names of
-"-" literally. dd interprets an output file of "." as the current
+"-" literally; dd interprets an output file of "." as the current
 directory and will not accept it.] The sg_dd utility does not truncate
-the &lt;output_file&gt; before starting the copy (the dd command does
+the <span style="font-style: italic;">OFILE</span> before starting the
+copy (the dd command does
 if it is a normal file). Hence a user may need to delete the output
 file before using the sg_dd utility (if the size of that file is
 greater than what sg_dd is going to copy over it).<br>
 <br>
-If the 'count' option is not given then an attempt is made to determine
+If the 'count=' option is not given then an attempt is made to
+determine
 the remaining blocks in the file, device or partition. If the input
 file is stdin and no count is given then a copy will continue until an
 EOF is detected on the input stream (or something else goes wrong). If
@@ -195,52 +214,60 @@ description</span><br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">ibs=&lt;block_size&gt;</td>
-      <td style="vertical-align: top;">same as bs<br>
+      <td style="vertical-align: top;">ibs=<span
+ style="font-style: italic;">BS</span></td>
+      <td style="vertical-align: top;">same as bs=<span
+ style="font-style: italic;">BS</span><br>
       </td>
       <td style="vertical-align: top;">number of bytes in each block of
-&lt;input_file&gt;<br>
+      <span style="font-style: italic;">IFILE</span><br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">iflag=&lt;flags&gt;<br>
+      <td style="vertical-align: top;">iflag=<span
+ style="font-style: italic;">FLAGS</span><br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">[new in sg3_utils 1.18] similar
+      <td style="vertical-align: top;">similar
 to option found in recent GNU dd versions, see below<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">obs=&lt;block_size&gt;</td>
-      <td style="vertical-align: top;">same as bs<br>
+      <td style="vertical-align: top;">obs=<span
+ style="font-style: italic;">BS</span></td>
+      <td style="vertical-align: top;">same as bs=<span
+ style="font-style: italic;">BS</span><br>
       </td>
       <td style="vertical-align: top;">number of bytes in each block of
-&lt;output_file&gt;</td>
+      <span style="font-style: italic;">OFILE</span></td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">oflag=&lt;flags&gt;<br>
+      <td style="vertical-align: top;">oflag=<span
+ style="font-style: italic;">FLAGS</span><br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">[new in sg3_utils 1.18] similar
+      <td style="vertical-align: top;">similar
 to option found in recent GNU dd versions, see below<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">seek=&lt;n_blocks_of&gt;</td>
+      <td style="vertical-align: top;">seek=<span
+ style="font-style: italic;">SEEK</span></td>
       <td style="vertical-align: top;">0<br>
       </td>
-      <td style="vertical-align: top;">block number (origin 0) in
-&lt;output_file&gt; to commence writing<br>
+      <td style="vertical-align: top;">block number (origin 0) in <span
+ style="font-style: italic;">OFILE</span> to commence writing<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">skip=&lt;n_blocks_of&gt;</td>
+      <td style="vertical-align: top;">skip=<span
+ style="font-style: italic;">SKIP</span></td>
       <td style="vertical-align: top;">0<br>
       </td>
-      <td style="vertical-align: top;">block number (origin 0) in
-&lt;input_file&gt; to commence reading</td>
+      <td style="vertical-align: top;">block number (origin 0) in <span
+ style="font-style: italic;">IFILE</span> to commence reading</td>
     </tr>
     <tr>
       <td style="vertical-align: top;">--help<br>
@@ -262,11 +289,12 @@ date then exit<br>
   </tbody>
 </table>
 <br>
-If either ibs and/or obs are given to sg_dd then they must be the same
-as bs
-(i.e. they are essentially dummies).&nbsp; The 'skip' option cannot be
+If either ibs= and/or obs= are given to sg_dd then they must have the
+same value
+as bs=
+(i.e. they are essentially dummies).&nbsp; The skip= option cannot be
 used on an input stream
-(e.g. stdin) while the 'seek' option cannot be used on an output stream
+(e.g. stdin) while the seek= option cannot be used on an output stream
 (e.g. stdout).<br>
 <br>
 All numeric arguments can take a multiplier suffix. From sg3_utils
@@ -368,10 +396,11 @@ as hexadecimal 9 [not (0 * 9)==0]. This is valid "2x4x0xa" and yields
 80 (but it isn't very clear).<br>
 <br>
 From sg3_utils version 1.19 (sg_dd version 5.46) hexadecimal numbers
-can also be indicated by a trailing "h" or "H". The "h" suffiz cannot
+can also be indicated by a trailing "h" or "H". The "h" suffix cannot
 be used together with a suffix multiplier.<br>
 <br>
-The "&lt;flags&gt;" argument of "iflag=" and "oflag=" is a comma
+The <span style="font-style: italic;">FLAGS</span> argument of
+"iflag=" and "oflag=" is a comma
 separated list of items chosen from one or more entries in this table:<br>
 <br>
 <table style="width: 100%; text-align: left;" border="1" cellpadding="2"
@@ -397,12 +426,15 @@ file</span><br>
       </td>
       <td style="vertical-align: top;">ignored<br>
       </td>
-      <td style="vertical-align: top;">applied on &lt;ofile&gt;<br>
+      <td style="vertical-align: top;">applied on <span
+ style="font-style: italic;">OFILE</span><br>
       </td>
-      <td style="vertical-align: top;">applied on &lt;ofile&gt;<br>
+      <td style="vertical-align: top;">applied on <span
+ style="font-style: italic;">OFILE</span><br>
       </td>
       <td style="vertical-align: top;">use O_APPEND open flag.
-Conflicts with 'seek=&lt;n&gt;' when "n &gt; 0"<br>
+Conflicts with 'seek=<span style="font-style: italic;">SEEK</span>'
+when "<span style="font-style: italic;">SEEK</span> &gt; 0"<br>
       </td>
     </tr>
     <tr>
@@ -531,44 +563,38 @@ description</span><br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">append=0|1<br>
-      </td>
-      <td style="vertical-align: top;">0<br>
-      </td>
-      <td style="vertical-align: top;">both<br>
-      </td>
-      <td style="vertical-align: top;">append to output file (rather
-than overwrite). Better to use 'iflag=append' and/or 'oflag=append'.<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top;">blk_sgio=0|1<br>
+      <td style="vertical-align: top;">blk_sgio=0 | 1<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">when set access devices via SCSI
-commands (SG_IO ioctl). May use 'iflag=sgio' and/or 'oflag=sgio'
+commands (SG_IO ioctl). May use iflag=sgio and/or oflag=sgio
 instead.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">bpt<br>
+      <td style="vertical-align: top;">bpt=<span
+ style="font-style: italic;">BPT</span><br>
       </td>
       <td style="vertical-align: top;">128 or 32<br>
       </td>
       <td style="vertical-align: top;">both<br>
       </td>
-      <td style="vertical-align: top;">blocks_per_transfer (granularity
-of each IO). Default is 128 when bs &lt; 2048 (bytes) else the default
-is 32. For block devices (bpt * bs) is constrained by <span
+      <td style="vertical-align: top;">where <span
+ style="font-style: italic;">BPT</span> is the blocks per transfer
+(granularity
+of each IO). Default is 128 when <span style="font-style: italic;">BS</span>
+&lt; 2048 (bytes) else the default
+is 32. For block devices (<span style="font-style: italic;">BPT</span>
+* <span style="font-style: italic;">BS</span>) is constrained by <span
  style="font-family: monospace;">/sys/block/&lt;device&gt;/queue/max_sectors_kb</span>
 .<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">cdbsz=6|10|12|16<br>
+      <td style="vertical-align: top;">cdbsz=6 | 10 | 12 | 16<br>
       </td>
       <td style="vertical-align: top;">10 or 16<br>
       </td>
@@ -582,7 +608,7 @@ case a 16 cdb is used.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">coe=0|1|2|3<br>
+      <td style="vertical-align: top;">coe=0 | 1 | 2 | 3<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
@@ -590,13 +616,14 @@ case a 16 cdb is used.<br>
       </td>
       <td style="vertical-align: top;">when non-zero, continue_on_error
 for
-sg devices and block devices using the SG_IO ioctl. May use 'iflag=coe'
-and/or 'oflag=coe'
-instead. An equivalent of 'coe=2' is 'iflag=coe,coe'<br>
+sg devices and block devices using the SG_IO ioctl. May use iflag=coe
+and/or oflag=coe
+instead. An equivalent of coe=2 is 'iflag=coe,coe'<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">coe_limit=&lt;n&gt;<br>
+      <td style="vertical-align: top;">coe_limit=<span
+ style="font-style: italic;">CL</span><br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
@@ -608,7 +635,7 @@ interpreted as no limit.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">dio=0|1<br>
+      <td style="vertical-align: top;">dio=0 | 1<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
@@ -619,27 +646,18 @@ nodes)<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">fua=0|1|2|3<br>
-      </td>
-      <td style="vertical-align: top;">0<br>
-      </td>
-      <td style="vertical-align: top;">both<br>
-      </td>
-      <td style="vertical-align: top;">force_unit_access, 1-&gt;of,
-2-&gt;if, 3-&gt;of+if . Better to use 'iflag=fua' and/or 'oflag=fua'. </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top;">odir=0|1<br>
+      <td style="vertical-align: top;">odir=0 | 1<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">O_DIRECT flag on open() when
-set. Better to use 'iflag=direct' and/or 'oflag=direct'. </td>
+set. Better to use iflag=direct and/or oflag=direct. </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">retries=&lt;n&gt;<br>
+      <td style="vertical-align: top;">retries=<span
+ style="font-style: italic;">RETR</span><br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
@@ -650,19 +668,20 @@ error on a sg device READ or WRITE command<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">sync=0|1<br>
+      <td style="vertical-align: top;">sync=0 | 1<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;">both<br>
       </td>
       <td style="vertical-align: top;">when set, sends SYNCHRONIZE
-CACHE SCSI command to &lt;ofile&gt; if it is a sg device or accessed
+CACHE SCSI command to <span style="font-style: italic;">OFILE</span>
+if it is a sg device or accessed
 via the SG_IO ioctl.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">time=0|1<br>
+      <td style="vertical-align: top;">time=0 | 1<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
@@ -673,13 +692,15 @@ throughput calculation at the completion of the copy<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">verbose=&lt;n&gt;<br>
+      <td style="vertical-align: top;">verbose=<span
+ style="font-style: italic;">VERB</span><br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;">sgm_dd<br>
       </td>
-      <td style="vertical-align: top;">larger &lt;n&gt; is the greater
+      <td style="vertical-align: top;">larger <span
+ style="font-style: italic;">VERB</span> is the greater
 the debug output. 1 and 2 print the cdbs for setup commands; 3 and 4
 print the cdbs for all commands<br>
       </td>
@@ -689,8 +710,9 @@ print the cdbs for all commands<br>
 <br>
 <br>
 The sg_dd utility examines the files it is given and treats them
-differently depending on their file type. Depending on
-'iflag=&lt;flags&gt;' and 'oflag=&lt;flags&gt;' settings: O_DIRECT,
+differently depending on their file type. Depending on iflag=<span
+ style="font-style: italic;">FLAGS</span> and oflag=<span
+ style="font-style: italic;">FLAGS</span> settings: O_DIRECT,
 O_SYNC, O_APPEND and O_EXCL flags may be added to the relevant open()
 command.<br>
 <br>
@@ -741,7 +763,8 @@ effect (e.g. 'oflag=direct' is ignored)<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">/dev/null or . (period)<br>
+      <td style="vertical-align: top;"><span
+ style="font-family: monospace;">/dev/null</span> or . (period)<br>
       </td>
       <td style="vertical-align: top;">O_RDONLY</td>
       <td style="vertical-align: top;">[do nothing]<br>
@@ -769,8 +792,8 @@ written<br>
       <td style="vertical-align: top;">O_RDWR</td>
       <td style="vertical-align: top;">SCSI commands</td>
       <td style="vertical-align: top;">Opens input O_RDONLY if O_RDWR
-fails.&nbsp; The 'blk_sgio=1' option equates to both 'iflag=sgio' and
-'oflag=sgio'. Partitions ignored. </td>
+fails.&nbsp; The blk_sgio=1 option equates to both iflag=sgio and
+oflag=sgio. Partitions ignored. </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">sg device<br>
@@ -811,10 +834,10 @@ series is a replacement for raw devices<br>
   </tbody>
 </table>
 <br>
-Some of the above combinations are not sensible (e.g. 'append=1' on a
+Some of the above combinations are not sensible (e.g. append=1 on a
 block device). Raw devices were introduced in the lk 2.4 series and are
 still available in the lk 2.6 series but opening a block device or a
-normal file with O_DIRECT (in sg_dd using the option 'odir=1') is
+normal file with O_DIRECT (in sg_dd using the option odir=1) is
 preferred in the lk 2.6 series. If either the input or output file is a
 raw device, or 'odir=1' is given then the internal buffers used by
 sg_dd are aligned to a memory page boundary. A memory page is 4
@@ -822,31 +845,36 @@ kilobytes in the i386 architecture. This memory alignment is required
 by both raw devices and normal block devices that
 implement O_DIRECT.<br>
 <br>
-The 'blk_sgio=1' option (or 'iflag=sgio' and/or 'oflag=sgio') is only
+The blk_sgio=1 option (or iflag=sgio and/or oflag=sgio) is only
 valid in the lk 2.6 series. This option
 instructs the sg_dd utility to use the SG_IO ioctl to issue SCSI
 commands even though the file type is not a scsi generic (sg) device.
 Currently this will work for all cd/dvd devices irrespective of the
 transport (except for some very old devices ( &gt; 10 years old)) and
-block devices representing SCSI disks (e.g. /dev/sda). Even though SCSI
+block devices representing SCSI disks (e.g. <span
+ style="font-family: monospace;">/dev/sda</span>). Even though SCSI
 tape (st) devices now accept the SG_IO ioctl in the lk 2.6 series, the
 sg_dd utility expects direct access devices (whereas tapes are
 sequential access) so sg_dd generates an error if a st device is
 detected. When the input or output file is a sg device then the
-'blk_sgio' option is ignored as IO with that file is always via SCSI
-commands. When 'blk_sgio=1' is used with a block device and the value
-given to 'bpt'
+blk_sgio option is ignored as IO with that file is always via SCSI
+commands. When blk_sgio=1 is used with a block device and the <span
+ style="font-style: italic;">BPT</span> value
 is too high then the first read may report an EIO (input/output)
-error; the solution is to lower the 'bpt' value. [The EIO error
+error; the solution is to lower the <span style="font-style: italic;">BPT</span>
+value. [The EIO error
 occurred often with CD/DVD drives which have 2048 bytes sectors, so the
-'bpt' default value was reduced for block size &gt;= 2048 bytes.]<br>
+<span style="font-style: italic;">BPT</span> default value was reduced
+for block size &gt;= 2048 bytes.]<br>
 <br>
-If a partition of block device is accessed (e.g. /dev/sda2) when
-'blk_sgio=0' (or is not given) then logical block address 0 for the
+If a partition of block device is accessed (e.g. <span
+ style="font-family: monospace;">/dev/sda2</span>) when blk_sgio=0 (or
+is not given) then logical block address 0 for the
 purposes of sg_dd (and its skip and seek options) is the beginning of
 that partition while the calculated count (e.g. when a 'count' option
 is not given) is the extent of that partition. However if a partition
-of block device is accessed (e.g. /dev/sda2) when 'blk_sgio=1' then the
+of block device is accessed (e.g. <span style="font-family: monospace;">/dev/sda2</span>)
+when blk_sgio=1 then the
 partition is ignored and the underlying device is accessed. This means
 logical block address 0 for the purposes of sg_dd (and its skip and
 seek options) is the beginning of the device while the calculated count
@@ -866,7 +894,8 @@ If a SIGUSR1 signal is sent to the process identifier (pid) of a
 running sg_dd utility then the number of blocks copied to that point is
 output. The copy continues.<br>
 <br>
-When the 'time' option is set, the elapsed time for the copy plus the
+When the 'time=1' option is given, the elapsed time for the copy plus
+the
 throughput measured in megabytes (10**6 bytes)&nbsp; per second is
 output when the copy is complete (or an error stops the copy). If a
 SIGUSR1 signal is sent to the process identifier (pid) of a running
@@ -878,22 +907,25 @@ device has probably already done multiple retries (probably
 interspersed with moving the heads to the extreme ends of the media)
 before the medium error is reported. However a transport error (e.g.
 causing a CRC error in returned data) is not necessarily seen by the
-device and a retry may quickly solve the problem. In SAS a transport
-layer retries (TLR) state machine is optional and requires both the
+device and a retry may quickly solve the problem. In SAS a Transport
+Layer Retries (TLR) state machine is optional and requires both the
 initiator and target to implement the capability. Most first generation
 SAS disks do not implement TLR. So transport errors in the form of
 "aborted commands" can be reported due to corruption (marginal cables)
 or congestion.<br>
 <br>
-When the 'retries=&lt;n&gt;' option is given and &lt;n&gt; is greater
+When the retries=<span style="font-style: italic;">RETR</span> option
+is given and <span style="font-style: italic;">RETR</span> is greater
 than 0 then most errors on a READ or WRITE SCSI command are retried up
-to &lt;n&gt; times. Device not ready errors are not retried and "unit
+to <span style="font-style: italic;">RETR</span> times. Device not
+ready errors are not retried and "unit
 attention" conditions are automatically retried (without looking at or
-decrementing &lt;n&gt;). Once the number of retries is exhausted on the
+decrementing <span style="font-style: italic;">RETR</span>). Once the
+number of retries is exhausted on the
 same operation without success then sg_dd will refer to the 'coe'
 option as to what to do next. Each new operation,<br>
 READ or WRITE, or to a different logical block address has its own
-retry count initialized to &lt;n&gt;.<br>
+retry count initialized to <span style="font-style: italic;">RETR</span>.<br>
 <h2><a class="mozTocH2" name="mozTocId437677"></a>Continue on error
 (coe)</h2>
 Recent additions to the sg_dd utility allow it to be used as a copy "of
@@ -903,18 +935,19 @@ Write errors from SCSI commands are reported and ignored and the sg_dd
 utility continues when the 'coe' option is non-zero. [In the case where
 media errors are causing write errors the user should check the setting
 of the AWRE bit in the SCSI "read write
-error recovery" mode page (see SBC-2 at http://www.t10.org).]<br>
+error recovery" mode page (see SBC-2 at <a href="http://www.t10.org">http://www.t10.org</a>).]<br>
 <br>
 When a SCSI READ command detects an unrecoverable read error it
 responds with a sense key of MEDIUM ERROR or HARDWARE ERROR.
 Additionally it responds with the logical block address of the first
 (lowest) block that it failed to read in the current READ command. Any
 valid blocks prior to the "bad" block may or may not have been
-transferred (depending on several other settings). If 'coe=0' then the
+transferred (depending on several other settings). If coe=0 then the
 sg_dd utility will simply terminate at this point (with a reasonable
 amount of debug information sent to stderr) <span
  style="font-weight: bold;">and</span> good blocks prior to the bad
-block may not be copied (depending on the setting of 'bpt'). If 'coe'
+block may not be copied (depending on the setting of <span
+ style="font-style: italic;">BPT</span>). If 'coe'
 is non-zero then the first
 thing sg_dd will try to do is a truncated read up to, but not
 including,
@@ -927,14 +960,14 @@ readable then most likely the associated ECC data indicates that it is
 corrupt and the ECC data cannot recover it. [It is possible that all
 the corruption is in the ECC data and the payload data is ok.] Such
 blocks can be retrieved with the READ LONG command. If the READ LONG
-fails then a block of zeroes is
+fails then a block of zeros is
 substituted for the bad block in the transfer buffer. When 'coe=1' then
-READ LONG is not attempted and the "bad" block is replaced by zeroes.
-When 'coe=2' (or 'iflag=coe,coe') then a READ LONG is attempted. When
-'coe=3' then a READ LONG with its CORRCT bit set is attempted. Only SBC
+READ LONG is not attempted and the "bad" block is replaced by zeros.
+When coe=2'(or 'iflag=coe,coe') then a READ LONG is attempted. When
+coe=3 then a READ LONG with its CORRCT bit set is attempted. Only SBC
 devices (primarily SCSI disks) optionally support READ LONG. CD/DVD
 devices (covered in the MMC-4 (draft) standard) do not, so a block of
-zeroes is substituted for them. Even if READ LONG succeeds on a "bad"
+zeros is substituted for them. Even if READ LONG succeeds on a "bad"
 block, the recovered data may not be useful. There are no guarantees
 that the user data will appear "as is" in the first 512 bytes.<br>
 <br>
@@ -943,7 +976,7 @@ fetched. Further bad blocks may be detected and if so
 the algorithm in the last two paragraphs is repeated. The result of
 this
 process is an imperfect copy with blocks that were read properly placed
-in the correct relative position in the output. When the 'coe=1' option
+in the correct relative position in the output. When the coe=1 option
 is given two addition counters are output on completion:<br>
 <ul>
   <li>unrecovered errors (number of bad blocks)<br>
@@ -957,12 +990,14 @@ second counter (always less than or equal to the first) is the number
 of "successful" READ LONG SCSI commands performed. If the source media
 is a CD or DVD then this number will be zero.<br>
 <br>
-The 'coe_limit=&lt;n&gt;' option is meant to stop sg_dd continuing ad
+The coe_limit=<span style="font-style: italic;">CL</span> option is
+meant to stop sg_dd continuing ad
 nausum if errors are being detected during reading. The input media may
 be blank (unrecorded) or beyond its logical block address limit. The
-'coe_limit=&lt;n&gt;' option is only active on read operations when
+coe_limit=<span style="font-style: italic;">CL</span> option is only
+active on read operations when
 'coe &gt; 0' which itself is only active on sg device nodes (or block
-devices when 'blk_sgio=1' (or 'iflag=sgio') is given).<br>
+devices when blk_sgio=1 (or iflag=sgio) is given).<br>
 <br>
 <h2><a class="mozTocH2" name="mozTocId566094"></a>Recovered errors</h2>
 Often errors are recovered using ECC data or by the device retrying
@@ -976,7 +1011,9 @@ the "Read error counter" and "Write error counter" logs pages which can
 be viewed with smartctl (from smartmontools) and sg_logs (from the same
 sg3_utils package that sg_dd comes from). Any block that is
 automatically or manually re-assigned adds a new entry to the "grown"
-defect list which can be viewed with 'sginfo -G' or 'sg_reassign -g'
+defect list which can be viewed with '<span
+ style="font-family: monospace;">sginfo -G</span>' or '<span
+ style="font-family: monospace;">sg_reassign -g</span>'
 (both found in the
 sg3_utils package).<br>
 <br>
@@ -986,7 +1023,7 @@ clear. When sg_dd detects RECOVERED ERRORs it reports them, counts
 them and continues the copy. Only the lba of the last recovered error
 in a READ or WRITE SCSI
 command is reported so there could be more than one recovered error per
-SCSI command. The 'bpt=1' option
+SCSI command. The bpt=1 option
 could be chosen to limit every SCSI command to a single block transfer
 (but that would slow things down a fair amount). If the count of
 recovered errors is greater than zero at the end of the copy then this
@@ -1027,12 +1064,14 @@ lot of output.</li>
 All verbose output is sent to stderr (so that sg_dd usage with "of=-"
 (copy output to stdout) is not corrupted).<br>
 <br>
-Following is an example of using 'verbose=1' to find information about
-/dev/sda . If no copy is required then setting 'count=0' will see to
-that. Since "dev/sda" is a block device then it would normally be
-accessed via Unix system commands. The 'verbose=1' output is relatively
-short when 'blk_sgio=0' (its default value). The second invocation is
-with 'blk_sgio=1' and a lot more is output. That includes INQUIRY
+Following is an example of using verbose=1 to find information about
+<span style="font-family: monospace;">/dev/sda</span> . If no copy is
+required then setting count=0 will see to
+that. Since <span style="font-family: monospace;">/dev/sda</span> is a
+block device then it would normally be
+accessed via Unix system commands. The verbose=1 output is relatively
+short when blk_sgio=0 (its default value). The second invocation is
+with blk_sgio=1 and a lot more is output. That includes INQUIRY
 standard response data (e.g. "SEAGATE ..." line).
 See the SBC-2 drafts at <a href="http://www.t10.org/">www.t10.org</a>
 for more information.<br>
@@ -1088,8 +1127,10 @@ have their own man pages.<br>
 (default: 4 threads) to potentially speed the copy. The syntax and
 semantics of sgp_dd are very similar to sg_dd. The "continue on error"
 processing in sgp_dd is simpler than what is described above for sg_dd.
-Instead of the 'verbose=&lt;n&gt;' option used by sg_dd, sgp_dd uses
-'deb=&lt;n&gt;' which does a similar thing.<br>
+Instead of the verbose=<span style="font-style: italic;">VERB</span>
+option used by sg_dd, sgp_dd uses
+'deb=<span style="font-style: italic;">VERB</span>' which does a
+similar thing.<br>
 <br>
 <span style="font-weight: bold;">sgm_dd</span> uses memory mapped IO to
 speed copies from or to sg device nodes. Memory mapped IO will bypass
@@ -1101,13 +1142,17 @@ there are various low level details (e.g. alignment and signal
 processing) that complicate the picture.<br>
 <br>
 <span style="font-weight: bold;">sg_read</span> uses a similar syntax
-to sg_dd but has no 'of=&lt;ofile&gt;'. It is designed to measure the
+to sg_dd but has no 'of=<span style="font-style: italic;">OFILE</span>'.
+It is designed to measure the
 performance of device (e.g. disk) caches, the throughput of the
 transport and command overhead. It perform a read (either a SCSI READ
 command or a Unix read()) from the given skip block address (default is
-logical block address 0) and continues doing reads until
-'count=&lt;blocks&gt;' is exhausted. If multiple reads are&nbsp;
-performed (i.e. when "count &gt; bpt") then they are all from the same
+logical block address 0) and continues doing reads until count=<span
+ style="font-style: italic;">COUNT</span> is exhausted. If multiple
+reads are&nbsp;
+performed (i.e. when "<span style="font-style: italic;">COUNT</span>
+&gt; <span style="font-style: italic;">BPT</span>") then they are all
+from the same
 logical address. For example, with SCSI READs, exactly the same READ
 cdb is issued for each read operation. The data is thrown away. Zero
 block reads can also be issued using a negative count value. This is
@@ -1122,7 +1167,7 @@ MEDIUM errors, while recovering as much data as possible.<br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 15th October 2006<br>
+<p>Last updated: 24th January 2007<br>
 <br>
 </p>
 </center>

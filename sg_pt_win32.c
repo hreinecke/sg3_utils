@@ -27,10 +27,11 @@
  *
  */
 
-/* version 1.00 2006/10/6 */
+/* version 1.01 2006/11/19 */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>

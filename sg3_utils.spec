@@ -1,21 +1,15 @@
-%define name    sg3_utils
-%define version 1.22
-%define release 1
-
-%define major   1
-%define minor   0
-%define libname %{_lib}sgutils-%{major}_%{minor}
-
-Summary:        Utilities for SCSI devices in Linux
-Name:           %{name}
-Version:        %{version}
-Release:        %{release}
-License:        GPL/FreeBSD
-Group:          Utilities/System
-URL:            http://www.torque.net/sg/sg3_utils.html
-Source0:        http://www.torque.net/sg/p/%{name}-%{version}.tgz
-BuildRoot:      %{_tmppath}/%{name}-%{version}-root
-Packager:       Douglas Gilbert <dgilbert at interlog dot com>
+Summary: Utilities for devices that use SCSI command sets
+Name: sg3_utils
+Version: 1.23
+Release: 1%{?dist}
+License: GPL
+Group: Utilities/System
+Source: ftp://www.torque.net/sg/p/sg3_utils-%{version}.tgz
+Url: http://www.torque.net/sg/sg3_utils.html
+Provides: sg_utils
+BuildRequires: libtool
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+Packager: Douglas Gilbert <dougg@torque.net>
 
 %description
 Collection of Linux utilities for devices that use the SCSI command set.
@@ -31,64 +25,52 @@ well (e.g. /dev/sda).
 Warning: Some of these tools access the internals of your system
 and the incorrect usage of them may render your system inoperable.
 
-%package -n     %{libname}
-Summary:        Shared library for %{name}
-Group:          System/Libraries
+%package libs
+Summary: Shared library for %{name}
+Group: System/Libraries
 
-%description -n %{libname}
+%description libs
 This package contains the shared library for %{name}.
 
-%package -n     %{libname}-devel
-Summary:        Static library and header files for the sgutils library
-Group:          Development/C
-Obsoletes:      %{name}-devel
-Provides:       %{name}-devel
-Provides:       libsgutils-devel
-Requires:       %{libname} = %{version}-%{release}
+%package devel
+Summary: Static library and header files for the sgutils library
+Group: Development/C
+Requires: %{name}-libs = %{version}-%{release}
 
-%description -n %{libname}-devel
-This package contains the static sgutils library and its header
-files.
+%description devel
+This package contains the static %{name} library and its header files for
+developing applications.
 
 %prep
-
 %setup -q
 
 %build
-
-make \
-     CFLAGS="%{optflags}" \
-     LIBDIR="%{_libdir}"
+make
 
 %install
-[ "%{buildroot}" != "/" ] && rm -rf %{buildroot}
-
-make install \
-        PREFIX=%{_prefix} \
-        LIBDIR=%{buildroot}/%{_libdir} \
-        INSTDIR=%{buildroot}/%{_bindir} \
-        MANDIR=%{buildroot}/%{_mandir} \
-        INCLUDEDIR=%{buildroot}/%{_includedir} \
-        LIB_VINFO=1:0:0
-
-%post -n %{libname} -p /sbin/ldconfig
-
-%postun -n %{libname} -p /sbin/ldconfig
+if [ "$RPM_BUILD_ROOT" != "/" ]; then
+        rm -rf $RPM_BUILD_ROOT
+fi
+%ifarch sparc64 ppc64 s390x x86_64
+make install PREFIX=$RPM_BUILD_ROOT/usr LIBDIR=$RPM_BUILD_ROOT/usr/lib64
+%else
+make install PREFIX=$RPM_BUILD_ROOT/usr
+%endif
 
 %clean
-[ "%{buildroot}" != "/" ] && rm -rf %{buildroot}
+rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc CHANGELOG COPYING COVERAGE CREDITS INSTALL README README.sg_start
-%attr(0755,root,root) %{_bindir}/*
+%doc CHANGELOG COVERAGE CREDITS INSTALL README README.sg_start
+%attr(755,root,root) %{_bindir}/*
 %{_mandir}/man8/*
 
-%files -n %{libname}
+%files libs
 %defattr(-,root,root)
 %{_libdir}/*.so.*
 
-%files -n %{libname}-devel
+%files devel
 %defattr(-,root,root)
 %{_includedir}/scsi/*.h
 %{_libdir}/*.so
@@ -96,6 +78,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Wed Jan 31 2007 - dgilbert at interlog dot com
+- add sg_read_buffer + sg_write_buffer
+  * sg3_utils-1.23
+
 * Mon Oct 16 2006 - dgilbert at interlog dot com
 - add sg_sat_identify, expand sg_format and sg_requests
   * sg3_utils-1.22

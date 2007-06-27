@@ -1,17 +1,17 @@
-.TH SG_RESET "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
+.TH SG_RESET "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_reset \- sends SCSI device, bus or host reset; or checks reset state
 .SH SYNOPSIS
 .B sg_reset
-[\fI-b\fR] [\fI-d\fR] [\fI-h\fR] [\fI-V\fR] 
-<\fIscsi_device\fR>
+[\fI\-b\fR] [\fI\-d\fR] [\fI\-h\fR] [\fI\-V\fR] 
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-The sg_reset utility with no options (other than the device name)
-reports on the reset state (e.g. if a reset is underway) of the
-given device. When given a '-d', '-b', or '-h' option it requests
-a device, bus or host reset respectively.
+The sg_reset utility with no options (other than \fIDEVICE\fR) reports on
+the reset state (e.g. if a reset is underway) of \fIDEVICE\fR. When given
+a \fI\-d\fR, \fI\-b\fR, or \fI\-h\fR option it requests a device, bus or
+host reset respectively.
 .PP
 In the linux kernel 2.6 series this utility can be called on sd,
 sr (cd/dvd), st or sg device nodes; if the user has appropriate
@@ -21,22 +21,26 @@ In the linux kernel 2.4 series support for this utility first
 appeared in lk 2.4.19 and could only be called on sg device
 nodes. Various vendors made this capability available in their
 kernels prior to lk 2.4.19.
+.SH OPTIONS
 .TP
--b
+\fB\-b\fR
 attempt a SCSI bus reset. This would normally be tried if the
-device reset (i.e. option '-d') was not successful.
+device reset (i.e. option \fI\-d\fR) was not successful.
 .TP
--d
+\fB\-d\fR
 attempt a SCSI device reset. If the device seems stuck, this is
 the first reset that should be tried. This assumes the linux
 scsi mid level error handler is not already in the process
-of resetting this device.
+of resetting \fIDEVICE\fR.
 .TP
--h
+\fB\-h\fR
 attempt a host adapter reset. This would normally be tried if both
-device reset (i.e. option '-d') and bus reset (i.e. option '-b')
+device reset (i.e. option \fI\-d\fR) and bus reset (i.e. option \fI\-b\fR)
 were not successful.
-.PP
+.TP
+\fB\-V\fR
+prints the version string then exits.
+.SH NOTES
 The error recovery code within the linux kernel when faced
 with SCSI commands timing out and no response from the
 device (LU), first tries a device reset and if that is
@@ -47,7 +51,7 @@ to reset with this utility. The "device,bus,host"
 order is also recommended (i.e. first start with the smallest
 hammer).
 .PP
-SAM-4 defines a hard reset (which includes a device power on
+SAM\-4 defines a hard reset (which includes a device power on
 and a transport reset), a logical unit reset and a I_T nexus
 reset. A LU reset and an I_T nexus reset can be requested via
 task management function (and support for LU reset is mandatory).
@@ -55,17 +59,17 @@ In Linux the SCSI subsystem leaves it up to the low level drivers
 as to whether a "device reset" is only for the addressed LU or
 all the LUs in the device that contains the addressed LU.
 The "bus reset" is a transport reset. A "host reset" attempts
-to re-initialize the HBA that the request passes through on
-route to the given device. Obviously a "host reset" and
+to re\-initialize the HBA that the request passes through on
+route to the \fIDEVICE\fR. Obviously a "host reset" and
 a "bus reset" can cause collateral damage.
 .PP
 This utility does not allow individual SCSI commands (or tasks
-as they are called in SAM-4) to be aborted. SAM-4 defines
+as they are called in SAM\-4) to be aborted. SAM\-4 defines
 ABORT TASK and ABORT TASK SET task management functions for that.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH COPYRIGHT
-Copyright \(co 1999-2006 Douglas Gilbert
+Copyright \(co 1999\-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+
 #ifdef SG3_UTILS_LINUX
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -15,8 +19,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2006 D. Gilbert
+/* A utility program originally written for the Linux OS SCSI subsystem.
+*  Copyright (C) 2000-2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -59,27 +63,34 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.65 20061007";    /* spc-4 rev 07 */
+static char * version_str = "0.70 20070125";    /* spc-4 rev 08 */
 
 
-#define SUPPORTED_VPDS_VPD 0x0
-#define UNIT_SERIAL_NUM_VPD 0x80
-#define DEV_ID_VPD  0x83
-#define SOFTW_INF_ID_VPD 0x84
-#define MAN_NET_ADDR_VPD  0x85
-#define X_INQ_VPD  0x86
-#define MODE_PG_POLICY_VPD  0x87
-#define SCSI_PORTS_VPD  0x88
-#define ATA_INFO_VPD  0x89
-#define BLOCK_LIMITS_VPD  0xb0
-#define UPR_EMC_VPD  0xc0
-#define RDAC_VERS_VPD 0xc2
-#define RDAC_VAC_VPD 0xc9
+#define VPD_SUPPORTED_VPDS 0x0
+#define VPD_UNIT_SERIAL_NUM 0x80
+#define VPD_DEVICE_ID  0x83
+#define VPD_SOFTW_INF_ID 0x84
+#define VPD_MAN_NET_ADDR  0x85
+#define VPD_EXT_INQ  0x86
+#define VPD_MODE_PG_POLICY  0x87
+#define VPD_SCSI_PORTS  0x88
+#define VPD_ATA_INFO  0x89
+#define VPD_BLOCK_LIMITS  0xb0
+#define VPD_UPR_EMC  0xc0
+#define VPD_RDAC_VERS 0xc2
+#define VPD_RDAC_VAC 0xc9
+
+/* values for selection one or more associations (2**vpd_assoc),
+   except _AS_IS */
+#define VPD_DI_SEL_LU 1
+#define VPD_DI_SEL_TPORT 2
+#define VPD_DI_SEL_TARGET 4
+#define VPD_DI_SEL_AS_IS 32
 
 #define DEF_ALLOC_LEN 252
 #define SAFE_STD_INQ_RESP_LEN 36
 #define MX_ALLOC_LEN (0xc000 + 0x80)
-#define ATA_INFO_VPD_LEN  572
+#define VPD_ATA_INFO_LEN  572
 
 
 static unsigned char rsp_buff[MX_ALLOC_LEN + 1];
@@ -96,17 +107,144 @@ static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
                             int do_verbose);
 #endif
 
+/* This structure is a duplicate of one of the same name in sg_vpd_vendor.c .
+   Take care that both have the same fields (and types). */
+struct svpd_values_name_t {
+    int value;
+    int subvalue;
+    int pdt;         /* peripheral device type id, -1 is the default */
+                     /* (all or not applicable) value */
+    int ro_vendor;   /* read-only or vendor flag */
+    const char * acron;
+    const char * name;
+};
+
+static struct svpd_values_name_t vpd_pg[] = {
+    {VPD_ATA_INFO, 0, -1, 0, "ai", "ATA information (SAT)"},
+    {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
+    {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
+#if 0
+    {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
+     "but designators ordered as found"},
+    {VPD_DEVICE_ID, VPD_DI_SEL_LU, -1, 0, "di_lu", "Device identification, "
+     "lu only"},
+    {VPD_DEVICE_ID, VPD_DI_SEL_TPORT, -1, 0, "di_port", "Device "
+     "identification, target port only"},
+    {VPD_DEVICE_ID, VPD_DI_SEL_TARGET, -1, 0, "di_target", "Device "
+     "identification, target device only"},
+#endif
+    {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
+    {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
+    {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
+    {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
+    {VPD_UNIT_SERIAL_NUM, 0, -1, 0, "sn", "Unit serial number"},
+    {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
+    {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
+    {VPD_UPR_EMC, 0, -1, 0, "upr", "Unit path report (EMC)"},
+    {VPD_RDAC_VERS, 0, -1, 0, "rdac_vers", "RDAC software version (IBM)"},
+    {VPD_RDAC_VAC, 0, -1, 0, "rdac_vac", "RDAC volume access control (IBM)"},
+    {0, 0, 0, 0, NULL, NULL},
+};
+
+static struct option long_options[] = {
+#ifdef SG3_UTILS_LINUX
+        {"ata", 0, 0, 'a'},
+#endif
+        {"cmddt", 0, 0, 'c'},
+        {"descriptors", 0, 0, 'd'},
+        {"extended", 0, 0, 'x'},
+        {"help", 0, 0, 'h'},
+        {"hex", 0, 0, 'H'},
+        {"id", 0, 0, 'i'},
+        {"len", 1, 0, 'l'},
+        {"new", 0, 0, 'N'},
+        {"old", 0, 0, 'O'},
+        {"page", 1, 0, 'p'},
+        {"raw", 0, 0, 'r'},
+        {"verbose", 0, 0, 'v'},
+        {"version", 0, 0, 'V'},
+        {0, 0, 0, 0},
+};
+
+struct opts_t {
+    int do_ata;
+    int do_cmddt;
+    int do_descriptors;
+    int do_help;
+    int do_hex;
+    int do_raw;
+    int do_verbose;
+    int do_version;
+    int do_decode;
+    int do_vpd;
+    int resp_len;
+    int page_num;
+    int num_pages;
+    int num_opcodes;
+    int p_given;
+    const char * page_arg;
+    const char * device_name;
+    int opt_new;
+};
 
 static void usage()
 {
 #ifdef SG3_UTILS_LINUX
     fprintf(stderr,
+            "Usage: sg_inq [--ata] [--cmddt] [--descriptors] [--extended] "
+            "[--help] [--hex]\n"
+            "              [--id] [--len=LEN] [--page=PG] [--raw] "
+            "[--verbose] [--version]\n"
+            "              DEVICE\n"
+            "  where:\n"
+            "    --ata|-a        treat DEVICE as (directly attached) ATA "
+            "device\n");
+#else
+    fprintf(stderr,
+            "Usage: sg_inq [--cmddt] [--descriptors] [--extended] [--help] "
+            "[--hex] [--id]\n"
+            "              [--len=LEN] [--page=PG] [--raw] [--verbose] "
+            "[--version]\n"
+            "              DEVICE\n"
+            "  where:\n");
+#endif
+    fprintf(stderr,
+            "    --cmddt|-c      command support data mode (set opcode "
+            "with '--page=PG')\n"
+            "                    use twice for list of supported "
+            "commands; obsolete\n"
+            "    --descriptors|-d    fetch and decode version descriptors\n"
+            "    --extended|-e|-x    decode extended INQUIRY data VPD page "
+            "(0x86)\n"
+            "    --help|-h       print usage message then exit\n"
+            "    --hex|-H        output response in hex\n"
+            "    --id|-i         decode device identification VPD page "
+            "(0x83)\n"
+            "    --len=LEN|-l LEN    requested response length (def: 0 "
+            "-> fetch 36\n"
+            "                        bytes first, then fetch again as "
+            "indicated)\n"
+            "    --page=PG|-p PG     Vital Product Data (VPD) page number "
+            "or\n"
+            "                        abbreviation (opcode number if "
+            "'--cmddt' given)\n"
+            "    --raw|-r        output response in binary (to stdout)\n"
+            "    --verbose|-v    increase verbosity\n"
+            "    --version|-V    print version string then exit\n\n"
+            "Performs a SCSI INQUIRY command.\n"
+            "If no options given then does a 'standard' INQUIRY.\n");
+}
+
+static void usage_old()
+{
+#ifdef SG3_UTILS_LINUX
+    fprintf(stderr,
             "Usage:  sg_inq [-a] [-A] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
             "[-i]\n"
-            "               [-l=<resp_len>] [-m] [-M] [-o=<opcode_page>] "
-            "[-p=<vpd_page>]\n"
+            "               [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
+            "[-p=VPD_PG]\n"
             "               [-P] [-r] [-s] [-v] [-V] [-x] [-36] [-?] "
-            "<device>\n"
+            "DEVICE\n"
             "  where:\n"
             "    -a    decode ATA information VPD page (0x89)\n"
             "    -A    treat <device> as (directly attached) ATA device\n");
@@ -114,10 +252,10 @@ static void usage()
     fprintf(stderr,
             "Usage:  sg_inq [-a] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
             "[-i]\n"
-            "               [-l=<resp_len>] [-m] [-M] [-o=<opcode_page>] "
-            "[-p=<vpd_page>]\n"
+            "               [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
+            "[-p=VPD_PG]\n"
             "               [-P] [-r] [-s] [-v] [-V] [-x] [-36] [-?] "
-            "<device>\n"
+            "DEVICE\n"
             "  where:\n"
             "    -a    decode ATA information VPD page (0x89)\n");
 
@@ -131,14 +269,17 @@ static void usage()
             "    -h    output in hex (ASCII to the right)\n"
             "    -H    output in hex (ASCII to the right) [same as '-h']\n"
             "    -i    decode device identification VPD page (0x83)\n"
-            "    -l=<resp_len>   requested response length (def: 36)\n"
+            "    -l=LEN    requested response length (def: 0 "
+            "-> fetch 36\n"
+            "                    bytes first, then fetch again as "
+            "indicated)\n"
             "    -m    decode management network addresses VPD page "
             "(0x85)\n"
             "    -M    decode mode page policy VPD page (0x87)\n"
-            "    -o=<opcode_page>   opcode or page code in hex (def: 0)\n"
-            "    -p=<vpd_page>   vpd page code in hex (def: 0)\n"
+            "    -o=OPCODE_PG    opcode or page code in hex (def: 0)\n"
+            "    -p=VPD_PG    vpd page code in hex (def: 0)\n"
             "    -P    decode Unit Path Report VPD page (0xc0) (EMC)\n"
-            "    -r    output raw binary data ('-rr': output for hdparm)\n"
+            "    -r    output response in binary ('-rr': output for hdparm)\n"
             "    -s    decode SCSI Ports VPD page (0x88)\n"
             "    -v    verbose (output cdb and, if non-zero, resid)\n"
             "    -V    output version string\n"
@@ -148,6 +289,300 @@ static void usage()
             "If no options given then does a standard SCSI INQUIRY\n");
 }
 
+static void usage_for(const struct opts_t * optsp)
+{
+    if (optsp->opt_new)
+        usage();
+    else
+        usage_old();
+}
+
+static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+{
+    int c, n;
+
+    while (1) {
+        int option_index = 0;
+
+#ifdef SG3_UTILS_LINUX
+        c = getopt_long(argc, argv, "acdehHil:NOp:rvVx", long_options,
+                        &option_index);
+#else
+        c = getopt_long(argc, argv, "cdehHil:NOp:rvVx", long_options,
+                        &option_index);
+#endif
+        if (c == -1)
+            break;
+
+        switch (c) {
+#ifdef SG3_UTILS_LINUX
+        case 'a':
+            ++optsp->do_ata;
+            break;
+#endif
+        case 'c':
+            ++optsp->do_cmddt;
+            break;
+        case 'd':
+            ++optsp->do_descriptors;
+            break;
+        case 'e':
+        case 'x':
+            ++optsp->do_decode;
+            optsp->page_num = VPD_EXT_INQ;
+            break;
+        case 'h':
+        case '?':
+            ++optsp->do_help;
+            break;
+        case 'H':
+            ++optsp->do_hex;
+            break;
+        case 'i':
+            ++optsp->do_decode;
+            optsp->page_num = VPD_DEVICE_ID;
+            break;
+        case 'l':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 65532)) {
+                fprintf(stderr, "bad argument to '--len='\n");
+                usage_for(optsp);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            optsp->resp_len = n;
+        case 'N':
+            break;      /* ignore */
+        case 'O':
+            optsp->opt_new = 0;
+            return 0;
+        case 'p':
+            optsp->page_arg = optarg;
+            ++optsp->p_given;
+            break;
+        case 'r':
+            ++optsp->do_raw;
+            break;
+        case 'v':
+            ++optsp->do_verbose;
+            break;
+        case 'V':
+            ++optsp->do_version;
+            break;
+        default:
+            fprintf(stderr, "unrecognised switch code %c [0x%x]\n", c, c);
+            if (optsp->do_help)
+                break;
+            usage_for(optsp);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    if (optind < argc) {
+        if (NULL == optsp->device_name) {
+            optsp->device_name = argv[optind];
+            ++optind;
+        }
+        if (optind < argc) {
+            for (; optind < argc; ++optind)
+                fprintf(stderr, "Unexpected extra argument: %s\n",
+                        argv[optind]);
+            usage_for(optsp);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    return 0;
+}
+
+static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+{
+    int k, jmp_out, plen, num, n;
+    const char * cp;
+
+    for (k = 1; k < argc; ++k) {
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case '3':
+                    if ('6' == *(cp + 1)) {
+                        optsp->resp_len = 36;
+                        --plen;
+                        ++cp;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 'a':
+                    optsp->page_num = VPD_ATA_INFO;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+#ifdef SG3_UTILS_LINUX
+                case 'A':
+                    ++optsp->do_ata;
+                    break;
+#endif
+                case 'b':
+                    optsp->page_num = VPD_BLOCK_LIMITS;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+                case 'c':
+                    ++optsp->do_cmddt;
+                    if ('l' == *(cp + 1)) {
+                        ++optsp->do_cmddt;
+                        --plen;
+                        ++cp;
+                    }
+                    break;
+                case 'd':
+                    ++optsp->do_descriptors;
+                    ++optsp->do_decode;
+                    break;
+                case 'e':
+                    ++optsp->do_vpd;
+                    break;
+                case 'h':
+                case 'H':
+                    ++optsp->do_hex;
+                    break;
+                case 'i':
+                    optsp->page_num = VPD_DEVICE_ID;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+                case 'm':
+                    optsp->page_num = VPD_MAN_NET_ADDR;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+                case 'M':
+                    optsp->page_num = VPD_MODE_PG_POLICY;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+                case 'N':
+                    optsp->opt_new = 1;
+                    return 0;
+                case 'O':
+                    break;
+                case 'P':
+                    optsp->page_num = VPD_UPR_EMC;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+                case 'r':
+                    ++optsp->do_raw;
+                    break;
+                case 's':
+                    optsp->page_num = VPD_SCSI_PORTS;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+                case 'v':
+                    ++optsp->do_verbose;
+                    break;
+                case 'V':
+                    ++optsp->do_version;
+                    break;
+                case 'x':
+                    optsp->page_num = VPD_EXT_INQ;
+                    ++optsp->do_vpd;
+                    ++optsp->num_pages;
+                    break;
+                case '?':
+                    ++optsp->do_help;
+                    break;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
+            }
+            if (plen <= 0)
+                continue;
+            else if (0 == strncmp("l=", cp, 2)) {
+                num = sscanf(cp + 2, "%d", &n);
+                if ((1 != num) || (n < 1)) {
+                    fprintf(stderr, "Inappropriate value after 'l=' "
+                            "option\n");
+                    usage_for(optsp);
+                    return SG_LIB_SYNTAX_ERROR;
+                } else if (n > MX_ALLOC_LEN) {
+                    fprintf(stderr, "value after 'l=' "
+                            "option too large\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                optsp->resp_len = n;
+            } else if (0 == strncmp("o=", cp, 2)) {
+                optsp->page_arg = cp + 2;
+                ++optsp->num_opcodes;
+            } else if (0 == strncmp("p=", cp, 2)) {
+                optsp->page_arg = cp + 2;
+                ++optsp->p_given;
+            } else if (0 == strncmp("-old", cp, 4))
+                ;
+            else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage_for(optsp);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == optsp->device_name)
+            optsp->device_name = cp;
+        else {
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", optsp->device_name, cp);
+            usage_for(optsp);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    return 0;
+}
+
+static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+{
+    int res;
+    char * cp;
+
+    cp = getenv("SG3_UTILS_OLD_OPTS");
+    if (cp) {
+        optsp->opt_new = 0;
+        res = process_cl_old(optsp, argc, argv);
+        if ((0 == res) && optsp->opt_new)
+            res = process_cl_new(optsp, argc, argv);
+    } else {
+        optsp->opt_new = 1;
+        res = process_cl_new(optsp, argc, argv);
+        if ((0 == res) && (0 == optsp->opt_new))
+            res = process_cl_old(optsp, argc, argv);
+    }
+    return res;
+}
+
+static const struct svpd_values_name_t *
+                sdp_find_vpd_by_acron(const char * ap)
+{
+    const struct svpd_values_name_t * vnp;
+
+    for (vnp = vpd_pg; vnp->acron; ++vnp) {
+        if (0 == strcmp(vnp->acron, ap))
+            return vnp;
+    }
+    return NULL;
+}
+
+static void enumerate_vpds()
+{
+    const struct svpd_values_name_t * vnp;
+
+    for (vnp = vpd_pg; vnp->acron; ++vnp) {
+        if (vnp->name && (0 == vnp->ro_vendor))
+            printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
+                   vnp->name);
+    }
+}
 
 static void dStrRaw(const char* str, int len)
 {
@@ -164,18 +599,18 @@ struct vpd_name {
 };
 
 static struct vpd_name vpd_name_arr[] = {
-    {SUPPORTED_VPDS_VPD, 0, "Supported VPD pages"},
-    {UNIT_SERIAL_NUM_VPD, 0, "Unit serial number"},
+    {VPD_SUPPORTED_VPDS, 0, "Supported VPD pages"},
+    {VPD_UNIT_SERIAL_NUM, 0, "Unit serial number"},
     {0x81, 0, "Implemented operating definitions (obsolete)"},
     {0x82, 0, "ASCII implemented operating definition (obsolete)"},
-    {DEV_ID_VPD, 0, "Device identification"},
-    {SOFTW_INF_ID_VPD, 0, "Software interface identification"},
-    {MAN_NET_ADDR_VPD, 0, "Management network addresses"},
-    {X_INQ_VPD, 0, "Extended INQUIRY data"},
-    {MODE_PG_POLICY_VPD, 0, "Mode page policy"},
-    {SCSI_PORTS_VPD, 0, "SCSI ports"},
-    {ATA_INFO_VPD, 0, "ATA information"},
-    {BLOCK_LIMITS_VPD, 0, "Block limits (sbc2)"}, 
+    {VPD_DEVICE_ID, 0, "Device identification"},
+    {VPD_SOFTW_INF_ID, 0, "Software interface identification"},
+    {VPD_MAN_NET_ADDR, 0, "Management network addresses"},
+    {VPD_EXT_INQ, 0, "Extended INQUIRY data"},
+    {VPD_MODE_PG_POLICY, 0, "Mode page policy"},
+    {VPD_SCSI_PORTS, 0, "SCSI ports"},
+    {VPD_ATA_INFO, 0, "ATA information"},
+    {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"}, 
     {0xb0, 0x1, "Sequential access device capabilities (ssc3)"},
     {0xb2, 0x1, "TapeAlert supported flags (ssc3)"},
     {0xb0, 0x11, "OSD information (osd)"},
@@ -492,7 +927,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                         id_ext <<= 8;
                     id_ext |= ip[m];
                 }
-                printf("      Identifier extension: 0x%llx\n", id_ext);
+                printf("      Identifier extension: 0x%" PRIx64 "\n", id_ext);
             } else if ((8 != i_len) && (12 != i_len)) {
                 fprintf(stderr, "      << can only decode 8, 12 and 16 "
                         "byte ids>>\n");
@@ -508,8 +943,8 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                     vsei <<= 8;
                 vsei |= ip[ci_off + 3 + m];
             }
-            printf("      Vendor Specific Extension Identifier: 0x%llx\n",
-                   vsei);
+            printf("      Vendor Specific Extension Identifier: 0x%" PRIx64
+                   "\n", vsei);
             if (12 == i_len) {
                 d_id = ((ip[8] << 24) | (ip[9] << 16) | (ip[10] << 8) |
                         ip[11]);
@@ -565,8 +1000,8 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                     vsei |= ip[3 + m];
                 }
                 printf("      NAA 5, IEEE Company_id: 0x%x\n", c_id);
-                printf("      Vendor Specific Identifier: 0x%llx\n",
-                       vsei);
+                printf("      Vendor Specific Identifier: 0x%" PRIx64
+                       "\n", vsei);
                 printf("      [0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
@@ -586,7 +1021,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                     vsei |= ip[3 + m];
                 }
                 printf("      NAA 6, IEEE Company_id: 0x%x\n", c_id);
-                printf("      Vendor Specific Identifier: 0x%llx\n",
+                printf("      Vendor Specific Identifier: 0x%" PRIx64 "\n",
                        vsei);
                 vsei = 0;
                 for (m = 0; m < 8; ++m) {
@@ -595,7 +1030,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                     vsei |= ip[8 + m];
                 }
                 printf("      Vendor Specific Identifier Extension: "
-                       "0x%llx\n", vsei);
+                       "0x%" PRIx64 "\n", vsei);
                 printf("      [0x");
                 for (m = 0; m < 16; ++m)
                     printf("%02x", (unsigned int)ip[m]);
@@ -673,7 +1108,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
     unsigned long long ull;
     int bump;
 
-    for (k = 0, bump; k < len; k += bump, ucp += bump) {
+    for (k = 0, bump = 24; k < len; k += bump, ucp += bump) {
         if ((len < 24) || (0 != (len % 4)))
             printf("%sTransport Id short or not multiple of 4 "
                    "[length=%d]:\n", leadin, len);
@@ -742,7 +1177,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                     ull <<= 8;
                 ull |= ucp[4 + j];
             }
-            printf("%s  SAS address: 0x%llx\n", leadin, ull);
+            printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
@@ -787,8 +1222,9 @@ static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  GRP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d SIMPSUP=%d\n",
            !!(buff[5] & 0x10), !!(buff[5] & 0x8), !!(buff[5] & 0x4),
            !!(buff[5] & 0x2), !!(buff[5] & 0x1));
-    printf("  CORR_D_SUP=%d NV_SUP=%d V_SUP=%d\n", !!(buff[6] & 0x80),
-           !!(buff[6] & 0x2), !!(buff[6] & 0x1));
+    printf("  CORR_D_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
+           !!(buff[6] & 0x4), !!(buff[6] & 0x2), !!(buff[6] & 0x1),
+           !!(buff[7] & 0x1));
 }
 
 static void decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
@@ -1094,32 +1530,45 @@ static int fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len,
     sz = sizeof(b);
     memset(b, 0xff, 4); /* guard against empty response */
     /* first check if unit serial number VPD page is supported */
-    res = sg_ll_inquiry(sg_fd, 0, 1, SUPPORTED_VPDS_VPD, b, sz, 0,
-                        verbose);
+    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_SUPPORTED_VPDS, b, sz, 0, verbose);
     if (0 == res) {
-        if ((SUPPORTED_VPDS_VPD != b[1]) || (0x0 != b[2]))
+        if ((VPD_SUPPORTED_VPDS != b[1]) || (0x0 != b[2])) {
+            if (verbose > 2)
+                fprintf(stderr, "fetch_unit_serial_num: bad supported VPDs "
+                        "page\n");
             return SG_LIB_CAT_MALFORMED;
+        }
         len = b[3];
         for (k = 0; k < len; ++k) {
-            if (UNIT_SERIAL_NUM_VPD == b[k + 4])
+            if (VPD_UNIT_SERIAL_NUM == b[k + 4])
                 break;
         }
         if (k < len) {
-            res = sg_ll_inquiry(sg_fd, 0, 1, UNIT_SERIAL_NUM_VPD,
+            res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM,
                                 b, sz, 0, verbose);
             if (0 == res) {
                 len = b[3];
                 len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
-                if ((UNIT_SERIAL_NUM_VPD == b[1]) && (len > 0)) {
+                if ((VPD_UNIT_SERIAL_NUM == b[1]) && (len > 0)) {
                     memcpy(obuff, b + 4, len);
                     obuff[len] = '\0';
                     return 0;
-                } else
+                } else {
+                    if (verbose > 2)
+                        fprintf(stderr, "fetch_unit_serial_num: bad sn VPD "
+                                "page\n");
                     return SG_LIB_CAT_MALFORMED;
+                }
             }
-        } else
+        } else {
+            if (verbose > 2)
+                fprintf(stderr, "fetch_unit_serial_num: no supported VPDs "
+                        "page\n");
             return SG_LIB_CAT_MALFORMED;
-    }
+        }
+    } else if (verbose > 2)
+        fprintf(stderr, "fetch_unit_serial_num: fetch supported VPDs "
+                "failed\n");
     return res;
 }
 
@@ -1146,25 +1595,21 @@ static const char * get_ansi_version_str(int version, char * buff,
 
 
 /* Returns 0 if successful */
-static int process_std_inq(int sg_fd, const char * file_name, int do_36,
-                           int resp_len, int do_vdescriptors, int do_hex,
-                           int do_raw, int do_verbose)
+static int process_std_inq(int sg_fd, const struct opts_t * optsp)
 {
-    int res, len, act_len, pqual, peri_type, ansi_version, k, j;
+    int res, len, rlen, act_len, pqual, peri_type, ansi_version, k, j;
     const char * cp;
     int vdesc_arr[8];
     char buff[48];
+    int verb;
 
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
-    if (resp_len > 0)
-        res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff,
-                            resp_len, 0, do_verbose);
-    else
-        res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff,
-                            SAFE_STD_INQ_RESP_LEN, 0, do_verbose);
+    rlen = (optsp->resp_len > 0) ? optsp->resp_len : SAFE_STD_INQ_RESP_LEN;
+    verb = optsp->do_verbose;
+    res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, 0, verb);
     if (0 == res) {
         pqual = (rsp_buff[0] & 0xe0) >> 5;
-        if (! do_raw) {
+        if (! optsp->do_raw) {
             if (0 == pqual)
                 printf("standard INQUIRY:\n");
             else if (1 == pqual)
@@ -1180,28 +1625,29 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
         len = rsp_buff[4] + 5;
         ansi_version = rsp_buff[2] & 0x7;
         peri_type = rsp_buff[0] & 0x1f;
-        if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) && (! do_36) &&
-            (0 == resp_len)) {
-            if (sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, len, 1, do_verbose)) {
+        if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) &&
+            (0 == optsp->resp_len)) {
+            rlen = len;
+            memset(rsp_buff, 0, rlen);
+            if (sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, 1, verb)) {
                 fprintf(stderr, "second INQUIRY (%d byte) failed\n", len);
                 return SG_LIB_CAT_OTHER;
             }
             if (len != (rsp_buff[4] + 5)) {
-                fprintf(stderr,
-                        "strange, twin INQUIRYs yield different "
-                        "'additional length'\n");
+                fprintf(stderr, "strange, twin INQUIRYs yield different "
+                        "'additional lengths'\n");
                 res = SG_LIB_CAT_MALFORMED;
+                len = rsp_buff[4] + 5;
             }
         }
-        if (do_36) {
-            act_len = len;
-            len = SAFE_STD_INQ_RESP_LEN;
-        } else
-            act_len = len;
-        if (do_hex)
-            dStrHex((const char *)rsp_buff, len, 0);
-        else if (do_raw)
-            dStrRaw((const char *)rsp_buff, len);
+        if (optsp->resp_len > 0)
+            act_len = rlen;
+        else
+            act_len = (rlen < len) ? rlen : len;
+        if (optsp->do_raw)
+            dStrRaw((const char *)rsp_buff, act_len);
+        else if (optsp->do_hex)
+            dStrHex((const char *)rsp_buff, act_len, 0);
         else {
             printf("  PQual=%d  Device_type=%d  RMB=%d  version=0x%02x ",
                    pqual, peri_type, !!(rsp_buff[1] & 0x80),
@@ -1229,57 +1675,59 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
                    !!(rsp_buff[7] & 0x20), !!(rsp_buff[7] & 0x10),
                    !!(rsp_buff[7] & 0x08), !!(rsp_buff[7] & 0x04));
             printf("CmdQue=%d\n", !!(rsp_buff[7] & 0x02));
-            if (len > 56)
-                printf("  Clocking=0x%x  QAS=%d  IUS=%d\n",
+            if (act_len > 56)
+                printf("  [SPI: Clocking=0x%x  QAS=%d  IUS=%d]\n",
                        (rsp_buff[56] & 0x0c) >> 2, !!(rsp_buff[56] & 0x2),
                        !!(rsp_buff[56] & 0x1));
-            if (act_len == len)
+            if (act_len >= len)
                 printf("    length=%d (0x%x)", len, len);
             else
-                printf("    length=%d (0x%x), but only read 36 bytes", 
-                       len, len);
+                printf("    length=%d (0x%x), but only fetched %d bytes", 
+                       len, len, act_len);
             if ((ansi_version >= 2) && (len < SAFE_STD_INQ_RESP_LEN))
                 printf("  [for SCSI>=2, len>=36 is expected]");
             cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
             if (strlen(cp) > 0)
                 printf("   Peripheral device type: %s\n", cp);
 
-            if (len <= 8)
+            if (act_len <= 8)
                 printf(" Inquiry response length=%d, no vendor, "
-                       "product or revision data\n", len);
+                       "product or revision data\n", act_len);
             else {
-                if (len < SAFE_STD_INQ_RESP_LEN)
-                    rsp_buff[len] = '\0';
+                if (act_len < SAFE_STD_INQ_RESP_LEN)
+                    rsp_buff[act_len] = '\0';
                 memcpy(xtra_buff, &rsp_buff[8], 8);
                 xtra_buff[8] = '\0';
                 printf(" Vendor identification: %s\n", xtra_buff);
-                if (len <= 16)
+                if (act_len <= 16)
                     printf(" Product identification: <none>\n");
                 else {
                     memcpy(xtra_buff, &rsp_buff[16], 16);
                     xtra_buff[16] = '\0';
                     printf(" Product identification: %s\n", xtra_buff);
                 }
-                if (len <= 32)
+                if (act_len <= 32)
                     printf(" Product revision level: <none>\n");
                 else {
                     memcpy(xtra_buff, &rsp_buff[32], 4);
                     xtra_buff[4] = '\0';
                     printf(" Product revision level: %s\n", xtra_buff);
                 }
-                if (do_vdescriptors) {
-                    for (j = 0, k = 58; ((j < 8) && ((k + 1) < len));
+                if (optsp->do_descriptors) {
+                    for (j = 0, k = 58; ((j < 8) && ((k + 1) < act_len));
                          k +=2, ++j) 
                         vdesc_arr[j] = ((rsp_buff[k] << 8) +
                                          rsp_buff[k + 1]);
                 }
             }
         }
-        if (! (do_raw || do_hex || do_36 || resp_len)) {
-            if (0 == fetch_unit_serial_num(sg_fd, xtra_buff,
-                                           sizeof(xtra_buff), do_verbose))
-                printf(" Unit serial number: %s\n", xtra_buff);
-            if (do_vdescriptors) {
+        if (! (optsp->do_raw || optsp->do_hex)) {
+            if (0 == optsp->resp_len) {
+                if (0 == fetch_unit_serial_num(sg_fd, xtra_buff,
+                                   sizeof(xtra_buff), optsp->do_verbose))
+                    printf(" Unit serial number: %s\n", xtra_buff);
+            }
+            if (optsp->do_descriptors) {
                 if (0 == vdesc_arr[0])
                     printf("\n  No version descriptors available\n");
                 else {
@@ -1300,36 +1748,50 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
     } else if (res < 0) { /* could be an ATA device */
 #ifdef SG3_UTILS_LINUX
         /* Try an ATA Identify Device command */
-        res = try_ata_identify(sg_fd, do_hex, do_raw, do_verbose);
+        res = try_ata_identify(sg_fd, optsp->do_hex, optsp->do_raw,
+                               optsp->do_verbose);
         if (0 != res) {
             fprintf(stderr, "Both SCSI INQUIRY and fetching ATA information "
-                    "failed on %s\n", file_name);
+                    "failed on %s\n", optsp->device_name);
             return SG_LIB_CAT_OTHER;
         }
 #else
-        fprintf(stderr, "SCSI INQUIRY failed on %s\n", file_name);
+        fprintf(stderr, "SCSI INQUIRY failed on %s, res=%d\n",
+                optsp->device_name, res);
         return res;
 #endif
-    } else {        /* SCSI device not supporting 36 byte INQUIRY?? */
-        printf("36 byte INQUIRY failed\n");
+    } else {
+        fprintf(stderr, "    inquiry: failed requesting %d byte response: ",
+                rlen);
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "not supported (?)\n");
+        else if (SG_LIB_CAT_NOT_READY == res)
+            fprintf(stderr, "device not ready (?)\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "field in cdb illegal\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "unit attention (?)\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "aborted command\n");
+        else
+            fprintf(stderr, "res=%d\n", res);
         return res;
     }
     return 0;
 }
 
 /* Returns 0 if successful */
-static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
-                         int do_hex, int do_raw, int do_verbose)
+static int process_cmddt(int sg_fd, const struct opts_t * optsp)
 {
     int k, j, num, len, peri_type, reserved_cmddt, support_num, res;
     char op_name[128];
 
     memset(rsp_buff, 0, DEF_ALLOC_LEN);
-    if (do_cmdlst) {
+    if (optsp->do_cmddt > 1) {
         printf("Supported command list:\n");
         for (k = 0; k < 256; ++k) {
             res = sg_ll_inquiry(sg_fd, 1, 0, k, rsp_buff, DEF_ALLOC_LEN,
-                                1, do_verbose);
+                                1, optsp->do_verbose);
             if (0 == res) {
                 peri_type = rsp_buff[0] & 0x1f;
                 support_num = rsp_buff[1] & 7;
@@ -1361,22 +1823,22 @@ static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
         }
     }
     else {
-        res = sg_ll_inquiry(sg_fd, 1, 0, num_opcode, rsp_buff, 
-                            DEF_ALLOC_LEN, 1, do_verbose);
+        res = sg_ll_inquiry(sg_fd, 1, 0, optsp->page_num, rsp_buff, 
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             peri_type = rsp_buff[0] & 0x1f;
-            if (! do_raw) {
-                printf("CmdDt INQUIRY, opcode=0x%.2x:  [", num_opcode);
-                sg_get_opcode_name((unsigned char)num_opcode, peri_type, 
+            if (! optsp->do_raw) {
+                printf("CmdDt INQUIRY, opcode=0x%.2x:  [", optsp->page_num);
+                sg_get_opcode_name((unsigned char)optsp->page_num, peri_type,
                                    sizeof(op_name) - 1, op_name);
                 op_name[sizeof(op_name) - 1] = '\0';
                 printf("%s]\n", op_name);
             }
             len = rsp_buff[5] + 6;
             reserved_cmddt = rsp_buff[4];
-            if (do_hex)
+            if (optsp->do_hex)
                 dStrHex((const char *)rsp_buff, len, 0);
-            else if (do_raw)
+            else if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else {
                 const char * desc_p;
@@ -1415,36 +1877,35 @@ static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
             }
         }
         else {
-            if (! do_raw) {
-                printf("CmdDt INQUIRY, opcode=0x%.2x:  [", num_opcode);
-                sg_get_opcode_name((unsigned char)num_opcode, 0, 
+            if (! optsp->do_raw) {
+                printf("CmdDt INQUIRY, opcode=0x%.2x:  [", optsp->page_num);
+                sg_get_opcode_name((unsigned char)optsp->page_num, 0, 
                                    sizeof(op_name) - 1, op_name);
                 op_name[sizeof(op_name) - 1] = '\0';
                 printf("%s]\n", op_name);
             }
             fprintf(stderr, "CmdDt INQUIRY on opcode=0x%.2x: failed\n",
-                    num_opcode);
+                    optsp->page_num);
         }
     }
     return res;
 }
 
 /* Returns 0 if successful */
-static int process_evpd(int sg_fd, int num_opcode, int do_hex,
-                        int do_raw, int verbose)
+static int process_evpd(int sg_fd, const struct opts_t * optsp)
 {
     int res, len, num, k, peri_type, vpd;
     const char * cp;
     char buff[48];
 
     memset(rsp_buff, 0, DEF_ALLOC_LEN);
-    if (!do_raw)
-        printf("VPD INQUIRY, page code=0x%.2x:\n", num_opcode);
-    res = sg_ll_inquiry(sg_fd, 0, 1, num_opcode, rsp_buff, DEF_ALLOC_LEN,
-                        1, verbose);
+    if (! optsp->do_raw)
+        printf("VPD INQUIRY, page code=0x%.2x:\n", optsp->page_num);
+    res = sg_ll_inquiry(sg_fd, 0, 1, optsp->page_num, rsp_buff,
+                        DEF_ALLOC_LEN, 1, optsp->do_verbose);
     if (0 == res) {
         len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-        if (num_opcode != rsp_buff[1]) {
+        if (optsp->page_num != rsp_buff[1]) {
             fprintf(stderr, "invalid VPD response; probably a STANDARD "
                     "INQUIRY response\n");
             return SG_LIB_CAT_MALFORMED;
@@ -1454,16 +1915,16 @@ static int process_evpd(int sg_fd, int num_opcode, int do_hex,
                    MX_ALLOC_LEN);
             return SG_LIB_CAT_MALFORMED;
         } else if (len > DEF_ALLOC_LEN) {
-            if (sg_ll_inquiry(sg_fd, 0, 1, num_opcode, rsp_buff, len, 1, 
-                              verbose))
+            if (sg_ll_inquiry(sg_fd, 0, 1, optsp->page_num, rsp_buff, len, 1, 
+                              optsp->do_verbose))
                 return SG_LIB_CAT_OTHER;
         }
-        if (do_raw)
+        if (optsp->do_raw)
             dStrRaw((const char *)rsp_buff, len);
         else {
-            if (do_hex)
+            if (optsp->do_hex)
                 dStrHex((const char *)rsp_buff, len, 0);
-            else if (0 == num_opcode) { /* decode this mandatory page */
+            else if (0 == optsp->page_num) { /* decode this mandatory page */
                 peri_type = rsp_buff[0] & 0x1f;
                 printf("   [PQual=%d  Peripheral device type: %s]\n",
                        (rsp_buff[0] & 0xe0) >> 5, 
@@ -1482,35 +1943,45 @@ static int process_evpd(int sg_fd, int num_opcode, int do_hex,
                 dStrHex((const char *)rsp_buff, len, 0);
         }
     } else {
-        fprintf(stderr,
-                "VPD INQUIRY, page code=0x%.2x: failed\n", num_opcode);
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "    inquiry: not supported (?)\n");
+        else if (SG_LIB_CAT_NOT_READY == res)
+            fprintf(stderr, "    inquiry: device not ready (?)\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "    inquiry: field in cdb illegal (page not "
+                    "supported)\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "    inquiry: unit attention (?)\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "    inquiry: aborted command\n");
+        else
+            fprintf(stderr, "    inquiry: failed, res=%d\n", res);
     }
     return res;
 }
 
 /* Returns 0 if successful */
-static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
-                      int do_raw, int verbose)
+static int decode_vpd(int sg_fd, const struct opts_t * optsp)
 {
     int len, pdt;
     int res = 0;
 
-    switch(num_opcode) {
-    case UNIT_SERIAL_NUM_VPD:
-        if (! do_raw)
+    switch (optsp->page_num) {
+    case VPD_UNIT_SERIAL_NUM:
+        if (! optsp->do_raw)
             printf("VPD INQUIRY: Unit serial number page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, UNIT_SERIAL_NUM_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (UNIT_SERIAL_NUM_VPD != rsp_buff[1]) {
+            if (VPD_UNIT_SERIAL_NUM != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
-            else if (do_hex)
+            else if (optsp->do_hex)
                 dStrHex((const char *)rsp_buff, len, 0);
             else {
                 char obuff[DEF_ALLOC_LEN];
@@ -1524,14 +1995,14 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
             }
         }
         break;
-    case DEV_ID_VPD:
-        if (! do_raw)
+    case VPD_DEVICE_ID:
+        if (! optsp->do_raw)
             printf("VPD INQUIRY: Device Identification page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, DEV_ID_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (DEV_ID_VPD != rsp_buff[1]) {
+            if (VPD_DEVICE_ID != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1541,42 +2012,42 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, DEV_ID_VPD, rsp_buff, len,
-                                  1, verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff, len,
+                                  1, optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_id_vpd(rsp_buff, len, do_hex);
+                decode_id_vpd(rsp_buff, len, optsp->do_hex);
         }
         break;
-    case SOFTW_INF_ID_VPD:
-        if (! do_raw)
+    case VPD_SOFTW_INF_ID:
+        if (! optsp->do_raw)
             printf("VPD INQUIRY: Software interface identification page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, SOFTW_INF_ID_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_SOFTW_INF_ID, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (SOFTW_INF_ID_VPD != rsp_buff[1]) {
+            if (VPD_SOFTW_INF_ID != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_softw_inf_id(rsp_buff, len, do_hex);
+                decode_softw_inf_id(rsp_buff, len, optsp->do_hex);
         }
         break;
-    case MAN_NET_ADDR_VPD:
-        if (!do_raw)
+    case VPD_MAN_NET_ADDR:
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: Management network addresses page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, MAN_NET_ADDR_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_MAN_NET_ADDR, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (MAN_NET_ADDR_VPD != rsp_buff[1]) {
+            if (VPD_MAN_NET_ADDR != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1586,24 +2057,24 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, MAN_NET_ADDR_VPD, rsp_buff,
-                                  len, 1, verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_MAN_NET_ADDR, rsp_buff,
+                                  len, 1, optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_net_man_vpd(rsp_buff, len, do_hex);
+                decode_net_man_vpd(rsp_buff, len, optsp->do_hex);
         }
         break;
-    case MODE_PG_POLICY_VPD:
-        if (!do_raw)
+    case VPD_MODE_PG_POLICY:
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: Mode page policy\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, MODE_PG_POLICY_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_MODE_PG_POLICY, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (MODE_PG_POLICY_VPD != rsp_buff[1]) {
+            if (VPD_MODE_PG_POLICY != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1613,24 +2084,24 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, MODE_PG_POLICY_VPD, rsp_buff,
-                                  len, 1, verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_MODE_PG_POLICY, rsp_buff,
+                                  len, 1, optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_mode_policy_vpd(rsp_buff, len, do_hex);
+                decode_mode_policy_vpd(rsp_buff, len, optsp->do_hex);
         }
         break;
-    case X_INQ_VPD:
-        if (!do_raw)
+    case VPD_EXT_INQ:
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: extended INQUIRY data page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, X_INQ_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_EXT_INQ, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (X_INQ_VPD != rsp_buff[1]) {
+            if (VPD_EXT_INQ != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1640,24 +2111,24 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, X_INQ_VPD, rsp_buff, len,
-                                  1, verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_EXT_INQ, rsp_buff, len,
+                                  1, optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_x_inq_vpd(rsp_buff, len, do_hex);
+                decode_x_inq_vpd(rsp_buff, len, optsp->do_hex);
         }
         break;
-    case ATA_INFO_VPD:
-        if (!do_raw)
+    case VPD_ATA_INFO:
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: ATA information page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, ATA_INFO_VPD, rsp_buff,
-                            ATA_INFO_VPD_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_ATA_INFO, rsp_buff,
+                            VPD_ATA_INFO_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (ATA_INFO_VPD != rsp_buff[1]) {
+            if (VPD_ATA_INFO != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1666,27 +2137,27 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                 fprintf(stderr, "response length too long: %d > %d\n", len,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
-            } else if (len > ATA_INFO_VPD_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, ATA_INFO_VPD, rsp_buff, len,
-                                  1, verbose))
+            } else if (len > VPD_ATA_INFO_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_ATA_INFO, rsp_buff, len,
+                                  1, optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
             /* format output for 'hdparm --Istdin' with '-rr' or '-HHH' */
-            if ((2 == do_raw) || (3 == do_hex))
+            if ((2 == optsp->do_raw) || (3 == optsp->do_hex))
                 dWordHex((const unsigned short *)(rsp_buff + 60),
                          256, -2, sg_is_big_endian());
-            else if (do_raw)
+            else if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_ata_info_vpd(rsp_buff, len, do_hex);
+                decode_ata_info_vpd(rsp_buff, len, optsp->do_hex);
         }
         break;
     case 0xb0:  /* could be BLOCK LIMITS but need to know pdt to find out */
         res = sg_ll_inquiry(sg_fd, 0, 1, 0xb0, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             pdt = rsp_buff[0] & 0x1f;
-            if (! do_raw) {
+            if (! optsp->do_raw) {
                 switch (pdt) {
                 case 0: case 4: case 7:
                     printf("VPD INQUIRY: Block limits page (SBC)\n");
@@ -1715,24 +2186,24 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
                 if (sg_ll_inquiry(sg_fd, 0, 1, 0xb0, rsp_buff,
-                                  len, 1, verbose))
+                                  len, 1, optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_b0_vpd(rsp_buff, len, do_hex, pdt);
-        } else if (! do_raw)
+                decode_b0_vpd(rsp_buff, len, optsp->do_hex, pdt);
+        } else if (! optsp->do_raw)
             printf("VPD INQUIRY: page=0xb0\n");
         break;
-    case UPR_EMC_VPD:   /* 0xc0 */
-        if (!do_raw)
+    case VPD_UPR_EMC:   /* 0xc0 */
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: Unit Path Report Page (EMC)\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, UPR_EMC_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UPR_EMC, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (UPR_EMC_VPD != rsp_buff[1]) {
+            if (VPD_UPR_EMC != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1742,26 +2213,26 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, UPR_EMC_VPD, rsp_buff, len, 1,
-                           verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_UPR_EMC, rsp_buff, len, 1,
+                           optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
-            else if (do_hex)
+            else if (optsp->do_hex)
                 dStrHex((const char *)rsp_buff, len, 1);
             else
                 decode_upr_vpd_c0_emc(rsp_buff, len);
         }
         break;
-    case RDAC_VERS_VPD:         /* 0xc2 */
-        if (!do_raw)
+    case VPD_RDAC_VERS:         /* 0xc2 */
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: Software Version (RDAC)\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, RDAC_VERS_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VERS, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (RDAC_VERS_VPD != rsp_buff[1]) {
+            if (VPD_RDAC_VERS != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1771,26 +2242,26 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, RDAC_VERS_VPD, rsp_buff, len, 1,
-                           verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VERS, rsp_buff, len, 1,
+                           optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
-            else if (do_hex)
+            else if (optsp->do_hex)
                 dStrHex((const char *)rsp_buff, len, 1);
             else
                 decode_rdac_vpd_c2(rsp_buff, len);
         }
         break;
-    case RDAC_VAC_VPD:          /* 0xc9 */
-        if (!do_raw)
+    case VPD_RDAC_VAC:          /* 0xc9 */
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: Volume Access Control (RDAC)\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, RDAC_VAC_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VAC, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (RDAC_VAC_VPD != rsp_buff[1]) {
+            if (VPD_RDAC_VAC != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1800,26 +2271,26 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, RDAC_VAC_VPD, rsp_buff, len, 1,
-                           verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VAC, rsp_buff, len, 1,
+                           optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
-            else if (do_hex)
+            else if (optsp->do_hex)
                 dStrHex((const char *)rsp_buff, len, 1);
             else
                 decode_rdac_vpd_c9(rsp_buff, len);
         }
         break;
-    case SCSI_PORTS_VPD:
-        if (!do_raw)
+    case VPD_SCSI_PORTS:
+        if (!optsp->do_raw)
             printf("VPD INQUIRY: SCSI Ports page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, SCSI_PORTS_VPD, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_SCSI_PORTS, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (SCSI_PORTS_VPD != rsp_buff[1]) {
+            if (VPD_SCSI_PORTS != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
                 return SG_LIB_CAT_MALFORMED;
@@ -1829,19 +2300,34 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, SCSI_PORTS_VPD, rsp_buff, len,
-                                  1, verbose))
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_SCSI_PORTS, rsp_buff, len,
+                                  1, optsp->do_verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw)
+            if (optsp->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else
-                decode_scsi_ports_vpd(rsp_buff, len, do_hex);
+                decode_scsi_ports_vpd(rsp_buff, len, optsp->do_hex);
         }
         break;
     default:
         printf(" Only hex output supported\n");
-        return process_evpd(sg_fd, num_opcode, do_hex, do_raw, verbose);
+        return process_evpd(sg_fd, optsp);
+    }
+    if (res) {
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "    inquiry: not supported (?)\n");
+        else if (SG_LIB_CAT_NOT_READY == res)
+            fprintf(stderr, "    inquiry: device not ready (?)\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "    inquiry: field in cdb illegal (page not "
+                    "supported)\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "    inquiry: unit attention (?)\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "    inquiry: aborted command\n");
+        else
+            fprintf(stderr, "    inquiry: failed, res=%d\n", res);
     }
     return res;
 }
@@ -1849,240 +2335,135 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, plen, jmp_out, res;
-    const char * file_name = 0;
-    const char * cp;
-    unsigned int num_opcode = 0; /* SUPPORTED_VPDS_VPD == 0 */
-    int num_opcode_given = 0;
-    int p_switch_given = 0;
-    int do_ata_device = 0;
-    int do_decode = 0;
-    int do_evpd = 0;
-    int do_cmddt = 0;
-    int do_cmdlst = 0;
-    int do_hex = 0;
-    int do_raw = 0;
-    int do_resp_len = 0;
-    int do_36 = 0;
-    int do_vdescriptors = 0;
-    int do_verbose = 0;
-    int num_pages = 0;
+    int sg_fd, num, res, n;
+    unsigned int u;
     int ret = 0;
+    const struct svpd_values_name_t * vnp;
+    struct opts_t opts;
 
-
-    for (k = 1; k < argc; ++k) {
-        cp = argv[k];
-        plen = strlen(cp);
-        if (plen <= 0)
-            continue;
-        if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
-                switch (*cp) {
-                case '3':
-                    if ('6' == *(cp + 1)) {
-                        do_36 = 1;
-                        --plen;
-                        ++cp;
-                    } else
-                        jmp_out = 1;
-                    break;
-                case 'a':
-                    num_opcode = ATA_INFO_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-#ifdef SG3_UTILS_LINUX
-                case 'A':
-                    do_ata_device = 1;
-                    break;
-#endif
-                case 'b':
-                    num_opcode = BLOCK_LIMITS_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-                case 'c':
-                    do_cmddt = 1;
-                    if ('l' == *(cp + 1)) {
-                        do_cmdlst = 1;
-                        --plen;
-                        ++cp;
-                    }
-                    break;
-                case 'd':
-                    do_decode = 1;
-                    break;
-                case 'e':
-                    do_evpd = 1;
-                    break;
-                case 'h':
-                case 'H':
-                    ++do_hex;
-                    break;
-                case 'i':
-                    num_opcode = DEV_ID_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-                case 'm':
-                    num_opcode = MAN_NET_ADDR_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-                case 'M':
-                    num_opcode = MODE_PG_POLICY_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-                case 'P':
-                    num_opcode = UPR_EMC_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-                case 'r':
-                    ++do_raw;
-                    break;
-                case 's':
-                    num_opcode = SCSI_PORTS_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-                case 'v':
-                    ++do_verbose;
-                    break;
-                case 'V':
-                    fprintf(stderr, "Version string: %s\n", version_str);
-                    exit(0);
-                case 'x':
-                    num_opcode = X_INQ_VPD;
-                    do_evpd = 1;
-                    ++num_pages;
-                    break;
-                case '?':
-                    usage();
-                    return 0;
-                default:
-                    jmp_out = 1;
-                    break;
-                }
-                if (jmp_out)
-                    break;
-            }
-            if (plen <= 0)
-                continue;
-            else if (0 == strncmp("l=", cp, 2)) {
-                num = sscanf(cp + 2, "%d", &do_resp_len);
-                if ((1 != num) || (do_resp_len < 1)) {
-                    fprintf(stderr, "Inappropriate value after 'l=' "
-                            "option\n");
-                    usage();
-                    return SG_LIB_SYNTAX_ERROR;
-                } else if (do_resp_len > MX_ALLOC_LEN) {
-                    fprintf(stderr, "value after 'l=' "
-                            "option too large\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-            } else if (0 == strncmp("o=", cp, 2)) {
-                num = sscanf(cp + 2, "%x", &num_opcode);
-                if ((1 != num) || (num_opcode > 255)) {
-                    fprintf(stderr, "Inappropriate value after 'o=' "
-                            "option\n");
-                    usage();
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                num_opcode_given = 1;
-                ++num_pages;
-            } else if (0 == strncmp("p=", cp, 2)) {
-                num = sscanf(cp + 2, "%x", &num_opcode);
-                if ((1 != num) || (num_opcode > 255)) {
-                    fprintf(stderr, "Inappropriate value after '-p' "
-                            "switch\n");
-                    usage();
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                num_opcode_given = 1;
-                p_switch_given = 1;
-                ++num_pages;
-            } else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
-                usage();
+    memset(&opts, 0, sizeof(opts));
+    opts.page_num = -1;
+    res = process_cl(&opts, argc, argv);
+    if (res)
+        return SG_LIB_SYNTAX_ERROR;
+    if (opts.do_help) {
+        usage_for(&opts);
+        if (opts.do_help > 1) {
+            fprintf(stderr, "/n>>> Available VPD page abbreviations:\n");
+            enumerate_vpds();
+        }
+        return 0;
+    }
+    if (opts.do_version) {
+        fprintf(stderr, "Version string: %s\n", version_str);
+        return 0;
+    }
+    if (opts.page_arg) {
+        if (opts.page_num >= 0) {
+            fprintf(stderr, "Given '-p' option and another option that "
+                    "implies a page\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (isalpha(*opts.page_arg)) {
+            vnp = sdp_find_vpd_by_acron(opts.page_arg);
+            if (NULL == vnp) {
+                if (opts.opt_new)
+                    fprintf(stderr, "abbreviation %s given to '--page=' "
+                            "not recognized\n", opts.page_arg);
+                else
+                    fprintf(stderr, "abbreviation %s given to '-p=' "
+                            "not recognized\n", opts.page_arg);
+                fprintf(stderr, ">>> Available abbreviations:\n");
+                enumerate_vpds();
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == file_name)
-            file_name = cp;
-        else {
-            fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", file_name, cp);
-            usage();
+            if ((1 != opts.do_hex) && (0 == opts.do_raw))
+                ++opts.do_decode;
+            opts.page_num = vnp->value;
+        } else {
+            if (opts.opt_new) {
+                n = sg_get_num(opts.page_arg);
+                if ((n < 0) || (n > 255)) {
+                    fprintf(stderr, "Bad argument to '--page=', "
+                            "expecting 0 to 255 inclusive\n");
+                    usage_for(&opts);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                if ((1 != opts.do_hex) && (0 == opts.do_raw))
+                    ++opts.do_decode;
+            } else {
+                num = sscanf(opts.page_arg, "%x", &u);
+                if ((1 != num) || (u > 255)) {
+                    fprintf(stderr, "Inappropriate value after '-o=' "
+                            "or '-p=' option\n");
+                    usage_for(&opts);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                n = u;
+            }
+            opts.page_num = n;
+        }
+    }
+
+    if ((0 == opts.do_cmddt) && (opts.page_num >= 0) && opts.p_given)
+        ++opts.do_vpd;
+
+    if (opts.do_raw && opts.do_hex) {
+        fprintf(stderr, "Can't do hex and raw at the same time\n");
+        usage_for(&opts);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if (opts.do_vpd && opts.do_cmddt) {
+        if (opts.opt_new)
+            fprintf(stderr, "Can't use '--cmddt' with VPD pages\n");
+        else
+            fprintf(stderr, "Can't have both '-e' and '-c' (or '-cl')\n");
+        usage_for(&opts);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if (opts.num_pages > 1) {
+        fprintf(stderr, "Can only fetch one page (VPD or Cmd) at a time\n");
+        usage_for(&opts);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if (opts.do_descriptors) {
+        if ((opts.resp_len > 0) && (opts.resp_len < 60)) {
+            fprintf(stderr, "version descriptors need INQUIRY response "
+                    "length >= 60 bytes\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (opts.do_vpd || opts.do_cmddt) {
+            fprintf(stderr, "version descriptors require standard INQUIRY\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-
-    if (do_raw && do_hex) {
-        fprintf(stderr, "Can't do hex and raw at the same time\n");
-        usage();
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    if (do_evpd && do_cmddt) {
-        fprintf(stderr, "Can't have both '-e' and '-c' (or '-cl')\n");
-        usage();
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    if (num_pages > 1) {
-        fprintf(stderr, "Can only fetch one page (VPD or Cmd) at a time\n");
-        usage();
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    if (do_decode) {
-        if (num_pages)
-            num_opcode_given = 0;
-        else {
-            do_vdescriptors = 1;
-            if (do_36) {
-                fprintf(stderr, "version descriptors need > 36 byte "
-                        "INQUIRY\n");
-                usage();
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            if (do_cmddt || do_evpd) {
-                fprintf(stderr, "version descriptors require standard"
-                        "INQUIRY\n");
-                usage();
-                return SG_LIB_SYNTAX_ERROR;
-            }
-        }
-    }
-    if (num_pages && do_ata_device) {
+    if (opts.num_pages && opts.do_ata) {
         fprintf(stderr, "Can't use '-A' with an explicit decode VPD "
                 "page option\n");
-        usage();
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    if (0 == file_name) {
-        fprintf(stderr, "No <device> argument given\n");
-        usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (num_pages && (! do_cmddt) && (! do_evpd)) {
-        do_evpd = 1;    /* '-o=' and '-p=' implies '-e' unless overridden */
-        if (! (do_raw || p_switch_given))
-            printf(" <<given page_code so assumed EVPD selected>>\n");
+    if (0 == opts.device_name) {
+        fprintf(stderr, "No DEVICE argument given\n");
+        usage_for(&opts);
+        return SG_LIB_SYNTAX_ERROR;
     }
 
-    if ((sg_fd = sg_cmds_open_device(file_name, 1 /* ro */, do_verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(opts.device_name, 1 /* ro */,
+                                     opts.do_verbose)) < 0) {
         fprintf(stderr, "sg_inq: error opening file: %s: %s\n",
-                file_name, safe_strerror(-sg_fd));
+                opts.device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    memset(rsp_buff, 0, MX_ALLOC_LEN + 1);
+    memset(rsp_buff, 0, sizeof(rsp_buff));
 
 #ifdef SG3_UTILS_LINUX
-    if (do_ata_device) {
-        res = try_ata_identify(sg_fd, do_hex, do_raw, do_verbose);
+    if (opts.do_ata) {
+        res = try_ata_identify(sg_fd, opts.do_hex, opts.do_raw,
+                               opts.do_verbose);
         if (0 != res) {
             fprintf(stderr, "fetching ATA information failed on %s\n",
-                    file_name);
+                    opts.device_name);
             ret = SG_LIB_CAT_OTHER;
         } else
             ret = 0;
@@ -2090,24 +2471,24 @@ int main(int argc, char * argv[])
     }
 #endif
 
-    if ((! do_cmddt) && (! do_evpd)) {
+    if ((! opts.do_cmddt) && (! opts.do_vpd)) {
         /* So it's a Standard INQUIRY, try ATA IDENTIFY if that fails */
-        ret = process_std_inq(sg_fd, file_name, do_36, do_resp_len,
-                              do_vdescriptors, do_hex, do_raw, do_verbose);
+        ret = process_std_inq(sg_fd, &opts);
         if (ret)
             goto err_out;
-    } else if (do_cmddt) {
-        ret = process_cmddt(sg_fd, do_cmdlst, num_opcode, do_hex, do_raw,
-                            do_verbose);
+    } else if (opts.do_cmddt) {
+        if (opts.page_num < 0)
+            opts.page_num = 0;
+        ret = process_cmddt(sg_fd, &opts);
         if (ret)
             goto err_out;
-    } else if (do_evpd) {
-        if (num_opcode_given) {
-            ret = process_evpd(sg_fd, num_opcode, do_hex, do_raw, do_verbose);
+    } else if (opts.do_vpd) {
+        if (opts.do_decode) {
+            ret = decode_vpd(sg_fd, &opts);
             if (ret)
                 goto err_out;
         } else {
-            ret = decode_vpd(sg_fd, num_opcode, do_hex, do_raw, do_verbose);
+            ret = process_evpd(sg_fd, &opts);
             if (ret)
                 goto err_out;
         }
@@ -2310,6 +2691,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x54, "SAM-2 T10/1157-D revision 23"},
     {0x55, "SAM-2 T10/1157-D revision 24"},
     {0x5c, "SAM-2 ANSI INCITS 366-2003"},
+    {0x5e, "SAM-2 ISO/IEC 14776-412"},
     {0x60, "SAM-3 (no version claimed)"},
     {0x62, "SAM-3 T10/1561-D revision 7"},
     {0x75, "SAM-3 T10/1561-D revision 13"},
@@ -2407,6 +2789,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x420, "MMC-5 (no version claimed)"},
     {0x42f, "MMC-5 T10/1675-D revision 03"},
     {0x431, "MMC-5 T10/1675-D revision 03b"},
+    {0x432, "MMC-5 T10/1675-D revision 04"},
     {0x440, "OSD-2 (no version claimed)"},
     {0x460, "SPC-4 (no version claimed)"},
     {0x480, "SMC-3 (no version claimed)"},
@@ -2514,6 +2897,8 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0xd5c, "FC-AL ANSI INCITS 272-1996"},
     {0xd60, "FC-AL-2 (no version claimed)"},
     {0xd61, "FC-AL-2 T11/1133-D revision 7.0"},
+    {0xd63, "FC-AL-2 ANSI INCITS 332-1999 with AM1-2003 & AM2-2006"},
+    {0xd64, "FC-AL-2 ANSI INCITS 332-1999 with Amnd 2 AM2-2006"},
     {0xd7c, "FC-AL-2 ANSI INCITS 332-1999"},
     {0xd7d, "FC-AL-2 ANSI INCITS 332-1999 with Amnd 1 AM1:2002"},
     {0xd80, "FC-PH-3 (no version claimed)"},
@@ -2530,6 +2915,11 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0xe20, "FC-LS (no version claimed)"},
     {0xe40, "FC-SP (no version claimed)"},
     {0xe42, "FC-SP T11/1570-D revision 1.6"},
+    {0xe60, "FC-PI-3 (no version claimed)"},
+    {0xe80, "FC-PI-4 (no version claimed)"},
+    {0xea0, "FC 10GFC (no version claimed)"},
+    {0xea2, "FC 10GFC ANSI INCITS 364-2003"},
+    {0xea3, "FC 10GFC ISO/IEC 14165-116"},
     {0x12e0, "FC-DA (no version claimed)"},
     {0x12e2, "FC-DA T11/1513-DT revision 3.1"},
     {0x1300, "FC-Tape (no version claimed)"},

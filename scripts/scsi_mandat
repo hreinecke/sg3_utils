@@ -1,0 +1,120 @@
+#!/bin/bash
+# scsi_mandat
+#
+# Script to test compliance with SCSI mandatory commands.
+# The vintage is SPC-3 and SPC-4 (see www.t10.org).
+#
+# Coverage:
+# Command                Standard/Draft (is mandatory in)
+# -------------------------------------------------------
+# INQUIRY (standard)     SCSI-2, SPC, SPC-2, SPC-3, SPC-4
+# INQUIRY (VPD pages 0, 0x83)     SPC-2, SPC-3, SPC-4
+# REPORT LUNS            SPC-3, SPC-4
+# TEST UNIT READY        SCSI-2, SPC, SPC-2, SPC-3, SPC-4
+# REQUEST SENSE          SCSI-2, SBC, SBC-2,3, MMC-4,5, SSC-2,3
+# SEND DIAGNOSTIC        SBC, SBC-2,3, SSC-2,3
+#
+# This script uses utilities frim sg3_utils package (version
+# 1.21 or later) and sdparm (version 0.99 or later)
+#
+# Douglas Gilbert 20061230
+
+
+log=0
+quiet=0
+
+file_err=0
+inv_opcode=0
+illeg_req=0
+not_ready=0
+medium=0
+other_err=0
+recovered=0
+sanity=0
+syntax=0
+timeout=0
+unit_attention=0
+aborted_command=0
+
+total_err=0
+
+usage()
+{
+  echo "Usage: scsi_mandat [-h] [-L] [-q] <device>"
+  echo "  where:  -h    print usage message"
+  echo "          -L, --log        append stderr to 'scsi_mandat.err'"
+  echo "          -q    suppress some output"
+  echo ""
+  echo "Check <device> for manadatory SCSI command support"
+}
+
+if (( $# < 1 ))
+  then
+    usage
+    exit 1
+fi 
+
+# opt=$1
+# echo ${opt##-*}
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    h|-help) usage ; exit 0 ;;
+    L|-log) let log=$log+1 ;;
+    q|-quiet) let quiet=$quiet+1 ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+for command in "sg_inq" "sg_luns" "sg_turs" "sg_requests" "sg_vpd" \
+                "sg_vpd -i" "sg_senddiag -t"
+do
+  if [ $quiet -eq 0 ]
+    then echo "$command" $1
+  fi
+
+  if [ $log -eq 0 ]
+  then
+    $command $1 > /dev/null 2>> /dev/null
+  else
+    $command $1 > /dev/null 2>> scsi_mandat.err
+  fi
+  res=$?
+  case "$res" in
+    0) ;;
+    1) echo "  syntax error" ; let syntax=$syntax+1 ;;
+    2) echo "  not ready" ; let not_ready=$not_ready+1 ;;
+    3) echo "  medium error" ; let medium=$medium+1 ;;
+    5) echo "  illegal request, general" ; let illeg_req=$illeg_req+1 ;;
+    6) echo "  unit attention" ; let unit_attention=$unit_attention+1 ;;
+    9) echo "  illegal request, invalid opcode" ; let inv_opcode=$inv_opcode+1 ;;
+    11) echo "  aborted command" ; let aborted_command=$aborted_command+1 ;;
+    15) echo "  file error with $1 " ; let file_err=$file_err+1 ;;
+    20) echo "  no sense" ; let other_err=$other_err+1 ;;
+    21) echo "  recovered error" ; let recovered_err=$recovered_err+1 ;;
+    33) echo "  timeout" ; let timeout=$timeout+1 ;;
+    97) echo "  response fails sanity" ; let sanity=$sanity+1 ;;
+    98) echo "  other SCSI error" ; let other_err=$other_err+1 ;;
+    99) echo "  other error" ; let other_err=$other_err+1 ;;
+    *) echo "  unknown exit status for sg_inq: $res" ; let other_err=$other_err+1 ;;
+  esac
+done
+
+echo ""
+let total_bad_err=$file_err+$inv_opcode+$illeg_req+$medium+$aborted_command
+let total_bad_err+=$other_err+$recovered+$sanity+$syntax+$timeout
+
+let total_allow_err=$not_ready+$unit_attention
+
+  echo "total number of bad errors: $total_bad_err "
+
+if [ $total_allow_err -gt 0 ]
+  then
+  echo "total number of allowable errors: $total_allow_err "
+fi
+
+exit $total_bad_err

@@ -6,7 +6,7 @@
 **
 ** Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
 ** Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
-** Copyright (C) 2005-2006  Douglas Gilbert   dgilbert at interlog dot com
+** Copyright (C) 2005-2007  Douglas Gilbert   dgilbert at interlog dot com
 **
 **   This program is free software; you can redistribute it and/or modify
 **   it under the terms of the GNU General Public License as published by
@@ -35,6 +35,8 @@
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
@@ -51,12 +53,23 @@
 #define FORMAT_TIMEOUT          (4 * 3600)       /* 4 hours ! */
 
 #define POLL_DURATION_SECS 30
+
+#if defined(MSC_VER) || defined(__MINGW32__)
+#define HAVE_MS_SLEEP
+#endif
+ 
+#ifdef HAVE_MS_SLEEP
+#include <windows.h>
+#define sleep_for(seconds)    Sleep( (seconds) * 1000)
+#else
+#define sleep_for(seconds)    sleep(seconds)
+#endif
  
 
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.11 20061012";
+static char * version_str = "1.13 20070125";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -138,7 +151,7 @@ scsi_format(int fd, int fmtpinfo, int rto_req, int cmplst, int pf_usage,
 
         verb = (verbose > 1) ? (verbose - 1) : 0;
         for(;;) {
-                sleep(POLL_DURATION_SECS);
+                sleep_for(POLL_DURATION_SECS);
                 progress = -1;
                 res = sg_ll_test_unit_ready_progress(fd, 0, &progress, 0,
                                                      verb);
@@ -178,7 +191,7 @@ print_read_cap(int fd, int do_16, int verbose)
                         printf("   Protection: prot_en=%d, rto_en=%d\n",
                                !!(resp_buff[12] & 0x1),
                                !!(resp_buff[12] & 0x2));
-                        printf("   Number of blocks=%llu\n",
+                        printf("   Number of blocks=%" PRIu64 "\n",
                                llast_blk_addr + 1);
                         printf("   Block size=%u bytes\n", block_size);
                         return (int)block_size;
@@ -219,52 +232,54 @@ print_read_cap(int fd, int do_16, int verbose)
 
 static void usage()
 {
-        printf("usage: sg_format [--cmplst=<n>] [--count=<block count>] "
-                "[--early] [--format]\n"
-                "                 [--help] [--long] [--pfu=<n>] [--pinfo] "
-                "[--resize]\n"
-                "                 [--rto_req] [--six] [--size=<block size>] "
-                "[--verbose]\n"
-                "                 [--version] [--wait] <scsi_disk>\n"
+        printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--early] "
+                "[--format] [--help]\n"
+                "                 [--long] [--pfu=PFU] [--pinfo] [--resize] "
+                "[--rto_req] [--six]\n"
+                "                 [--size=SIZE] [--verbose] [--version] "
+                "[--wait] DEVICE\n"
                 "  where:\n"
-                "    --cmplst=<n> | -C <n>  for CMPLST bit in format cdb "
+                "    --cmplst=0|1\n"
+                "      -C 0|1        sets CMPLST bit in format cdb "
                 "(default: 1)\n"
-                "    --count=<block count> | -c <block count>\n"
-                "                   best left alone during format (defaults "
-                "to max allowable)\n"
-                "    --early | -e   exit once format started (user can "
+                "    --count=COUNT|-c COUNT    number of blocks to "
+                "report after format or\n"
+                "                              resize. With format "
+                "defaults to same as current\n"
+                "    --early|-e      exit once format started (user can "
                 "monitor progress)\n"
-                "    --format | -F  format unit (default report current count"
+                "    --format|-F     format unit (default: report current count"
                 " and size)\n"
-                "    --help | -h    prints out this usage message\n"
-                "    --long | -l    allow for 64 bit lbas (default: assume "
+                "    --help|-h       prints out this usage message\n"
+                "    --long|-l       allow for 64 bit lbas (default: assume "
                 "32 bit lbas)\n"
-                "    --pfu=<n> | -P <n>  Protection Field Usage value "
+                "    --pfu=PFU|-P PFU    Protection Field Usage value "
                 "(default: 0)\n"
-                "    --pinfo | -p   set the FMTPINFO bit to format with "
+                "    --pinfo|-p      set the FMTPINFO bit to format with "
                 "protection\n");
-        printf( "                   information (defaults to no protection "
+        printf( "                    information (defaults to no protection "
                 "information)\n"
-                "    --resize | -r  resize (rather than format) to '--count' "
+                "    --resize|-r     resize (rather than format) to COUNT "
                 "value\n"
-                "    --rto_req | -R  set the RTO_REQ bit in format (only valid "
-                "with '--pinfo')\n"
-                "    --six | -6     use 6 byte MODE SENSE/SELECT\n"
-                "    --size=<block size> | -s <block size>\n"
-                "                   only needed to change block size"
-                " (default to\n"
-                "                   current device's block size)\n"
-                "    --verbose | -v verbosity (show commands + parameters "
-                "sent)\n"
-                "                   use multiple time for more verbosity\n"
-                "    --version | -V print version details and exit\n"
-                "    --wait | -w    format command waits till complete (def: "
-                "poll)\n\n"
+                "    --rto_req|-R    set the RTO_REQ bit in format (only "
+                "vaid with '--pinfo')\n"
+                "    --six|-6        use 6 byte MODE SENSE/SELECT\n"
+                "    --size=SIZE|-s SIZE    bytes per block, defaults to "
+                "DEVICE's current\n"
+                "                           block size. Only needed to "
+                "change current block\n"
+                "                           size\n"
+                "    --verbose|-v    increase verbosity\n"
+                "    --version|-V    print version details and exit\n"
+                "    --wait|-w       format command waits until format "
+                "operation completes\n"
+                "                    (default: set IMMED=1 and poll with "
+                "Test Unit Ready)\n\n"
                 "\tExample: sg_format --format /dev/sdc\n\n"
                 "This utility formats or resizes SCSI disks.\n");
-        printf("WARNING: This utility will destroy all the data on the "
-                "target device when\n\t '--format' is given. Check that you "
-                "have the correct device.\n");
+        printf("WARNING: This utility will destroy all the data on "
+                "DEVICE when\n\t '--format' is given. Check that you "
+                "have the correct DEVICE.\n");
 }
 
 
@@ -549,7 +564,8 @@ int main(int argc, char **argv)
                                 prob = 1;
                 } else if (bd_len != 8)
                         prob = 1;
-                printf("  Number of blocks=%llu [0x%llx]\n", ull, ull);
+                printf("  Number of blocks=%" PRIu64 " [0x%" PRIx64 "]\n",
+                       ull, ull);
                 printf("  Block size=%d [0x%x]\n", bd_blk_len, bd_blk_len);
         } else {
                 printf("  No block descriptors present\n");
@@ -680,11 +696,11 @@ int main(int argc, char **argv)
                 printf("\nA FORMAT will commence in 10 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
-                sleep(5);
+                sleep_for(5);
                 printf("A FORMAT will commence in 5 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
-                sleep(5);
+                sleep_for(5);
                 res = scsi_format(fd, pinfo, rto_req, cmplst, pfu, ! fwait,
                                   early, verbose);
                 ret = res;

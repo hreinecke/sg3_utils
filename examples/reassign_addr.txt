@@ -4,8 +4,8 @@
 
 # To see logical block addresses placed in the command parameter block
 # without executing them command try something like:
-# 'sg_reassign --address=- -d -vv /dev/sda < reassign_addr.txt
+# 'sg_reassign --address=- --dummy -vv /dev/sda < reassign_addr.txt
 
 1,34,0x33,0X444  0x89abcde	0xdeadbeef  	# 6 lba's
 
-# dpg 20060824
+# dpg 20070130

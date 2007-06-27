@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2006 Douglas Gilbert.
+ * Copyright (c) 2005-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,8 @@
 #include <ctype.h>
 #include <getopt.h>
 #include <limits.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
@@ -49,7 +51,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.08 20061015";
+static char * version_str = "1.11 20070127";
 
 #define ME "sg_reassign: "
 
@@ -64,6 +66,7 @@ static struct option long_options[] = {
         {"eight", 1, 0, 'e'},
         {"grown", 0, 0, 'g'},
         {"help", 0, 0, 'h'},
+        {"hex", 0, 0, 'H'},
         {"longlist", 1, 0, 'l'},
         {"primary", 0, 0, 'p'},
         {"verbose", 0, 0, 'v'},
@@ -74,39 +77,39 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_reassign [--address=<n>[,<n>...]] [--dummy] [--eight=0|1] "
+          "sg_reassign [--address=A,A...] [--dummy] [--eight=0|1] "
           "[--grown]\n"
-          "                   [--help] [--longlist=0|1] [--primary] "
+          "                   [--help] [--hex] [--longlist=0|1] [--primary] "
           "[--verbose]\n"
-          "                   [--version] <scsi_device>\n"
+          "                   [--version] DEVICE\n"
           "  where:\n"
-          "    --address=<n>[,<n>...]\n"
-          "      -a <n>[,<n>...]     comma separated logical block "
+          "    --address=A,A...|-a A,A...    comma separated logical block "
           "addresses\n"
-          "                          (at least one required)\n"
-          "    --address=- | -a -    read stdin for logical block "
+          "                                  one or more, assumed to be "
+          "decimal\n"
+          "    --address=-|-a -    read stdin for logical block "
           "addresses\n"
-          "    --dummy | -d          prepare but do not execute "
-          "REASSIGN BLOCKS\n"
-          "                          command\n"
+          "    --dummy|-d          prepare but do not execute REASSIGN "
+          "BLOCKS command\n"
           "    --eight=0|1\n"
-          "      -e 0|1              force eight byte (64 bit) lbas "
+          "      -e 0|1            force eight byte (64 bit) lbas "
           "when 1,\n"
-          "                          four byte (32 bit) lbas when 0 "
+          "                        four byte (32 bit) lbas when 0 "
           "(def)\n"
-          "    --grown | -g          fetch grown defect list length, "
+          "    --grown|-g          fetch grown defect list length, "
           "don't reassign\n"
-          "    --help | -h           print out usage message\n"
+          "    --help|-h           print out usage message\n"
+          "    --hex|-H            print response in hex (for '-g' or "
+          "'-p')\n"
           "    --longlist=0|1\n"
-          "       -l 0|1             use 4 byte list length when "
-          "'--longlist=1',\n"
-          "                          safe to ignore and use 2 byte "
-          "list length\n"
-          "    --primary | -p        fetch primary defect list length, "
+          "       -l 0|1           use 4 byte list length when 1, safe to "
+          "ignore\n"
+          "                        which default to 2 byte list length\n"
+          "    --primary|-p        fetch primary defect list length, "
           "don't reassign\n"
-          "    --verbose | -v        increase verbosity\n"
-          "    --version | -V        print version string and exit\n\n"
-          "Perform a REASSIGN BLOCKS SCSI command (or READ DEFECT LIST)\n"
+          "    --verbose|-v        increase verbosity\n"
+          "    --version|-V        print version string and exit\n\n"
+          "Perform a SCSI REASSIGN BLOCKS command (or READ DEFECT LIST)\n"
           );
 }
 
@@ -124,16 +127,16 @@ long long get_llnum(const char * buf)
     len = strlen(buf);
     commap = strchr(buf + 1, ',');
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%llx", &unum);
+        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
         num = unum;
     } else if (commap && ('H' == toupper(*(commap - 1)))) {
-        res = sscanf(buf, "%llx", &unum);
+        res = sscanf(buf, "%" SCNx64 "", &unum);
         num = unum;
     } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
-        res = sscanf(buf, "%llx", &unum);
+        res = sscanf(buf, "%" SCNx64 "", &unum);
         num = unum;
     } else
-        res = sscanf(buf, "%lld", &num);
+        res = sscanf(buf, "%" SCNd64 "", &num);
     if (1 == res)
         return num;
     else
@@ -257,6 +260,7 @@ int main(int argc, char * argv[])
     int eight = -1;
     int addr_arr_len = 0;
     int grown = 0;
+    int do_hex = 0;
     int longlist = 0;
     int primary = 0;
     int verbose = 0;
@@ -270,7 +274,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "a:de:ghl:pvV", long_options,
+        c = getopt_long(argc, argv, "a:de:ghHl:pvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -304,6 +308,9 @@ int main(int argc, char * argv[])
         case '?':
             usage();
             return 0;
+        case 'H':
+            ++do_hex;
+            break;
         case 'l':
             num = sscanf(optarg, "%d", &res);
             if ((1 == num) && ((0 == res) || (1 == res)))
@@ -411,7 +418,7 @@ int main(int argc, char * argv[])
             if (verbose) {
                 fprintf(stderr, "  Would have reassigned these blocks:\n");
                 for (j = 0; j < addr_arr_len; ++j) 
-                    printf("    0x%llx\n", addr_arr[j]);
+                    printf("    0x%" PRIx64 "\n", addr_arr[j]);
             }
             return 0;
         }
@@ -461,6 +468,10 @@ int main(int argc, char * argv[])
         } else if (0 != res) {
             fprintf(stderr, "READ DEFECT DATA (10) failed\n");
             goto err_out;
+        }
+        if (do_hex) {
+            dStrHex((const char *)param_arr, param_len, 1);
+            goto err_out;       /* ret is zero */
         }
         lstp = "";
         got_grown = !!(param_arr[1] & 0x8);

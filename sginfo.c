@@ -111,9 +111,11 @@
  */
 
 #define _XOPEN_SOURCE 500
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
-static const char * version_str = "2.23 [20060826]";
+static const char * version_str = "2.25 [20070121]";
 
 #include <stdio.h>
 #include <string.h>
@@ -1475,7 +1477,7 @@ static int read_defect_list(int grown_only)
     if (defectformat == HEAD_SORT_TOKEN) {
         defectformat = 0x04;
         sorthead = 1;
-        headsp = malloc(sizeof(unsigned int) * MAX_HEADS);
+        headsp = (unsigned int *)malloc(sizeof(unsigned int) * MAX_HEADS);
         if (headsp == NULL) {
            perror("malloc failed"); 
            return status;
@@ -1598,12 +1600,12 @@ static int read_defect_list(int grown_only)
         if (len > 0) {
             k = len + 8;              /* length of defect list + header */
             if (k > (int)sizeof(cbuffer)) {
-                heapp = malloc(k);
+                heapp = (unsigned char *)malloc(k);
 
                 if (len > 0x80000 && NULL == heapp) {
                     len = 0x80000;      /* go large: 512 KB */
                     k = len + 8;
-                    heapp = malloc(k);
+                    heapp = (unsigned char *)malloc(k);
                 }
                 if (heapp != NULL)
                     bp = heapp;
@@ -1649,7 +1651,7 @@ trytenbyte:
                 }
                 k = len + 4;            /* length of defect list + header */
                 if (k > (int)sizeof(cbuffer) && NULL == heapp) { 
-                    heapp = malloc(k);
+                    heapp = (unsigned char *)malloc(k);
                     if (heapp != NULL)
                         bp = heapp;
                 }
@@ -2754,7 +2756,7 @@ static int sas_phy_control_discover(struct mpage_info * mpi,
     for (k = 0, p = pagestart + 8; k < num_phys; ++k, p += 48) {
         intfield(p + 1, 1, "Phy Identifier");
         bitfield(p + 4, "Attached Device type", 0x7, 4);
-        bitfield(p + 5, "Negotiated Physical Link rate", 0xf, 0);
+        bitfield(p + 5, "Negotiated Logical Link rate", 0xf, 0);
         bitfield(p + 6, "Attached SSP Initiator port", 0x1, 3);
         bitfield(p + 6, "Attached STP Initiator port", 0x1, 2);
         bitfield(p + 6, "Attached SMP Initiator port", 0x1, 1);

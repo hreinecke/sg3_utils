@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 
 */
 
-static char * version_str = "0.28 20061015";
+static char * version_str = "0.30 20070125";
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -73,31 +73,32 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr,
-            "Usage: 'sg_get_config [--brief] [--current] [--help] [--hex] "
+            "Usage:  sg_get_config [--brief] [--current] [--help] [--hex] "
             "[--inner-hex]\n"
-            "                      [--list] [--rt=<num>] [--starting=<num>] "
+            "                      [--list] [--rt=RT] [--starting=FC] "
             "[--verbose]\n"
-            "                      [--version] <device>'\n"
-            " where --brief | -b     only give feature names of <device> "
+            "                      [--version] DEVICE\n"
+            "  where\n"
+            "    --brief|-b       only give feature names of DEVICE "
             "(don't decode)\n"
-            "       --current | -c   equivalent to '--rt=1' (show "
+            "    --current|-c     equivalent to '--rt=1' (show "
             "current)\n"
-            "       --help | -h      output usage message\n"
-            "       --hex | -H       output response in hex\n"
-            "       --inner-hex | -i  decode to feature name, then output "
+            "    --help|-h        print usage message then exit\n"
+            "    --hex|-H         output response in hex\n"
+            "    --inner-hex|-i    decode to feature name, then output "
             "features in hex\n"
-            "       --list | -l      list all known features + profiles "
-            "(ignore <device>)\n"
-            "       --rt=<num> | -r <num>     default value is 0\n"
-            "                 0 -> all feature descriptors (regardless "
+            "    --list|-l        list all known features + profiles "
+            "(ignore DEVICE)\n"
+            "    --rt=RT|-r RT    default value is 0\n"
+            "                     0 -> all feature descriptors (regardless "
             "of currency)\n"
-            "                 1 -> all current feature descriptors\n"
-            "                 2 -> only feature descriptor matching "
+            "                     1 -> all current feature descriptors\n"
+            "                     2 -> only feature descriptor matching "
             "'starting'\n"
-            "       --starting=<num> | -s <num>  starting from feature "
-            "<num>\n"
-            "       --verbose | -v   verbose\n"
-            "       --version | -V   output version string\n\n"
+            "    --starting=FC|-s FC    starting from feature "
+            "code (FC) value\n"
+            "    --verbose|-v     verbose\n"
+            "    --version|-V     output version string\n\n"
             "Get configuration information for MMC drive and/or media\n");
 }
 
@@ -240,8 +241,8 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
                feature);
-        printf("    available profiles [ordered from most to least "
-               "advanced]:\n");
+        printf("    available profiles [more recent typically higher "
+               "in list]:\n");
         for (k = 4; k < len; k += 4) {
             profile = (ucp[k] << 8) + ucp[k + 1];
             printf("      profile: %s , currentP=%d\n",

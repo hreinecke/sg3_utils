@@ -1,10 +1,10 @@
-.TH SG_MAP "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_MAP "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_map \- displays mapping between linux sg and other SCSI devices
 .SH SYNOPSIS
 .B sg_map
-[\fI-a\fR] [\fI-h\fR] [\fI-i\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR]
-[\fI-sr\fR] [\fI-st\fR] [\fI-V\fR] [\fI-x\fR]
+[\fI\-a\fR] [\fI-h\fR] [\fI\-i\fR] [\fI\-n\fR] [\fI\-scd\fR] [\fI\-sd\fR]
+[\fI\-sr\fR] [\fI\-st\fR] [\fI\-V\fR] [\fI\-x\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -14,46 +14,47 @@ sg devices and finds the corresponding SCSI disk, cdrom or tape
 device name (if any). Scanners are an example of SCSI devices
 that have no alternate SCSI device name apart from their sg device
 name.
+.SH OPTIONS
 .TP
--a
+\fB\-a\fR
 assume the sg devices have alphabetical device names and loop
 through /dev/sga, /dev/sgb, etc. Default is numeric scan.
 Note that sg device nodes with an alphabetical index have been
 deprecated since the linux kernel 2.2 series.
 .TP
--h
+\fB\-h\fR
 print usage message then exit.
 .TP
--i
+\fB\-i\fR
 in addition do a standard INQUIRY and output vendor, product and revision
 strings for devices that are found.
 .TP
--n
+\fB\-n\fR
 assume the sg devices have numeric device names and loop
 through /dev/sg0, /dev/sg1, etc. Default is numeric scan
 .TP
--scd
+\fB\-scd\fR
 display mappings to SCSI cdrom device names of the form
 /dev/scd0, /dev/scd1 etc
 .TP
--sd
+\fB\-sd\fR
 display mappings to SCSI disk device names
 .TP
--sr
+\fB\-sr\fR
 display mappings to SCSI cdrom device names of the form
 /dev/sr0, /dev/sr1 etc
 .TP
--st
+\fB\-st\fR
 display mappings to SCSI tape device names
 .TP
--V
+\fB\-V\fR
 print out version string then exit (without further ado).
 .TP
--x
+\fB\-x\fR
 after each active sg device name is displayed there are
 five digits: <host_number> <bus> <scsi_id> <lun> <scsi_type>
-.PP
-If no options starting with "-s" are given then the mapping to
+.SH NOTES
+If no options starting with "\-s" are given then the mapping to
 all SCSI disk, cdrom and tape device names is shown.
 .PP
 If the device file system (devfs) is present a line noting
@@ -80,7 +81,7 @@ be /dev/sdb this is not necessarily so. Facilities associated
 with udev may assign major 8, minor 16 some other device node
 name. This version of sg_map has been extended to cope with
 sparse disk device node names of the form "/dev/sd<str>"
-where <str> can be one of [a-z,aa-zz,aaa-zzz]. See the sg_map26
+where <str> can be one of [a\-z,aa\-zz,aaa\-zzz]. See the sg_map26
 utility for a more precise way (i.e. less directory scanning)
 for mapping between sg device names and higher level names;
 including finding user defined names.
@@ -113,7 +114,7 @@ My system has a SCSI disk, a cd writer and a dvd player:
 .PP
 In order to find which sg device name corresponds to the disk:
 .br
-   $ sg_map -sd
+   $ sg_map \-sd
 .br
    # Note: the devfs pseudo file system is present
 .br
@@ -123,9 +124,9 @@ In order to find which sg device name corresponds to the disk:
 .br
    /dev/sg2
 .PP
-The "-x" option gives the following output:
+The "\-x" option gives the following output:
 .br
-   sg_map -x
+   sg_map \-x
 .br
    # Note: the devfs pseudo file system is present
 .br
@@ -158,7 +159,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2006 Douglas Gilbert
+Copyright \(co 2000\-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

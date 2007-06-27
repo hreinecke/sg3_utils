@@ -16,8 +16,10 @@ Here is a list of utilities that have been ported:
     sg_luns
     sg_modes
     sg_persist
+    sg_opcodes
     sg_prevent
     sg_rdac
+    sg_read_buffer
     sg_read_long
     sg_readcap
     sg_reassign
@@ -33,6 +35,7 @@ Here is a list of utilities that have been ported:
     sg_verify
     sg_vpd
     sg_wr_mode
+    sg_write_buffer
     sg_write_long
 
 Most utility names are indicative of the main SCSI command
@@ -70,9 +73,9 @@ command. To access ATAPI devices (e.g. ATAPI DVD drives) the
 kernel may need to be configured with the "atapicam" device.
 
 At the present time these utilities have been lightly tested on a
-FreeBSD version 5.3 system with some SCSI disks, a SCSI tape
+FreeBSD version 6.2 system with some SCSI disks, a SCSI tape
 drive and an ATAPI CD drive.
 
 
 Doug Gilbert
-11th October 2006
+15th January 2007

@@ -1,19 +1,20 @@
-.TH SG_WRITE_LONG "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_WRITE_LONG "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_write_long \- send the WRITE LONG SCSI command
+sg_write_long \- send the SCSI WRITE LONG command
 .SH SYNOPSIS
 .B sg_write_long
-[\fI--16\fR] [\fI--cor_dis\fR] [\fI--help\fR] [\fI--in=<name>\fR]
-[\fI--lba=<num>\fR] [\fI--pblock\fR] [\fI--verbose\fR] [\fI--version\fR]
-[\fI--wr_uncor\fR] [\fI--xfer_len=<num>\fR] \fI<scsi_device>\fR
+[\fI\-\-16\fR] [\fI\-\-cor_dis\fR] [\fI\-\-help\fR] [\fI\-\-in=IF\fR]
+[\fI\-\-lba=LBA\fR] [\fI\-\-pblock\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wr_uncor\fR] [\fI\-\-xfer_len=BTL\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send the WRITE LONG (10 or 16 byte) SCSI command to the given device.
-The buffer to be written to the device is filled with
+Send the SCSI WRITE LONG (10 or 16 byte) command to \fIDEVICE\fR. The buffer
+to be written to the \fIDEVICE\fR is filled with
 .B 0xff
-bytes or read from the given file. This buffer includes the sector data
-and the ECC bytes.
+bytes or read from the \fIIF\fR file. This buffer includes the logical
+data (e.g. 512 bytes) and the ECC bytes.
 .PP
 This utility can be used to generate a MEDIUM ERROR at a specific logical
 block address. This can be useful for testing error handling. Prior to
@@ -35,67 +36,69 @@ be taken with the settings in the "read write error recovery" mode page.
 Specifically if the ARRE (for reads) and/or AWRE (for writes) are set
 then recovered errors will cause the lba to be reassigned (and the old
 location to be added to the grown defect list (PLIST)). This is not easily 
-reversed and uses the (finite number) of spare blocks sets aside for
+reversed and uses the (finite number) of spare sectors set aside for
 this purpose. If in doubt it is probably safest to clear the ARRE and
 AWRE bits. These bits can be checked and modified with the sdparm utility.
-For example: "sdparm -c AWRE,ARRE /dev/sda" will clear the bits until
-the disk is rebooted (assuming the "saved" bits are not set).
+For example: "sdparm \-c AWRE,ARRE /dev/sda" will clear the bits until
+the disk is rebooted.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---16 | -S
-send a WRITE LONG (16) SCSI command to the given device. The default
-action (in the absence of this option) is to send a WRITE LONG (10)
-SCSI command.
+\fB\-S\fR, \fB\-\-16\fR
+send a SCSI WRITE LONG (16) command to \fIDEVICE\fR. The default action (in
+the absence of this option) is to send a SCSI WRITE LONG (10) command.
 .TP
---cor_dis | -c
+\fB\-c\fR, \fB\-\-cor_dis\fR
 sets the correction disabled (i.e 'COR_DIS') bit. This inhibits various
 other mechanisms such as automatic block reallocation, error recovery
 and various informational exception conditions being triggered.
-This bit is new in SBC-3 .
+This bit is new in SBC\-3 .
 .TP
---help | -h
+\fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
---in=<name> | -i <name>
-read data (binary) from given file <name> and use it for the WRITE LONG
-SCSI command. If <name> is "-" then stdin is read. If this option is
-not given then a buffer of 0xff bytes is written.
+\fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
+read data (binary) from file named \fIIF\fR and use it for the SCSI WRITE
+LONG command. If \fIIF\fR is "\-" then stdin is read. If this option is
+not given then 0xff bytes are used as fill.
 .TP
---lba=<num> | -l <num>
-the logical block address of the sector to corrupt. Defaults to lba 0
-which is a dangerous block to overwrite on a disk that is in use.
-Assumed to be in decimal unless prefixed with '0x'. If the lba is
-larger than can fit in 32 bits then the '--16' form should be used.
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the logical block address of the sector to overwrite.
+Defaults to lba 0 which is a dangerous block to overwrite on a disk that is
+in use. Assumed to be in decimal unless prefixed with '0x' or has a
+traling 'h'. If \fILBA\fR is larger than can fit in 32 bits then the
+\fI\-\-16\fR option should be used.
 .TP
---pblock | -p
-sets the physical block (i.e 'PBLOCK') bit. This instructs the device
-to use the given data (unless '--wr_uncor' is also given) to write
-to the physical block containing the given lba. The default action
+\fB\-p\fR, \fB\-\-pblock\fR
+sets the physical block (i.e 'PBLOCK') bit. This instructs \fIDEVICE\fR
+to use the given data (unless \fI\-\-wr_uncor\fR is also given) to write
+to the physical block specified by \fILBA\fR. The default action
 is to write to the logical block corresponding to the given lba.
-This bit is new in SBC-3 .
+This bit is new in SBC\-3 .
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increase the degree of verbosity (debug messages).
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 output version string then exit.
 .TP
---wr_uncor | -w
+\fB\-w\fR, \fB\-\-wr_uncor\fR
 sets the "write uncorrected" (i.e 'WR_UNCOR') bit. This instructs the
-device to flag the given lba (or the physical block that contains it
-if '--pblock' is also given) as having an unrecoverable error
-associated with it. Note: no data is transferred to the device,
-other that the command (i.e. the cdb). The default action is to
-use the provided data (--xfer_len= bytes in length) and write it to
-the device.  This bit is new in SBC-3 .
+\fIDEVICE\fR to flag the given lba (or the physical block that contains it
+if \fI\-\-pblock\fR is also given) as having an unrecoverable error
+associated with it. Note: no data is transferred to \fIDEVICE\fR,
+other than the command (i.e. the cdb). The default action is to
+use the provided data (\fI\-\-xfer_len=BTL\fR in length) and write it to
+\fIDEVICE\fR.  This bit is new in SBC\-3 .
 .TP
---xfer_len=<num>|-x <num>
-the transfer length in bytes (default to 520). If the given value (or the
-default) does not match the "long" block size of the device, nothing is
-written to the device and the appropriate xfer_len value is derived from the
-error response and printed (to stderr).
-.PP
-The lba and xfer_len numerical arguments may be followed by the following
-multiplicative suffixes:
+\fB\-x\fR, \fB\-\-xfer_len\fR=\fIBTL\fR
+where \fIBTL\fR is the byte transfer length (default to 520). If the
+given value (or the default) does not match the "long" block size of the
+device, nothing is written to \fIDEVICE\fR and the appropriate xfer_len value
+may be deduced from the error response which is printed (to stderr).
+.SH NOTES
+The \fILBA\fR and \fIBTL\fR (transfer length) arguments may be followed by
+the following multiplicative suffixes:
 c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
 MB *1,000,000; g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix
 of the form "x<n>" multiplies the leading number by <n>.
@@ -103,22 +106,22 @@ of the form "x<n>" multiplies the leading number by <n>.
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
 given, multipliers cannot be used.
-.SH "NOTES"
+.PP
 To read from a defective sector (that, for example, has been filled with
 0xff bytes by this utility) use:
 .PP
-  sg_dd if=<scsi_device> skip=<lba> of=/dev/null bs=512 count=1
+  sg_dd if=\fIDEVICE\fR skip=\fILBA\fR of=/dev/null bs=512 count=1
 .PP
 To overwrite to a defective sector use:
 .PP
-  sg_dd of=<scsi_device> seek=<lba> if=/dev/zero bs=512 count=1    
+  sg_dd of=\fIDEVICE\fR seek=\fILBA\fR if=/dev/zero bs=512 count=1    
 .PP
 This will result in a sector (block) with 512 bytes of 0x0 without a
 MEDIUM ERROR since the ECC and associated data will be well formed.
 .PP
-The 10 byte WRITE LONG SCSI command limits the logical block address
-to a 32 bit quantity. For larger lbas use the '--16' option for the
-WRITE LONG (16) SCSI command.
+The 10 byte SCSI WRITE LONG command limits the logical block address
+to a 32 bit quantity. For larger lbas use the \fI\-\-16\fR option for the
+SCSI WRITE LONG (16) command.
 .SH EXIT STATUS
 The exit status of sg_write_long is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -127,7 +130,7 @@ Written by Saeed Bishara. Further work by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2006 Douglas Gilbert
+Copyright \(co 2004\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

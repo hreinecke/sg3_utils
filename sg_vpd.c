@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Douglas Gilbert.
+ * Copyright (c) 2006-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
@@ -47,7 +49,7 @@
 
 */
 
-static char * version_str = "0.16 20051012";    /* spc-4 rev 7a */
+static char * version_str = "0.18 20070121";    /* spc-4 rev 8 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -166,13 +168,12 @@ static void usage()
 {
     fprintf(stderr,
             "Usage: sg_vpd  [--enumerate] [--help] [--hex] [--ident] "
-            "[--long]\n"
-            "               [--page=<vpd_page>] [--quiet] [--raw] "
-            "[--verbose] [--version]\n"
-            "               <device>\n");
+            "[--long] [--page=PG]\n"
+            "               [--quiet] [--raw] [--verbose] [--version] "
+            "DEVICE\n");
     fprintf(stderr,
             "  where:\n"
-            "    --enumerate|-e  enumerate known VPD pages names then "
+            "    --enumerate|-e    enumerate known VPD pages names then "
             "exit\n"
             "    --help|-h       output this usage message then exit\n"
             "    --hex|-H        output page in ASCII hexadecimal\n"
@@ -181,12 +182,10 @@ static void usage()
             "                    short logical unit designator (equiv: "
             "'-qp di_lu')\n"
             "    --long|-l       perform extra decoding\n"
-            "    --page=<vpd_page>|-p <vpd_page>    fetch given VPD "
-            "page\n"
-            "                    <vpd_page> is an acronym, or a decimal "
-            "number\n"
-            "                    unless hex indicator is given (e.g. "
-            "'0x83')\n"
+            "    --page=PG|-p PG    fetch VPD page where PG is an "
+            "acronym, or a decimal\n"
+            "                       number unless hex indicator "
+            "is given (e.g. '0x83')\n"
             "    --quiet|-q      suppress some output when decoding\n"
             "    --raw|-r        output page in binary\n"
             "    --verbose|-v    increase verbosity\n"
@@ -723,7 +722,7 @@ static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                         id_ext <<= 8;
                     id_ext |= ip[m];
                 }
-                printf("      Identifier extension: 0x%llx\n", id_ext);
+                printf("      Identifier extension: 0x%" PRIx64 "\n", id_ext);
             } else if ((8 != i_len) && (12 != i_len)) {
                 fprintf(stderr, "      << can only decode 8, 12 and 16 "
                         "byte ids>>\n");
@@ -739,8 +738,8 @@ static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                     vsei <<= 8;
                 vsei |= ip[ci_off + 3 + m];
             }
-            printf("      Vendor Specific Extension Identifier: 0x%llx\n",
-                   vsei);
+            printf("      Vendor Specific Extension Identifier: 0x%" PRIx64
+                   "\n", vsei);
             if (12 == i_len) {
                 d_id = ((ip[8] << 24) | (ip[9] << 16) | (ip[10] << 8) |
                         ip[11]);
@@ -799,8 +798,8 @@ static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                 }
                 if (long_out) {
                     printf("      NAA 5, IEEE Company_id: 0x%x\n", c_id);
-                    printf("      Vendor Specific Identifier: 0x%llx\n",
-                           vsei);
+                    printf("      Vendor Specific Identifier: 0x%" PRIx64
+                           "\n", vsei);
                     printf("      [0x");
                     for (m = 0; m < 8; ++m)
                         printf("%02x", (unsigned int)ip[m]);
@@ -827,8 +826,8 @@ static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                 }
                 if (long_out) {
                     printf("      NAA 6, IEEE Company_id: 0x%x\n", c_id);
-                    printf("      Vendor Specific Identifier: 0x%llx\n",
-                           vsei);
+                    printf("      Vendor Specific Identifier: 0x%" PRIx64
+                           "\n", vsei);
                     vsei = 0;
                     for (m = 0; m < 8; ++m) {
                         if (m > 0)
@@ -836,7 +835,7 @@ static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                         vsei |= ip[8 + m];
                     }
                     printf("      Vendor Specific Identifier Extension: "
-                           "0x%llx\n", vsei);
+                           "0x%" PRIx64 "\n", vsei);
                     printf("      [0x");
                     for (m = 0; m < 16; ++m)
                         printf("%02x", (unsigned int)ip[m]);
@@ -924,7 +923,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
     unsigned long long ull;
     int bump;
 
-    for (k = 0, bump; k < len; k += bump, ucp += bump) {
+    for (k = 0, bump= 24; k < len; k += bump, ucp += bump) {
         if ((len < 24) || (0 != (len % 4)))
             printf("%sTransport Id short or not multiple of 4 "
                    "[length=%d]:\n", leadin, len);
@@ -993,7 +992,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                     ull <<= 8;
                 ull |= ucp[4 + j];
             }
-            printf("%s  SAS address: 0x%llx\n", leadin, ull);
+            printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
@@ -1038,8 +1037,9 @@ static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  GRP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d SIMPSUP=%d\n",
            !!(buff[5] & 0x10), !!(buff[5] & 0x8), !!(buff[5] & 0x4),
            !!(buff[5] & 0x2), !!(buff[5] & 0x1));
-    printf("  CORR_D_SUP=%d NV_SUP=%d V_SUP=%d\n", !!(buff[6] & 0x80),
-           !!(buff[6] & 0x2), !!(buff[6] & 0x1));
+    printf("  CORR_D_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
+           !!(buff[6] & 0x4), !!(buff[6] & 0x2), !!(buff[6] & 0x1),
+           !!(buff[7] & 0x1));
 }
 
 static void decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
@@ -1754,7 +1754,7 @@ int main(int argc, char * argv[])
         }
     }
     if ('\0' == device_name[0]) {
-        fprintf(stderr, "No <device> argument given\n");
+        fprintf(stderr, "No DEVICE argument given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

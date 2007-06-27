@@ -30,6 +30,9 @@
  *
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Additional sense data categories (to those defined in sg_lib.h).
@@ -42,6 +45,29 @@
                                 /* sense key plus 'info' field: */
                                 /*       [sk,asc,ascq: 0x3/0x4,*,*] */
 
+
+/* Invokes a ATA PASS-THROUGH (12 or 16) SCSI command (SAT). If cdb_len
+ * is 12 then a ATA PASS-THROUGH (12) command is called. If cdb_len is 16
+ * then a ATA PASS-THROUGH (16) command is called. If cdb_len is any other
+ * value -1 is returned. After copying from cdbp to an internal buffer,
+ * the first byte (i.e. offset 0) is set to 0xa1 if cdb_len is 12; or is
+ * set to 0x85 if cdb_len is 16. The last byte (offset 11 or offset 15) is
+ * set to 0x0 in the internal buffer. If timeout_secs <= 0 then the timeout
+ * is set to 60 seconds. For data in or out transfers set dinp or doutp,
+ * and dlen to the number of bytes to transfer. If dlen is zero then no data
+ * transfer is assumed. If sense buffer obtained then it is written to
+ * sensep, else sensep[0] is set to 0x0. If ATA return descriptor is obtained
+ * then written to ata_return_dp, else ata_return_dp[0] is set to 0x0. Either
+ * sensep or ata_return_dp (or both) may be NULL pointers. Returns SCSI
+ * status value (>= 0) or -1 if other error. Users are expected to check the
+ * sense buffer themselves. If available the data in resid is written to
+ * residp.
+ */
+extern int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
+                          int timeout_secs,  void * dinp, void * doutp,
+                          int dlen, unsigned char * sensep,
+                          int max_sense_len, unsigned char * ata_return_dp,
+                          int max_ata_return_len, int * residp, int verbose);
 
 /* Invokes a FORMAT UNIT (SBC-3) command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Format unit not supported,
@@ -77,6 +103,15 @@ extern int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact,
                                         int rq_scope, unsigned int rq_type,
                                         void * paramp, int param_len,
                                         int noisy, int verbose);
+
+/* Invokes a SCSI READ BUFFER command (SPC). Return of 0 ->
+ * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+extern int sg_ll_read_buffer(int sg_fd, int mode, int buffer_id,
+                             int buffer_offset, void * resp,
+                             int mx_resp_len, int noisy, int verbose);
 
 /* Invokes a SCSI READ DEFECT DATA (10) command (SBC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
@@ -186,6 +221,15 @@ extern int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
                           int veri_len, void * data_out, int data_out_len,
                           unsigned long * infop, int noisy, int verbose);
 
+/* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
+ * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+extern int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id,
+                              int buffer_offset, void * paramp,
+                              int param_len, int noisy, int verbose);
+
 /* Invokes a SCSI WRITE LONG (10) command (SBC). Note that 'xfer_len'
  * is in bytes. Returns 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> WRITE LONG(10) not supported,
@@ -212,27 +256,8 @@ extern int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                               int xfer_len, int * offsetp, int noisy,
                               int verbose);
 
-/* Invokes a ATA PASS-THROUGH (12 or 16) SCSI command (SAT). If cdb_len
- * is 12 then a ATA PASS-THROUGH (12) command is called. If cdb_len is 16
- * then a ATA PASS-THROUGH (16) command is called. If cdb_len is any other
- * value -1 is returned. After copying from cdbp to an internal buffer,
- * the first byte (i.e. offset 0) is set to 0xa1 if cdb_len is 12; or is
- * set to 0x85 if cdb_len is 16. The last byte (offset 11 or offset 15) is
- * set to 0x0 in the internal buffer. If timeout_secs <= 0 then the timeout
- * is set to 60 seconds. For data in or out transfers set dinp or doutp,
- * and dlen to the number of bytes to transfer. If dlen is zero then no data
- * transfer is assumed. If sense buffer obtained then it is written to
- * sensep, else sensep[0] is set to 0x0. If ATA return descriptor is obtained
- * then written to ata_return_dp, else ata_return_dp[0] is set to 0x0. Either
- * sensep or ata_return_dp (or both) may be NULL pointers. Returns SCSI
- * status value (>= 0) or -1 if other error. Users are expected to check the
- * sense buffer themselves. If available the data in resid is written to
- * residp.
- */
-extern int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
-                          int timeout_secs,  void * dinp, void * doutp,
-                          int dlen, unsigned char * sensep,
-                          int max_sense_len, unsigned char * ata_return_dp,
-                          int max_ata_return_len, int * residp, int verbose);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

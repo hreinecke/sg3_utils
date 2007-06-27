@@ -1,5 +1,7 @@
 #define _XOPEN_SOURCE 500
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -18,10 +20,9 @@
 #include <linux/major.h> 
 #include "sg_lib.h"
 #include "sg_io_linux.h"
-#include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2006 D. Gilbert
+*  Copyright (C) 2001 - 2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -40,7 +41,7 @@
 
 */
 
-static const char * version_str = "1.14 20061015";
+static const char * version_str = "1.17 20070121";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -148,28 +149,28 @@ static int dd_filetype(const char * filename)
 static void usage()
 {
     fprintf(stderr, "Usage: "
-           "sg_read  [blk_sgio=0|1] [bpt=<num>] [bs=<num>] "
+           "sg_read  [blk_sgio=0|1] [bpt=BPT] [bs=BS] "
            "[cdbsz=6|10|12|16]\n"
-           "                count=<num> [dio=0|1] [dpo=0|1] [fua=0|1] "
-           "if=<infile>\n"
+           "                count=COUNT [dio=0|1] [dpo=0|1] [fua=0|1] "
+           "if=IFILE\n"
            "                [mmap=0|1] [no_dfxer=0|1] [odir=0|1] "
-           "[skip=<num>]\n"
-           "                [time=<num>] [verbose=<n>] [--help] "
+           "[skip=SKIP]\n"
+           "                [time=TI] [verbose=VERB] [--help] "
            "[--version]\n"
            "  where:\n"
            "    blk_sgio 0->normal IO for block devices, 1->SCSI commands "
            "via SG_IO\n"
            "    bpt      is blocks_per_transfer (default is 128, or 64 KiB "
-           "for def 'bs')\n"
-           "             setting 'bpt=0' will do 'count' zero block SCSI "
+           "for default BS)\n"
+           "             setting 'bpt=0' will do COUNT zero block SCSI "
            "READs\n"
-           "    bs       must match sector size if 'if' accessed via SCSI "
+           "    bs       must match sector size if IFILE accessed via SCSI "
            "commands\n"
            "             (def=512)\n"
            "    cdbsz    size of SCSI READ command (default is 10)\n"
-           "    count    total bytes read will be 'bs'*'count' (if no "
+           "    count    total bytes read will be BS*COUNT (if no "
            "error)\n"
-           "             (if negative, do |count| zero block SCSI READs)\n"
+           "             (if negative, do |COUNT| zero block SCSI READs)\n"
            "    dio      1-> attempt direct IO on sg device, 0->indirect IO "
            "(def)\n");
     fprintf(stderr,
@@ -619,10 +620,10 @@ int main(int argc, char * argv[])
             fprintf(stderr, "Opened %s for Unix reads with flags=0x%x\n",
                     inf, flags);
         if (skip > 0) {
-            llse_loff_t offset = skip;
+            off64_t offset = skip;
 
             offset *= bs;       /* could exceed 32 bits here! */
-            if (llse_llseek(infd, offset, SEEK_SET) < 0) {
+            if (lseek64(infd, offset, SEEK_SET) < 0) {
                 snprintf(ebuff,  EBUFF_SZ,
                     ME "couldn't skip to required position on %s", inf);
                 perror(ebuff);
@@ -637,7 +638,7 @@ int main(int argc, char * argv[])
 
     if (dd_count > 0) {
         if (do_dio || do_odir || (FT_RAW & in_type)) {
-            wrkBuff = malloc(bs * bpt + psz);
+            wrkBuff = (unsigned char *)malloc(bs * bpt + psz);
             if (0 == wrkBuff) {
                 fprintf(stderr, "Not enough user memory for aligned "
                         "storage\n");
@@ -646,14 +647,14 @@ int main(int argc, char * argv[])
             wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         } else if (do_mmap) {
-            wrkPos = mmap(NULL, bs * bpt, PROT_READ | PROT_WRITE,
-                          MAP_SHARED, infd, 0);
+            wrkPos = (unsigned char *)mmap(NULL, bs * bpt,
+			PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
             if (MAP_FAILED == wrkPos) {
                 perror(ME "error from mmap()");
                 return SG_LIB_CAT_OTHER;
             }
         } else {
-            wrkBuff = malloc(bs * bpt);
+            wrkBuff = (unsigned char *)malloc(bs * bpt);
             if (0 == wrkBuff) {
                 fprintf(stderr, "Not enough user memory\n");
                 return SG_LIB_CAT_OTHER;
@@ -732,10 +733,10 @@ int main(int argc, char * argv[])
             }
         } else {
             if (iters > 0) { /* subsequent iteration reset skip position */
-                llse_loff_t offset = skip;
+                off64_t offset = skip;
 
                 offset *= bs;       /* could exceed 32 bits here! */
-                if (llse_llseek(infd, offset, SEEK_SET) < 0) {
+                if (lseek64(infd, offset, SEEK_SET) < 0) {
                     perror(ME "could not reset skip position");
                     break;
                 }

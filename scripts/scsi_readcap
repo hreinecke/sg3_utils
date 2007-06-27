@@ -1,0 +1,49 @@
+#!/bin/bash
+
+###################################################################
+#
+#  Fetch READ CAPACITY information for the given SCSI device(s).
+#
+#  This script assumes the sg3_utils package is installed.
+#
+##################################################################
+
+verbose=""
+brief=""
+
+usage()
+{
+  echo "Usage: scsi_readcap [-b] [-h] [-v] <device>+"
+  echo "  where:"
+  echo "    -b, --brief          output brief capacity data"
+  echo "    -h, --help           print usage message"
+  echo "    -v, --verbose        more verbose output"
+  echo ""
+  echo "Use SCSI READ CAPACITY command to fetch the size of each <device>"
+}
+
+if (( $# < 1 ))
+  then
+    usage
+    exit 1
+fi
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    b|-brief) brief="-b" ;;
+    h|-help) usage ; exit 0 ;;
+    v|-verbose) verbose="-v" ;;
+    vv) verbose="-vv" ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+for i
+do
+	echo "sg_readcap $brief $verbose $i"
+        sg_readcap $brief $verbose $i
+done

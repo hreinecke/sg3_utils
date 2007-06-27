@@ -1,0 +1,46 @@
+#!/bin/bash
+
+###################################################################
+#
+#  Check the temperature of the given SCSI device(s).
+#
+#  This script assumes the sg3_utils package is installed.
+#
+##################################################################
+
+verbose=""
+
+usage()
+{
+  echo "Usage: scsi_temperature [-h] [-v] <device>+"
+  echo "  where:"
+  echo "    -h, --help           print usage message"
+  echo "    -v, --verbose        more verbose output"
+  echo ""
+  echo "Use SCSI LOG SENSE command to fetch temperature of each <device>"
+}
+
+if (( $# < 1 ))
+  then
+    usage
+    exit 1
+fi
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    h|-help) usage ; exit 0 ;;
+    v|-verbose) verbose="-v" ;;
+    vv) verbose="-vv" ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+for i
+do
+	echo "sg_logs -t $verbose $i"
+        sg_logs -t $verbose $i
+done

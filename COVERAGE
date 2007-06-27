@@ -33,7 +33,7 @@ READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
-READ BUFFER         sg_rbuf, sg_test_rwbuf
+READ BUFFER         sg_rbuf, sg_test_rwbuf, sg_read_buffer
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ DEFECT(10)     sginfo, sg_reassign('-g'), ++
@@ -59,7 +59,7 @@ WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
 WRITE(16)           sg_dd, sgm_dd, sgp_dd
-WRITE BUFFER        sg_test_rwbuf
+WRITE BUFFER        sg_test_rwbuf, sg_write_buffer
 WRITE LONG (10)     sg_write_long, ++
 WRITE LONG (16)     sg_write_long, ++
 
@@ -83,4 +83,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Doug Gilbert
-14th October 2006
+2nd November 2006

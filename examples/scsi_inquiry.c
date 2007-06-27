@@ -53,7 +53,8 @@ int main(int argc, char * argv[])
     int s_fd, res, k, to;
     unsigned char inqCmdBlk [INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0,
                                                 INQUIRY_REPLY_LEN, 0};
-    unsigned char * inqBuff = malloc(OFF + sizeof(inqCmdBlk) + 512);
+    unsigned char * inqBuff = (unsigned char *)
+                                malloc(OFF + sizeof(inqCmdBlk) + 512);
     unsigned char * buffp = inqBuff + OFF;
     My_Scsi_Ioctl_Command * ishp = (My_Scsi_Ioctl_Command *)inqBuff;
     char * file_name = 0;
@@ -61,15 +62,15 @@ int main(int argc, char * argv[])
     int oflags = 0;
 
     for (k = 1; k < argc; ++k) {
-	if (0 == strcmp(argv[k], "-n"))
-	    do_nonblock = 1;
-	else if (*argv[k] != '-')
+        if (0 == strcmp(argv[k], "-n"))
+            do_nonblock = 1;
+        else if (*argv[k] != '-')
             file_name = argv[k];
-	else {
-	    printf("Unrecognized argument '%s'\n", argv[k]);
-	    file_name = 0;
-	    break;
-	}
+        else {
+            printf("Unrecognized argument '%s'\n", argv[k]);
+            file_name = 0;
+            break;
+        }
     }
     if (0 == file_name) {
         printf("Usage: 'scsi_inquiry [-n] <scsi_device>'\n");
@@ -81,7 +82,7 @@ int main(int argc, char * argv[])
     }
     
     if (do_nonblock)
-	oflags = O_NONBLOCK;
+        oflags = O_NONBLOCK;
     s_fd = open(file_name, oflags | O_RDWR);
     if (s_fd < 0) {
         if ((EROFS == errno) || (EACCES == errno)) {

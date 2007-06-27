@@ -21,6 +21,8 @@ CFLAGS = -g -O2 -Wall -W $(EXTRA_FLAGS)
 
 CFLAGS_PTHREADS = -D_REENTRANT
 
+# there is no rule to make the following in the parent directory,
+# it is assumed they are already built.
 D_FILES = ../sg_lib.o ../sg_pt_freebsd.o
 O_FILES = sg_lib.o sg_pt_freebsd.o
 
@@ -38,7 +40,7 @@ clean:
 	/bin/rm -rf .libs
 
 sg_simple5: sg_simple5.o $(D_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
 
 install: $(EXECS)
 	install -d $(INSTDIR)

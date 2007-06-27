@@ -1,49 +1,48 @@
-.TH SG_PREVENT "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_PREVENT "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_prevent \- invoke SCSI PREVENT ALLOW MEDIUM REMOVAL command on a device
+sg_prevent \- sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command
 .SH SYNOPSIS
 .B sg_prevent
-[\fI--allow\fR] [\fI--help\fR] [\fI--prevent=<n>\fR] [\fI--verbose\fR]
-[\fI--version\fR] \fI<scsi_device>\fR
+[\fI\-\-allow\fR] [\fI\-\-help\fR] [\fI\-\-prevent=PC\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command to the given SCSI
-device. The default action of this utility is to disallow the user and the
-SCSI START STOP UNIT command (see sg_start) removing or ejecting
-the medium from a drive. Drives that hold removable disks, tape
-cartridges or cd/dvd media typically implement this command. The definition
-of the "prevent" codes for this command differ between disks and
-tapes (covered by SBC-3 and SSC-3) and cd/dvd drives (covered by MMC-5).
-The "prevent codes" described here are from MMC-5.
+Sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command to \fIDEVICE\fR.
+The default action of this utility is to prevent the removing or
+ejecting of the medium from a drive. This is done by ignoring the
+SCSI START STOP UNIT command (see sg_start) and ignoring the eject
+button on the drive when the user presses it. Drives that hold removable
+disks, tape cartridges or cd/dvd media typically implement this command.
+The definition of the "prevent" codes for this command differ between
+disks and tapes (covered by SBC\-3 and SSC\-3) and cd/dvd drives (covered
+by MMC\-5). The "prevent codes" described here are from MMC\-5.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---allow | -a
-allow medium removal. This is equivalent to setting the argument
-to '--prevent' to 2. Cannot be used with '--prevent' option (i.e. use
-no options (hence prevent removal), this option or '--prevent').
+\fB\-a\fR, \fB\-\-allow\fR
+allow medium removal. This is equivalent to setting to '\-\-prevent=2'.
+Cannot be used with \fI\-\-prevent=PC\fR option (i.e. either use
+no options (hence prevent removal), this option or \fI\-\-prevent=PC\fR).
 .TP
---help | -h
+\fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
---prevent=<n> | -p <n>
-prevent codes: 0 allows removal, 1 prevents removal (default), 2 allows
-persistent removal while 3 prevents persistent removal. "Persistent" in this
-context means that the initiator (port) that successfully uses code 3 blocks
-other initiators (ports) from allowing removal. A "persistent prevent" state
-can be cleared by owner allowing persistent removal (code 2) or a power
-cycle (or anything that resets the device (lun)) or some special
-commands (e.g. various service actions of Persistent Reserve Out, see SPC-3).
+\fB\-p\fR, \fB\-\-prevent\fR=\fIPC\fR
+where \fIPC\fR is a prevent code value. Defined values are: 0 allows removal,
+1 prevents removal (default), 2 allows persistent removal while 3 prevents
+persistent removal. "Persistent" in this context means that the
+initiator (port) that successfully uses code 3 blocks other initiators (ports)
+from allowing removal. A "persistent prevent" state can be cleared by the
+owner allowing persistent removal (code 2) or a power cycle (or anything that
+resets the device (lun)) or some special commands (e.g. various service
+actions of Persistent Reserve Out, see SPC\-3).
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
-.PP
-In some cases removable media can be ejected by an application (see
-sg_start and its '-loej' option). Often a user with physical access
-to the drive can attempt to eject the media by pressing a button on
-the drive.
 .SH EXIT STATUS
 The exit status of sg_prevent is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -52,7 +51,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2006 Douglas Gilbert
+Copyright \(co 2004\-2007 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

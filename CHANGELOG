@@ -2,6 +2,36 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.23 [20070131]
+  - sg_read_buffer: new utility
+  - sg_write_buffer: new utility
+  - sg_opcodes, sg_senddiag, sg_logs, sg_modes, sg_start, sg_inq,
+    sg_turs, sg_readcap, sg_rbuf: add getopt_long() based cli;
+    old and new cli selectable, new getopt_long cli is default
+  - scripts: new subdirectory containing some bash scripts
+    - add scripts/README file
+  - sg_reassign: add '--hex' option for grown and primary lists
+  - sg_rtpg: add '--raw' option
+  - sg_lib.h, sg_cmds_basic.h + sg_cmds_extra.h: add C++ 
+    'extern "C" ' wrappers
+    - cleanup C code so it will compile as C++
+  - sg_lib: sync with spc4r08
+    - include <inttypes.h>, use PRId64 instead of %lld form
+    - fix sg_get_sense_str() when empty sense buffer
+  - win32 port: add Makefile.mingw + related support for MinGW
+  - sg_cmds_extra: add sg_ll_read_buffer() and sg_ll_write_buffer()
+  - sg_dd, sgp_dd, sgm_dd, sg_read: use lseek64() instead of llseek.c
+  - sgm_dd: accept coe=<n> for interworking with sg_dd
+  - sg_rdac: fix on non-linux ports
+  - sg_ses: fix spurious warning in additional element status page
+    - '-rr' option outputs a diagnostic page in binary to stdout
+  - sg_opcodes: add command timeout descriptor support (spc4r08)
+    - change linux specific pass through to generic pass through
+  - sg_logs: add 'name=value' decoding for SAS specific lpage
+  - examples+utils subdirectories: remove symlinks
+  - synchronize man pages with usage messages
+  - sg3_utils.spec: rework
+
 Changelog for sg3_utils-1.22 [20061016]
   - sgp_dd: accept verbose=<n> as well as deb=<n> to ease
     interworking with sg_dd and sgm_dd

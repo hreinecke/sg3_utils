@@ -1,264 +1,322 @@
-.TH SG_INQ "8" "September 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_INQ "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_inq \- outputs data retrieved from the SCSI INQUIRY or
-ATA IDENTIFY (PACKET) DEVICE command
+sg_inq \- sends a SCSI INQUIRY or ATA IDENTIFY (PACKET) DEVICE command
+and outputs the response
 .SH SYNOPSIS
 .B sg_inq
-[\fI-a\fR] [\fI-A\fR] [\fI-b\fR] [\fI-c\fR] [\fI-cl\fR] [\fI-d\fR]
-[\fI-e\fR] [\fI-h\fR] [\fI-H\fR] [\fI-i\fR] [\fI-m\fR] [\fI-m\fR]
-[\fI-o=<opcode_page>\fR] [\fI-p=<vpd_page>\fR] [\fI-P\fR] [\fI-r\fR]
-[\fI-s\fR] [\fI-v\fR] [\fI-V\fR] [\fI-x\fR] [\fI-36\fR] [\fI-?\fR]
-\fI<device>\fR
+[\fI\-\-ata\fR] [\fI\-\-cmddt\fR] [\fI\-\-descriptors\fR] [\fI\-\-extended\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-len=LEN\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
+.PP
+.B sg_inq
+[\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c\fR] [\fI\-cl\fR]
+[\fI\-d\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR] [\fI\-l=LEN\fR]
+[\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR] [\fI\-p=VPD_PG\fR] [\fI\-P\fR]
+[\fI\-r\fR] [\fI\-s\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR]
+[\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility by default sends an INQUIRY SCSI command to the given
+This utility by default sends a SCSI INQUIRY command to the given
 device and then outputs the response. All SCSI devices are meant
 to respond to a "standard" INQUIRY command with at least a 36 byte
 response (in SCSI 2 and higher). An INQUIRY is termed as "standard"
-when both the EVPD and CmdDt bits are clear. 
+when both the EVPD and CmdDt (obsolete) bits are clear. 
 .PP
-An important "non-standard" INQUIRY page is the Device Identification
-Vital Product Data (VPD) page (page number: 0x83). Since SPC-3,
-support for this page has been flagged as mandatory. The '-i'
-option decodes this page.
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later
+section on the old command line syntax outlines the second group of
+options.
 .PP
-If <device> exists and the SCSI INQUIRY fails (because the SG_IO
-ioctl is unknown) then an ATA IDENTIFY (PACKET) DEVICE is tried. If it
-succeeds then device identification strings are output. If the "-r" option
-is given then the 512 byte IDENTIFY response is output in binary. If
-the "-H" (or "-h") option is given then the 512 byte response is
-output in ASCII hex, grouped as 256 16 bit words, 8 words per line.
-If the "-A" option is given then the SCSI INQUIRY is not performed
-and the device is assumed to be ATA (or ATAPI). This allows ATAPI
-transport information to be found for ATAPI cd/dvd drives; since
-without this option such drives respond to a SCSI INQUIRY command.
+An important "non\-standard" INQUIRY page is the Device Identification
+Vital Product Data (VPD) page [0x83]. Since SPC\-3, support for this page
+has been flagged as mandatory. The \fI\-\-id\fR option decodes this page.
+To get fine grained decoding of this VPD page and others, including
+some vendor specific VPD pages, see the
+.B sg_vpd
+utility.
 .PP
-The reference document used for interpreting an INQUIRY is T10/1713-D
-Revision 6 (SPC-4, 18 July 2006) found at http://www.t10.org .
+If the \fIDEVICE\fR exists and the SCSI INQUIRY fails (because the SG_IO ioctl
+is not supported) then an ATA IDENTIFY (PACKET) DEVICE is tried. If it
+succeeds then device identification strings are output. The \fI\-\-raw\fR
+and \fI\-\-hex\fR options can be used to manipulate the output. If the
+\fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
+and the \fIDEVICE\fR is assumed to be ATA (or ATAPI).
+.PP
+The reference document used for interpreting an INQUIRY is T10/1713\-D
+Revision 7a (SPC\-4, 7 October 2006) found at http://www.t10.org .
 Obsolete items in the standard INQUIRY response are displayed in
 brackets. The reference document for the ATA IDENTIFY (PACKET) DEVICE
-command is ATA8-ACS found at http://www.t13.org .
-.PP
-ATA or ATAPI devices that use a SCSI to ATA Translation layer (see
-SAT at www.t10.org) may support the ATA Information VPD page. This
-returns the IDENTIFY (PACKET) DEVICE response amongst other things.
-See the '-a' option.
+command is ATA8\-ACS found at http://www.t13.org .
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
--a
-decodes the ATA Information Vital Product Data (VPD) page [0x89].
-If '-H' is given then the whole page as ASCII hex bytes; with '-HH'
-the IDENTIFY (PACKET) DEVICE response is output in ASCII hex bytes;
-and without either the IDENTIFY (PACKET) DEVICE response is output
-in 16 bit ASCII hex words. This page is defined in SAT (revision 5)
-at www.t10.org .
+\fB\-a\fR, \fB\-\-ata\fR
+Assume given \fIDEVICE\fR is an ATA or ATAPI device which can receive ATA
+commands from the host operating system. Skip the SCSI INQUIRY command and
+use either the ATA IDENTIFY DEVICE command (for nonpacket devices) or the
+ATA IDENTIFY PACKET DEVICE command. This option is only available in Linux.
 .TP
--A
-Assume given <device> is an ATA or ATAPI device which can receive
-ATA passthrough commands from the host operating system. Skip
-the SCSI INQUIRY command and use either the ATA IDENTIFY DEVICE
-command (for nonpacket devices) or the ATA IDENTIFY PACKET DEVICE
-command. This option is not available in the FreeBSD port.
+\fB\-c\fR, \fB\-\-cmddt\fR
+set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
+conjunction with the \fI\-\-page=PG\fR option where \fIPG\fR specifies the
+SCSI command opcode to query. When used twice (e.g. '\-cc') this utility
+forms a list by looping over all 256 opcodes (0 to 255 inclusive) only
+outputting a line for found commands. The CmdDt bit is now obsolete.
+It has been replaced by the REPORT SUPPORTED OPERATION CODES command,
+see the sg_opcodes utility.
 .TP
--b
-decodes the Block Limits Vital Product Data (VPD) page [0xb0].
-This page is defined in SBC-2 (revision 16) at www.t10.org .
+\fB\-d\fR, \fB\-\-descriptors\fR
+decodes and prints the version descriptors found in a standard INQUIRY
+response. There are up to 8 of them. Version descriptors indicate which
+versions of standards and/or drafts the \fIDEVICE\fR complies with. The
+normal components of a standard INQUIRY are output (typically from
+the first 36 bytes of the response) followed by the version descriptors
+if any.
 .TP
--c
-set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used
-in conjunction with the '-o=<opcode>' option to specify the SCSI command
-opcode to supply the support data for. The command support data is a mask of
-the same length as the command with bits set in positions that are
-modifiable. For example, '12 03 ff 00 ff 01' shows the device 
-supports the EVPD and CmdDt bits [byte 1, bits 0 and 1] in an INQUIRY command.
-The CmdDt bit is now obsolete. It has been replaced by the REPORT SUPPORTED
-OPERATION CODES command which is accessed via the sg_opcodes utility.
+\fB\-e\fR, \fB\-x\fR, \fB\-\-extended\fR
+prints the extended INQUIRY VPD page [0x86].
 .TP
--cl
-lists the command data for all supported commands (followed by the command
-name) by looping through all 256 opcodes. This option uses the CmdDt bit
-which is now obsolete. See the sg_opcodes utility.
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit. When used twice, after the
+usage message, there is a list of available abbreviations than can be
+given to the \fI\-\-page=PG\fR option.
 .TP
--d
-decodes depending on context. If '-e' option is given, or any option that
-implies '-e' (e.g. '-i' or '-p=80'), then this utility attempts to
-decode the indicated VPD page.  Otherwise the version descriptors (if any)
-are listed following a standard INQUIRY response. There are up to 8 version
-descriptors in the response of a standard INQUIRY, If the version descriptor
-code is recognised then the corresponding string is output.
-Version descriptors are versions of standards and drafts that the device
-claims to comply with (e.g. SAM, SPC, SBC, SPI, FCP, SAS etc).
+\fB\-H\fR, \fB\-\-hex\fR
+rather than decode a standard INQUIRY response, a VPD page or command
+support data; print out the response in hex to stdout. Error messages and
+warnings are typically output to stderr. When used twice with the ATA
+Information VPD page [0x89] decodes the start of the response then output
+the ATA IDENTIFY (PACKET) DEVICE response in hexadecimal bytes (not 16 bit
+words). When used three times with the ATA Information VPD page [0x89] or
+the \fI\-\-ata\fR option, this utility outputs the ATA IDENTIFY (PACKET)
+DEVICE response in hexadecimal words suitable for input
+to 'hdparm \-\-Istdin'.  See note below.
 .TP
--e
-enable (i.e. sets) the Vital Product Data (EVPD) bit (defaults to clear(0)).
-Used in conjunction with the '-p=<vpd_page>' option to specify the VPD page
-to fetch. If '-p' is not given then VPD page 0 (list supported VPD pages)
-is assumed. Support for VPD page 0 and page 0x83 (device identification)
-have been made mandatory in SPC-3 .
+\fB\-i\fR, \fB\-\-id\fR
+prints the device identification VPD page [0x83].
 .TP
--h
-outputs INQUIRY response in hex rather than trying to decode it. When
-used with '-i' outputs partially decoded device identification descriptors
-with the identifier itself output in hex. When selected, ATA IDENTIFY (PACKET)
-DEVICE responses are output in 16 bit words if '-h' is given; they are output in
-bytes when '-hh' (or '-HH') is given. The '-hh' option has a similar effect
-on the ATA information VPD page decoding (i.e. when the '-a' option is given).
-When used three times ('-hhh' or '-HHH'), the response is output in a form
-acceptable for 'hdparm --Istdin' to decode. 
+\fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
+the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.
+This is the (maximum) length of the response to be sent by the device.
+The default value of \fILEN\fR is 0 which is interpreted as: first request
+is for 36 bytes and if necessary execute another INQUIRY if the "additional
+length" field in the response indicates that more than 36 bytes is available.
+If \fILEN\fR is greater than 0 then only one INQUIRY command is performed.
+See paragraph below about "36 byte INQUIRYs".
 .TP
--H
-same action as '-h'. For compatibility with many other sg3_utils programs
-in which '-H' is for hex output.
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
 .TP
--i
-decodes the Device Identification Vital Product Data (VPD) page [0x83].
-This page is made up of several "identification descriptors". If '-h' is
-given then each descriptor header is decoded and the identifier itself
-is output in hex. To see the whole VPD 0x83 page response in hex
-use '-p=83 -h'. Since SPC-3, support for the device identification VPD
-page is mandatory.
+\fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
+the \fIPG\fR argument can be either a number of an abbreviation for a VPD
+page. To enumerate the available abbreviations for VPD pages use '\-hh' or
+a bad abbreviation (e.g, '\-\-page=xxx'). When the \fI\-\-cmddt\fR option is
+given (once) then \fIPG\fR is interpreted as an opcode number (so VPD page
+abbreviations make little sense).
 .TP
--m
-decodes the Management network addresses Vital Product Data (VPD)
-page [0x85]. This page is made up of several "network service descriptors".
-If '-h' is given then each descriptor payload is output in hex.
+\fB\-r\fR, \fB\-\-raw\fR
+output the response in binary to stdout. Error messages and warnings, if
+any, are sent to stderr.
 .TP
--M
-decodes the Mode page policy Vital Product Data (VPD) page [0x87].
-This page is made up of several "mode page policy descriptors".
-If '-h' is given then each descriptor payload is output in hex.
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level of verbosity. Can be used multiple times.
 .TP
--o=<opcode_page>
-used in conjunction with the '-e' or '-c' option. If neither given then
-the '-e' option assumed. When the '-e' option is also given (or assumed)
-then the argument to this option is the VPD page number. The argument
-is interpreted as hexadecimal and is expected to be in the range 0 to ff 
-inclusive. Only VPD page 0 is decoded and lists supported VPD pages and
-their names (if known). To decode the mandatory device identification
-page (0x83) use the '-i' option.
-A now obsolete usage is when the '-c' option is given in which
-case the argument to this option is assumed to be a command opcode number. 
-Recent SCSI draft standards have moved this facility (see sg_opcodes).
-Defaults to 0 so if '-e' is given without '-o=' then VPD page 0 is output.
-.TP
--p=<vpd_page>
-same action as '-o=<opcode_page>' option described above. Since the
-opcode value with the CmdDt is now obsolete, the main use of this
-option is to specify the VPD page number. The argument is interpreted as
-hexadecimal and is expected to be in the range 0 to ff inclusive.
-Defaults to 0 so if '-e' is given without '-p=' then VPD page 0 is output.
-.TP
--P
-decodes the Unit Path Report Vital Product Data (VPD) page [0xc0],
-which is specific to selected EMC devices. To see the whole VPD 0xc0
-page response in hex use '-p=c0 -h'.
-.TP
--r
-outputs the INQUIRY response in binary. If the SCSI INQUIRY has failed
-and an ATA IDENTIFY succeeds then the 512 bytes of the IDENTIFY response
-is output in binary. Overrides the various VPD decoding options. Standard
-output should be redirected to a file or some other program that can
-process binary data. Can be used twice (i.e. '-rr' (and '-HHH' has same
-effect)) and if used with the '-A' or '-a' option yields output with the
-same format as "cat /proc/ide/hd<x>/identify" so that it can then be
-piped to "hdparm --Istdin".
-.TP
--s
-decodes the SCSI Ports Vital Product Data (VPD) page [0x88]. The response
-contains information about the target (or rarely the initiator) ports
-associated with the addressed device server (i.e. the target). In practice
-this is a way to find all target port addresses of a dual ported disk.
-If '-h' is given then each target (and/or initiator) descriptor is output
-in hex. To see the whole VPD 0x88 page response in hex use '-p=88 -h'.
-.TP
--v
-verbose: print out cdb of issued commands prior to execution. '-vv'
-and '-vvv' are also accepted yielding greater verbosity. For ATA disks
-the identity response (256 16 bit words) is output when this option
-is given.
-.TP
--V
-print out version string
-.TP
--x
-decodes the Extended INQUIRY data Vital Product Data (VPD) [0x86] page.
-If '-h' is given then prints out VPD page in hex which is similar to
-using '-p=86 -h'.
-.TP
--36
-only requests 36 bytes of response data for an INQUIRY. Furthermore even
-if the device indicates in its response it can supply more data, a
-second (longer) INQUIRY is not performed. This is a paranoid setting.
-.TP
--?
-output usage message and exit. Ignore all other parameters.
-.PP
+\fB\-V\fR, \fB\-\-version\fR
+print out version string then exit.
+.SH NOTES
 Some devices with weak SCSI command set implementations lock up when
 they receive commands they don't understand (or even response lengths
 that they don't expect). Such devices need to be treated carefully,
-hence the '-36' option. Without this option this utility will issue
+use the '\-\-len=36' option. Without this option this utility will issue
 an initial standard INQUIRY requesting 36 bytes of response data. If
 the device indicates it could have supplied more data then a second
 INQUIRY is issued to fetch the longer response. That second command may
 lock up faulty devices.
 .PP
+ATA or ATAPI devices that use a SCSI to ATA Translation layer (see
+SAT at www.t10.org) may support the ATA Information VPD page. This
+returns the IDENTIFY (PACKET) DEVICE response amongst other things.
+The ATA Information VPD page can be fetched with '\-\-page=ai'.
+.PP
 In the INQUIRY standard response there is a 'MultiP' flag which is set
 when the device has 2 or more ports. Some vendors use the preceding
 vendor specific ('VS') bit to indicate which port is being accessed by
-the INQUIRY command (0 -> relative port 1 (port "a"), 1 -> relative
+the INQUIRY command (0 \-> relative port 1 (port "a"), 1 \-> relative
 port 2 (port "b")). When the 'MultiP' flag is set, the preceding vendor
-specific bit is shown in parentheses. SPC-3 compliant devices should
+specific bit is shown in parentheses. SPC\-3 compliant devices should
 use the device identification VPD page (0x83) to show which port is
 being used for access and the SCSI ports VPD page (0x88) to show all
 available ports on the device.
 .PP
-In the 2.4 series of Linux kernels the given device must be
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
 will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
 device names may be used as well (e.g. "/dev/st0m").
 .SH ATA DEVICES
-There are two major types of ATA devices: non-packet devices (e.g. ATA
+There are two major types of ATA devices: non\-packet devices (e.g. ATA
 disks) and packet devices (ATAPI). The majority of ATAPI devices are
 CD/DVD drives in which the ATAPI transport carries the MMC set (i.e.
 a SCSI command set). Further, both types of ATA devices can be connected
 to a host computer via a "SCSI" (or some other) transport. When an
-ATA disk is controlled via a SCSI (or non-ATA) transport then two
+ATA disk is controlled via a SCSI (or non\-ATA) transport then two
 approaches are commonly used: tunnelling (e.g. STP in Serial Attached
-SCSI (SAS)) or by emulating a SCSI device (typically via a SCSI to
+SCSI (SAS)) or by emulating a SCSI device (e.g. with a SCSI to
 ATA translation layer, see SAT at www.t10.org ). Even when the
 physical transport to the host computer is ATA (especially in the
-case of SATA) the linux operating system may choose to put a SAT
-layer in the driver "stack" (e.g. libata).
+case of SATA) the operating system may choose to put a SAT
+layer in the driver "stack" (e.g. libata in Linux).
 .PP
 The main identifying command for any SCSI device is an INQUIRY. The
-corresponding command for an ATA non-packet device is IDENTIFY DEVICE
+corresponding command for an ATA non\-packet device is IDENTIFY DEVICE
 while for an ATA packet device it is IDENTIFY PACKET DEVICE.
 .PP
 When this utility is invoked for an ATAPI device (e.g. a CD/DVD
 drive with "sg_inq /dev/hdc") then a SCSI INQUIRY is sent to the
 device and if it responds then the response to decoded and output and
 this utility exits. To see the response for an ATA IDENTIFY PACKET
-DEVICE command add the '-A' option (e.g. "sg_inq -A /dev/hdc) and to
-see the response in hex add the "-H" option as
-well (e.g. "sg_inq -A -H /dev/hdc").
+DEVICE command add the \fI\-\-ata\fR option (e.g. "sg_inq \-\-ata /dev/hdc).
 .PP
 This utility doesn't decode the response to an ATA IDENTIFY (PACKET)
-DEVICE command, hdparm does a good job at that. The '-rr'
-option (or '-HHH') has been added for use with either the '-A' or '-a'
-option to produce a format acceptable to "hdparm --Istdin". See hdparm.
+DEVICE command, hdparm does a good job at that. The '\-HHH' option has
+been added for use with either the '\-\-ata' or '\-\-page=ai'
+option to produce a format acceptable to "hdparm \-\-Istdin". 
+An example: 'sg_inq \-\-ata \-HHH /dev/hdc | hdparm \-\-Istdin'. See hdparm.
 .SH EXIT STATUS
 The exit status of sg_inq is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using \fI\-\-old\fR (or \fI\-O\fR) as the first option.
+.TP
+\fB\-36\fR
+only requests 36 bytes of response data for an INQUIRY. Furthermore even
+if the device indicates in its response it can supply more data, a
+second (longer) INQUIRY is not performed. This is a paranoid setting.
+Equivalent to '\-\-len=36' in the main description.
+.TP
+\fB\-a\fR
+fetch the ATA Information VPD page [0x89]. Equivalent to '\-\-page=ai' in
+the main description. This page is defined in SAT (see at www.t10.org).
+.TP
+\fB\-A\fR
+Assume given \fIDEVICE\fR is an ATA or ATAPI device.
+Equivalent to \fI\-\-ata\fR in the main description.
+.TP
+\fB\-b\fR
+decodes the Block Limits VPD page [0xb0].  Equivalent to '\-\-page=bl' in
+the main description. This page is defined in SBC\-2 (see www.t10.org).
+.TP
+\fB\-c\fR
+set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
+ conjunction with the \fI\-o=OPCODE_PG\fR option to specify the SCSI command
+opcode to query. Equivalent to \fI\-\-cmddt\fR in the main description.
+.TP
+\fB\-cl\fR
+lists the command data for all supported commands (followed by the command
+name) by looping through all 256 opcodes. This option uses the CmdDt bit
+which is now obsolete. See the sg_opcodes utility.
+Equivalent to '\-\-cmddt \-\-cmddt' in the main description.
+.TP
+\fB\-d\fR
+decodes depending on context. If \fI\-e\fR option is given, or any option
+that implies \fI\-e\fR (e.g. '\-i' or '\-p=80'), then this utility attempts
+to decode the indicated VPD page.  Otherwise the version descriptors (if any)
+are listed following a standard INQUIRY response. In the version descriptors
+sense, equivalent to \fI\-\-descriptors\fR in the main description.
+.TP
+\fB\-e\fR
+enable (i.e. sets) the Vital Product Data (EVPD) bit (defaults to clear(0)).
+Used in conjunction with the \fI\-p=VPD_PG\fR option to specify the VPD page
+to fetch. If \fI\-p=VPD_PG\fR is not given then VPD page 0 (list supported
+VPD pages) is assumed.
+.TP
+\fB\-h\fR
+outputs INQUIRY response in hex rather than trying to decode it.
+Equivalent to \fI\-\-hex\fR in the main description.
+.TP
+\fB\-H\fR
+same action as \fI\-h\fR.
+Equivalent to \fI\-\-hex\fR in the main description.
+.TP
+\fB\-i\fR
+decodes the Device Identification VPD page [0x83]. Equivalent to
+\fI\-\-id\fR in the main description. This page is made up of
+several "designation descriptors". If \fI\-h\fR is given then each
+descriptor header is decoded and the identifier itself is output in hex.
+To see the whole VPD 0x83 page response in hex use '\-p=83 \-h'.
+.TP
+\fB\-m\fR
+decodes the Management network addresses VPD page [0x85]. Equivalent
+to '\-\-page=mna' in the main description.
+.TP
+\fB\-M\fR
+decodes the Mode page policy VPD page [0x87].  Equivalent to '\-\-page=mpp'
+in the main description.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-o\fR=\fIOPCODE_PG\fR
+used in conjunction with the \fI\-e\fR or \fI\-c\fR option. If neither given
+then the \fI\-e\fR option assumed. When the \fI\-e\fR option is also
+given (or assumed) then the argument to this option is the VPD page number.
+The argument is interpreted as hexadecimal and is expected to be in the range
+0 to ff inclusive. Only VPD page 0 is decoded and it lists supported VPD pages
+and their names (if known). To decode the mandatory device identification
+page (0x83) use the \fI\-i\fR option. A now obsolete usage is when the
+\fI\-c\fR option is given in which case the argument to this option is assumed
+to be a command opcode number. Recent SCSI draft standards have moved this
+facility to a separate command (see sg_opcodes). Defaults to 0 so if \fI\-e\fR
+is given without this option then VPD page 0 is output.
+.TP
+\fB\-p\fR=\fIVPD_PG\fR
+same action as \fI\-o=OPCODE_PG\fR option described in the previous entry.
+Since the opcode value with the CmdDt is now obsolete, the main use of this
+option is to specify the VPD page number. The argument is interpreted as
+hexadecimal and is expected to be in the range 0 to ff inclusive.
+Defaults to 0 so if \fI\-e\fR is given without this option then VPD page 0
+is output.
+.TP
+\fB\-P\fR
+decodes the Unit Path Report VPD page [0xc0] which is EMC specific.
+Equivalent to '\-\-page=upr' in the main description.
+.TP
+\fB\-r\fR
+outputs the response in binary to stdout.  Equivalent to \fI\-\-raw\fR in
+the main description.  Can be used twice (i.e. '\-rr' (and '\-HHH' has
+same effect)) and if used with the \fI\-A\fR or \fI\-a\fR option yields
+output with the same format as "cat /proc/ide/hd<x>/identify" so that it
+can then be piped to "hdparm \-\-Istdin".
+.TP
+\fB\-s\fR
+decodes the SCSI Ports VPD page [0x88].
+Equivalent to '\-\-page=sp' in the main description.
+.TP
+\fB\-v\fR
+increase level of verbosity. Can be used multiple times.
+.TP
+\fB\-V\fR
+print out version string then exit.
+.TP
+\fB\-x\fR
+decodes the Extended INQUIRY data VPD [0x86] page.
+Equivalent to '\-\-page=ei' in the main description.
+.TP
+\fB\-?\fR
+output usage message and exit. Ignore all other parameters.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2001-2006 Douglas Gilbert
+Copyright \(co 2001\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sgdiag(scsirastools), sg_opcodes(sg3_utils), sg_modes(sg3_utils),
-.B sg_logs(sg3_utils), hdparm(hdparm), sg_vpd(sg_vpd)
+.B sg_opcodes sg_vpd(sg3_utils), hdparm(hdparm), sgdiag(scsirastools)

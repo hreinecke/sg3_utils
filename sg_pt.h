@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2006 Douglas Gilbert.
+ * Copyright (c) 2005-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  *
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 extern int scsi_pt_open_device(const char * device_name, int read_only,
@@ -101,5 +105,8 @@ extern int get_scsi_pt_duration_ms(const void * scsi_pt_obj);
    processing is complete in order to clean up resources. */
 extern void destruct_scsi_pt_obj(void * scsi_pt_obj);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif
