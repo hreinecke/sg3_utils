@@ -21,7 +21,7 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999 - 2002 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2003 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
    This version should compile with Linux sg drivers with version numbers
    >= 30000 .
 */
-static char * version_str = "1.04 20020316";
+static char * version_str = "1.07 20030101";
 
 
 #define DEF_BLOCK_SIZE 512
@@ -78,6 +78,10 @@ static char * version_str = "1.04 20020316";
 #define FT_OTHER 0		/* filetype other than sg or raw device */
 #define FT_SG 1			/* filetype is sg char device */
 #define FT_RAW 2		/* filetype is raw char device */
+#define FT_DEV_NULL 3           /* either "/dev/null" or "." as filename */
+#define FT_ST 4                 /* filetype is st char device (tape) */
+
+#define DEV_NULL_MINOR_NUM 3
 
 static int sum_of_resids = 0;
 
@@ -86,6 +90,9 @@ static int in_full = 0;
 static int in_partial = 0;
 static int out_full = 0;
 static int out_partial = 0;
+
+static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
+
 
 static void install_handler (int sig_num, void (*sig_handler) (int sig))
 {
@@ -131,14 +138,22 @@ static void siginfo_handler(int sig)
 int dd_filetype(const char * filename)
 {
     struct stat st;
+    size_t len = strlen(filename);
 
+    if ((1 == len) && ('.' == filename[0]))
+        return FT_DEV_NULL;
     if (stat(filename, &st) < 0)
-	return FT_OTHER;
+        return FT_OTHER;
     if (S_ISCHR(st.st_mode)) {
-	if (RAW_MAJOR == major(st.st_rdev))
-	    return FT_RAW;
-	else if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
-	    return FT_SG;
+        if ((MEM_MAJOR == major(st.st_rdev)) &&
+            (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
+            return FT_DEV_NULL;
+        if (RAW_MAJOR == major(st.st_rdev))
+            return FT_RAW;
+        if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
+            return FT_SG;
+        if (SCSI_TAPE_MAJOR == major(st.st_rdev))
+            return FT_ST;
     }
     return FT_OTHER;
 }
@@ -148,15 +163,16 @@ void usage()
     fprintf(stderr, "Usage: "
            "sgm_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
            "               [bs=<num>] [bpt=<num>] [count=<n>] [time=<n>]\n"
-           "               [cdbsz=<6|10|12|16>] [fua=0|1|2|3] [sync=0|1]"
-	   " [--version]\n"
-           "            either 'if' or 'of' must be a sg or raw device\n"
+           "               [cdbsz=6|10|12|16] [fua=0|1|2|3] [sync=0|1]\n"
+           "               [dio=0|1] [--version]\n"
            " 'bs'  must be device block size (default 512)\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
 	   " 'fua' force unit access: 0->don't(def), 1->of, 2->if, 3->of+if\n"
-	   " 'sync' 0->no sync(def), 1->SYNCHRONIZE CACHE on of after xfer\n"
-	   " 'cdbsz' size of SCSI READ or WRITE command (default is 10)\n");
+	   " 'sync' 0->no sync(def), 1->SYNCHRONIZE CACHE after xfer\n"
+	   " 'cdbsz' size of SCSI READ or WRITE command (default is 10)\n"
+	   " 'dio'  0->indirect IO on write, 1->direct IO on write\n"
+	   "        (only when read side is sg device (using mmap))\n");
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
@@ -390,7 +406,7 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, int from_block,
 /* -1 -> unrecoverable error, 0 -> successful, 1 -> recoverable (ENOMEM),
    2 -> try again */
 int sg_write(int sg_fd, unsigned char * buff, int blocks, int to_block,
-             int bs, int cdbsz, int fua, int do_mmap)
+             int bs, int cdbsz, int fua, int do_mmap, int * diop)
 {
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -417,6 +433,8 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, int to_block,
     io_hdr.pack_id = to_block;
     if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
+    if (diop && *diop)
+        io_hdr.flags |= SG_FLAG_DIRECT_IO;
 
     while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
            (EINTR == errno))
@@ -448,6 +466,9 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, int to_block,
         sg_chk_n_print3("writing", &io_hdr);
         return -1;
     }
+    if (diop && *diop &&
+	((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
+	*diop = 0;      /* flag that dio not done (completely) */
     return 0;
 }
 
@@ -520,6 +541,8 @@ int main(int argc, char * argv[])
     int do_time = 0;
     int scsi_cdbsz = DEF_SCSI_CDBSZ;
     int do_sync = 0;
+    int do_dio = 0;
+    int num_dio_not_done = 0;
     int fua_mode = 0;
     int in_sect_sz, out_sect_sz;
     char ebuff[EBUFF_SZ];
@@ -570,6 +593,8 @@ int main(int argc, char * argv[])
             fua_mode = get_num(buf);
         else if (0 == strcmp(key,"sync"))
             do_sync = get_num(buf);
+        else if (0 == strcmp(key,"dio"))
+            do_dio = get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
             fprintf(stderr, ME "for Linux sg version 3 driver: %s\n",
                     version_str);
@@ -608,7 +633,11 @@ int main(int argc, char * argv[])
     if (inf[0] && ('-' != inf[0])) {
 	in_type = dd_filetype(inf);
 
-	if (FT_SG == in_type) {
+        if (FT_ST == in_type) {
+            fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
+            return 1;
+        }
+        else if (FT_SG == in_type) {
 	    if ((infd = open(inf, O_RDWR)) < 0) {
                 snprintf(ebuff, EBUFF_SZ, 
 			 ME "could not open %s for sg reading", inf);
@@ -642,7 +671,7 @@ int main(int argc, char * argv[])
 		return 1;
 	    }
         }
-        if (FT_SG != in_type) {
+        else {
             if ((infd = open(inf, O_RDONLY)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
 			 ME "could not open %s for reading", inf);
@@ -666,7 +695,11 @@ int main(int argc, char * argv[])
     if (outf[0] && ('-' != outf[0])) {
 	out_type = dd_filetype(outf);
 
-	if (FT_SG == out_type) {
+        if (FT_ST == out_type) {
+            fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
+            return 1;
+        }
+        else if (FT_SG == out_type) {
 	    if ((outfd = open(outf, O_RDWR)) < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
 			 "sg writing", outf);
@@ -700,8 +733,10 @@ int main(int argc, char * argv[])
 		}
 	    }
         }
+        else if (FT_DEV_NULL == out_type)
+            outfd = -1; /* don't bother opening */
 	else {
-	    if (FT_OTHER == out_type) {
+	    if (FT_RAW != out_type) {
 		if ((outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
 		    snprintf(ebuff, EBUFF_SZ,
 			     ME "could not open %s for writing", outf);
@@ -735,7 +770,7 @@ int main(int argc, char * argv[])
 		"Can't have both 'if' as stdin _and_ 'of' as stdout\n");
         return 1;
     }
-#if 1
+#if 0
     if ((FT_OTHER == in_type) && (FT_OTHER == out_type)) {
         fprintf(stderr, "Both 'if' and 'of' can't be ordinary files\n");
         return 1;
@@ -800,6 +835,24 @@ int main(int argc, char * argv[])
     if (dd_count < 0) {
         fprintf(stderr, "Couldn't calculate count, please give one\n");
         return 1;
+    }
+    if (do_dio && (FT_SG != in_type)) {
+    	do_dio = 0;
+	fprintf(stderr, ">>> dio only performed on 'of' side when 'if' is"
+		" an sg device\n");
+    }
+    if (do_dio) {
+        int fd;
+        char c;
+
+        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+            if (1 == read(fd, &c, 1)) {
+                if ('0' == c)
+                    fprintf(stderr, ">>> %s set to '0' but should be set "
+                            "to '1' for direct IO\n", proc_allow_dio);
+            }
+            close(fd);
+        }
     }
 
     if (wrkMmap)
@@ -878,22 +931,28 @@ int main(int argc, char * argv[])
         if (FT_SG == out_type) {
             int do_mmap = (FT_SG == in_type) ? 0 : 1;
 	    int fua = fua_mode & 1;
+	    int dio_res = do_dio;
 
             res = sg_write(outfd, wrkPos, blocks, seek, bs, scsi_cdbsz, fua,
-			   do_mmap);
+			   do_mmap, &dio_res);
             if (2 == res) {
                 fprintf(stderr, 
 			"Unit attention, media changed, continuing (w)\n");
                 res = sg_write(outfd, wrkPos, blocks, seek, bs, scsi_cdbsz,
-			       fua, do_mmap);
+			       fua, do_mmap, &dio_res);
             }
             else if (0 != res) {
                 fprintf(stderr, "sg_write failed, seek=%d\n", seek);
                 break;
             }
-            else
+            else {
                 out_full += blocks;
+		if (do_dio && (0 == dio_res))
+		    num_dio_not_done++;
+	    }
         }
+        else if (FT_DEV_NULL == out_type)
+            out_full += blocks; /* act as if written out without error */
         else {
 	    while (((res = write(outfd, wrkPos, blocks * bs)) < 0)
 		   && (EINTR == errno))
@@ -957,7 +1016,7 @@ int main(int argc, char * argv[])
     if (wrkBuff) free(wrkBuff);
     if (STDIN_FILENO != infd)
         close(infd);
-    if (STDOUT_FILENO != outfd)
+    if ((STDOUT_FILENO != outfd) && (FT_DEV_NULL != out_type))
         close(outfd);
     res = 0;
     if (0 != dd_count) {
@@ -968,5 +1027,8 @@ int main(int argc, char * argv[])
     if (sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
 		sum_of_resids);
+    if (num_dio_not_done)
+        fprintf(stderr, ">> dio requested but _not done %d times\n", 
+		num_dio_not_done);
     return res;
 }

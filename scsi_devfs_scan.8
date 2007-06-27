@@ -1,0 +1,42 @@
+.TH SG_DEVFS_SCAN "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sg_devfs_scan \- Scan SCSI devices within a devfs tree
+.SH SYNOPSIS
+.B sg_devfs_scan
+[\fI-d <dir>\fR] 
+[\fI-i\fR] 
+[\fI-ide\fR] 
+[\fI-l [-x]\fR]
+[\fI-q\fR]
+<\fIgeneric device\fR>
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+scsi_devfs_scan is a utility for doing a directory scan on a system
+running devfs to identify SCSI (and optionally IDE) devices. Various
+information (including an INQUIRY) can be listed for each found device.
+.TP
+-d <dir>
+location of devfs [default: /dev ]
+.TP
+-i
+show INQUIRY data for each SCSI device
+.TP
+-ide
+show scan of IDE devices after SCSI ones
+.TP
+-l
+show device file names in leaf directory
+.TP
+-x
+add (major,minor) information to '-l'
+.TP
+-q
+just output host, bus, target, lun numbers
+.SH AUTHORS
+Written by D. Gilbert
+.SH COPYRIGHT
+Copyright \(co 2001 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -23,18 +23,19 @@
       This program scans the /dev directory structure looking for the
       devfs "primary" scsi (and optionally IDE) device names.
 
-   Version 0.12 20020228
+   Version 0.13 20030430
 */
 
 void usage()
 {
-    printf("Usage: 'scsi_devfs_scan [-ide] [-i] [-d <dir>] [-f] [-x]'\n");
-    printf("    where: -ide show scan of IDE devices after SCSI ones\n");
+    printf("Usage: 'scsi_devfs_scan [-d <dir>] [-i] [-ide] [-l [-x]] "
+	   "[-q]'\n");
+    printf("    where: -d <dir> location of devfs [default: /dev ]\n");
     printf("           -i   show INQUIRY data for each SCSI device\n");
-    printf("           -d <dir> location of devfs [default: /dev ]\n");
+    printf("           -ide show scan of IDE devices after SCSI devices\n");
     printf("           -l   show device file names in leaf directory\n");
-    printf("           -x   add (major,minor) information to '-l'\n");
     printf("           -q   just output host, bus, target, lun numbers\n");
+    printf("           -x   add (major,minor) information to '-l'\n");
 }
 
 #define NAME_LEN_MAX 256

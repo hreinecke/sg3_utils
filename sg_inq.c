@@ -12,19 +12,22 @@
 #include "sg_err.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2002 D. Gilbert
+*  Copyright (C) 2000-2003 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
    This program outputs information provided by a SCSI INQUIRY command.
-   It is mainly based on the SCSI-3 SPC-1 document with some additions
-   from SPC-2 (draft revision 18).
+   It is mainly based on the SCSI-3 SPC-2 document.
+
+   Acknowledgment:
+      -	Martin Schwenke <martin@meltin.net> added the raw switch and other
+	improvements [20020814]
    
 */
 
-static char * version_str = "0.17 20020228";
+static char * version_str = "0.23 20030506";
 
 
 /* #define SG_DEBUG */
@@ -90,21 +93,32 @@ static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op,
 
 static void usage()
 {
-    printf("Usage: 'sg_inq [-e] [-h] [-o=<opcode_page>] [-V]"
-	   " <sg_device>'\n"
-	   " where -e   set EVPD mode\n"
-	   "       -c   set CmdDt mode\n"
-	   "       -cl  list supported commands using CmdDt mode\n"
-	   "       -h   output in hex (ASCII to the right)\n"
-	   "       -o=<opcode_page> opcode or page code in hex\n"
-	   "       -p   output SCSI adapter PCI information\n"
-	   "       -V   output version string\n"
-	   "       -36  only perform a 36 byte INQUIRY\n"
-	   "       -?   output this usage message\n"
-	   " If no optional switches given (or '-h') then does"
-	   " a standard INQUIRY\n");
+    fprintf(stderr,
+	    "Usage: 'sg_inq [-c] [-cl] [-e] [-h|-r] [-o=<opcode_page>] [-p]"
+	    " [-V] [-36]\n               [-?] <sg_device>'\n"
+	    " where -c   set CmdDt mode (use -o for opcode)\n"
+	    "       -cl  list supported commands using CmdDt mode\n"
+	    "       -e   set EVPD mode (use -o for page code)\n"
+	    "       -h   output in hex (ASCII to the right)\n"
+	    "       -o=<opcode_page> opcode or page code in hex\n"
+	    "       -p   output SCSI adapter PCI information\n"
+	    "       -r   output raw binary data\n"
+	    "       -V   output version string\n"
+	    "       -36  only perform a 36 byte INQUIRY\n"
+	    "       -?   output this usage message\n"
+	    " If no optional switches given (or '-h') then does"
+	    " a standard INQUIRY\n");
 }
 
+
+static void dStrRaw(const char* str, int len)
+{
+    int i;
+    
+    for (i = 0 ; i < len; i++) {
+	printf("%c", str[i]);
+    }
+}
 
 static void dStrHex(const char* str, int len)
 {
@@ -169,16 +183,18 @@ int main(int argc, char * argv[])
     int do_cmddt = 0;
     int do_cmdlst = 0;
     int do_hex = 0;
+    int do_raw = 0;
     int do_pci = 0;
     int do_36 = 0;
-    int oflags = O_RDONLY;
+    int oflags = O_RDONLY | O_NONBLOCK;
     int ansi_version = 0;
+    int ret = 0;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strncmp("-o=", argv[k], 3)) {
             num = sscanf(argv[k] + 3, "%x", &num_opcode);
             if ((1 != num) || (num_opcode > 255)) {
-                printf("Bad number after '-o' switch\n");
+                fprintf(stderr, "Bad number after '-o' switch\n");
                 file_name = 0;
                 break;
             }
@@ -187,6 +203,8 @@ int main(int argc, char * argv[])
 	    do_evpd = 1;
         else if (0 == strcmp("-h", argv[k]))
 	    do_hex = 1;
+        else if (0 == strcmp("-r", argv[k]))
+	    do_raw = 1;
         else if (0 == strcmp("-cl", argv[k])) {
 	    do_cmdlst = 1;
 	    do_cmddt = 1;
@@ -202,29 +220,35 @@ int main(int argc, char * argv[])
 	    break;
 	}
         else if (0 == strcmp("-V", argv[k])) {
-	    printf("Version string: %s\n", version_str);
+	    fprintf(stderr, "Version string: %s\n", version_str);
 	    exit(0);
 	}
         else if (*argv[k] == '-') {
-            printf("Unrecognized switch: %s\n", argv[k]);
+            fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
             break;
         }
         else if (0 == file_name)
             file_name = argv[k];
         else {
-            printf("too many arguments\n");
+            fprintf(stderr, "too many arguments\n");
             file_name = 0;
             break;
         }
     }
+    
+    if (do_raw && do_hex) {
+	fprintf(stderr, "Can't do hex and raw at the same time\n");
+	file_name = 0;
+    }
+    
     if (0 == file_name) {
         usage();
         return 1;
     }
 
     if (do_pci)
-    	oflags = O_RDWR;
+    	oflags = O_RDWR | O_NONBLOCK;
     if ((sg_fd = open(file_name, oflags)) < 0) {
         snprintf(ebuff, EBUFF_SZ, "sg_inq: error opening file: %s", file_name);
         perror(ebuff);
@@ -232,26 +256,34 @@ int main(int argc, char * argv[])
     }
     /* Just to be safe, check we have a new sg device by trying an ioctl */
     if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &k) < 0) || (k < 30000)) {
-        printf("sg_inq: %s doesn't seem to be a version 3 sg device\n",
-               file_name);
+        fprintf(stderr,
+		"sg_inq: %s doesn't seem to be a version 3 sg device\n",
+		file_name);
         close(sg_fd);
         return 1;
     }
     memset(rsp_buff, 0, MX_ALLOC_LEN + 1);
 
     if (! (do_cmddt || do_evpd)) {
-	printf("standard INQUIRY:\n");
+        if (!do_raw)
+	    printf("standard INQUIRY:\n");
+	if (num_opcode > 0)
+	    printf(" <<given opcode or page_code is being ignored>>\n");
+	
         if (0 == do_inq(sg_fd, 0, 0, 0, rsp_buff, 36, 1)) {
 	    len = rsp_buff[4] + 5;
 	    ansi_version = rsp_buff[2] & 0x7;
 	    if ((len > 36) && (len < 256) && (! do_36)) {
 		if (do_inq(sg_fd, 0, 0, 0, rsp_buff, len, 1)) {
-	    	    printf("second INQUIRY (%d byte) failed\n", len);
+	    	    fprintf(stderr, "second INQUIRY (%d byte) failed\n", len);
 	    	    return 1;
 		}
-		if (len != (rsp_buff[4] + 5))
-	    	    printf("strange, twin INQUIRYs yield different "
-		    	   "'additional length'\n");
+		if (len != (rsp_buff[4] + 5)) {
+	    	    fprintf(stderr,
+			    "strange, twin INQUIRYs yield different "
+			    "'additional length'\n");
+		    ret = 2;
+		}
 	    }
 	    if (do_36) {
 	    	act_len = len;
@@ -261,6 +293,8 @@ int main(int argc, char * argv[])
 	    	act_len = len;
 	    if (do_hex)
 		dStrHex((const char *)rsp_buff, len);
+	    else if (do_raw)
+		dStrRaw((const char *)rsp_buff, len);
 	    else {
 	        printf("  PQual=%d, Device type=%d, RMB=%d, ANSI version=%d, ",
 	               (rsp_buff[0] & 0xe0) >> 5, rsp_buff[0] & 0x1f,
@@ -322,7 +356,8 @@ int main(int argc, char * argv[])
 		    }
 		}
             }
-	    if (0 == do_inq(sg_fd, 0, 1, 0x80, rsp_buff, MX_ALLOC_LEN, 0)) {
+	    if (!do_raw &&
+		(0 == do_inq(sg_fd, 0, 1, 0x80, rsp_buff, MX_ALLOC_LEN, 0))) {
 	        len = rsp_buff[3];
 		if (len > 0) {
 		    memcpy(buff, rsp_buff + 4, len);
@@ -337,66 +372,123 @@ int main(int argc, char * argv[])
 	}
     }
     else if (do_cmddt) {
+	int reserved_cmddt;
+	char op_name[128];
+
     	if (do_cmdlst) {
 	    printf("Supported command list:\n");
 	    for (k = 0; k < 256; ++k) {
 		if (0 == do_inq(sg_fd, 1, 0, k, rsp_buff, MX_ALLOC_LEN, 1)) {
 		    support_num = rsp_buff[1] & 7;
+		    reserved_cmddt = rsp_buff[4];
 		    if ((3 == support_num) || (5 == support_num)) {
 		    	num = rsp_buff[5];
 		    	for (j = 0; j < num; ++j)
 			    printf(" %.2x", (int)rsp_buff[6 + j]);
 			if (5 == support_num)
-			    printf("  [vendor specific manner (5)]\n");
-			else
-			    printf("\n");
+			    printf("  [vendor specific manner (5)]");
+			sg_get_command_name((unsigned char)k, 
+					    sizeof(op_name) - 1, op_name);
+			op_name[sizeof(op_name) - 1] = '\0';
+			printf("  %s\n", op_name);
 		    }
 		    else if ((4 == support_num) || (6 == support_num))
 		    	printf("  opcode=0x%.2x vendor specific (%d)\n",
 			       k, support_num);
+		    else if ((0 == support_num) && (reserved_cmddt > 0)) {
+		    	printf("  opcode=0x%.2x ignored cmddt bit, "
+			       "given standard INQUIRY response, stop\n", k);
+			break;
+		    }
 		}
 		else {
-		    printf("CmdDt INQUIRY on opcode=0x%.2x: failed\n", k);
+		    fprintf(stderr,
+			    "CmdDt INQUIRY on opcode=0x%.2x: failed\n", k);
 		    break;
 		}
 	    }
 	}
 	else {
-	    printf("CmdDt INQUIRY, opcode=0x%.2x:\n", num_opcode);
+	    if (! do_raw) {
+	        printf("CmdDt INQUIRY, opcode=0x%.2x:  [", num_opcode);
+		sg_get_command_name((unsigned char)num_opcode, 
+				    sizeof(op_name) - 1, op_name);
+		op_name[sizeof(op_name) - 1] = '\0';
+		printf("%s]\n", op_name);
+	    }
 	    if (0 == do_inq(sg_fd, 1, 0, num_opcode, rsp_buff, 
 	    		    MX_ALLOC_LEN, 1)) {
 		len = rsp_buff[5] + 6;
+		reserved_cmddt = rsp_buff[4];
 		if (do_hex)
 		    dStrHex((const char *)rsp_buff, len);
+		else if (do_raw)
+		    dStrRaw((const char *)rsp_buff, len);
 		else {
 		    const char * desc_p;
-		    support_num = rsp_buff[1] & 7;
+		    int prnt_cmd = 0;
 
+		    support_num = rsp_buff[1] & 7;
+		    num = rsp_buff[5];
 		    switch (support_num) {
-		    case 0: desc_p = "no data available"; break;
+		    case 0: 
+			if (0 == reserved_cmddt)
+			    desc_p = "no data available"; 
+			else
+			    desc_p = "ignored cmddt bit, standard INQUIRY "
+				     "response";
+			break;
 		    case 1: desc_p = "not supported"; break;
 		    case 2: desc_p = "reserved (2)"; break;
-		    case 3: desc_p = "supported as per standard"; break;
+		    case 3: desc_p = "supported as per standard"; 
+			    prnt_cmd = 1;
+			    break;
 		    case 4: desc_p = "vendor specific (4)"; break;
-		    case 5: desc_p = "supported in vendor specific way"; 
+		    case 5: desc_p = "supported in vendor specific way";
+			    prnt_cmd = 1; 
 		    	    break;
 		    case 6: desc_p = "vendor specific (6)"; break;
 		    case 7: desc_p = "reserved (7)"; break;
 		    default: desc_p = "impossible value > 7"; break;
 		    }
-
-		    printf("  Support field: %s\n", desc_p);
+		    if (prnt_cmd) {
+		        printf("  Support field: %s [", desc_p);
+		        for (j = 0; j < num; ++j)
+			    printf(" %.2x", (int)rsp_buff[6 + j]);
+			printf(" ]\n");
+		    } else
+		        printf("  Support field: %s\n", desc_p);
 		}
 	    }
+	    else {
+		fprintf(stderr,
+			"CmdDt INQUIRY on opcode=0x%.2x: failed\n",
+			num_opcode);
+		return 1;
+	    }
+
 	}
     }
     else if (do_evpd) {
-	printf("EVPD INQUIRY, page code=0x%.2x:\n", num_opcode);
+	if (!do_raw)
+	    printf("EVPD INQUIRY, page code=0x%.2x:\n", num_opcode);
         if (0 == do_inq(sg_fd, 0, 1, num_opcode, rsp_buff, MX_ALLOC_LEN, 1)) {
 	    len = rsp_buff[3] + 4;
-	    if (! do_hex)
-	    	printf(" Only hex output supported\n");
-	    dStrHex((const char *)rsp_buff, len);
+	    if (num_opcode != rsp_buff[1])
+		printf("non evpd respone; probably a STANDARD INQUIRY "
+		       "response\n");
+	    else if (do_raw)
+		dStrRaw((const char *)rsp_buff, len);
+	    else {
+		if (! do_hex)
+		    printf(" Only hex output supported\n");
+		dStrHex((const char *)rsp_buff, len);
+	    }
+	}
+	else {
+	    fprintf(stderr,
+		    "EVPD INQUIRY, page code=0x%.2x: failed\n", num_opcode);
+	    return 1;
 	}
     }
 
@@ -419,5 +511,5 @@ int main(int argc, char * argv[])
     }
 
     close(sg_fd);
-    return 0;
+    return ret;
 }

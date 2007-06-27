@@ -18,7 +18,7 @@
  * -n    Display information from notch parameters page.
  * -p    Display information from Peripheral Device Page.
  * -V    Display information from Verify Error Recovery Page.
- * -v    Show version number
+ * -uno  Display info from page number no.
  * -v    Show version number
  * -a    All of the above.
  * -l    List known scsi devices on the system
@@ -88,9 +88,11 @@
  * 		sizeof(buffer) (which is sizeof(char*) == 4 or 32 bit archs) 
  *			was used incorrectly all over the place. Fixed.
  *                                      [version 1.95]
- *
  * Douglas Gilbert (dgilbert@interlog.com) 
- *    20020113	snprintf() type cleanup
+ *    20020113	snprintf() type cleanup [version 1.96]
+ *    20021211	correct sginfo MODE_SELECT, protect against block devices
+ *              that answer sg's ioctls. [version 1.97]
+ *    20021228  scan for some "scd<n>" as well as "sr<n>" device names [1.98]
  */
 
 #include <stdio.h>
@@ -102,6 +104,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "sg_include.h"
 
 #ifdef SG_GET_RESERVED_SIZE
@@ -630,7 +634,8 @@ static int put_mode_page(int page, unsigned char * contents, int page_code)
     pagelen1 = contents[0] + 1;
 
     *((int *) buffer1) = pagelen1+14;      /* length of input data */
-    *(((int *) buffer1) + 1) = pagelen1+8;        /* length of output buffer */
+    *(((int *) buffer1) + 1) = 0;          /* length of output buffer */
+    /* *(((int *) buffer1) + 1) = pagelen1+8;     was before .... */
 
     cmd = (unsigned char *) (((int *) buffer1) + 2);
 
@@ -1356,7 +1361,7 @@ static void make_dev_name(char * fname, int k, int do_numeric)
     fname[MDEV_NAME_SZ - 1] = '\0';
     len = strlen(fname);
     if (do_numeric)
-        snprintf(buff + len, MDEV_NAME_SZ - len, "%d", k);
+        snprintf(fname + len, MDEV_NAME_SZ - len, "%d", k);
     else {
         if (k <= 26) {
             buff[0] = 'a' + (char)k;
@@ -1376,6 +1381,8 @@ char *devices[] =
  "/dev/sdm", "/dev/sdn", "/dev/sdo", "/dev/sdp", "/dev/sdq", "/dev/sdr",
  "/dev/sds", "/dev/sdt", "/dev/sdu", "/dev/sdv", "/dev/sdw", "/dev/sdx",
  "/dev/sdy", "/dev/sdz", "/dev/sdaa", "/dev/sdab", "/dev/sdac", "/dev/sdad",
+ "/dev/scd0", "/dev/scd1", "/dev/scd2", "/dev/scd3", "/dev/scd4", "/dev/scd5",
+ "/dev/scd6", "/dev/scd7", "/dev/scd8", "/dev/scd9", "/dev/scd10", "/dev/scd11",
  "/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/sr3", "/dev/sr4", "/dev/sr5",
  "/dev/sr6", "/dev/sr7", "/dev/sr8", "/dev/sr9", "/dev/sr10", "/dev/sr11",
  "/dev/nst0", "/dev/nst1", "/dev/nst2", "/dev/nst3", "/dev/nst4", "/dev/nst5",
@@ -1385,6 +1392,7 @@ char *devices[] =
 static Sg_map sg_map_arr[(sizeof(devices) / sizeof(char *)) + 1];
 
 #define EBUFF_SZ 256
+#define MAX_HOLES 4
 
 /* Print out a list of the known devices on the system */
 static void show_devices()
@@ -1394,6 +1402,7 @@ static void show_devices()
     char name[MDEV_NAME_SZ];
     char ebuff[EBUFF_SZ];
     int do_numeric = 1;
+    int max_holes = MAX_HOLES;
 
     for (k = 0, j = 0; k < sizeof(devices) / sizeof(char *); k++) {
         fd = open(devices[k], O_RDONLY | O_NONBLOCK);
@@ -1428,13 +1437,13 @@ static void show_devices()
         printf("%s ", devices[k]);
         close(fd);
     };
-    printf("\n");
+    printf("\n"); // <<<<<<<<<<<<<<<<<<<<<
     for (k = 0; k < MAX_SG_DEVS; k++) {
         make_dev_name(name, k, do_numeric);
         fd = open(name, O_RDWR | O_NONBLOCK);
         if (fd < 0) {
             if ((ENOENT == errno) && (0 == k)) {
-                do_numeric = 1;
+                do_numeric = 0;
                 make_dev_name(name, k, do_numeric);
                 fd = open(name, O_RDWR | O_NONBLOCK);
             }
@@ -1447,10 +1456,14 @@ static void show_devices()
 		    	     "open on %s failed (%d)", name, errno);
                     perror(ebuff);
 #endif
-                    break;
+		    if (max_holes-- > 0)
+			continue;
+		    else
+                        break;
                 }
             }
         }
+	max_holes = MAX_HOLES;
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &bus);
         if (err < 0) {
             snprintf(ebuff, EBUFF_SZ, "SCSI(3) ioctl on %s failed", name);
@@ -1656,15 +1669,24 @@ static int open_sg_dev(char * devname)
 {
     int fd, err, bus, bbus, k;
     My_scsi_idlun m_idlun, mm_idlun;
-    int do_numeric = 0;
+    int do_numeric = 1;
     char name[DEVNAME_SZ];
+    struct stat a_st;
+    int block_dev = 0;
 
     strncpy(name, devname, DEVNAME_SZ);
     name[DEVNAME_SZ - 1] = '\0';
     fd = open(name, O_RDONLY);
     if (fd < 0)
         return fd;
-    if (ioctl(fd, SG_GET_TIMEOUT, 0) < 0) {
+    if (fstat(fd, &a_st) < 0) {
+	fprintf(stderr, "could do fstat() on fd ??\n");
+	close(fd);
+	return -9999;
+    }
+    if (S_ISBLK(a_st.st_mode))
+    	block_dev = 1;
+    if (block_dev || (ioctl(fd, SG_GET_TIMEOUT, 0) < 0)) {
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &bus);
         if (err < 0) {
             perror("A SCSI device name is required\n");
@@ -1684,7 +1706,7 @@ static int open_sg_dev(char * devname)
             fd = open(name, O_RDWR | O_NONBLOCK);
             if (fd < 0) {
                 if ((ENOENT == errno) && (0 == k)) {
-                    do_numeric = 1;
+                    do_numeric = 0;
                     make_dev_name(name, k, do_numeric);
                     fd = open(name, O_RDWR | O_NONBLOCK);
                 }
@@ -1916,7 +1938,7 @@ int main(int argc, char *argv[])
             notch = 1;
             /* fall through */
         case 'v':
-            fprintf(stdout, " Sginfo version 1.96\n");
+            fprintf(stdout, " Sginfo version 1.98\n");
             break;
         default:
             fprintf(stdout, "Unknown option '-%c' (ascii %02xh)\n", c, c);

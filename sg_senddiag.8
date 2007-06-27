@@ -1,21 +1,19 @@
-.TH SG_SENDDIAG "8" "March 2003" "sg3_utils-1.03" SG3_UTILS
+.TH SG_SENDDIAG "8" "April 2003" "sg3_utils-1.04" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
 .B sg_senddiag
-[\fI-cpf\fR] [\fI-doff\fR] [\fI-h\fR] [\fI-l\fR] [\fI-s=<self_test_code>\fR]
-[\fI-t\fR] [\fI-uoff\fR] [\fI-V\fR] [\fI-?\fR] \fI<sg_device>\fR
+[\fI-doff\fR] [\fI-e\fR] [\fI-h\fR] [\fI-l\fR] [\fI-pf\fR] 
+[\fI-s=<self_test_code>\fR] [\fI-t\fR] [\fI-uoff\fR] [\fI-V\fR] [\fI-?\fR]
+\fI<sg_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This command sends a SEND DIAGNOSTIC SCSI command to the given device.
+This utility sends a SEND DIAGNOSTIC SCSI command to the given device.
 In the case of '-l' option it then sends a RECEIVE DIAGNOSTIC SCSI
 command to fetch the response (i.e. the page numbers of supported
-diagnostic pages). This command is mainly used to make the device do
+diagnostic pages). This utility is mainly used to make the device do
 self tests.
-.TP
--cpf
-clear Page Format (PF) bit. By default it is set (i.e. 1).
 .TP
 -doff
 set the Device Offline (DevOfl) bit (default is clear). Only significant 
@@ -34,6 +32,9 @@ outputs response from RECEIVE DIAGNOSTIC is hex rather than decode it.
 lists the names of all diagnostic pages supported by this device.
 The request is sent via a SEND DIAGNOSTIC command and the response
 is fetched by a RECEIVE DIAGNOSTIC command.
+.TP
+-pf
+set Page Format (PF) bit. By default it is clear (i.e. 0).
 .TP
 -s=<self_test_code>
 the default value is 0 which is inactive. A value of 1 selects a background

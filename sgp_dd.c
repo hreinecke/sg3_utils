@@ -47,7 +47,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "5.10 20020317";
+static char * version_str = "5.11 20020518";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -73,6 +73,10 @@ static char * version_str = "5.10 20020317";
 #define FT_OTHER 0              /* filetype other than sg or raw device */
 #define FT_SG 1                 /* filetype is sg char device */
 #define FT_RAW 2                /* filetype is raw char device */
+#define FT_DEV_NULL 3           /* either "/dev/null" or "." as filename */
+#define FT_ST 4                 /* filetype is st char device (tape) */
+
+#define DEV_NULL_MINOR_NUM 3
 
 #define EBUFF_SZ 512
 
@@ -166,14 +170,22 @@ int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
 int dd_filetype(const char * filename)
 {
     struct stat st;
+    size_t len = strlen(filename);
 
+    if ((1 == len) && ('.' == filename[0]))
+        return FT_DEV_NULL;
     if (stat(filename, &st) < 0)
         return FT_OTHER;
     if (S_ISCHR(st.st_mode)) {
+        if ((MEM_MAJOR == major(st.st_rdev)) &&
+            (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
+            return FT_DEV_NULL;
         if (RAW_MAJOR == major(st.st_rdev))
             return FT_RAW;
-        else if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
+        if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
             return FT_SG;
+        if (SCSI_TAPE_MAJOR == major(st.st_rdev))
+            return FT_ST;
     }
     return FT_OTHER;
 }
@@ -183,16 +195,13 @@ void usage()
     fprintf(stderr, "Usage: "
            "sgp_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
            "               [bs=<num>] [bpt=<num>] [count=<n>]\n"
-           "               [dio=<n>] [thr=<n>] [coe=<n>] [gen=0|1]\n"
-           "               [time=0|1] [deb=<n>] [cdbsz=<6|10|12|16>] "
-	   "[--version]\n"
-           "            usually either 'if' or 'of' is a sg or raw device\n"
+           "               [dio=0|1>] [thr=<n>] [coe=0|1] [time=0|1]\n"
+           "               [deb=<n>] [cdbsz=6|10|12|16] [--version]\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
            " 'thr' is number of threads, must be > 0, default 4, max 16\n");
     fprintf(stderr, " 'coe' continue on error, 0->exit (def), "
     	   "1->zero + continue\n"
-           " 'gen' 0-> one file is special(def), 1-> any files allowed\n"
 	   " 'time' 0->no timing(def), 1->time plus calculate throughput\n"
            " 'fua' force unit access: 0->don't(def), 1->of, 2->if, 3->of+if\n"
            " 'sync' 0->no sync(def), 1->SYNCHRONIZE CACHE on of after xfer\n"
@@ -390,13 +399,16 @@ void * read_write_thread(void * v_clp)
 
         status = pthread_mutex_lock(&clp->out_mutex);
         if (0 != status) err_exit(status, "lock out_mutex");
-        while ((! clp->out_stop) && ((rep->blk + seek_skip) != clp->out_blk)) {
-            /* if write would be out of sequence then wait */
-            pthread_cleanup_push(cleanup_out, (void *)clp);
-            status = pthread_cond_wait(&clp->out_sync_cv, &clp->out_mutex);
-            if (0 != status) err_exit(status, "cond out_sync_cv");
-            pthread_cleanup_pop(0);
-        }
+	if (FT_DEV_NULL != clp->out_type) {
+	    while ((! clp->out_stop) && 
+		   ((rep->blk + seek_skip) != clp->out_blk)) {
+		/* if write would be out of sequence then wait */
+		pthread_cleanup_push(cleanup_out, (void *)clp);
+		status = pthread_cond_wait(&clp->out_sync_cv, &clp->out_mutex);
+		if (0 != status) err_exit(status, "cond out_sync_cv");
+		pthread_cleanup_pop(0);
+	    }
+	}
 
         if (clp->out_stop || (clp->out_count <= 0)) {
             if (! clp->out_stop)
@@ -416,6 +428,12 @@ void * read_write_thread(void * v_clp)
         pthread_cleanup_push(cleanup_out, (void *)clp);
         if (FT_SG == clp->out_type)
             sg_out_operation(clp, rep); /* releases out_mutex mid operation */
+	else if (FT_DEV_NULL == clp->out_type) {
+	    /* skip actual write operation */
+	    clp->out_done_count -= blocks;
+	    status = pthread_mutex_unlock(&clp->out_mutex);
+	    if (0 != status) err_exit(status, "unlock out_mutex");
+	}
         else {
             normal_out_operation(clp, rep, blocks);
 	    status = pthread_mutex_unlock(&clp->out_mutex);
@@ -917,7 +935,6 @@ int main(int argc, char * argv[])
     int out_num_sect = 0;
     int num_threads = DEF_NUM_THREADS;
     pthread_t threads[MAX_NUM_THREADS];
-    int gen = 0;
     int do_time = 0;
     int do_sync = 0;
     int in_sect_sz, out_sect_sz, status, infull, outfull;
@@ -973,8 +990,6 @@ int main(int argc, char * argv[])
             num_threads = get_num(buf);
         else if (0 == strcmp(key,"coe"))
             rcoll.coe = get_num(buf);
-        else if (0 == strcmp(key,"gen"))
-            gen = get_num(buf);
         else if (0 == strcmp(key,"time"))
             do_time = get_num(buf);
         else if (0 == strcmp(key,"cdbsz"))
@@ -1023,7 +1038,11 @@ int main(int argc, char * argv[])
     if (inf[0] && ('-' != inf[0])) {
     	rcoll.in_type = dd_filetype(inf);
 
-        if (FT_SG == rcoll.in_type) {
+        if (FT_ST == rcoll.in_type) {
+            fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
+            return 1;
+        }
+        else if (FT_SG == rcoll.in_type) {
             if ((rcoll.infd = open(inf, O_RDWR)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
 			 ME "could not open %s for sg reading", inf);
@@ -1034,7 +1053,7 @@ int main(int argc, char * argv[])
                            &rcoll.in_scsi_type))
                 return 1;
         }
-        if (FT_SG != rcoll.in_type) {
+        else {
             if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
 			 ME "could not open %s for reading", inf);
@@ -1057,7 +1076,11 @@ int main(int argc, char * argv[])
     if (outf[0] && ('-' != outf[0])) {
 	rcoll.out_type = dd_filetype(outf);
 
-        if (FT_SG == rcoll.out_type) {
+        if (FT_ST == rcoll.out_type) {
+            fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
+            return 1;
+        }
+        else if (FT_SG == rcoll.out_type) {
 	    if ((rcoll.outfd = open(outf, O_RDWR)) < 0) {
                 snprintf(ebuff,  EBUFF_SZ,
 			 ME "could not open %s for sg writing", outf);
@@ -1069,8 +1092,10 @@ int main(int argc, char * argv[])
 			   &rcoll.out_scsi_type))
 		return 1;
         }
+	else if (FT_DEV_NULL == rcoll.out_type)
+            rcoll.outfd = -1; /* don't bother opening */
 	else {
-	    if (FT_OTHER == rcoll.out_type) {
+	    if (FT_RAW != rcoll.out_type) {
 		if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                              ME "could not open %s for writing", outf);
@@ -1101,10 +1126,6 @@ int main(int argc, char * argv[])
     }
     if ((STDIN_FILENO == rcoll.infd) && (STDOUT_FILENO == rcoll.outfd)) {
         fprintf(stderr, "Disallow both if and of to be stdin and stdout");
-        return 1;
-    }
-    if ((FT_OTHER == rcoll.in_type) && (FT_OTHER == rcoll.out_type) && !gen) {
-        fprintf(stderr, "Either 'if' or 'of' must be a sg or raw device\n");
         return 1;
     }
     if (count < 0) {
@@ -1265,7 +1286,7 @@ int main(int argc, char * argv[])
     if (0 != status) err_exit(status, "pthread_cancel");
     if (STDIN_FILENO != rcoll.infd)
         close(rcoll.infd);
-    if (STDOUT_FILENO != rcoll.outfd)
+    if ((STDOUT_FILENO != rcoll.outfd) && (FT_DEV_NULL != rcoll.out_type))
         close(rcoll.outfd);
     res = 0;
     if (0 != rcoll.out_count) {
