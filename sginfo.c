@@ -7,7 +7,7 @@
  * Options are:
  * -6    do 6 byte mode sense + select (deafult: 10 byte)
  * -a    display all mode pages reported by the device: equivalent to '-t 63'.
- * -A    display all mode pages and subpages reported by the device: equivalent 
+ * -A    display all mode pages and subpages reported by the device: equivalent
  *       to '-t 63,255'.
  * -c    access Cache control page.
  * -C    access Control Page.
@@ -16,7 +16,7 @@
  * -e    access Read-Write error recovery page.
  * -E    access Control Extension page.
  * -f    access Format Device Page.
- * -Farg defect list format (-Flogical, -Fphysical, -Findex, -Fhead)
+ * -Farg defect list format (-Flogical, -flba64, -Fphysical, -Findex, -Fhead)
  * -g    access rigid disk geometry page.
  * -G    display only "grown" defect list (default format: index)
  * -i    display information from Inquiry command.
@@ -106,7 +106,7 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * sginfo_version_str = "sginfo version 2.09 [20050119]";
+static const char * sginfo_version_str = "sginfo version 2.11 [20050309]";
 
 #include <stdio.h>
 #include <string.h>
@@ -201,7 +201,7 @@ static int spi4_training_config(struct mpage_info * mpi, const char * prefix);
 static int spi4_negotiated(struct mpage_info * mpi, const char * prefix);
 static int spi4_report_xfer(struct mpage_info * mpi, const char * prefix);
 
-enum page_class {PC_COMMON, PC_DISK, PC_TAPE, PC_CDVD, PC_SES};
+enum page_class {PC_COMMON, PC_DISK, PC_TAPE, PC_CDVD, PC_SES, PC_SMC};
 
 struct mpage_name_func {
     int page;
@@ -251,6 +251,7 @@ static struct mpage_name_func mpage_disk[] =
     { 0xb, 0, PC_DISK, "Medium Types Supported", NULL},
     { 0xc, 0, PC_DISK, "Notch and Partition", disk_notch_parameters},
     { 0x10, 0, PC_DISK, "XOR control", disk_xor_control},
+    { 0x1c, 1, PC_DISK, "Background control", NULL},
 };
 static const int mpage_disk_len = sizeof(mpage_disk) / sizeof(mpage_disk[0]);
 
@@ -282,6 +283,7 @@ static struct mpage_name_func mpage_tape[] =
     { 0x13, 0, PC_TAPE, "Medium partition(3)", tape_medium_part2_4},
     { 0x14, 0, PC_TAPE, "Medium partition(4)", tape_medium_part2_4},
     { 0x1c, 0, PC_TAPE, "Informational Exceptions", common_informational},
+    { 0x1d, 0, PC_TAPE, "Medium configuration", NULL},
 };
 static const int mpage_tape_len = sizeof(mpage_tape) / sizeof(mpage_tape[0]);
 
@@ -290,6 +292,15 @@ static struct mpage_name_func mpage_ses[] =
     { 0x14, 0, PC_SES, "Enclosure services management", ses_services_manag},
 };
 static const int mpage_ses_len = sizeof(mpage_ses) / sizeof(mpage_ses[0]);
+
+static struct mpage_name_func mpage_smc[] =
+{
+    { 0x1d, 0, PC_SMC, "Element address assignment", NULL},
+    { 0x1e, 0, PC_SMC, "Transport geometry parameters", NULL},
+    { 0x1f, 0, PC_SMC, "Device capabilities", NULL},
+    { 0x1f, 1, PC_SMC, "Extended device capabilities", NULL},
+};
+static const int mpage_smc_len = sizeof(mpage_smc) / sizeof(mpage_smc[0]);
 
 
 static char * transport_proto_arr[] =
@@ -396,8 +407,10 @@ static int do_scsi_io(struct scsi_cmnd_io * sio)
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("do_scsi_cmd, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     default:
         if (trace_cmd) {
@@ -448,8 +461,9 @@ enum page_class get_page_class(struct mpage_info * mpi)
         return PC_DISK;
     case 1:
     case 2:
-    case 8:     /* should be SMC */
         return PC_TAPE;
+    case 8:     /* should be SMC */
+        return PC_SMC;
     case 5:
         return PC_CDVD;
     case 0xd:
@@ -480,6 +494,10 @@ struct mpage_name_func * get_mpage_name_func(struct mpage_info * mpi)
     case PC_SES:
         mpf = get_mpage_info(mpi->page, mpi->subpage, mpage_ses,
                              mpage_ses_len);
+        break;
+    case PC_SMC:
+        mpf = get_mpage_info(mpi->page, mpi->subpage, mpage_smc,
+                             mpage_smc_len);
         break;
     case PC_COMMON:
         /* picked up it catch all next */
@@ -538,13 +556,30 @@ static void dump(void *buffer, unsigned int length)
 
 }
 
-static int getnbyte(unsigned char *pnt, int nbyte)
+static int getnbyte(const unsigned char *pnt, int nbyte)
 {
     unsigned int result;
     int i;
+
+    if (nbyte > 4)
+        fprintf(stderr, "getnbyte() limited to 32 bits, nbyte=%d\n", nbyte);
     result = 0;
     for (i = 0; i < nbyte; i++)
         result = (result << 8) | (pnt[i] & 0xff);
+    return result;
+}
+
+static long long getnbyte_ll(const unsigned char *pnt, int nbyte)
+{
+    long long result;
+    int i;
+
+    if (nbyte > 8)
+        fprintf(stderr, "getnbyte_ll() limited to 64 bits, nbyte=%d\n",
+                nbyte);
+    result = 0;
+    for (i = 0; i < nbyte; i++)
+        result = (result << 8) + (pnt[i] & 0xff);
     return result;
 }
 
@@ -1115,9 +1150,9 @@ static int common_disconnect_reconnect(struct mpage_info * mpi,
     };
     intfield(pagestart + 2, 1, "Buffer full ratio");
     intfield(pagestart + 3, 1, "Buffer empty ratio");
-    intfield(pagestart + 4, 2, "Bus Inactivity Limit");
+    intfield(pagestart + 4, 2, "Bus Inactivity Limit (SAS: 100us)");
     intfield(pagestart + 6, 2, "Disconnect Time Limit");
-    intfield(pagestart + 8, 2, "Connect Time Limit");
+    intfield(pagestart + 8, 2, "Connect Time Limit (SAS: 100us)");
     intfield(pagestart + 10, 2, "Maximum Burst Size");
     bitfield(pagestart + 12, "EMDP", 1, 7);
     bitfield(pagestart + 12, "Fair Arbitration (fcp:faa,fab,fac)", 0x7, 4);
@@ -1179,7 +1214,7 @@ static int common_control_extension(struct mpage_info * mpi, const char * prefix
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 2, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 4, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -1190,6 +1225,8 @@ static int common_control_extension(struct mpage_info * mpi, const char * prefix
                mpi->subpage);
         printf("--------------------------------------------\n");
     }
+    bitfield(pagestart + 4, "TCMOS", 1, 2);
+    bitfield(pagestart + 4, "SCSIP", 1, 1);
     bitfield(pagestart + 4, "IALUAE", 1, 0);
     bitfield(pagestart + 5, "Initial Priority", 0xf, 0);
 
@@ -1259,7 +1296,7 @@ static int disk_error_recovery(struct mpage_info * mpi, const char * prefix)
     intfield(pagestart + 5, 1, "Head Offset Count");
     intfield(pagestart + 6, 1, "Data Strobe Offset Count");
     intfield(pagestart + 8, 1, "Write Retry Count");
-    intfield(pagestart + 10, 2, "Recovery Time Limit");
+    intfield(pagestart + 10, 2, "Recovery Time Limit (ms)");
     if (x_interface && replace)
         return put_mode_page(mpi, cbuffer);
     else
@@ -1375,18 +1412,19 @@ static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
 
 static char *formatname(int format) {
     switch(format) {
-        case 0x0: return "logical blocks";
+        case 0x0: return "logical block addresses (32 bit)";
+        case 0x3: return "logical block addresses (64 bit)";
         case 0x4: return "bytes from index [Cyl:Head:Off]\n"
-        "Offset -1 marks whole track as bad.\n";
+                "Offset -1 marks whole track as bad.\n";
         case 0x5: return "physical blocks [Cyl:Head:Sect]\n"
-        "Sector -1 marks whole track as bad.\n";
+                "Sector -1 marks whole track as bad.\n";
     }
     return "Weird, unknown format";
 }
 
 static int read_defect_list(int grown_only)
 {
-    int i, len, reallen, table, k;
+    int i, len, reallen, table, k, defect_format;
     int status = 0;
     int header = 1;
     int sorthead = 0;
@@ -1524,15 +1562,16 @@ trytenbyte:
         else {
             if (table && !status && !sorthead)
                 printf("\n");
+            defect_format = (bp[1] & 0x7);
             printf("%d entries (%d bytes) in %s table.\n", 
-                   reallen / ((bp[1] & 7) ? 8 : 4), reallen,
+                   reallen / ((0 == defect_format) ? 4 : 8), reallen,
                    table ? "grown" : "manufacturer");
             if (!sorthead) 
-                printf("Format (%x) is: %s\n", 
-                   bp[1] & 7, 
-                   formatname(bp[1] & 7));
+                printf("Format (%x) is: %s\n", defect_format, 
+                   formatname(defect_format));
             i = 0;
-            if ((bp[1] & 7) == 4) {
+            switch (defect_format) {
+            case 4:     /* bytes from index */
                 while (len > 0) {
                     snprintf((char *)cbuffer1, 40, "%6d:%3u:%8d", getnbyte(df, 3),
                              df[3], getnbyte(df + 4, 4));
@@ -1549,7 +1588,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }
-            } else if ((bp[1] & 7) == 5) {
+            case 5:     /* physical sector */
                 while (len > 0) {
                     snprintf((char *)cbuffer1, 40, "%6d:%2u:%5d", getnbyte(df, 3),
                              df[3], getnbyte(df + 4, 4));
@@ -1566,8 +1605,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }                           
-            }
-            else {
+            case 0:     /* lba (32 bit) */
                 while (len > 0) {
                     printf("%10d", getnbyte(df, 4));
                     len -= 4;
@@ -1580,6 +1618,23 @@ trytenbyte:
                     else
                         printf("|");
                 }
+            case 3:     /* lba (64 bit) */
+                while (len > 0) {
+                    printf("%15lld", getnbyte_ll(df, 8));
+                    len -= 8;
+                    df += 8;
+                    i++;
+                    if (i >= 5) {
+                        printf("\n");
+                        i = 0;
+                    }
+                    else
+                        printf("|");
+                }
+                break;
+            default:
+                printf("unknown defect list format: %d\n", defect_format);
+                break;
             }
             if (i && !sorthead)
                 printf("\n");
@@ -1869,7 +1924,7 @@ static int cdvd_write_param(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 19, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 20, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -1888,6 +1943,7 @@ static int cdvd_write_param(struct mpage_info * mpi, const char * prefix)
     bitfield(pagestart + 3, "Copy", 1, 4);
     bitfield(pagestart + 3, "Track Mode", 0xf, 0);
     bitfield(pagestart + 4, "Data Block type", 0xf, 0);
+    intfield(pagestart + 5, 1, "Link size");
     bitfield(pagestart + 7, "Initiator app. code", 0x3f, 0);
     intfield(pagestart + 8, 1, "Session Format");
     intfield(pagestart + 10, 4, "Packet size");
@@ -2304,7 +2360,7 @@ static int ses_services_manag(struct mpage_info * mpi, const char * prefix)
         printf("----------------------------------------------------\n");
     }
     bitfield(pagestart + 5, "ENBLTC", 1, 0);
-    intfield(pagestart + 6, 2, "Maximum time to completion");
+    intfield(pagestart + 6, 2, "Maximum time to completion (100 ms units)");
 
     if (x_interface && replace)
         return put_mode_page(mpi, cbuffer);
@@ -3090,7 +3146,7 @@ static void show_devices()
         printf("%s ", devices[k]);
         close(fd);
     };
-    printf("\n"); // <<<<<<<<<<<<<<<<<<<<<
+    printf("\n"); /* <<<<<<<<<<<<<<<<<<<<< */
     for (k = 0; k < MAX_SG_DEVS; k++) {
         make_dev_name(name, k, do_numeric);
         fd = open(name, O_RDWR | O_NONBLOCK);
@@ -3276,7 +3332,8 @@ static void usage(char *errtext)
           "\t-E    Access Control Extension page.\n"
           "\t-f    Access Format Device Page.\n"
           "\t-Farg Format of the defect list:\n"
-          "\t\t-Flogical  - logical blocks\n"
+          "\t\t-Flogical  - logical block addresses (32 bit)\n"
+          "\t\t-Flba64    - logical block addresses (64 bit)\n"
           "\t\t-Fphysical - physical blocks\n"
           "\t\t-Findex    - defect bytes from index\n"
           "\t\t-Fhead     - sort by head\n", stdout);
@@ -3369,6 +3426,8 @@ int main(int argc, char *argv[])
         case 'F':
             if (!strcasecmp(optarg, "logical"))
                 defectformat = 0x0;
+            else if (!strcasecmp(optarg, "lba64"))
+                defectformat = 0x3;
             else if (!strcasecmp(optarg, "physical"))
                 defectformat = 0x5;
             else if (!strcasecmp(optarg, "index"))

@@ -14,7 +14,7 @@
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004 D. Gilbert
+*  Copyright (C) 2004-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.21 20041224";
+static char * version_str = "0.22 20050309";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -152,8 +152,10 @@ static int do_prin(int sg_fd, int rq_servact, void * resp, int mx_resp_len,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("PRIN, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     default:
         if (noisy) {
@@ -213,8 +215,10 @@ static int do_prout(int sg_fd, int rq_servact, int rq_scope,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("PROUT, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     default:
         if (noisy) {
@@ -295,18 +299,17 @@ static const char * scsi_ptype_strs[] = {
     /* 0x10 */ "bridging expander",
     "object based storage",
     "automation/driver interface",
+    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
+    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
+    "well known logical unit",
+    "no physical device on this lu",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
 {
     int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
 
-    if (0x1f == scsi_ptype)
-        return "no physical device on this lu";
-    else if (0x1e == scsi_ptype)
-        return "well known logical unit";
-    else
-        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 static const char * pr_type_strs[] = {

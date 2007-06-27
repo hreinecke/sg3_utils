@@ -14,7 +14,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999 - 2004 D. Gilbert
+*  Copyright (C) 1999 - 2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -38,7 +38,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.00 20041130";
+static char * version_str = "4.02 20050312";
 
 #define ME "sg_scan: "
 
@@ -87,7 +87,7 @@ void usage()
     printf("           -w   force open with read/write flag\n");
     printf("           -x   extra information output about queuing\n");
     printf("      <sam_dev> name of device that understands SAM command"
-	   " set\n");
+           " set\n");
 }
 
 void make_dev_name(char * fname, int k, int do_numeric)
@@ -146,7 +146,7 @@ int main(int argc, char * argv[])
     int * argv_index_arr;
 
     if ((argv_index_arr = malloc(max_file_args * sizeof(int))))
-	memset(argv_index_arr, 0, max_file_args * sizeof(int));
+        memset(argv_index_arr, 0, max_file_args * sizeof(int));
     else {
         printf(ME "Out of memory\n");
         return 1;
@@ -178,35 +178,35 @@ int main(int argc, char * argv[])
             return 1;
         }
         else if (*argv[k] != '-') {
-	    if (j < max_file_args) {
-		has_file_args = 1;
-		argv_index_arr[j++] = k;
-	    } else {
-	        printf("Too many command line arguments\n");
-		return 1;
-	    }
+            if (j < max_file_args) {
+                has_file_args = 1;
+                argv_index_arr[j++] = k;
+            } else {
+                printf("Too many command line arguments\n");
+                return 1;
+            }
         }
     }
 
     flags = writeable ? O_RDWR : O_RDONLY;
 
     for (k = 0, res = 0, j = 0; 
-	 (k < max_file_args)  && (has_file_args || (num_errors < MAX_ERRORS));
+         (k < max_file_args)  && (has_file_args || (num_errors < MAX_ERRORS));
          ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, ME "Error closing %s ", fname);
             perror(ME "close error");
             return 1;
         }
-	if (has_file_args) {
-	    if (argv_index_arr[j])
-		file_namep = argv[argv_index_arr[j++]];
-	    else
-		break;
-	} else {
+        if (has_file_args) {
+            if (argv_index_arr[j])
+                file_namep = argv[argv_index_arr[j++]];
+            else
+                break;
+        } else {
             make_dev_name(fname, k, do_numeric);
-	    file_namep = fname;
-	}
+            file_namep = fname;
+        }
 
         sg_fd = open(file_namep, flags | O_NONBLOCK);
         if (sg_fd < 0) {
@@ -231,9 +231,9 @@ int main(int argc, char * argv[])
         }
         res = ioctl(sg_fd, SCSI_IOCTL_GET_IDLUN, &my_idlun);
         if (res < 0) {
-	    res = try_ata_identity(file_namep, sg_fd, do_inquiry);
+            res = try_ata_identity(file_namep, sg_fd, do_inquiry);
             if (res == 0)
-		continue;
+                continue;
             snprintf(ebuff, EBUFF_SZ,
                      ME "device %s failed on scsi ioctl, skip", file_namep);
             perror(ebuff);
@@ -250,7 +250,7 @@ int main(int argc, char * argv[])
         }
         res = ioctl(sg_fd, SG_EMULATED_HOST, &emul);
         if (res < 0)
-	    emul = -1;
+            emul = -1;
         printf("%s: scsi%d channel=%d id=%d lun=%d", file_namep, host_no,
                (my_idlun.dev_id >> 16) & 0xff, my_idlun.dev_id & 0xff,
                (my_idlun.dev_id >> 8) & 0xff);
@@ -277,8 +277,8 @@ int main(int argc, char * argv[])
             else
                 printf("\n");
         }
-	else
-	    printf("\n");
+        else
+            printf("\n");
         if (do_inquiry) {
             if (-1 == sg_ver3) {
                 sg_ver3 = 0;
@@ -291,7 +291,7 @@ int main(int argc, char * argv[])
         }
     }
     if ((num_errors >= MAX_ERRORS) && (num_silent < num_errors) &&
-	(! has_file_args)) {
+        (! has_file_args)) {
         printf("Stopping because there are too many error\n");
         if (eacces_err)
             printf("    root access may be required\n");
@@ -322,16 +322,18 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
         if ((err = scsi_inq(sg_fd, inqBuff)) < 0) {
             perror(ME "Inquiry SG_IO + SCSI_IOCTL_SEND_COMMAND ioctl error");
             return 1;
-	} else if (err) {
+        } else if (err) {
             printf(ME "SCSI_IOCTL_SEND_COMMAND ioctl error=0x%x\n", err);
             return 1;
-	}
-        sg_io = 1;
+        }
     } else {
+        sg_io = 1;
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
-        case SG_LIB_CAT_CLEAN:
         case SG_LIB_CAT_RECOVERED:
+            sg_chk_n_print3("Inquiry, continuing", &io_hdr);
+            /* fall through */
+        case SG_LIB_CAT_CLEAN:
             break;
         default: /* won't bother decoding other categories */
             ok = 0;
@@ -346,7 +348,7 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
         printf("    %.8s  %.16s  %.4s ", p + 8, p + 16, p + 32);
         printf("[rmb=%d cmdq=%d pqual=%d pdev=0x%x] ",
                !!(p[1] & 0x80), !!(p[7] & 2), (p[0] & 0xe0) >> 5, 
-	       (p[0] & 0x1f));
+               (p[0] & 0x1f));
         if (do_extra && sg_io)
             printf("dur=%ums\n", io_hdr.duration);
         else
@@ -374,7 +376,7 @@ int scsi_inq(int sg_fd, unsigned char * inqBuff)
     memcpy(sicp->data, inqCmdBlk, INQ_CMD_LEN);
     res = ioctl(sg_fd, SCSI_IOCTL_SEND_COMMAND, sicp);
     if (0 == res)
-	memcpy(inqBuff, sicp->data, INQ_REPLY_LEN);
+        memcpy(inqBuff, sicp->data, INQ_REPLY_LEN);
     return res;
 }
 
@@ -423,7 +425,7 @@ void swapbytes(char *out, const char *in, size_t n)
         for (k = 0; k < (n - 1); k += 2) {
             out[k] = in[k + 1];
             out[k + 1] = in[k];
-	}
+        }
     }
 }
 
@@ -480,10 +482,10 @@ void printswap(char *output, char *in, unsigned int n)
 }
 
 #define ATA_IDENTIFY_BUFF_SZ  sizeof(struct ata_identify_device)
+#define HDIO_DRIVE_CMD_OFFSET 4
 
 int ata_command_interface(int device, char *data)
 {
-    const int HDIO_DRIVE_CMD_OFFSET = 4;
     unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     int retval; 
 
@@ -508,14 +510,14 @@ int try_ata_identity(const char * file_namep, int ata_fd, int do_inq)
 
     res = ata_command_interface(ata_fd, (char *)&ata_ident);
     if (res)
-	return res;
+        return res;
     printf("%s: ATA device\n", file_namep);
     if (do_inq) {
-	printf("    ");
+        printf("    ");
         printswap(model, (char *)ata_ident.model, 40);
         printswap(serial, (char *)ata_ident.serial_no, 20);
         printswap(firm, (char *)ata_ident.fw_rev, 8);
-	printf("\n");
+        printf("\n");
     }
     return res;
 }

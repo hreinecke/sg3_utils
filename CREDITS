@@ -1,9 +1,13 @@
 The author of sg3_utils would like to thank the following people who
 have made contributions:
 
+
 Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
         written by Joerg Schilling). isosize is now found in the util-linux
         package and in the archive directory of this package.
+
+Christophe Varoqui <christophe dot varoqui at free dot fr> original sg_rtpg
+        [20041229]
 
 Clayton Weaver <cgweav at email dot com> contributed safe_strerror().
 
@@ -16,8 +20,14 @@ Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
 
 F. Jansen: additions to sg_scan
 
+Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
+        that has become sg_format [20050201]
+
 Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example 
         programs for the original sg driver
+
+James Bottomley <jejb at parisc-linux dot org> co-author of blk512-linux
+        that has become sg_format [20050201]
 
 Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
         Additions to sginfo and sg_map.
@@ -31,8 +41,11 @@ Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
         values in sg_dd (and friends); also problems when reading /dev/null
 
-Peter Allworth <linsol at zeta dot org dot au> original dd clone design used by
-        sg3_utils's dd variants (e.g. sg_dd).
+Peter Allworth <linsol at zeta dot org dot au> original dd clone design used
+        by sg3_utils's dd variants (e.g. sg_dd).
+
+Remy Card has his copyright notice on llseek.c which is borrowed from the
+        util-linux package.
 
 Saeed Bishara contributed sg_write_long
 
@@ -42,9 +55,6 @@ Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
 Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific" 
         data and "-6" switch for sg_modes
 
-Christophe Varoqui <christophe dot varoqui at free dot fr> original sg_rtpg
-        [20041229]
-
 
 Doug Gilbert
-30th December 2004
+11th March 2005

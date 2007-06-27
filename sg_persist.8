@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "December 2004" "sg3_utils-1.12" SG3_UTILS
+.TH SG_PERSIST "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sg_persist \- use the Persistent Reservation In and Out SCSI commands
 to manipulate registrations and reservations
@@ -22,8 +22,8 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing! The relevant sections of the
-SCSI Primary Commands document (SPC-3 most recent draft revision 21
-dated 22nd September 2004) are sections 5.6 (general information), 6.11 (for
+SCSI Primary Commands document (SPC-3 most recent draft revision 21d
+dated 14th February 2005) are sections 5.6 (general information), 6.11 (for
 PRIN) and 6.12 (for PROUT). To safeguard against accidental use,
 the '--out' option must be given when a PROUT sub-command (e.g. '--register')
 is used.

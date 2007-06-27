@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Douglas Gilbert.
+ * Copyright (c) 2004-2005 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.05 20041229";
+static char * version_str = "1.06 20050210";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 
@@ -156,6 +156,10 @@ int main(int argc, char * argv[])
         ret = 0;
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Request Sense command not supported\n");
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "bad field in Request Sense cdb\n");
+    else
+        fprintf(stderr, "Request Sense command failed\n");
 
     res = close(sg_fd);
     if (res < 0) {

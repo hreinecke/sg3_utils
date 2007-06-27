@@ -64,10 +64,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.05 20050120";
+static char * version_str = "1.07 20050308";
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -227,7 +228,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0xa5, 0, "Move medium"},
     {0xa5, 5, "Play audio(12)"},
     {0xa6, 0, "Exchange medium"},
-    {0xa6, 5, "Load/unload cd/dvd"},
+    {0xa6, 5, "Load/unload medium"},
     {0xa7, 0, "Move medium attached"},
     {0xa7, 5, "Set read ahead"},
     {0xa8, 0, "Read(12)"},
@@ -236,7 +237,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0xab, 0, "Service action in(12)"},
     {0xac, 0, "erase(12)"},
     {0xac, 5, "Get performance"},
-    {0xad, 5, "Read dvd structure"},
+    {0xad, 5, "Read DVD/BD structure"},
     {0xae, 0, "Write and verify(12)"},
     {0xaf, 0, "Verify(12)"},
     {0xb0, 0, "Search data high(12)"},
@@ -261,7 +262,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0xbe, 0, "Volume set in"},
     {0xbe, 5, "Read CD"},
     {0xbf, 0, "Volume set out"},
-    {0xbf, 5, "Send DVD structure"},
+    {0xbf, 5, "Send DVD/BD structure"},
 };
 
 #define NORMAL_OPCODES_SZ \
@@ -275,6 +276,7 @@ static const struct value_name_t maint_in_arr[] = {
     {0xc, 0, "Report supported operation codes"},
     {0xd, 0, "Report supported task management functions"},
     {0xe, 0, "Report priority"},
+    {0xf, 0, "Report timeout"},
 };
 
 #define MAINT_IN_SZ \
@@ -285,6 +287,7 @@ static const struct value_name_t maint_out_arr[] = {
     {0xa, 0, "Set target port groups"},
     {0xb, 0, "Change aliases"},
     {0xe, 0, "Set priority"},
+    {0xf, 0, "Set timeout"},
 };
 
 #define MAINT_OUT_SZ \
@@ -606,10 +609,10 @@ static struct error_info additional[] =
     {0x17,0x03,"Recovered data with negative head offset"},
     {0x17,0x04,"Recovered data with retries and/or circ applied"},
     {0x17,0x05,"Recovered data using previous sector id"},
-    {0x17,0x06,"Recovered data without ecc - data auto-reallocated"},
-    {0x17,0x07,"Recovered data without ecc - recommend reassignment"},
-    {0x17,0x08,"Recovered data without ecc - recommend rewrite"},
-    {0x17,0x09,"Recovered data without ecc - data rewritten"},
+    {0x17,0x06,"Recovered data without ECC - data auto-reallocated"},
+    {0x17,0x07,"Recovered data without ECC - recommend reassignment"},
+    {0x17,0x08,"Recovered data without ECC - recommend rewrite"},
+    {0x17,0x09,"Recovered data without ECC - data rewritten"},
     {0x18,0x00,"Recovered data with error correction applied"},
     {0x18,0x01,"Recovered data with error corr. & retries applied"},
     {0x18,0x02,"Recovered data - data auto-reallocated"},
@@ -617,7 +620,7 @@ static struct error_info additional[] =
     {0x18,0x04,"Recovered data with L-EC"},
     {0x18,0x05,"Recovered data - recommend reassignment"},
     {0x18,0x06,"Recovered data - recommend rewrite"},
-    {0x18,0x07,"Recovered data with ecc - data rewritten"},
+    {0x18,0x07,"Recovered data with ECC - data rewritten"},
     {0x18,0x08,"Recovered data with linking"},
     {0x19,0x00,"Defect list error"},
     {0x19,0x01,"Defect list not available"},
@@ -629,7 +632,7 @@ static struct error_info additional[] =
     {0x1C,0x01,"Primary defect list not found"},
     {0x1C,0x02,"Grown defect list not found"},
     {0x1D,0x00,"Miscompare during verify operation"},
-    {0x1E,0x00,"Recovered id with ecc correction"},
+    {0x1E,0x00,"Recovered id with ECC correction"},
     {0x1F,0x00,"Partial defect list transfer"},
     {0x20,0x00,"Invalid command operation code"},
     {0x20,0x01,"Access denied - initiator pending-enrolled"},
@@ -697,6 +700,7 @@ static struct error_info additional[] =
     {0x2A,0x07,"Implicit asymmetric access state transition failed"},
     {0x2A,0x08,"Priority changed"},
     {0x2A,0x09,"Capacity data has changed"},
+    {0x2A,0x10,"Timestamp changed"},
     {0x2B,0x00,"Copy cannot execute since host cannot disconnect"},
     {0x2C,0x00,"Command sequence error"},
     {0x2C,0x01,"Too many windows specified"},
@@ -1052,6 +1056,15 @@ static const char *sense_key_desc[] = {
     "Key=15"                    /* Reserved */
 };
 
+char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
+{
+    if ((sense_key >= 0) && (sense_key < 16))
+         snprintf(buff, buff_len, "%s", sense_key_desc[sense_key]);
+    else
+         snprintf(buff, buff_len, "invalid value: 0x%x", sense_key);
+    return buff;
+}
+
 char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
     int k, num, rlen;
@@ -1114,7 +1127,7 @@ const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
         desc_len = add_len + 2;
         if (descp[0] == desc_type)
             return descp;
-        if (add_len < 0) // short descriptor ??
+        if (add_len < 0) /* short descriptor ?? */
             break;
     }
     return NULL;
@@ -1132,13 +1145,10 @@ int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
     switch (sensep[0] & 0x7f) {
     case 0x70:
     case 0x71:
-        if (sensep[0] & 0x80) {
-            if (info_outp)
-                *info_outp = (sensep[3] << 24) + (sensep[4] << 16) +
-                             (sensep[5] << 8) + sensep[6];
-            return 1;
-        } else
-            return 0;
+        if (info_outp)
+            *info_outp = (sensep[3] << 24) + (sensep[4] << 16) +
+                         (sensep[5] << 8) + sensep[6];
+        return (sensep[0] & 0x80) ? 1 : 0;
     case 0x72:
     case 0x73:
         ucp = sg_scsi_sense_desc_find(sensep, sb_len, 0 /* info desc */);
@@ -1151,6 +1161,43 @@ int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
             }
             if (info_outp)
                 *info_outp = ull;
+            return !!(ucp[2] & 0x80);
+        } else
+            return 0;
+    default:
+        return 0;
+    }
+}
+
+int sg_get_sense_progress_fld(const unsigned char * sensep,
+                              int sb_len, int * progress_outp)
+{
+    const unsigned char * ucp;
+    int sk;
+
+    if (sb_len < 7)
+        return 0;
+    switch (sensep[0] & 0x7f) {
+    case 0x70:
+    case 0x71:
+        sk = (sensep[2] & 0xf);
+        if ((sb_len < 18) || ((NO_SENSE != sk) && (NOT_READY != sk)))
+            return 0;
+        if (sensep[15] & 0x80) {
+            if (progress_outp)
+                *progress_outp = (sensep[16] << 8) + sensep[17];
+            return 1;
+        } else
+            return 0;
+    case 0x72:
+    case 0x73:
+        sk = (sensep[1] & 0xf);
+        if ((NO_SENSE != sk) && (NOT_READY != sk))
+            return 0;
+        ucp = sg_scsi_sense_desc_find(sensep, sb_len, 2 /* sense key spec. */);
+        if (ucp && (0x6 == ucp[1]) && (0x80 & ucp[4])) {
+            if (progress_outp)
+                *progress_outp = (ucp[5] << 8) + ucp[6];
             return 1;
         } else
             return 0;
@@ -1266,7 +1313,7 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
         case 3:
             fprintf(sg_warnings_str, "Field replaceable unit\n");
             if (add_len >= 2)
-                fprintf(sg_warnings_str, "    0x%x\n", descp[3]);
+                fprintf(sg_warnings_str, "    code=0x%x\n", descp[3]);
             else
                 processed = 0;
             break;
@@ -1427,8 +1474,8 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     fprintf(sg_warnings_str, "  Info fld=0x%x [%u] ", info,
                             info);
                 else if (info > 0)
-                    fprintf(sg_warnings_str, "  vendor specific Info "
-                            "fld=0x%x ", info);
+                    fprintf(sg_warnings_str, "  Valid=0, Info fld=0x%x [%u] ",
+                            info, info);
             }
             if (sense_buffer[2] & 0xe0) {
                 if (sense_buffer[2] & 0x80)
@@ -1442,7 +1489,11 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                             /* incorrect block length requested */
                 fprintf(sg_warnings_str, "\n");
             }
+            if ((len >= 14) && sense_buffer[14])
+                fprintf(sg_warnings_str, "  Field replaceable unit code: "
+                        "%d\n", sense_buffer[14]);
             if ((len >= 18) && (sense_buffer[15] & 0x80)) {
+                /* sense key specific decoding */
                 switch (ssh.sense_key) {
                 case ILLEGAL_REQUEST:
                     fprintf(sg_warnings_str, "  Sense Key Specific: Error in "
@@ -1579,6 +1630,8 @@ void sg_print_driver_status(int driver_status)
     fprintf(sg_warnings_str, " [%s, %s] ", driv_cp, sugg_cp);
 }
 
+/* Returns 1 if no errors found and thus nothing printed; otherwise
+   prints error/warning (prefix by 'leadin') and returns 0. */
 static int sg_sense_print(const char * leadin, int scsi_status,
                           int host_status, int driver_status,
                           const unsigned char * sense_buffer, int sb_len)
@@ -1678,6 +1731,8 @@ int sg_normalize_sense(const struct sg_io_hdr * hp,
     return sg_scsi_normalize_sense(hp->sbp, hp->sb_len_wr, sshp);
 }
 
+/* Returns 1 if no errors found and thus nothing printed; otherwise
+   returns 0. */
 int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp)
 {
     return sg_sense_print(leadin, hp->status, hp->host_status,
@@ -1685,6 +1740,8 @@ int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp)
 }
 #endif
 
+/* Returns 1 if no errors found and thus nothing printed; otherwise
+   returns 0. */
 int sg_chk_n_print(const char * leadin, int masked_status,
                    int host_status, int driver_status,
                    const unsigned char * sense_buffer, int sb_len)
@@ -1729,17 +1786,24 @@ int sg_err_category_new(int scsi_status, int host_status, int driver_status,
 
         if ((sense_buffer && (sb_len > 2)) &&
             (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh))) {
-            if (RECOVERED_ERROR == ssh.sense_key)
+            switch (ssh.sense_key) {
+            case RECOVERED_ERROR:
                 return SG_LIB_CAT_RECOVERED;
-            else if (UNIT_ATTENTION == ssh.sense_key) {
+            case MEDIUM_ERROR: 
+            case HARDWARE_ERROR: 
+                return SG_LIB_CAT_MEDIUM_HARD;
+            case UNIT_ATTENTION:
                 if (0x28 == ssh.asc)
                     return SG_LIB_CAT_MEDIA_CHANGED;
                 if (0x29 == ssh.asc)
                     return SG_LIB_CAT_RESET;
-            }
-            else if (ILLEGAL_REQUEST == ssh.sense_key) {
+                break;
+            case ILLEGAL_REQUEST:
                 if ((0x20 == ssh.asc) && (0x0 == ssh.ascq))
                     return SG_LIB_CAT_INVALID_OP;
+                else
+                    return SG_LIB_CAT_ILLEGAL_REQ;
+                break;
             }
         }
         return SG_LIB_CAT_SENSE;
@@ -2040,12 +2104,15 @@ static void dStrHexErr(const char* str, int len)
 
 /* If the number in 'buf' can be decoded or the multiplier is unknown
    then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix. */
+   multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
+   Main (SI) multipliers supported: K, M, G. */
 int sg_get_num(const char * buf)
 {
-    int res, num;
+    int res, num, n;
     unsigned int unum;
+    char * cp;
     char c = 'c';
+    char c2, c3;
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1;
@@ -2053,31 +2120,57 @@ int sg_get_num(const char * buf)
         res = sscanf(buf + 2, "%x", &unum);
         num = (int)unum;
     } else
-        res = sscanf(buf, "%d%c", &num, &c);
-    if (1 == res)
+        res = sscanf(buf, "%d%c%c%c", &num, &c, &c2, &c3);
+    if (res < 1)
+        return -1LL;
+    else if (1 == res)
         return num;
-    else if (2 != res)
-        return -1;
     else {
-        switch (c) {
-        case 'c':
+        if (res > 2)
+            c2 = toupper(c2);
+        if (res > 3)
+            c3 = toupper(c3);
+        switch (toupper(c)) {
         case 'C':
             return num;
-        case 'b':
+        case 'W':
+            return num * 2;
         case 'B':
             return num * 512;
-        case 'k':
-            return num * 1024;
         case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
+            if (2 == res)
+                return num * 1024;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1024;
+            return -1;
         case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
+            if (2 == res)
+                return num * 1048576;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1048576;
+            return -1;
         case 'G':
-            return num * 1000000000;
+            if (2 == res)
+                return num * 1073741824;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1073741824;
+            return -1;
+        case 'X':
+            cp = strchr(buf, 'x');
+            if (NULL == cp)
+                cp = strchr(buf, 'X');
+            if (cp) {
+                n = sg_get_num(cp + 1);
+                if (-1 != n)
+                    return num * n;
+            }
+            return -1;
         default:
             if (NULL == sg_warnings_str)
                 sg_warnings_str = stderr;
@@ -2089,13 +2182,16 @@ int sg_get_num(const char * buf)
 
 /* If the number in 'buf' can be decoded or the multiplier is unknown
    then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix. */
+   multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
+   Main (SI) multipliers supported: K, M, G, T, P. */
 long long sg_get_llnum(const char * buf)
 {
     int res;
-    long long num;
+    long long num, ll;
     unsigned long long unum;
+    char * cp;
     char c = 'c';
+    char c2, c3;
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1LL;
@@ -2103,35 +2199,73 @@ long long sg_get_llnum(const char * buf)
         res = sscanf(buf + 2, "%llx", &unum);
         num = unum;
     } else
-        res = sscanf(buf, "%lld%c", &num, &c);
-    if (1 == res)
-        return num;
-    else if (2 != res)
+        res = sscanf(buf, "%lld%c%c%c", &num, &c, &c2, &c3);
+    if (res < 1)
         return -1LL;
+    else if (1 == res)
+        return num;
     else {
-        switch (c) {
-        case 'c':
+        if (res > 2)
+            c2 = toupper(c2);
+        if (res > 3)
+            c3 = toupper(c3);
+        switch (toupper(c)) {
         case 'C':
             return num;
-        case 'b':
+        case 'W':
+            return num * 2;
         case 'B':
             return num * 512;
-        case 'k':
-            return num * 1024;
         case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
+            if (2 == res)
+                return num * 1024;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1024;
+            return -1LL;
         case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
+            if (2 == res)
+                return num * 1048576;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1048576;
+            return -1LL;
         case 'G':
-            return num * 1000000000;
-        case 't':
-            return num * 1024LL * 1024LL * 1024LL * 1024LL;
+            if (2 == res)
+                return num * 1073741824;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1073741824;
+            return -1LL;
         case 'T':
-            return num * 1000000000000LL;
+            if (2 == res)
+                return num * 1099511627776LL;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000000000LL;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1099511627776LL;
+            return -1LL;
+        case 'P':
+            if (2 == res)
+                return num * 1099511627776LL * 1024;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000000000LL * 1000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1099511627776LL * 1024;
+            return -1LL;
+        case 'X':
+            cp = strchr(buf, 'x');
+            if (NULL == cp)
+                cp = strchr(buf, 'X');
+            if (cp) {
+                ll = sg_get_llnum(cp + 1);
+                if (-1LL != ll)
+                    return num * ll;
+            }
+            return -1LL;
         default:
             if (NULL == sg_warnings_str)
                 sg_warnings_str = stderr;

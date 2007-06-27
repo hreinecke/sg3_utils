@@ -37,10 +37,7 @@
    device. A block size ('bs') is assumed to be 512 if not given. This
    program complains if 'ibs' or 'obs' are given with some other value
    than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
-   'of' is not given or 'of=-' then stdout assumed.  Multipliers:
-      'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
-      'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
-      't' *(1024^4)     'T' *(1000^4)
+   'of' is not given or 'of=-' then stdout assumed.
    
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
@@ -52,7 +49,7 @@
 
 */
 
-static char * version_str = "5.21 20050113";
+static char * version_str = "5.23 20050309";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -261,7 +258,9 @@ static void guarded_stop_both(Rq_coll * clp)
     guarded_stop_out(clp);
 }
 
-/* Return of 0 -> success, -1 -> failure, 2 -> try again */
+/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_MEDIA_CHANGED -> media changed, SG_LIB_CAT_ILLEGAL_REQ
+ * -> bad field in cdb, -1 -> other failure */
 int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 {
     int k, res;
@@ -858,8 +857,8 @@ int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
-            fprintf(stderr, "Recovered error on block=%d, num=%d\n",
-                    rep->blk, rep->num_blks);
+            sg_chk_n_print3((rep->wr ? "writing continuing":
+                                       "reading continuing"), hp);
             break;
         case SG_LIB_CAT_MEDIA_CHANGED:
             return 1;
@@ -986,21 +985,49 @@ int main(int argc, char * argv[])
                 return 1;
             } else
                 strncpy(outf, buf, INOUTF_SZ);
-        } else if (0 == strcmp(key,"ibs"))
+        } else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
-        else if (0 == strcmp(key,"obs"))
+            if (-1 == ibs) {
+                fprintf(stderr, ME "bad argument to 'ibs'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"obs")) {
             obs = sg_get_num(buf);
-        else if (0 == strcmp(key,"bs"))
+            if (-1 == obs) {
+                fprintf(stderr, ME "bad argument to 'obs'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"bs")) {
             rcoll.bs = sg_get_num(buf);
-        else if (0 == strcmp(key,"bpt"))
+            if (-1 == rcoll.bs) {
+                fprintf(stderr, ME "bad argument to 'bs'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"bpt")) {
             rcoll.bpt = sg_get_num(buf);
-        else if (0 == strcmp(key,"skip"))
+            if (-1 == rcoll.bpt) {
+                fprintf(stderr, ME "bad argument to 'bpt'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
-        else if (0 == strcmp(key,"seek"))
+            if (-1LL == skip) {
+                fprintf(stderr, ME "bad argument to 'skip'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"seek")) {
             seek = sg_get_llnum(buf);
-        else if (0 == strcmp(key,"count"))
+            if (-1LL == seek) {
+                fprintf(stderr, ME "bad argument to 'seek'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"count")) {
             count = sg_get_llnum(buf);
-        else if (0 == strcmp(key,"dio"))
+            if (-1LL == count) {
+                fprintf(stderr, ME "bad argument to 'count'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"dio"))
             rcoll.dio = sg_get_num(buf);
         else if (0 == strcmp(key,"thr"))
             num_threads = sg_get_num(buf);
@@ -1160,7 +1187,11 @@ int main(int argc, char * argv[])
                                          &in_sect_sz);
             }
             if (0 != res) {
-                fprintf(stderr, "Unable to read capacity on %s\n", inf);
+               if (res == SG_LIB_CAT_INVALID_OP)
+                    fprintf(stderr, "read capacity not supported on %s\n",
+                            inf);
+                else
+                    fprintf(stderr, "Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
             }
         } else if (FT_BLOCK == rcoll.in_type) {
@@ -1188,7 +1219,11 @@ int main(int argc, char * argv[])
                                          &out_sect_sz);
             }
             if (0 != res) {
-                fprintf(stderr, "Unable to read capacity on %s\n", outf);
+               if (res == SG_LIB_CAT_INVALID_OP)
+                    fprintf(stderr, "read capacity not supported on %s\n",
+                            outf);
+                else
+                    fprintf(stderr, "Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
             }
         } else if (FT_BLOCK == rcoll.out_type) {

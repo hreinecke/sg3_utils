@@ -38,10 +38,7 @@
    This program complains if 'ibs' or 'obs' are given with a value
    that differs from 'bs' (or the default 512).
    If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed. Multipliers:
-     'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
-     'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
-     't' *(1024^4)     'T' *(1000^4)
+   not given or 'of=-' then stdout assumed.
 
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
@@ -57,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.17 20050107";
+static char * version_str = "1.19 20050309";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -192,7 +189,9 @@ void usage()
            "        (only when read side is sg device (using mmap))\n");
 }
 
-/* Return of 0 -> success, -1 -> failure, 2 -> try again */
+/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_MEDIA_CHANGED -> media changed, SG_LIB_CAT_ILLEGAL_REQ
+ * -> bad field in cdb, -1 -> other failure */
 int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 {
     int k, res;
@@ -404,8 +403,7 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        fprintf(stderr, "Recovered error while reading block=%lld, num=%d\n",
-               from_block, blocks);
+        sg_chk_n_print3("Reading, continuing", &io_hdr);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
@@ -474,8 +472,7 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        fprintf(stderr, "Recovered error while writing block=%lld, num=%d\n",
-               to_block, blocks);
+        sg_chk_n_print3("Writing, continuing", &io_hdr);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
@@ -560,21 +557,49 @@ int main(int argc, char * argv[])
                 return 1;
             } else
                 strncpy(outf, buf, INOUTF_SZ);
-        } else if (0 == strcmp(key,"ibs"))
+        } else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
-        else if (0 == strcmp(key,"obs"))
+            if (-1 == ibs) {
+                fprintf(stderr, ME "bad argument to 'ibs'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"obs")) {
             obs = sg_get_num(buf);
-        else if (0 == strcmp(key,"bs"))
+            if (-1 == obs) {
+                fprintf(stderr, ME "bad argument to 'obs'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"bs")) {
             bs = sg_get_num(buf);
-        else if (0 == strcmp(key,"bpt"))
+            if (-1 == bs) {
+                fprintf(stderr, ME "bad argument to 'bs'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"bpt")) {
             bpt = sg_get_num(buf);
-        else if (0 == strcmp(key,"skip"))
+            if (-1 == bpt) {
+                fprintf(stderr, ME "bad argument to 'bpt'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
-        else if (0 == strcmp(key,"seek"))
+            if (-1LL == skip) {
+                fprintf(stderr, ME "bad argument to 'skip'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"seek")) {
             seek = sg_get_llnum(buf);
-        else if (0 == strcmp(key,"count"))
+            if (-1LL == seek) {
+                fprintf(stderr, ME "bad argument to 'seek'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"count")) {
             dd_count = sg_get_llnum(buf);
-        else if (0 == strcmp(key,"time"))
+            if (-1LL == dd_count) {
+                fprintf(stderr, ME "bad argument to 'count'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"time"))
             do_time = sg_get_num(buf);
         else if (0 == strcmp(key,"cdbsz")) {
             scsi_cdbsz_in = sg_get_num(buf);
@@ -768,13 +793,17 @@ int main(int argc, char * argv[])
         in_num_sect = -1;
         if (FT_SG == in_type) {
             res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
-            if (2 == res) {
+            if (SG_LIB_CAT_MEDIA_CHANGED == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed(in), continuing\n");
                 res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
-                fprintf(stderr, "Unable to read capacity on %s\n", inf);
+               if (res == SG_LIB_CAT_INVALID_OP)
+                    fprintf(stderr, "read capacity not supported on %s\n",
+                            inf);
+                else
+                    fprintf(stderr, "Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
             }
         } else if (FT_BLOCK == in_type) {
@@ -794,13 +823,17 @@ int main(int argc, char * argv[])
         out_num_sect = -1;
         if (FT_SG == out_type) {
             res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
-            if (2 == res) {
+            if (SG_LIB_CAT_MEDIA_CHANGED == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed(out), continuing\n");
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
-                fprintf(stderr, "Unable to read capacity on %s\n", outf);
+               if (res == SG_LIB_CAT_INVALID_OP)
+                    fprintf(stderr, "read capacity not supported on %s\n",
+                            outf);
+                else
+                    fprintf(stderr, "Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
             }
         } else if (FT_BLOCK == out_type) {

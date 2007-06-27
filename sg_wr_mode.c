@@ -46,7 +46,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.02 20050120";
+static char * version_str = "1.04 20050306";
 
 #define ME "sg_wr_mode: "
 
@@ -83,7 +83,8 @@ static void usage()
           " to write\n"
           "         --contents=- | -c -   read stdin for mode page contents"
           " to write\n"
-          "         --dbd | -d            disable block descriptors\n"
+          "         --dbd | -d            disable block descriptors (DBD bit"
+          " in cdb)\n"
           "         --force | -f          force the contents to be written\n"
           "         --help | -h           print out usage message\n"
           "         --len=<10|6> | -l <10|6>   use 10 byte (def) or 6 byte "
@@ -424,14 +425,19 @@ int main(int argc, char * argv[])
     memset(ref_md, 0, MX_ALLOC_LEN);
     alloc_len = mode_6 ? SHORT_ALLOC_LEN : MX_ALLOC_LEN;
     if (mode_6)
-        res = sg_ll_mode_sense6(sg_fd, dbd, 0, pg_code, sub_pg_code, ref_md,
-                                alloc_len, 1, verbose);
+        res = sg_ll_mode_sense6(sg_fd, dbd, 0 /*current */, pg_code,
+                                sub_pg_code, ref_md, alloc_len, 1, verbose);
      else
-        res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd, 0, pg_code,
-                                 sub_pg_code, ref_md, alloc_len, 1, verbose);
+        res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd, 0 /* current */,
+                                 pg_code, sub_pg_code, ref_md, alloc_len, 1,
+                                 verbose);
     if (SG_LIB_CAT_INVALID_OP == res) {
         fprintf(stderr, "MODE SENSE (%d) not supported, try '--len=%d'\n",
                 (mode_6 ? 6 : 10), (mode_6 ? 10 : 6));
+        goto err_out;
+    } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+        fprintf(stderr, "bad field in MODE SENSE (%d) command\n",
+                (mode_6 ? 6 : 10));
         goto err_out;
     } else if (0 != res) {
         fprintf(stderr, "MODE SENSE (%d) failed\n", (mode_6 ? 6 : 10));
@@ -458,7 +464,7 @@ int main(int argc, char * argv[])
         }
         ref_md[0] = 0;
         if (! mode_6)
-            ref_md[0] = 0;
+            ref_md[1] = 0;
         if (md_len > alloc_len) {
             fprintf(stderr, "mode data length=%d exceeds allocation "
                     "length=%d\n", md_len, alloc_len);
@@ -511,6 +517,10 @@ int main(int argc, char * argv[])
             fprintf(stderr, "MODE SELECT (%d) not supported\n",
                     (mode_6 ? 6 : 10));
             goto err_out;
+        } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+            fprintf(stderr, "bad field in MODE SELECT (%d) command\n",
+                    (mode_6 ? 6 : 10));
+            goto err_out;
         } else if (0 != res) {
             fprintf(stderr, "MODE SELECT (%d) failed\n", (mode_6 ? 6 : 10));
             goto err_out;
@@ -522,7 +532,8 @@ int main(int argc, char * argv[])
         if (bd_len) {
             printf("  block descriptor(s):\n");
             dStrHex((const char *)(ref_md + hdr_len), bd_len, -1);
-        }
+        } else
+            printf("  << no block descriptors >>\n");
         printf("  mode page:\n");
         dStrHex((const char *)(ref_md + off), md_len - off, -1);
     }

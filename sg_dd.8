@@ -1,4 +1,4 @@
-.TH SG_DD "8" "October 2004" "sg3_utils-1.10" SG3_UTILS
+.TH SG_DD "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -8,12 +8,12 @@ devices that understand the SCSI command set.
 [\fIcdbsz=6|10|12|16\fR] [\fIcoe=0|1\fR] [\fIcount=<n>\fR] [\fIdio=0|1\fR]
 [\fIfua=0|1|2|3\fR] [\fIibs=<n>\fR] [\fIif=<ifile>\fR] [\fIobs=<n>\fR]
 [\fIodir=0|1\fR] [\fIof=<ofile>\fR] [\fIseek=<n>\fR] [\fIskip=<n>\fR]
-[\fIsync=0|1\fR] [\fItime=0|1\fR] [\fI--version\fR]
+[\fIsync=0|1\fR] [\fItime=0|1\fR] [\fIverbose=<n>\fR] [\fI--version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Copy data to and from any files. Specialised for "files" that are
-Linux SCSI generic (sg) devices, raw devices and those block devices
+Linux SCSI generic (sg) devices, raw devices or other devices
 that support the SG_IO ioctl (which are only found in the lk 2.6
 series). Similar syntax and semantics to
 .B dd(1) 
@@ -24,8 +24,8 @@ when set to 1 the output will be appended to the normal file given
 to the "of=<name>" argument. Appending only takes place to normal files:
 not to pipes nor raw files nor sg devices nor block devices. Error
 message produced if append=1 and seek=<n> where <n> > 0. Default is 0
-which starts output at offset  of a normal file (subject to the "seek="
-argument).
+which starts output at the beginning of a normal file (or at some other
+offset if the "seek=" argument is given).
 .TP
 blk_sgio=0 | 1
 when set to 0, block devices (e.g. /dev/sda) are treated like normal
@@ -33,14 +33,14 @@ files (i.e.
 .B read(2)
 and 
 .B write(2)
-are used for IO). When set to 1, block 
-devices are assumed to accept the SG_IO ioctl and SCSI commands are
-issued for IO. This is only supported for 2.6 series kernels. Note
-that ATAPI devices (e.g. cd/dvd players) use the SCSI command set
-but ATA disks do not. If the input or output device is a block device
-partition then setting this option causes the partition information
-to be ignored (since access is directly to the underlying device).
-Default is 0.
+are used for IO). When set to 1, block devices are assumed to accept the
+SG_IO ioctl and SCSI commands are issued for IO. This is only supported
+for 2.6 series kernels. Note that ATAPI devices (e.g. cd/dvd players) use
+the SCSI command set but ATA disks do not (unless there is a protocol
+conversion as often occurs in the USB mass storage class). If the input
+or output device is a block device partition (e.g. /dev/sda3) then setting
+this option causes the partition information to be ignored (since access
+is directly to the underlying device). Default is 0.
 .TP
 bpt=BLOCKS
 each IO transaction will be made using this number of blocks (or less if 
@@ -51,11 +51,13 @@ transfer or memory restrictions).
 bs=BYTES
 this
 .B must
-be the block size of the physical device. Note that this differs from
+be the block size of the physical device (if either the input or output
+files are accessed via SCSI commands). Note that this differs from
 .B dd(1)
 which permits "bs" to be an integral multiple. Default is 512 which
 is usually correct for disks but incorrect for cdroms (which normally
-have 2048 byte blocks).
+have 2048 byte blocks). For this utility the maximum size of each individual
+IO operation is 'bs * bpt' bytes.
 .TP
 cdbsz=6 | 10 | 12 | 16
 size of SCSI READ and/or WRITE commands issued on sg device 
@@ -109,9 +111,10 @@ if given must be the same as bs
 odir=0 | 1
 when set to one opens block devices (e.g. /dev/sda) with the O_DIRECT
 flag. User memory buffers are aligned to the page size when set. The
-default is 0 (i.e. the O_DIRECT flag is not used). The blk_sgio flag
-takes precedence if it is also set. Has no effect on sg, normal or raw
-files.
+default is 0 (i.e. the O_DIRECT flag is not used). Has no effect on sg,
+normal or raw files. If blk_sgio is also set then both are honoured:
+block devices are opened with the O_DIRECT flag and SCSI commands are
+issued via the SG_IO ioctl.
 .TP
 of=FILE
 write to FILE instead of stdout. A file name of - is taken to be stdout.
@@ -137,28 +140,32 @@ time=0 | 1
 when 1, times transfer and does throughput calculation, outputting the
 results (to stderr) at completion. When 0 (default) doesn't perform timing
 .TP
+verbose=<n>
+as <n> increases so does the amount of debug output sent to stderr.
+Default value is zero which yields the minimum amount of debug output.
+A value of 1 reports extra information that is not repetitive. A value
+2 reports cdbs and responses for SCSI commands that are not repetitive
+(i.e. other that READ and WRITE). Error processing is not considered
+repetitive. Values of 3 and 4 yield ouput for all SCSI commands (and
+Unix read() and write() calls).
+.TP
 --version
 outputs version number information and exits
 .PP
-A raw device must be bound to a block device prior to using sg_dd.
-See
-.B raw(8)
-for more information about binding raw devices. To be safe, the sg device
-mapping to SCSI block devices should be checked with "cat /proc/scsi/scsi",
-or sg_map before use.
-.PP
-Raw disk partition information can often be found with
-.B fdisk(8)
-[the "-ul" argument is useful in this respect].
+The exit status of the sg_dd utilty is 0 when successful, 1 for
+total failure (i.e. failed before copying data) and 2 when some
+data has been copied (prior to some problem).
 .PP
 BYTES and BLOCKS may be followed by one of these multiplicative suffixes:
-c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
-g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
-T *1,000,000,000,000 (the latter two can only be used for count, skip
-and seek values).
+c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
+MB *1,000,000 . This pattern continues for "G", "T" and "P". The latter two
+suffixes can only be used for count, skip and seek values). Also a suffix of
+the form "x<n>" multiplies the leading number by <n>. These multiplicative
+suffixes are compatible with GNU's dd command (since 2002) which claims
+compliance with SI and with IEC 60027-2.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
-either "0x" or "0X". When hex numbers are given multipliers cannot be
+either "0x" or "0X". When hex numbers are given, multipliers cannot be
 used.
 .PP
 The count, skip and seek parameters can take 64 bit values (i.e. very 
@@ -177,11 +184,22 @@ configuration change to activate it. This is typically done with
 All informative, warning and error output is sent to stderr so that
 dd's output file can be stdout and remain unpolluted. If no options
 are given, then the usage message is output and nothing else happens.
+.PP
+A raw device must be bound to a block device prior to using sg_dd.
+See
+.B raw(8)
+for more information about binding raw devices. To be safe, the sg device
+mapping to SCSI block devices should be checked with "cat /proc/scsi/scsi",
+or sg_map before use.
+.PP
+Raw disk partition information can often be found with
+.B fdisk(8)
+[the "-ul" argument is useful in this respect].
 .SH EXAMPLES
 .PP
 Looks quite similar in usage to dd:
 .PP
-   sg_dd if=/dev/sg0 of=t bs=512 count=1M
+   sg_dd if=/dev/sg0 of=t bs=512 count=1MB
 .PP
 This will copy 1 million 512 byte blocks from the device associated with
 /dev/sg0 (which should have 512 byte blocks) to a file called t.
@@ -195,7 +213,7 @@ reduced. Using a raw device to do something similar on a IDE disk:
 .PP
    raw /dev/raw/raw1 /dev/hda
 .br
-   sg_dd if=/dev/raw/raw1 of=t bs=512 count=1M
+   sg_dd if=/dev/raw/raw1 of=t bs=512 count=1MB
 .PP
 To copy a SCSI disk partition to an IDE disk partition:
 .PP
@@ -243,7 +261,7 @@ Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2004 Douglas Gilbert
+Copyright \(co 2000-2005 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

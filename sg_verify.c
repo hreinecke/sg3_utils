@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Douglas Gilbert.
+ * Copyright (c) 2004-2005 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.01 20041229";
+static char * version_str = "1.02 20050309";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -86,14 +86,14 @@ static void usage()
 
 }
 
-/* Invokes a SCSI VERIFY (10) command */
-/* Return of 0 -> success, -1 -> failure, SG_LIB_CAT_INVALID_OP -> 
-   Verify(10) not supported */
+/* Invokes a SCSI VERIFY (10) command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Verify(10) not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
                    int veri_len, void * data_out, int data_out_len,
                    int verbose)
 {
-    int k;
+    int k, res;
     unsigned char vCmdBlk[VERIFY10_CMDLEN] = 
                 {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -143,17 +143,18 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
                 safe_strerror(errno));
         return -1;
     }
-    switch (sg_err_category3(&io_hdr)) {
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("VERIFY(10), continuing", &io_hdr);
+        /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
-    case SG_LIB_CAT_RECOVERED:
-        fprintf(sg_warnings_str, "Recovered error on VERIFY(10) command, "
-                "continuing\n");
-        return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("VERIFY(10) command problem", &io_hdr);
-        return SG_LIB_CAT_INVALID_OP;
+        return res;
     default:
         sg_chk_n_print3("VERIFY(10) command problem", &io_hdr);
         return -1;
@@ -268,6 +269,8 @@ int main(int argc, char * argv[])
         if (0 != res) {
             if (SG_LIB_CAT_INVALID_OP == res)
                 fprintf(stderr, "Verify(10) command not supported\n");
+            else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                fprintf(stderr, "bad field in Verify(10) cdb\n");
             else
                 fprintf(stderr, "Verify(10) failed near lba=%llu [0x%llx]\n",
                         lba, lba);

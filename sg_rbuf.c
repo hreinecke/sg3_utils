@@ -55,7 +55,7 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.78 20050106";
+static char * version_str = "4.79 20050309";
 
 static void usage()
 {
@@ -184,10 +184,10 @@ int main(int argc, char * argv[])
 
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
-    case SG_LIB_CAT_CLEAN:
-        break;
     case SG_LIB_CAT_RECOVERED:
-        printf("Recovered error on READ BUFFER descriptor, continuing\n");
+        sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         break;
     default: /* won't bother decoding other categories */
         sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr);
@@ -297,7 +297,7 @@ int main(int argc, char * argv[])
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
-            printf("Recovered error on READ BUFFER data, continuing\n");
+            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr);
             break;
         default: /* won't bother decoding other categories */
             sg_chk_n_print3("READ BUFFER data error", &io_hdr);

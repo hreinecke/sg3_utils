@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "November 2004" "sg3_utils-1.11" SG3_UTILS
+.TH SG_INQ "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sg_inq \- outputs data retrieved from the SCSI INQUIRY command
 .SH SYNOPSIS
@@ -26,9 +26,9 @@ ioctl is unknown) then an ATA IDENTIFY is tried. If it succeeds then
 device identification strings are output. If the "-r" option is given
 then the 256 byte IDENTIFY block is output in binary.
 .PP
-The reference document used for interpreting an INQUIRY is T10/1416-D Revision 
-21a (9th November 2004) found at http://www.t10.org . Obsolete items in the
-standard INQUIRY response are displayed in brackets.
+The reference document used for interpreting an INQUIRY is T10/1416-D Revision
+21d (SPC-3, 14th February 2005) found at http://www.t10.org . Obsolete items
+in the standard INQUIRY response are displayed in brackets.
 .TP
 -c
 set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used

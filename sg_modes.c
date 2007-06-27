@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "0.31 20050121";
+static char * version_str = "0.34 20050223";
 
 #define ME "sg_modes: "
 
@@ -61,18 +61,15 @@ static const char * scsi_ptype_strs[] = {
     "automation/drive interface",
     "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
+    "well known logical unit",
+    "no physical device on this lu",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
 {
     int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
 
-    if (0x1f == scsi_ptype)
-        return "no physical device on this lu";
-    else if (0x1e == scsi_ptype)
-        return "well known logical unit";
-    else
-        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 static const char * transport_proto_arr[] =
@@ -134,6 +131,7 @@ static struct page_code_desc pc_desc_tape[] = {
     {0x13, 0x0, "Medium Partition [3]"},
     {0x14, 0x0, "Medium Partition [4]"},
     {0x1c, 0x0, "Informational exceptions control (tape version)"},
+    {0x1d, 0x0, "Medium configuration"},
 };
 
 static struct page_code_desc pc_desc_cddvd[] = {
@@ -154,6 +152,7 @@ static struct page_code_desc pc_desc_smc[] = {
     {0x1d, 0x0, "Element address assignment"},
     {0x1e, 0x0, "Transport geometry parameters"},
     {0x1f, 0x0, "Device capabilities"},
+    {0x1f, 0x1, "Extended device capabilities"},
 };
 
 static struct page_code_desc pc_desc_scc[] = {
@@ -377,14 +376,16 @@ static const char * pg_control_str_arr[] = {
 
 static void usage()
 {
-    printf("Usage: 'sg_modes [-a] [-A] [-c=<page_control] [-d] [-h] [-l]\n\t\t"
+    printf("Usage: 'sg_modes [-a] [-A] [-c=<page_control] [-d] [-D] [-h] "
+           "[-l]\n\t\t"
            " [-p=<page_number>[,<sub_page_code>]] [-r]"
            "\n\t\t [-subp=<sub_page_code>] [-v] [-V] [-6] [<scsi_device>]'\n"
            " where -a   get all mode pages supported by device\n"
            "       -A   get all mode pages and subpages supported by device\n"
            "       -c=<page_control> page control (def: 0 [current],"
            " 1 [changeable],\n            2 [default], 3 [saved])\n"
-           "       -d   disable block descriptors\n"
+           "       -d   disable block descriptors (field in cdb)\n"
+           "       -D   disable block descriptor output\n"
            "       -h   output in hex\n"
            "       -l   list common page codes for device peripheral type,\n"
            "            if no device given then assume disk type\n"
@@ -416,6 +417,7 @@ int main(int argc, char * argv[])
     int do_all = 0;
     int do_all_sub = 0;
     int do_dbd = 0;
+    int no_desc_out = 0;
     int do_hex = 0;
     int do_mode6 = 0;  /* Use MODE SENSE(6) instead of MODE SENSE(10) */
     int do_list = 0;
@@ -443,6 +445,8 @@ int main(int argc, char * argv[])
             pc = u;
         } else if (0 == strcmp("-d", argv[k]))
             do_dbd = 1;
+        else if (0 == strcmp("-D", argv[k]))
+            no_desc_out = 1;
         else if (0 == strcmp("-h", argv[k]))
             do_hex = 1;
         else if (0 == strcmp("-l", argv[k]))
@@ -584,12 +588,18 @@ int main(int argc, char * argv[])
         if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, ">>>>>> try again without the '-6' "
                     "switch for a 10 byte MODE SENSE command\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in cdb (perhaps subpages "
+                    "not supported\n");
     } else {
         res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, do_dbd, pc, pg_code,
                          sub_pg_code, rsp_buff, rsp_buff_size, 1, do_verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, ">>>>>> try again with a '-6' "
                     "switch for a 6 byte MODE SENSE command\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in cdb (perhaps subpages "
+                    "not supported\n");
     }
     if (0 == res) {
         int medium_type, specific, headerlen;
@@ -640,31 +650,33 @@ int main(int argc, char * argv[])
             if (bd_len + headerlen > rsp_buff_size)
                 bd_len = rsp_buff_size - headerlen;
         }
-        printf("  Block descriptor length=%d\n", bd_len);
-        if (bd_len > 0) {
-            len = 8;
-            density_code_off = 0;
-            num = bd_len;
-            if (longlba) {
-                printf("> longlba block descriptors:\n");
-                len = 16;
-                density_code_off = 8;
+        if (! no_desc_out) {
+            printf("  Block descriptor length=%d\n", bd_len);
+            if (bd_len > 0) {
+                len = 8;
+                density_code_off = 0;
+                num = bd_len;
+                if (longlba) {
+                    printf("> longlba block descriptors:\n");
+                    len = 16;
+                    density_code_off = 8;
+                }
+                else if (0 == inq_out.peripheral_type) { 
+                    printf("> Direct access device block descriptors:\n");
+                    density_code_off = 4;
+                }
+                else
+                    printf("> General mode parameter block descriptors:\n");
+    
+                ucp = rsp_buff + headerlen;
+                while (num > 0) {
+                    printf("   Density code=0x%x\n", *(ucp + density_code_off));
+                    dStrHex((const char *)ucp, len, 1);
+                    ucp += len;
+                    num -= len;
+                }
+                printf("\n");
             }
-            else if (0 == inq_out.peripheral_type) { 
-                printf("> Direct access device block descriptors:\n");
-                density_code_off = 4;
-            }
-            else
-                printf("> General mode parameter block descriptors:\n");
-
-            ucp = rsp_buff + headerlen;
-            while (num > 0) {
-                printf("   Density code=0x%x\n", *(ucp + density_code_off));
-                dStrHex((const char *)ucp, len, 1);
-                ucp += len;
-                num -= len;
-            }
-            printf("\n");
         }
         ucp = rsp_buff + bd_len + headerlen;    /* start of mode page(s) */
         md_len -= bd_len + headerlen;           /* length of mode page(s) */

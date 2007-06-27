@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Douglas Gilbert.
+ * Copyright (c) 2004-2005 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@
  * (e.g. disks)
  */
 
-static char * version_str = "1.01 20041229";
+static char * version_str = "1.02 20050210";
 
 
 #define ME "sg_sync: "
@@ -194,6 +194,8 @@ int main(int argc, char * argv[])
         ret = 0;
     else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Synchronize cache command not supported\n");
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "bad field in Synchronize cache command\n");
     else
         fprintf(stderr, "Synchronize cache failed\n");
 

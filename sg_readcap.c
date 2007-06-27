@@ -13,7 +13,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2004 D. Gilbert
+*  Copyright (C) 1999 - 2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "3.68 20041106";
+static char * version_str = "3.69 20050211";
 
 #define ME "sg_readcap: "
 
@@ -144,7 +144,7 @@ int main(int argc, char * argv[])
                     printf("   Last block address=%u (0x%x), Number of "
                            "blocks=%u\n", last_blk_addr, last_blk_addr,
                            last_blk_addr + 1);
-                printf("   Block size = %u bytes\n", block_size);
+                printf("   Block size=%u bytes\n", block_size);
                 if (! pmi) {
                     unsigned long long total_sz = last_blk_addr + 1;
                     double sz_mb, sz_gb;
@@ -159,8 +159,7 @@ int main(int argc, char * argv[])
                            total_sz, sz_mb, sz_gb);
                 }
             }
-        }
-        else if (SG_LIB_CAT_INVALID_OP == res) {
+        } else if (SG_LIB_CAT_INVALID_OP == res) {
             do16 = 1;
             close(sg_fd);
             if ((sg_fd = open(file_name, O_RDWR | O_NONBLOCK)) < 0) {
@@ -172,7 +171,9 @@ int main(int argc, char * argv[])
             if (verbose)
                 fprintf(stderr, "READ CAPACITY (10) not supported, trying "
                         "READ CAPACITY (16)\n");
-        } else if (verbose)
+        } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
+        else if (verbose)
             fprintf(stderr, "READ CAPACITY (10) failed [res=%d]\n", res);
     }
     if (do16) {
@@ -187,7 +188,7 @@ int main(int argc, char * argv[])
                           (resp_buff[10] << 8) | resp_buff[11]);
             printf("Read Capacity results:\n");
             printf("   Protection: prot_en=%d, rto_en=%d\n",
-                   (resp_buff[12] & 0x1), ((resp_buff[12] & 0x2) ? 1 : 0));
+                   !!(resp_buff[12] & 0x1), !!(resp_buff[12] & 0x2));
             if (pmi)
                 printf("   PMI mode: given lba=0x%llx, last block before "
                        "delay=0x%llx\n", llba, llast_blk_addr);
@@ -195,7 +196,7 @@ int main(int argc, char * argv[])
                 printf("   Last block address=%llu (0x%llx), Number of "
                        "blocks=%llu\n", llast_blk_addr, llast_blk_addr, 
                        llast_blk_addr + 1);
-            printf("   Block size = %u bytes\n", block_size);
+            printf("   Block size=%u bytes\n", block_size);
             if (! pmi) {
                 unsigned long long total_sz = llast_blk_addr + 1;
                 double sz_mb, sz_gb;
@@ -212,6 +213,8 @@ int main(int argc, char * argv[])
         }
         else if (SG_LIB_CAT_INVALID_OP == res) 
             fprintf(stderr, "READ CAPACITY (16) not supported\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
         else if (verbose)
             fprintf(stderr, "READ CAPACITY (16) failed [res=%d]\n", res);
     }

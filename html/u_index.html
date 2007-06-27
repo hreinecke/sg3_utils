@@ -1,0 +1,913 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="Content-Type"
+ content="text/html; charset=iso-8859-1">
+  <meta name="GENERATOR"
+ content="Mozilla/4.79 [en] (X11; U; Linux 2.5.31 i686) [Netscape]">
+  <title>Linux sg3_utils package</title>
+</head>
+<body alink="#ff0000" background="paper.jpg" bgcolor="#ffffff"
+ link="#0000ff" text="#000000" vlink="#000080">
+<center>
+<h1> The&nbsp; Linux sg3_utils package</h1>
+</center>
+<a href="#intro">Introduction</a> <br>
+<a href="#contents">Contents </a><br>
+<a href="#Examples"><span style="text-decoration: underline;">Examples</span></a><br>
+<a href="#notes">Notes</a> <br>
+<a href="#download">Download</a> <br>
+<a href="#others">Programs from other sources</a> <br>
+&nbsp;
+<h2> <a name="intro"></a>Introduction</h2>
+The <span style="font-weight: bold;">sg3_utils</span> package contains
+utilities
+that send SCSI commands to Linux devices. As well as devices on SCSI
+transports (e.g. Fibre channel and the SCSI parallel interface) many
+other devices use SCSI command sets. Examples are ATAPI cd/dvd writers
+and SATA disks (typically via a translation layer or bridge device).
+SCSI command sets are divided into what are called "primary" commands
+(e.g. SPC-3) and device class specific sets (e.g. SBC-2 for disks and
+MMC-4 for cd/dvd devices).&nbsp; SCSI command sets and transports
+definitions can be found at <a href="http://www.t10.org">www.t10.org</a>
+.<br>
+<br>
+The
+<span style="font-weight: bold;">sg3_utils</span> pacakge targets the
+linux kernel 2.4 and 2.6 series and is
+still under active development. An earlier package called sg_utils
+targeted the&nbsp; linux kernel 2.2 series with some support for the
+2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>&nbsp;
+for further information about sg_utils.&nbsp; This
+document describes
+version 1.13 of sg3_utils . <br>
+<br>
+In the linux kernel 2.4 series these utilities must be
+used with a SCSI generic (sg) driver device name (e.g. <span
+ style="font-family: monospace;">/dev/sg0</span>). In
+the lk 2.6 series almost all of these utilities can be used with the
+primary device names as well (e.g. <span
+ style="font-family: monospace;">/dev/sda, /dev/sdc0, /dev/st0</span>
+and
+<span style="font-family: monospace;">/dev/hdd</span> (if it is an
+ATAPI device)). The SCSI generic (sg) interface
+still represents a cleaner interface than the primary device names
+since the drivers behind primary device names have their
+own policies, may interfere with error processing and in some cases
+run their own
+state machines (e.g. the cdrom driver interferes with attempts to
+prevent media removal with sg_prevent).<br>
+<p>SCSI utility programs for Linux from other sources are listed and
+briefly described in
+the final section. </p>
+<h2> <a name="contents"></a>Contents of sg3_utils</h2>
+Here is a listing in alphabetical order of the utilities in the
+sg3_utils package:<br>
+<br>
+<table style="width: 100%; text-align: left;" border="1" cellpadding="2"
+ cellspacing="2">
+  <tbody>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Utility</span><br>
+      </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Main
+SCSI commands</span><br>
+      </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">subdirectory</span><br>
+      </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Notes</span><br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">hxascdmp<br>
+      </td>
+      <td style="vertical-align: top;">-<br>
+      </td>
+      <td style="vertical-align: top;">utils<br>
+      </td>
+      <td style="vertical-align: top;">converts stdin (assumed binary)
+to ASCII hex and ASCII on stdout (like Unix <span
+ style="font-weight: bold;">od</span> command)<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">isosize<br>
+      </td>
+      <td style="vertical-align: top;">-<br>
+      </td>
+      <td style="vertical-align: top;">archive<br>
+      </td>
+      <td style="vertical-align: top;">size of an ISO 9660 file system,
+now in the <span style="font-weight: bold;">util-linux</span> package<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">rescan-scsi-bus.sh<br>
+      </td>
+      <td style="vertical-align: top;">-<br>
+      </td>
+      <td style="vertical-align: top;">archive<br>
+      </td>
+      <td style="vertical-align: top;">copy of Kurt Garloff's useful
+script<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">scsi_devfs_scan<br>
+      </td>
+      <td style="vertical-align: top;">INQUIRY<br>
+      </td>
+      <td style="vertical-align: top;">archive<br>
+      </td>
+      <td style="vertical-align: top;">more relevant to lk 2.4 (in lk
+2.6 sysfs replaces devfs; see <a href="../scsi/lsscsi.html">lsscsi</a>
+)<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">scsi_inquiry<br>
+      </td>
+      <td style="vertical-align: top;">INQUIRY<br>
+      </td>
+      <td style="vertical-align: top;">examples<br>
+      </td>
+      <td style="vertical-align: top;">uses deprecated
+SCSI_IOCTL_SEND_COMMAND ioctl<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sginfo<br>
+      </td>
+      <td style="vertical-align: top;">MODE SENSE/SELECT, READ DEFECT<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">symbolic decoding (optional
+changing) of mode pages. Can also output (disk) defect lists<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sgm_dd<br>
+      </td>
+      <td style="vertical-align: top;">READ, WRITE<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">sg_dd variant that uses memory
+mapped IO (only on sg devices)<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sgp_dd<br>
+      </td>
+      <td style="vertical-align: top;">READ, WRITE<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">sg_dd variant that uses POSIX
+threads<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sgq_dd<br>
+      </td>
+      <td style="vertical-align: top;">READ, WRITE<br>
+      </td>
+      <td style="vertical-align: top;">archive<br>
+      </td>
+      <td style="vertical-align: top;">sg_dd variant that uses
+asynchronous sg IO calls<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_dd<br>
+      </td>
+      <td style="vertical-align: top;">READ, WRITE<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Unix <span
+ style="font-weight: bold;">dd</span> command variant, uses
+SG_IO ioctl to send SCSI commands to do reads and writes when
+instructed. See the <a href="sg_dd.html">sg_dd</a> page. </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_emc_trepass<br>
+      </td>
+      <td style="vertical-align: top;">MODE SELECT<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">utility specialized for EMC
+Clariion series<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_format<br>
+      </td>
+      <td style="vertical-align: top;">FORMAT<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">format or resize a SCSI disk<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_get_config<br>
+      </td>
+      <td style="vertical-align: top;">GET CONFIGURATION<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fetch features and profiles of a
+cd/dvd drive and/or its current media<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_inq<br>
+      </td>
+      <td style="vertical-align: top;">INQUIRY<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fetch standard reponse, VPD
+pages (including device identification) or version decsriptors<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_logs<br>
+      </td>
+      <td style="vertical-align: top;">LOG SENSE<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fetch log sense pages, decode
+standard pages<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_luns<br>
+      </td>
+      <td style="vertical-align: top;">REPORT LUNS<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fetch luns reported by a device
+(lun 0 or "well known lu")<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_map<br>
+      </td>
+      <td style="vertical-align: top;">INQUIRY<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">shows mapping between sg devices
+and primary device node (if any). In lk 2.6 see <a
+ href="../scsi/lsscsi.html">lsscsi</a> .<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_modes<br>
+      </td>
+      <td style="vertical-align: top;">MODE SENSE<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">dump mode pages (mainly in hex)<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_opcodes<br>
+      </td>
+      <td style="vertical-align: top;">REPORT SUPPORTED OPERATION CODES<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fetch supported SCSI commands or
+supported task management functions<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_persist<br>
+      </td>
+      <td style="vertical-align: top;">PERSISTENT RESERVATION IN/OUT<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">control reservations and report
+reservation status<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_prevent<br>
+      </td>
+      <td style="vertical-align: top;">PREVENT ALLOW MEDIUM REMOVAL<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">control media removal, mainly
+for those SCSI devices which have removable media (mainly CD/DVD drives)<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_rbuff<br>
+      </td>
+      <td style="vertical-align: top;">READ BUFFER<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">read from SCSI device cache.
+Typically for testing the SCSI transport (for throughput or errors)<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_read<br>
+      </td>
+      <td style="vertical-align: top;">READ<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">read continually from same
+offset. Syntax similar to sg_dd (without write side). Can test SCSI
+device cache and transport performance (like sg_rbuff).<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_readcap<br>
+      </td>
+      <td style="vertical-align: top;">READ CAPACITY<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fetch the number of blocks and
+the individual block size for disks and CD/DVD media<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_read_long<br>
+      </td>
+      <td style="vertical-align: top;">READ LONG<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">read from given lba data which
+includes the block and ECC data.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_reassign<br>
+      </td>
+      <td style="vertical-align: top;">REASSIGN BLOCKS<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">reassign a lba from one sector
+on a disk (typically damaged) to a new (spare) sector. User data copied
+if it is recoverable.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_request<br>
+      </td>
+      <td style="vertical-align: top;">REQUEST SENSE<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fetch sense data from the given
+SCSI device. Useful if no autosense , to get progress indication (e.g.
+during a format) or find the power condition state.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_reset<br>
+      </td>
+      <td style="vertical-align: top;">-<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Issue a driver, (SCSI) bus or
+device (target or lun?) reset.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_rtpg<br>
+      </td>
+      <td style="vertical-align: top;">REPORT TARGET PORT GROUPS<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Specialized for multi-ported
+SCSI devices where one port (or a group of them) is preferred for IO
+over another (or others).<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_scan<br>
+      </td>
+      <td style="vertical-align: top;">[INQUIRY]<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">maps each sg device name to
+the corresponding numeric &lt;host, channel, target', lun&gt; tuple. In
+lk 2.6 series the "<a href="scsi/lsscsi.html">lsscsi</a> -g" command is
+similar.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_senddiag<br>
+      </td>
+      <td style="vertical-align: top;">SEND DIAGNOSTIC<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Issues either a default self
+test or a short/extended foreground/background self test. With no
+arguments it uses RECEIVE DIAGNOSTIC to list all supported diagnostic
+pages.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_ses<br>
+      </td>
+      <td style="vertical-align: top;">SEND/RECEIVE DIAGNOSTIC<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Fetches status diagnostic
+pages from, and sends some control pages to, a SCSI Enclosure Services
+(SES) device.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_simple1,2,3,4<br>
+      </td>
+      <td style="vertical-align: top;">INQUIRY, TEST UNIT READY<br>
+      </td>
+      <td style="vertical-align: top;">examples<br>
+      </td>
+      <td style="vertical-align: top;">Simple code examples of using
+the scsi generic (sg) driver interface<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_simple16<br>
+      </td>
+      <td style="vertical-align: top;">READ<br>
+      </td>
+      <td style="vertical-align: top;">examples<br>
+      </td>
+      <td style="vertical-align: top;">Simple code example of sending a
+16 byte cdb SCSI READ command<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_start<br>
+      </td>
+      <td style="vertical-align: top;">START STOP UNIT<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Controls the power condition
+state of a SCSI device. Primary use is to spin up and down SCSI disks.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_sync<br>
+      </td>
+      <td style="vertical-align: top;">SYNCHRONIZE CACHE<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Causes disk caches to be flushed
+to media<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_test_rwbuf<br>
+      </td>
+      <td style="vertical-align: top;">READ/WRITE BUFFER<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Random pattern written to SCSI
+device buffer then read back and checked. Used in testing for data
+corruption.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_turs<br>
+      </td>
+      <td style="vertical-align: top;">TEST UNIT READY<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Issue one or more Test Unit
+Ready commands. Can be used to time SCSI command overhead.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_verify</td>
+      <td style="vertical-align: top;">VERIFY</td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">reads indicated blocks on a SCSI
+disks, stops on the first error found. Does not yield any data. Useful
+for media scans.</td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_write_long<br>
+      </td>
+      <td style="vertical-align: top;">WRITE LONG<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">writes to a lba, data which
+includes the block and ECC data. Suitable data typically fetched by
+prior
+sg_read_long utility.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_wr_mode<br>
+      </td>
+      <td style="vertical-align: top;">MODE SELECT<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">writes mode pages supplied in
+ASCII hex (e.g. from "sg_modes -r") to the given SCSI device<br>
+      </td>
+    </tr>
+  </tbody>
+</table>
+<br>
+More SCSI commands may be issued than shown in the "main SCSI
+commands" column. For example many utilities issue a SCSI INQUIRY
+command to find out the peripheral device type of the given SCSI
+device. Some SCSI commands listed above are only relevant to a specific
+device type (e.g. FORMAT UNIT) and should not be sent to a device
+belonging to other peripheral device types (and in some cases the logic
+blocks inappropriate attempts). See the COVERAGE file in the main
+directory of the tarball for a more exhaustive list of SCSI commands
+issued by the sg3_utils utilities.<br>
+<br>
+If the "subdirectory"
+column is empty in the above table then that utility is in the main
+directory and more
+documentation can be found in its "man" page. All utilities in the main
+directory have "man" pages and some in the subdirectories have "man"
+pages.<br>
+<br>
+In the above table all utilities in the main directory except sgp_dd
+issue SG_IO ioctls when they want to send SCSI commands to the given
+device. The sgp_dd utility will only issue SCSI commands using the sg
+driver's asynchronous (write()/read() ) interface to device nodes that
+have the sg driver's major device number (i.e. "char" major 21). This
+means that all utilities in the main directory are "safe" with any
+given device node. If the device node does not support the SG_IO ioctl
+then that is reported and the utility exits.<br>
+<br>
+Irrespective of the Unix device node used to access a device, care
+should be taken not to interfere with a device while it is "active".
+Obviously invoking a "sg_format -F" utility a disk with mounted file
+systems on it is going to cause damage.<br>
+<h2><a name="Examples"></a>Examples</h2>
+The fundemental SCSI command whose support is mandatory for all SCSI
+devices is INQUIRY. All devices should respond to a "standard" (i.e.
+when no Vital Product Pages are requested) INQUIRY.<br>
+<br>
+<span style="font-family: monospace;">$ sg_inq /dev/sda</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">standard INQUIRY:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; PQual=0&nbsp;
+Device_type=0&nbsp; RMB=0&nbsp; version=0x03&nbsp; [SPC]</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; [AERC=0]&nbsp;
+[TrmTsk=0]&nbsp; NormACA=0&nbsp; HiSUP=1&nbsp; Resp_data_format=2</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; SCCS=0&nbsp; ACC=0&nbsp;
+TGPS=0&nbsp; 3PC=0&nbsp; Protect=0</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; BQue=0&nbsp;
+EncServ=0&nbsp; MultiP=0&nbsp; MChngr=0&nbsp; [ACKREQQ=0]&nbsp; Addr16=1</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; [RelAdr=0]&nbsp;
+WBus16=1&nbsp; Sync=1&nbsp; Linked=1&nbsp; [TranDis=1]&nbsp; CmdQue=1</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Clocking=0x3&nbsp;
+QAS=0&nbsp; IUS=0</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; length=144
+(0x90)&nbsp;&nbsp; Peripheral device type: disk</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Vendor identification:
+SEAGATE</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Product identification:
+ST318451LW</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Product revision level: 0003</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Unit serial number:
+xxxxxxxxx</span><br>
+<br>
+Some SCSI devices have version descriptor information showing which
+standards (and drafts) they support:<br>
+<br>
+<span style="font-family: monospace;">$ sg_inq -d /dev/sdb</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">standard INQUIRY:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; PQual=0&nbsp;
+Device_type=0&nbsp; RMB=0&nbsp; version=0x03&nbsp; [SPC]</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; [AERC=0]&nbsp;
+[TrmTsk=0]&nbsp; NormACA=0&nbsp; HiSUP=0&nbsp; Resp_data_format=2</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; SCCS=0&nbsp; ACC=0&nbsp;
+TGPS=0&nbsp; 3PC=0&nbsp; Protect=0</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; BQue=0&nbsp;
+EncServ=0&nbsp; MultiP=0&nbsp; MChngr=0&nbsp; [ACKREQQ=0]&nbsp; Addr16=1</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; [RelAdr=0]&nbsp;
+WBus16=1&nbsp; Sync=1&nbsp; Linked=1&nbsp; [TranDis=1]&nbsp; CmdQue=1</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Clocking=0x0&nbsp;
+QAS=0&nbsp; IUS=0</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; length=96
+(0x60)&nbsp;&nbsp; Peripheral device type: disk</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Vendor identification:
+FUJITSU</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Product identification:
+MAM3184MP</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Product revision level: 0106</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;Unit serial number:
+xxxxxxxxx</span><br style="font-family: monospace;">
+<br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Version descriptors:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; SAM-2 (no
+version claimed)</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; SPI-3
+T10/1302-D revision 10</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; SPC ANSI
+X3.301:1997</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp; SBC T10/0996-D
+revision 08c</span><br>
+<br>
+Many modern SCSI devices also support "Vital Product Data" (VPD) pages.
+Here is a request to list available VPD pages:<br>
+<br>
+<span style="font-family: monospace;">$ sg_inq -e /dev/sg1</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">VPD INQUIRY, page code=0x00:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp; [PQual=0&nbsp;
+Peripheral device type: disk]</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp; Supported VPD pages:</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;
+0x0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Supported VPD pages</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;
+0x80&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Unit serial number</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;
+0x83&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Device identification</span><br>
+<br>
+The sg_scan and sg_map utilities show the relationships between sg
+devices and their &lt;bus, channel, target, lun&gt; tuples and their
+primary device node names:<br>
+<p>Example: given these 3 SCSI devices: <br>
+<tt style="font-family: monospace;">$ cat /proc/scsi/scsi</tt><span
+ style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">Attached devices:</tt><span
+ style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">Host: scsi1 Channel: 00 Id: 00 Lun:
+00</tt><span style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">&nbsp; Vendor: SEAGATE&nbsp; Model:
+ST318451LW&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Rev: 0003</tt><span
+ style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">&nbsp; Type:&nbsp;&nbsp;
+Direct-Access&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ANSI SCSI revision: 03</tt><span style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">Host: scsi2 Channel: 00 Id: 04 Lun:
+00</tt><span style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">&nbsp; Vendor: PIONEER&nbsp; Model:
+DVD-ROM DVD-303&nbsp; Rev: 1.10</tt><span
+ style="font-family: monospace;">
+</span><br style="font-family: monospace;">
+<tt style="font-family: monospace;">&nbsp; Type:&nbsp;&nbsp;
+CD-ROM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ANSI SCSI revision: 02</tt><span style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">Host: scsi2 Channel: 00 Id: 06 Lun:
+00</tt><span style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">&nbsp; Vendor: YAMAHA&nbsp;&nbsp;
+Model:
+CRW4416S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Rev: 1.0g</tt><span
+ style="font-family: monospace;">
+</span><br style="font-family: monospace;">
+<tt style="font-family: monospace;">&nbsp; Type:&nbsp;&nbsp;
+CD-ROM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ANSI SCSI revision: 02</tt> </p>
+<p>then the output from sg_scan is: <br>
+<tt style="font-family: monospace;">$ sg_scan</tt><span
+ style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">/dev/sg0: scsi1 channel=0 id=0
+lun=0&nbsp; type=0</tt><span style="font-family: monospace;"> </span><tt
+ style="font-family: monospace;"><br>
+/dev/sg1: scsi2 channel=0 id=4 lun=0&nbsp; type=5</tt><span
+ style="font-family: monospace;"> </span><br
+ style="font-family: monospace;">
+<tt style="font-family: monospace;">/dev/sg2: scsi2 channel=0 id=6
+lun=0&nbsp; type=5</tt> </p>
+<p>INQUIRY data can be added to that output with the "-i" option. The
+sg_map utility shows the mapping between scsi generic (sg) devices and
+the corresponding primary device node. For some peripheral device
+types, SCSI enclosures for example, there is no mapping and the
+enclosure device must be accessed via a sg device node.<br>
+</p>
+<p style="font-family: monospace;">$ sg_map <br>
+/dev/sg0&nbsp; /dev/sda <br>
+/dev/sg1&nbsp; /dev/scd0 <br>
+/dev/sg2&nbsp; /dev/scd1</p>
+In the lk 2.6 series of kernels sg_scan and sg_map are less important
+as most
+utilities in the sg3_utils package can be issued directly against the
+primary device node (e.g. /dev/sda).&nbsp; However the sg driver is
+still needed to "talk" to devices such as enclosures which have no
+specialized driver in linux.<br>
+<h2> <a name="notes"></a>Notes</h2>
+Starting with sg3_utils-1.09 a library called libsgutils is built and
+is required by most utilities. The library is made up of two source
+files: sg_lib.c and sg_cmds.c; and their associated header files . The
+sg_lib.c file contains SCSI
+command,
+sense key and additional sense code strings and various related helper
+functions. The sg_cmds.c file contains low level wrapper functions for
+commonly used SCSI commands. The library is built both as a shared
+object and a static library. The binary rpm package only contains the
+shared library while the sg3_utils-devel rpm package contains the
+static library, sg_lib.h and sg_cmds.h . If users do not want libraries
+(shared or static) then they can refer to the "lib_no_lib" subdirectory
+in the tarball which contains "no_lib" versions of the Makefile and the
+rpm "spec" file.<br>
+<br>
+Many of the utilities in the sg3_utils package use the SG_IO ioctl
+(rather than the older write()/read() interface) in the sg driver. In
+the lk 2.6&nbsp; series the SG_IO ioctl (or at least a stripped
+down version of it) has been implemented in the block subsystem. That
+means that commands that previously only worked on sg device names will
+now work on block device names as well (e.g. "sg_inq /dev/sda"). To use
+this facility safely version sg3_utils-1.02 or later should be used.
+Note that SCSI tape devices (both st and osst device drivers) are char
+devices and support the SG_IO ioctl from lk 2.6.6 onwards.<br>
+<p>See the notes about header file problems in the README file inside
+each package. </p>
+<h2> <a name="download"></a>Download</h2>
+Various tarballs that include the source, a README, CHANGELOG, INSTALL
+and a Makefile can be found in the <u>sg_utils tables</u> on the main
+page (link at the bottom of this page). There are also source,
+i386 binary rpm and deb packages available. Both sg3_utils and the
+older sg_utils packages can
+be found on http://freshmeat.net .
+<h2> <a name="others"></a>Programs from other sources</h2>
+<h3> scu</h3>
+The SCSI Command Utility (SCU) implements various SCSI commands
+necessary for normal maintenance and diagnostics of SCSI
+peripherals. Some of its features include: formatting, scanning for
+(and reassigning) bad blocks, downloading new firmware, executing
+diagnostics and obtaining performance information. It is available on
+several Unix platforms (and NT), however it is only currently available
+in binary form. See <a
+ href="http://www.bit-net.com/%7Ermiller/scu.html">www.bit-net.com/~rmiller/scu.html</a>
+for more details.
+<h3> dt</h3>
+The Data Test (DT) program is modelled on dd's syntax but <b>dt </b>can
+do a lot more than sequential copies. It is a comprehensive data test
+program for SCSI devices such as disks, tapes and cdrom/dvds. It is
+available on several Unix platforms (and NT), and its source is
+available (unlike its stable mate <b>scu</b> discussed earlier). See <a
+ href="http://www.bit-net.com/%7Ermiller/dt.html">www.bit-net.com/~rmiller/dt.html</a>
+for more details. Both <b>scu</b> and <b>dt </b>are written by Robin
+T. Miller &lt;Robin.Miller@hp.com&gt;
+<h3> scsidev</h3>
+Kurt Garloff &lt;garloff@suse.de&gt; describes this utility thus: "This
+program scans the SCSI bus and creates device nodes in /dev/scsi/,
+which have a naming corresponding to their SCSI IDs and LUNs, just
+like with devfs. (The devfs has no notion of host adapter IDs,
+scsidev is better here.) Furthermore, the devices are inquired to
+tell their names and serial numbers. Those can be compared with the
+entries in a database /etc/scsi.alias and device nodes corresponding
+to these entries are being built. So,this will even work if you change
+the SCSI IDs of a device, where the devfs approach would fail". For
+more information see: <a
+ href="http://www.garloff.de/kurt/linux/scsidev">www.garloff.de/kurt/linux/scsidev</a>
+. He also has the useful <b>rescan-scsi-bus.sh</b> script at the same
+location.
+<h3> ddrescue</h3>
+This is another utility from&nbsp; Kurt Garloff &lt;garloff@suse.de&gt;
+for rescuing damaged media. It is a variant of dd that will continue
+passed errors on the input file. It is applicable to any device that
+can be read by dd (e.g. IDE and SCSI disks, cds and tapes). For more
+information see: <a href="http://www.garloff.de/kurt/linux/ddrescue">www.garloff.de/kurt/linux/ddrescue</a>
+<h3> mapscsi</h3>
+Michael Clark &lt;michael@metaparadigm.com&gt; describes his utility
+thus: "mapscsi is a small utility that creates a consistent mapping
+to Linux scsi devices. mapscsi achieves this by creating symbolic
+links to linux scsi disk devices after scanning all scsi disk devices,
+finding out their host, channel, id, lun, pci location (if available),
+Fibre Channel world wide node and port names, loop and port ids (with
+qla2x00 v4.46.5 driver) vendor, product and serial number details and
+using this information plus a mapping rules file containing device
+templates to dynamically create link names". For more information see: <a
+ href="http://gort.metaparadigm.com/mapscsi">http://gort.metaparadigm.com/mapscsi</a>
+.
+<h3> scsimap</h3>
+Steve Cameron &lt;smcameron@yahoo.com&gt; has the following description
+at his site:
+<p>This is a utility to create and maintain symbolic links mapping a
+predictable set of names to the rather unpredictable names used by
+linux for disk devices. For example, you might map: <br>
+<tt>/dev/mydisk1 -&gt; /dev/sda1</tt> <br>
+<tt>/dev/mydisk2 -&gt; /dev/sdb1</tt> <br>
+<tt>/dev/mydisk3 -&gt; /dev/sdc1</tt> <br>
+If you removed the disk corresponding to /dev/sdb1, then on reboot,
+/dev/sdc1 will become /dev/sdb1, and /dev/sdc1 will be gone. and your
+fstab will be wrong, etc. (Especially problematic on a SAN). <b>scsimap</b>
+will maintain the mapping so that after the reboot, /dev/mydisk3 -&gt;
+will point to /dev/sdb1 and /dev/mydisk2 will be gone. scsimap also
+handles later generation Compaq array controllers (those which use
+the cciss driver.) </p>
+<p>See: <a href="http://www.geocities.com/smcameron">www.geocities.com/smcameron</a>
+. </p>
+<h3> smartsuite</h3>
+This is a package that supports S.M.A.R.T. capabilities built into
+modern IDE and SCSI-3 disks. Self-Monitoring, Analysis and Reporting
+Technology (S.M.A.R.T.) is described at <a
+ href="http://www.pc.ibm.com/us/infobrf/ibsmart.html">www.pc.ibm.com/us/infobrf/ibsmart.html</a>.
+For smartsuite see <a href="http://sourceforge.net/projects/smartsuite">sourceforge.net/projects/smartsuite</a>
+. <br>
+<br>
+<h3>smartmontools</h3>
+This project has taken over from the aforementioned
+smartsuite which is currently not actively maintained. See <a
+ href="http://smartmontools.sourceforge.net">http://smartmontools.sourceforge.net</a>
+. The author is a maintainer of the SCSI component of this project.
+[The lead maintainer is Bruce Allen.]<br>
+<br>
+<h3>scsirastools</h3>
+"This project includes changes that enhance the Reliability,
+Availability and Serviceability (RAS) of the drivers that are
+commonly used in a Linux software RAID-1 configuration. Other
+efforts have been made to enable various common hardware RAID
+adapters and their drivers on Linux." See <a
+ href="http://scsirastools.sourceforge.net">http://scsirastools.sourceforge.net</a>
+. The package contains some low level scsi utilities including <b>sgdskfl</b>
+to load disk firmware, <b>sgmode</b> to get and set mode pages, <b>sgdefects</b>
+to read primary and grown defect lists and <b>sgdiag</b> to perform
+format and other test functions.<br>
+&nbsp;<br>
+<h3>SeaTools</h3>
+SeaTools is a freely available (binary, not source) utility for disk
+diagnostics from Seagate which is a disk manufacturer. It can be found
+at <a href="http://www.seagate.com">http://www.seagate.com</a> under
+the support tab. They have both a command line and a graphical utility.
+&nbsp;Some of the facilities will work on any SCSI disks while others
+are Seagate specific. Self tests, mode page settings and formats (to
+different block sizes) are amongst the facilities available.<br>
+<h3> devlabel</h3>
+Devlabel is "a small userspace app which maps symlinks to underlying
+disk names. It uses [INQUIRY VPD] Page83/Page80 data to track the
+true locations of disks even if their hd/sd name changes and simply
+updates the symlink to point to the right place." Sysfs support for the
+lk 2.6 series and support for multi-path configurations is on the
+author's "to do" list. See <a href="http://www.lerhaupt.com/linux.html">http://www.lerhaupt.com/linux.html</a>
+.<br>
+<br>
+<h3>plscsi</h3>
+This utility allows arbitrary SCSI commands to be sent to a device. See
+<a href="http://members.aol.com/plscsi">http://members.aol.com/plscsi</a>
+. It is similar to FreeBSD's camcontrol command.<br>
+<br>
+<p>Return to <a href="index.html">main</a> page. </p>
+<center>
+<p>Last updated: 13th March 2005, 13:00<br>
+<br>
+</p>
+</center>
+</body>
+</html>

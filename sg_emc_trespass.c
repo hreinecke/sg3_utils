@@ -25,7 +25,7 @@
  *  any later version.
  */
 
-static char * version_str = "0.11 20041019";
+static char * version_str = "0.12 20050210";
 
 static int debug = 0;
 
@@ -37,7 +37,7 @@ static void do_trespass(int fd, int hr, int short_cmd)
                 { 0, 0, 0, 0, 0, 0, 0, 0x00, 
                   TRESPASS_PAGE,        /* Page code */
                   0x09,                 /* Page length - 2 */
-                  hr ? 0x01 : 0x81,     /* Trespass code + Honor reservation bit */
+                  0x81,                 /* Trespass code + Honor reservation bit */
                   0xff, 0xff,           /* Trespass target */
                   0, 0, 0, 0, 0, 0      /* Reserved bytes / unknown */
         };
@@ -45,11 +45,15 @@ static void do_trespass(int fd, int hr, int short_cmd)
                 { 0, 0, 0, 0, 
                   TRESPASS_PAGE,        /* Page code */
                   0x02,                 /* Page length - 2 */
-                  hr ? 0x01 : 0x81,     /* Trespass code + Honor reservation bit */
+                  0x81,                 /* Trespass code + Honor reservation bit */
                   0xff,                 /* Trespass target */
         };
         int res;
 
+        if (hr) {       /* override Trespass code + Honor reservation bit */
+                short_trespass_pg[6] = 0x01;
+                long_trespass_pg[10] = 0x01;
+        }
         if (short_cmd)
                 res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
                                  short_trespass_pg, sizeof(short_trespass_pg),
@@ -66,6 +70,7 @@ static void do_trespass(int fd, int hr, int short_cmd)
                                         short_cmd ? "short" : "long");
                 break;
         case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
                 fprintf(stderr, "%s form trepass page failed, try again %s "
                         "'-s' option\n", short_cmd ? "short" : "long",
                         short_cmd ? "without" : "with");

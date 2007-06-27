@@ -54,7 +54,7 @@
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
-static char * version_str = "1.05 20050121";
+static char * version_str = "1.06 20050309";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -84,7 +84,7 @@ static char * version_str = "1.05 20050121";
 #define REPORT_LUNS_CMDLEN 12
 #define MAINTENANCE_IN_CMD 0xa3
 #define MAINTENANCE_IN_CMDLEN 12
-#define REPORT_TGT_GRP_SA 0x0a
+#define REPORT_TGT_PRT_GRP_SA 0x0a
 #define LOG_SENSE_CMD     0x4d
 #define LOG_SENSE_CMDLEN  10
 #define LOG_SELECT_CMD     0x4c
@@ -94,6 +94,7 @@ static char * version_str = "1.05 20050121";
 
 #define MODE6_RESP_HDR_LEN 4
 #define MODE10_RESP_HDR_LEN 8
+#define MODE_RESP_ARB_LEN 1024
 
 
 const char * sg_cmds_version()
@@ -147,8 +148,11 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Inquiry", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    inquiry: resid=%d\n", io_hdr.resid);
         return 0;
@@ -214,8 +218,11 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Inquiry", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (inq_data) {
             inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
             inq_data->peripheral_type = inq_resp[0] & 0x1f;
@@ -290,8 +297,9 @@ int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
     }
 }
 
-/* Invokes a SCSI SYNCHRONIZE CACHE (10) command */
-/* Return of 0 -> success, -1 -> failure, 2 -> try again */
+/* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
+ * -1 -> failure, SG_LIB_CAT_MEDIA_CHANGED -> repeat, SG_LIB_CAT_INVALID_OP
+ * -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb */
 int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
                         unsigned int lba, unsigned int count, int noisy,
                         int verbose)
@@ -348,10 +356,8 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
     case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_MEDIA_CHANGED:
-        if (verbose > 1)
-            sg_chk_n_print3("synchronize cache", &io_hdr);
-        return 2; /* probably have another go ... */
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("synchronize cache", &io_hdr);
         return res;
@@ -364,9 +370,9 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
 }
 
 
-/* Invokes a SCSI READ CAPACITY (16) command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, 2 -> media changed,
- * -1 -> other failure */
+/* Invokes a SCSI READ CAPACITY (16) command. Returns 0 -> success,
+ * -1 -> failure, SG_LIB_CAT_MEDIA_CHANGED -> repeat, SG_LIB_CAT_INVALID_OP
+ *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb */
 int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba, 
                      void * resp, int mx_resp_len, int verbose)
 {
@@ -420,20 +426,21 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (verbose)
+            sg_chk_n_print3("Read capacity (16)", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    read_capacity16: resid=%d\n",
                     io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
-        if (verbose > 1)
-            sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr);
-        return res;
+    case SG_LIB_CAT_ILLEGAL_REQ:
     case SG_LIB_CAT_MEDIA_CHANGED:
         if (verbose > 1)
             sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr);
-        return 2;
+        return res;
     default:
         sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr);
         return -1;
@@ -441,7 +448,8 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
 }
 
 /* Invokes a SCSI READ CAPACITY (10) command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, 2 -> media changed,
+ * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_MEDIA_CHANGED
+ * -> media changed, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * -1 -> other failure */
 int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, 
                      void * resp, int mx_resp_len, int verbose)
@@ -486,20 +494,21 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (verbose)
+            sg_chk_n_print3("Read capacity (10)", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    read_capacity10: resid=%d\n",
                     io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
-        if (verbose > 1)
-            sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr);
-        return res;
+    case SG_LIB_CAT_ILLEGAL_REQ:
     case SG_LIB_CAT_MEDIA_CHANGED:
         if (verbose > 1)
             sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr);
-        return 2;
+        return res;
     default:
         sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr);
         return -1;
@@ -507,7 +516,8 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
 }
 
 /* Invokes a SCSI MODE SENSE (6) command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, -1 -> other failure */
+ * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
+ * bad field in cdb, -1 -> other failure */
 int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
                       void * resp, int mx_resp_len, int noisy, int verbose)
 {
@@ -553,8 +563,11 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Mode sense (6)", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    mode sense (6): resid=%d\n",
                     io_hdr.resid);
@@ -568,6 +581,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         }
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("Mode sense (6) error", &io_hdr);
         return res;
@@ -585,7 +599,8 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
 }
 
 /* Invokes a SCSI MODE SENSE (10) command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, -1 -> other failure */
+ * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
+ * bad field in cdb, -1 -> other failure */
 int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                        int sub_pg_code, void * resp, int mx_resp_len,
                        int noisy, int verbose)
@@ -633,8 +648,11 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Mode sense (10)", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    mode sense (10): resid=%d\n",
                     io_hdr.resid);
@@ -648,6 +666,7 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         }
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("Mode sense (10) error", &io_hdr);
         return res;
@@ -665,7 +684,8 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
 }
 
 /* Invokes a SCSI MODE SELECT (6) command.  Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, -1 -> other failure */
+ * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
+ * bad field in cdb, -1 -> other failure */
 int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
                        int param_len, int noisy, int verbose)
 {
@@ -713,10 +733,14 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Mode select (6)", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("Mode select (6) error", &io_hdr);
         return res;
@@ -733,7 +757,8 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
 }
 
 /* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, -1 -> other failure */
+ * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
+ * bad field in cdb, -1 -> other failure */
 int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
                        int param_len, int noisy, int verbose)
 {
@@ -782,10 +807,14 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Mode select (10)", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("Mode select (10) error", &io_hdr);
         return res;
@@ -844,13 +873,13 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
     return offset;
 }
 
-/* Invokes a SCSI REQUEST SENSE command */
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Request Sense not
- * supported??, -1 -> other failure */
+/* Invokes a SCSI REQUEST SENSE command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Request Sense not * supported??,
+ * SG_LIB_CAT_ILEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
                         int verbose)
 {
-    int k;
+    int k, res;
     unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] = 
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -892,38 +921,35 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     }
 
     /* shouldn't get errors on Request Sense but it is best to be safe */
-    switch (sg_err_category3(&io_hdr)) {
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    request sense: resid=%d\n",
-                    io_hdr.resid);
-        if ((mx_resp_len >= 8) && (io_hdr.resid > (mx_resp_len - 8))) {
-            if (verbose)
-                fprintf(sg_warnings_str, "    request sense: resid=%d "
-                        "indicates response too short\n", io_hdr.resid);
-            return -1;
-        }
-        return 0;
+    res =  sg_err_category3(&io_hdr);
+    switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        fprintf(sg_warnings_str, "Recovered error on REQUEST SENSE command, "
-                "continuing\n");
-        if (verbose && io_hdr.resid)
+        if (verbose)
+            sg_chk_n_print3("Request sense", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        if ((mx_resp_len >= 8) && (io_hdr.resid > (mx_resp_len - 8))) {
+            fprintf(sg_warnings_str, "    request sense: resid=%d "
+                    "indicates response too short\n", io_hdr.resid);
+            return -1;
+        } else if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    request sense: resid=%d\n",
                     io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr);
-        return SG_LIB_CAT_INVALID_OP;
+        return res;
     default:
         sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr);
         return -1;
     }
 }
 
-/* Invokes a SCSI REPORT LUNS command */
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Report Luns not
- * supported, -1 -> other failure */
+/* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Report Luns not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
                       int mx_resp_len, int noisy, int verbose)
 {
@@ -965,13 +991,17 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Report luns", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    report_luns: resid=%d\n",
                     io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("REPORTS LUNS command error", &io_hdr);
         return res;
@@ -984,9 +1014,9 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
     }
 }
 
-/* Invokes a SCSI LOG SENSE command */
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Log Sense not
- * supported, -1 -> other failure */
+/* Invokes a SCSI LOG SENSE command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Log Sense not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code, 
                     int paramp, unsigned char * resp, int mx_resp_len, 
                     int noisy, int verbose)
@@ -1035,16 +1065,20 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Log sense", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    log_sense: resid=%d\n",
                     io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("log_sense error", &io_hdr);
-        return SG_LIB_CAT_INVALID_OP;
+        return res;
     default:
         if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
@@ -1058,9 +1092,9 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
 }
 
 
-/* Invokes a SCSI LOG SELECT command */
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Log Select not
- * supported, -1 -> other failure */
+/* Invokes a SCSI LOG SELECT command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Log Select not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
                      unsigned char * paramp, int param_len, 
                      int noisy, int verbose)
@@ -1107,16 +1141,20 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Log select", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    log_select: resid=%d\n",
                     io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("log_select error", &io_hdr);
-        return SG_LIB_CAT_INVALID_OP;
+        return res;
     default:
         if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
@@ -1128,63 +1166,140 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
     }
 }
 
-/* Invokes a SCSI REPORT TARGET PORT GROUPS command */
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not
- * supported, -1 -> other failure */
-int sg_ll_report_tgt_grp(int sg_fd, void * resp,
-                         int mx_resp_len, int noisy, int verbose)
+/* Invokes a SCSI REPORT TARGET PORT GROUPS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
+                             int mx_resp_len, int noisy, int verbose)
 {
     int k, res;
-    unsigned char rtgCmdBlk[MAINTENANCE_IN_CMDLEN] =
-                         {MAINTENANCE_IN_CMD, REPORT_TGT_GRP_SA,
+    unsigned char rtpgCmdBlk[MAINTENANCE_IN_CMDLEN] =
+                         {MAINTENANCE_IN_CMD, REPORT_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
-    rtgCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
-    rtgCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
-    rtgCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
-    rtgCmdBlk[9] = mx_resp_len & 0xff;
+    rtpgCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
+    rtpgCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
+    rtpgCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
+    rtpgCmdBlk[9] = mx_resp_len & 0xff;
     if (NULL == sg_warnings_str)
         sg_warnings_str = stderr;
     if (verbose) {
         fprintf(sg_warnings_str, "    report target port groups cdb: ");
         for (k = 0; k < MAINTENANCE_IN_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rtgCmdBlk[k]);
+            fprintf(sg_warnings_str, "%02x ", rtpgCmdBlk[k]);
         fprintf(sg_warnings_str, "\n");
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rtgCmdBlk);
+    io_hdr.cmd_len = sizeof(rtpgCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = mx_resp_len;
     io_hdr.dxferp = resp;
-    io_hdr.cmdp = rtgCmdBlk;
+    io_hdr.cmdp = rtpgCmdBlk;
     io_hdr.sbp = sense_b;
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "report_tgt_grp (SG_IO) error: %s\n",
+        fprintf(sg_warnings_str, "report_tgt_prt_grp (SG_IO) error: %s\n",
                 safe_strerror(errno));
         return -1;
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Report target port groups", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    report_tgt_grp: resid=%d\n",
+            fprintf(sg_warnings_str, "    report_tgt_prt_grp: resid=%d\n",
                     io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
-            sg_chk_n_print3("synchronize cache", &io_hdr);
+            sg_chk_n_print3("REPORT TARGET PORT GROUPS", &io_hdr);
         return res;
     default:
         if (noisy || verbose)
             sg_chk_n_print3("REPORT TARGET PORT GROUPS command error", &io_hdr);
         return -1;
     }
+}
+
+/* Fetches current, changeable, default and/or saveable modes pages as
+ * indicated (by those "*_mp" arguments that are not NULL).
+ * Return of 0 -> overall success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure.
+ * If success_mask pointer is not NULL then zeroes it then sets bit 0 if
+ * current fetched ok, bit 1 if changeable fetched ok, bit 2 if default
+ * fetched ok and bit 3 if saved fetched ok. Continues if an error is
+ * detected but returns the first error encountered.  */
+int sg_get_mode_page_types(int sg_fd, int mode6, int pg_code,
+                           int sub_pg_code, int mx_mpage_len,
+                           int * success_mask, void * current_mp,
+                           void * changeable_mp, void * default_mp,
+                           void * saved_mp, int verbose)
+{
+    int k, res, offset, calc_len;
+    unsigned char buff[MODE_RESP_ARB_LEN];
+    char ebuff[EBUFF_SZ];
+    void * pc_arr[4];
+    int first_err = 0;
+    int mx_mode_resp_len;
+
+    if (success_mask)
+        *success_mask = 0;
+    if (mx_mpage_len < 4)
+        return 0;
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (mode6)
+        mx_mode_resp_len =
+                (MODE_RESP_ARB_LEN < 252) ? MODE_RESP_ARB_LEN : 252;
+    else
+        mx_mode_resp_len = MODE_RESP_ARB_LEN;
+    memset(ebuff, 0, sizeof(ebuff));
+    pc_arr[0] = current_mp;
+    pc_arr[1] = changeable_mp;
+    pc_arr[2] = default_mp;
+    pc_arr[3] = saved_mp;
+    for (k = 0; k < 4; ++k) {
+        if (NULL == pc_arr[k])
+            continue;
+        if (mode6)
+            res = sg_ll_mode_sense6(sg_fd, 0 /* dbd */, k /* pc */,
+                                    pg_code, sub_pg_code, buff,
+                                    mx_mode_resp_len, 0, verbose);
+        else
+            res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, 0 /* dbd */,
+                                     k /* pc */, pg_code, sub_pg_code,
+                                     buff, mx_mode_resp_len, 0, verbose);
+        if (0 != res) {
+            if (0 == first_err)
+                first_err = res;
+            continue;
+        }
+        offset = sg_mode_page_offset(buff, mx_mode_resp_len, mode6,
+                                     ebuff, EBUFF_SZ);
+        if (verbose && (offset < 0)) {
+            if (('\0' != ebuff[0]) && (verbose > 0))
+                fprintf(sg_warnings_str, "sg_get_mode_page_types: "
+                        "pc=%d: %s\n", k, ebuff);
+            return offset;
+        }
+        calc_len = mode6 ? (buff[0] + 1) : ((buff[0] << 8) + buff[1] + 2);
+        calc_len = (calc_len < MODE_RESP_ARB_LEN) ? calc_len :
+                                                    MODE_RESP_ARB_LEN;
+        calc_len -= offset;
+        calc_len = (calc_len < mx_mpage_len) ? calc_len : mx_mpage_len;
+        memcpy(pc_arr[k], buff + offset, calc_len);
+        if (success_mask)
+            *success_mask |= (1 << k);
+    }
+    return first_err;
 }

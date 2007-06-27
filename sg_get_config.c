@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.13 20050110";
+static char * version_str = "0.15 20050309";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -83,7 +83,8 @@ static struct option long_options[] = {
 };
 
 /* Returns 0 when successful, SG_LIB_CAT_INVALID_OP if command not
-   supported, else -1 */
+   supported, SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
+   else -1 */
 static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
                             int mx_resp_len, int noisy, int verbose)
 {
@@ -134,15 +135,18 @@ static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("Get config, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
             fprintf(stderr, "      get config: resid=%d\n", io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("get config error", &io_hdr);
-        return SG_LIB_CAT_INVALID_OP;
+        return res;
     default:
         if (verbose | noisy) {
             snprintf(ebuff, EBUFF_SZ, "get config error, rt=%d, "
@@ -203,18 +207,15 @@ static const char * scsi_ptype_strs[] = {
     "automation/driver interface",
     "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
+    "well known logical unit",
+    "no physical device on this lu",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
 {
     int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
 
-    if (0x1f == scsi_ptype)
-        return "no physical device on this lu";
-    else if (0x1e == scsi_ptype)
-        return "well known logical unit";
-    else
-        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 struct code_desc {
@@ -247,7 +248,7 @@ static struct code_desc profile_desc_arr[] = {
         {0x2b, "DVD+R double layer"},
         {0x40, "BD-ROM"},
         {0x41, "BD-R sequential recording"},
-        {0x42, "BD-R random recording"},
+        {0x42, "BD-R random recording (RRM)"},
         {0x43, "BD-RE"},
         {0xffff, "Non-conforming profile"},
 };
@@ -298,8 +299,10 @@ static struct code_desc feature_desc_arr[] = {
         {0x32, "Double density CD-RW write"},
         {0x33, "Layer jump recording"},
         {0x37, "CD-RW media write support"},
+        {0x38, "BD-R Pseudo-overwrite (POW)"},
         {0x3b, "DVD+R double layer"},
         {0x40, "BD read"},
+        {0x41, "BD write"},
         {0x100, "Power management"},
         {0x101, "SMART"},
         {0x102, "Embedded changer"},
@@ -426,7 +429,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      WDCB=%d, SPWP=%d, SSWPP=%d\n", !!(ucp[4] & 4),
+        printf("      WDCB=%d, SPWP=%d, SSWPP=%d\n", !!(ucp[4] & 0x4),
                !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
     case 0x10:     /* Random readable */
@@ -446,9 +449,11 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
     case 0x22:     /* Sector erasable */
     case 0x26:     /* Restricted overwrite */
     case 0x27:     /* CDRW CAV write */
-    case 0x40:     /* BD read */
+    case 0x38:     /* BD-R pseudo-overwrite (POW) */
     case 0x100:    /* Power management */
+    case 0x104:    /* Firmware upgrade */
     case 0x109:    /* Media serial number */
+    case 0x110:    /* VCPS */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
@@ -498,9 +503,11 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 4)
-            printf("      RENoSA=%d, Expand=%d, QCert=%d, Cert=%d\n", 
+            printf("      BD-RE: RENoSA=%d, Expand=%d, QCert=%d, Cert=%d\n",
                    !!(ucp[4] & 0x8), !!(ucp[4] & 0x4), !!(ucp[4] & 0x2),
                    !!(ucp[4] & 0x1));
+        if (len > 8)
+            printf("      BD-R: RRM=%d\n", !!(ucp[8] & 0x1));
         break;
     case 0x24:     /* Hardware defect management */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -587,7 +594,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      CD-RW=%d, R-W sub-code=%d\n",
                !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
-    case 0x2e:     /* CD mastering (seesion at once) */
+    case 0x2e:     /* CD mastering (session at once) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
@@ -623,7 +630,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      CD-RW media sub-type support=0x%x\n", ucp[5]);
+        printf("      CD-RW media sub-type support (bitmask)=0x%x\n", ucp[5]);
         break;
     case 0x3b:     /* DVD+R double layer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -634,6 +641,60 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             break;
         }
         printf("      Write=%d\n", !!(ucp[4] & 0x1));
+        break;
+    case 0x40:     /* BD Read */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 32) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      Bitmaps for BD-RE read support:\n");
+        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
+               "Class 3=0x%x\n", (ucp[8] << 8) + ucp[9],
+               (ucp[10] << 8) + ucp[11],
+               (ucp[12] << 8) + ucp[13],
+               (ucp[14] << 8) + ucp[15]);
+        printf("      Bitmaps for BD-R read support:\n");
+        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
+               "Class 3=0x%x\n", (ucp[16] << 8) + ucp[17],
+               (ucp[18] << 8) + ucp[19],
+               (ucp[20] << 8) + ucp[21],
+               (ucp[22] << 8) + ucp[23]);
+        printf("      Bitmaps for BD-ROM read support:\n");
+        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
+               "Class 3=0x%x\n", (ucp[24] << 8) + ucp[25],
+               (ucp[26] << 8) + ucp[27],
+               (ucp[28] << 8) + ucp[29],
+               (ucp[30] << 8) + ucp[31]);
+        break;
+    case 0x41:     /* BD Write */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 32) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      Bitmaps for BD-RE write support:\n");
+        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
+               "Class 3=0x%x\n", (ucp[8] << 8) + ucp[9],
+               (ucp[10] << 8) + ucp[11],
+               (ucp[12] << 8) + ucp[13],
+               (ucp[14] << 8) + ucp[15]);
+        printf("      Bitmaps for BD-R write support:\n");
+        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
+               "Class 3=0x%x\n", (ucp[16] << 8) + ucp[17],
+               (ucp[18] << 8) + ucp[19],
+               (ucp[20] << 8) + ucp[21],
+               (ucp[22] << 8) + ucp[23]);
+        printf("      Bitmaps for BD-ROM write support:\n");
+        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
+               "Class 3=0x%x\n", (ucp[24] << 8) + ucp[25],
+               (ucp[26] << 8) + ucp[27],
+               (ucp[28] << 8) + ucp[29],
+               (ucp[30] << 8) + ucp[31]);
         break;
     case 0x101:    /* SMART */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -667,11 +728,6 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      Scan=%d, SCM=%d, SV=%d, number of volume levels=%d\n",
                !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1),
                (ucp[6] << 8) + ucp[7]);
-        break;
-    case 0x104:    /* Firmware upgrade */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
-               feature);
         break;
     case 0x105:    /* Timeout */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -950,6 +1006,8 @@ int main(int argc, char * argv[])
                           inner_hex);
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Get Configuration command not supported\n");
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "field in Get Configuration command illegal\n");
     else
         fprintf(stderr, "Get Configuration command failed\n");
 

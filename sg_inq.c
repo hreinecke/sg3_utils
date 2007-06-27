@@ -35,7 +35,7 @@ in the future.
    
 */
 
-static char * version_str = "0.45 20050114";
+static char * version_str = "0.46 20050215";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -125,18 +125,15 @@ static const char * scsi_ptype_strs[] = {
     "automation/driver interface",
     "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d", 
+    "well known logical unit",
+    "no physical device on this lu",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
 {
     int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
 
-    if (0x1f == scsi_ptype)
-        return "no physical device on this lu";
-    else if (0x1e == scsi_ptype)
-        return "well known logical unit";
-    else
-        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 struct vpd_name {
@@ -149,7 +146,7 @@ static struct vpd_name vpd_name_arr[] = {
     {0x0, 0, "Supported VPD pages"},
     {0x80, 0, "Unit serial number"},
     {0x81, 0, "Implemented operating definitions"},
-    {0x82, 0, "ASCII implemented operating definition"},
+    {0x82, 0, "ASCII implemented operating definition (obsolete)"},
     {0x83, 0, "Device identification"},
     {0x84, 0, "Software interface identification"},
     {0x85, 0, "Management network addresses"},
@@ -515,9 +512,10 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                 break;
             }
             printf("      MD5 logical unit identifier:\n");
-            // does %s print out UTF-8 ok??
-            // Seems to depend on the locale. Looks ok here with my
-            // locale setting: en_AU.UTF-8
+            /* does %s print out UTF-8 ok??
+             * Seems to depend on the locale. Looks ok here with my
+             * locale setting: en_AU.UTF-8
+	     */
             printf("      %s\n", (const char *)ip);
             break;
         default: /* reserved */
@@ -1492,10 +1490,10 @@ static void printswap(char *output, char *in, unsigned int n)
 }
 
 #define ATA_IDENTIFY_BUFF_SZ  sizeof(struct ata_identify_device)
+#define HDIO_DRIVE_CMD_OFFSET 4
 
 static int ata_command_interface(int device, char *data)
 {
-    const int HDIO_DRIVE_CMD_OFFSET = 4;
     unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     int retval; 
 

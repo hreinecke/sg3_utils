@@ -7,14 +7,17 @@ on the right. The second table lists supported ATA commands.
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        ----------------------------------------------
 GET CONFIGURATION   sg_get_config
-INQUIRY             sg_inq, sginfo, sg_logs, sg_map('-i'), sg_modes,
-                    sg_opcodes, sg_persist, sg_scan, sg_ses
+INQUIRY             sg_dd, sg_inq, sginfo, sg_logs, sg_map('-i'), sg_modes,
+                    sg_opcodes, sg_persist, sg_scan, sg_ses, sg_format
+FORMAT UNIT         sg_format
 LOG SELECT          sg_logs('-r')
 LOG SENSE           sg_logs
-MODE SELECT(6)      sg_wr_mode, sginfo, sg_emc_trespass
-MODE SELECT(10)     sg_wr_mode, sginfo, sg_emc_trespass
-MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_senddiag('-e')
-MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_senddiag('-e')
+MODE SELECT(6)      sg_wr_mode, sginfo, sg_format, sg_emc_trespass
+MODE SELECT(10)     sg_wr_mode, sginfo, sg_format, sg_emc_trespass
+MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_format, sg_dd,
+                    sg_senddiag('-e')
+MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_format, sg_dd,
+                    sg_senddiag('-e')
 PERSISTENT IN       sg_persist
 PERSISTENT OUT      sg_persist
 PREVENT ALLOW MEDIUM REMOVAL            sg_prevent
@@ -23,11 +26,11 @@ READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ BUFFER         sg_rbuf, sg_test_rwbuf
-READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd
-READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd
+READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format
+READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format
 READ DEFECT(10)     sginfo
 READ DEFECT(12)     sginfo
-READ LONG           sg_read_long
+READ LONG           sg_read_long, sg_dd
 REASSIGN BLOCKS     sg_reassign
 RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses
 REPORT LUNS         sg_luns
@@ -38,7 +41,7 @@ REQUEST SENSE       sg_requests
 SEND DIAGNOSTIC     sg_senddiag, sg_ses
 START STOP          sg_start
 SYNCHRONIZE CACHE   sg_sync, sg_dd, sgm_dd, sgp_dd
-TEST UNIT READY     sg_turs
+TEST UNIT READY     sg_turs, sg_format
 VERIFY(10)          sg_verify
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
@@ -54,4 +57,4 @@ IDENTIFY            sg_inq, sg_scan
 
 
 Doug Gilbert
-8th January 2005
+5th March 2005

@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.00 [20041015]
+/* Version 1.07 [20050227]
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
  * as open source and encourage their unencumbered use.
@@ -128,15 +128,26 @@ extern int sg_scsi_normalize_sense(const unsigned char * sensep,
 extern const unsigned char * sg_scsi_sense_desc_find(
                 const unsigned char * sensep, int sense_len, int desc_type);
 
+/* Yield string associated with sense_key value. Returns 'buff'. */
+extern char * sg_get_sense_key_str(int sense_key,int buff_len, char * buff);
+
 /* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
 extern char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len,
                                   char * buff);
 
-/* Returns 1 if information field valid in sense data and places data
-   where info_outp points. If information field is not available (valid)
-   returns 0. Handles both fixed and descriptor sense formats. */
+/* Returns 1 if valid bit set, 0 if valid bit clear. Irrespective the
+   information field is written out via 'info_outp' (except when it is
+   NULL). Handles both fixed and descriptor sense formats. */
 extern int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
-				 unsigned long long * info_outp);
+                                 unsigned long long * info_outp);
+
+/* Returns 1 if sense key is NO_SENSE or NOT_READY and SKSV is set. Places
+   progress field from sense data where progress_outp points. If progress
+   field is not available returns 0. Handles both fixed and descriptor
+   sense formats. N.B. App should multiply by 100 and divide by 65536
+   to get percentage completion from given value. */
+extern int sg_get_sense_progress_fld(const unsigned char * sensep,
+                                     int sb_len, int * progress_outp);
 
 
 /* <<< General purpose (i.e. not SCSI specific) utility functions >>> */
@@ -157,16 +168,17 @@ extern void dStrHex(const char* str, int len, int no_ascii);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
    then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix. Recognised multipliers: c C  *1;  b  B *512;
-   k  *1,024;  K  *1,000;  m  *1,048,576;  M *1,000,000;  g *1,073,741,824;
-   G *1,000,000,000 . */
+   multiplier suffix (not both). Recognised multipliers: c C  *1;  w W  *2;
+   b  B *512;  k K KiB  *1,024;  KB  *1,000;  m M MiB  *1,048,576;
+   MB *1,000,000; g G GiB *1,073,741,824;  GB *1,000,000,000 and x<m>
+   which multiplies the leading number by <n> . */
 extern int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
    then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix.  In addition to supporting the multipliers of
-   sg_get_num(), this function supports: t *1,099,511,627,776 and
-   T *1,000,000,000,000 . */
+   multiplier suffix (not both). In addition to supporting the multipliers
+   of sg_get_num(), this function supports: t T TiB  *(2**40); TB *(10**12);
+   p P PiB  *(2**50); PB  *(10**15) . */
 extern long long sg_get_llnum(const char * buf);
 
 extern const char * sg_lib_version();
@@ -274,13 +286,17 @@ extern void sg_print_host_status(int host_status);
 extern void sg_print_driver_status(int driver_status);
 
 /* sg_chk_n_print() returns 1 quietly if there are no errors/warnings
-   else it prints to stderr and returns 0. */
+   else it prints errors/warnings (prefixed by 'leadin') to
+   'sg_warnings_fd' and returns 0. */
 extern int sg_chk_n_print(const char * leadin, int masked_status,
                           int host_status, int driver_status,
                           const unsigned char * sense_buffer, int sb_len);
 
 /* The following function declaration is for the sg version 3 driver. */
 struct sg_io_hdr;
+/* sg_chk_n_print3() returns 1 quietly if there are no errors/warnings;
+   else it prints errors/warnings (prefixed by 'leadin') to
+   'sg_warnings_fd' and returns 0. */
 extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp);
 
 /* Calls sg_scsi_normalize_sense() after obtaining the sense buffer and
@@ -293,10 +309,18 @@ extern int sg_normalize_sense(const struct sg_io_hdr * hp,
 /* The following "category" function returns one of the following */
 #define SG_LIB_CAT_CLEAN 0      /* No errors or other information */
 #define SG_LIB_CAT_MEDIA_CHANGED 1 /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0x6,0x28,*] */
 #define SG_LIB_CAT_RESET 2      /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0x6,0x29,*] */
 #define SG_LIB_CAT_TIMEOUT 3
 #define SG_LIB_CAT_RECOVERED 4  /* Successful command after recovered err */
-#define SG_LIB_CAT_INVALID_OP 5 /* Invalid operation code */
+                                /*       [sk,asc,ascq: 0x1,*,*] */
+#define SG_LIB_CAT_INVALID_OP 5 /* Invalid operation code: */
+                                /*       [sk,asc,ascq: 0x5,0x20,0x0] */
+#define SG_LIB_CAT_MEDIUM_HARD 6 /* medium or hardware error sense key */
+                                /*       [sk,asc,ascq: 0x3/0x4,*,*] */
+#define SG_LIB_CAT_ILLEGAL_REQ 7 /* Illegal request (other than invalid */
+                                 /* opcode):   [sk,asc,ascq: 0x5,*,*] */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
 #define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
 

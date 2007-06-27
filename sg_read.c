@@ -21,7 +21,7 @@
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2004 D. Gilbert
+*  Copyright (C) 2001 - 2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,24 +31,16 @@
    or cdrom) and discards that data. Its primary goal is to time
    multiple reads all from the same logical address. Its interface
    is a subset of another member of this package: sg_dd which is a 
-   "dd" variant. The input file can be a scsi generic device, a raw device
-   or a seekable file. Streams such as stdin are not acceptable.
+   "dd" variant. The input file can be a scsi generic device, a block device,
+   a raw device or a seekable file. Streams such as stdin are not acceptable.
    The block size ('bs') is assumed to be 512 if not given. 
-   Various arguments can take a multiplier suffix:
-     'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
-     'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
-
-   The "bpt" (blocks per transfer) argument controls the maximum number
-   of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
-   in this case) is read from the sg device in a single SCSI command.
 
    This version should compile with Linux sg drivers with version numbers
    >= 30000 . For mmap-ed IO the sg version number >= 30122 .
 
 */
 
-static const char * version_str = "1.01 20041011";
+static const char * version_str = "1.04 20050309";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -73,6 +65,7 @@ static const char * version_str = "1.01 20041011";
 #define FT_OTHER 0              /* filetype other than sg or raw device */
 #define FT_SG 1                 /* filetype is sg char device */
 #define FT_RAW 2                /* filetype is raw char device */
+#define FT_BLOCK 4              /* filetype is block device */
 
 static int sum_of_resids = 0;
 
@@ -140,30 +133,38 @@ int dd_filetype(const char * filename)
             return FT_RAW;
         else if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
             return FT_SG;
-    }
+    } else if (S_ISBLK(st.st_mode))
+        return FT_BLOCK;
     return FT_OTHER;
 }
 
 void usage()
 {
     fprintf(stderr, "Usage: "
-           "sg_read  if=<infile> [skip=<num>] [bs=<num>] [bpt=<num>] "
-           "count=<num>\n"
-           "                [dio=<num>] [mmap=<num>] [time=<num>]"
-           " [cdbsz=<6|10|12|16>]\n"
-           " 'if'  is an sg or raw device, or a seekable file (not stdin)\n"
-           " 'bs'  must match sector size (when 'if' is sg device) "
-           "(def=512)\n"
-           " 'skip' each transfer starts at this logical address (def=0)\n"
-           " 'count' total bytes read will be 'bs'*'count' (if no error)\n"
-           " 'bpt' is blocks_per_transfer (default is 128, or 64 KiB for "
+           "sg_read  if=<infile> count=<num> [blk_sgio=0|1] [bpt=<num>] "
+           "[bs=<num>]\n"
+           "                [cdbsz=6|10|12|16] [dio=0|1] [mmap=0|1] "
+           "[odir=0|1]\n"
+           "                [skip=<num>] [time=<num>] [--version]\n"
+           " blk_sgio 0->normal IO for block devices, 1->SCSI commands via "
+           "SG_IO\n"
+           " bpt      is blocks_per_transfer (default is 128, or 64 KiB for "
            "def 'bs')\n"
-           " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
-           " 'mmap' is mmap-ed IO, 1->perform, 0->indirect IO (def)\n"
-           " 'time' 0->do nothing(def), 1->time from 1st cmd, 2->time "
-           "from 2nd cmd\n"
-           " 'cdbsz' size of SCSI READ command (default is 10)\n");
-    fprintf(stderr, "\nVersion: %s\n", version_str);
+           " bs       must match sector size if 'if' accessed via SCSI "
+           "commands (def=512)\n"
+           " cdbsz    size of SCSI READ command (default is 10)\n"
+           " count    total bytes read will be 'bs'*'count' (if no error)\n"
+           " dio      1-> attempt direct IO on sg device, 0->indirect IO "
+           "(def)\n"
+           " if       an sg, block or raw device, or a seekable file (not "
+           "stdin)\n"
+           " mmap     1->perform mmaped IO on sg device, 0->indirect IO "
+           "(def)\n"
+           " odir     1->open block device O_DIRECT, 0->don't (def)\n"
+           " skip     each transfer starts at this logical address (def=0)\n"
+           " time     0->do nothing(def), 1->time from 1st cmd, 2->time "
+           "from 2nd, ...\n"
+           " --version  print version number then exit\n");
 }
 
 int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
@@ -279,11 +280,10 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
     }
 
     switch (sg_err_category3(&io_hdr)) {
-    case SG_LIB_CAT_CLEAN:
-        break;
     case SG_LIB_CAT_RECOVERED:
-        fprintf(stderr, "Recovered error while reading block=%d, num=%d\n",
-               from_block, blocks);
+        sg_chk_n_print3("reading, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
@@ -317,16 +317,17 @@ int main(int argc, char * argv[])
     char inf[INF_SZ];
     int in_type = FT_OTHER;
     int do_dio = 0;
+    int do_odir = 0;
+    int do_blk_sgio = 0;
     int do_mmap = 0;
     int do_time = 0;
     int scsi_cdbsz = DEF_SCSI_CDBSZ;
     int dio_incomplete = 0;
     int res, k, t, buf_sz, dio_tmp, iters, orig_count;
-    int infd, blocks;
+    int infd, blocks, flags, blocks_per;
     unsigned char * wrkBuff = NULL;
     unsigned char * wrkPos;
     char ebuff[EBUFF_SZ];
-    int blocks_per;
     struct timeval start_tm, end_tm;
     size_t psz = getpagesize();
 
@@ -350,15 +351,31 @@ int main(int argc, char * argv[])
             *buf++ = '\0';
         if (strcmp(key,"if") == 0)
             strncpy(inf, buf, INF_SZ);
-        else if (0 == strcmp(key,"bs"))
+        else if (0 == strcmp(key,"bs")) {
             bs = sg_get_num(buf);
-        else if (0 == strcmp(key,"bpt"))
+            if (-1 == bs) {
+                fprintf(stderr, ME "bad argument to 'bs'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"bpt")) {
             bpt = sg_get_num(buf);
-        else if (0 == strcmp(key,"skip"))
+            if (-1 == bpt) {
+                fprintf(stderr, ME "bad argument to 'bpt'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_num(buf);
-        else if (0 == strcmp(key,"count"))
+            if (-1 == skip) {
+                fprintf(stderr, ME "bad argument to 'skip'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"count")) {
             dd_count = sg_get_num(buf);
-        else if (0 == strcmp(key,"dio"))
+            if (-1 == dd_count) {
+                fprintf(stderr, ME "bad argument to 'count'\n");
+                return 1;
+            }
+        } else if (0 == strcmp(key,"dio"))
             do_dio = sg_get_num(buf);
         else if (0 == strcmp(key,"mmap"))
             do_mmap = sg_get_num(buf);
@@ -366,7 +383,14 @@ int main(int argc, char * argv[])
             do_time = sg_get_num(buf);
         else if (0 == strcmp(key,"cdbsz"))
             scsi_cdbsz = sg_get_num(buf);
-        else {
+        else if (0 == strcmp(key,"blk_sgio"))
+            do_blk_sgio = sg_get_num(buf);
+        else if (0 == strcmp(key,"odir"))
+            do_odir = sg_get_num(buf);
+        else if (0 == strncmp(key, "--vers", 6)) {
+            fprintf(stderr, ME ": %s\n", version_str);
+            return 0;
+        } else {
             fprintf(stderr, "Unrecognized argument '%s'\n", key);
             usage();
             return 1;
@@ -407,30 +431,48 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
+    if (0 == strcmp("-", inf)) {
+        fprintf(stderr, "'-' (stdin) invalid as <filename>\n");
+        usage();
+        return 1;
+    }
     in_type = dd_filetype(inf);
 
-    if (FT_SG == in_type) {
-        if ((infd = open(inf, O_RDWR)) < 0) {
-            snprintf(ebuff, EBUFF_SZ,
-                     ME "could not open %s for sg reading", inf);
-            perror(ebuff);
-            return 1;
+    if ((FT_BLOCK & in_type) && do_blk_sgio)
+        in_type |= FT_SG;
+
+    if (FT_SG & in_type) {
+        flags = O_RDWR;
+        if ((do_odir && (FT_BLOCK & in_type)))
+            flags |= O_DIRECT;
+        if ((infd = open(inf, flags)) < 0) {
+            flags = O_RDONLY;
+            if ((do_odir && (FT_BLOCK & in_type)))
+                flags |= O_DIRECT;
+            if ((infd = open(inf, flags)) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                         ME "could not open %s for sg reading", inf);
+                perror(ebuff);
+                return 1;
+            }
         }
-        t = bs * bpt;
-        if ((do_mmap) && (0 != (t % psz)))
-            t = ((t / psz) + 1) * psz;    /* round up to next pagesize */
-        res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
-        if (res < 0)
-            perror(ME "SG_SET_RESERVED_SIZE error");
-        res = ioctl(infd, SG_GET_VERSION_NUM, &t);
-        if ((res < 0) || (t < 30000)) {
-            fprintf(stderr, ME "sg driver prior to 3.x.y\n");
-            return 1;
-        }
-        if (do_mmap && (t < 30122)) {
-            fprintf(stderr, ME "mmap-ed IO needs a sg driver version "
-                    ">= 3.1.22\n");
-            return 1;
+        if (! (FT_BLOCK & in_type)) {
+            t = bs * bpt;
+            if ((do_mmap) && (0 != (t % psz)))
+                t = ((t / psz) + 1) * psz;    /* round up to next pagesize */
+            res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
+            if (res < 0)
+                perror(ME "SG_SET_RESERVED_SIZE error");
+            res = ioctl(infd, SG_GET_VERSION_NUM, &t);
+            if ((res < 0) || (t < 30000)) {
+                fprintf(stderr, ME "sg driver prior to 3.x.y\n");
+                return 1;
+            }
+            if (do_mmap && (t < 30122)) {
+                fprintf(stderr, ME "mmap-ed IO needs a sg driver version "
+                        ">= 3.1.22\n");
+                return 1;
+            }
         }
     }
     else {
@@ -462,7 +504,7 @@ int main(int argc, char * argv[])
         return 0;
     orig_count = dd_count;
 
-    if (do_dio || (FT_RAW == in_type)) {
+    if (do_dio || (FT_RAW & in_type)) {
         wrkBuff = malloc(bs * bpt + psz);
         if (0 == wrkBuff) {
             fprintf(stderr, "Not enough user memory for raw\n");
@@ -501,7 +543,7 @@ int main(int argc, char * argv[])
         if ((do_time > 0) && (iters == (do_time - 1)))
             gettimeofday(&start_tm, NULL);
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
-        if (FT_SG == in_type) {
+        if (FT_SG & in_type) {
             dio_tmp = do_dio;
             res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
                            &dio_tmp, do_mmap);
@@ -626,7 +668,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Some error occurred,");
         res = 2;
     }
-    if (FT_SG == in_type)
+    if (FT_SG & in_type)
         print_stats(iters);
     else
         print_stats(0);
