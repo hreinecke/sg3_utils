@@ -17,7 +17,7 @@
    data transfer (and no REQUEST SENSE command iff the unit is ready)
    then this can be used for timing per SCSI command overheads.
 
-*  Copyright (C) 2000-2003 D. Gilbert
+*  Copyright (C) 2000-2004 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
      'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
      'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
 
-   Version 03.08 (20020406)
+   Version 03.11 (20040602)
 */
 
 #define TUR_CMD_LEN 6
@@ -39,10 +39,10 @@ int get_num(char * buf)
     char c;
 
     res = sscanf(buf, "%d%c", &num, &c);
-    if (0 == res)
-        return -1;
-    else if (1 == res)
+    if (1 == res)
         return num;
+    else if (2 != res)
+        return -1;
     else {
         switch (c) {
         case 'c':
@@ -78,7 +78,7 @@ int main(int argc, char * argv[])
     int sg_fd, k;
     unsigned char turCmdBlk [TUR_CMD_LEN] =
                                 {0x00, 0, 0, 0, 0, 0};
-    sg_io_hdr_t io_hdr;
+    struct sg_io_hdr io_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char sense_buffer[32];
@@ -96,8 +96,8 @@ int main(int argc, char * argv[])
                 break;
             }
         }
-	else if (0 == strcmp("-t", argv[k]))
-	    do_time = 1;
+        else if (0 == strcmp("-t", argv[k]))
+            do_time = 1;
         else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
@@ -113,30 +113,23 @@ int main(int argc, char * argv[])
     }
     if ((0 == file_name) || (num_turs <= 0)) {
         printf("Usage: 'sg_turs [-t] [-n=<num_of_test_unit_readys>] "
-	       "<sg_device>'\n"
-	       " where '-n=<num>' number of test_unit_ready commands "
-	       "(def: 1)\n"
-	       "                  can take k, K, m, M postfix multipliers\n"
-	       "       '-t'   outputs total duration and commands per "
-	       "second\n");
+               "<sg_device>'\n"
+               " where '-n=<num>' number of test_unit_ready commands "
+               "(def: 1)\n"
+               "                  can take k, K, m, M postfix multipliers\n"
+               "       '-t'   outputs total duration and commands per "
+               "second\n");
         return 1;
     }
 
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
         snprintf(ebuff, EBUFF_SZ, 
-		 "sg_turs: error opening file: %s", file_name);
+                 "sg_turs: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
-    /* Just to be safe, check we have a new sg driver by trying an ioctl */
-    if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &k) < 0) || (k < 30000)) {
-        printf("sg_turs: %s isn't an sg device (or the sg driver is old)\n",
-               file_name);
-        close(sg_fd);
-        return 1;
-    }
     /* Prepare TEST UNIT READY command */
-    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(turCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_buffer);
@@ -145,9 +138,9 @@ int main(int argc, char * argv[])
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
     if (do_time) {
-	start_tm.tv_sec = 0;
-	start_tm.tv_usec = 0;
-	gettimeofday(&start_tm, NULL);
+        start_tm.tv_sec = 0;
+        start_tm.tv_usec = 0;
+        gettimeofday(&start_tm, NULL);
     }
     for (k = 0; k < num_turs; ++k) {
         io_hdr.pack_id = k;
@@ -158,11 +151,11 @@ int main(int argc, char * argv[])
         }
         if (io_hdr.info & SG_INFO_OK_MASK) {
             ++num_errs;
-	    if (1 == num_turs) {	/* then print out the error message */
-	        if (SG_ERR_CAT_CLEAN != sg_err_category3(&io_hdr))
-		    sg_chk_n_print3("tur", &io_hdr);
-	    }
-	}
+            if (1 == num_turs) {        /* then print out the error message */
+                if (SG_ERR_CAT_CLEAN != sg_err_category3(&io_hdr))
+                    sg_chk_n_print3("tur", &io_hdr);
+            }
+        }
     }
     if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;

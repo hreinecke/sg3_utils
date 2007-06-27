@@ -7,4 +7,4 @@ typedef long      llse_loff_t;
 
 extern llse_loff_t llse_llseek(unsigned int fd,
                                llse_loff_t offset,
-			       unsigned int origin);
+                               unsigned int origin);

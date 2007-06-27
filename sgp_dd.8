@@ -1,14 +1,19 @@
-.TH SGP_DD "8" "May 2002" "sg3_utils-1.00" SG3_UTILS
+.TH SGP_DD "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
 .SH NAME
-sgp_dd \- copies data to and from sg and raw devices
+sgp_dd \- copies data to and from files and devices. Specialised for
+devices that understand the SCSI command set.
 .SH SYNOPSIS
 .B sgp_dd
-[\fIOPTION\fR]...
+[\fIbpt=<n>\fR] [\fIbs=<n>\fR] [\fIcdbsz=6|10|12|16\fR] [\fIcoe=0|1\fR]
+[\fIcount=<n>\fR] [\fIdeb=<n>\fR] [\fIdio=0|1\fR] [\fIfua=0|1|2|3\fR]
+[\fIibs=<n>\fR] [\fIif=<ifile>\fR] [\fIobs=<n>\fR] [\fIof=<ofile>\fR]
+[\fIseek=<n>\fR] [\fIskip=<n>\fR] [\fIsync=0|1\fR] [\fIthr=<n>\fR]
+[\fItime=0|1\fR] [\fI--version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Copy data to and from Linux SCSI generic (sg) and raw devices. 
-Similar syntax and semantics to 
+Copy data to and from any files. Specialised for "files" that are
+Linux SCSI generic (sg) and raw devices. Similar syntax and semantics to 
 .B dd(1) 
 but does not perform any conversions. Uses POSIX threads to increase
 the amount of parallelism. This improves speed in some cases.
@@ -32,11 +37,22 @@ Default is 10 byte SCSI command blocks
 coe=0 | 1
 continue on error is 0 (off) by default. When it is 1 read errors
 are stepped over (with a block (or blocks) of zeroes being output).
-When 1 write errors are ignored (and alignment is maintained)
+When 1, write errors are ignored (and alignment is maintained)
+Similar to "conv=noerror" in
+.B dd(1)
+command. Default is 0 which implies stop on error
 .TP
 count=BLOCKS
-copy this number of blocks. Default is minimum number that sg devices
-return from READ CAPACITY (if that works) or 0
+copy this number of blocks from 'if' to 'of'. Default is the
+minimum (of 'if' and 'of') number of blocks that sg devices return from
+READ CAPACITY SCSI commands or that block devices report.
+Normal files are not probed for their size. If 'skip'
+or 'seek' are given and the count is derived (i.e. not explicitly given)
+then the derived count is scaled back so that the copy will not overrun the
+device. If the file name is a block device partition and count is not given
+then the size of the partition rather than the size of the whole device is
+used. If count is not given and cannot be derived then an error message
+is issued and no copy takes place.
 .TP
 deb=NUM
 outputs debug information. If NUM is 0 (default) then none and as NUM
@@ -50,15 +66,16 @@ has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
 fua=0 | 1 | 2 | 3
 force unit access bit. When 3, fua is set on both "if" and "of", when 2, fua
-is set on "if", when 1, fua is set on "of", when 0, fua is cleared on both.
-6 byte SCSI READ and WRITE commands (cdbsz=6) do not support the fua bit.
-Only active for sg device file names
+is set on "if", when 1, fua is set on "of", when 0 (the default), fua is
+cleared on both. 6 byte SCSI READ and WRITE commands (cdbsz=6) do not
+support the fua bit. Only active for sg device file names.
 .TP
 ibs=BYTES
 if given must be the same as bs
 .TP
 if=FILE
-read from FILE instead of stdin. A file name of - is taken to be stdin
+read from FILE instead of stdin. A file name of - is taken to be stdin.
+Starts reading at the beginning of FILE unless "skip" is given.
 .TP
 obs=BYTES
 if given must be the same as bs
@@ -70,10 +87,12 @@ If FILE is /dev/null then no actual writes are performed. If FILE is .
 shorthand notation)
 .TP
 seek=BLOCKS
-skip BLOCKS bs-sized blocks at start of output
+start writing BLOCKS bs-sized blocks from the start of the output file.
+Default is block 0 (i.e. start of file).
 .TP
 skip=BLOCKS
-skip BLOCKS bs-sized blocks at start of input
+start reading BLOCKS bs-sized blocks from the start of input file.
+Default is block 0 (i.e. start of file).
 .TP
 sync=0 | 1
 when 1, does SYNCHRONIZE CACHE command on "of" at the end of the transfer.
@@ -105,7 +124,17 @@ Raw device partition information can often be found with
 .PP
 BYTES and BLOCKS may be followed by the following multiplicative suffixes:
 c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
-g *1,073,741,824; and G *1,000,000,000
+g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
+T *1,000,000,000,000 (the latter two can only be used for count, skip
+and seek values).
+.PP
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X". When hex numbers are given multipliers cannot be
+used.
+.PP
+The count, skip and seek parameters can take 64 bit values (i.e. very
+big numbers). Other values are limited to what can fit in a signed
+32 bit number.
 .PP
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
@@ -161,9 +190,9 @@ geometry (stepping over errors on the source disk):
 .SH AUTHORS
 Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
-Report bugs to <dgilbert@interlog.com>.
+Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2002 Douglas Gilbert
+Copyright \(co 2000-2004 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

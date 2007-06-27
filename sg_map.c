@@ -29,8 +29,8 @@
 
    Note: This program requires sg version 2 or better.
 
-   Version 0.16 20021211
-	- additions for osst [Kurt Garloff <garloff@suse.de>]
+   Version 0.18 20030812
+        - additions for osst [Kurt Garloff <garloff at suse dot de>]
 */
 
 
@@ -55,7 +55,7 @@ typedef struct my_map_info
 } my_map_info_t;
 
 
-#define MAX_SG_DEVS 128
+#define MAX_SG_DEVS 256
 #define MAX_SD_DEVS 128
 #define MAX_SR_DEVS 128
 #define MAX_ST_DEVS 128
@@ -170,7 +170,7 @@ int main(int argc, char * argv[])
         }
         else if (0 == strcmp("-st", argv[k])) {
             do_st = 1;
-	    do_osst = 1;
+            do_osst = 1;
             do_all_s = 0;
         }
         else if (0 == strcmp("-sr", argv[k])) {
@@ -237,20 +237,20 @@ int main(int argc, char * argv[])
         res = ioctl(sg_fd, SG_GET_SCSI_ID, &map_arr[k].sg_dat);
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ,
-	    	     "device %s failed on sg ioctl, skip", fname);
+                     "device %s failed on sg ioctl, skip", fname);
             perror(ebuff);
             ++num_errors;
             continue;
         }
-	if (do_inquiry) {
-	    char buff[36];
+        if (do_inquiry) {
+            char buff[36];
 
-	    if (0 == do_inq(sg_fd, 0, 0, 0, buff, sizeof(buff), 1)) {
-		memcpy(map_arr[k].vendor, &buff[8], 8);
-		memcpy(map_arr[k].product, &buff[16], 16);
-		memcpy(map_arr[k].revision, &buff[32], 4);
-	    }
-	}
+            if (0 == do_inq(sg_fd, 0, 0, 0, buff, sizeof(buff), 1)) {
+                memcpy(map_arr[k].vendor, &buff[8], 8);
+                memcpy(map_arr[k].product, &buff[16], 16);
+                memcpy(map_arr[k].revision, &buff[32], 4);
+            }
+        }
         map_arr[k].active = 1;
         map_arr[k].oth_dev_num = -1;
         last_sg_ind = k;
@@ -322,8 +322,8 @@ int main(int argc, char * argv[])
                 break;
             }
             if (do_inquiry)
-	    	printf("  %.8s  %.16s  %.4s", map_arr[k].vendor, 
-		       map_arr[k].product, map_arr[k].revision);
+                printf("  %.8s  %.16s  %.4s", map_arr[k].vendor, 
+                       map_arr[k].product, map_arr[k].revision);
             break;
         default:
             printf("  bad logic\n");
@@ -369,11 +369,11 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
             perror("sg_map: close error");
-#ifndef IGN_CLOSE_ERR		
+#ifndef IGN_CLOSE_ERR           
             return;
 #else
             ++num_errors;
-	    sg_fd = 0;
+            sg_fd = 0;
 #endif
         }
 #endif
@@ -385,7 +385,7 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
         sg_fd = open(fname, O_RDONLY | O_NONBLOCK);
         if (sg_fd < 0) {
 #ifdef DEBUG
-	    printf ("ERROR %i\n", errno);
+            printf ("ERROR %i\n", errno);
 #endif
             if (EBUSY == errno) {
                 printf("Device %s is busy\n", fname);
@@ -409,29 +409,29 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
         res = ioctl(sg_fd, SCSI_IOCTL_GET_IDLUN, &my_idlun);
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ,
-	    	     "device %s failed on scsi ioctl(idlun), skip", fname);
+                     "device %s failed on scsi ioctl(idlun), skip", fname);
             perror(ebuff);
             ++num_errors;
 #ifdef DEBUG
-	    printf ("Couldn't get IDLUN!\n");
+            printf ("Couldn't get IDLUN!\n");
 #endif
             continue;
         }
         res = ioctl(sg_fd, SCSI_IOCTL_GET_BUS_NUMBER, &host_no);
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ,
-		 "device %s failed on scsi ioctl(bus_number), skip", fname);
+                 "device %s failed on scsi ioctl(bus_number), skip", fname);
             perror(ebuff);
             ++num_errors;
 #ifdef DEBUG
-	    printf ("Couldn't get BUS!\n");
+            printf ("Couldn't get BUS!\n");
 #endif
             continue;
         }
-#ifdef DEBUG	    
-	printf ("%i(%x) %i %i %i %i\n", host_no, my_idlun.host_unique_id, 
-		(my_idlun.dev_id>>24)&0xff, (my_idlun.dev_id>>16)&0xff,
-		(my_idlun.dev_id>>8)&0xff, my_idlun.dev_id&0xff);
+#ifdef DEBUG        
+        printf ("%i(%x) %i %i %i %i\n", host_no, my_idlun.host_unique_id, 
+                (my_idlun.dev_id>>24)&0xff, (my_idlun.dev_id>>16)&0xff,
+                (my_idlun.dev_id>>8)&0xff, my_idlun.dev_id&0xff);
 #endif
         ind = find_dev_in_sg_arr(&my_idlun, host_no, last_sg_ind);
         if (ind >= 0) {
@@ -451,20 +451,20 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 #define INQUIRY_CMDLEN  6
 
 static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op, 
-		  void * resp, int mx_resp_len, int noisy)
+                  void * resp, int mx_resp_len, int noisy)
 {
     int res;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    sg_io_hdr_t io_hdr;
+    struct sg_io_hdr io_hdr;
 
     if (cmddt)
-    	inqCmdBlk[1] |= 2;
+        inqCmdBlk[1] |= 2;
     if (evpd)
-    	inqCmdBlk[1] |= 1;
+        inqCmdBlk[1] |= 1;
     inqCmdBlk[2] = (unsigned char)pg_op;
     inqCmdBlk[4] = (unsigned char)mx_resp_len;
-    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(inqCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
@@ -483,14 +483,14 @@ static int do_inq(int sg_fd, int cmddt, int evpd, unsigned int pg_op,
     switch (res) {
     case SG_ERR_CAT_CLEAN:
     case SG_ERR_CAT_RECOVERED:
-	return 0;
+        return 0;
     default:
-	if (noisy) {
-	    char ebuff[EBUFF_SZ];
-	    snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt=%d, "
-	    	     "EVPD=%d, page_opcode=%x ", cmddt, evpd, pg_op);
+        if (noisy) {
+            char ebuff[EBUFF_SZ];
+            snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt=%d, "
+                     "EVPD=%d, page_opcode=%x ", cmddt, evpd, pg_op);
             sg_chk_n_print3(ebuff, &io_hdr);
-	}
-	return -1;
+        }
+        return -1;
     }
 }

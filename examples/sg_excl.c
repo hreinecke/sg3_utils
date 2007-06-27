@@ -42,7 +42,7 @@
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, ok, sg_fd2;
+    int sg_fd, k, ok /*, sg_fd2 */;
     unsigned char inqCmdBlk [INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     unsigned char turCmdBlk [TUR_CMD_LEN] =

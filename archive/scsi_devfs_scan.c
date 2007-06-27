@@ -29,7 +29,7 @@
 void usage()
 {
     printf("Usage: 'scsi_devfs_scan [-d <dir>] [-i] [-ide] [-l [-x]] "
-	   "[-q]'\n");
+           "[-q]'\n");
     printf("    where: -d <dir> location of devfs [default: /dev ]\n");
     printf("           -i   show INQUIRY data for each SCSI device\n");
     printf("           -ide show scan of IDE devices after SCSI devices\n");
@@ -131,7 +131,7 @@ static int do_inquiry(int sg_fd, void * resp, int mx_resp_len)
     case SG_ERR_CAT_RECOVERED:
         return 0;
     default:
-	sg_chk_n_print3("Failed INQUIRY", &io_hdr);
+        sg_chk_n_print3("Failed INQUIRY", &io_hdr);
         return -1;
     }
 }
@@ -142,94 +142,94 @@ void leaf_dir(const char * lf, unsigned int * larr)
     int res;
 
     if (do_quiet) {
-	printf("%u\t%u\t%u\t%u\n", larr[0], larr[1], larr[2], larr[3]);
-	return;
+        printf("%u\t%u\t%u\t%u\n", larr[0], larr[1], larr[2], larr[3]);
+        return;
     }
     printf("%u\t%u\t%u\t%u\t%s\n", larr[0], larr[1], larr[2], larr[3], lf);
     if (do_leaf) {
-	struct dirent * de_entry;
-	struct dirent * de_result;
-	DIR * sdir;
-	int outpos;
+        struct dirent * de_entry;
+        struct dirent * de_result;
+        DIR * sdir;
+        int outpos;
 
-	if (NULL == (sdir = opendir(lf))) {
-	    fprintf(stderr, "leaf_dir: opendir of %s: failed\n", lf);
-	    return;
-	}
-	de_entry = (struct dirent *)malloc(sizeof(struct dirent) + 
-					   NAME_LEN_MAX);
-	if (NULL == de_entry)
-	    return;
-	res = 0;
-	printf("\t");
-	outpos = 8;
-	while (1) {
-	    res = readdir_r(sdir, de_entry, &de_result);
-	    if (0 != res) {
-		fprintf(stderr, "leaf_dir: readdir_r of %s: %s\n", 
-			lf, strerror(res));
-		res = -2;
-		break;
-	    }
-	    if (de_result == NULL) 
-		break;
-	    strncpy(name, de_entry->d_name, NAME_LEN_MAX * 2);
-	    if ((0 == strcmp("..", name)) ||(0 == strcmp(".", name))) 
-		continue;
-	    if (do_extra) {
-		struct stat st;
-		char devname[NAME_LEN_MAX * 2];
+        if (NULL == (sdir = opendir(lf))) {
+            fprintf(stderr, "leaf_dir: opendir of %s: failed\n", lf);
+            return;
+        }
+        de_entry = (struct dirent *)malloc(sizeof(struct dirent) + 
+                                           NAME_LEN_MAX);
+        if (NULL == de_entry)
+            return;
+        res = 0;
+        printf("\t");
+        outpos = 8;
+        while (1) {
+            res = readdir_r(sdir, de_entry, &de_result);
+            if (0 != res) {
+                fprintf(stderr, "leaf_dir: readdir_r of %s: %s\n", 
+                        lf, strerror(res));
+                res = -2;
+                break;
+            }
+            if (de_result == NULL) 
+                break;
+            strncpy(name, de_entry->d_name, NAME_LEN_MAX * 2);
+            if ((0 == strcmp("..", name)) ||(0 == strcmp(".", name))) 
+                continue;
+            if (do_extra) {
+                struct stat st;
+                char devname[NAME_LEN_MAX * 2];
 
-		strncpy(devname, lf, NAME_LEN_MAX * 2);
-		strcat(devname, "/");
-		strcat(devname, name);
-		if (stat(devname, &st) < 0)
-		    return;
-		if (S_ISCHR(st.st_mode)) {
-		    strcat(name, "(c ");
-		    sprintf(name + strlen(name), "%d %d)", major(st.st_rdev),
-			    minor(st.st_rdev));
-		}
-		else if (S_ISBLK(st.st_mode)) {
-		    strcat(name, "(b ");
-		    sprintf(name + strlen(name), "%d %d)", major(st.st_rdev),
-			    minor(st.st_rdev));
-		}
-	    }
-	    res = strlen(name);
-	    if ((outpos + res + 2) > 80) {
-		printf("\n\t");
-		outpos = 8;
-	    }
-	    printf("%s  ", name);
-	    outpos += res + 2;
-	}
-	printf("\n");
+                strncpy(devname, lf, NAME_LEN_MAX * 2);
+                strcat(devname, "/");
+                strcat(devname, name);
+                if (stat(devname, &st) < 0)
+                    return;
+                if (S_ISCHR(st.st_mode)) {
+                    strcat(name, "(c ");
+                    sprintf(name + strlen(name), "%d %d)", major(st.st_rdev),
+                            minor(st.st_rdev));
+                }
+                else if (S_ISBLK(st.st_mode)) {
+                    strcat(name, "(b ");
+                    sprintf(name + strlen(name), "%d %d)", major(st.st_rdev),
+                            minor(st.st_rdev));
+                }
+            }
+            res = strlen(name);
+            if ((outpos + res + 2) > 80) {
+                printf("\n\t");
+                outpos = 8;
+            }
+            printf("%s  ", name);
+            outpos += res + 2;
+        }
+        printf("\n");
     }
     if (do_inq) {
-	int sg_fd;
-	char buff[64];
+        int sg_fd;
+        char buff[64];
 
-	memset(buff, 0, sizeof(buff));
-	strncpy(name, lf, NAME_LEN_MAX * 2);
-	strcat(name, "/generic");
-	if ((sg_fd = open(name, O_RDONLY)) < 0) {
-	    if (! checked_sg) {
-		checked_sg = 1;
-		if ((sg_fd = open("/dev/sg0", O_RDONLY)) >= 0)
-		    close(sg_fd);  /* try and get sg module loaded */
-		sg_fd = open(name, O_RDONLY);
-	    }
-	    if (sg_fd < 0) {
-		printf("Unable to open sg device: %s, %s\n", name, 
-		       strerror(errno));
-		return;
-	    }
-	}
-	if (0 != do_inquiry(sg_fd, buff, 64))
-	    return;
-	close(sg_fd);
-	dStrHex(buff, 64);
+        memset(buff, 0, sizeof(buff));
+        strncpy(name, lf, NAME_LEN_MAX * 2);
+        strcat(name, "/generic");
+        if ((sg_fd = open(name, O_RDONLY)) < 0) {
+            if (! checked_sg) {
+                checked_sg = 1;
+                if ((sg_fd = open("/dev/sg0", O_RDONLY)) >= 0)
+                    close(sg_fd);  /* try and get sg module loaded */
+                sg_fd = open(name, O_RDONLY);
+            }
+            if (sg_fd < 0) {
+                printf("Unable to open sg device: %s, %s\n", name, 
+                       strerror(errno));
+                return;
+            }
+        }
+        if (0 != do_inquiry(sg_fd, buff, 64))
+            return;
+        close(sg_fd);
+        dStrHex(buff, 64);
     }
 }
 
@@ -246,37 +246,37 @@ int hbtl_scan(const char * path, int level, unsigned int *larr)
 
     level_slen = strlen(level_arr[level]);
     if (NULL == (sdir = opendir(path))) {
-	fprintf(stderr, "hbtl_scan: opendir of %s: failed\n", path);
-	return -1;
+        fprintf(stderr, "hbtl_scan: opendir of %s: failed\n", path);
+        return -1;
     }
     de_entry = (struct dirent *)malloc(sizeof(struct dirent) + NAME_LEN_MAX);
     if (NULL == de_entry)
-    	return -3;
+        return -3;
     res = 0;
     while (1) {
-	res = readdir_r(sdir, de_entry, &de_result);
-	if (0 != res) {
-	    fprintf(stderr, "hbtl_scan: readdir_r of %s: %s\n", 
-	    	    path, strerror(res));
-	    res = -2;
-	    break;
-	}
-	if (de_result == NULL) 
-	    break;
-	if (0 == strncmp(level_arr[level], de_entry->d_name, level_slen)) {
-	    if (1 != sscanf(de_entry->d_name + level_slen, "%u", larr + level))
-	    	larr[level] = UINT_MAX;
-	    strncpy(new_path, path, NAME_LEN_MAX * 2);
-	    strcat(new_path, "/");
-	    strcat(new_path, de_entry->d_name);
-	    if ((level + 1) < LEVELS) {
-		res = hbtl_scan(new_path, level + 1, larr);
-		if (res < 0)
-		    break;
-	    }
-	    else 
-	    	leaf_dir(new_path, larr);
-	}
+        res = readdir_r(sdir, de_entry, &de_result);
+        if (0 != res) {
+            fprintf(stderr, "hbtl_scan: readdir_r of %s: %s\n", 
+                    path, strerror(res));
+            res = -2;
+            break;
+        }
+        if (de_result == NULL) 
+            break;
+        if (0 == strncmp(level_arr[level], de_entry->d_name, level_slen)) {
+            if (1 != sscanf(de_entry->d_name + level_slen, "%u", larr + level))
+                larr[level] = UINT_MAX;
+            strncpy(new_path, path, NAME_LEN_MAX * 2);
+            strcat(new_path, "/");
+            strcat(new_path, de_entry->d_name);
+            if ((level + 1) < LEVELS) {
+                res = hbtl_scan(new_path, level + 1, larr);
+                if (res < 0)
+                    break;
+            }
+            else 
+                leaf_dir(new_path, larr);
+        }
     }
     free(de_entry);
     closedir(sdir);
@@ -307,11 +307,11 @@ int main(int argc, char * argv[])
         else if (0 == strcmp("-q", argv[k]))
             do_quiet = 1;
         else if (0 == strncmp("-d", argv[k], 2)) {
-	    if (strlen(argv[k]) > 2)
-		strncpy(ds_root, argv[k] + 2, D_ROOT_SZ);
-	    else if (++k < argc)
-		strncpy(ds_root, argv[k], D_ROOT_SZ);
-	}
+            if (strlen(argv[k]) > 2)
+                strncpy(ds_root, argv[k] + 2, D_ROOT_SZ);
+            else if (++k < argc)
+                strncpy(ds_root, argv[k], D_ROOT_SZ);
+        }
         else if ((0 == strcmp("-?", argv[k])) ||
                  (0 == strncmp("-h", argv[k], 2))) {
             printf("Scan SCSI devices within a devfs tree\n\n");
@@ -332,23 +332,23 @@ int main(int argc, char * argv[])
     strncpy(di_root, ds_root, D_ROOT_SZ);
     strcat(di_root, "/.devfsd");
     if (stat(di_root, &st) < 0)
-	printf("Didn't find %s so perhaps devfs is not present,"
-		" continuing ...\n", di_root);
+        printf("Didn't find %s so perhaps devfs is not present,"
+                " continuing ...\n", di_root);
     strncpy(di_root, ds_root, D_ROOT_SZ);
     strcat(ds_root, "/scsi");
     strcat(di_root, "/ide");
 
     if (do_ide)
-	printf("SCSI scan:\n");
+        printf("SCSI scan:\n");
     res = hbtl_scan(ds_root, 0, larr);
     if (res < 0)
-    	printf("main: scsi hbtl_scan res=%d\n", res);
+        printf("main: scsi hbtl_scan res=%d\n", res);
     do_inq = 0;  /* won't try SCSI INQUIRY on IDE devices */
     if (do_ide) {
-	printf("\nIDE scan:\n");
-	res = hbtl_scan(di_root, 0, larr);
-	if (res < 0)
-	    printf("main: ide hbtl_scan res=%d\n", res);
+        printf("\nIDE scan:\n");
+        res = hbtl_scan(di_root, 0, larr);
+        if (res < 0)
+            printf("main: ide hbtl_scan res=%d\n", res);
     }
     return 0;
 }

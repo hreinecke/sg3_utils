@@ -15,13 +15,12 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <linux/major.h> 
-typedef unsigned char u_char;   /* horrible, for scsi.h */
 #include "sg_include.h"
 #include "sg_err.h"
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001, 2002 D. Gilbert
+*  Copyright (C) 2001 - 2003 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -48,7 +47,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static const char * version_str = "0.95 20021207";
+static const char * version_str = "0.99 20040708";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -87,6 +86,7 @@ static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 static void install_handler (int sig_num, void (*sig_handler) (int sig))
 {
     struct sigaction sigact;
+
     sigaction (sig_num, NULL, &sigact);
     if (sigact.sa_handler != SIG_IGN)
     {
@@ -103,9 +103,9 @@ void print_stats(int iters)
         fprintf(stderr, "  remaining block count=%d\n", dd_count);
     fprintf(stderr, "%d+%d records in", in_full - in_partial, in_partial);
     if (iters > 0)
-	fprintf(stderr, ", SCSI commands issued: %d\n", iters);
+        fprintf(stderr, ", SCSI commands issued: %d\n", iters);
     else
-	fprintf(stderr, "\n");
+        fprintf(stderr, "\n");
 }
 
 static void interrupt_handler(int sig)
@@ -123,6 +123,7 @@ static void interrupt_handler(int sig)
 
 static void siginfo_handler(int sig)
 {
+    sig = sig;  /* dummy to stop -W warning messages */
     fprintf(stderr, "Progress report, continuing ...\n");
     print_stats(0);
 }
@@ -148,19 +149,19 @@ void usage()
            "sg_read  if=<infile> [skip=<num>] [bs=<num>] [bpt=<num>] "
            "count=<num>\n"
            "                [dio=<num>] [mmap=<num>] [time=<num>]"
-	   " [cdbsz=<6|10|12|16>]\n"
+           " [cdbsz=<6|10|12|16>]\n"
            " 'if'  is an sg or raw device, or a seekable file (not stdin)\n"
            " 'bs'  must match sector size (when 'if' is sg device) "
-	   "(def=512)\n"
+           "(def=512)\n"
            " 'skip' each transfer starts at this logical address (def=0)\n"
            " 'count' total bytes read will be 'bs'*'count' (if no error)\n"
            " 'bpt' is blocks_per_transfer (default is 128, or 64KB for "
-	   "def 'bs')\n"
+           "def 'bs')\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
            " 'mmap' is mmap-ed IO, 1->perform, 0->indirect IO (def)\n"
            " 'time' 0->do nothing(def), 1->time from 1st cmd, 2->time "
            "from 2nd cmd\n"
-	   " 'cdbsz' size of SCSI READ command (default is 10)\n");
+           " 'cdbsz' size of SCSI READ command (default is 10)\n");
     fprintf(stderr, "\nVersion: %s\n", version_str);
 }
 
@@ -245,21 +246,21 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
 {
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
-    sg_io_hdr_t io_hdr;
+    struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block)) {
         fprintf(stderr, ME "bad cdb build, from_block=%d, blocks=%d\n",
                 from_block, blocks);
         return -1;
     }
-    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = cdbsz;
     io_hdr.cmdp = rdCmd;
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = bs * blocks;
     if (! do_mmap) /* not required: shows dxferp unused during mmap-ed IO */
-	io_hdr.dxferp = buff;
+        io_hdr.dxferp = buff;
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
@@ -305,10 +306,10 @@ int get_num(char * buf)
     char c;
 
     res = sscanf(buf, "%d%c", &num, &c);
-    if (0 == res)
-        return -1;
-    else if (1 == res)
+    if (1 == res)
         return num;
+    else if (2 != res)
+        return -1;
     else {
         switch (c) {
         case 'c':
@@ -375,8 +376,8 @@ int main(int argc, char * argv[])
     for(k = 1; k < argc; k++) {
         if (argv[k]) {
             strncpy(str, argv[k], STR_SZ);
-	    str[STR_SZ - 1] = '\0';
-	}
+            str[STR_SZ - 1] = '\0';
+        }
         else
             continue;
         for(key = str, buf = key; *buf && *buf != '=';)
@@ -420,6 +421,10 @@ int main(int argc, char * argv[])
         fprintf(stderr, "skip cannot be negative\n");
         return 1;
     }
+    if (bpt < 1) {
+        fprintf(stderr, "bpt must be greater than 0\n");
+        return 1;
+    }
     if (do_dio && do_mmap) {
         fprintf(stderr, "cannot select both dio and mmap\n");
         return 1;
@@ -443,13 +448,13 @@ int main(int argc, char * argv[])
     if (FT_SG == in_type) {
         if ((infd = open(inf, O_RDWR)) < 0) {
             snprintf(ebuff, EBUFF_SZ,
-	    	     ME "could not open %s for sg reading", inf);
+                     ME "could not open %s for sg reading", inf);
             perror(ebuff);
             return 1;
         }
         t = bs * bpt;
-	if ((do_mmap) && (0 != (t % psz)))
-	    t = ((t / psz) + 1) * psz;    /* round up to next pagesize */
+        if ((do_mmap) && (0 != (t % psz)))
+            t = ((t / psz) + 1) * psz;    /* round up to next pagesize */
         res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
         if (res < 0)
             perror(ME "SG_SET_RESERVED_SIZE error");
@@ -458,21 +463,21 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "sg driver prior to 3.x.y\n");
             return 1;
         }
-	if (do_mmap && (t < 30122)) {
+        if (do_mmap && (t < 30122)) {
             fprintf(stderr, ME "mmap-ed IO needs a sg driver version "
-		    ">= 3.1.22\n");
+                    ">= 3.1.22\n");
             return 1;
         }
     }
     else {
-	if (do_mmap) {
+        if (do_mmap) {
             fprintf(stderr, ME "mmap-ed IO only support on sg "
-		    "devices\n");
-	    return 1;
-	}
+                    "devices\n");
+            return 1;
+        }
         if ((infd = open(inf, O_RDONLY)) < 0) {
             snprintf(ebuff,  EBUFF_SZ,
-	    	     ME "could not open %s for reading", inf);
+                     ME "could not open %s for reading", inf);
             perror(ebuff);
             return 1;
         }
@@ -503,12 +508,12 @@ int main(int argc, char * argv[])
                                    (~(psz - 1)));
     }
     else if (do_mmap) {
-	wrkPos = mmap(NULL, bs * bpt, PROT_READ | PROT_WRITE,
-		      MAP_SHARED, infd, 0);
-	if (MAP_FAILED == wrkPos) {
-	    perror(ME "error from mmap()");
-	    return 1;
-	}
+        wrkPos = mmap(NULL, bs * bpt, PROT_READ | PROT_WRITE,
+                      MAP_SHARED, infd, 0);
+        if (MAP_FAILED == wrkPos) {
+            perror(ME "error from mmap()");
+            return 1;
+        }
     }
     else {
         wrkBuff = malloc(bs * bpt);
@@ -529,13 +534,13 @@ int main(int argc, char * argv[])
 
     /* main loop */
     for (iters = 0; dd_count > 0; ++iters) {
-	if ((do_time > 0) && (iters == (do_time - 1)))
-	    gettimeofday(&start_tm, NULL);
+        if ((do_time > 0) && (iters == (do_time - 1)))
+            gettimeofday(&start_tm, NULL);
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG == in_type) {
             dio_tmp = do_dio;
             res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
-			   &dio_tmp, do_mmap);
+                           &dio_tmp, do_mmap);
             if (1 == res) {     /* ENOMEM, find what's available+try that */
                 if (ioctl(infd, SG_GET_RESERVED_SIZE, &buf_sz) < 0) {
                     perror("RESERVED_SIZE ioctls failed");
@@ -546,13 +551,13 @@ int main(int argc, char * argv[])
                 fprintf(stderr, 
                         "Reducing read to %d blocks per loop\n", blocks_per);
                 res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
-			       &dio_tmp, do_mmap);
+                               &dio_tmp, do_mmap);
             }
             else if (2 == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed, continuing (r)\n");
                 res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
-			       &dio_tmp, do_mmap);
+                               &dio_tmp, do_mmap);
             }
             if (0 != res) {
                 fprintf(stderr, ME "failed, skip=%d\n", skip);
@@ -565,15 +570,15 @@ int main(int argc, char * argv[])
             }
         }
         else {
-	    if (iters > 0) { /* subsequent iteration reset skip position */
-		llse_loff_t offset = skip;
+            if (iters > 0) { /* subsequent iteration reset skip position */
+                llse_loff_t offset = skip;
 
-		offset *= bs;       /* could exceed 32 bits here! */
-		if (llse_llseek(infd, offset, SEEK_SET) < 0) {
-		    perror(ME "could not reset skip position");
-		    break;
-		}
-	    }
+                offset *= bs;       /* could exceed 32 bits here! */
+                if (llse_llseek(infd, offset, SEEK_SET) < 0) {
+                    perror(ME "could not reset skip position");
+                    break;
+                }
+            }
             while (((res = read(infd, wrkPos, blocks * bs)) < 0) &&
                    (EINTR == errno))
                 ;
@@ -583,16 +588,16 @@ int main(int argc, char * argv[])
                 break;
             }
             else if (res < blocks * bs) {
-		fprintf(stderr, ME "short read: wanted/got=%d/%d bytes"
-			", stop\n", blocks * bs, res);
+                fprintf(stderr, ME "short read: wanted/got=%d/%d bytes"
+                        ", stop\n", blocks * bs, res);
                 blocks = res / bs;
                 if ((res % bs) > 0) {
                     blocks++;
                     in_partial++;
                 }
-		dd_count -= blocks;
-		in_full += blocks;
-		break;
+                dd_count -= blocks;
+                in_full += blocks;
+                break;
             }
             in_full += blocks;
         }
@@ -600,56 +605,56 @@ int main(int argc, char * argv[])
             dd_count -= blocks;
     }
     if (do_time > 0) {
-	gettimeofday(&end_tm, NULL);
-	if (start_tm.tv_sec || start_tm.tv_usec) {
-	    struct timeval res_tm;
-	    double a, b, c;
+        gettimeofday(&end_tm, NULL);
+        if (start_tm.tv_sec || start_tm.tv_usec) {
+            struct timeval res_tm;
+            double a, b, c;
 
-	    res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
-	    res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
-	    if (res_tm.tv_usec < 0) {
-		--res_tm.tv_sec;
-		res_tm.tv_usec += 1000000;
-	    }
-	    a = res_tm.tv_sec;
-	    a += (0.000001 * res_tm.tv_usec);
-	    b = (double)bs * (orig_count - dd_count);
-	    if (do_time > 1)
-		c = b - ((double)bs * ((do_time - 1.0) * bpt));
-	    else
-		c = 0.0;
+            res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
+            res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
+            if (res_tm.tv_usec < 0) {
+                --res_tm.tv_sec;
+                res_tm.tv_usec += 1000000;
+            }
+            a = res_tm.tv_sec;
+            a += (0.000001 * res_tm.tv_usec);
+            b = (double)bs * (orig_count - dd_count);
+            if (do_time > 1)
+                c = b - ((double)bs * ((do_time - 1.0) * bpt));
+            else
+                c = 0.0;
 
-	    if (1 == do_time) {
-		fprintf(stderr, "time for all (SCSI) commands was "
-		    "%d.%06d secs", (int)res_tm.tv_sec, (int)res_tm.tv_usec);
-		if ((a > 0.00001) && (b > 511))
-		    fprintf(stderr, ", %.2f MB/sec\n", b / (a * 1000000.0));
-		else
-		    fprintf(stderr, "\n");
-	    }
-	    else if (2 == do_time) {
-		fprintf(stderr, "time from second (SCSI) command to end "
-		    "was %d.%06d secs", (int)res_tm.tv_sec, 
-		    (int)res_tm.tv_usec);
-		if ((a > 0.00001) && (c > 511))
-		    fprintf(stderr, ", %.2f MB/sec\n", c / (a * 1000000.0));
-		else
-		    fprintf(stderr, "\n");
-	    }
-	    else { 
-		fprintf(stderr, "time from start of (SCSI) command "
-			"#%d to end was %d.%06d secs", do_time,
-			(int)res_tm.tv_sec, (int)res_tm.tv_usec);
-		if ((a > 0.00001) && (c > 511))
-		    fprintf(stderr, ", %.2f MB/sec\n", c / (a * 1000000.0));
-		else
-		    fprintf(stderr, "\n");
-	    }
-	}
+            if (1 == do_time) {
+                fprintf(stderr, "time for all (SCSI) commands was "
+                    "%d.%06d secs", (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+                if ((a > 0.00001) && (b > 511))
+                    fprintf(stderr, ", %.2f MB/sec\n", b / (a * 1000000.0));
+                else
+                    fprintf(stderr, "\n");
+            }
+            else if (2 == do_time) {
+                fprintf(stderr, "time from second (SCSI) command to end "
+                    "was %d.%06d secs", (int)res_tm.tv_sec, 
+                    (int)res_tm.tv_usec);
+                if ((a > 0.00001) && (c > 511))
+                    fprintf(stderr, ", %.2f MB/sec\n", c / (a * 1000000.0));
+                else
+                    fprintf(stderr, "\n");
+            }
+            else { 
+                fprintf(stderr, "time from start of (SCSI) command "
+                        "#%d to end was %d.%06d secs", do_time,
+                        (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+                if ((a > 0.00001) && (c > 511))
+                    fprintf(stderr, ", %.2f MB/sec\n", c / (a * 1000000.0));
+                else
+                    fprintf(stderr, "\n");
+            }
+        }
     }
 
     if (wrkBuff)
-	free(wrkBuff);
+        free(wrkBuff);
 
     close(infd);
     res = 0;
@@ -658,9 +663,9 @@ int main(int argc, char * argv[])
         res = 2;
     }
     if (FT_SG == in_type)
-	print_stats(iters);
+        print_stats(iters);
     else
-	print_stats(0);
+        print_stats(0);
     if (dio_incomplete) {
         int fd;
         char c;

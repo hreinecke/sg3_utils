@@ -77,15 +77,15 @@ int main(int argc, char * argv[])
 
     k = SG_SCSI_RESET_NOTHING;
     if (do_device_reset) {
-	printf("sg_reset: starting device reset\n");
+        printf("sg_reset: starting device reset\n");
         k = SG_SCSI_RESET_DEVICE;
     }
     else if (do_bus_reset) {
-	printf("sg_reset: starting bus reset\n");
+        printf("sg_reset: starting bus reset\n");
         k = SG_SCSI_RESET_BUS;
     }
     else if (do_host_reset) {
-	printf("sg_reset: starting host reset\n");
+        printf("sg_reset: starting host reset\n");
         k = SG_SCSI_RESET_HOST;
     }
 
@@ -97,7 +97,7 @@ int main(int argc, char * argv[])
             printf("sg_reset: requested type of reset may not be available\n");
         else if (EACCES == errno)
             printf("sg_reset: reset requires CAP_SYS_ADMIN (root) "
-	    	   "permission\n");
+                   "permission\n");
         else if (EINVAL == errno)
             printf("sg_reset: SG_SCSI_RESET not supported\n");
         else if (EIO == errno)
@@ -109,11 +109,11 @@ int main(int argc, char * argv[])
     if (SG_SCSI_RESET_NOTHING == k)
         printf("sg_reset: did nothing, device is normal mode\n");
     else if (SG_SCSI_RESET_DEVICE == k)
-	printf("sg_reset: completed device reset\n");
+        printf("sg_reset: completed device reset\n");
     else if (SG_SCSI_RESET_BUS == k)
-	printf("sg_reset: completed bus reset\n");
+        printf("sg_reset: completed bus reset\n");
     else if (SG_SCSI_RESET_HOST == k)
-	printf("sg_reset: completed host reset\n");
+        printf("sg_reset: completed host reset\n");
 
     if (close(sg_fd) < 0) {
         perror("sg_reset: close error");

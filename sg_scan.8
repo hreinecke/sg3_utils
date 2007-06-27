@@ -1,41 +1,52 @@
-.TH SG_SCAN "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.TH SG_SCAN "8" "January 2004" "sg3_utils-1.06" SG3_UTILS
 .SH NAME
-sg_scan \- does a SCSI bus scan and prints the results to standard output
+sg_scan \- does a scan of sg devices (or given SCSI/ATAPI/ATA devices) and 
+prints the results
 .SH SYNOPSIS
 .B sg_scan
 [\fI-a\fR] 
+[\fI-i\fR] 
 [\fI-n\fR] 
 [\fI-w\fR] 
-[\fI-i\fR] 
 [\fI-x\fR] 
-<\fIgeneric device\fR>
+[\fI<sam_dev>\fR]* 
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-sg_reset exercises the SCSI device/bus/host reset capability. It is
-supported by the sg driver in lk 2.2.16 and beyond but associated
-SCSI middle level driver changes have not been accepted into the
-standard kernel at this time. Many distributions contain the patch to
-the mid-level that activates this feature.
+If no <sam_dev> device names are given, sg_scan does a scan of the sg 
+devices and outputs a line of information for each sg device that is 
+currently bound to a SCSI device. Once any <sam_dev> is given only the
+given <sam_dev>s are scanned. 
+Devices are opened with the O_NONBLOCK flag so that the scan will
+not "hang" on any device that another process holds an O_EXCL lock on.
+.PP
+Any given <sam_devs> device names are expected to comply
+with (to some extent) the Storage Architecture Model (SAM see www.t10.org).
+Any device names associated with the Linux SCSI subsystem (e.g. /dev/sda
+and /dev/st0m) are suitable. Devices names associated with ATAPI
+devices (e.g. most CD/DVD drives and ATAPI tape drives) are also suitable.
+If the device does not fall into the above categories then an ATA
+IDENTITY command is tried.
 .TP
 -a
-do alpha scan (ie sga, sgb, sgc)
-.TP
--n
-do numeric scan (ie sg0, sg1...) [default]
-.TP
--w
-force open with read/write flag
+do alphabetical scan (i.e. sga, sgb, sgc)
 .TP
 -i
-do SCSI INQUIRY, output results
+do a SCSI INQUIRY, output results in a second (indented) line. If the device
+is an ATA disk then output information from an ATA IDENTITY command
+.TP
+-n
+do numeric scan (i.e. sg0, sg1...) [default]
+.TP
+-w
+use a read/write flag when opening sg device (default is read-only)
 .TP
 -x
 extra information output about queuing
 .SH AUTHORS
 Written by D. Gilbert and F. Jansen
 .SH COPYRIGHT
-Copyright \(co 1999-2002 Douglas Gilbert
+Copyright \(co 1999-2004 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
