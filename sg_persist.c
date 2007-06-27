@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.31 20070129";
+static char * version_str = "0.33 20070314";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -143,7 +143,7 @@ static void usage()
             "    --reserve|-R               PR Out: Reserve\n"
             "    --transport-id=H,H...|-X H,H...    TransportID "
             "hex number(s),\n"
-            "                               comma separated list\n"
+            "                               comma separated list of bytes\n"
             "    --transport-id=-|-X -      read TransportID from stdin\n"
             "    --unreg|-U                 optional with PR Out Register "
             "and Move\n"
@@ -295,30 +295,29 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
             fprintf(stderr, "PR in: aborted command\n");
         else
             fprintf(stderr, "PR in: command failed\n");
-        return 1;
+        return res;
     }
     if (PRIN_RCAP_SA == prin_sa) {
         if (8 != pr_buff[1]) {
             fprintf(stderr, "Unexpected response for PRIN Report "
                             "Capabilities\n");
-            return 1;
+            return SG_LIB_CAT_MALFORMED;
         }
         if (do_hex)
             dStrHex((const char *)pr_buff, 8, 1);
         else {
             printf("Report capabilities response:\n");
-            printf("  Compatible Reservation handling(CRH): %d\n",
+            printf("  Compatible Reservation Handling(CRH): %d\n",
                    !!(pr_buff[2] & 0x10));
-            printf("  Specify Initiator Ports capable(SIP_C): %d\n",
+            printf("  Specify Initiator Ports Capable(SIP_C): %d\n",
                    !!(pr_buff[2] & 0x8));
-            printf("  All target ports capable(ATP_C): %d\n",
+            printf("  All Target Ports Capable(ATP_C): %d\n",
                    !!(pr_buff[2] & 0x4));
-            printf("  Persist Through Power Loss capable(PTPL_C): %d\n",
+            printf("  Persist Through Power Loss Capable(PTPL_C): %d\n",
                    !!(pr_buff[2] & 0x1));
-            printf("  Type Mask Valid(TMV): %d\n",
-                   !!(pr_buff[3] & 0x80));
+            printf("  Type Mask Valid(TMV): %d\n", !!(pr_buff[3] & 0x80));
             printf("  Allow commands: %d\n", (pr_buff[3] >> 4) & 0x7);
-            printf("  Persist Through Power Loss active(PTPL_A): %d\n",
+            printf("  Persist Through Power Loss Active(PTPL_A): %d\n",
                    !!(pr_buff[3] & 0x1));
             if (pr_buff[3] & 0x80) {
                 printf("    Support indicated in Type mask:\n");
@@ -482,7 +481,7 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
             fprintf(stderr, "PR out: aborted command\n");
         else
             fprintf(stderr, "PR out: command failed\n");
-        return 1;
+        return res;
     } else if (do_verbose) {
         char buff[64];
 
@@ -544,7 +543,7 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
             fprintf(stderr, "PR out: aborted command\n");
         else
             fprintf(stderr, "PR out: command failed\n");
-        return 1;
+        return res;
     } else if (do_verbose)
         fprintf(stderr, "PR out: 'register and move' "
                 "command successful\n");

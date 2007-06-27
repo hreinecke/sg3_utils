@@ -107,7 +107,7 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
                          {MAINTENANCE_IN_CMD, REPORT_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     rtpgCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
     rtpgCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
@@ -132,7 +132,7 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "report Target port group", res,
+    ret = sg_cmds_process_resp(ptvp, "report target port group", res,
                                mx_resp_len, sense_b, noisy, verbose,
                                &sense_cat);
     if (-1 == ret)
@@ -174,7 +174,7 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
     unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] = 
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     senddiagCmdBlk[1] = (unsigned char)((sf_code << 5) | (pf_bit << 4) |
                         (sf_bit << 2) | (devofl_bit << 1) | unitofl_bit);
@@ -190,7 +190,7 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
         fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
             fprintf(sg_warnings_strm, "    Send diagnostic parameter "
-                    "block:\n");
+                    "list:\n");
             dStrHex((const char *)paramp, param_len, -1);
         }
     }
@@ -246,7 +246,7 @@ int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
     unsigned char rcvdiagCmdBlk[RECEIVE_DIAGNOSTICS_CMDLEN] = 
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     rcvdiagCmdBlk[1] = (unsigned char)(pcv ? 0x1 : 0);
     rcvdiagCmdBlk[2] = (unsigned char)(pg_code);
@@ -313,7 +313,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
     unsigned char rdefCmdBlk[READ_DEFECT10_CMDLEN] = 
         {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     rdefCmdBlk[2] = (unsigned char)(((req_plist << 4) & 0x10) |
                          ((req_glist << 3) & 0x8) | (dl_format & 0x7));
@@ -387,7 +387,7 @@ int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
                          {SERVICE_ACTION_IN_12_CMD, READ_MEDIA_SERIAL_NUM_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     rmsnCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
     rmsnCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
@@ -460,7 +460,7 @@ int sg_ll_report_id_info(int sg_fd, int itype, void * resp,
                         REPORT_IDENTIFYING_INFORMATION_SA,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     riiCmdBlk[6] = (max_resp_len >> 24) & 0xff;
     riiCmdBlk[7] = (max_resp_len >> 16) & 0xff;
@@ -535,7 +535,7 @@ int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
                          SET_IDENTIFYING_INFORMATION_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     siiCmdBlk[6] = (param_len >> 24) & 0xff;
     siiCmdBlk[7] = (param_len >> 16) & 0xff;
@@ -551,7 +551,7 @@ int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
         fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
             fprintf(sg_warnings_strm, "    Set identifying information "
-                    "parameter block:\n");
+                    "parameter list:\n");
             dStrHex((const char *)paramp, param_len, -1);
         }
     }
@@ -600,7 +600,7 @@ int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
-                      int fmtdata, int cmplist, int dlist_format,
+                      int fmtdata, int cmplst, int dlist_format,
                       int timeout_secs, void * paramp, int param_len,
                       int noisy, int verbose)
 {
@@ -608,7 +608,7 @@ int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
     unsigned char fuCmdBlk[FORMAT_UNIT_CMDLEN] = 
                 {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     if (fmtpinfo)
         fuCmdBlk[1] |= 0x80;
@@ -618,7 +618,7 @@ int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
         fuCmdBlk[1] |= 0x20;
     if (fmtdata)
         fuCmdBlk[1] |= 0x10;
-    if (cmplist)
+    if (cmplst)
         fuCmdBlk[1] |= 0x8;
     if (dlist_format)
         fuCmdBlk[1] |= (dlist_format & 0x7);
@@ -632,7 +632,7 @@ int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
         fprintf(sg_warnings_strm, "\n");
     }
     if ((verbose > 1) && (param_len > 0)) {
-        fprintf(sg_warnings_strm, "    format parameter block:\n");
+        fprintf(sg_warnings_strm, "    format parameter list:\n");
         dStrHex((const char *)paramp, param_len, -1);
     }
 
@@ -685,7 +685,7 @@ int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist,
     unsigned char reassCmdBlk[REASSIGN_BLKS_CMDLEN] = 
         {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     reassCmdBlk[1] = (unsigned char)(((longlba << 1) & 0x2) | (longlist & 0x1));
     if (NULL == sg_warnings_strm)
@@ -697,7 +697,7 @@ int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist,
         fprintf(sg_warnings_strm, "\n");
     }
     if (verbose > 1) {
-        fprintf(sg_warnings_strm, "    reassign blocks parameter block\n");
+        fprintf(sg_warnings_strm, "    reassign blocks parameter list\n");
         dStrHex((const char *)paramp, param_len, -1);
     }
 
@@ -749,7 +749,7 @@ int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     unsigned char gcCmdBlk[GET_CONFIG_CMD_LEN] = {GET_CONFIG_CMD, 0, 0, 0, 
                                                   0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
@@ -831,7 +831,7 @@ int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
     unsigned char prinCmdBlk[PERSISTENT_RESERVE_IN_CMDLEN] =
                  {PERSISTENT_RESERVE_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     if (rq_servact > 0)
         prinCmdBlk[1] = (unsigned char)(rq_servact & 0x1f);
@@ -901,7 +901,7 @@ int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
     unsigned char proutCmdBlk[PERSISTENT_RESERVE_OUT_CMDLEN] =
                  {PERSISTENT_RESERVE_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     if (rq_servact > 0)
         proutCmdBlk[1] = (unsigned char)(rq_servact & 0x1f);
@@ -989,7 +989,7 @@ int sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
     int k, res, sense_cat, ret;
     unsigned char readLongCmdBlk[READ_LONG10_CMDLEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     memset(readLongCmdBlk, 0, READ_LONG10_CMDLEN);
     readLongCmdBlk[0] = READ_LONG10_CMD;
@@ -1082,7 +1082,7 @@ int sg_ll_read_long16(int sg_fd, int pblock, int correct,
     int k, res, sense_cat, ret;
     unsigned char readLongCmdBlk[SERVICE_ACTION_IN_16_CMDLEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     memset(readLongCmdBlk, 0, sizeof(readLongCmdBlk));
     readLongCmdBlk[0] = SERVICE_ACTION_IN_16_CMD;
@@ -1181,7 +1181,7 @@ int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
     int k, res, sense_cat, ret;
     unsigned char writeLongCmdBlk[WRITE_LONG10_CMDLEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     memset(writeLongCmdBlk, 0, WRITE_LONG10_CMDLEN);
     writeLongCmdBlk[0] = WRITE_LONG10_CMD;
@@ -1278,7 +1278,7 @@ int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
     int k, res, sense_cat, ret;
     unsigned char writeLongCmdBlk[SERVICE_ACTION_OUT_16_CMDLEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     memset(writeLongCmdBlk, 0, sizeof(writeLongCmdBlk));
     writeLongCmdBlk[0] = SERVICE_ACTION_OUT_16_CMD;
@@ -1382,7 +1382,7 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
     unsigned char vCmdBlk[VERIFY10_CMDLEN] = 
                 {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     if (dpo)
         vCmdBlk[1] |= 0x10;
@@ -1484,7 +1484,7 @@ int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * sp;
     const unsigned char * ucp;
-    void * ptvp;
+    struct sg_pt_base * ptvp;
     const char * cnamep;
     char b[256];
     int ret = -1;
@@ -1626,7 +1626,7 @@ int sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     unsigned char rbufCmdBlk[READ_BUFFER_CMDLEN] = 
         {READ_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     rbufCmdBlk[1] = (unsigned char)(mode & 0x1f);
     rbufCmdBlk[2] = (unsigned char)(buffer_id & 0xff);
@@ -1699,7 +1699,7 @@ int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     unsigned char wbufCmdBlk[WRITE_BUFFER_CMDLEN] = 
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     wbufCmdBlk[1] = (unsigned char)(mode & 0x1f);
     wbufCmdBlk[2] = (unsigned char)(buffer_id & 0xff);
@@ -1717,7 +1717,7 @@ int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
             fprintf(sg_warnings_strm, "%02x ", wbufCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
-            fprintf(sg_warnings_strm, "    Write buffer parameter block%s:\n",
+            fprintf(sg_warnings_strm, "    Write buffer parameter list%s:\n",
                     ((param_len > 256) ? " (first 256 bytes)" : ""));
             dStrHex((const char *)paramp,
                     ((param_len > 256) ? 256 : param_len), -1);

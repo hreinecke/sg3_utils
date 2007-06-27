@@ -3,26 +3,11 @@
 # Conveniently create and set scsi logging level, show SCSI_LOG fields in human
 # readable form.
 #
-# Copyright (C) IBM Corp. 2006
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or (at
-# your option) any later version.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-# 02110-1301, USA.
+# (C) Copyright IBM Corp. 2006
 ###############################################################################
 
-# Contributed by Andreas Herrmann <aherrman@de.ibm.com> 2006/08/18
 
+REVISION="1.0"
 SCRIPTNAME="scsi_logging_level"
 
 declare -i LOG_ERROR=0
@@ -38,17 +23,6 @@ declare -i LOG_IOCTL=0
 
 declare -i LEVEL=0
 
-_ERROR_SHIFT=0
-_TIMEOUT_SHIFT=3
-_SCAN_SHIFT=6
-_MLQUEUE_SHIFT=9
-_MLCOMPLETE_SHIFT=12
-_LLQUEUE_SHIFT=15
-_LLCOMPLETE_SHIFT=18
-_HLQUEUE_SHIFT=21
-_HLCOMPLETE_SHIFT=24
-_IOCTL_SHIFT=27
-
 SET=0
 GET=0
 CREATE=0
@@ -63,7 +37,7 @@ eval set -- "$OPTS"
 printversion()
 {
     cat <<EOF
-$SCRIPTNAME (s390-tools) %S390_TOOLS_VERSION%
+%S390_TOOLS_VERSION% ($SCRIPTNAME $REVISION)
 (C) Copyright IBM Corp. 2006
 EOF
 }
@@ -106,7 +80,7 @@ Note: Several SCSI_LOG fields can be specified using several options.
 When multiple options specify same SCSI_LOG field the most specific
 option has precedence.
 
-Example: "scsi_logging_level --hlqueue 3 --hlcomplete 2 --all 1 -s" sets
+Example: "scsi_logging_level --hlqueue 3 --highlevel 2 --all 1 -s" sets
 SCSI_LOG_HLQUEUE=3, SCSI_LOG_HLCOMPLETE=2 and assigns all other SCSI_LOG
 fields the value 1.
 EOF
@@ -114,11 +88,10 @@ EOF
 
 check_level()
 {
-# something is wrong with the following if ... dpg 20061027
-#    if [ `echo -n $1 | tr --complement [:digit:] 'a' | grep -s 'a'` ]
-#    then
-#	invalid_cmdline "log level '$1' out of range [0, 7]"
-#    fi
+    if [ `echo -n $1 | tr --complement [:digit:] 'a' | grep -s 'a'` ]
+    then
+	invalid_cmdline "log level '$1' out of range [0, 7]"
+    fi
 	
     if [ $1 -lt 0 -o $1 -gt 7 ]
     then
@@ -225,16 +198,16 @@ show_logging_level()
 {
     echo "dev.scsi.logging_level = $LEVEL"
 
-    LOG_ERROR=$((($LEVEL>>$_ERROR_SHIFT) & 7))
-    LOG_TIMEOUT=$((($LEVEL>>$_TIMEOUT_SHIFT) & 7))
-    LOG_SCAN=$((($LEVEL>>$_SCAN_SHIFT) & 7))
-    LOG_MLQUEUE=$((($LEVEL>>$_MLQUEUE_SHIFT) & 7))
-    LOG_MLCOMPLETE=$((($LEVEL>>$_MLCOMPLETE_SHIFT) & 7))
-    LOG_LLQUEUE=$((($LEVEL>>$_LLQUEUE_SHIFT) & 7))
-    LOG_LLCOMPLETE=$((($LEVEL>>$_LLCOMPLETE_SHIFT) & 7))
-    LOG_HLQUEUE=$((($LEVEL>>$_HLQUEUE_SHIFT) & 7))
-    LOG_HLCOMPLETE=$((($LEVEL>>$_HLCOMPLETE_SHIFT) & 7))
-    LOG_IOCTL=$((($LEVEL>>$_IOCTL_SHIFT) & 7))
+    LOG_ERROR=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
+    LOG_TIMEOUT=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
+    LOG_SCAN=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
+    LOG_MLQUEUE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
+    LOG_MLCOMPLETE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
+    LOG_LLQUEUE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
+    LOG_LLCOMPLETE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
+    LOG_HLQUEUE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3));
+    LOG_HLCOMPLETE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3));
+    LOG_IOCTL=$(($LEVEL & 7))
 
     echo "SCSI_LOG_ERROR=$LOG_ERROR"
     echo "SCSI_LOG_TIMEOUT=$LOG_TIMEOUT"
@@ -259,19 +232,18 @@ set_logging_level()
  	exit 1
     fi
 }
-
 create_logging_level()
 {
-    LEVEL=$((($LOG_ERROR & 7)<<$_ERROR_SHIFT))
-    LEVEL=$(($LEVEL|(($LOG_TIMEOUT & 7)<<$_TIMEOUT_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_SCAN & 7)<<$_SCAN_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_MLQUEUE & 7)<<$_MLQUEUE_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_MLCOMPLETE & 7)<<$_MLCOMPLETE_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_LLQUEUE & 7)<<$_LLQUEUE_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_LLCOMPLETE & 7)<<$_LLCOMPLETE_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_HLQUEUE & 7)<<$_HLQUEUE_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_HLCOMPLETE & 7)<<$_HLCOMPLETE_SHIFT)))
-    LEVEL=$(($LEVEL|(($LOG_IOCTL & 7)<<$_IOCTL_SHIFT)))
+    LEVEL=$(($LOG_IOCTL & 7)); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_HLCOMPLETE & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_HLQUEUE & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_LLCOMPLETE & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_LLQUEUE & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_MLCOMPLETE & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_MLQUEUE & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_SCAN & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_TIMEOUT & 7))); LEVEL=$(($LEVEL<<3))
+    LEVEL=$(($LEVEL|($LOG_ERROR & 7)))
 }
 
 check_cmdline $*
@@ -292,4 +264,3 @@ then
 else
     invalid_cmdline missing option \'-g\', \'-s\' or \'-c\'
 fi
-

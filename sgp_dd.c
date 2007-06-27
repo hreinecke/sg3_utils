@@ -50,7 +50,7 @@
 
 */
 
-static char * version_str = "5.36 20070121";
+static char * version_str = "5.37 20070319";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -99,6 +99,7 @@ static char * version_str = "5.36 20070121";
 struct flags_t {
     int append;
     int coe;
+    int dio;
     int direct;
     int dpo;
     int dsync;
@@ -133,7 +134,6 @@ typedef struct request_collection
     pthread_cond_t out_sync_cv;       /* -/ hold writes until "in order" */
     int bs;
     int bpt;
-    int dio;
     int dio_incomplete;         /* -\ */
     int sum_of_resids;          /*  | */
     pthread_mutex_t aux_mutex;  /* -/ (also serializes some printf()s */
@@ -153,7 +153,6 @@ typedef struct request_element
     unsigned char cmd[MAX_SCSI_CDBSZ];
     unsigned char sb[SENSE_BUFF_LEN];
     int bs;
-    int dio;
     int dio_incomplete;
     int resid;
     int cdbsz_in;
@@ -342,14 +341,15 @@ static void usage()
            "2->IFILE,\n"
            "                3->OFILE+IFILE\n"
            "    if          file or device to read from (def: stdin)\n"
-           "    iflag       comma separated list from: [coe,direct,dpo,dsync,"
-           "excl,fua]\n"
+           "    iflag       comma separated list from: [coe,dio,direct,dpo,"
+           "dsync,excl,\n"
+           "                fua]\n"
            "    of          file or device to write to (def: stdout), "
            "OFILE of '.'\n"
            "                treated as /dev/null\n"
-           "    oflag       comma separated list from: [append,coe,direct,dpo,"
-           "dsync,excl,\n"
-           "                fua]\n"
+           "    oflag       comma separated list from: [append,coe,dio,direct,"
+           "dpo,dsync,\n"
+           "                excl,fua]\n"
            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
            "after copy\n"
            "    thr         is number of threads, must be > 0, default 4, "
@@ -512,7 +512,6 @@ static void * read_write_thread(void * v_clp)
                                    (~(psz - 1)));
     /* Follow clp members are constant during lifetime of thread */
     rep->bs = clp->bs;
-    rep->dio = clp->dio;
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
     rep->debug = clp->debug;
@@ -930,6 +929,7 @@ static int sg_start_io(Rq_elem * rep)
     struct sg_io_hdr * hp = &rep->io_hdr;
     int fua = rep->wr ? rep->out_flags.fua : rep->in_flags.fua;
     int dpo = rep->wr ? rep->out_flags.dpo : rep->in_flags.dpo;
+    int dio = rep->wr ? rep->out_flags.dio : rep->in_flags.dio;
     int cdbsz = rep->wr ? rep->cdbsz_out : rep->cdbsz_in;
     int res;
 
@@ -951,7 +951,7 @@ static int sg_start_io(Rq_elem * rep)
     hp->timeout = DEF_TIMEOUT;
     hp->usr_ptr = rep;
     hp->pack_id = (int)rep->blk;
-    if (rep->dio)
+    if (dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
     if (rep->debug > 8) {
         fprintf(stderr, "sg_start_io: SCSI %s, blk=%lld num_blks=%d\n",
@@ -986,7 +986,7 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
     memset(&io_hdr, 0 , sizeof(struct sg_io_hdr));
     /* FORCE_PACK_ID active set only read packet with matching pack_id */
     io_hdr.interface_id = 'S';
-    io_hdr.dxfer_direction = rep->wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_direction = wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
     io_hdr.pack_id = (int)rep->blk;
 
     while (((res = read(wr ? rep->outfd : rep->infd, &io_hdr,
@@ -1006,13 +1006,13 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3((rep->wr ? "writing continuing":
+            sg_chk_n_print3((wr ? "writing continuing":
                                        "reading continuing"), hp, 0);
             break;
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
             if (rep->debug > 8)
-                sg_chk_n_print3((rep->wr ? "writing": "reading"), hp, 0);
+                sg_chk_n_print3((wr ? "writing": "reading"), hp, 0);
             return res;
         case SG_LIB_CAT_NOT_READY:
         default:
@@ -1020,7 +1020,7 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
                 char ebuff[EBUFF_SZ];
 
                 snprintf(ebuff, EBUFF_SZ, "%s blk=%lld",
-                         rep->wr ? "writing": "reading", rep->blk);
+                         wr ? "writing": "reading", rep->blk);
                 status = pthread_mutex_lock(a_mutp);
                 if (0 != status) err_exit(status, "lock aux_mutex");
                 sg_chk_n_print3(ebuff, hp, 0);
@@ -1032,7 +1032,7 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 #if 0
     if (0 == (++testing % 100)) return -1;
 #endif
-    if (rep->dio &&
+    if ((wr ? rep->out_flags.dio : rep->in_flags.dio) &&
         ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         rep->dio_incomplete = 1; /* count dios done as indirect IO */
     else
@@ -1085,6 +1085,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
             fp->append = 1;
         else if (0 == strcmp(cp, "coe"))
             fp->coe = 1;
+        else if (0 == strcmp(cp, "dio"))
+            fp->dio = 1;
         else if (0 == strcmp(cp, "direct"))
             fp->direct = 1;
         else if (0 == strcmp(cp, "dpo"))
@@ -1179,9 +1181,10 @@ int main(int argc, char * argv[])
         } else if ((0 == strncmp(key,"deb", 3)) ||
                    (0 == strncmp(key,"verb", 4)))
             rcoll.debug = sg_get_num(buf);
-        else if (0 == strcmp(key,"dio"))
-            rcoll.dio = sg_get_num(buf);
-        else if (0 == strcmp(key,"fua")) {
+        else if (0 == strcmp(key,"dio")) {
+            rcoll.in_flags.dio = sg_get_num(buf);
+            rcoll.out_flags.dio = rcoll.in_flags.dio;
+        } else if (0 == strcmp(key,"fua")) {
             n = sg_get_num(buf);
             if (n & 1)
                 rcoll.out_flags.fua = 1;

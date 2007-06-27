@@ -162,10 +162,6 @@ extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
 extern int sg_normalize_sense(const struct sg_io_hdr * hp, 
                               struct sg_scsi_sense_hdr * sshp);
 
-
-/* Some extra "category" function returns (beyond those in sg_lib.h) */
-#define SG_LIB_CAT_TIMEOUT 33
-
 extern int sg_err_category(int masked_status, int host_status,
                int driver_status, const unsigned char * sense_buffer,
                int sb_len);

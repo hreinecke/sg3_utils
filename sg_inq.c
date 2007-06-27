@@ -63,7 +63,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.70 20070125";    /* spc-4 rev 08 */
+static char * version_str = "0.70 20070429";    /* spc-4 rev 10 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -329,6 +329,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         case 'e':
         case 'x':
             ++optsp->do_decode;
+            ++optsp->do_vpd;
             optsp->page_num = VPD_EXT_INQ;
             break;
         case 'h':
@@ -340,6 +341,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'i':
             ++optsp->do_decode;
+            ++optsp->do_vpd;
             optsp->page_num = VPD_DEVICE_ID;
             break;
         case 'l':
@@ -369,7 +371,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised switch code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage_for(optsp);
@@ -847,7 +849,7 @@ static const char * id_type_arr[] =
     "EUI-64 based",
     "NAA",
     "Relative target port",
-    "Target port group",
+    "Target port group",        /* spc4r09: _primary_ target port group */
     "Logical unit group",
     "MD5 logical unit identifier",
     "SCSI name string",
@@ -1047,7 +1049,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
             d_id = ((ip[2] << 8) | ip[3]);
             printf("      Relative target port: 0x%x\n", d_id);
             break;
-        case 5: /* Target port group */
+        case 5: /* (primary) Target port group */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
                 fprintf(stderr, "      << expected binary code_set, target "
                         "port association, length 4>>\n");
@@ -1312,7 +1314,7 @@ static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-       case 0: case 4: case 7:
+        case 0: case 4: case 7:
             if (len < 16) {
                 fprintf(stderr, "Block limits VPD page length too "
                         "short=%d\n", len);
@@ -1322,10 +1324,16 @@ static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Optimal transfer length granularity: %u blocks\n", u);
             u = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) |
                 buff[11];
-            printf("  Maximum transfer length: %u blocks\n", u);
+             printf("  Maximum transfer length: %u blocks\n", u);
             u = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) |
                 buff[15];
             printf("  Optimal transfer length: %u blocks\n", u);
+            if (len > 19) {     /* added in sbc3r09 */
+                u = (buff[16] << 24) | (buff[17] << 16) | (buff[18] << 8) |
+                    buff[19];
+                printf("  Maximum prefetch, xdread, xdwrite transfer length: %u "
+                       "blocks\n", u);
+            }
             break;
         case 1: case 8:
             printf("  WORM=%d\n", !!(buff[4] & 0x1));
@@ -2421,6 +2429,8 @@ int main(int argc, char * argv[])
         usage_for(&opts);
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (((opts.do_vpd || opts.do_cmddt)) && (opts.page_num < 0))
+        opts.page_num = 0;
     if (opts.num_pages > 1) {
         fprintf(stderr, "Can only fetch one page (VPD or Cmd) at a time\n");
         usage_for(&opts);
@@ -2575,7 +2585,8 @@ static int ata_command_interface(int device, char *data, int * atapi_flag,
                         "\t%s [%d]\n", safe_strerror(errno), errno);
             return errno;
         }
-    }
+    } else if (verbose > 1)
+        fprintf(stderr, "HDIO_GET_IDENTITY succeeded\n");
     if (0x2 == ((get_ident[0] >> 14) &0x3)) {   /* ATAPI device */
         if (verbose > 1)
             fprintf(stderr, "assume ATAPI device from HDIO_GET_IDENTITY "
@@ -2597,8 +2608,11 @@ static int ata_command_interface(int device, char *data, int * atapi_flag,
                             errno);
                 return errno;
             }
-        } else if (atapi_flag)
+        } else if (atapi_flag) {
             *atapi_flag = 1;
+            if (verbose > 1)
+                fprintf(stderr, "HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) succeeded\n");
+        }
     } else {    /* assume non-packet device */
         buff[0] = ATA_IDENTIFY_DEVICE;
         buff[3] = 1;
@@ -2608,7 +2622,8 @@ static int ata_command_interface(int device, char *data, int * atapi_flag,
                         "ioctl failed:\n\t%s [%d]\n", safe_strerror(errno),
                         errno);
             return errno;
-        }
+        } else if (verbose > 1)
+            fprintf(stderr, "HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) succeeded\n");
     }
     /* if the command returns data, copy it back */
     memcpy(data, buff + HDIO_DRIVE_CMD_OFFSET, ATA_IDENTIFY_BUFF_SZ);
@@ -2713,6 +2728,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x1a0, "SMC (no version claimed)"},
     {0x1bb, "SMC T10/0999-D revision 10a"},
     {0x1bc, "SMC ANSI INCITS 314-1998"},
+    {0x1be, "SMC ISO/IEC 14776-351"},
     {0x1c0, "SES (no version claimed)"},
     {0x1db, "SES T10/1212-D revision 08b"},
     {0x1dc, "SES ANSI INCITS 305-1998"},
@@ -2740,6 +2756,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x275, "SPC-2 T10/1236-D revision 19"},
     {0x276, "SPC-2 T10/1236-D revision 20"},
     {0x277, "SPC-2 ANSI INCITS 351-2001"},
+    {0x278, "SPC-2 ISO/IEC 14776-452"},
     {0x280, "OCRW (no version claimed)"},
     {0x29e, "OCRW ISO/IEC 14776-381"},
     {0x2a0, "MMC-3 (no version claimed)"},
@@ -2775,7 +2792,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x37d, "SSC-2 ANSI INCITS 380-2003"},
     {0x380, "BCC (no version claimed)"},
     {0x3a0, "MMC-4 (no version claimed)"},
-    {0x3b0, "MMC-4 T10/1545-D revision 5"},
+    {0x3b0, "MMC-4 T10/1545-D revision 5"},     /* dropped in spc4r09 */
     {0x3b1, "MMC-4 T10/1545-D revision 5a"},
     {0x3bd, "MMC-4 T10/1545-D revision 3"},
     {0x3be, "MMC-4 T10/1545-D revision 3d"},
@@ -2794,6 +2811,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x460, "SPC-4 (no version claimed)"},
     {0x480, "SMC-3 (no version claimed)"},
     {0x4a0, "ADC-2 (no version claimed)"},
+    {0x4a7, "ADC-2 T10/1741-D revision 7"},
     {0x4c0, "SBC-3 (no version claimed)"},
     {0x4e0, "MMC-6 (no version claimed)"},
     {0x820, "SSA-TL2 (no version claimed)"},
@@ -2845,6 +2863,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0xa00, "FCP-3 (no version claimed)"},
     {0xa07, "FCP-3 T10/1560-D revision 3f"},
     {0xa0f, "FCP-3 T10/1560-D revision 4"},
+    {0xa11, "FCP-3 ANSI INCITS 416-2006"},
     {0xa20, "ADT-2 (no version claimed)"},
     {0xa40, "FCP-4 (no version claimed)"},
     {0xaa0, "SPI (no version claimed)"},
@@ -2911,7 +2930,10 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0xddc, "FC-PI ANSI INCITS 352-2002"},
     {0xde0, "FC-PI-2 (no version claimed)"},
     {0xde2, "FC-PI-2 T11/1506-D revision 5.0"},
+    {0xde4, "FC-PI-2 ANSI INCITS 404-2006"},
     {0xe00, "FC-FS-2 (no version claimed)"},
+    {0xe02, "FC-FS-2 ANSI INCITS 242-2007"},
+    {0xe04, "FC-FS-2 ANSI INCITS 242-2007 with AM1 ANSI INCITS 242/AM1-2007"},
     {0xe20, "FC-LS (no version claimed)"},
     {0xe40, "FC-SP (no version claimed)"},
     {0xe42, "FC-SP T11/1570-D revision 1.6"},
@@ -2958,6 +2980,7 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
     {0x1eab, "SAT T10/1711-D rev 9"},
+    {0x1ead, "SAT ANSI INCITS 431-2007"},
     {0x1ec0, "SAT-2 (no version claimed)"},
 };
 

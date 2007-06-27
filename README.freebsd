@@ -18,6 +18,7 @@ Here is a list of utilities that have been ported:
     sg_persist
     sg_opcodes
     sg_prevent
+    sg_raw
     sg_rdac
     sg_read_buffer
     sg_read_long
@@ -76,6 +77,8 @@ At the present time these utilities have been lightly tested on a
 FreeBSD version 6.2 system with some SCSI disks, a SCSI tape
 drive and an ATAPI CD drive.
 
+See the FreeBSD section in the INSTALL file for install directions.
+
 
 Doug Gilbert
-15th January 2007
+3rd May 2007

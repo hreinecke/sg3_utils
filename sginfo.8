@@ -1,4 +1,4 @@
-.TH SGINFO "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
+.TH SGINFO "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -303,18 +303,10 @@ by Michael Weller. sginfo is derived from scsiinfo and uses the sg
 interface to get around the 4 KB buffer limit in scsiinfo that cramped
 the display of defect lists especially. sginfo was written by Douglas 
 Gilbert with patches from Kurt Garloff. This manpage corresponds with
-version 2.01 of sginfo. It may be backported (or just copied) soon to
-become scsiinfo 2.01 .
+version 2.25 of sginfo.
 .PP
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B plscsi(internet), scsiinfo(internet), sg_modes(sg3_utils),
-.B sg_inq(sg3_utils), sdparm(sdparm)
-.PP
-plscsi can send arbitrary (user supplied) SCSI commands; scsiinfo is the
-predecessor of this utility; sg_modes is a low level MODE SENSE based
-utility and sg_inq is specialized for the mandatory SCSI INQUIRY
-command which contains a lot of information about advanced devices.
-Users may find sdparm more convenient for getting and setting mode
-page parameters.
+.B scsiinfo(internet); sg_modes, sg_inq, sg_vpd (sg3_utils),
+.B sdparm(sdparm)

@@ -1,4 +1,4 @@
-.TH SG_SES "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_SES "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -61,7 +61,7 @@ output the response in hexadecimal.
 \fB\-i\fR, \fB\-\-inner\-hex\fR
 the outer levels of a status diagnostic page are decoded and printed out
 but the innermost level (e.g. the element status descriptor) is output in
-hex.
+hex. Implemented for the more complex diagnostic pages.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 list all known diagnostic page names and SES elements. \fIDEVICE\fR

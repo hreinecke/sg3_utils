@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.02 2007/1/21 */
+/* version 1.03 2007/4/3 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,6 +46,17 @@
 
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs (60 seconds) */
+
+struct sg_pt_linux_scsi {
+    struct sg_io_hdr io_hdr;
+    int in_err;
+    int os_err;
+};
+
+struct sg_pt_base {
+    struct sg_pt_linux_scsi impl;
+};
+
 
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
@@ -80,13 +91,7 @@ int scsi_pt_close_device(int device_fd)
 }
 
 
-struct sg_pt_linux_scsi {
-    struct sg_io_hdr io_hdr;
-    int in_err;
-    int os_err;
-};
-
-void * construct_scsi_pt_obj()
+struct sg_pt_base * construct_scsi_pt_obj()
 {
     struct sg_pt_linux_scsi * ptp;
 
@@ -97,20 +102,21 @@ void * construct_scsi_pt_obj()
         ptp->io_hdr.interface_id = 'S';
         ptp->io_hdr.dxfer_direction = SG_DXFER_NONE;
     }
-    return ptp;
+    return (struct sg_pt_base *)ptp;
 }
 
-void destruct_scsi_pt_obj(void * vp)
+void destruct_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp)
         free(ptp);
 }
 
-void set_scsi_pt_cdb(void * vp, const unsigned char * cdb, int cdb_len)
+void set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
+                     int cdb_len)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp->io_hdr.cmdp)
         ++ptp->in_err;
@@ -118,10 +124,10 @@ void set_scsi_pt_cdb(void * vp, const unsigned char * cdb, int cdb_len)
     ptp->io_hdr.cmd_len = cdb_len;
 }
 
-void set_scsi_pt_sense(void * vp, unsigned char * sense,
+void set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
                        int max_sense_len)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp->io_hdr.sbp)
         ++ptp->in_err;
@@ -130,10 +136,10 @@ void set_scsi_pt_sense(void * vp, unsigned char * sense,
     ptp->io_hdr.mx_sb_len = max_sense_len;
 }
 
-void set_scsi_pt_data_in(void * vp,             /* from device */
+void set_scsi_pt_data_in(struct sg_pt_base * vp,  /* from device */
                          unsigned char * dxferp, int dxfer_len)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp->io_hdr.dxferp)
         ++ptp->in_err;
@@ -144,10 +150,10 @@ void set_scsi_pt_data_in(void * vp,             /* from device */
     }
 }
 
-void set_scsi_pt_data_out(void * vp,            /* to device */
+void set_scsi_pt_data_out(struct sg_pt_base * vp,   /* to device */
                           const unsigned char * dxferp, int dxfer_len)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp->io_hdr.dxferp)
         ++ptp->in_err;
@@ -158,41 +164,43 @@ void set_scsi_pt_data_out(void * vp,            /* to device */
     }
 }
 
-void set_scsi_pt_packet_id(void * vp, int pack_id)
+void set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     ptp->io_hdr.pack_id = pack_id;
 }
 
-void set_scsi_pt_tag(void * vp, int tag)
+void set_scsi_pt_tag(struct sg_pt_base * vp, unsigned long long tag)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     ++ptp->in_err;
     tag = tag;                  /* dummy to silence compiler */
 }
 
-void set_scsi_pt_task_management(void * vp, int tmf_code)
+/* Note that task management function codes are transport specific */
+void set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     ++ptp->in_err;
     tmf_code = tmf_code;        /* dummy to silence compiler */
 }
 
-void set_scsi_pt_task_attr(void * vp, int attribute, int priority)
+void set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute,
+                           int priority)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     ++ptp->in_err;
     attribute = attribute;      /* dummy to silence compiler */
     priority = priority;        /* dummy to silence compiler */
 }
 
-int do_scsi_pt(void * vp, int fd, int time_secs, int verbose)
+int do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
 {
-    struct sg_pt_linux_scsi * ptp = (struct sg_pt_linux_scsi *)vp;
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
@@ -241,9 +249,9 @@ int do_scsi_pt(void * vp, int fd, int time_secs, int verbose)
 #define SG_LIB_SUGGEST_MASK     SUGGEST_MASK
 #define SG_LIB_DRIVER_SENSE    DRIVER_SENSE
 
-int get_scsi_pt_result_category(const void * vp)
+int get_scsi_pt_result_category(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
     int dr_st = ptp->io_hdr.driver_status & SG_LIB_DRIVER_MASK;
     int scsi_st = ptp->io_hdr.status & 0x7e;
 
@@ -263,44 +271,44 @@ int get_scsi_pt_result_category(const void * vp)
         return SCSI_PT_RESULT_GOOD;
 }
 
-int get_scsi_pt_resid(const void * vp)
+int get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return ptp->io_hdr.resid;
 }
 
-int get_scsi_pt_status_response(const void * vp)
+int get_scsi_pt_status_response(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return ptp->io_hdr.status;
 }
 
-int get_scsi_pt_sense_len(const void * vp)
+int get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return ptp->io_hdr.sb_len_wr;
 }
 
-int get_scsi_pt_duration_ms(const void * vp)
+int get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return ptp->io_hdr.duration;
 }
 
-int get_scsi_pt_transport_err(const void * vp)
+int get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return (ptp->io_hdr.host_status << 8) + ptp->io_hdr.driver_status;
 }
 
-int get_scsi_pt_os_err(const void * vp)
+int get_scsi_pt_os_err(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return ptp->os_err;
 }
@@ -334,9 +342,10 @@ static const char * linux_driver_suggests[] = {
     (int)(sizeof(linux_driver_suggests) / sizeof(linux_driver_suggests[0]))
 
 
-char * get_scsi_pt_transport_err_str(const void * vp, int max_b_len, char * b)
+char * get_scsi_pt_transport_err_str(const struct sg_pt_base * vp,
+                                     int max_b_len, char * b)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
     int ds = ptp->io_hdr.driver_status;
     int hs = ptp->io_hdr.host_status;
     int n, m;
@@ -374,10 +383,10 @@ char * get_scsi_pt_transport_err_str(const void * vp, int max_b_len, char * b)
     return b;
 }
 
-char * get_scsi_pt_os_err_str(const void * vp,
+char * get_scsi_pt_os_err_str(const struct sg_pt_base * vp,
                               int max_b_len, char * b)
 {
-    const struct sg_pt_linux_scsi * ptp = (const struct sg_pt_linux_scsi *)vp;
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
     const char * cp;
 
     cp = safe_strerror(ptp->os_err);

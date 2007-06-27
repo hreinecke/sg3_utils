@@ -86,6 +86,18 @@ Utilities that are linux specific (e.g. sg_map) are not built for
 FreeBSD.
 
 
+Solaris
+=======
+In Solaris, the utilities can be built with "make -f Makefile.solaris".
+This will build a shared object (i.e. libsgutils.so and friends) that
+the utilities depend on. To install use "make -f Makefile.solaris install".
+These makes depend on gcc and libtool. To build without reliance on a shared
+library (and thus libtool) use "make -f no_lib/Makefile.solaris" (or
+execute the "make_no_lib_solaris.sh" script which does the same thing).
+Utilities that are linux specific (e.g. sg_map) are not built for
+Solaris.
+
+
 Tru64 (OSF)
 ===========
 In Tru64, the utilities can be built with "make -f Makefile.osf1".
@@ -128,5 +140,5 @@ will be placed in that directory. They can be executed in a MSYS or "cmd"
 shell.
 
 
-21st January 2007
+3rd May 2007
 Doug Gilbert

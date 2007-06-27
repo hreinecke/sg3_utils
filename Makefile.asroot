@@ -16,7 +16,7 @@ EXECS = sg_dd sgp_dd sgm_dd sg_read sg_map sg_scan sg_rbuf \
 	sg_verify sg_emc_trespass sg_luns sg_sync sg_prevent \
 	sg_get_config sg_wr_mode sg_rtpg sg_reassign sg_format \
 	sg_rmsn sg_ident sg_map26 sg_rdac sg_vpd sg_sat_identify \
-	sg_read_buffer sg_write_buffer
+	sg_read_buffer sg_write_buffer sg_raw
 
 MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sginfo.8 sg_readcap.8 sg_turs.8 sg_inq.8 sg_test_rwbuf.8 \
@@ -26,7 +26,7 @@ MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sg_luns.8 sg_sync.8 sg_prevent.8 sg_get_config.8 sg_wr_mode.8 \
 	sg_rtpg.8 sg_reassign.8 sg_format.8 sg_rmsn.8 sg_ident.8 \
 	sg_map26.8 sg_rdac.8 sg_vpd.8 sg3_utils.8 sg_sat_identify.8 \
-	sg_read_buffer.8 sg_write_buffer.8
+	sg_read_buffer.8 sg_write_buffer.8 sg_raw.8
 MAN_PREF = man8
 
 HEADERS = sg_lib.h sg_cmds.h sg_cmds_basic.h sg_cmds_extra.h sg_pt.h \
@@ -209,6 +209,9 @@ sg_read_buffer: sg_read_buffer.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_write_buffer: sg_write_buffer.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_raw: sg_raw.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 

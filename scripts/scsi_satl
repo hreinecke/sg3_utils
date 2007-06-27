@@ -24,7 +24,7 @@
 # This script uses utilities from sg3_utils package (version
 # 1.22 or later) and sdparm (version 0.99 or later)
 #
-# Douglas Gilbert 20061230
+# Douglas Gilbert 20070317
 
 
 quiet=0

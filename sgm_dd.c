@@ -55,7 +55,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.31 20070123";
+static char * version_str = "1.32 20070318 shared_mmap";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -80,6 +80,13 @@ static char * version_str = "1.31 20070123";
 #endif
 #ifndef SAI_READ_CAPACITY_16
 #define SAI_READ_CAPACITY_16  0x10
+#endif
+
+#ifndef SG_FLAG_SHARED_MMAP_IO
+#define SG_FLAG_SHARED_MMAP_IO 8
+#endif
+#ifndef SG_INFO_SHARED_MMAP_IO
+#define SG_INFO_SHARED_MMAP_IO 8
 #endif
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -115,15 +122,20 @@ static int start_tm_valid = 0;
 static struct timeval start_tm;
 static int blk_sz = 0;
 
+static int shared_mm_req = 0;
+static int shared_mm_done = 0;
+
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 struct flags_t {
     int append;
+    int dio;
     int direct;
     int dpo;
     int dsync;
     int excl;
     int fua;
+    int smmap;
 };
 
 
@@ -273,8 +285,9 @@ void usage()
            "    of          file or device to write to (def: stdout), "
            "OFILE of '.'\n"
            "                treated as /dev/null\n"
-           "    oflag       comma separated list from: [append,direct,dpo,"
-           "dsync,excl,fua]\n"
+           "    oflag       comma separated list from: [append,dio,direct,"
+           "dpo,dsync,\n"
+           "                excl,fua,smmap]\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
@@ -286,7 +299,7 @@ void usage()
            "    --help      print usage message then exit\n"
            "    --version   print version information then exit\n\n"
            "Copy from IFILE to OFILE, similar to dd command\n"
-           "specialized for SCSI devices for which mmap-ed IO attemped\n");
+           "specialized for SCSI devices for which mmap-ed IO attempted\n");
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
@@ -563,7 +576,8 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
  * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
  * -1 -> unrecoverable error */
 int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
-             int bs, int cdbsz, int fua, int dpo, int do_mmap, int * diop)
+             int bs, int cdbsz, int fua, int dpo, int do_mmap,
+             int mmap_shareable, int * diop)
 {
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -582,15 +596,18 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
     io_hdr.cmdp = wrCmd;
     io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
     io_hdr.dxfer_len = bs * blocks;
-    if (! do_mmap)
+    if (mmap_shareable || (! do_mmap))
         io_hdr.dxferp = buff;
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.pack_id = (int)to_block;
-    if (do_mmap)
+    if (mmap_shareable) {
+        io_hdr.flags |= SG_FLAG_SHARED_MMAP_IO;
+        ++shared_mm_req;
+    } else if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
-    if (diop && *diop)
+    else if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
     if (verbose > 2) {
         fprintf(stderr, "    write cdb: ");
@@ -644,6 +661,8 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
         sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         return res;
     }
+    if ((mmap_shareable) && (SG_INFO_SHARED_MMAP_IO & io_hdr.info))
+        ++shared_mm_done;
     if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
@@ -669,6 +688,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
             *np++ = '\0';
         if (0 == strcmp(cp, "append"))
             fp->append = 1;
+        else if (0 == strcmp(cp, "dio"))
+            fp->dio = 1;
         else if (0 == strcmp(cp, "direct"))
             fp->direct = 1;
         else if (0 == strcmp(cp, "dpo"))
@@ -679,6 +700,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
             fp->excl = 1;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = 1;
+        else if (0 == strcmp(cp, "smmap"))
+            fp->smmap = 1;
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
@@ -723,7 +746,6 @@ int main(int argc, char * argv[])
     int cdbsz_given = 0;
     int do_coe = 0;     /* dummy, just accept + ignore */
     int do_sync = 0;
-    int do_dio = 0;
     int num_dio_not_done = 0;
     int in_sect_sz, out_sect_sz;
     int n, flags;
@@ -732,6 +754,7 @@ int main(int argc, char * argv[])
     size_t psz = getpagesize();
     struct flags_t in_flags;
     struct flags_t out_flags;
+    int mmap_shareable = 0;
     int ret = 0;
 
     inf[0] = '\0';
@@ -774,7 +797,7 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"dio"))
-            do_dio = sg_get_num(buf);
+            out_flags.dio = sg_get_num(buf);
         else if (0 == strcmp(key,"fua")) {
             n = sg_get_num(buf);
             if (n & 1)
@@ -939,6 +962,7 @@ int main(int argc, char * argv[])
                 perror(ebuff);
                 return SG_LIB_FILE_ERROR;
             }
+            mmap_shareable = 1;
         }
         else {
             flags = O_RDONLY;
@@ -1183,12 +1207,12 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (do_dio && (FT_SG != in_type)) {
-        do_dio = 0;
+    if (out_flags.dio && (FT_SG != in_type)) {
+        out_flags.dio = 0;
         fprintf(stderr, ">>> dio only performed on 'of' side when 'if' is"
                 " an sg device\n");
     }
-    if (do_dio) {
+    if (out_flags.dio) {
         int fd;
         char c;
 
@@ -1202,9 +1226,11 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (wrkMmap)
+    if (wrkMmap) {
         wrkPos = wrkMmap;
-    else {
+        if (! (mmap_shareable && out_flags.smmap &&  (FT_SG == out_type)))
+            mmap_shareable = 0;                                                                                                
+    } else {
         if ((FT_RAW == in_type) || (FT_RAW == out_type)) {
             wrkBuff = (unsigned char *)malloc(blk_sz * bpt + psz);
             if (0 == wrkBuff) {
@@ -1237,8 +1263,8 @@ int main(int argc, char * argv[])
     }
     req_count = dd_count;
 
-    if (verbose && (dd_count > 0) && (0 == do_dio) &&
-        (FT_SG == in_type) && (FT_SG == out_type))
+    if (verbose && (dd_count > 0) && (0 == out_flags.dio) &&
+        (FT_SG == in_type) && (FT_SG == out_type) && (! mmap_shareable))
         fprintf(stderr, "Since both 'if' and 'of' are sg devices, only do "
                 "mmap-ed transfers on 'if'\n");
 
@@ -1290,18 +1316,19 @@ int main(int argc, char * argv[])
 
         if (FT_SG == out_type) {
             int do_mmap = (FT_SG == in_type) ? 0 : 1;
-            int dio_res = do_dio;
+            int dio_res = out_flags.dio;
 
             ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz, scsi_cdbsz_out,
-                           out_flags.fua, out_flags.dpo, do_mmap, &dio_res);
+                           out_flags.fua, out_flags.dpo, do_mmap,
+                           mmap_shareable, &dio_res);
             if ((SG_LIB_CAT_UNIT_ATTENTION == ret) ||
                 (SG_LIB_CAT_ABORTED_COMMAND == ret)) {
                 fprintf(stderr, "Unit attention or aborted command, "
                         "continuing (w)\n");
-                dio_res = do_dio;
+                dio_res = out_flags.dio;
                 ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz,
                                scsi_cdbsz_out, out_flags.fua, out_flags.dpo,
-                               do_mmap, &dio_res);
+                               do_mmap, mmap_shareable, &dio_res);
             }
             if (0 != ret) {
                 fprintf(stderr, "sg_write failed, seek=%lld\n", seek);
@@ -1309,7 +1336,7 @@ int main(int argc, char * argv[])
             }
             else {
                 out_full += blocks;
-                if (do_dio && (0 == dio_res))
+                if (out_flags.dio && (0 == dio_res))
                     num_dio_not_done++;
             }
         }
@@ -1376,5 +1403,9 @@ int main(int argc, char * argv[])
     if (num_dio_not_done)
         fprintf(stderr, ">> dio requested but _not_ done %d times\n", 
                 num_dio_not_done);
+    if ((verbose > 0) && out_flags.smmap && (shared_mm_req > 0)) {
+        fprintf(stderr, ">> shared_mm_req=%d,  shared_mm_done=%d\n",
+                shared_mm_req, shared_mm_done);
+    }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

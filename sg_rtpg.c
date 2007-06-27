@@ -45,16 +45,15 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.11 20070127";
+static char * version_str = "1.12 20070419";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
-
-#define ME "sg_rtpg: "
 
 #define TPGS_STATE_OPTIMIZED 0x0
 #define TPGS_STATE_NONOPTIMIZED 0x1
 #define TPGS_STATE_STANDBY 0x2
 #define TPGS_STATE_UNAVAILABLE 0x3
+#define TPGS_STATE_OFFLINE 0xe          /* SPC-4 rev 9 */
 #define TPGS_STATE_TRANSITIONING 0xf
 
 #define STATUS_CODE_NOSTATUS 0x0
@@ -125,10 +124,12 @@ static void decode_status(const int st)
         printf(" (no status available)");
         break;
     case STATUS_CODE_CHANGED_BY_SET:
-        printf(" (status changed by SET TARGET PORT GROUPS)");
+        printf(" (target port asym. state changed by SET TARGET PORT "
+               "GROUPS command)");
         break;
     case STATUS_CODE_CHANGED_BY_IMPLICIT:
-        printf(" (status changed by implicit TPGS behaviour)");
+        printf(" (target port asym. state changed by implicit lu "
+               "behaviour)");
         break;
     default:
         printf(" (unknown status code)");
@@ -150,6 +151,9 @@ static void decode_tpgs_state(const int st)
         break;
     case TPGS_STATE_UNAVAILABLE:
         printf(" (unavailable)");
+        break;
+    case TPGS_STATE_OFFLINE:
+        printf(" (offline)");
         break;
     case TPGS_STATE_TRANSITIONING:
         printf(" (transitioning between states)");
@@ -199,10 +203,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            fprintf(stderr, "Version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -229,7 +233,7 @@ int main(int argc, char * argv[])
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+        fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
@@ -281,6 +285,7 @@ int main(int argc, char * argv[])
             printf("\n");
 
             printf("    T_SUP : %d, ", !!(ucp[1] & 0x80));
+            printf("O_SUP : %d, ", !!(ucp[1] & 0x40));
             printf("U_SUP : %d, ", !!(ucp[1] & 0x08));
             printf("S_SUP : %d, ", !!(ucp[1] & 0x04));
             printf("AN_SUP : %d, ", !!(ucp[1] & 0x02));

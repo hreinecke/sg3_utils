@@ -34,17 +34,6 @@
 extern "C" {
 #endif
 
-/*
- * Additional sense data categories (to those defined in sg_lib.h).
- */
-
-#define SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO 17 /* Illegal request (other than */
-                                /* invalid opcode) plus 'info' field: */
-                                /*  [sk,asc,ascq: 0x5,*,*] */
-#define SG_LIB_CAT_MEDIUM_HARD_WITH_INFO 18 /* medium or hardware error */
-                                /* sense key plus 'info' field: */
-                                /*       [sk,asc,ascq: 0x3/0x4,*,*] */
-
 
 /* Invokes a ATA PASS-THROUGH (12 or 16) SCSI command (SAT). If cdb_len
  * is 12 then a ATA PASS-THROUGH (12) command is called. If cdb_len is 16

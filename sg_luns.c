@@ -45,17 +45,18 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.10 20070128";
+static char * version_str = "1.12 20070419";
 
-#define REPORT_LUNS_BUFF_LEN 1024
-
-#define ME "sg_luns: "
+#define REPORT_LUNS_BUFF_LEN (1024*64)
+    
+static unsigned char reportLunsBuff[REPORT_LUNS_BUFF_LEN];
 
 
 static struct option long_options[] = {
         {"decode", 0, 0, 'd'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
+        {"quiet", 0, 0, 'q'},
         {"raw", 0, 0, 'r'},
         {"select", 1, 0, 's'},
         {"verbose", 0, 0, 'v'},
@@ -66,12 +67,14 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_luns    [--decode] [--help] [--hex] [--raw] [--select=SR]\n"
+          "sg_luns    [--decode] [--help] [--hex] [--quiet] [--raw] "
+          "[--select=SR]\n"
           "                  [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --decode|-d        decode all luns into component parts\n"
           "    --help|-h          print out usage message\n"
           "    --hex|-H           output in hexadecimal\n"
+          "    --quiet|-q         output only ASCII hex lun values\n"
           "    --raw|-r           output in binary\n"
           "    --select=SR|-s SR    select report SR (def: 0)\n"
           "                          0 -> luns apart from 'well "
@@ -212,9 +215,9 @@ static void dStrRaw(const char* str, int len)
 int main(int argc, char * argv[])
 {
     int sg_fd, k, m, off, res, c, list_len, luns, trunc;
-    unsigned char reportLunsBuff[REPORT_LUNS_BUFF_LEN];
     int decode = 0;
     int do_hex = 0;
+    int do_quiet = 0;
     int do_raw = 0;
     int select_rep = 0;
     int verbose = 0;
@@ -225,7 +228,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHrs:vV", long_options,
+        c = getopt_long(argc, argv, "dhHqrs:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -241,6 +244,9 @@ int main(int argc, char * argv[])
         case 'H':
             ++do_hex;
             break;
+        case 'q':
+            ++do_quiet;
+            break;
         case 'r':
             ++do_raw;
             break;
@@ -255,10 +261,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -285,7 +291,7 @@ int main(int argc, char * argv[])
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+        fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
@@ -300,31 +306,34 @@ int main(int argc, char * argv[])
         list_len = (reportLunsBuff[0] << 24) + (reportLunsBuff[1] << 16) +
                    (reportLunsBuff[2] << 8) + reportLunsBuff[3];
         if (do_raw) {
-            dStrRaw((const char *)reportLunsBuff, list_len + 4);
+            dStrRaw((const char *)reportLunsBuff, list_len + 8);
             goto the_end;
         }
         if (do_hex) {
-            dStrHex((const char *)reportLunsBuff, list_len + 4, 1);
+            dStrHex((const char *)reportLunsBuff, list_len + 8, 1);
             goto the_end;
         }
         luns = (list_len / 8);
-        printf("Lun list length = %d which imples %d lun entr%s\n",
-               list_len, luns, ((1 == luns) ? "y" : "ies"));
+        if (0 == do_quiet)
+            printf("Lun list length = %d which imples %d lun entr%s\n",
+                   list_len, luns, ((1 == luns) ? "y" : "ies"));
         if ((list_len + 8) > (int)sizeof(reportLunsBuff)) {
             luns = ((sizeof(reportLunsBuff) - 8) / 8);
             trunc = 1;
-            printf("  <<too many luns for internal buffer, will show %d "
-                   "luns>>\n", luns);
+            fprintf(stderr, "  <<too many luns for internal buffer, will "
+                    "show %d luns>>\n", luns);
         }
-        if (verbose) {
+        if (verbose > 1) {
             fprintf(stderr, "\nOutput response in hex\n");
             dStrHex((const char *)reportLunsBuff,
                     (trunc ? (int)sizeof(reportLunsBuff) : list_len + 8), 1);
         }
         for (k = 0, off = 8; k < luns; ++k) {
-            if (0 == k)
-                printf("Report luns [select_report=%d]:\n", select_rep);
-            printf("    ");
+            if (0 == do_quiet) {
+                if (0 == k)
+                    printf("Report luns [select_report=%d]:\n", select_rep);
+                printf("    ");
+            }
             for (m = 0; m < 8; ++m, ++off)
                 printf("%02x", reportLunsBuff[off]);
             printf("\n");

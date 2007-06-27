@@ -35,6 +35,7 @@ Description: Collection of Linux utilities for devices that use the
      * sgp_dd - like sg_dd, only multithreaded
      * sg_persist - accesses the Persistent Reservation In and Out commands
      * sg_prevent - issues PREVENT ALLOW MEDIUM REMOVAL command (MMC + SSC)
+     * sg_raw - send arbitrary SCSI commands
      * sg_rbuf - tests SCSI bus speed
      * sg_rdac - vendor specific for RDAC hardware
      * sg_read - reads multiple blocks, useful for timing

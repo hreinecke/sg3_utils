@@ -45,7 +45,7 @@
  * (e.g. disks).
  */
 
-static char * version_str = "1.07 20070127";
+static char * version_str = "1.07 20070419";
 
 
 #define ME "sg_sync: "
@@ -151,7 +151,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

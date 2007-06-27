@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_MODES "8" "February 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_modes \- reads mode pages with SCSI MODE SENSE command
 .SH SYNOPSIS
@@ -47,12 +47,20 @@ are requested which is equivalent to '\-\-page=63,255'.
 .TP
 \fB\-c\fR, \fB\-\-control\fR=\fIPC\fR
 \fIPC\fR is the page control value. Up to four different versions of each
-page are held by the device: the current values [0] (i.e. those active at
-the moment), the changeable values [1] (bit mask showing which fields could
-be changed with a MODE SELECT), default values [2] (the manufacturer's
-settings). Finally there are the saved values [3] which are the values that
-will be re\-instated the next time the device is power cycled. If this option
-is not given then current values [0] are assumed.
+page are held by the device:
+.br
+  \fB0\fR : current values (i.e. those active at present)
+.br
+  \fB1\fR : changeable values
+.br
+  \fB2\fR : default values (i.e. the manufacturer's settings)
+.br
+  \fB3\fR : saved values
+.br
+The changeable values are bit masks showing which fields could be changed
+with a MODE SELECT. The saved values will be re\-instated the next time
+the device is power cycled or reset. If this option is not given then
+current values [0] are assumed.
 .TP
 \fB\-d\fR, \fB\-\-dbd\fR
 disable block descriptors. By default, block descriptors (usually
@@ -134,7 +142,7 @@ then has the same action as '\-R'
 \fB\-R\fR
 output the selected mode page to stdout a byte per line. Each line contains
 two hexadecimal digits (e.g. "3e"). Useful as input (after editing) to
-the sg_wr_mode utility.
+the sg_wr_mode(8) utility.
 .TP
 \fB\-6\fR, \fB\-\-six\fR
 by default this utility sends a 10 byte MODE SENSE command to
@@ -228,7 +236,7 @@ for the subpage code is 0.
 \fB\-r\fR
 output the selected mode page to stdout a byte per line. Each line contains
 two hexadecimal digits (e.g. "3e"). Useful as input (after editing) to
-the sg_wr_mode utility.
+the sg_wr_mode(8) utility.
 .TP
 \fB\-subp\fR=\fISPG\fR
 sub page code to fetch. Should be a hexadecimal number between 0 and 
@@ -252,7 +260,7 @@ Copyright \(co 2000\-2007 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(sdparm), sg_wr_mode(sg3_utils), sginfo(sg3_utils),
+.B sdparm(8), sg_wr_mode(8), sginfo(8),
 .B sgmode(scsirastools), scsiinfo(net), scu(net),
 .B seatools(seagate)
 .PP

@@ -19,7 +19,7 @@
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   Invocation: sg_simple16 <sg_device>
+   Invocation: sg_simple16 <scsi_device>
 
    Version 1.02 (20020206)
 

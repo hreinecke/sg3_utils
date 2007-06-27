@@ -18,6 +18,7 @@ Here is a list of utilities that have been ported:
     sg_opcodes
     sg_persist
     sg_prevent
+    sg_raw
     sg_rdac
     sg_read_buffer
     sg_read_long
@@ -79,4 +80,4 @@ subdirectory. Currently only the Tru64 port uses it.
 
 
 Doug Gilbert
-12th January 2006
+3rd May 2007

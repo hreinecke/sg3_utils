@@ -1,6 +1,10 @@
 # This file is an example for the sg_persist utility.
-# That utility can take one or more "transportID"s from stdin when either
-# the '--transport-id=-" or "-X -" option is given on the command line.
+# It discusses using "TransportID"s which are defined (most recently)
+# in SPC-4 revison 9 section 7.5.4 titled: "TransportID identifiers".
+#
+# The sg_persist utility can take one or more "transportID"s from stdin when
+# either the '--transport-id=-" or "-X -" option is given on the command
+# line.
 
 # To see transport IDs decoded after they have been read in (e.g. to check
 # they are well formed) use the verbose flag 3 times (i.e. "... -vvv ...").
@@ -34,4 +38,4 @@
 # ... since there is only one line in this file that has a
 # transportID on it that will be decoded (i.e. the "SPI" one above).
 
-# dpg 20041124
+# dpg 20070223

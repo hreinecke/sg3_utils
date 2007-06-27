@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_SENDDIAG "8" "February 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -81,11 +81,20 @@ likely the \fI\-\-pf\fR option should also be given.
 .TP
 \fB\-s\fR, \fB\-\-selftest\fR=\fIST\fR
 where \fIST\fR is the self-test code. The default value is 0 which is
-inactive. A value of 1 selects a background short self-test; 2 selects a
-background extended self-test; 5 selects a foreground short self-test; 6
-selects a foreground extended test. A value of 4 will abort a (background)
-self-test that is in progress. This option is mutually exclusive with
-default self-test (i.e. \fI\-\-test\fR).
+inactive. Some other values:
+.br
+  \fB1\fR : background short self-test
+.br
+  \fB2\fR : background extended self-test
+.br
+  \fB4\fR : aborts a (background) self-test that is in progress
+.br
+  \fB5\fR : foreground short self-test
+.br
+  \fB6\fR : foreground extended self-test
+.br
+This option is mutually exclusive with default self-test (i.e. 
+can't have (\fIST\fR > 0) and \fI\-\-test\fR).
 .TP
 \fB\-t\fR, \fB\-\-test\fR
 sets the _default_ Self Test (SelfTest) bit. By default this is clear (0).
@@ -112,7 +121,7 @@ codes' maximum duration is vendor specific (e.g. a little over 10 minutes
 with the author's disks). The foreground self-test codes wait until they
 are completed while the background self-test codes return immediately. The
 results of both foreground and background self-test codes are placed in
-the 'self-test results' log page (see sg_logs). The SCSI command timeout
+the 'self-test results' log page (see sg_logs(8)). The SCSI command timeout
 for this utility is set to 60 minutes to allow for slow foreground extended
 self-tests.
 .PP
@@ -132,7 +141,7 @@ turn on the CJTPAT (jitter pattern) on some SAS disks (one script for each
 phy). One possible invocation
 is: 'sg_senddiag \-\-pf \-\-raw=\- /dev/sg2 < .../sdiag_sas_p1_cjtpat.txt'
 .PP
-Arbitrary diagnostic pages can be read (in hex) with the sg_ses
+Arbitrary diagnostic pages can be read (in hex) with the sg_ses(8)
 utility (not only those defined in SES\-2).
 .PP
 If the utility is used with no options (e.g. "sg_senddiag /dev/sg1")
@@ -146,7 +155,7 @@ generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks and
 DVD drives) can also be specified. For example 'sg_senddiag \-t /dev/sda'
 will work in the 2.6 series kernels.
 .PP
-To access SCSI enclosures see the sg_ses utility. sg_ses uses the
+To access SCSI enclosures see the sg_ses(8) utility. sg_ses uses the
 SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS commands as outlined
 in the SES\-2 (draft) standard.
 .SH EXIT STATUS
@@ -240,4 +249,4 @@ Copyright \(co 2003\-2007 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_ses(sg3_utils), smartmontools(see net), sg_logs(sg3_utils)
+.B sg_ses(8), sg_logs(8), smartmontools(see net)
