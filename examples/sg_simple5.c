@@ -11,15 +11,15 @@
    interface. This allows this example program to be ported to
    OSes other than linux.
 
-*  Copyright (C) 2006 D. Gilbert
+*  Copyright (C) 2006-2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   Invocation: sg_simple5 [-x] <sg_device>
+   Invocation: sg_simple5 [-x] <scsi_device>
 
-   Version 1.00 (20060105)
+   Version 1.01 (20070331)
 
 */
 
@@ -42,7 +42,7 @@ int main(int argc, char * argv[])
     char b[512];
     unsigned char sense_b[32];
     int verbose = 0;
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp("-v", argv[k]))

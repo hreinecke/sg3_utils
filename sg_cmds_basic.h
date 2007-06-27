@@ -244,6 +244,8 @@ extern int sg_cmds_close_device(int device_fd);
 extern const char * sg_cmds_version();
 
 
+struct sg_pt_base;
+
 /* This is an internal worker used by both sg_cmds_basic and sg_cmds_extra */
 /* Returns -2 for sense data (may not be fatal), -1 for failed or the
    number of bytes fetched. For data out (to device) or no data, set
@@ -251,9 +253,10 @@ extern const char * sg_cmds_version();
    output via 'o_sense_cat' pointer (if not NULL). Outputs to
    sg_warnings_strm (def: stderr) if problems; depending on 'noisy'
    and 'verbose' settings */
-extern int sg_cmds_process_resp(void * ptvp, const char * leadin, int res,
-                                int mx_resp_len, const unsigned char * sense_b,
-                                int noisy, int verbose, int * o_sense_cat);
+extern int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
+                                int res, int mx_resp_len,
+                                const unsigned char * sense_b, int noisy,
+                                int verbose, int * o_sense_cat);
 
 #ifdef __cplusplus
 }

@@ -26,7 +26,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.14 20070129";
+static char * version_str = "1.14 20070419";
 
 #define MAX_XFER_LEN 10000
 
@@ -192,7 +192,7 @@ int main(int argc, char * argv[])
             }
             break;
         default:
-            fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

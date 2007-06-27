@@ -9,7 +9,7 @@
 # Uses sdparm rather than sg3_utils as the former is simpler to
 # use for setting mode page value.
 #
-# Douglas Gilbert 20061208
+# Douglas Gilbert 20070317
 
 
 seconds=30

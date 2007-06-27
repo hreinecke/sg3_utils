@@ -43,15 +43,39 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.32 20070128";    /* ses2r15 */
+static char * version_str = "1.34 20070419";    /* ses2r16 */
 
 #define MX_ALLOC_LEN 4096
-#define MX_ELEM_HDR 512
+#define MX_ELEM_HDR 1024
 
 #define TEMPERATURE_OFFSET 20   /* 8 bits represents -19 C to +235 C */
                                 /* value of 0 (would imply -20 C) reserved */
 
-#define ME "sg_ses: "
+#define DEVICE_EL 0x1
+#define POWER_SUPPLY_EL 0x2
+#define COOLING_EL 0x3
+#define TEMPERATURE_EL 0x4
+#define DOOR_LOCK_EL 0x5
+#define AUD_ALARM_EL 0x6
+#define ENC_SC_ELECTR_EL 0x7
+#define SCC_CELECTR_EL 0x8
+#define NV_CACHE_EL 0x9
+#define INV_OP_REASON_EL 0xa
+#define UI_POWER_SUPPLY_EL 0xb
+#define DISPLAY_EL 0xc
+#define KEY_PAD_EL 0xd
+#define ENCLOSURE_EL 0xe
+#define SCSI_PORT_TRAN_EL 0xf
+#define LANGUAGE_EL 0x10
+#define COMM_PORT_EL 0x11
+#define VOLT_SENSOR_EL 0x12
+#define CURR_SENSOR_EL 0x13
+#define SCSI_TPORT_EL 0x14
+#define SCSI_IPORT_EL 0x15
+#define SIMPLE_SUBENC_EL 0x16
+#define ARRAY_DEV_EL 0x17
+#define SAS_EXPANDER_EL 0x18
+#define SAS_CONNECTOR_EL 0x19
 
 
 static struct option long_options[] = {
@@ -200,52 +224,68 @@ static const char * find_in_page_code_desc(int page_num)
 }
 
 struct element_desc {
-        int type_code;
+        int elem_code;
         const char * desc;
 };
 static struct element_desc element_desc_arr[] = {
         {0x0, "Unspecified"},
-        {0x1, "Device"},
-        {0x2, "Power supply"},
-        {0x3, "Cooling"},
-        {0x4, "Temperature sense"},
-        {0x5, "Door lock"},
-        {0x6, "Audible alarm"},
-        {0x7, "Enclosure service controller electronics"},
-        {0x8, "SCC controller electronics"},
-        {0x9, "Nonvolatile cache"},
-        {0xa, "Invalid operation reason"},
-        {0xb, "Uninterruptible power supply"},
-        {0xc, "Display"},
-        {0xd, "Key pad entry"},
-        {0xe, "Enclosure"},
-        {0xf, "SCSI port/transceiver"},
-        {0x10, "Language"},
-        {0x11, "Communication port"},
-        {0x12, "Voltage sensor"},
-        {0x13, "Current sensor"},
-        {0x14, "SCSI target port"},
-        {0x15, "SCSI initiator port"},
-        {0x16, "Simple subenclosure"},
-        {0x17, "Array device"},
-        {0x18, "SAS expander"},
-        {0x19, "SAS connector"},
+        {DEVICE_EL, "Device"},
+        {POWER_SUPPLY_EL, "Power supply"},
+        {COOLING_EL, "Cooling"},
+        {TEMPERATURE_EL, "Temperature sense"},
+        {DOOR_LOCK_EL, "Door lock"},
+        {AUD_ALARM_EL, "Audible alarm"},
+        {ENC_SC_ELECTR_EL, "Enclosure services controller electronics"},
+        {SCC_CELECTR_EL, "SCC controller electronics"},
+        {NV_CACHE_EL, "Nonvolatile cache"},
+        {INV_OP_REASON_EL, "Invalid operation reason"},
+        {UI_POWER_SUPPLY_EL, "Uninterruptible power supply"},
+        {DISPLAY_EL, "Display"},
+        {KEY_PAD_EL, "Key pad entry"},
+        {ENCLOSURE_EL, "Enclosure"},
+        {SCSI_PORT_TRAN_EL, "SCSI port/transceiver"},
+        {LANGUAGE_EL, "Language"},
+        {COMM_PORT_EL, "Communication port"},
+        {VOLT_SENSOR_EL, "Voltage sensor"},
+        {CURR_SENSOR_EL, "Current sensor"},
+        {SCSI_TPORT_EL, "SCSI target port"},
+        {SCSI_IPORT_EL, "SCSI initiator port"},
+        {SIMPLE_SUBENC_EL, "Simple subenclosure"},
+        {ARRAY_DEV_EL, "Array device"},
+        {SAS_EXPANDER_EL, "SAS expander"},
+        {SAS_CONNECTOR_EL, "SAS connector"},
 };
 
-static const char * find_element_desc(int type_code)
+static const char * find_element_desc(int elem_code)
 {
     int k;
     int num = sizeof(element_desc_arr) / sizeof(element_desc_arr[0]);
     const struct element_desc * edp = &element_desc_arr[0];
 
     for (k = 0; k < num; ++k, ++edp) {
-        if (type_code == edp->type_code)
+        if (elem_code == edp->elem_code)
             return edp->desc;
-        else if (type_code < edp->type_code)
+        else if (elem_code < edp->elem_code)
             return NULL;
     }
     return NULL;
 }
+
+#if 0
+static const char * get_element_desc(int elem_code, int b_len, char * b)
+{
+    const char * elem_desc;
+
+    if (b_len > 0)
+        b[b_len - 1] = '\0';
+    elem_desc = find_element_desc(elem_code);
+    if (elem_desc)
+        snprintf(b, b_len - 1, "%s", elem_desc);
+    else
+        snprintf(b, b_len - 1, "unknown element code=0x%x", elem_code);
+    return b;
+}
+#endif
 
 struct element_hdr {
     unsigned char etype;
@@ -330,7 +370,7 @@ static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<ses_configuration_sdg: response too short>>>\n");
     return;
 }
 
@@ -446,6 +486,9 @@ static char * find_sas_connector_type(int conn_type, char * buff,
     case 0x23:
         snprintf(buff, buff_len, "SATA device plug [max 1 phy]");
         break;
+    case 0x2f:
+        snprintf(buff, buff_len, "SAS virtual connector [max 1 phy]");
+        break;
     case 0x3f:
         snprintf(buff, buff_len, "Vendor specific internal connector");
         break;
@@ -474,7 +517,7 @@ static char * find_sas_connector_type(int conn_type, char * buff,
 }
 
 static const char * element_status_desc[] = {
-    "Unsupported", "OK", "Critical", "Non-critical",
+    "Unsupported", "OK", "Critical", "Noncritical",
     "Unrecoverable", "Not installed", "Unknown", "Not available",
     "reserved [8]", "reserved [9]", "reserved [10]", "reserved [11]",
     "reserved [12]", "reserved [13]", "reserved [14]", "reserved [15]",
@@ -510,7 +553,7 @@ static void print_element_status(const char * pad,
         printf("%sstatus in hex: %02x %02x %02x %02x\n",
                pad, statp[0], statp[1], statp[2], statp[3]);
         break;
-    case 1:     /* device */
+    case DEVICE_EL:
         printf("%sSlot address: %d\n", pad, statp[1]);
         if ((! filter) || (0xe0 & statp[2]))
             printf("%sApp client bypassed A=%d, Do not remove=%d, Enc "
@@ -532,7 +575,7 @@ static void print_element_status(const char * pad,
         if ((! filter) || (0x1 & statp[3]))
             printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
         break;
-    case 2:     /* power supply */
+    case POWER_SUPPLY_EL:
         if ((! filter) || ((0x80 & statp[1]) || (0xe & statp[2])))
             printf("%sIdent=%d, DC overvoltage=%d, DC undervoltage=%d, DC "
                    "overcurrent=%d\n", pad, !!(statp[1] & 0x80),
@@ -546,8 +589,8 @@ static void print_element_status(const char * pad,
                    pad, !!(statp[3] & 0x4), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
-    case 3:     /* cooling */
-        if ((! filter) || ((0x80 & statp[1]) || (0x70 & statp[3])))
+    case COOLING_EL:
+        if ((! filter) || ((0xc0 & statp[1]) || (0x70 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Requested on=%d, Off=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[3] & 0x40),
                    !!(statp[3] & 0x20), !!(statp[3] & 0x10));
@@ -555,52 +598,58 @@ static void print_element_status(const char * pad,
                (((0x7 & statp[1]) << 8) + statp[2]) * 10,
                actual_speed_desc[7 & statp[3]]);
         break;
-    case 4:     /* temperature sensor */
-        if ((! filter) || ((0x80 & statp[1]) || (0xf & statp[3])))
-            printf("%sIdent=%d, OT Failure=%d, OT warning=%d, UT failure=%d, "
-                   "UT warning=%d\n", pad, !!(statp[1] & 0x80), 
-                   !!(statp[3] & 0x8), !!(statp[3] & 0x4), !!(statp[3] & 0x2),
-                   !!(statp[3] & 0x1));
+    case TEMPERATURE_EL:     /* temperature sensor */
+        if ((! filter) || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
+            printf("%sIdent=%d, Fail=%d, OT failure=%d, OT warning=%d, "
+                   "UT failure=%d\n", pad, !!(statp[1] & 0x80), 
+                   !!(statp[1] & 0x40), !!(statp[3] & 0x8),
+                   !!(statp[3] & 0x4), !!(statp[3] & 0x2));
+            printf("%sUT warning=%d\n", pad, !!(statp[3] & 0x1));
+        }
         if (statp[2])
             printf("%sTemperature=%d C\n", pad,
                    (int)statp[2] - TEMPERATURE_OFFSET);
         else
             printf("%sTemperature: <reserved>\n", pad);
         break;
-    case 5:     /* door lock */
-        if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[3])))
-            printf("%sIdent=%d, Unlock=%d\n", pad, !!(statp[1] & 0x80),
+    case DOOR_LOCK_EL:
+        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
+            printf("%sIdent=%d, Fail=%d, Unlock=%d\n", pad,
+                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x1));
         break;
-    case 6:     /* audible alarm */
-        if ((! filter) || ((0x80 & statp[1]) || (0xd0 & statp[3])))
-            printf("%sIdent=%d, Request mute=%d, Mute=%d, Remind=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[3] & 0x80),
+    case AUD_ALARM_EL:     /* audible alarm */
+        if ((! filter) || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
+            printf("%sIdent=%d, Fail=%d, Request mute=%d, Mute=%d, "
+                   "Remind=%d\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40), !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x10));
         if ((! filter) || (0xf & statp[3]))
             printf("%sTone indicator: Info=%d, Non-crit=%d, Crit=%d, "
                    "Unrecov=%d\n", pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case 7:     /* enclosure services controller electronics element */
-        if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[2])))
-            printf("%sIdent=%d, Report=%d\n", pad, !!(statp[1] & 0x80),
+    case ENC_SC_ELECTR_EL:     /* enclosure services controller electronics */
+        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2])))
+            printf("%sIdent=%d, Fail=%d, Report=%d\n", pad,
+                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1));
         break;
-    case 8:     /* SCC controller electronics element */
-        if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[2])))
-            printf("%sIdent=%d, Report=%d\n", pad, !!(statp[1] & 0x80),
+    case SCC_CELECTR_EL:     /* SCC controller electronics */
+        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2])))
+            printf("%sIdent=%d, Fail=%d, Report=%d\n", pad,
+                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1));
         break;
-    case 9:     /* Non volatile cache element */
+    case NV_CACHE_EL:     /* Non volatile cache */
         res = (statp[2] << 8) + statp[3];
-        printf("%sIdent=%d, Size multiplier=%d, Non volatile cache "
-               "size=0x%x\n", pad, !!(statp[1] & 0x80),
+        printf("%sIdent=%d, Fail=%d, Size multiplier=%d, Non volatile cache "
+               "size=0x%x\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                (statp[1] & 0x3), res);
         printf("%sHence non volatile cache size: %d %s\n", pad, res,
                nv_cache_unit[statp[1] & 0x3]);
         break;
-    case 0xa:   /* Invalid operation reason element */
+    case INV_OP_REASON_EL:   /* Invalid operation reason */
         res = ((statp[1] >> 6) & 3);
         printf("%sInvop type=%d   %s\n", pad, res, invop_type_desc[res]);
         switch (res) {
@@ -620,7 +669,7 @@ static void print_element_status(const char * pad,
             break;
         }
         break;
-    case 0xb:   /* Uninterruptible power supply */
+    case UI_POWER_SUPPLY_EL:   /* Uninterruptible power supply */
         if (0 == statp[1])
             printf("%sBattery status: discharged or unknown\n", pad);
         else if (255 == statp[1])
@@ -632,24 +681,28 @@ static void print_element_status(const char * pad,
                    "%d\n", pad, !!(statp[2] & 0x80), !!(statp[2] & 0x40),
                    !!(statp[2] & 0x20), !!(statp[2] & 0x10),
                    !!(statp[2] & 0x8));
-        if ((! filter) || ((0x7 & statp[2]) || (0x83 & statp[3])))
-            printf("%sUPS fail=%d, Warn=%d, Intf fail=%d, Ident=%d, Batt fail"
-                   "=%d, BPF=%d\n", pad, !!(statp[2] & 0x4), !!(statp[2] & 0x2),
-                   !!(statp[2] & 0x1), !!(statp[3] & 0x80), !!(statp[3] & 0x2),
-                   !!(statp[3] & 0x1));
+        if ((! filter) || ((0x7 & statp[2]) || (0xc3 & statp[3]))) {
+            printf("%sUPS fail=%d, Warn=%d, Intf fail=%d, Ident=%d, Fail=%d, "
+                   "Batt fail=%d\n", pad, !!(statp[2] & 0x4),
+                   !!(statp[2] & 0x2), !!(statp[2] & 0x1),
+                   !!(statp[3] & 0x80), !!(statp[3] & 0x40),
+                   !!(statp[3] & 0x2));
+            printf("%sBPF=%d\n", pad, !!(statp[3] & 0x1));
+        }
         break;
-    case 0xc:   /* Display (ses2r15) */
-        if ((! filter) || (0x80 & statp[1]))
-            printf("%sIdent=%d, Display mode status=%d, Display "
-                   "character status=0x%x\n", pad,
-                   !!(statp[1] & 0x80), (statp[1] & 0x3),
+    case DISPLAY_EL:   /* Display (ses2r15) */
+        if ((! filter) || (0xc0 & statp[1]))
+            printf("%sIdent=%d, Fail=%d, Display mode status=%d, Display "
+                   "character status=0x%x\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40), (statp[1] & 0x3),
                    ((statp[2] << 8) & statp[3]));
         break;
-    case 0xd:   /* Key pad entry */
-        if ((! filter) || (0x80 & statp[1]))
-            printf("%sIdent=%d\n", pad, !!(statp[1] & 0x80));
+    case KEY_PAD_EL:   /* Key pad entry */
+        if ((! filter) || (0xc0 & statp[1]))
+            printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40));
         break;
-    case 0xe:   /* Enclosure */
+    case ENCLOSURE_EL:
         if ((! filter) || ((0x80 & statp[1]) || (0x3 & statp[2])))
             printf("%sIdent=%d, Failure indication=%d, Warning indication="
                    "%d\n", pad, !!(statp[1] & 0x80), !!(statp[2] & 0x2),
@@ -658,29 +711,33 @@ static void print_element_status(const char * pad,
             printf("%sFailure requested=%d, Warning requested=%d\n",
                    pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case 0xf:   /* SCSI port/transceiver */
-        if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[2]) ||
+    case SCSI_PORT_TRAN_EL:   /* SCSI port/transceiver */
+        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x13 & statp[3])))
-            printf("%sIdent=%d, Report=%d, Disabled=%d, Loss of link=%d, Xmit"
-                   " fail=%d\n", pad, !!(statp[1] & 0x80), !!(statp[2] & 0x1),
+            printf("%sIdent=%d, Fail=%d, Report=%d, Disabled=%d, Loss of "
+                   "link=%d, Xmit fail=%d\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40), !!(statp[2] & 0x1),
                    !!(statp[3] & 0x10), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
-    case 0x10:   /* Language */
+    case LANGUAGE_EL:
         printf("%sIdent=%d, Language code: %.2s\n", pad, !!(statp[1] & 0x80),
                statp + 2);
         break;
-    case 0x11:   /* Communication port */
-        if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[3])))
-            printf("%sIdent=%d, Disabled=%d\n", pad, !!(statp[1] & 0x80),
+    case COMM_PORT_EL:   /* Communication port */
+        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
+            printf("%sIdent=%d, Fail=%d, Disabled=%d\n", pad,
+                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x1));
         break;
-    case 0x12:   /* Voltage sensor */
-        if ((! filter) || (0x8f & statp[1]))
-            printf("%sIdent=%d, Warn Over=%d, Warn Under=%d, Crit Over=%d, "
-                   "Crit Under=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x8), !!(statp[1] & 0x4),!!(statp[1] & 0x2),
-                   !!(statp[1] & 0x1));
+    case VOLT_SENSOR_EL:   /* Voltage sensor */
+        if ((! filter) || (0xcf & statp[1])) {
+            printf("%sIdent=%d, Fail=%d,  Warn Over=%d, Warn Under=%d, "
+                   "Crit Over=%d\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40), !!(statp[1] & 0x8),
+                   !!(statp[1] & 0x4), !!(statp[1] & 0x2));
+            printf("Crit Under=%d\n", !!(statp[1] & 0x1));
+        }
 #ifdef SG3_UTILS_MINGW
         printf("%sVoltage: %g volts\n", pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
@@ -689,11 +746,11 @@ static void print_element_status(const char * pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
 #endif
         break;
-    case 0x13:   /* Current sensor */
-        if ((! filter) || (0x8a & statp[1]))
-            printf("%sIdent=%d, Warn Over=%d, Crit Over=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x8),
-                   !!(statp[1] & 0x2));
+    case CURR_SENSOR_EL:   /* Current sensor */
+        if ((! filter) || (0xca & statp[1]))
+            printf("%sIdent=%d, Fail=%d, Warn Over=%d, Crit Over=%d\n",
+                    pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
+                    !!(statp[1] & 0x8), !!(statp[1] & 0x2));
 #ifdef SG3_UTILS_MINGW
         printf("%sCurrent: %g amps\n", pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
@@ -702,25 +759,25 @@ static void print_element_status(const char * pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
 #endif
         break;
-    case 0x14:   /* SCSI target port */
-        if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[2]) ||
+    case SCSI_TPORT_EL:   /* SCSI target port */
+        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
-            printf("%sIdent=%d, Report=%d, Enabled=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[2] & 0x1),
-                   !!(statp[3] & 0x1));
+            printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
+                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
+                   !!(statp[2] & 0x1), !!(statp[3] & 0x1));
         break;
-    case 0x15:   /* SCSI initiator port */
-        if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[2]) ||
+    case SCSI_IPORT_EL:   /* SCSI initiator port */
+        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
-            printf("%sIdent=%d, Report=%d, Enabled=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[2] & 0x1),
-                   !!(statp[3] & 0x1));
+            printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
+                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
+                   !!(statp[2] & 0x1), !!(statp[3] & 0x1));
         break;
-    case 0x16:   /* Simple subenclosure */
-        printf("%sIdent=%d, Short enclosure status: 0x%x\n", pad,
-               !!(statp[1] & 0x80), statp[3]);
+    case SIMPLE_SUBENC_EL:   /* Simple subenclosure */
+        printf("%sIdent=%d, Fail=%d, Short enclosure status: 0x%x\n", pad,
+               !!(statp[1] & 0x80), !!(statp[1] & 0x40), statp[3]);
         break;
-    case 0x17:   /* Array device */
+    case ARRAY_DEV_EL:   /* Array device */
         if ((! filter) || (0xf0 & statp[1]))
             printf("%sOK=%d, Reserved device=%d, Hot spare=%d, Cons check="
                    "%d\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
@@ -750,14 +807,16 @@ static void print_element_status(const char * pad,
                    pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case 0x18:   /* SAS expander */
-        printf("%sIdent=%d\n", pad, !!(statp[1] & 0x80));
+    case SAS_EXPANDER_EL:
+        printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
+               !!(statp[1] & 0x40));
         break;
-    case 0x19:   /* SAS connector */
+    case SAS_CONNECTOR_EL:
         printf("%sIdent=%d, %s, Connector physical "
                "link=0x%x\n", pad, !!(statp[1] & 0x80), 
                find_sas_connector_type((statp[1] & 0x7f), buff, sizeof(buff)),
                statp[2]);
+        printf("%sFail=%d\n", pad, !!(statp[3] & 0x40));
         break;
     default:
         printf("%sUnknown element type, status in hex: %02x %02x %02x %02x\n",
@@ -824,7 +883,7 @@ static void ses_enclosure_sdg(const struct element_hdr * ehp, int num_telems,
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<enc: response too short>>>\n");
     return;
 }
 
@@ -958,7 +1017,7 @@ static void ses_threshold_sdg(const struct element_hdr * ehp, int num_telems,
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<thresh: response too short>>>\n");
     return;
 }
 
@@ -1013,7 +1072,7 @@ static void ses_element_desc_sdg(const struct element_hdr * ehp,
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<element: response too short>>>\n");
     return;
 }
 
@@ -1049,16 +1108,21 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
     switch (0xf & ucp[0]) {
     case 0:     /* FCP */
         ports = ucp[2 + eip_offset];
-        printf("   [%d] Transport protocol: FCP, number of ports: %d\n",
-               elem_num + 1, ports);
+        printf("    Transport protocol: FCP\n");
+#if 0
+        printf("%s element\n", get_element_desc(elem_type, sizeof(b), b));
+#endif
+        printf("    number of ports: %d\n", ports);
         printf("    node_name: ");
         for (m = 0; m < 8; ++m)
             printf("%02x", ucp[6 + eip_offset + m]);
+        if (eip_offset)
+            printf(", bay number: %d", ucp[5 + eip_offset]);
         printf("\n");
         per_ucp = ucp + 14 + eip_offset;
         for (j = 0; j < ports; ++j, per_ucp += 16) {
-            printf("    [%d] port loop position: %d, port requested hard "
-                   "address: %d\n", j + 1, per_ucp[0], per_ucp[4]);
+            printf("    port index: %d, port loop position: %d, port "
+                   "requested hard address: %d\n", j, per_ucp[0], per_ucp[4]);
             printf("      n_port identifier: %02x%02x%02x\n",
                    per_ucp[5], per_ucp[6], per_ucp[7]);
             printf("      n_port name: ");
@@ -1069,26 +1133,32 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
         break;
     case 6:     /* SAS */
         desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
-        printf("   [%d] Transport protocol: SAS, ", elem_num + 1);
+        printf("    Transport protocol: SAS\n");
+#if 0
+        printf("%s element\n", get_element_desc(elem_type, sizeof(b), b));
+#endif
         if (0 == desc_type) {
             phys = ucp[2 + eip_offset];
-            printf("SAS and SATA device descriptor type [%d]\n", desc_type);
-            printf("    number of phys: %d, not all phys: %d\n", phys,
+            printf("    number of phys: %d, not all phys: %d", phys,
                    ucp[3 + eip_offset] & 1);
+            if (eip_offset)
+                printf(", bay number: %d", ucp[5 + eip_offset]);
+            printf("\n");
             per_ucp = ucp + 4 + eip_offset + eip_offset;
             for (j = 0; j < phys; ++j, per_ucp += 28) {
-                printf("    [%d] device type: %s\n", phys + 1,
+                printf("    phy index: %d\n", j);
+                printf("      device type: %s\n",
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
-                printf("      initiator port for: %s %s %s\n",
-                       ((per_ucp[2] & 8) ? "SSP" : ""),
-                       ((per_ucp[2] & 4) ? "STP" : ""),
-                       ((per_ucp[2] & 2) ? "SMP" : ""));
-                printf("      target port for: %s %s %s %s %s\n",
-                       ((per_ucp[3] & 0x80) ? "SATA_port_selector" : ""),
-                       ((per_ucp[3] & 8) ? "SSP" : ""),
-                       ((per_ucp[3] & 4) ? "STP" : ""),
-                       ((per_ucp[3] & 2) ? "SMP" : ""),
-                       ((per_ucp[3] & 1) ? "SATA_device" : ""));
+                printf("      initiator port for:%s%s%s\n",
+                       ((per_ucp[2] & 8) ? " SSP" : ""),
+                       ((per_ucp[2] & 4) ? " STP" : ""),
+                       ((per_ucp[2] & 2) ? " SMP" : ""));
+                printf("      target port for:%s%s%s%s%s\n",
+                       ((per_ucp[3] & 0x80) ? " SATA_port_selector" : ""),
+                       ((per_ucp[3] & 8) ? " SSP" : ""),
+                       ((per_ucp[3] & 4) ? " STP" : ""),
+                       ((per_ucp[3] & 2) ? " SMP" : ""),
+                       ((per_ucp[3] & 1) ? " SATA_device" : ""));
                 printf("      attached SAS address: 0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", per_ucp[4 + m]);
@@ -1099,8 +1169,7 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
             }
         } else if (1 == desc_type) {
             phys = ucp[2 + eip_offset];
-            if (0x18 == elem_type) {
-                printf("expander descriptor type\n");
+            if (SAS_EXPANDER_EL == elem_type) {
                 printf("    number of phys: %d\n", phys);
                 printf("    SAS address: 0x");
                 for (m = 0; m < 8; ++m)
@@ -1108,7 +1177,7 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
                 printf("\n");
                 per_ucp = ucp + 14 + eip_offset;
                 for (j = 0; j < phys; ++j, per_ucp += 2) {
-                    printf("      [%d] ", j + 1);
+                    printf("      [%d] ", j);
                     if (0xff == per_ucp[0])
                         printf("no attached connector");
                     else
@@ -1117,13 +1186,14 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
                         printf(", other element index: %d", per_ucp[1]);
                     printf("\n");
                 }
-            } else if ((0x14 == elem_type) || (0x15 == elem_type)) {
-                printf("SCSI %s port descriptor type\n", 
-                       ((0x14 == elem_type) ? "target" : "initiator"));
+            } else if ((SCSI_TPORT_EL == elem_type) ||
+                       (SCSI_IPORT_EL == elem_type) ||
+                       (ENC_SC_ELECTR_EL == elem_type)) {
                 printf("    number of phys: %d\n", phys);
                 per_ucp = ucp + 6 + eip_offset;
                 for (j = 0; j < phys; ++j, per_ucp += 12) {
-                    printf("    phy identifier: 0x%x\n", per_ucp[0]);
+                    printf("    phy index: %d\n", j);
+                    printf("      phy identifier: 0x%x\n", per_ucp[0]);
                     if (0xff == per_ucp[2])
                         printf("      no attached connector");
                     else
@@ -1155,9 +1225,10 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
    to "additional" to allow for SAS expander and SATA devices */
 static void ses_additional_elem_sdg(const struct element_hdr * ehp,
                          int num_telems, unsigned int ref_gen_code,
-                         const unsigned char * resp, int resp_len)
+                         const unsigned char * resp, int resp_len,
+                         int inner_hex)
 {
-    int j, k, desc_len, elem_type, invalid, proto, desc_type, eip;
+    int j, k, desc_len, elem_type, invalid;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -1178,11 +1249,12 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
     ucp = resp + 8;
     for (k = 0; k < num_telems; ++k) {
         elem_type = ehp[k].etype;
-        if (! ((1 == elem_type) ||      /* device */
-               (0x14 == elem_type) ||   /* scsi target */
-               (0x15 == elem_type) ||   /* scsi initiator */
-               (0x17 == elem_type) ||   /* array */
-               (0x18 == elem_type)))    /* SAS expander */
+        if (! ((DEVICE_EL == elem_type) ||
+               (SCSI_TPORT_EL == elem_type) ||
+               (SCSI_IPORT_EL == elem_type) ||
+               (ARRAY_DEV_EL == elem_type) ||
+               (SAS_EXPANDER_EL == elem_type) ||
+               (ENC_SC_ELECTR_EL == elem_type)))
             continue;   /* skip if not one of above element types */
         if ((ucp + 1) > last_ucp)
             goto truncated;
@@ -1195,24 +1267,12 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
                    ehp[k].etype, ehp[k].se_id);
         for (j = 0; j < ehp[k].num_elements; ++j, ucp += desc_len) {
             invalid = !!(ucp[0] & 0x80);
-            eip = !!(ucp[0] & 0x10);
-            proto = (ucp[0] & 0xf);
-            if (0x6 == proto) {  /* SAS */
-                desc_type = ((eip ? ucp[5] : ucp[3]) >> 6) & 0x3;
-                if (eip) {
-                    if (0 == desc_type) /* device or array element */
-                        printf("    element index: %d [0x%x], bay number: %d"
-                               " [0x%x]\n", ucp[3], ucp[3], ucp[7], ucp[7]);
-                    else  /* target, initiator or SAS expander element */
-                        printf("    element index: %d [0x%x]\n", ucp[3],
-                               ucp[3]);
-                }
-            } else {  /* FCP most likely */
-                if (eip)
-                    printf("    element index: %d [0x%x]\n", ucp[3], ucp[3]);
-            }
+            if (ucp[0] & 0x10)  /* eip=1 */
+                printf("    element index: %d [0x%x]\n", ucp[3], ucp[3]);
             desc_len = ucp[1] + 2;
-            if (invalid)
+            if (inner_hex)
+                dStrHex((const char *)ucp + 4, desc_len, 0);
+            else if (invalid)
                 printf("      flagged as invalid (no further information)\n");
             else
                 ses_additional_elem_each(ucp, desc_len, j, elem_type);
@@ -1220,7 +1280,7 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<additional: response too short>>>\n");
     return;
 }
 
@@ -1254,7 +1314,7 @@ static void ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<subenc: response too short>>>\n");
     return;
 }
 
@@ -1288,7 +1348,7 @@ static void ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<subence str: response too short>>>\n");
     return;
 }
 
@@ -1340,7 +1400,7 @@ static void ses_download_code_sdg(const unsigned char * resp, int resp_len)
     }
     return;
 truncated:
-    fprintf(stderr, "    <<<response too short>>>\n");
+    fprintf(stderr, "    <<<download: response too short>>>\n");
     return;
 }
 
@@ -1552,7 +1612,7 @@ static int ses_process_status(int sg_fd, int page_code, int do_raw,
                 if (res < 0)
                     break;
                 ses_additional_elem_sdg(element_hdr_arr, res, ref_gen_code,
-                                        rsp_buff, rsp_len);
+                                        rsp_buff, rsp_len, inner_hex);
                 break;
             case 0xb: 
                 ses_subenc_help_sdg(rsp_buff, rsp_len);
@@ -1693,10 +1753,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -1729,7 +1789,7 @@ int main(int argc, char * argv[])
                "code):\n");
         num = sizeof(element_desc_arr) / sizeof(element_desc_arr[0]);
         for (k = 0; k < num; ++k, ++edp)
-            printf("    %s  [0x%x]\n", edp->desc, edp->type_code);
+            printf("    %s  [0x%x]\n", edp->desc, edp->elem_code);
         return 0;
     }
     if (do_control && do_status) {
@@ -1753,13 +1813,13 @@ int main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+        fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (! do_raw) {
         if (sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
-            fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
+            fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
                     device_name);
             ret = SG_LIB_CAT_OTHER;
             goto err_out;

@@ -1,4 +1,4 @@
-.TH SG_DD "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_DD "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -103,6 +103,7 @@ default is 0 which selects indirect (buffered) IO on sg devices. Value of 1
 attempts direct IO which, if not available, falls back to indirect IO and
 notes this at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed).
+For finer grain control use 'iflag=dio' or 'oflag=dio'.
 .TP
 \fBibs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
@@ -206,10 +207,16 @@ will set its CORRCT bit if 'coe' given thrice. SCSI disks may automatically
 try and remap faulty sectors (see the AWRE and ARRE in the read write
 error recovery mode page (the sdparm utility to access and possibly change
 these attributes)). Errors occurring on other files types will stop sg_dd.
-Error messages are sent to stderr. This flag is similar to 'conv=noerror'
-in the
+Error messages are sent to stderr. This flag is similar
+ o 'conv=noerror,sync' in the
 .B dd(1) 
 utility. See note about READ LONG below.
+.TP
+dio
+request the sg device node associated with this flag does direct IO.
+If direct IO is not available, falls back to indirect IO and notes
+this at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
+has the value of 0 then a warning is issued (and indirect IO is performed).
 .TP
 direct
 causes the O_DIRECT flag to be added to the open of \fIIFILE\fR and/or

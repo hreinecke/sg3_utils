@@ -22,7 +22,7 @@
    
 */
 
-static char * version_str = "0.69 20070129";    /* SPC-4 revision 8 */
+static char * version_str = "0.73 20070419";    /* SPC-4 revision 9 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -42,41 +42,46 @@ static char * version_str = "0.69 20070129";    /* SPC-4 revision 8 */
 #define SELF_TEST_LPAGE 0x10
 #define PORT_SPECIFIC_LPAGE 0x18
 #define GSP_LPAGE 0x19
+#define TAPE_ALERT_LPAGE 0x2e
 #define IE_LPAGE 0x2f
 #define NOT_SUBPG_LOG 0x0
 #define ALL_SUBPG_LOG 0xff
 
 #define PCB_STR_LEN 128
 
+#define LOG_SENSE_PROBE_ALLOC_LEN 4
+
 static unsigned char rsp_buff[MX_ALLOC_LEN];
 
 static struct option long_options[] = {
-        {"all", 0, 0, 'a'},
-        {"control", 1, 0, 'c'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"list", 0, 0, 'l'},
-        {"maxlen", 1, 0, 'm'},
-        {"name", 0, 0, 'n'},
-        {"new", 0, 0, 'N'},
-        {"old", 0, 0, 'O'},
-        {"page", 1, 0, 'p'},
-        {"paramp", 1, 0, 'P'},
-        {"pcb", 0, 0, 'q'},
-        {"ppc", 0, 0, 'Q'},
-        {"raw", 0, 0, 'r'},
-        {"reset", 0, 0, 'R'},
-        {"sp", 0, 0, 's'},
-        {"select", 0, 0, 'S'},
-        {"temperature", 0, 0, 't'},
-        {"transport", 0, 0, 'T'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"all", no_argument, 0, 'a'},
+        {"brief", no_argument, 0, 'b'},
+        {"control", required_argument, 0, 'c'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"list", no_argument, 0, 'l'},
+        {"maxlen", required_argument, 0, 'm'},
+        {"name", no_argument, 0, 'n'},
+        {"new", no_argument, 0, 'N'},
+        {"old", no_argument, 0, 'O'},
+        {"page", required_argument, 0, 'p'},
+        {"paramp", required_argument, 0, 'P'},
+        {"pcb", no_argument, 0, 'q'},
+        {"ppc", no_argument, 0, 'Q'},
+        {"raw", no_argument, 0, 'r'},
+        {"reset", no_argument, 0, 'R'},
+        {"sp", no_argument, 0, 's'},
+        {"select", no_argument, 0, 'S'},
+        {"temperature", no_argument, 0, 't'},
+        {"transport", no_argument, 0, 'T'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
 struct opts_t {
     int do_all;
+    int do_brief;
     int do_help;
     int do_hex;
     int do_list;
@@ -102,17 +107,18 @@ struct opts_t {
 
 static void usage()
 {
-    printf("Usage: sg_logs [--all] [--control=PC] [--help] [--hex] "
-           "[--list] [--maxlen=LEN]\n"
-           "               [--name] [--page=PG[,SPG]] [--paramp=PP] [--pcb] "
-           "[--ppc]\n"
-           "               [--raw] [--reset] [--select] [--sp] "
+    printf("Usage: sg_logs [--all] [--brief] [--control=PC] [--help] [--hex] "
+           "[--list]\n"
+           "               [--maxlen=LEN] [--name] [--page=PG[,SPG]] "
+           "[--paramp=PP] [--pcb]\n"
+           "               [--ppc] [--raw] [--reset] [--select] [--sp] "
            "[--temperature]\n"
            "               [--transport] [--verbose] [--version] DEVICE\n"
            "  where:\n"
            "    --all|-a        fetch and decode all log pages\n"
            "                    use twice to fetch and decode all log pages "
            "and subpages\n"
+           "    --brief|-b      shorten the output of some log pages\n"
            "    --control=PC|-c PC    page control(PC) (default: 1)\n"
            "                          0: current threshhold, 1: current "
            "cumulative\n"
@@ -127,6 +133,7 @@ static void usage()
            "subpage names\n"
            "    --maxlen=LEN|-m LEN    max response length (def: 0 "
            "-> everything)\n"
+           "                           when > 1 will request LEN bytes\n"
            "    --name|-n       decode some pages into multiple name=value "
            "lines\n"
            "    --page=PG|-p PG    page code (in decimal)\n"
@@ -155,7 +162,7 @@ static void usage()
 
 static void usage_old()
 {
-    printf("Usage:  sg_logs [-a] [-A] [-c=PC] [-h] [-H] [-l] [-L] "
+    printf("Usage:  sg_logs [-a] [-A] [-b] [-c=PC] [-h] [-H] [-l] [-L] "
            "[-m=LEN] [-n]\n"
            "                [-p=PG[,SPG]] [-paramp=PP] [-pcb] [-ppc] "
            "[-r] [-select]\n"
@@ -163,6 +170,7 @@ static void usage_old()
            "  where:\n"
            "    -a     fetch and decode all log pages\n"
            "    -A     fetch and decode all log pages and subpages\n"
+           "    -b     shorten the output of some log pages\n"
            "    -c=PC  page control(PC) (default: 1)\n"
            "                  0: current threshhold, 1: current cumulative\n"
            "                  2: default threshhold, 3: default cumulative\n"
@@ -243,7 +251,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAc:hHlLm:nNOp:P:qQrRsStTvV",
+        c = getopt_long(argc, argv, "aAbc:hHlLm:nNOp:P:qQrRsStTvV",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -254,6 +262,9 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'A':
             optsp->do_all += 2;
+            break;
+        case 'b':
+            ++optsp->do_brief;
             break;
         case 'c':
             n = sg_get_num(optarg);
@@ -279,7 +290,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'm':
             n = sg_get_num(optarg);
-            if (n < 0) {
+            if ((n < 0) || (1 == n)) {
                 fprintf(stderr, "bad argument to '--maxlen='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
@@ -356,7 +367,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised switch code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -398,6 +409,9 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     break;
                 case 'A':
                     optsp->do_all += 2;
+                    break;
+                case 'b':
+                    ++optsp->do_brief;
                     break;
                 case 'h':
                 case 'H':
@@ -568,33 +582,38 @@ static int do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
     int res;
 
     memset(resp, 0, mx_resp_len);
-    if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
-                               optsp->page_control, optsp->pg_code,
-                               optsp->subpg_code, optsp->paramp,
-                               resp, 4, noisy, optsp->do_verbose))) {
-        switch (res) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            return res;
-        default:
-            return -1;
-        }
-    }
-    actual_len = (resp[2] << 8) + resp[3] + 4;
-    if ((0 == optsp->do_raw) && (optsp->do_verbose > 1)) {
-        fprintf(stderr, "  Log sense (find length) response:\n");
-        dStrHex((const char *)resp, 4, 1);
-        fprintf(stderr, "  hence calculated response length=%d\n",
-                actual_len);
-    }
-    /* Some HBAs don't like odd transfer lengths */
-    if (actual_len % 2)
-        actual_len += 1;
-    if (actual_len > mx_resp_len)
+    if (optsp->maxlen > 1)
         actual_len = mx_resp_len;
+    else {
+        if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
+                                   optsp->page_control, optsp->pg_code,
+                                   optsp->subpg_code, optsp->paramp,
+                                   resp, LOG_SENSE_PROBE_ALLOC_LEN,
+                                   noisy, optsp->do_verbose))) {
+            switch (res) {
+            case SG_LIB_CAT_NOT_READY:
+            case SG_LIB_CAT_INVALID_OP:
+            case SG_LIB_CAT_ILLEGAL_REQ:
+            case SG_LIB_CAT_UNIT_ATTENTION:
+            case SG_LIB_CAT_ABORTED_COMMAND:
+                return res;
+            default:
+                return -1;
+            }
+        }
+        actual_len = (resp[2] << 8) + resp[3] + 4;
+        if ((0 == optsp->do_raw) && (optsp->do_verbose > 1)) {
+            fprintf(stderr, "  Log sense (find length) response:\n");
+            dStrHex((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
+            fprintf(stderr, "  hence calculated response length=%d\n",
+                    actual_len);
+        }
+        /* Some HBAs don't like odd transfer lengths */
+        if (actual_len % 2)
+            actual_len += 1;
+        if (actual_len > mx_resp_len)
+            actual_len = mx_resp_len;
+    }
     if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
                                optsp->page_control, optsp->pg_code,
                                optsp->subpg_code, optsp->paramp,
@@ -718,7 +737,7 @@ static void show_page_name(int pg_code, int subpg_code,
             case 0x16:
                 printf("%sTape diagnostic (ssc-3)\n", b);
                 break;
-            case 0x2e:
+            case TAPE_ALERT_LPAGE:
                 printf("%sTapeAlert (ssc-2)\n", b);
                 break;
             default:
@@ -726,12 +745,16 @@ static void show_page_name(int pg_code, int subpg_code,
                 break;
             }
         }
+        break;
     case 8:
         /* medium changer type devices */
         {
             switch (pg_code) {
             case 0x14:
                 printf("%sMedia changer statistics (smc-3)\n", b);
+                break;
+            case 0x15:
+                printf("%sElement statistics (smc-3)\n", b);
                 break;
             case 0x2e:
                 printf("%sTapeAlert (smc-3)\n", b);
@@ -741,6 +764,7 @@ static void show_page_name(int pg_code, int subpg_code,
                 break;
             }
         }
+        break;
     case 0x12: /* Automation Device interface (ADC) */
         {
             switch (pg_code) {
@@ -764,12 +788,13 @@ static void show_page_name(int pg_code, int subpg_code,
                 break;
             }
         }
-
-    default: done = 0; break;
+        break;
+    default:
+        done = 0;
+        break;
     }
     if (done)
         return;
-
     printf("%s??\n", b);
 }
 
@@ -1457,14 +1482,15 @@ static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
             printf("  phy identifier = %d\n", vcp[1]);
         spld_len = vcp[3];
         if (spld_len < 44)
-            spld_len = 48;
+            spld_len = 48;      /* in SAS-1 and SAS-1.1 vcp[3]==0 */
         else
             spld_len += 4;
-        t = ((0x70 & vcp[4]) >> 4);
         if (optsp->do_name) {
+            t = ((0x70 & vcp[4]) >> 4);
             printf("      att_dev_type=%d\n", t);
             printf("      att_iport_mask=0x%x\n", vcp[6]);
             printf("      att_phy_id=%d\n", vcp[24]);
+            printf("      att_reason=0x%x\n", (vcp[4] & 0xf));
             for (n = 0, ull = vcp[16]; n < 8; ++n) {
                 ull <<= 8; ull |= vcp[16 + n];
             }
@@ -1479,11 +1505,13 @@ static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
             printf("      phy_reset_probs=%ld\n", ul);
             ul = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
             printf("      running_disparity=%ld\n", ul);
+            printf("      reason=0x%x\n", (vcp[5] & 0xf0) >> 4);
             for (n = 0, ull = vcp[8]; n < 8; ++n) {
                 ull <<= 8; ull |= vcp[8 + n];
             }
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
+            t = ((0x70 & vcp[4]) >> 4);
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "end device"); break;
@@ -1492,6 +1520,40 @@ static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
             printf("    attached device type: %s\n", s);
+            t = 0xf & vcp[4];
+            switch (t) {
+            case 0: snprintf(s, sz, "unknown"); break;
+            case 1: snprintf(s, sz, "power on"); break;
+            case 2: snprintf(s, sz, "hard reset"); break;
+            case 3: snprintf(s, sz, "SMP phy control function"); break;
+            case 4: snprintf(s, sz, "loss of dword synchronization"); break;
+            case 5: snprintf(s, sz, "mux mix up"); break;
+            case 6: snprintf(s, sz, "I_T nexus loss timeout for STP/SATA");
+                break;
+            case 7: snprintf(s, sz, "break timeout timer expired"); break;
+            case 8: snprintf(s, sz, "phy test function stopped"); break;
+            case 9: snprintf(s, sz, "expander device reduced functionality");
+                 break;
+            default: snprintf(s, sz, "reserved [0x%x]", t); break;
+            }
+            printf("    attached reason: %s\n", s);
+            t = (vcp[5] & 0xf0) >> 4;
+            switch (t) {
+            case 0: snprintf(s, sz, "unknown"); break;
+            case 1: snprintf(s, sz, "power on"); break;
+            case 2: snprintf(s, sz, "hard reset"); break;
+            case 3: snprintf(s, sz, "SMP phy control function"); break;
+            case 4: snprintf(s, sz, "loss of dword synchronization"); break;
+            case 5: snprintf(s, sz, "mux mix up"); break;
+            case 6: snprintf(s, sz, "I_T nexus loss timeout for STP/SATA");
+                break;
+            case 7: snprintf(s, sz, "break timeout timer expired"); break;
+            case 8: snprintf(s, sz, "phy test function stopped"); break;
+            case 9: snprintf(s, sz, "expander device reduced functionality");
+                 break;
+            default: snprintf(s, sz, "reserved [0x%x]", t); break;
+            }
+            printf("    reason: %s\n", s);
             t = (0xf & vcp[5]);
             switch (t) {
             case 0: snprintf(s, sz, "phy enabled; unknown");
@@ -1505,12 +1567,14 @@ static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
                          break;
             case 5: snprintf(s, sz, "phy enabled; reset in progress");
                          break;
+            case 6: snprintf(s, sz, "phy enabled; unsupported phy attached");
+                         break;
             case 8: snprintf(s, sz, "phy enabled; 1.5 Gbps"); break;
             case 9: snprintf(s, sz, "phy enabled; 3 Gbps"); break;
             case 0xa: snprintf(s, sz, "phy enabled; 6 Gbps"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
-            printf("    negotiated logical link rate: %s\n", s);/* sas2r07 */
+            printf("    negotiated logical link rate: %s\n", s);
             printf("    attached initiator port: ssp=%d stp=%d smp=%d\n",
                    !! (vcp[6] & 8), !! (vcp[6] & 4), !! (vcp[6] & 2));
             printf("    attached target port: ssp=%d stp=%d smp=%d\n",
@@ -1559,13 +1623,15 @@ static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
     }
 }
 
-static int show_protocol_specific_page(unsigned char * resp, int len, 
+static int show_protocol_specific_page(unsigned char * resp, int len,
                                        const struct opts_t * optsp)
 {
     int k, num, param_len;
     unsigned char * ucp;
 
     num = len - 4;
+    if (optsp->do_name)
+        printf("log_page=0x%x\n", PORT_SPECIFIC_LPAGE);
     for (k = 0, ucp = resp + 4; k < num; ) {
         param_len = ucp[3] + 4;
         /* each phy has a 48 byte descriptor but since param_len is
@@ -1578,6 +1644,313 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
         show_sas_rel_target_port(ucp, param_len, optsp);
         k += param_len;
         ucp += param_len;
+    }
+    return 1;
+}
+
+static int show_stats_perform_page(unsigned char * resp, int len,
+                                   const struct opts_t * optsp)
+{
+    int k, num, n, param_len, param_code, spf, subpg_code, extra;
+    int pcb, nam;
+    unsigned char * ucp;
+    const char * ccp;
+    unsigned long long ull;
+    char pcb_str[PCB_STR_LEN];
+
+    nam = optsp->do_name;
+    num = len - 4;
+    ucp = resp + 4;
+    spf = !!(resp[0] & 0x40);
+    subpg_code = spf ? resp[1] : 0;
+    if (nam) {
+        printf("log_page=0x%x\n", GSP_LPAGE);
+        if (subpg_code > 0)
+            printf("log_subpage=0x%x\n", subpg_code);
+    }
+    if (subpg_code > 31)
+        return 0;
+    if (0 == subpg_code) { /* General statistics and performance log page */
+        if (num < 0x5c)
+            return 0;
+        for (k = num; k > 0; k -= extra, ucp += extra) {
+            if (k < 3)
+                return 0;
+            param_len = ucp[3];
+            extra = param_len + 4;
+            param_code = (ucp[0] << 8) + ucp[1];
+            pcb = ucp[2];
+            switch (param_code) {
+            case 1:     /* Statistics and performance log parameter */
+                ccp = nam ? "parameter_code=1" : "Statistics and performance "
+                        "log parameter";
+                printf("%s\n", ccp);
+                for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[4 + n];
+                }
+                ccp = nam ? "read_commands=" : "number of read commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[12]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[12 + n];
+                }
+                ccp = nam ? "write_commands=" : "number of write commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[20]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[20 + n];
+                }
+                ccp = nam ? "lb_received="
+                          : "number of logical blocks received = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[28]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[28 + n];
+                }
+                ccp = nam ? "lb_transmitted="
+                          : "number of logical blocks transmitted = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[36]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[36 + n];
+                }
+                ccp = nam ? "read_proc_intervals="
+                          : "read command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[44]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[44 + n];
+                }
+                ccp = nam ? "write_proc_intervals="
+                          : "write command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[52]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[52 + n];
+                }
+                ccp = nam ? "weight_rw_commands=" : "weighted number of "
+                                "read commands plus write commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[60]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[60 + n];
+                }
+                ccp = nam ? "weight_rw_processing=" : "weighted read command "
+                                "processing plus write command processing = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                break;
+            case 2:     /* Idle time log parameter */
+                ccp = nam ? "parameter_code=2" : "Idle time log parameter";
+                printf("%s\n", ccp);
+                for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[4 + n];
+                }
+                ccp = nam ? "idle_time_intervals=" : "idle time "
+                                "intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                break;
+            case 3:     /* Time interval log parameter */
+                ccp = nam ? "parameter_code=3" : "Time interval log "
+                        "parameter";
+                printf("%s\n", ccp);
+                for (n = 0, ull = ucp[4]; n < 4; ++n) {
+                    ull <<= 8; ull |= ucp[4 + n];
+                }
+                ccp = nam ? "time_interval_exp=" : "time interval "
+                                "exponent = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[8]; n < 4; ++n) {
+                    ull <<= 8; ull |= ucp[8 + n];
+                }
+                ccp = nam ? "time_interval_int=" : "time interval "
+                                "integer = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                break;
+            case 4:     /* FUA statistics and performance log parameter */
+                ccp = nam ? "parameter_code=4" : "Force unit access "
+                        "statistics and performance log parameter ";
+                printf("%s\n", ccp);
+                for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[4 + n];
+                }
+                ccp = nam ? "read_fua_commands=" : "number of read FUA "
+                                "commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[12]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[12 + n];
+                }
+                ccp = nam ? "write_fua_commands=" : "number of write FUA "
+                                "commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[20]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[20 + n];
+                }
+                ccp = nam ? "read_fua_nv_commands="
+                          : "number of read FUA_NV commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[28]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[28 + n];
+                }
+                ccp = nam ? "write_fua_nv_commands="
+                          : "number of write FUA_NV commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[36]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[36 + n];
+                }
+                ccp = nam ? "read_fua_proc_intervals="
+                          : "read FUA command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[44]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[44 + n];
+                }
+                ccp = nam ? "write_fua_proc_intervals="
+                          : "write FUA command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[52]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[52 + n];
+                }
+                ccp = nam ? "read_fua_nv_proc_intervals="
+                          : "read FUA_NV command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[60]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[60 + n];
+                }
+                ccp = nam ? "write_fua_nv_proc_intervals="
+                          : "write FUA_NV command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                break;
+            default:
+                if (nam) {
+                    printf("parameter_code=%d\n", param_code);
+                    printf("  unknown=1\n");
+                } else
+                    fprintf(stderr, "show_performance...  unknown parameter "
+                            "code %d\n", param_code);
+                if (optsp->do_verbose)
+                    dStrHex((const char *)ucp, extra, 1);
+                break;
+            }
+            if ((optsp->do_pcb) && (0 == optsp->do_name)) {
+                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+                printf("    <%s>\n", pcb_str);
+            }
+        }
+    } else {    /* Group statistics and performance (n) log page */
+        if (num < 0x34)
+            return 0;
+        for (k = num; k > 0; k -= extra, ucp += extra) {
+            if (k < 3)
+                return 0;
+            param_len = ucp[3];
+            extra = param_len + 4;
+            param_code = (ucp[0] << 8) + ucp[1];
+            pcb = ucp[2];
+            switch (param_code) {
+            case 1:     /* Group n Statistics and performance log parameter */
+                if (nam)
+                    printf("parameter_code=1\n");
+                else
+                    printf("Group %d Statistics and performance log "
+                           "parameter\n", subpg_code);
+                for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[4 + n];
+                }
+                ccp = nam ? "gn_read_commands=" : "group n number of read "
+                                "commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[12]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[12 + n];
+                }
+                ccp = nam ? "gn_write_commands=" : "group n number of write "
+                                "commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[20]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[20 + n];
+                }
+                ccp = nam ? "gn_lb_received="
+                          : "group n number of logical blocks received = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[28]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[28 + n];
+                }
+                ccp = nam ? "gn_lb_transmitted="
+                          : "group n number of logical blocks transmitted = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[36]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[36 + n];
+                }
+                ccp = nam ? "gn_read_proc_intervals="
+                          : "group n read command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[44]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[44 + n];
+                }
+                ccp = nam ? "gn_write_proc_intervals="
+                          : "group n write command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                break;
+            case 4: /* Group n FUA statistics and performance log parameter */
+                ccp = nam ? "parameter_code=4" : "Group n force unit access "
+                        "statistics and performance log parameter";
+                printf("%s\n", ccp);
+                for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[4 + n];
+                }
+                ccp = nam ? "gn_read_fua_commands="
+                          : "group n number of read FUA commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[12]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[12 + n];
+                }
+                ccp = nam ? "gn_write_fua_commands="
+                          : "group n number of write FUA commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[20]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[20 + n];
+                }
+                ccp = nam ? "gn_read_fua_nv_commands="
+                          : "group n number of read FUA_NV commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[28]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[28 + n];
+                }
+                ccp = nam ? "gn_write_fua_nv_commands="
+                          : "group n number of write FUA_NV commands = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[36]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[36 + n];
+                }
+                ccp = nam ? "gn_read_fua_proc_intervals="
+                          : "group n read FUA command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[44]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[44 + n];
+                }
+                ccp = nam ? "gn_write_fua_proc_intervals=" : "group n write "
+                            "FUA command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[52]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[52 + n];
+                }
+                ccp = nam ? "gn_read_fua_nv_proc_intervals=" : "group n "
+                            "read FUA_NV command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[60]; n < 8; ++n) {
+                    ull <<= 8; ull |= ucp[60 + n];
+                }
+                ccp = nam ? "gn_write_fua_nv_proc_intervals=" : "group n "
+                            "write FUA_NV command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                break;
+            default:
+                if (nam) {
+                    printf("parameter_code=%d\n", param_code);
+                    printf("  unknown=1\n");
+                } else
+                    fprintf(stderr, "show_performance...  unknown parameter "
+                            "code %d\n", param_code);
+                if (optsp->do_verbose)
+                    dStrHex((const char *)ucp, extra, 1);
+                break;
+            }
+            if ((optsp->do_pcb) && (0 == optsp->do_name)) {
+                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+                printf("    <%s>\n", pcb_str);
+            }
+        }
     }
     return 1;
 }
@@ -2046,6 +2419,277 @@ static void show_device_stats_page(unsigned char * resp, int len,
     }
 }
 
+static void show_media_stats_page(unsigned char * resp, int len, 
+                                  int show_pcb)
+{
+    int k, j, num, pl, pc, pcb;
+    unsigned char * ucp;
+    unsigned char * xp;
+    unsigned long long ull;
+    char pcb_str[PCB_STR_LEN];
+
+    printf("Media statistics page (smc-3)\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        k = pl - 4;
+        xp = ucp + 4;
+        if (k > (int)sizeof(ull)) {
+            xp += (k - sizeof(ull));
+            k = sizeof(ull);
+        }
+        ull = 0;
+        for (j = 0; j < k; ++j) {
+            if (j > 0)
+                ull <<= 8;
+            ull |= xp[j];
+        }
+        switch (pc) {
+        case 0: 
+            printf("  Number of moves: %" PRIu64 "\n", ull);
+            break;
+        case 1: 
+            printf("  Number of picks: %" PRIu64 "\n", ull);
+            break;
+        case 2: 
+            printf("  Number of pick retries: %" PRIu64 "\n", ull);
+            break;
+        case 3: 
+            printf("  Number of places: %" PRIu64 "\n", ull);
+            break;
+        case 4: 
+            printf("  Number of place retries: %" PRIu64 "\n", ull);
+            break;
+        case 5: 
+            printf("  Number of volume tags read by volume "
+                   "tag reader: %" PRIu64 "\n", ull);
+            break;
+        case 6: 
+            printf("  Number of invalid volume tags returned by "
+                   "volume tag reader: %" PRIu64 "\n", ull);
+            break;
+        case 7: 
+            printf("  Number of library door opens: %" PRIu64 "\n", ull);
+            break;
+        case 8: 
+            printf("  Number of import/export door opens: %" PRIu64 "\n",
+                   ull);
+            break;
+        case 9: 
+            printf("  Number of physical inventory scans: %" PRIu64 "\n",
+                   ull);
+            break;
+        case 0xa: 
+            printf("  Number of medium transport unrecovered errors: "
+                   "%" PRIu64 "\n", ull);
+            break;
+        case 0xb: 
+            printf("  Number of medium transport recovered errors: "
+                   "%" PRIu64 "\n", ull);
+            break;
+        case 0xc: 
+            printf("  Number of medium transport X axis translation "
+                   "unrecovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0xd: 
+            printf("  Number of medium transport X axis translation "
+                   "recovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0xe: 
+            printf("  Number of medium transport Y axis translation "
+                   "unrecovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0xf: 
+            printf("  Number of medium transport Y axis translation "
+                   "recovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x10: 
+            printf("  Number of medium transport Z axis translation "
+                   "unrecovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x11: 
+            printf("  Number of medium transport Z axis translation "
+                   "recovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x12: 
+            printf("  Number of medium transport rotational translation "
+                   "unrecovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x13: 
+            printf("  Number of medium transport rotational translation "
+                   "recovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x14: 
+            printf("  Number of medium transport inversion translation "
+                   "unrecovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x15: 
+            printf("  Number of medium transport inversion translation "
+                   "recovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x16: 
+            printf("  Number of medium transport auxiliary translation "
+                   "unrecovered errors: %" PRIu64 "\n", ull);
+            break;
+        case 0x17: 
+            printf("  Number of medium transport auxiliary translation "
+                   "recovered errors: %" PRIu64 "\n", ull);
+            break;
+        default:
+            printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n",
+                   pc, ull);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static void show_element_stats_page(unsigned char * resp, int len,
+                                    int show_pcb)
+{
+    int num, pl, pc, pcb;
+    unsigned int v;
+    unsigned char * ucp;
+    char str[PCB_STR_LEN];
+
+    printf("Element statistics page (smc-3) [0x15]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        printf("  Element address: %d\n", pc);
+        v = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+        printf("    Number of places: %u\n", v);
+        v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
+        printf("    Number of place retries: %u\n", v);
+        v = (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15];
+        printf("    Number of picks: %u\n", v);
+        v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
+        printf("    Number of pick retries: %u\n", v);
+        v = (ucp[20] << 24) + (ucp[21] << 16) + (ucp[22] << 8) + ucp[23];
+        printf("    Number of determined volume identifiers: %u\n", v);
+        v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
+        printf("    Number of unreadable volume identifiers: %u\n", v);
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("\n        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static char * tape_alert_strs[] = {
+    "<parameter code 0, unknown>",              /* 0x0 */
+    "Read warning",
+    "Write warning",
+    "Hard error",
+    "Media",
+    "Read failure",
+    "Write failure",
+    "Media life",
+    "Not data grade",                           /* 0x8 */
+    "Write protect",
+    "No removal",
+    "Cleaning media",
+    "Unsupported format",
+    "Recoverable mechanical cartridge failure",
+    "Unrecoverable mechanical cartridge failure",
+    "Memory chip in cartridge failure",
+    "Forced eject",                             /* 0x10 */
+    "Read only format",
+    "Tape directory corrupted on load",
+    "Nearing media life",
+    "Cleaning required",
+    "Cleaning requested",
+    "Expired cleaning media",
+    "Invalid cleaning tape",
+    "Retension requested",                      /* 0x18 */
+    "Dual port interface error",
+    "Cooling fan failing",
+    "Power supply failure",
+    "Power consumption",
+    "Drive maintenance",
+    "Hardware A",
+    "Hardware B",
+    "Interface",                                /* 0x20 */
+    "Eject media",
+    "Microcode update fail",
+    "Drive humidity",
+    "Drive temperature",
+    "Drive voltage",
+    "Predictive failure",
+    "Diagnostics required",
+    "Obsolete (28h)",                           /* 0x28 */
+    "Obsolete (29h)",
+    "Obsolete (2Ah)",
+    "Obsolete (2Bh)",
+    "Obsolete (2Ch)",
+    "Obsolete (2Dh)",
+    "Obsolete (2Eh)",
+    "Reserved (2Fh)",
+    "Reserved (30h)",                           /* 0x30 */
+    "Reserved (31h)",
+    "Lost statistics",
+    "Tape directory invalid at unload",
+    "Tape system area write failure",
+    "Tape system area read failure",
+    "No start of data",
+    "Loading failure",
+    "Unrecoverable unload failure",             /* 0x38 */
+    "Automation interface failure",
+    "Firmware failure",
+    "WORM medium - integrity check failed",
+    "WORM medium - overwrite attempted",
+};
+
+static void show_tape_alert_ssc_page(unsigned char * resp, int len,
+                                     int show_pcb,
+                                     const struct opts_t * optsp)
+{
+    int num, pl, pc, pcb, flag;
+    unsigned char * ucp;
+    char str[PCB_STR_LEN];
+
+    /* N.B. the Tape alert log page for smc-3 is different */
+    printf("Tape alert page (ssc-3) [0x2e]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        flag = ucp[4] & 1;
+        if (optsp->do_verbose && (0 == optsp->do_brief) && flag)
+            printf("  >>>> ");
+        if ((0 == optsp->do_brief) || optsp->do_verbose || flag) {
+            if (pc < (int)(sizeof(tape_alert_strs) /
+                           sizeof(tape_alert_strs[0])))
+                printf("  %s: %d\n", tape_alert_strs[pc], flag);
+            else
+                printf("  Reserved parameter code 0x%x, flag: %d\n", pc,
+                       flag);
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("\n        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
 static void show_seagate_cache_page(unsigned char * resp, int len, 
                                     int show_pcb)
 {
@@ -2219,8 +2863,8 @@ static void show_ascii_page(unsigned char * resp, int len,
     case 0xc:
         {
             switch (inq_dat->peripheral_type) {
-            case 1: case 2: case 8:
-                /* tape, (printer) and medium changer type devices */
+            case 1: case 2:
+                /* tape and (printer) type devices */
                 show_sequential_access_page(resp, len, optsp->do_pcb,
                                             optsp->do_verbose);
                 break;
@@ -2242,9 +2886,12 @@ static void show_ascii_page(unsigned char * resp, int len,
     case 0x14:
         {
             switch (inq_dat->peripheral_type) {
-            case 1: case 8: case 0x12:
-                /* tape, medium changer and adc type devices */
+            case 1: case 0x12:
+                /* tape and adc type devices */
                 show_device_stats_page(resp, len, optsp->do_pcb);
+                break;
+            case 8: /* smc-3 */
+                show_media_stats_page(resp, len, optsp->do_pcb);
                 break;
             default:
                 done = 0;
@@ -2259,6 +2906,9 @@ static void show_ascii_page(unsigned char * resp, int len,
                 /* disk (direct access) type devices */
                 show_background_scan_results_page(resp, len, optsp->do_pcb,
                                                   optsp->do_verbose);
+                break;
+            case 8: /* smc-3 */
+                show_element_stats_page(resp, len, optsp->do_pcb);
                 break;
             default:
                 done = 0;
@@ -2282,6 +2932,21 @@ static void show_ascii_page(unsigned char * resp, int len,
     case PORT_SPECIFIC_LPAGE:
         done = show_protocol_specific_page(resp, len, optsp);
         break;
+    case GSP_LPAGE: /* defined for subpages 0 to 31 inclusive */
+        done = show_stats_perform_page(resp, len, optsp);
+        break;
+    case TAPE_ALERT_LPAGE:
+        {
+            switch (inq_dat->peripheral_type) {
+            case 1:     /* ssc only */
+                show_tape_alert_ssc_page(resp, len, optsp->do_pcb, optsp);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
+        break;
     case IE_LPAGE:
         show_IE_page(resp, len, optsp->do_pcb, 1);
         break;
@@ -2304,10 +2969,6 @@ static void show_ascii_page(unsigned char * resp, int len,
             case 0: case 4: case 7: case 0xe:
                 /* disk (direct access) type devices */
                 show_seagate_factory_page(resp, len, optsp->do_pcb);
-                break;
-            case 1: case 2: case 8:
-                /* streaming or medium changer devices */
-                /* call ssc_device_status_log_page() */
                 break;
             default:
                 done = 0;
@@ -2479,6 +3140,8 @@ int main(int argc, char * argv[])
     if (0 == opts.do_all) {
         if (opts.do_raw)
             dStrRaw((const char *)rsp_buff, pg_len + 4);
+        else if (opts.do_hex > 1)
+            dStrHex((const char *)rsp_buff, pg_len + 4, 1);
         else if (pg_len > 1) {
             if (opts.do_hex) {
                 if (rsp_buff[0] & 0x40)
@@ -2509,7 +3172,8 @@ int main(int argc, char * argv[])
         }
         memcpy(parr, rsp_buff + 4, my_len);
         for (k = 0; k < my_len; ++k) {
-            printf("\n");
+            if (0 == opts.do_raw)
+                printf("\n");
             opts.pg_code = parr[k] & 0x3f;
             if (spf)
                 opts.subpg_code = parr[++k];
@@ -2520,11 +3184,15 @@ int main(int argc, char * argv[])
             if (0 == res) {
                 pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
                 if ((pg_len + 4) > resp_len) {
-                    printf("Only fetched %d bytes of response, truncate "
-                           "output\n", resp_len);
+                    fprintf(stderr, "Only fetched %d bytes of response, "
+                            "truncate output\n", resp_len);
                     pg_len = resp_len - 4;
                 }
-                if (opts.do_hex) {
+                if (opts.do_raw)
+                    dStrRaw((const char *)rsp_buff, pg_len + 4);
+                else if (opts.do_hex > 1)
+                    dStrHex((const char *)rsp_buff, pg_len + 4, 1);
+                else if (opts.do_hex) {
                     if (rsp_buff[0] & 0x40)
                         printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"
                                "len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],

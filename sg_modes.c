@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "1.23 20070127";
+static char * version_str = "1.25 20070425";
 
 #define MX_ALLOC_LEN (1024 * 4)
 #define PG_CODE_ALL 0x3f
@@ -297,7 +297,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised switch code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -646,10 +646,10 @@ static struct page_code_desc pc_desc_t_spi4[] = {
 };
 
 static struct page_code_desc pc_desc_t_sas[] = {
-    {0x18, 0x0, "LU SSP, short format"},
-    {0x19, 0x0, "Port SSP, short format"},
-    {0x19, 0x1, "Port SSP, phy control and discover"},
-    {0x19, 0x2, "Port SSP, shared"},
+    {0x18, 0x0, "Protocol specific logical unit (SAS)"},
+    {0x19, 0x0, "Protocol specific port (SAS)"},
+    {0x19, 0x1, "Phy control and discover (SAS)"},
+    {0x19, 0x2, "Shared port control (SAS)"},
 };
 
 static struct page_code_desc pc_desc_t_adt[] = {
@@ -851,7 +851,7 @@ static int examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
     const char * cp;
 
     mresp_len = (optsp->do_raw || optsp->do_hex) ? sizeof(rbuf) : 4;
-    for (header = 0, k = 0; k < 0x3f; ++k) {
+    for (header = 0, k = 0; k < PG_CODE_MAX; ++k) {
         if (optsp->do_six) {
             res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0, rbuf, mresp_len,
                                     0, optsp->do_verbose);
@@ -940,7 +940,7 @@ int main(int argc, char * argv[])
 
     if (NULL == opts.device_name) {
         if (opts.do_list) {
-            if ((opts.pg_code < 0) || (opts.pg_code > 0x3f)) {
+            if ((opts.pg_code < 0) || (opts.pg_code > PG_CODE_MAX)) {
                 printf("    Assume peripheral device type: disk\n");
                 list_page_codes(0, 0, -1);
             } else {
@@ -1106,6 +1106,11 @@ int main(int argc, char * argv[])
             medium_type = rsp_buff[2];
             specific = rsp_buff[3];
             longlba = rsp_buff[4] & 1;
+        }
+        if ((bd_len + headerlen) > md_len) {
+            fprintf(stderr, "Invalid block descriptor length=%d, ignore\n",
+                    bd_len);
+            bd_len = 0;
         }
         if (opts.do_raw) {
             if (1 == opts.do_raw)

@@ -3,7 +3,7 @@
 # given device into CJTPAT (jitter pattern) generation mode.
 # N.B. This will turn the receiver off on phy id 0.
 #
-# Usage example: 'sg_senddiag -pf -raw=- /dev/sg2 < {this_file}'
+# Usage example: 'sg_senddiag --pf --raw=- /dev/sg2 < {this_file}'
 #
 3f,6,0,1c,0,1,2,9,
 0,0,0,0,0,0,0,0,

@@ -2,6 +2,44 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.24 [20070507]
+  - sg_raw: new utility to send arbirary SCSI commands
+  - sg_luns: increase number of luns that can be fetched
+    - fix length of raw and hex output
+    - add '--quiet' option to output only ASCII hex
+      representation of each lun
+  - sg_rtpg: update for changes in spc4r09
+  - sg_persist: update documentation, spc-4 references
+    - fix exit status values
+  - sg_inq: update version descriptors per spc4r09
+    - fix '--id' and '--extended'
+    - extend block limits VPD page (sbc3r09)
+  - sg_vpd: extend block limits VPD page (sbc3r09)
+    - append relative target port identifier to SAS target
+      port address with '-iq' option
+  - sg_logs: add decoding for stats+performance log pages
+    - fix showing of page names for pdt > 0
+    - implement '-HH' for single and all pages, fix '-r'
+    - when '--maxlen=' given, only do single fetch
+    - add Tape Alert (ssc), Media and Element statistics (smc) pages 
+    - add '--brief' option
+  - sg_ses: sync with ses2r16
+    - fix bay number for SAS
+  - sg_format: add '--dcrt' and '--security' options
+  - sgm_dd: add 'smmap' oflag for shared_mmap_io testing
+    - add 'dio' oflag
+  - sg_dd, sgp_dd: add 'dio' iflag and oflag
+  - sg_modes: change SAS mode page names per sas2r09
+    - check validity of block descriptors length
+  - sg_pt: change opaque context object from 'void *'
+    to 'struct sg_pt_base *'
+  - sg_opcodes: anticipate extra tmfs from 07-159r0
+  - sg_sat_set_features: add more usage information
+    - add man page
+  - sg_sat_phy_event: add to examples directory
+  - sg_lib: sync asc/ascq codes with spc4r10
+  - Solaris port: using uscsi interface
+
 Changelog for sg3_utils-1.23 [20070131]
   - sg_read_buffer: new utility
   - sg_write_buffer: new utility

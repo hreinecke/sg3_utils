@@ -1,4 +1,4 @@
-.TH SG_VPD "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_VPD "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_vpd \- fetches Vital Product Data (VPD) pages using a SCSI INQUIRY command
 .SH SYNOPSIS
@@ -39,7 +39,7 @@ times, see section on the ATA information vpd page.
 .TP
 \fB\-i\fR, \fB\-\-ident\fR
 decode the device identification (0x83) VPD page. When used once this option
-has the same effect as '\-\-page=di'. When use twice then the short form o
+has the same effect as '\-\-page=di'. When use twice then the short form of
 the device identification VPD page's logical unit designator is decoded. In
 the latter case this option has the same effect as '\-\-quiet \-\-page=di_lu'.
 .TP
@@ -75,7 +75,7 @@ increases the level or verbosity.
 print out version string then exit.
 .SH ATA INFORMATION VPD PAGE
 This VPD page (0x89 or 'ai') is defined by the SCSI to ATA Translation
-draft. It contains information about the SAT layer, the "signature" of
+standard. It contains information about the SAT layer, the "signature" of
 the ATA device and the response to the ATA IDENTIFY (PACKET) DEVICE
 command. The latter part has 512 bytes of identity, capability and
 settings data which the hdparm utility is capable of decoding (so this

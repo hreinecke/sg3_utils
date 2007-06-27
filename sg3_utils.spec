@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.23
+Version: 1.24
 Release: 1%{?dist}
 License: GPL
 Group: Utilities/System
@@ -78,6 +78,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/*.la
 
 %changelog
+* Mon May 07 2007 - dgilbert at interlog dot com
+- add sg_raw; sg_rtpg, sg_log, sg_inq and sg_format updates
+  * sg3_utils-1.24
+
 * Wed Jan 31 2007 - dgilbert at interlog dot com
 - add sg_read_buffer + sg_write_buffer
   * sg3_utils-1.23

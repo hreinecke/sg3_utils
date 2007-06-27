@@ -8,12 +8,12 @@ command set is used by ATAPI devices (CD/DVDs and tapes), USB
 mass storage devices, Fibre Channel disks, IEEE 1394 storage
 devices (that use the "SBP" protocol), SAS and iSCSI.
 
-This package originally targetted the Linux SCSI subsystem. Since most
+This package originally targeted the Linux SCSI subsystem. Since most
 operating systems contain a SCSI command pass-through mechanism, many
 utilities within this package have been ported. This README mainly
 concentrates on Linux: see the README.freebsd file for the FreeBSD port,
-the README.tru64 file for the Tru64 (OSF) port and README.win32 for the
-Windows port.
+README.solaris for the Solaris port, the README.tru64 file for the Tru64
+(OSF) port and README.win32 for the Windows port.
 
 Most utilities within the sg3_utils package work at the SCSI command level.
 For example the sg_inq utility issues a SCSI INQUIRY command and decodes the
@@ -151,11 +151,11 @@ Here is list in alphabetical order of utilities found in the main directory
 of the sg3_utils directory:
   - sginfo, sgm_dd, sgp_dd, sg_dd, sg_emc_trespass, sg_get_config,
     sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map, sg_map26,
-    sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_rbuf, sg_rdac, sg_read,
-    sg_readcap, sg_read_buffer, sg_read_long, sg_reassign, sg_request,
-    sg_reset, sg_rmsn, sg_rtpg, sg_sat_identify, sg_scan, sg_senddiag,
-    sg_ses, sg_start, sg_sync, sg_test_rwbuff, sg_turs, sg_verify, sg_vpd,
-    sg_write_buffer, sg_write_long, sg_wr_mode
+    sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_raw, sg_rbuf, sg_rdac,
+    sg_read, sg_readcap, sg_read_buffer, sg_read_long, sg_reassign,
+    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_sat_identify, sg_scan,
+    sg_senddiag, sg_ses, sg_start, sg_sync, sg_test_rwbuff, sg_turs,
+    sg_verify, sg_vpd, sg_write_buffer, sg_write_long, sg_wr_mode
 
 These utilities and the libsgutils.so library which they depend on are built
 by the Makefile in the main directory. This Makefile does not invoke the
@@ -181,10 +181,10 @@ Some of these utilities have man pages.
 
 Here is a list in alphabetical order of utilities found in the examples
 subdirectory:
-  - sg_excl.c, scsi_inquiry, sg_iovec_tst.c, sg_sat_chk_power.c,
-    sg__sat_identify.c, sg_sat_set_features.c, sg_sat_smart_rd_data.c,
-    sg_simple1, sg_simple2, sg_simple3, sg_simple4, sg_simple5 and
-    sg_simple16.c
+  - sg_excl, scsi_inquiry, sg_iovec_tst, sg_sat_chk_power,
+    sg__sat_identify, sg_sat_phy_event, sg_sat_set_features,
+    sg_sat_smart_rd_data, sg_simple1, sg_simple2, sg_simple3, sg_simple4,
+    sg_simple5 and sg_simple16
 
 Also in that subdirectory is a script to test sg_persist, an example
 data file for sg_persist (called "transport_ids.txt") and an example
@@ -199,15 +199,8 @@ Unix od command. There is also code to sg_chk_asc.c which checks a given
 text file (typically a copy of http://www.t10.org/lists/asc-num.txt ) and
 checks it against the asc/ascq text strings held in sg_lib.c .
 
-The "doc" subdirectory contains copies of web pages relevant to
-the sg3_utils package. Currently it contains:
-  - sg3_utils.html : a description of the sg3_utils package contents
-  - sg_dd.html : describes the sg_dd utility and compares it with the
-                 Unix dd command
-  - sg_io.html : describes the SG_IO ioctl used by sg3_utils. Looks
-                 at differences between the lk 2.4 and 2.6 series;
-                 including its use with block devices
-  - tools.html : a list of SCSI and storage tools with a summary and url
+The "doc" subdirectory contains a README.doc file containing the urls of
+various related documents.
 
 The "scripts" subdirectory contains some bourne (bash) shell scripts
 that rely on utilities in the main directory. One script uses the sdparm
@@ -292,7 +285,7 @@ or using '-O' as the first command line option.
 
 The more recent utilities that use "getopt_long" only are:
   - sg_format sg_get_config sg_ident sg_luns sg_map26 sg_persist
-    sg_prevent sg_read_buffer sg_read_long sg_reassign sg_requests
+    sg_prevent sg_raw sg_read_buffer sg_read_long sg_reassign sg_requests
     sg_rmsn sg_rtpg sg_sat_identify sg_scan (w), sg_ses sg_sync
     sg_test_rwbuf sg_verify sg_vpd sg_write_buffer sg_write_long
     sg_wr_mode
@@ -326,21 +319,10 @@ The include file path issues are now all addressed in one file called
 sg.h header files has not been a problem in the latter lk 2.4 and lk 2.6
 series.
 
-scsirastools
-============
-This package found at http://scsirastools.sourceforge.net contains utilities
-which overlap with the functionality offered in sg3_utils. Utilities of note
-in scsirastools are:
-  - sgdskfl: for loading firmware into SCSI disks
-  - sgmode: get and set mode pages
-  - sgdefects: list primary and grown defect lists
-  - sgdiag to perform format and other test functions
+Other SCSI and storage tools
+============================
+See http://www.torque.net/sg/tools.html
 
-plscsi
-======
-This is a utility which can issue arbitrary SCSI commands (i.e. supplied by
-user). It is available for Linux and other operating systems.
-See http://members.aol.com/plscsi .
 
 Doug Gilbert
-31st January 2007
+7th May 2007

@@ -41,7 +41,8 @@
 
 /* This program uses a ATA PASS-THROUGH SCSI command to package
    an ATA IDENTIFY (PACKAGE) DEVICE command. See http://www.t10.org
-   SAT draft at time of writing: sat-r09.pdf
+   for the most recent SAT: sat-r09.pdf . SAT is now a standard:
+   SAT ANSI INCITS 431-2007.
 
 */
 
@@ -50,6 +51,7 @@
 #define SAT_ATA_PASS_THROUGH12 0xa1     /* clashes with MMC BLANK comand */
 #define SAT_ATA_PASS_THROUGH12_LEN 12
 #define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
+#define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d
 
 #define ATA_IDENTIFY_DEVICE 0xec
 #define ATA_IDENTIFY_PACKET_DEVICE 0xa1
@@ -59,17 +61,17 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.03 20070130";
+static char * version_str = "1.03 20070501";
 
 static struct option long_options[] = {
-        {"chk_cond", 0, 0, 'c'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"len", 1, 0, 'l'},
-        {"packet", 0, 0, 'p'},
-        {"raw", 0, 0, 'r'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"chk_cond", no_argument, 0, 'c'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"len", required_argument, 0, 'l'},
+        {"packet", no_argument, 0, 'p'},
+        {"raw", no_argument, 0, 'r'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -180,7 +182,8 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                 return ret; 
             case SPC_SK_NO_SENSE:
             case SPC_SK_RECOVERED_ERROR:
-                if ((0x0 == ssh.asc) && (0x1d == ssh.ascq)) {
+                if ((0x0 == ssh.asc) &&
+		    (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
                     if (SAT_ATA_RETURN_DESC != ata_return_desc[0]) {
                         if (verbose)
                             fprintf(stderr, "did not find ATA Return "
@@ -327,7 +330,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

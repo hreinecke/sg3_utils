@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_INQ "8" "February 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_inq \- sends a SCSI INQUIRY or ATA IDENTIFY (PACKET) DEVICE command
 and outputs the response
@@ -33,9 +33,7 @@ An important "non\-standard" INQUIRY page is the Device Identification
 Vital Product Data (VPD) page [0x83]. Since SPC\-3, support for this page
 has been flagged as mandatory. The \fI\-\-id\fR option decodes this page.
 To get fine grained decoding of this VPD page and others, including
-some vendor specific VPD pages, see the
-.B sg_vpd
-utility.
+some vendor specific VPD pages, see the sg_vpd(8) utility.
 .PP
 If the \fIDEVICE\fR exists and the SCSI INQUIRY fails (because the SG_IO ioctl
 is not supported) then an ATA IDENTIFY (PACKET) DEVICE is tried. If it
@@ -65,7 +63,7 @@ SCSI command opcode to query. When used twice (e.g. '\-cc') this utility
 forms a list by looping over all 256 opcodes (0 to 255 inclusive) only
 outputting a line for found commands. The CmdDt bit is now obsolete.
 It has been replaced by the REPORT SUPPORTED OPERATION CODES command,
-see the sg_opcodes utility.
+see the sg_opcodes(8) utility.
 .TP
 \fB\-d\fR, \fB\-\-descriptors\fR
 decodes and prints the version descriptors found in a standard INQUIRY
@@ -219,7 +217,7 @@ opcode to query. Equivalent to \fI\-\-cmddt\fR in the main description.
 \fB\-cl\fR
 lists the command data for all supported commands (followed by the command
 name) by looping through all 256 opcodes. This option uses the CmdDt bit
-which is now obsolete. See the sg_opcodes utility.
+which is now obsolete. See the sg_opcodes(8) utility.
 Equivalent to '\-\-cmddt \-\-cmddt' in the main description.
 .TP
 \fB\-d\fR
@@ -271,8 +269,8 @@ and their names (if known). To decode the mandatory device identification
 page (0x83) use the \fI\-i\fR option. A now obsolete usage is when the
 \fI\-c\fR option is given in which case the argument to this option is assumed
 to be a command opcode number. Recent SCSI draft standards have moved this
-facility to a separate command (see sg_opcodes). Defaults to 0 so if \fI\-e\fR
-is given without this option then VPD page 0 is output.
+facility to a separate command (see sg_opcodes(8)). Defaults to 0 so if
+\fI\-e\fR is given without this option then VPD page 0 is output.
 .TP
 \fB\-p\fR=\fIVPD_PG\fR
 same action as \fI\-o=OPCODE_PG\fR option described in the previous entry.
@@ -319,4 +317,4 @@ Copyright \(co 2001\-2007 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_opcodes sg_vpd(sg3_utils), hdparm(hdparm), sgdiag(scsirastools)
+.B sg_opcodes(8), sg_vpd(8), hdparm(8), sgdiag(scsirastools)

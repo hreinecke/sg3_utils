@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "Jamuary 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG3_UTILS "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -78,10 +78,10 @@ example an attempt to read a corrupted block on a disk will yield this value.
 .TP
 .B 5
 the \fIDEVICE\fR reports an "illegal request" with an additional sense code
-other than "invalid operation code". This is often a supported command with
-a field set requesting an unsupported capability. For commands that require
-a "service action" field this value can indicate that the command with that
-service action value is not supported.
+other than "invalid command operation code". This is often a supported
+command with a field set requesting an unsupported capability. For commands
+that require a "service action" field this value can indicate that the
+command with that service action value is not supported.
 .TP
 .B 6
 the \fIDEVICE\fR reports a "unit attention" condition. This usually indicates
@@ -92,7 +92,7 @@ conditions are usually only reported once by a device.
 .TP
 .B 9
 the \fIDEVICE\fR reports an illegal request with an additional sense code
-of "invalid operation code" which means that it doesn't support the
+of "invalid command operation code" which means that it doesn't support the
 requested command.
 .TP
 .B 11

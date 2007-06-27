@@ -1,18 +1,18 @@
-.TH SG_LOGS "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_LOGS "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
-[\fI\-\-all\fR] [\fI\-\-control=PC\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
+[\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
 [\fI\-\-page=PG[,SPG]\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR]
 [\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR]
 [\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-[\fI\-a\fR] [\fI\-A\fR] [\fI\-c=PC\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-l\fR]
-[\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG[,SPG]\fR]
+[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-h\fR] [\fI\-H\fR]
+[\fI\-l\fR] [\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG[,SPG]\fR]
 [\fI\-paramp=PP\fR] [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-select\fR]
 [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
 \fIDEVICE\fR
@@ -42,11 +42,23 @@ process: first the "supported log pages" log page is fetched, then for each
 entry in the response, the corresponding log page is fetched and displayed.
 When used twice (e.g. '-aa') all log pages and subpages are fetched.
 .TP
+\fB\-b\fR, \fB\-\-brief\fR
+shorten the amount of output for some log pages. For example the Tape
+Alert log page only outputs parameters whose flags are set when
+\fI\-\-brief\fR is given.
+.TP
 \fB\-c\fR, \fB\-\-control\fR=\fIPC\fR
-accepts 0, 1, 2 or 3 for the \fIPC\fR argument. 0 for current threshold
-values, 1 for current cumulative values, 2 for default threshold values and
-3 for default cumulative values. The default is 1 (i.e. current threshold
-values).
+accepts 0, 1, 2 or 3 for the \fIPC\fR argument:
+.br
+  \fB0\fR : current threshold values
+.br
+  \fB1\fR : current cumulative values
+.br
+  \fB2\fR : default threshold values
+.br
+  \fB3\fR : default cumulative values
+.br
+The default value is 1 (i.e. current cumulative values).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -66,9 +78,10 @@ supported by this device. There is a list of common log page codes below.
 sets the "allocation length" field in the LOG SENSE cdb. The is the maximum
 length in bytes that the response will be. Without this option (or \fILEN\fR
 equal to 0) this utility first fetches the 4 byte response then does a second
-access with the length indicated in the first (4 byte) response. Responses
-can be quite large (e.g. the background scan results log page) and this
-option can be used to limit the amount of information returned.
+access with the length indicated in the first (4 byte) response. Negative
+values and 1 for \fILEN\fR are not accepted. Responses can be quite
+large (e.g. the background scan results log page) and this option can be
+used to limit the amount of information returned.
 .TP
 \fB\-n\fR, \fB\-\-name\fR
 decode some log pages into 'name=value' entries, one per line. The name
@@ -149,9 +162,18 @@ increase level of verbosity.
 \fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.
 .SH NOTES
+This utility will usually do a double fetch of log pages with the SCSI LOG
+SENSE command. The first fetch requests a 4 byte response (i.e. place 4 in
+the "allocation length" field in the cdb). From that response it can
+calculate the actual length of the response which is what it asks for
+on the second fetch. This is typical practice in SCSI and guaranteed to
+work in the standards. However some older devices don't comply. For
+those devices using the \fI\-\-maxlen=LEN\fR option will do a single fetch.
+A value of 252 should be a safe starting point.
+.PP
 Various log pages hold information error rates, device temperature,
 start stop cycles since device produced and the results of the last
-20 self tests. Self tests can be initiated by the sg_senddiag utility.
+20 self tests. Self tests can be initiated by the sg_senddiag(8) utility.
 The smartmontools package provides much of the information found with
 sg_logs in a form suitable for monitoring the health of SCSI disks and
 tape drives.
@@ -196,6 +218,8 @@ the leading "0x", or as their decimal equivalents.]:
 .br
 0x18      Protocol specific port (SAS transport)
 .br
+0x19      General statistics and performance
+.br
 0x2f      Informational exceptions
 .br
 0x37      Seagate cache (vendor, disk)
@@ -207,7 +231,7 @@ generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
 and DVD drives) can also be specified. For example "sg_logs \-a /dev/sda"
 will work in the 2.6 series kernels.
 .SH EXIT STATUS
-The exit status of sg_modes is 0 when it is successful. Otherwise see
+The exit status of sg_logs is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH OLDER COMMAND LINE OPTIONS
 The options in this section were the only ones available prior to sg3_utils
@@ -312,4 +336,4 @@ Copyright \(co 2002\-2007 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B smartctl(smartmontools), sg_senddiag(sg3_utils)
+.B smartctl(smartmontools), sg_senddiag(8)

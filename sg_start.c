@@ -27,7 +27,7 @@
  
 */
 
-static char * version_str = "0.55 20070128";
+static char * version_str = "0.55 20070419";
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},
@@ -206,7 +206,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised switch code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();

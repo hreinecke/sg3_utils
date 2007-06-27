@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_PERSIST "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
@@ -28,12 +28,12 @@ sub\-command of the PRIN command. Other PRIN sub\-commands are
 READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
-should be aware of what they are doing! The relevant sections of the
-SCSI Primary Commands document (SPC\-4 most recent draft revision 5a
-dated 14th June 2006) are sections 5.6 (general information), 6.11 (for
-PRIN) and 6.12 (for PROUT). To safeguard against accidental use,
-the \fI\-\-out\fR option must be given when a PROUT sub\-command (e.g.
-\fI\-\-register\fR) is used.
+should be aware of what they are doing. The relevant sections of the
+SCSI Primary Commands document (i.e. SPC\-4 whose most recent draft is
+revision 9 dated 17th February 2007) are sections 5.6 (titled "Reservation"),
+6.13 (for the PRIN command) and 6.14 (for the PROUT command). To safeguard
+against accidental use, the \fI\-\-out\fR option must be given when a
+PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
 .PP
 The older SCSI RESERVE and RELEASE commands (both 6 and 10 byte variants)
 are not supported by this utility. In SPC\-3, RESERVE and RELEASE are 
@@ -131,7 +131,7 @@ exclusive access \- registrants only, 7\-> write exclusive \- all registrants,
 8\-> exclusive access \- all registrants. Default value is 0 (which is
 an invalid type). Each "persistent reservation type" is explained in more
 detail in a subsection of that name in the read reservation section of
-the PRIN command (section 6.11.3.4 of SPC\-4 revision 5a). 
+the PRIN command (section 6.13.3.4 of SPC\-4 revision 9). 
 .TP
 \fB\-s\fR, \fB\-\-read\-full\-status\fR
 Read Full Status is a sub\-command of the PRIN command. For each registration
@@ -188,7 +188,7 @@ current persistent reservation. The \fI\-\-prout\-type=TYPE\fR
 and \fI\-\-param\-rk=RK\fR options, matching the reservation, must also be
 specified.
 .TP
-\fB\-c\fR, \fB\-\-report/-capabilities\fR
+\fB\-c\fR, \fB\-\-report\-capabilities\fR
 Report Capabilities is a sub\-command of the PRIN command. It lists
 information about the aspects of persistent reservations that the
 \fIDEVICE\fR supports.
@@ -202,10 +202,11 @@ and \fI\-\-param\-rk=RK\fR options must also be specified.
 a transportID is required for the PROUT 'register and move' sub\-command
 and is optional for the PROUT 'register' and 'register and ignore
 existing key' sub\-commands. The latter two sub\-commands can take multiple
-transportIDs in a list but only one is supported on the command line.
-\fIH,H...\fR is a comma separated list of hex numbers representing
-the bytes of the transportID. The list of hex numbers will be padded
-out with zeros to 24 bytes which is the minimum length of a
+transportIDs in a list but only one is supported with this option
+variant (use the following option variant that reads stdin if multiple
+transportIDs are required). \fIH,H...\fR is a comma separated list of hex
+bytes which represent the transportID. The list of hex numbers will be
+padded out with zeros to 24 bytes which is the minimum length of a
 transportID. A transportID longer than 24 bytes (e.g. for iSCSI) is
 padded with zeros so its length is a multiple of 4.
 .TP
@@ -257,6 +258,9 @@ mismatched \fI\-\-prout\-type=TYPE\fR) will result in a RESERVATION
 CONFLICT status. This can be a bit confusing when you know there is
 only one (active) initiator: the "conflict" is with the SPC standard, not
 another initiator.
+.PP
+TransportIDs are defined in SPC\-4 and their structures vary depending
+on the underlying transport.
 .SH EXAMPLES
 .PP
 Due to defaults the simplest example executes the 'read keys' sub\-command

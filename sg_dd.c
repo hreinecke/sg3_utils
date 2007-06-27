@@ -51,7 +51,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.60 20070124";
+static char * version_str = "5.61 20070318";
 
 #define ME "sg_dd: "
 
@@ -134,6 +134,7 @@ static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 struct flags_t {
     int append;
     int coe;
+    int dio;
     int direct;
     int dpo;
     int dsync;
@@ -288,9 +289,9 @@ static void usage()
            "    ibs         input block size (if given must be same as "
            "'bs=')\n"
            "    if          file or device to read from (def: stdin)\n"
-           "    iflag       comma separated list from: [coe,direct,dpo,"
-           "dsync,excl,fua,\n"
-           "                sgio]\n"
+           "    iflag       comma separated list from: [coe,dio,direct,"
+           "dpo,dsync,excl,\n"
+           "                fua,sgio]\n"
            "    obs         output block size (if given must be same as "
            "'bs=')\n"
            "    odir        1->use O_DIRECT when opening block dev, "
@@ -299,9 +300,9 @@ static void usage()
            "OFILE of '.'\n");
     fprintf(stderr,
            "                treated as /dev/null\n"
-           "    oflag       comma separated list from: [append,coe,direct"
-           ",dpo,dsync,excl,\n"
-           "                fua,sgio]\n"
+           "    oflag       comma separated list from: [append,coe,dio,"
+           "direct,dpo,dsync,\n"
+           "                excl,fua,sgio]\n"
            "    retries     retry sgio errors RETR times (def: 0)\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
@@ -992,6 +993,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
             fp->append = 1;
         else if (0 == strcmp(cp, "coe"))
             ++fp->coe;
+        else if (0 == strcmp(cp, "dio"))
+            fp->dio = 1;
         else if (0 == strcmp(cp, "direct"))
             fp->direct = 1;
         else if (0 == strcmp(cp, "dpo"))
@@ -1029,7 +1032,6 @@ int main(int argc, char * argv[])
     int in_type = FT_OTHER;
     char outf[INOUTF_SZ];
     int out_type = FT_OTHER;
-    int dio = 0;
     int dio_incomplete = 0;
     int cdbsz_given = 0;
     int do_sync = 0;
@@ -1105,9 +1107,10 @@ int main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'count='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key, "dio"))
-            dio = sg_get_num(buf);
-        else if (0 == strcmp(key, "fua")) {
+        } else if (0 == strcmp(key, "dio")) {
+            oflag.dio = sg_get_num(buf);
+            iflag.dio = oflag.dio;
+        } else if (0 == strcmp(key, "fua")) {
             t = sg_get_num(buf);
             oflag.fua = (t & 1) ? 1 : 0;
             iflag.fua = (t & 2) ? 1 : 0;
@@ -1536,7 +1539,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
+    if (iflag.dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
         (FT_RAW & out_type)) {
         size_t psz = getpagesize();
         wrkBuff = (unsigned char*)malloc(blk_sz * bpt + psz);
@@ -1572,7 +1575,7 @@ int main(int argc, char * argv[])
     while (dd_count > 0) {
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG & in_type) {
-            dio_tmp = dio;
+            dio_tmp = iflag.dio;
             res = sg_read(infd, wrkPos, blocks, skip, blk_sz, &iflag,
                           &dio_tmp, &blks_read);
             if (-2 == res) {     /* ENOMEM, find what's available+try that */
@@ -1604,7 +1607,7 @@ int main(int argc, char * argv[])
                     blocks = blks_read;
                 }
                 in_full += blocks;
-                if (dio && (0 == dio_tmp))
+                if (iflag.dio && (0 == dio_tmp))
                     dio_incomplete++;
             }
         } else {
@@ -1634,7 +1637,7 @@ int main(int argc, char * argv[])
             break;      /* nothing read so leave loop */
 
         if (FT_SG & out_type) {
-            dio_tmp = dio;
+            dio_tmp = oflag.dio;
             retries_tmp = oflag.retries;
             first = 1;
             while (1) {
@@ -1693,7 +1696,7 @@ int main(int argc, char * argv[])
                 break;
             } else {
                 out_full += blocks;
-                if (dio && (0 == dio_tmp))
+                if (oflag.dio && (0 == dio_tmp))
                     dio_incomplete++;
             }
         } else if (FT_DEV_NULL & out_type)

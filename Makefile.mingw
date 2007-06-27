@@ -14,7 +14,8 @@ EXECS =	sg_readcap sg_turs sg_inq sg_start sg_modes sg_logs sg_senddiag \
 	sg_sync sg_prevent sg_get_config sg_wr_mode \
 	sg_rtpg sg_reassign sg_format sg_rmsn sg_ident \
 	sg_read_long sg_write_long sg_verify sg_rdac sg_vpd \
-	sg_sat_identify sg_read_buffer sg_write_buffer sg_opcodes
+	sg_sat_identify sg_read_buffer sg_write_buffer sg_opcodes \
+	sg_raw
 
 EXE_S =	sg_readcap.exe sg_turs.exe sg_inq.exe sg_start.exe sg_modes.exe \
 	sg_logs.exe sg_senddiag.exe sg_persist.exe sg_requests.exe \
@@ -23,7 +24,7 @@ EXE_S =	sg_readcap.exe sg_turs.exe sg_inq.exe sg_start.exe sg_modes.exe \
 	sg_format.exe sg_rmsn.exe sg_ident.exe sg_read_long.exe \
 	sg_write_long.exe sg_verify.exe sg_rdac.exe sg_vpd.exe \
 	sg_sat_identify.exe sg_read_buffer.exe sg_write_buffer.exe \
-	sg_opcodes.exe
+	sg_opcodes.exe sg_raw.exe
 
 OS_FLAGS = -DSG3_UTILS_WIN32 -DSG3_UTILS_MINGW -DSPTD
 # OS_FLAGS = -DSG3_UTILS_WIN32 -DSG3_UTILS_MINGW
@@ -36,6 +37,7 @@ CFLAGS = -g -O2 -Wall -W $(EXTRA_FLAGS)
 
 O_FILES = sg_lib.o sg_cmds_basic.o sg_cmds_extra.o sg_pt_win32.o
 O_BFILES = sg_lib.o sg_cmds_basic.o sg_pt_win32.o
+O_RFILES = sg_lib.o sg_pt_win32.o
 O_SFILES = sg_lib.o
 
 LDFLAGS = 
@@ -137,4 +139,7 @@ sg_write_buffer: sg_write_buffer.o $(O_FILES)
 
 sg_opcodes: sg_opcodes.o $(O_BFILES)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES)
+
+sg_raw: sg_raw.o $(O_RFILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_RFILES)
 

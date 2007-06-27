@@ -1,10 +1,10 @@
-.TH SG_LUNS "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_LUNS "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sg_luns \- send the SCSI REPORT LUNS command
 .SH SYNOPSIS
 .B sg_luns
-[\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR]
-[\fI\-\-select=SR\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-quiet\fR]
+[\fI\-\-raw\fR] [\fI\-\-select=SR\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -25,6 +25,9 @@ output the usage message then exit.
 \fB\-H\fR, \fB\-\-hex\fR
 output response to this command in ASCII hex.
 .TP
+\fB\-q\fR, \fB\-\-quiet\fR
+output ASCII hex rendering of each report lun, one per line.
+.TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary (to stdout).
 .TP
@@ -37,7 +40,16 @@ unit addressing, peripheral device addressing and flat space addressing.
 When 1 is given the \fIDEVICE\fR should yield a list of only "well known"
 logical units addressable via this "I_T" nexus. When 2 is given the
 \fIDEVICE\fR should yield all luns addressable via this "I_T" nexus.
-Currently SPC\-3 (rev 23) doesn't specify any other values. 
+To simplify, for the I_T nexus associated with the \fIDEVICE\fR, the
+meanings of the \fISR\fR values are:
+.br
+  \fB0\fR : all luns excluding well known logical units
+.br
+  \fB1\fR : well known logical units
+.br
+  \fB2\fR : all luns
+.br
+Values greater than 2 are reserved (at SPC\-4 (rev 8)).
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -57,4 +69,4 @@ Copyright \(co 2004\-2007 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq(sg3_utils)
+.B sg_inq(8)

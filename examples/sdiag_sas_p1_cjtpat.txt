@@ -4,7 +4,7 @@
 # See sdiag_sas_p1_stop.txt to turn off this test pattern.
 # N.B. This will turn the receiver off on phy id 1.
 #
-# Usage example: 'sg_senddiag -pf -raw=- /dev/sg2 < {this_file}'
+# Usage example: 'sg_senddiag --pf --raw=- /dev/sg2 < {this_file}'
 #
 3f,6,0,1c,1,1,2,9,
 0,0,0,0,0,0,0,0,

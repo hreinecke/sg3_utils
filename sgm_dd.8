@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SGM_DD "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from files and devices. Specialized for
 devices that understand the SCSI command set and does memory mapped
@@ -21,8 +21,16 @@ transfers on sg devices. Similar syntax and semantics to
 but does not perform any conversions.
 .PP
 Will only perform memory mapped transfers when \fIIFILE\fR or \fIOFILE\fR
-are SCSI generic (sg) devices. If both \fIIFILE\fR and \fIOFILE\fR are
-sg devices then memory mapped transfers are only performed on \fIIFILE\fR.
+are SCSI generic (sg) devices.
+.PP
+If both \fIIFILE\fR and \fIOFILE\fR are sg devices then memory mapped 
+transfers are performed on \fIIFILE\fR. If no other flags are specified
+then indirect IO is performed on \fIOFILE\fR. If 'oflag=dio' is given then
+direct IO is attempted on \fIOFILE\fR. If 'oflag=smmap' is given then
+shared mmap-ed IO (sharing the mmap-ed reserve buffer associated with
+\fIIFILE\fR) is attempted. In both latter cases if the faster IO option
+is not available, they fall back to indirect IO and report this at
+the end of the copy.
 .PP
 The first group in the synopsis above are "standard" Unix
 .B dd(1)
@@ -73,6 +81,7 @@ Only allowed when the read\-side (i.e. \fIIFILE\fR) is a sg device. When
 1 there may be a "zero copy" copy (i.e. mmap\-ed transfer on the read into
 the user space and direct IO from there on the write, potentially two DMAs
 and no data copying from the CPU). Default is 0.
+The same action as 'dio=1' is also available with 'oflag=dio'.
 .TP
 \fBibs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
@@ -145,6 +154,10 @@ from the beginning of the file or, if \fISEEK\fR is given, starting at
 block \fISEEK\fR. Note that attempting to 'append' to a device file (e.g.
 a disk) will usually be ignored or may cause an error to be reported.
 .TP
+dio
+is only active with oflag (i.e. 'oflag=dio'). Its action is described in
+the 'dio=1' option description above.
+.TP
 direct
 causes the O_DIRECT flag to be added to the open of \fIIFILE\fR and/or
 \fIOFILE\fR. This flag requires some memory alignment on IO. Hence user
@@ -173,6 +186,11 @@ causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
 commands. This only has effect with sg devices. The 6 byte variants
 of the SCSI READ and WRITE commands do not support the FUA bit.
 Only active for sg device file names.
+.TP
+smmap
+is only active for oflag. It sets shared mmap IO usage on \fIOFILE\fR if
+it is a sg device node. The \fIIFILE\fR also needs to be a sg device
+node (or there is no mmap-ed reserve buffer to share).
 .SH RETIRED OPTIONS
 Here are some retired options that are still present:
 .TP

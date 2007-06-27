@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.32 [20070129]
+/* Version 1.34 [20070422]
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
@@ -222,6 +222,17 @@ extern void sg_print_scsi_status(int scsi_status);
 
 extern int sg_err_category_sense(const unsigned char * sense_buffer,
                                  int sb_len);
+
+/* Here are some additional sense data categories that are not returned
+   by sg_err_category_sense() but are returned by some related functions. */
+#define SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO 17 /* Illegal request (other than */
+                                /* invalid opcode) plus 'info' field: */
+                                /*  [sk,asc,ascq: 0x5,*,*] */
+#define SG_LIB_CAT_MEDIUM_HARD_WITH_INFO 18 /* medium or hardware error */
+                                /* sense key plus 'info' field: */
+                                /*       [sk,asc,ascq: 0x3/0x4,*,*] */
+#define SG_LIB_CAT_TIMEOUT 33
+
 
 /* Iterates to next designation descriptor in the device identification
    VPD page. The 'initial_desig_desc' should point to start of first

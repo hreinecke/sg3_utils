@@ -29,6 +29,7 @@ Here is a list of utilities that have been ported:
     sg_persist
     sg_opcodes
     sg_prevent
+    sg_raw
     sg_rdac
     sg_read_buffer
     sg_read_long
@@ -128,4 +129,4 @@ See the INSTALL file for more details.
 
 
 Doug Gilbert
-21st January 2007
+3rd May 2007

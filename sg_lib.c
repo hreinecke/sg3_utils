@@ -71,7 +71,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.32 20070129";    /* spc-4 rev 8 */
+static char * version_str = "1.34 20070422";    /* spc-4 rev 10 */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -1086,6 +1086,9 @@ static struct error_info additional[] =
     {0x74,0x03,"Incorrect data encryption key"},
     {0x74,0x04,"Cryptographic integrity validation failed"},
     {0x74,0x05,"Error decrypting data"},
+    {0x74,0x06,"Unknown signature verification key"},
+    {0x74,0x07,"Encryption parameters not useable"},
+    {0x74,0x08,"Digital signature validation failure"},
     {0x74,0x71,"Logical unit access not authorized"},
     {0, 0, NULL}
 };

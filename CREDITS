@@ -35,6 +35,9 @@ Hayashi Naoyuki <titan at culzean dot org>
 Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example 
         programs for the original sg driver
 
+Ingo van Lil <inguin at gmx dot de>
+	contributed sg_raw [20070331]
+
 James Bottomley <jejb at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
@@ -73,4 +76,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-31st October 2006
+31st March 2007

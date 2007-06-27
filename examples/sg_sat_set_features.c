@@ -33,18 +33,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <getopt.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
 /* This program performs a ATA PASS-THROUGH (16) SCSI command in order
    to perform an ATA SET FEATURES command. See http://www.t10.org
-   SAT draft at time of writing: sat-r08a.pdf
+   SAT draft at time of writing: sat-r09.pdf
 
    Invocation:
-        sg_sat_set_features [-c <n>] [-f <n>] [-l <n>] [-v] [-V] <device>
+        sg_sat_set_features [-c <n>] [-f <n>] [-h] [-l <n>] [-v] [-V] <device>
 
 */
 
@@ -56,16 +58,53 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.02 20070130";
+static char * version_str = "1.02 20070406";
+
+static struct option long_options[] = {
+        {"count", required_argument, 0, 'c'},
+        {"chk_cond", no_argument, 0, 'C'},
+        {"feature", required_argument, 0, 'f'},
+        {"help", no_argument, 0, 'h'},
+        {"lba", required_argument, 0, 'l'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {0, 0, 0, 0},
+};
+
+void usage()
+{
+    fprintf(stderr, "Usage: "
+          "sg_sat_set_features [--count=C] [--chk_cond] [--feature=F] "
+          "[--help]\n"
+          "                           [-lba=LBA] [--verbose] [--version] "
+          "DEVICE\n"
+          "  where:\n"
+          "    --count=C|-c C       count field contents (def: 0)\n"
+          "    --chk_cond|-C        set chk_cond field in pass-through "
+          "(def: 0)\n"
+          "    --feature=F|-f F     feature field contents (def: 0)\n"
+          "    --help|-h            output this usage message\n"
+          "    --lba=LBA| -l LBA    LBA field contents (def: 0)\n"
+          "    --verbose|-v         increase verbosity\n"
+          "    --version|-V         print version string and exit\n\n"
+          "Sends an ATA SET FEATURES command via a SAT pass through.\n"
+          "Primary feature code is placed in '--feature=F' with '--count=C' "
+          "and\n"
+          "'--lba=LBA' being auxiliaries for some features.  The arguments C, "
+          "F and LBA\n"
+          "are decimal unless prefixed by '0x' or have a trailing 'h'.\n"
+          "Example enabling write cache: 'sg_sat_set_feature --feature=2 "
+          "/dev/sdc'\n");
+}
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k;
+    int sg_fd, c, k;
     unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
     sg_io_hdr_t io_hdr;
-    char * file_name = 0;
+    char device_name[256];
     char ebuff[EBUFF_SZ];
     unsigned char sense_buffer[64];
     int count = 0;
@@ -80,58 +119,80 @@ int main(int argc, char * argv[])
     int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
     const unsigned char * ucp = NULL;
 
-    for (k = 1; k < argc; ++k) {
-        if (0 == strncmp(argv[k], "-c", 2)) {
-            count = sg_get_num(argv[++k]);
+    memset(device_name, 0, sizeof(device_name));
+    while (1) {
+        int option_index = 0;
+
+        c = getopt_long(argc, argv, "c:Cf:hl:vV", long_options,
+                        &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+        case 'c':
+            count = sg_get_num(optarg);
             if ((count < 0) || (count > 255)) {
-                fprintf(stderr, "bad argument for '-c'\n");
-                file_name = 0;
-                break;
+                fprintf(stderr, "bad argument for '--count'\n");
+                return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strncmp(argv[k], "-f", 2)) {
-            feature = sg_get_num(argv[++k]);
+            break;
+        case 'C':
+            chk_cond = 1;
+            break;
+        case 'f':
+            feature = sg_get_num(optarg);
             if ((feature < 0) || (feature > 255)) {
-                fprintf(stderr, "bad argument for '-f'\n");
-                file_name = 0;
-                break;
+                fprintf(stderr, "bad argument for '--feature'\n");
+                return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strncmp(argv[k], "-l", 2)) {
-            lba = sg_get_num(argv[++k]);
-            if (lba < 0) {
-                fprintf(stderr, "bad argument for '-l'\n");
-                file_name = 0;
-                break;
+            break;
+        case 'h':
+        case '?':
+            usage();
+            return 0;
+        case 'l':
+            lba = sg_get_num(optarg);
+            if ((lba < 0) || (lba > 255)) {
+                fprintf(stderr, "bad argument for '--lba'\n");
+                return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(argv[k], "-v"))
+            break;
+        case 'v':
             ++verbose;
-        else if (0 == strcmp(argv[k], "-vv"))
-            verbose += 2;
-        else if (0 == strcmp(argv[k], "-vvv"))
-            verbose += 3;
-        else if (0 == strcmp(argv[k], "-V")) {
+            break;
+        case 'V':
             fprintf(stderr, "version: %s\n", version_str);
-            exit(0);
-        } else if (*argv[k] == '-') {
-            printf("Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
-        } else if (0 == file_name)
-            file_name = argv[k];
-        else {
-            fprintf(stderr, "too many arguments\n");
-            file_name = 0;
-            break;
+            return 0;
+        default:
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if (0 == file_name) {
-        fprintf(stderr, "Usage: 'sg_sat_set_features [-c <n>] [-f <n>] "
-                "[-l <n>] [-v] [-V] <device>'\n");
+    if (optind < argc) {
+        if ('\0' == device_name[0]) {
+            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
+            device_name[sizeof(device_name) - 1] = '\0';
+            ++optind;
+        }
+        if (optind < argc) {
+            for (; optind < argc; ++optind)
+                fprintf(stderr, "Unexpected extra argument: %s\n",
+                        argv[optind]);
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+
+    if ('\0' == device_name[0]) {
+        fprintf(stderr, "missing device name!\n");
+        usage();
         return 1;
     }
 
-    if ((sg_fd = open(file_name, O_RDWR)) < 0) {
+    if ((sg_fd = open(device_name, O_RDWR)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-                 "sg_sat_set_features: error opening file: %s", file_name);
+                 "sg_sat_set_features: error opening file: %s", device_name);
         perror(ebuff);
         return 1;
     }

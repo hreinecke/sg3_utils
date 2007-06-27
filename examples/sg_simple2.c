@@ -15,16 +15,18 @@
    which includes the sg_lib.h header and logic and so has more
    advanced error processing.
    This version demonstrates the "sg3" interface.
+   In the lk 2.6 series devices nodes such as /dev/sda also support
+   the SG_IO ioctl.
 
-*  Copyright (C) 1999 D. Gilbert
+*  Copyright (C) 1999-2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   Invocation: sg_simple2 [-x] <sg_device>
+   Invocation: sg_simple2 [-x] <scsi_device>
 
-   Version 03.57 (20020226)
+   Version 03.58 (20070312)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]

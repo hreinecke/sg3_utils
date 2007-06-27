@@ -16,7 +16,8 @@ EXECS = sg_readcap sg_turs sg_inq sg_start sg_modes sg_logs \
 	sg_sync sg_prevent sg_get_config sg_wr_mode \
 	sg_rtpg sg_reassign sg_format sg_rmsn sg_ident \
 	sg_read_long sg_write_long sg_verify sg_rdac sg_vpd \
-	sg_sat_identify sg_read_buffer sg_write_buffer sg_opcodes
+	sg_sat_identify sg_read_buffer sg_write_buffer sg_opcodes \
+	sg_raw
 
 MAN_PGS = sg_readcap.8 sg_turs.8 sg_inq.8 sg_start.8 sg_modes.8 sg_logs.8 \
 	  sg_senddiag.8 sg_persist.8 sg_requests.8 sg_ses.8 sg_luns.8 \
@@ -24,7 +25,7 @@ MAN_PGS = sg_readcap.8 sg_turs.8 sg_inq.8 sg_start.8 sg_modes.8 sg_logs.8 \
 	  sg_rtpg.8 sg_reassign.8 sg_format.8 sg_rmsn.8 sg_ident.8 \
 	  sg_read_long.8 sg_write_long.8 sg_verify.8 sg_rdac.8 sg_vpd.8 \
 	  sg3_utils.8 sg_sat_identify.8 sg_read_buffer.8 sg_write_buffer.8 \
-	  sg_opcodes.8
+	  sg_opcodes.8 sg_raw.8
 
 MAN_PREF = man8
 
@@ -167,6 +168,9 @@ sg_write_buffer: sg_write_buffer.o libsgutils.la getopt_long/getopt_long.o
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la getopt_long/getopt_long.o
 
 sg_opcodes: sg_opcodes.o libsgutils.la getopt_long/getopt_long.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la getopt_long/getopt_long.o
+
+sg_raw: sg_raw.o libsgutils.la getopt_long/getopt_long.o
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la getopt_long/getopt_long.o
 
 install: $(EXECS)

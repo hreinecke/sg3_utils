@@ -17,7 +17,7 @@
 # This script uses utilities frim sg3_utils package (version
 # 1.21 or later) and sdparm (version 0.99 or later)
 #
-# Douglas Gilbert 20061230
+# Douglas Gilbert 20070317
 
 
 log=0

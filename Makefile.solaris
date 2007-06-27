@@ -1,0 +1,205 @@
+SHELL = /bin/sh
+
+PREFIX=/usr/local
+LIBDIR=$(DESTDIR)/$(PREFIX)/lib
+INSTDIR=$(DESTDIR)/$(PREFIX)/bin
+MANDIR=$(DESTDIR)/$(PREFIX)/man
+INCLUDEDIR=$(DESTDIR)/$(PREFIX)/include
+
+CC = gcc
+LD = gcc
+# LIBTOOL = libtool15
+LIBTOOL = libtool
+LT_EXTRA = --tag=junk
+
+EXECS = sg_readcap sg_turs sg_inq sg_start sg_modes sg_logs \
+	sg_senddiag sg_persist sg_requests sg_ses sg_luns \
+	sg_sync sg_prevent sg_get_config sg_wr_mode \
+	sg_rtpg sg_reassign sg_format sg_rmsn sg_ident \
+	sg_read_long sg_write_long sg_verify sg_rdac sg_vpd \
+	sg_sat_identify sg_read_buffer sg_write_buffer sg_opcodes \
+	sg_raw
+
+MAN_PGS = sg_readcap.8 sg_turs.8 sg_inq.8 sg_start.8 sg_modes.8 sg_logs.8 \
+	  sg_senddiag.8 sg_persist.8 sg_requests.8 sg_ses.8 sg_luns.8 \
+	  sg_sync.8 sg_prevent.8 sg_get_config.8 sg_wr_mode.8 \
+	  sg_rtpg.8 sg_reassign.8 sg_format.8 sg_rmsn.8 sg_ident.8 \
+	  sg_read_long.8 sg_write_long.8 sg_verify.8 sg_rdac.8 sg_vpd.8 \
+	  sg3_utils.8 sg_sat_identify.8 sg_read_buffer.8 sg_write_buffer.8 \
+	  sg_opcodes.8 sg_raw.8
+MAN_PREF = man8
+
+HEADERS = sg_lib.h sg_cmds.h sg_cmds_basic.h sg_cmds_extra.h sg_pt.h
+
+OS_FLAGS = -DSG3_UTILS_SOLARIS
+LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+S_CFLAGS = $(OS_FLAGS) $(LARGE_FILE_FLAGS)
+
+# CFLAGS = -O2 -Wall -W
+CFLAGS = -g -O2 -Wall -W
+# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99
+
+CFLAGS_PTHREADS = -D_REENTRANT
+
+# LDFLAGS = -lcam 
+# LDFLAGS = -v -lm
+
+LIB_VINFO = 1:0:0
+# Perhaps should use "-release RELEASE" instead
+# RELEASE = 1.1
+
+all: $(EXECS)
+
+depend dep:
+	for i in *.c; do $(CC) $(INCLUDES) $(CFLAGS) -M $$i; \
+	done > .depend
+
+clean:
+	/bin/rm -f *.o $(EXECS) core* .depend *.a *.la *.lo
+	/bin/rm -rf .libs
+
+.c.o:
+	$(CC) $(INCLUDES) $(CFLAGS) $(S_CFLAGS) -c -o $@ $<
+ 
+sg_lib.lo: sg_lib.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_lib.c
+
+sg_cmds_basic.lo: sg_cmds_basic.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds_basic.c
+
+sg_cmds_extra.lo: sg_cmds_extra.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds_extra.c
+
+sg_pt_solaris.lo: sg_pt_solaris.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_pt_solaris.c
+
+libsgutils.la: sg_lib.lo sg_cmds_basic.lo sg_cmds_extra.lo sg_pt_solaris.lo
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o libsgutils.la sg_lib.lo \
+	sg_cmds_basic.lo sg_cmds_extra.lo sg_pt_solaris.lo -rpath $(LIBDIR) \
+	-version-info $(LIB_VINFO)
+
+# libsgutils.la: sg_lib.lo sg_cmds_basic.lo sg_cmds_extra.lo
+#	$(LIBTOOL) --mode=link $(LD) -o libsgutils.la sg_lib.lo \
+#	sg_cmds_basic.lo sg_cmds_extra.lo -rpath $(LIBDIR) -release $(RELEASE)
+
+sg_readcap: sg_readcap.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_turs: sg_turs.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_inq: sg_inq.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_start: sg_start.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_modes: sg_modes.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_logs: sg_logs.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_senddiag: sg_senddiag.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_persist: sg_persist.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_requests: sg_requests.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_ses: sg_ses.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_luns: sg_luns.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_sync: sg_sync.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_prevent: sg_prevent.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_get_config: sg_get_config.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_wr_mode: sg_wr_mode.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_rtpg: sg_rtpg.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_reassign: sg_reassign.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_format: sg_format.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_rmsn: sg_rmsn.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_ident: sg_ident.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_read_long: sg_read_long.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_write_long: sg_write_long.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_verify: sg_verify.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_rdac: sg_rdac.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_vpd: sg_vpd.o sg_vpd_vendor.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o sg_vpd_vendor.o libsgutils.la
+
+sg_sat_identify: sg_sat_identify.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_read_buffer: sg_read_buffer.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_write_buffer: sg_write_buffer.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_opcodes: sg_opcodes.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+sg_raw: sg_raw.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+
+install: $(EXECS)
+	install -d $(INSTDIR)
+	install -d $(LIBDIR)
+	$(LIBTOOL) --mode=install $(LT_EXTRA) install -c libsgutils.la $(LIBDIR)/libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --finish $(LIBDIR)
+	for name in $(EXECS); \
+	 do $(LIBTOOL) $(LT_EXTRA) --mode=install install -m 755 \
+		-f $(INSTDIR) $$name; \
+	done
+	install -d $(MANDIR)/$(MAN_PREF)
+	for mp in $(MAN_PGS); \
+	 do install -s -m 644 -f $(MANDIR)/$(MAN_PREF) $$mp; \
+	done
+#	install -d $(INCLUDEDIR)/scsi
+#	for hdr in $(HEADERS); \
+#	 do install -m 644 $$hdr $(INCLUDEDIR)/scsi ; \
+#	done
+
+uninstall:
+	$(LIBTOOL) $(LT_EXTRA) --mode=uninstall rm -f $(LIBDIR)/libsgutils.la
+	dists="$(EXECS)"; \
+	for name in $$dists; do \
+	 rm -f $(INSTDIR)/$$name; \
+	done
+	for mp in $(MAN_PGS); do \
+	 rm -f $(MANDIR)/$(MAN_PREF)/$$mp; \
+	done
+#	for hdr in $(HEADERS); do \
+#	 rm -f $(INCLUDEDIR)/scsi/$$hdr ; \
+#	done
+

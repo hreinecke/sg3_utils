@@ -21,7 +21,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.29 20070127";
+static char * version_str = "0.30 20070419";    /* spc4r09+07-159r0 */
 
 // #define USE_LINUX_SG_IO_IF 1
 
@@ -30,7 +30,7 @@ static char * version_str = "0.29 20070127";
  *    SG_IO ioctl and a more generic sg_pt mechanism that is portable
  *    to other OSes. The code is conditionally compiled depending
  *    on the USE_LINUX_SG_IO_IF define and whether the Makefile
- *    indicates the OS is linux.
+ *    indicates the OS is Linux.
  *    N.B. Various Makefiles are set assuming this is not defined.
  *
  *  - since support for the SCSI REPORT SUPPORTED OPERATION CODES and
@@ -306,7 +306,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised switch code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -884,6 +884,10 @@ int main(int argc, char * argv[])
             printf("    Target reset\n");
         if (rsoc_buff[0] & 0x1)
             printf("    Wakeup\n");
+        if (rsoc_buff[1] & 0x4)
+            printf("    Query unit attention\n");
+        if (rsoc_buff[1] & 0x2)
+            printf("    Query task set\n");
         if (rsoc_buff[1] & 0x1)
             printf("    I_T nexus reset\n");
     } else if (0 == rep_opts) {  /* list all supported operation codes */
@@ -1075,7 +1079,7 @@ static int do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode,
     unsigned char rsocCmdBlk[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
                                               0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     if (rctd)
         rsocCmdBlk[2] |= 0x80;
@@ -1145,7 +1149,7 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
     unsigned char rstmfCmdBlk[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    void * ptvp;
+    struct sg_pt_base * ptvp;
 
     rstmfCmdBlk[6] = (unsigned char)((mx_resp_len >> 24) & 0xff);
     rstmfCmdBlk[7] = (unsigned char)((mx_resp_len >> 16) & 0xff);
