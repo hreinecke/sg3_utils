@@ -23,7 +23,7 @@
       This program scans the /dev directory structure looking for the
       devfs "primary" scsi (and optionally IDE) device names.
 
-   Version 0.10 20010217
+   Version 0.11 20020114
 */
 
 void usage()
@@ -172,14 +172,14 @@ void leaf_dir(const char * lf, unsigned int * larr)
 	    }
 	    if (de_result == NULL) 
 		break;
-	    strcpy(name, de_entry->d_name);
+	    strncpy(name, de_entry->d_name, NAME_LEN_MAX * 2);
 	    if ((0 == strcmp("..", name)) ||(0 == strcmp(".", name))) 
 		continue;
 	    if (do_extra) {
 		struct stat st;
 		char devname[NAME_LEN_MAX * 2];
 
-		strcpy(devname, lf);
+		strncpy(devname, lf, NAME_LEN_MAX * 2);
 		strcat(devname, "/");
 		strcat(devname, name);
 		if (stat(devname, &st) < 0)
@@ -210,7 +210,7 @@ void leaf_dir(const char * lf, unsigned int * larr)
 	char buff[64];
 
 	memset(buff, 0, sizeof(buff));
-	strcpy(name, lf);
+	strncpy(name, lf, NAME_LEN_MAX * 2);
 	strcat(name, "/generic");
 	if ((sg_fd = open(name, O_RDONLY)) < 0) {
 	    if (! checked_sg) {
@@ -265,7 +265,7 @@ int hbtl_scan(const char * path, int level, unsigned int *larr)
 	if (0 == strncmp(level_arr[level], de_entry->d_name, level_slen)) {
 	    if (1 != sscanf(de_entry->d_name + level_slen, "%u", larr + level))
 	    	larr[level] = UINT_MAX;
-	    strcpy(new_path, path);
+	    strncpy(new_path, path, NAME_LEN_MAX * 2);
 	    strcat(new_path, "/");
 	    strcat(new_path, de_entry->d_name);
 	    if ((level + 1) < LEVELS) {
@@ -282,15 +282,18 @@ int hbtl_scan(const char * path, int level, unsigned int *larr)
     return res;
 }
 
+#define D_ROOT_SZ 512
+
+
 int main(int argc, char * argv[])
 {
     int k, res;
-    char ds_root[512];
-    char di_root[512];
+    char ds_root[D_ROOT_SZ];
+    char di_root[D_ROOT_SZ];
     unsigned int larr[LEVELS];
     struct stat st;
 
-    strcpy(ds_root, "/dev");
+    strncpy(ds_root, "/dev", D_ROOT_SZ);
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp("-ide", argv[k]))
             do_ide = 1;
@@ -304,9 +307,9 @@ int main(int argc, char * argv[])
             do_quiet = 1;
         else if (0 == strncmp("-d", argv[k], 2)) {
 	    if (strlen(argv[k]) > 2)
-		strcpy(ds_root, argv[k] + 2);
+		strncpy(ds_root, argv[k] + 2, D_ROOT_SZ);
 	    else if (++k < argc)
-		strcpy(ds_root, argv[k]);
+		strncpy(ds_root, argv[k], D_ROOT_SZ);
 	}
         else if ((0 == strcmp("-?", argv[k])) ||
                  (0 == strncmp("-h", argv[k], 2))) {
@@ -325,12 +328,12 @@ int main(int argc, char * argv[])
             return 1;
         }
     }
-    strcpy(di_root, ds_root);
+    strncpy(di_root, ds_root, D_ROOT_SZ);
     strcat(di_root, "/.devfsd");
     if (stat(di_root, &st) < 0)
 	printf("Didn't find %s so perhaps devfs is not present,"
 		" continuing ...\n", di_root);
-    strcpy(di_root, ds_root);
+    strncpy(di_root, ds_root, D_ROOT_SZ);
     strcat(ds_root, "/scsi");
     strcat(di_root, "/ide");
 

@@ -44,7 +44,7 @@
    This version should compile with Linux sg drivers with version numbers
    >= 30000 . Also this version tries to use real time signals.
 
-   Version 3.982 20000827
+   Version 3.99 20020126
 
 
 6 byte commands [READ: 0x08, WRITE: 0x0a]:
@@ -78,6 +78,12 @@
 #define SGQ_CAN_READ 1
 #define SGQ_CAN_WRITE 2
 #define SGQ_TIMEOUT 4
+
+
+#define STR_SZ 1024
+#define INOUTF_SZ 512
+#define EBUFF_SZ 512
+
 
 typedef struct request_element
 {
@@ -362,7 +368,7 @@ int start_read(Rq_coll * clp)
     int blocks = (clp->in_count > clp->bpt) ? clp->bpt : clp->in_count;
     Rq_elem * rep = clp->rd_posp;
     int buf_sz, res;
-    char ebuff[256];
+    char ebuff[EBUFF_SZ];
 
 #ifdef SG_DEBUG
     printf("start_read, elem idx=%d\n", rep - clp->elem);
@@ -399,7 +405,7 @@ int start_read(Rq_coll * clp)
                (EINTR == errno))
             ;
         if (res < 0) {
-            sprintf(ebuff, "sgs_dd: reading, in_blk=%d ", rep->blk);
+            snprintf(ebuff, EBUFF_SZ, "sgs_dd: reading, in_blk=%d ", rep->blk);
             perror(ebuff);
             rep->state = SGQ_IO_ERR;
             return res;
@@ -430,7 +436,7 @@ int start_write(Rq_coll * clp)
 {
     Rq_elem * rep = clp->wr_posp;
     int res, blocks;
-    char ebuff[256];
+    char ebuff[EBUFF_SZ];
 
     while ((0 != rep->wr) || (SGQ_IO_FINISHED != rep->state)) {
         rep = rep->nextp;
@@ -461,7 +467,7 @@ int start_write(Rq_coll * clp)
                      rep->num_blks * clp->bs)) < 0) && (EINTR == errno))
             ;
         if (res < 0) {
-            sprintf(ebuff, "sgs_dd: output, out_blk=%d ", rep->blk);
+            snprintf(ebuff, EBUFF_SZ, "sgs_dd: output, out_blk=%d ", rep->blk);
             perror(ebuff);
             rep->state = SGQ_IO_ERR;
             return res;
@@ -654,16 +660,16 @@ int main(int argc, char * argv[])
     int ibs = 0;
     int obs = 0;
     int count = -1;
-    char str[512];
+    char str[STR_SZ];
     char * key;
     char * buf;
-    char inf[512];
-    char outf[512];
+    char inf[INOUTF_SZ];
+    char outf[INOUTF_SZ];
     int res, k;
     int in_num_sect = 0;
     int out_num_sect = 0;
     int in_sect_sz, out_sect_sz, crw;
-    char ebuff[256];
+    char ebuff[EBUFF_SZ];
     Rq_coll rcoll;
 
     memset(&rcoll, 0, sizeof(Rq_coll));
@@ -676,8 +682,10 @@ int main(int argc, char * argv[])
     }
 
     for(k = 1; k < argc; k++) {
-        if (argv[k])
-            strcpy(str, argv[k]);
+        if (argv[k]) {
+            strncpy(str, argv[k], STR_SZ);
+	    str[STR_SZ - 1] = '\0';
+	}
         else
             continue;
         for(key = str, buf = key; *buf && *buf != '=';)
@@ -685,9 +693,9 @@ int main(int argc, char * argv[])
         if (*buf)
             *buf++ = '\0';
         if (strcmp(key,"if") == 0)
-            strcpy(inf, buf);
+            strncpy(inf, buf, INOUTF_SZ);
         else if (strcmp(key,"of") == 0)
-            strcpy(outf, buf);
+            strncpy(outf, buf, INOUTF_SZ);
         else if (0 == strcmp(key,"ibs"))
             ibs = get_num(buf);
         else if (0 == strcmp(key,"obs"))
@@ -733,7 +741,8 @@ int main(int argc, char * argv[])
     rcoll.outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
         if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
-            sprintf(ebuff, "sgs_dd: could not open %s for reading", inf);
+            snprintf(ebuff, EBUFF_SZ, "sgs_dd: could not open %s for reading",
+	    	     inf);
             perror(ebuff);
             return 1;
         }
@@ -744,7 +753,7 @@ int main(int argc, char * argv[])
 
                 offset *= rcoll.bs;       /* could overflow here! */
                 if (lseek(rcoll.infd, offset, SEEK_SET) < 0) {
-                    sprintf(ebuff,
+                    snprintf(ebuff, EBUFF_SZ,
                 "sgs_dd: couldn't skip to required position on %s", inf);
                     perror(ebuff);
                     return 1;
@@ -777,8 +786,8 @@ int main(int argc, char * argv[])
         }
         if (! rcoll.out_is_sg) {
             if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
-                sprintf(ebuff,
-                        "sgs_dd: could not open %s for writing", outf);
+                snprintf(ebuff, EBUFF_SZ,
+                         "sgs_dd: could not open %s for writing", outf);
                 perror(ebuff);
                 return 1;
             }
@@ -787,7 +796,7 @@ int main(int argc, char * argv[])
 
                 offset *= rcoll.bs;       /* could overflow here! */
                 if (lseek(rcoll.outfd, offset, SEEK_SET) < 0) {
-                    sprintf(ebuff,
+                    snprintf(ebuff, EBUFF_SZ,
                 "sgs_dd: couldn't seek to required position on %s", outf);
                     perror(ebuff);
                     return 1;

@@ -19,14 +19,16 @@
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   Invocation: sg_simple5 <sg_device>
+   Invocation: sg_simple16 <sg_device>
 
-   Version 1.00 (20011123)
+   Version 1.02 (20020206)
 
 */
 
 #define READ16_REPLY_LEN 512
 #define READ16_CMD_LEN 16
+
+#define EBUFF_SZ 256
 
 int main(int argc, char * argv[])
 {
@@ -35,7 +37,7 @@ int main(int argc, char * argv[])
 		{0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
-    char ebuff[128];
+    char ebuff[EBUFF_SZ];
     unsigned char inBuff[READ16_REPLY_LEN];
     unsigned char sense_buffer[32];
 
@@ -54,18 +56,19 @@ int main(int argc, char * argv[])
         }
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_simple5 <sg_device>'\n");
+        printf("Usage: 'sg_simple16 <sg_device>'\n");
         return 1;
     }
 
     if ((sg_fd = open(file_name, O_RDWR)) < 0) {
-        sprintf(ebuff, "sg_simple5: error opening file: %s", file_name);
+        snprintf(ebuff, EBUFF_SZ,
+		 "sg_simple16: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
     /* Just to be safe, check we have a new sg device by trying an ioctl */
     if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &k) < 0) || (k < 30000)) {
-        printf("sg_simple5: %s doesn't seem to be an new sg device\n",
+        printf("sg_simple16: %s doesn't seem to be an new sg device\n",
                file_name);
         close(sg_fd);
         return 1;
@@ -88,7 +91,7 @@ int main(int argc, char * argv[])
     /* io_hdr.usr_ptr = NULL; */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("sg_simple5: Inquiry SG_IO ioctl error");
+        perror("sg_simple16: Inquiry SG_IO ioctl error");
         close(sg_fd);
         return 1;
     }

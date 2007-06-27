@@ -20,15 +20,16 @@
    This program outputs debug information to the console/log for _all_
    active sg devices.
 
-   Version 3.54 (20010110)
+   Version 3.55 (20020115)
 */
 
+#define EBUFF_SZ 256
 
 
 int main(int argc, char * argv[])
 {
     int fd, res, debug, t;
-    char ebuff[256];
+    char ebuff[EBUFF_SZ];
     
     if ((argc != 2) || ('-' == *argv[1])) {
         printf("Usage: sg_debug <sg_device>\n");
@@ -39,7 +40,8 @@ int main(int argc, char * argv[])
         if (EBUSY == errno)
             printf("Failed trying to open %s because it is busy\n", argv[1]);
         else {
-            sprintf(ebuff, "sg_debug: Error trying to open %s ", argv[1]);
+            snprintf(ebuff, EBUFF_SZ, "sg_debug: Error trying to open %s ", 
+	    	     argv[1]);
             perror(ebuff);
         }
         return 1;
@@ -61,7 +63,7 @@ int main(int argc, char * argv[])
     
     res = close(fd);
     if (res < 0) {
-        sprintf(ebuff, "sg_debug: trying to close %s ", argv[1]);
+        snprintf(ebuff, EBUFF_SZ, "sg_debug: trying to close %s ", argv[1]);
         perror(ebuff);
         return 1;
     }

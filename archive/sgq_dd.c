@@ -15,13 +15,14 @@
 #include <sys/sysmacros.h>
 #include <sys/poll.h>
 #include <linux/major.h>
+#include <sys/time.h>
 typedef unsigned char u_char;   /* horrible, for scsi.h */
 #include "sg_include.h"
 #include "sg_err.h"
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999, 2000 D. Gilbert and P. Allworth
+*  Copyright (C) 1999-2002 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -47,7 +48,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "0.52 20010819";
+static char * version_str = "0.53 20020124";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -78,6 +79,11 @@ static char * version_str = "0.52 20010819";
 
 #define QS_IN_POLL 11
 #define QS_OUT_POLL 12
+
+#define STR_SZ 1024
+#define INOUTF_SZ 512
+#define EBUFF_SZ 512
+
 
 struct request_element;
 
@@ -209,11 +215,13 @@ int dd_filetype(const char * filename)
 void usage()
 {
     fprintf(stderr, "Usage: "
-           "sgq_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
-           "               [bs=<num>] [bpt=<num>] [count=<n>]\n"
-           "               [dio=<n>] [thr=<n>] [coe=<n>] [gen=<n>]\n"
-           "               [deb=<n>] [--version]\n"
-           "            usually either 'if' or 'of' is a sg or raw device\n"
+           "sgq_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>] "
+           "[bs=<num>]\n"
+           "            [bpt=<num>] [count=<n>] [dio=<n>] [thr=<n>] "
+	   "[coe=<n>] [gen=<n>]\n"
+           "            [dio=<n>] [thr=<n>] [coe=<n>] [gen=<n>] "
+           "[deb=<n>] [--version]\n"
+           "         usually either 'if' or 'of' is a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
            " 'thr' is number of queues, must be > 0, default 4, max 32\n");
@@ -524,9 +532,9 @@ int sg_finish_io(int wr, Rq_elem * rep)
             return 1;
         default:
             {
-                char ebuff[64];
-                sprintf(ebuff, "%s blk=%d", rep->wr ? "writing": "reading",
-                        rep->blk);
+                char ebuff[EBUFF_SZ];
+                snprintf(ebuff, EBUFF_SZ, "%s blk=%d", 
+			 rep->wr ? "writing": "reading", rep->blk);
                 sg_chk_n_print3(ebuff, hp);
                 return -1;
             }
@@ -580,7 +588,7 @@ int prepare_rq_elems(Rq_coll * clp, const char * inf, const char * outf)
     int k;
     Rq_elem * rep;
     size_t psz;
-    char ebuff[256];
+    char ebuff[EBUFF_SZ];
     int sz = clp->bpt * clp->bs;
     int scsi_type;
 
@@ -605,8 +613,8 @@ int prepare_rq_elems(Rq_coll * clp, const char * inf, const char * outf)
 		rep->infd = clp->infd;
 	    else {
 		if ((rep->infd = open(inf, O_RDWR)) < 0) {
-                    sprintf(ebuff, "sgq_dd: could not open %s for sg reading",
-                            inf);
+                    snprintf(ebuff, EBUFF_SZ, 
+			     "sgq_dd: could not open %s for sg reading", inf);
                     perror(ebuff);
                     return 1;
                 }
@@ -627,8 +635,8 @@ int prepare_rq_elems(Rq_coll * clp, const char * inf, const char * outf)
 		rep->outfd = clp->outfd;
 	    else {
 		if ((rep->outfd = open(outf, O_RDWR)) < 0) {
-                    sprintf(ebuff, "sgq_dd: could not open %s for sg writing",
-                            outf);
+                    snprintf(ebuff, EBUFF_SZ, 
+			     "sgq_dd: could not open %s for sg writing", outf);
                     perror(ebuff);
                     return 1;
                 }
@@ -742,10 +750,12 @@ int main(int argc, char * argv[])
     int out_num_sect = 0;
     int num_threads = DEF_NUM_THREADS;
     int gen = 0;
+    int do_time = 0;
     int in_sect_sz, out_sect_sz, first_xfer, qstate, req_index, seek_skip;
     int blocks, stop_after_write, terminate;
-    char ebuff[256];
+    char ebuff[EBUFF_SZ];
     Rq_elem * rep;
+    struct timeval start_tm, end_tm;
 
     memset(&rcoll, 0, sizeof(Rq_coll));
     rcoll.bpt = DEF_BLOCKS_PER_TRANSFER;
@@ -760,7 +770,7 @@ int main(int argc, char * argv[])
 
     for(k = 1; k < argc; k++) {
         if (argv[k])
-            strcpy(str, argv[k]);
+            strncpy(str, argv[k], STR_SZ);
         else
             continue;
         for(key = str, buf = key; *buf && *buf != '=';)
@@ -768,9 +778,9 @@ int main(int argc, char * argv[])
         if (*buf)
             *buf++ = '\0';
         if (strcmp(key,"if") == 0)
-            strcpy(inf, buf);
+            strncpy(inf, buf, INOUTF_SZ);
         else if (strcmp(key,"of") == 0)
-            strcpy(outf, buf);
+            strncpy(outf, buf, INOUTF_SZ);
         else if (0 == strcmp(key,"ibs"))
             ibs = get_num(buf);
         else if (0 == strcmp(key,"obs"))
@@ -795,6 +805,8 @@ int main(int argc, char * argv[])
             gen = get_num(buf);
         else if (0 == strncmp(key,"deb", 3))
             rcoll.debug = get_num(buf);
+        else if (0 == strcmp(key,"time"))
+            do_time = get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
             fprintf(stderr, "sgq_dd for sg version 3 driver: %s\n", 
 	    	    version_str);
@@ -840,15 +852,16 @@ int main(int argc, char * argv[])
 
         if (FT_SG == rcoll.in_type) {
             if ((rcoll.infd = open(inf, O_RDWR)) < 0) {
-                sprintf(ebuff, "sgq_dd: could not open %s for sg reading", 
-			inf);
+                snprintf(ebuff, EBUFF_SZ,
+			 "sgq_dd: could not open %s for sg reading", inf);
                 perror(ebuff);
                 return 1;
             }
         }
         if (FT_SG != rcoll.in_type) {
             if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
-                sprintf(ebuff, "sgq_dd: could not open %s for reading", inf);
+                snprintf(ebuff, EBUFF_SZ,
+			 "sgq_dd: could not open %s for reading", inf);
                 perror(ebuff);
                 return 1;
             }
@@ -857,7 +870,7 @@ int main(int argc, char * argv[])
 
                 offset *= rcoll.bs;       /* could exceed 32 here! */
                 if (llse_llseek(rcoll.infd, offset, SEEK_SET) < 0) {
-                    sprintf(ebuff,
+                    snprintf(ebuff, EBUFF_SZ,
                 "sgq_dd: couldn't skip to required position on %s", inf);
                     perror(ebuff);
                     return 1;
@@ -870,7 +883,7 @@ int main(int argc, char * argv[])
 
         if (FT_SG == rcoll.out_type) {
 	    if ((rcoll.outfd = open(outf, O_RDWR)) < 0) {
-                sprintf(ebuff, 
+                snprintf(ebuff, EBUFF_SZ,
 			"sgq_dd: could not open %s for sg writing", outf);
                 perror(ebuff);
                 return 1;
@@ -879,7 +892,7 @@ int main(int argc, char * argv[])
 	else {
 	    if (FT_OTHER == rcoll.out_type) {
 		if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
-                    sprintf(ebuff,
+                    snprintf(ebuff, EBUFF_SZ,
                             "sgq_dd: could not open %s for writing", outf);
                     perror(ebuff);
                     return 1;
@@ -887,7 +900,7 @@ int main(int argc, char * argv[])
 	    }
 	    else {
 		if ((rcoll.outfd = open(outf, O_WRONLY)) < 0) {
-                    sprintf(ebuff,
+                    snprintf(ebuff, EBUFF_SZ,
                             "sgq_dd: could not open %s for raw writing", outf);
                     perror(ebuff);
                     return 1;
@@ -898,7 +911,7 @@ int main(int argc, char * argv[])
 
                 offset *= rcoll.bs;       /* could exceed 32 bits here! */
 		if (llse_llseek(rcoll.outfd, offset, SEEK_SET) < 0) {
-                    sprintf(ebuff,
+                    snprintf(ebuff, EBUFF_SZ,
                 "sgq_dd: couldn't seek to required position on %s", outf);
                     perror(ebuff);
                     return 1;
@@ -987,6 +1000,11 @@ int main(int argc, char * argv[])
     stop_after_write = 0;
     terminate = 0;
     seek_skip =  rcoll.seek - rcoll.skip;
+    if (do_time) {
+        start_tm.tv_sec = 0;
+        start_tm.tv_usec = 0;
+        gettimeofday(&start_tm, NULL);
+    }
     while (rcoll.out_done_count > 0) { /* >>>>>>>>> main loop */
         req_index = -1;
 	qstate = decider(&rcoll, first_xfer, &req_index);
@@ -1103,6 +1121,28 @@ int main(int argc, char * argv[])
 	if (terminate)
 	    break;
     } /* >>>>>>>>>>>>> end of main loop */
+
+    if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+        struct timeval res_tm;
+        double a, b;
+
+        gettimeofday(&end_tm, NULL);
+        res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
+        res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
+        if (res_tm.tv_usec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_usec += 1000000;
+        }
+        a = res_tm.tv_sec;
+        a += (0.000001 * res_tm.tv_usec);
+        b = (double)rcoll.bs * (dd_count - rcoll.out_done_count);
+        printf("time to transfer data was %d.%06d secs",
+               (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+        if ((a > 0.00001) && (b > 511))
+            printf(", %.2f MB/sec\n", b / (a * 1000000.0));
+        else
+            printf("\n");
+    }
 
     if (STDIN_FILENO != rcoll.infd)
         close(rcoll.infd);

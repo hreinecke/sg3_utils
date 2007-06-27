@@ -6,7 +6,7 @@ MANDIR=/usr/local/man
 CC = gcc
 LD = gcc
 
-EXECS = sgq_dd sg_poll sg_reset sg_bus_xfer sg_hold isosize
+EXECS = sgq_dd sg_poll sg_bus_xfer sg_hold isosize
 
 COMMON = isosize
 
@@ -33,9 +33,6 @@ sg_poll: sg_poll.o ../sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sgq_dd: sgq_dd.o ../sg_err.o ../llseek.o
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg_reset: sg_reset.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_bus_xfer: sg_bus_xfer.o ../sg_err.o

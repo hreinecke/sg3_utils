@@ -38,6 +38,8 @@
 #define INQ_CMD_LEN 6
 #define TUR_CMD_LEN 6
 
+#define EBUFF_SZ 256
+
 
 int main(int argc, char * argv[])
 {
@@ -49,7 +51,7 @@ int main(int argc, char * argv[])
     unsigned char inqBuff[INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
-    char ebuff[128];
+    char ebuff[EBUFF_SZ];
     unsigned char sense_buffer[32];
     int do_extra = 0;
 
@@ -75,7 +77,8 @@ int main(int argc, char * argv[])
     }
     
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
-        sprintf(ebuff, "sg_simple2: error opening file: %s", file_name);
+        snprintf(ebuff, EBUFF_SZ,
+		 "sg_simple2: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }

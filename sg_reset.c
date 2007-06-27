@@ -11,7 +11,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999 D. Gilbert
+*  Copyright (C) 1999-2002 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -20,7 +20,7 @@
    This program send either device, bus or host resets to device,
    or bus or host associated with the given sg device.
 
-   Version 0.02 (20000105)
+   Version 0.52 (20020126)
 */
 
 #ifndef SG_SCSI_RESET
@@ -38,11 +38,10 @@
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, k, j;
+    int sg_fd, res, k;
     int do_device_reset = 0;
     int do_bus_reset = 0;
     int do_host_reset = 0;
-    int do_wait = 0;
     char * file_name = 0;
 
     for (k = 1; k < argc; ++k) {
@@ -52,8 +51,6 @@ int main(int argc, char * argv[])
             do_bus_reset = 1;
         else if (0 == strcmp("-h", argv[k]))
             do_host_reset = 1;
-        else if (0 == strcmp("-w", argv[k]))
-            do_wait = 1;
         else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
@@ -64,28 +61,33 @@ int main(int argc, char * argv[])
     }
     if (0 == file_name) {
         printf(
-        "Usage: 'sg_reset [-d] [-b] [-h] [-w] <generic_device>'\n");
-        printf("  where: -d       attempt a scsi device reset\n");
-        printf("         -b       attempt a scsi bus reset\n");
+        "Usage: 'sg_reset [-d] [-b] [-h] <generic_device>'\n");
+        printf("  where: -d       attempt a SCSI device reset\n");
+        printf("         -b       attempt a SCSI bus reset\n");
         printf("         -h       attempt a host adapter reset\n");
-        printf("         -w       wait for one of the resets to complete\n");
         printf("   {if no switch given then check if reset underway}\n");
         return 1;
     }
 
-    sg_fd = open(file_name, O_RDWR);
+    sg_fd = open(file_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
         perror("sg_reset: open error");
         return 1;
     }
-    /* Don't worry, being very careful not to write to a none-sg file ... */
+
     k = SG_SCSI_RESET_NOTHING;
-    if (do_device_reset)
+    if (do_device_reset) {
+	printf("sg_reset: starting device reset\n");
         k = SG_SCSI_RESET_DEVICE;
-    else if (do_bus_reset)
+    }
+    else if (do_bus_reset) {
+	printf("sg_reset: starting bus reset\n");
         k = SG_SCSI_RESET_BUS;
-    else if (do_host_reset)
+    }
+    else if (do_host_reset) {
+	printf("sg_reset: starting host reset\n");
         k = SG_SCSI_RESET_HOST;
+    }
 
     res = ioctl(sg_fd, SG_SCSI_RESET, &k);
     if (res < 0) {
@@ -94,34 +96,24 @@ int main(int argc, char * argv[])
         else if (EIO == errno)
             printf("sg_reset: requested type of reset may not be available\n");
         else if (EACCES == errno)
-            printf("sg_reset: to do a reset needs root permission\n");
-        else
+            printf("sg_reset: reset requires CAP_SYS_ADMIN (root) "
+	    	   "permission\n");
+        else if (EINVAL == errno)
             printf("sg_reset: SG_SCSI_RESET not supported\n");
+        else if (EIO == errno)
+            printf("sg_reset: scsi_reset_provider() call failed\n");
+        else
+            perror("sg_reset: SG_SCSI_RESET failed");
         return 1;
     }
     if (SG_SCSI_RESET_NOTHING == k)
         printf("sg_reset: did nothing, device is normal mode\n");
-    else {
-        if (SG_SCSI_RESET_DEVICE == k)
-            printf("sg_reset: started device reset\n");
-        else if (SG_SCSI_RESET_BUS == k)
-            printf("sg_reset: started bus reset\n");
-        else if (SG_SCSI_RESET_HOST == k)
-            printf("sg_reset: started host reset\n");
-
-        if (do_wait) {
-            printf("waiting for the reset to complete...\n");
-            j = 0;
-            k = SG_SCSI_RESET_NOTHING;
-            do {
-                if (0 != j)
-                    sleep(1);
-                res = ioctl(sg_fd, SG_SCSI_RESET, &k);
-                ++j;
-            } while ((res < 0) && (EBUSY == errno));
-            printf("  ... reset seemingly completed\n");
-        }
-    }
+    else if (SG_SCSI_RESET_DEVICE == k)
+	printf("sg_reset: completed device reset\n");
+    else if (SG_SCSI_RESET_BUS == k)
+	printf("sg_reset: completed bus reset\n");
+    else if (SG_SCSI_RESET_HOST == k)
+	printf("sg_reset: completed host reset\n");
 
     if (close(sg_fd) < 0) {
         perror("sg_reset: close error");
