@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.19
+Version: 1.20
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -124,6 +124,10 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Tue Apr 18 2006 - dgilbert at interlog dot com
+- sg_logs: sas port specific page decoding, sg*_dd updates
+  * sg3_utils-1.20
+
 * Fri Jan 27 2006 - dgilbert at interlog dot com
 - sg_get_config: resync features with mmc5 rev 1
   * sg3_utils-1.19

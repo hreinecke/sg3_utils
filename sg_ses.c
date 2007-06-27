@@ -43,7 +43,7 @@
  *commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.23 20060115";    /* ses2r13 */
+static char * version_str = "1.24 20060329";    /* ses2r14 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -611,13 +611,16 @@ static void print_element_status(const char * pad,
                    !!(statp[2] & 0x8));
         if ((! filter) || ((0x7 & statp[2]) || (0x83 & statp[3])))
             printf("%sUPS fail=%d, Warn=%d, Intf fail=%d, Ident=%d, Batt fail"
-                   "=%d,BPF=%d\n", pad, !!(statp[2] & 0x4), !!(statp[2] & 0x2),
+                   "=%d, BPF=%d\n", pad, !!(statp[2] & 0x4), !!(statp[2] & 0x2),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x80), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
-    case 0xc:   /* Display */
+    case 0xc:   /* Display (ses2r14 + 05-011r1) */
         if ((! filter) || (0x80 & statp[1]))
-            printf("%sIdent=%d\n", pad, !!(statp[1] & 0x80));
+            printf("%sIdent=%d, Display mode status=%d, Display "
+                   "character=0x%x\n", pad,
+                   !!(statp[1] & 0x80), (statp[1] & 0x3),
+                   ((statp[2] << 8) & statp[3]));
         break;
     case 0xd:   /* Key pad entry */
         if ((! filter) || (0x80 & statp[1]))

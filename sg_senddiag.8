@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_SENDDIAG "8" "April 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -117,8 +117,11 @@ The length of the diagnostic page to be sent is derived from the number
 of bytes given to the '-raw=' option. The diagnostic page code (number)
 should be the first byte of the sequence (i.e. as dictated by SPC-3
 diagnostic page format). The SAS 1.1 protocol specific diagnostic page
-could be sent with this option, for example. Advanced SES control
-diagnostic pages could also be sent.
+could be sent with this option, for example. The examples subdirectory
+in the sg3_utils packages contains two example scripts that turn on
+the CJTPAT (jitter pattern) on some SAS disks (one script for each phy).
+One possible invocation
+is: 'sg_senddiag -pf -raw=- /dev/sg2 < .../sdiag_sas_p1_cjtpat.txt'
 .PP
 Arbitrary diagnostic pages can be read (in hex) with the sg_ses
 utility (not only those defined in SES-2).
@@ -142,7 +145,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003-2005 Douglas Gilbert
+Copyright \(co 2003-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

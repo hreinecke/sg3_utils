@@ -13,7 +13,7 @@
 #include "sg_io_linux.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004-2005 D. Gilbert
+*  Copyright (C) 2004-2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.22 20051220";
+static char * version_str = "0.23 20060315";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -504,13 +504,17 @@ int main(int argc, char * argv[])
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
 #ifndef TEST_CODE
     if (do_taskman) {
-        if (0 != do_rstmf(sg_fd, rsoc_buff, sizeof(rsoc_buff), 1,
-                          do_verbose))
+        if (0 != do_rstmf(sg_fd, rsoc_buff, sizeof(rsoc_buff), 0,
+                          do_verbose)) {
+            fprintf(stderr, "Report supported task management functions failed\n");
             return 1;
+        }
     } else {
         if (0 != do_rsoc(sg_fd, rep_opts, do_opcode, do_servact, rsoc_buff,
-                         sizeof(rsoc_buff), 1, do_verbose))
+                         sizeof(rsoc_buff), 0, do_verbose)) {
+            fprintf(stderr, "Report supported operation codes failed\n");
             return 1;
+        }
     }
 #else
     if (do_taskman)

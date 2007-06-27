@@ -1,4 +1,4 @@
-.TH SG_SCAN "8" "January 2004" "sg3_utils-1.06" SG3_UTILS
+.TH SG_SCAN "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
 sg_scan \- does a scan of sg devices (or given SCSI/ATAPI/ATA devices) and 
 prints the results
@@ -29,7 +29,9 @@ If the device does not fall into the above categories then an ATA
 IDENTIFY command is tried.
 .TP
 -a
-do alphabetical scan (i.e. sga, sgb, sgc)
+do alphabetical scan (i.e. sga, sgb, sgc). Note that sg device nodes with
+an alphabetical index have been deprecated since the linux kernel 2.2
+series.
 .TP
 -i
 do a SCSI INQUIRY, output results in a second (indented) line. If the device
@@ -43,10 +45,23 @@ use a read/write flag when opening sg device (default is read-only)
 .TP
 -x
 extra information output about queuing
+.PP
+This utility was written at a time when hotplugging of SCSI devices
+was not supported in Linux. It used a simple algorithm to scan sg
+device nodes in ascending numeric or alphabetical order, stopping
+after there were 4 consecutive errors.
+.PP
+In the linux kernel 2.6 series, this utility uses sysfs to find which
+sg device nodes are active and only checks those. Hence there can be
+large "holes" in the numbering of sg device nodes (e.g. after an
+adapter has been removed) and still all active sg device nodes will
+be listed. This utility assumes that sg device nodes are named using
+the normal conventions and searches from /dev/sg0 to /dev/sg4095
+inclusive.
 .SH AUTHORS
 Written by D. Gilbert and F. Jansen
 .SH COPYRIGHT
-Copyright \(co 1999-2004 Douglas Gilbert
+Copyright \(co 1999-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

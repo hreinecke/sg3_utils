@@ -2,6 +2,38 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.20 [20060418]
+  - sg_logs: decode phy event descriptors in SAS port specific
+    log page (sas2r03)
+    - new parameter control byte format (spc4r03), subpages to come
+  - update Makefile (linux) to install sg_io_linux.h + sg_linux_inc.h
+  - sg_map26: fix for block device mapping in lk 2.6.16-rc1 and beyond
+    - cope with sysfs removal of 'generic' symlink post lk 2.6.16,
+      anticipate removal of 'tape' symlink
+  - sg_dd, sgm_dd, sgp_dd: fix problem around 0x7fffffff blocks
+  - sg_dd: fix read_long processing error (when 'coe=2' or 3)
+    - expand 'coe=' to take 0...3 (invokes read long with 2 or 3)
+    - allow for SG_GET_RESERVED_SIZE yielding 0, lk 2.6.16 feature
+  - sgp_dd: add 'iflag=' and 'oflag=' arguments; signals (like sg_dd)
+  - sgm_dd: add 'iflag=' and 'oflag=' arguments; signals (like sg_dd)
+  - sg_get_config: double->dual renaming (mmc5r03)
+  - sg_read: add 'dpo=' and 'fua=' options
+    - allow 'count' < 0 (or 'bpt=0') for issuing zero block READs
+    - allow for SG_GET_RESERVED_SIZE yielding 0, lk 2.6.16 feature
+    - add 'no_dxfer=0|1' option
+  - sg_modes: fix exit value when MODE SENSE fails
+    - add '-e' to examine presence of page codes from 0x0 to 0x3e
+  - sg_requests: add '--num=' and '--time' options for timing multiple
+    invocations
+  - sg_inq: fix vpd 0x83 designator code 8 name: "scsi name string"
+  - sg_scan: if lk 2.6, use sysfs to find active sg device nodes
+  - sg_map: if lk 2.6, use sysfs to find active sg device nodes
+  - sg_ses: expand display element (per 05-011r1)
+  - sg_start: add an '-i' option which is equivalent to '--imm=1'
+  - sg_senddiag: update man page showing use of two scripts in
+    examples directory (sdiag_sas_p0_cjtpat.txt and _p1_) 
+  - sg_lib: fix sg_get_sense_descriptors_str() case 9 (ATA Return)
+
 Changelog for sg3_utils-1.19 [20060127]
   - sg_start: accept '--' options (e.g. 'sg_start --stop')
     - add '--fl=<n>' option for jump to format layer (mmc5)
@@ -19,7 +51,7 @@ Changelog for sg3_utils-1.19 [20060127]
   - sginfo: correct defect list handling ('-d' and '-G')
   - sg_verify: improve error processing (e.g. medium errors)
   - sg_ses: scsi target_initiator port additional element
-     status (06-036r0)
+     status (ses2r14)
   - many: arguments that currently accept '0x' or '0X' to
      indicate a hex number may alternatively take a trailing
      'h' or 'H' to indicate hex

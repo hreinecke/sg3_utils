@@ -71,6 +71,6 @@ Architecture: any
 Depends: libsgutils1-0
 Recommends: sg3-utils
 Description: Utilities for working with generic SCSI devices (developer files)
- This package contains the <scsi/sg_cmds.h> and <scsi/sg_lib.h> header
- files, the /usr/lib/libsgutils.a static library and other assorted
- development tidbits.
+ This package contains the <scsi/sg_cmds.h> , <scsi/sg_lib.h> ,
+ <scsi/sg_linux_inc.h> and <scsi/sg_io_linux.h> header files, the
+ /usr/lib/libsgutils.a static library and other assorted development tidbits.

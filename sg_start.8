@@ -1,10 +1,10 @@
-.TH SG_START "8" "January 2006" "sg3_utils-1.19" SG3_UTILS
+.TH SG_START "8" "April 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
 sg_start \- starts (spins-up) or stops (spins down) device, load or
 eject medium
 .SH SYNOPSIS
 .B sg_start
-[\fI--eject\fR] [\fI--fl=<n>\fR] [\fI--imm=0|1\fR] [\fI--load\fR]
+[\fI--eject\fR] [\fI--fl=<n>\fR] [\fI-i\fR] [\fI--imm=0|1\fR] [\fI--load\fR]
 [\fI--loej\fR] [\fI--pc=<n>\fR] [\fI--start\fR] [\fI--stop\fR] [\fI-v\fR]
 [\fI-V\fR] [\fI0|1\fR] \fI<device>\fR
 .SH DESCRIPTION
@@ -45,6 +45,13 @@ sets the format layer number for the disc to "jump" to (defined in
 MMC-5). Values of '<n>' can be 0 to 3. When this option is chosen,
 the FL, LoEj and Start bits are set in the cdb as required by MMC-5; thus
 the user does not need to set the '--start' and/or '--load' options. 
+.TP
+-i
+sets the IMM bit on the START STOP UNIT command so this utility will
+return immediately and not wait for the media to spin down. Same
+effect as '--imm=1'. The default action (without this option or
+a '--imm=1' option) is to wait until the media spins down before
+returning.
 .TP
 --imm=0|1
 when the immediate bit is 1 then this utility returns immediately after
@@ -117,7 +124,7 @@ In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and SCSI DVDs) can also be specified. For example "sg_start 0 /dev/sda"
 will work in the 2.6 series kernels.
-.SH NOTE
+.SH NOTES
 Earlier versions had a '-s' option to perform a SYNCHRONIZE CACHE command
 before the START STOP UNIT command was issued. According to recent SBC-2
 drafts this is done implicitly if required. Hence the "-s" option has been

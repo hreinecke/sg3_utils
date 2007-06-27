@@ -55,7 +55,7 @@
 #include "sg_pt.h"
 
 
-static char * version_str = "1.24 20060125";
+static char * version_str = "1.26 20060413";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -192,7 +192,7 @@ static int process_resp(void * ptvp, const char * leadin, int res,
             got = mx_resp_len - resid;
             if (verbose && (resid > 0))
                 fprintf(sg_warnings_strm, "    %s: requested %d bytes but "
-                        " got %d bytes\n", leadin, mx_resp_len, got);
+                        "got %d bytes\n", leadin, mx_resp_len, got);
             return got;
         } else
             return 0;
@@ -228,7 +228,7 @@ static int process_resp(void * ptvp, const char * leadin, int res,
             got = mx_resp_len - resid;
             if ((verbose > 2) || (got > 0))
                 fprintf(sg_warnings_strm, "    requested %d bytes but "
-                        " got %d bytes\n", mx_resp_len, got);
+                        "got %d bytes\n", mx_resp_len, got);
         }
         if (o_sense_cat)
             *o_sense_cat = scat;
@@ -1790,7 +1790,7 @@ int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
 }
 
 /* Invokes a SCSI REPORT DEVICE IDENTIFIER command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
+ * SG_LIB_CAT_INVALID_OP -> Report device identifier not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_report_dev_id(int sg_fd, void * resp, int mx_resp_len,
                         int noisy, int verbose)
@@ -1856,7 +1856,7 @@ int sg_ll_report_dev_id(int sg_fd, void * resp, int mx_resp_len,
 }
 
 /* Invokes a SCSI SET DEVICE IDENTIFIER command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
+ * SG_LIB_CAT_INVALID_OP -> Set device identifier not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_set_dev_id(int sg_fd, void * paramp, int param_len,
                      int noisy, int verbose)

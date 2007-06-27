@@ -18,7 +18,8 @@ SG_IO ioctl in the 2.6 series<br>
 <a href="#Conclusion"></a>
 <ol id="mozToc">
 <!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6--><li><a href="#mozTocId288504">
-The&nbsp; Linux SG_IO ioctl in the 2.6 series </a>
+The&nbsp; Linux
+SG_IO ioctl in the 2.6 series </a>
     <ol>
       <li><a href="#mozTocId857690">Introduction</a></li>
       <li><a href="#mozTocId844428">SCSI and related
@@ -26,9 +27,12 @@ command sets </a></li>
       <li><a href="#mozTocId568229">SG_IO ioctl overview</a></li>
       <li><a href="#mozTocId575826">SG_IO ioctl in the sg
 driver </a></li>
-      <li><a href="#mozTocId104192">SG_IO ioctl differences </a></li>
+      <li><a href="#mozTocId104192">SG_IO ioctl
+differences </a></li>
       <li><a href="#mozTocId830340">open() considerations</a></li>
-      <li><a href="#mozTocId645134">SCSI command permissions</a></li>
+      <li><a href="#mozTocId645134">SCSI command
+permissions</a></li>
+      <li><a href="#mozTocId154063">Maximum transfer size per command</a></li>
       <li><a href="#mozTocId267334">Conclusion</a></li>
     </ol>
   </li>
@@ -43,7 +47,7 @@ and SCSI tape (st) devices.&nbsp; So there are multiple implementations
 of this ioctl within the kernel with slightly different characteristics
 and describing these is the purpose of this document.<br>
 <br>
-The information in this page is valid for linux kernel 2.6.14 .<br>
+The information in this page is valid for linux kernel 2.6.16 .<br>
 <h2><a class="mozTocH2" name="mozTocId844428"></a>SCSI and related
 command sets<br>
 </h2>
@@ -1533,6 +1537,96 @@ technique doesn't scale well, since more advanced command sets (e.g.
 OSD) use service actions (and one opcode: 0x7f in the case of OSD).
 There may also be overlap in opcode usage between command sets, for
 example between SBC, MMC and SSC.<br>
+<h2><a class="mozTocH2" name="mozTocId154063"></a>Maximum transfer size
+per command</h2>
+The largest amount of data that can be transferred by a single SCSI
+command is often a concern. Various SCSI command sets (e.g. SBC-3 for
+disk
+READs and WRITEs, SSC-3 for tape READs and WRITEs, and SPC-4 for
+READ+WRITE BUFFER) allow very large
+data transfer sizes but Linux is not so accommodating. The Host Bus
+Adapter (HBA)
+could have transfer size limits as could the transport and finally the
+SCSI device
+itself. In the latter case SBC-3 defines a "Block Limits" Vital Product
+Data (VPD) while SSC has the READ BLOCK LIMITS SCSI command. SBC-3's
+optional Block Limits VPD page contains both maximum and optimal
+counts. In the author's opinion that latter distinction is very
+important: the block susbsystem should try and use optimal sizes while
+pass through users should only be constrained by maximum sizes. Also if
+a pass through user exceeds a maximum transfer size imposed by a SCSI
+device, then the device can report an error. There is an
+underlying assumption that the applications using a pass through
+interface know what they are doing, or at least know more than the
+various kernel susbsystems. On the other hand, the kernel has the
+responsibility to allocate critical shared resources such as memory.<br>
+<br>
+In the past, Linux used a single, "big-enough", block of memory for the
+source or destination of large data transfers. Then scatter-gather
+lists where added to break transfers up into smaller (often "page" size
+(4 KB on i386 architecture)) chunks which made memory management easier
+for the kernel. Now, in the lk 2.6 series, the single block of memory
+option is being phased out. <br>
+<br>
+The Linux SCSI subsystem imposes a 128
+element limit on scatter gather lists via its SCSI_MAX_PHYS_SEGMENTS
+define. The way various memory pools are allocated by the linux SCSI
+subsystem, SCSI_MAX_PHYS_SEGMENTS could be increased to 256. Associated
+with each type of HBA there is normally a low level driver (LLD). Each
+LLD can further limit the maximum number of elements with
+the scsi_host_template::sg_tablesize field. Prior to lk 2.6.16 the sg
+and
+st drivers used the .sg_tablesize field only, since lk 2.6.16 those
+drivers are also constrained by SCSI_MAX_PHYS_SEGMENTS. This leads to a
+potential halving of the maximum transfer size. Many LLDs set the
+.sg_tablesize field to SG_ALL (which is 255) but they may as well set
+that field to 256 unless the HBA hardware has a constraint.<br>
+<br>
+User space
+memory may be allocated as the source and/or destination for DMA
+transfers from
+the HBA (i.e. direct IO). Even if the user space allocated a large
+amount of memory
+with a single malloc(), the HBA DMA element typically has a different
+view of
+memory. This view may well contain many "page" size discontinuous
+pieces. This has the
+effect of using up, or perhaps exhausting, scatter-gather elements.<br>
+<br>
+The sg driver attempts to build scatter gather lists with each element
+up to SG_SCATTER_SZ bytes large. This define is found in
+include/scsi/sg.h
+and has been set to 32 KB for some years. That is 8 times the page size
+(of 4 KB) on the i386 architecture. Some users who need really
+large transfers increase this define (and it is best to keep it a power
+of 2). However since lk 2.6.16 another limit comes into play: the
+MAX_SEGMENT_SIZE define which is set to 64 KB. MAX_SEGMENT_SIZE is a
+default and can be overridden by the LLD calling
+blk_queue_max_segment_size().<br>
+<br>
+In lk 2.6.16 two further LLD parameters
+come into play even when the sg (and st) driver is used. These are
+scsi_host_template::max_sectors and scsi_host_template::use_clustering
+.&nbsp; <br>
+<br>
+The .max_sectors setting in the LLD is the maximum number of 512 byte
+sectors allowed in a single SCSI command's scatter gather lists (for
+data transfers). Yes, that is a strange limit when trying to send a
+SCSI
+WRITE BUFFER command to upload firmware. Sysfs makes the LLD's
+.max_sectors setting visible (converted to kilobytes) in
+/sys/block/sd&lt;x&gt;/queue/max_hw_sectors_kb . The maximum allowable
+value in a LLD's .max_sector seems to be 65535 (0xffff in hexadecimal).
+This limits the maximum transfer size to (32*1024*1024 - 512) bytes,
+assuming other limitations have been overcome. [The 65535 sector limit
+is because Scsi_Host::max_sectors has type "unsigned short". Hopefully
+this type is expanded to "int" in the future (or removed).]<br>
+<br>
+The .use_clustering field should be set to ENABLE_CLUSTERING . If not,
+the block subsystem rebuilds the scatter gather list it gets from the
+sg driver with page size (e.g. 4 KB) elements. [Actually is does that
+anyway, but
+when ENABLE_CLUSTERING is set, it coalesces them again!]<br>
 <br>
 <h2><a class="mozTocH2" name="mozTocId267334"></a>Conclusion</h2>
 In some situations, sending commands via the SG_IO ioctl may interfere
@@ -1547,7 +1641,7 @@ time to lock out a file system.<br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 2nd November 2005<br>
+<p>Last updated: 2nd Aprl 2006<br>
 <br>
 </p>
 </center>

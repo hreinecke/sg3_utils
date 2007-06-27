@@ -27,7 +27,7 @@ MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sg_map26.8
 MAN_PREF = man8
 
-HEADERS = sg_lib.h sg_cmds.h sg_pt.h
+HEADERS = sg_lib.h sg_cmds.h sg_pt.h sg_io_linux.h sg_linux_inc.h
 
 OS_FLAGS = -DSG3_UTILS_LINUX
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64

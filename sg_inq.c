@@ -56,11 +56,10 @@
  *
  * From SPC-3 revision 16 the CmdDt bit in an INQUIRY is obsolete. There
  * is now a REPORT SUPPORTED OPERATION CODES command that yields similar
- * information [MAINTENANCE IN, service action = 0xc]. Support will be
- * added in the future.
+ * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.57 20050106";    /* spc-4 rev02 */
+static char * version_str = "0.59 20050320";    /* spc-4 rev 04 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -176,7 +175,8 @@ static struct vpd_name vpd_name_arr[] = {
     {SCSI_PORTS_VPD, 0, "SCSI ports"},
     {ATA_INFO_VPD, 0, "ATA information"},
     {BLOCK_LIMITS_VPD, 0, "Block limits (sbc2)"}, 
-    {0xb0, 0x1, "SSC device capabilities (ssc3)"},
+    {0xb0, 0x1, "Sequential access device capabilities (ssc3)"},
+    {0xb2, 0x1, "TapeAlert supported flags (ssc3)"},
     {0xb0, 0x11, "OSD information (osd)"},
     {0xb1, 0x11, "Security token (osd)"},
     {0xc0, 0, "vendor: Firmware numbers (seagate); Unit path report (EMC)"},
@@ -640,7 +640,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                 dStrHex((const char *)ip, i_len, 0);
                 break;
             }
-            printf("      MD5 logical unit identifier:\n");
+            printf("      SCSI name string:\n");
             /* does %s print out UTF-8 ok??
              * Seems to depend on the locale. Looks ok here with my
              * locale setting: en_AU.UTF-8
@@ -1580,7 +1580,8 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                     printf("VPD INQUIRY: Block limits page (SBC)\n");
                     break;
                 case 1: case 8:
-                    printf("VPD INQUIRY: Device capabilities (SSC)\n");
+                    printf("VPD INQUIRY: Sequential access device "
+                           "capabilities (SSC)\n");
                     break;
                 case 0x11:
                     printf("VPD INQUIRY: OSD information (OSD)\n");
@@ -2253,8 +2254,8 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x320, "SBC-2 (no version claimed)"},
     {0x322, "SBC-2 T10/1417-D revision 5a"},
     {0x324, "SBC-2 T10/1417-D revision 15"},
-    {0x32b, "SBC-2 T10/1417-D revision 16"},
-    {0x32d, "SBC-2 ANSI INCITS 405-2005"},
+    {0x33b, "SBC-2 T10/1417-D revision 16"},
+    {0x33d, "SBC-2 ANSI INCITS 405-2005"},
     {0x340, "OSD (no version claimed)"},
     {0x341, "OSD T10/1355-D revision 0"},
     {0x342, "OSD T10/1355-D revision 7a"},
@@ -2436,6 +2437,8 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x1729, "Universal Serial Bus Specification, Revision 2.0"},
     {0x1730, "USB Mass Storage Class Bulk-Only Transport, Revision 1.0"},
     {0x1ea0, "SAT (no version claimed)"},
+    {0x1ea7, "SAT T10/1711-d rev 8"},
+    {0x1ec0, "SAT-2 (no version claimed)"},
 };
 
 static int version_descriptor_arr_sz = (sizeof(version_descriptor_arr) /

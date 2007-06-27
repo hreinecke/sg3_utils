@@ -185,7 +185,9 @@ subdirectory:
 
 Also in that subdirectory is a script to test sg_persist, an example
 data file for sg_persist (called "transport_ids.txt") and an example
-data file for sg_reassign (called "reassign_addr.txt").
+data file for sg_reassign (called "reassign_addr.txt"). There are also
+two scripts for 'sg_senddiag -pf -raw=-' that will put some SAS disk
+phys into a compliant jitter tolerance pattern (CJTPAT). 
 
 The "utils" subdirectory contains source and a Makefile to build
 "hxascdmp" which accepts binary data from stdin (or a file on the
@@ -301,4 +303,4 @@ user). It is available for Linux and other operating systems.
 See http://members.aol.com/plscsi .
 
 Doug Gilbert
-27th January 2006
+18th April 2006

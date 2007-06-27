@@ -19,12 +19,14 @@
    
 */
 
-static char * version_str = "0.49 20060127";
+static char * version_str = "0.53 20060316";
 
 #define ME "sg_logs: "
 
 #define MX_ALLOC_LEN (1024 * 17)
 #define PG_CODE_ALL 0x0
+
+#define PCB_STR_LEN 128
 
 
 /* Call LOG SENSE twice: the first time ask for 4 byte response to determine
@@ -174,7 +176,7 @@ static void show_page_name(int page_no,
         {
             switch (page_no) {
             case 0xc:
-                printf("    0x0c    Sequential Access (ssc-2)\n");
+                printf("    0x0c    Sequential access device (ssc-2)\n");
                 break;
             case 0x14:
                 printf("    0x14    Device statistics (ssc-3)\n");
@@ -203,7 +205,7 @@ static void show_page_name(int page_no,
                 printf("    0x14    Device statistics (adc)\n");
                 break;
             case 0x15:
-                printf("    0x15    DT device log information (adc)\n");
+                printf("    0x15    Service buffers information (adc)\n");
                 break;
             default:
                 done = 0;
@@ -221,7 +223,7 @@ static void show_page_name(int page_no,
 
 static void get_pcb_str(int pcb, char * outp, int maxoutlen)
 {
-    char buff[128];
+    char buff[PCB_STR_LEN];
     int n;
 
     n = sprintf(buff, "du=%d [ds=%d] tsd=%d etc=%d ", ((pcb & 0x80) ? 1 : 0),
@@ -251,7 +253,7 @@ static void show_buffer_under_overrun_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Buffer over-run/under-run page\n");
     num = len - 4;
@@ -301,7 +303,7 @@ static void show_buffer_under_overrun_page(unsigned char * resp, int len,
         if (show_pcb) {
             pcb = ucp[2];
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
         num -= pl;
@@ -316,7 +318,7 @@ static void show_error_counter_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     switch(resp[0] & 0x3f) {
     case 2:
@@ -368,7 +370,7 @@ static void show_error_counter_page(unsigned char * resp, int len,
         printf(" = %llu", ull);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
         num -= pl;
@@ -383,7 +385,7 @@ static void show_non_medium_error_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Non-medium error page\n");
     num = len - 4;
@@ -417,7 +419,7 @@ static void show_non_medium_error_page(unsigned char * resp, int len,
         printf(" = %llu", ull);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
         num -= pl;
@@ -430,7 +432,7 @@ static void show_last_n_error_page(unsigned char * resp, int len,
 {
     int k, num, pl, pc, pcb;
     unsigned char * ucp;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
     ucp = &resp[0] + 4;
@@ -461,7 +463,7 @@ static void show_last_n_error_page(unsigned char * resp, int len,
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("      <%s>\n", pcb_str);
+            printf("        <%s>\n", pcb_str);
         }
     }
 }
@@ -471,7 +473,7 @@ static void show_last_n_deferred_error_page(unsigned char * resp,
 {
     int k, num, pl, pc, pcb;
     unsigned char * ucp;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
     ucp = &resp[0] + 4;
@@ -492,7 +494,7 @@ static void show_last_n_deferred_error_page(unsigned char * resp,
         dStrHex((const char *)ucp + 4, pl - 4, 1);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("      <%s>\n", pcb_str);
+            printf("        <%s>\n", pcb_str);
         }
     }
 }
@@ -520,7 +522,7 @@ static void show_self_test_page(unsigned char * resp, int len, int show_pcb)
     int k, num, n, res, pcb;
     unsigned char * ucp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
     if (num < 0x190) {
@@ -554,7 +556,7 @@ static void show_self_test_page(unsigned char * resp, int len, int show_pcb)
                    ucp[16] & 0xf, ucp[17], ucp[18]);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
     }
@@ -565,7 +567,7 @@ static void show_Temperature_page(unsigned char * resp, int len,
 {
     int k, num, extra, pc, pcb;
     unsigned char * ucp;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
     ucp = &resp[0] + 4;
@@ -605,7 +607,7 @@ static void show_Temperature_page(unsigned char * resp, int len,
             continue;
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
     }
@@ -616,7 +618,7 @@ static void show_Start_Stop_page(unsigned char * resp, int len, int show_pcb)
     int k, num, extra, pc, pcb;
     unsigned int n;
     unsigned char * ucp;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
     ucp = &resp[0] + 4;
@@ -667,7 +669,7 @@ static void show_Start_Stop_page(unsigned char * resp, int len, int show_pcb)
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
     }
@@ -677,7 +679,7 @@ static void show_IE_page(unsigned char * resp, int len, int show_pcb, int full)
 {
     int k, num, extra, pc, pcb;
     unsigned char * ucp;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
     ucp = &resp[0] + 4;
@@ -720,21 +722,140 @@ static void show_IE_page(unsigned char * resp, int len, int show_pcb, int full)
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+    }
+}
+
+static void show_sas_phy_event_info(int peis, unsigned long val,
+                                    unsigned long thresh_val)
+{
+    switch (peis) {
+    case 0:
+        printf("     No event\n");
+        break;
+    case 0x1:
+        printf("     Invalid word count: %lu\n", val);
+        break;
+    case 0x2:
+        printf("     Running disparity error count: %lu\n", val);
+        break;
+    case 0x3:
+        printf("     Loss of dword synchronization count: %lu\n", val);
+        break;
+    case 0x4:
+        printf("     Phy reset problem count: %lu\n", val);
+        break;
+    case 0x5:
+        printf("     Elasticity buffer overflow count: %lu\n", val);
+        break;
+    case 0x6:
+        printf("     Received ERROR  count: %lu\n", val);
+        break;
+    case 0x20:
+        printf("     Received address frame error count: %lu\n", val);
+        break;
+    case 0x21:  /* sas2r02 + 06-134r0 */
+        printf("     Transmitted OPEN_REJECT abandon count: %lu\n", val);
+        break;
+    case 0x22:
+        printf("     Received OPEN_REJECT abandon count: %lu\n", val);
+        break;
+    case 0x23:
+        printf("     Transmitted OPEN_REJECT retry count: %lu\n", val);
+        break;
+    case 0x24:
+        printf("     Received OPEN_REJECT retry count: %lu\n", val);
+        break;
+    case 0x25:
+        printf("     Received AIP (PARTIAL) count: %lu\n", val);
+        break;
+    case 0x26:
+        printf("     Received AIP (CONNECTION) count: %lu\n", val);
+        break;
+    case 0x27:
+        printf("     Transmitted BREAK count: %lu\n", val);
+        break;
+    case 0x28:
+        printf("     Received BREAK count: %lu\n", val);
+        break;
+    case 0x29:
+        printf("     Break timeout count: %lu\n", val);
+        break;
+    case 0x2a:
+        printf("     Connection count: %lu\n", val);
+        break;
+    case 0x2b:
+        printf("     Peak transmitted pathway blocked count: %lu\n",
+               val & 0xff);
+        printf("         Peak value detector threshold: %lu\n",
+               thresh_val & 0xff);
+        break;
+    case 0x2c:
+        printf("     Peak transmitted arbitration wait time (us to 32767): "
+               "%lu\n", val & 0xffff);
+        printf("         Peak value detector threshold: %lu\n",
+               thresh_val & 0xffff);
+        break;
+    case 0x2d:
+        printf("     Peak arbitration time (us): %lu\n", val);
+        printf("         Peak value detector threshold: %lu\n", thresh_val);
+        break;
+    case 0x2e:
+        printf("     Peak connection time (us): %lu\n", val);
+        printf("         Peak value detector threshold: %lu\n", thresh_val);
+        break;
+    case 0x40:
+        printf("     Transmitted SSP frame count: %lu\n", val);
+        break;
+    case 0x41:
+        printf("     Received SSP frame count: %lu\n", val);
+        break;
+    case 0x42:
+        printf("     Transmitted SSP frame error count: %lu\n", val);
+        break;
+    case 0x43:
+        printf("     Received SSP frame error count: %lu\n", val);
+        break;
+    case 0x44:
+        printf("     Transmitted CREDIT_BLOCKED count: %lu\n", val);
+        break;
+    case 0x45:
+        printf("     Received CREDIT_BLOCKED count: %lu\n", val);
+        break;
+    case 0x50:
+        printf("     Transmitted SATA frame count: %lu\n", val);
+        break;
+    case 0x51:
+        printf("     Received SATA frame count: %lu\n", val);
+        break;
+    case 0x52:
+        printf("     SATA flow control buffer overflow count: %lu\n", val);
+        break;
+    case 0x60:
+        printf("     Transmitted SMP frame count: %lu\n", val);
+        break;
+    case 0x61:
+        printf("     Received SMP frame count: %lu\n", val);
+        break;
+    case 0x62:
+        printf("     Received SMP frame error count: %lu\n", val);
+        break;
+    default:
+        break;
     }
 }
 
 static int show_protocol_specific_page(unsigned char * resp, int len, 
                                        int show_pcb)
 {
-    int k, j, num, param_len, nphys, pcb, t, sz;
+    int k, j, m, num, param_len, nphys, pcb, t, sz, spld_len;
     unsigned char * ucp;
     unsigned char * vcp;
     unsigned long long ull;
     unsigned long ul;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
     char s[64];
 
     sz = sizeof(s);
@@ -747,18 +868,25 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
            a 8 phy wide link) can be represented */
         if (6 != (0xf & ucp[4]))
             return 0;   /* only decode SAS log page */
-        printf("SAS Protocol Specific page\n");
-        printf("relative target port id=%d\n", (ucp[0] << 8) | ucp[1]);
+        if (0 == k)
+            printf("SAS Protocol Specific page\n");
+        printf("relative target port id = %d\n", (ucp[0] << 8) | ucp[1]);
         nphys = ucp[7];
-        printf("number of phys = %d\n", nphys);
+        printf(" number of phys = %d", nphys);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
 
-        for (j = 0, vcp = ucp + 8; j < (param_len - 8); vcp += 48, j += 48 ) {
+        for (j = 0, vcp = ucp + 8; j < (param_len - 8);
+             vcp += spld_len, j += spld_len) {
             printf("  phy identifier = %d\n", vcp[1]);
+            spld_len = vcp[3];
+            if (spld_len < 44)
+                spld_len = 48;
+            else
+                spld_len += 4;
             t = ((0x70 & vcp[4]) >> 4);
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
@@ -784,9 +912,9 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
             }
             printf("    negotiated physical link rate: %s\n", s);
             printf("    attached initiator port: ssp=%d, stp=%d smp=%d\n",
-                   !! (vcp[6] & 8), !! (vcp[6] & 4), (vcp[6] & 2));
+                   !! (vcp[6] & 8), !! (vcp[6] & 4), !! (vcp[6] & 2));
             printf("    attached target port: ssp=%d, stp=%d smp=%d\n",
-                   !! (vcp[7] & 8), !! (vcp[7] & 4), (vcp[7] & 2));
+                   !! (vcp[7] & 8), !! (vcp[7] & 4), !! (vcp[7] & 2));
             ull = vcp[8]; ull <<= 8; ull |= vcp[9]; ull <<= 8; ull |= vcp[10];
             ull <<= 8; ull |= vcp[11]; ull <<= 8; ull |= vcp[12];
             ull <<= 8; ull |= vcp[13]; ull <<= 8; ull |= vcp[14];
@@ -806,6 +934,24 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
             printf("    Loss of DWORD synchronization = %ld\n", ul);
             ul = (vcp[44] << 24) | (vcp[45] << 16) | (vcp[46] << 8) | vcp[47];
             printf("    Phy reset problem = %ld\n", ul);
+            if (spld_len > 51) {
+                int num_ped, peis;
+                unsigned char * xcp;
+                unsigned long pvdt;
+
+                num_ped = vcp[51];
+                if (num_ped > 0)
+                    printf("    Phy event descriptors:\n");
+                xcp = vcp + 52;
+                for (m = 0; m < (num_ped * 12); m += 12, xcp += 12) {
+                    peis = xcp[3];
+                    ul = (xcp[4] << 24) | (xcp[5] << 16) | (xcp[6] << 8) |
+                         xcp[7];
+                    pvdt = (xcp[8] << 24) | (xcp[9] << 16) | (xcp[10] << 8) |
+                           xcp[11];
+                    show_sas_phy_event_info(peis, ul, pvdt);
+                }
+            }
         }
         k += param_len;
         ucp += param_len;
@@ -820,7 +966,7 @@ static void show_format_status_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Format status page (sbc-2) [0x8]\n");
     num = len - 4;
@@ -868,13 +1014,13 @@ static void show_format_status_page(unsigned char * resp, int len,
                 printf(" = %llu", ull);
             if (show_pcb) {
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-                printf("  <%s>\n", pcb_str);
+                printf("\n        <%s>\n", pcb_str);
             } else
                 printf("\n");
         } else {
             if (show_pcb) {
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-                printf("  <%s>\n", pcb_str);
+                printf("\n        <%s>\n", pcb_str);
             }
         }
         num -= pl;
@@ -887,7 +1033,7 @@ static void show_non_volatile_cache_page(unsigned char * resp, int len,
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Non-volatile cache page (sbc-2) [0x17]\n");
     num = len - 4;
@@ -946,7 +1092,7 @@ static void show_non_volatile_cache_page(unsigned char * resp, int len,
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("    <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         }
         num -= pl;
         ucp += pl;
@@ -979,7 +1125,7 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
 {
     int j, m, num, pl, pc, pcb;
     unsigned char * ucp;
-    char str[128];
+    char str[PCB_STR_LEN];
 
     printf("Background scan results page (sbc-2) [0x15]\n");
     num = len - 4;
@@ -1041,7 +1187,7 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
         }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("    <%s>\n", str);
+            printf("\n        <%s>\n", str);
         }
         num -= pl;
         ucp += pl;
@@ -1055,7 +1201,7 @@ static void show_sequential_access_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull, gbytes;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Sequential access device page (ssc-3)\n");
     num = len - 4;
@@ -1144,7 +1290,7 @@ static void show_sequential_access_page(unsigned char * resp, int len,
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
         num -= pl;
@@ -1159,7 +1305,7 @@ static void show_device_stats_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Device statistics page (ssc-3 and adc)\n");
     num = len - 4;
@@ -1246,7 +1392,7 @@ static void show_device_stats_page(unsigned char * resp, int len,
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
         num -= pl;
@@ -1261,7 +1407,7 @@ static void show_seagate_cache_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Seagate cache page [0x37]\n");
     num = len - 4;
@@ -1295,7 +1441,7 @@ static void show_seagate_cache_page(unsigned char * resp, int len,
         printf(" = %llu", ull);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
         num -= pl;
@@ -1310,7 +1456,7 @@ static void show_seagate_factory_page(unsigned char * resp, int len,
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
-    char pcb_str[64];
+    char pcb_str[PCB_STR_LEN];
 
     printf("Seagate/Hitachi factory page [0x3e]\n");
     num = len - 4;
@@ -1349,7 +1495,7 @@ static void show_seagate_factory_page(unsigned char * resp, int len,
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("  <%s>\n", pcb_str);
+            printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
         num -= pl;

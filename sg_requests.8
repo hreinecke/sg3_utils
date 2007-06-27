@@ -1,10 +1,10 @@
-.TH SG_REQUESTS "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_REQUESTS "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
-sg_requests \- send the scsi command request sense
+sg_requests \- send one or more SCSI REQUEST SENSE commands
 .SH SYNOPSIS
 .B sg_requests
-[\fI--desc\fR] [\fI--help\fR] [\fI--verbose\fR] [\fI--version\fR]
-\fI<scsi_device>\fR
+[\fI--desc\fR] [\fI--help\fR] [\fI--num=<n>\fR] [\fI--time\fR]
+[\fI--verbose\fR] [\fI--version\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -21,6 +21,14 @@ field may cause a check condition status with an illegal request sense key.
 .TP
 --help | -h
 output the usage message then exit.
+.TP
+--num=<n> | -n <n>
+perform <n> SCSI REQUEST SENSE commands, stopping whe either <n> is
+reached or an error occurs. The default value for <n> is 1 .
+.TP
+--time | -t
+time the SCSI REQUEST SENSE command(s) and calculate the average number
+of operations per second.
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output).
@@ -51,7 +59,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2005 Douglas Gilbert
+Copyright \(co 2004-2006 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
