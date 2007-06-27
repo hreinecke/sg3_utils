@@ -1,16 +1,14 @@
-.TH SG_DD "8" "December 2000" "sg_utils-0.90" SG_UTILS
+.TH SG_DD "8" "December 2000" "sg3_utils-0.91" SG3_UTILS
 .SH NAME
-sg_dd \- variant of 
-.B dd 
-that copies data to and from sg and raw devices
+copies data to and from sg and raw devices
 .SH SYNOPSIS
 .B sg_dd
 [\fIOPTION\fR]...
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Copy data to and from Linux sg and raw devices. Similar syntax and semantics
-to 
+Copy data to and from Linux SCSI generic (sg) and raw devices.
+Similar syntax and semantics to 
 .B dd(1) 
 but does not perform any conversions.
 .TP
@@ -26,6 +24,11 @@ is usually correct for disks but incorrect for cdroms (which are usually
 count=BLOCKS
 copy this number of blocks. Default is minimum number that sg devices
 return from READ CAPACITY (if that works) or 0
+.TP
+dio=0 | 1
+default is 0 which selects indirect IO. Value of 1 attempts direct
+IO which, if not available, falls back to indirect IO and notes this
+at completion
 .TP
 ibs=BYTES
 if given must be the same as bs
@@ -63,8 +66,17 @@ BYTES and BLOCKS may be followed by the following multiplicative suffixes:
 c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
 g *1,073,741,824; and G *1,000,000,000
 .PP
+Data usually gets to the user space in a 2 stage process: first the
+SCSI adapter DMAs into kernel buffers and then the sg driver copies
+this data into user memory (write operations reverse this sequence).
+This is called "indirect IO" and there is a "dio" option to select
+"direct IO" which will DMA directly into user memory. Due to some
+issues "direct IO" is disabled in the sg driver and needs a 
+configuration change to activate it.
+.PP
 All informative, warning and error output is sent to stderr so that
-the output file can be stdout and remain unpolluted.
+dd\'s output file can be stdout and remain unpolluted. If no options
+are given, then the usage message is output and nothing else happens.
 .SH EXAMPLES
 .PP
 Looks quite similar in usage to dd:
@@ -95,6 +107,12 @@ This assumes a valid partition is found on the SCSI disk at the given
 skip block address (past the 5 GB point of that disk) and that
 the partition goes to the end of the SCSI disk. An explicit count
 is probably a safer option.
+.SH SIGNALS
+The signal handling has been borrowed from dd: SIGINT, SIGQUIT and
+SIGPIPE output the number of remaining blocks to be transferred and
+the records in + out counts; then they have their default action.
+SIGUSR1 causes the same information to be output yet the copy continues.
+All output caused by signals is sent to stderr.
 .SH AUTHORS
 Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
@@ -107,6 +125,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 A POSIX threads version of this command called
 .B sgp_dd
-in the sg_utils package. The lmbench package contains
+is in the sg3_utils package. The lmbench package contains
 .B lmdd
 which is also interesting.
+.B raw(8), dd(1)

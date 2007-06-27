@@ -12,11 +12,11 @@ EXECS = sg_simple1 sg_simple2 sg_simple3 sg_dd sg_debug \
 
 COMMON = sg_scan scsi_inquiry sginfo sg_readcap isosize
 
-MAN_PGS = sg_dd.8 sgp_dd.8
+MAN_PGS = sg_dd.8 sgp_dd.8 sg_map.8 sg_rbuf.8 isosize.8
 MAN_PREF = man8
 
 CFLAGS = -g -O2 -Wall -D_REENTRANT
-# CFLAGS = -g -O2 -Wall pedantic -D_REENTRANT
+# CFLAGS = -g -O2 -Wall -pedantic -D_REENTRANT
 
 LDFLAGS =
 

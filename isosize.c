@@ -11,11 +11,15 @@
  * isosize.c - Andries Brouwer, 000608
  *
  * Synopsis:
- *    isosize [-x] <filename>
+ *    isosize [-x] [-d <num>] <filename>
  *        where "-x" gives length in sectors and sector size while
  *              without this argument the size is given in bytes
- *        without "-x" gives length in bytes
+ *        without "-x" gives length in bytes unless "-d <num>" is
+ *		given. In the latter case the length in bytes divided
+ *		by <num> is given
  *
+ *  Version 2.03 2000/12/21
+ *     - add "-d <num>" option and use long long to fix things > 2 GB
  *  Version 2.02 2000/10/11
  *     - error messages on IO failures [D. Gilbert]
  *
@@ -114,21 +118,46 @@ struct iso_primary_descriptor {
 
 int main(int argc, char * argv[]) {
     struct iso_primary_descriptor ipd;
-    int fd, nsecs, ssize;
+    int fd, nsecs, ssize, j, m;
+    int divisor = 0;
+    const char * filenamep = NULL;
 
-    if (argc > 1 && !strcmp("-x", argv[1])) {
-        argc--;
-        argv++;
-        xflag = 1;
+    for (j = 1; j < argc; ++j) {
+	if (0 == strncmp("-d", argv[j], 2)) {
+	    if (strlen(argv[j]) > 2)
+		m = 2;
+	    else {
+		++j;
+		if (j >= argc) {
+		    filenamep = NULL;
+		    break;
+		}
+		m = 0;
+	    }
+	    if (1 != sscanf(argv[j] + m, "%d", &divisor)) {
+	    	fprintf(stderr, "Couldn't decode number after '-d' switch\n");
+		filenamep = NULL;
+		break;
+	    }
+	}
+	else if (0 == strcmp("-x", argv[j]))
+	    xflag = 1;
+	else if (*argv[j] == '-') {
+            fprintf(stderr, "Unrecognized switch: %s\n", argv[j]);
+            filenamep = NULL;
+            break;
+        }
+        else
+            filenamep = argv[j];
     }
 
-    if(argc != 2) {
-        fprintf(stderr, "Usage: isosize [-x] iso9660-image\n");
+    if(filenamep == NULL) {
+        fprintf(stderr, "Usage: isosize [-x] [-d <num>] iso9660-image\n");
         return 1;
     }
 
-    if ((fd = open(argv[1],O_RDONLY)) < 0) {
-        fprintf(stderr, "failed to open: %s", argv[1]);
+    if ((fd = open(filenamep,O_RDONLY)) < 0) {
+        fprintf(stderr, "failed to open: %s", filenamep);
         perror(", error");
         return 1;
     }
@@ -146,8 +175,15 @@ int main(int argc, char * argv[]) {
 
     if (xflag)
         printf ("sector count: %d, sector size: %d\n", nsecs, ssize);
-    else
-        printf ("%d\n", nsecs * ssize);
+    else {
+	long long product = nsecs;
 
+	if (0 == divisor)
+	    printf ("%lld\n", product * ssize);
+	else if (divisor == ssize)
+	    printf ("%d\n", nsecs);
+	else
+	    printf ("%lld\n", (product * ssize) / divisor);
+    }
     return 0;
 }
