@@ -3,7 +3,7 @@
 
 /* Feel free to copy and modify this GPL-ed code into your applications. */
 
-/* Version 0.89 (20030313) 
+/* Version 0.90 (20030519) 
 */
 
 
@@ -157,6 +157,6 @@ extern int sg_err_category3(struct sg_io_hdr * hp);
 extern int sg_get_command_size(unsigned char opcode);
 
 extern void sg_get_command_name(unsigned char opcode, int buff_len, 
-				char * buff);
+                                char * buff);
 
 #endif
