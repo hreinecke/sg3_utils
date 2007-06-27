@@ -14,6 +14,9 @@ Clayton Weaver <cgweav at email dot com> contributed safe_strerror().
 Dave Johnson <ddj at ccv dot brown dot edu> improved disk defect list
       handling [20051218]
 
+Dave Williams <dave at opensourcesolutions dot co dot uk> help with
+	sgp_dd especially and "> 0x7fffffff" with sg*_dd [20060303]
+
 Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
         sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
         sg_turs and sginfo
@@ -25,6 +28,9 @@ F. Jansen: additions to sg_scan
 
 Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
+
+Hayashi Naoyuki <titan at culzean dot org>
+        port to Tru64 [20060127]
 
 Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example 
         programs for the original sg driver
@@ -66,4 +72,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-20th December 2005
+3rd March 2006

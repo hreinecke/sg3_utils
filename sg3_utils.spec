@@ -1,5 +1,5 @@
 %define	name	sg3_utils
-%define	version	1.19
+%define	version	1.20
 %define	release	1
 
 %define	major	1
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Tue Apr 18 2006 - dgilbert at interlog dot com
+- sg_logs: sas port specific page decoding, sg*_dd updates
+  * sg3_utils-1.20
+
 * Fri Jan 27 2006 - dgilbert at interlog dot com
 - sg_get_config: resync features with mmc5 rev 1
   * sg3_utils-1.19

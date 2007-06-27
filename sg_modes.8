@@ -1,10 +1,10 @@
-.TH SG_MODES "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_MODES "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
 sg_modes \- reads SCSI MODE SENSE pages
 .SH SYNOPSIS
 .B sg_modes
 [\fI-a\fR] [\fI-A\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-D\fR]
-[\fI-f\fR] [\fI-h\fR] [\fI-H\fR] [\fI-l\fR] [\fI-L\fR]
+[\fI-e\fR] [\fI-f\fR] [\fI-h\fR] [\fI-H\fR] [\fI-l\fR] [\fI-L\fR]
 [\fI-p=<page_code>\fR] [\fI-p=<page_code>,<sub_page_code>\fR]
 [\fI-r\fR] [\fI-subp=<sub_page_code>\fR] [\fI-v\fR] [\fI-V\fR] [\fI-6\fR]
 [\fI-?\fR] [\fI<scsi_device>\fR]
@@ -42,6 +42,11 @@ alternatively they may ignore it.
 -D
 disable outputting block descriptors. Irrespective of whether block
 descriptors are present in the response or not, they are not output.
+.TP
+-e
+examine each mode page in the range 0 through to 62 (inclusive).
+If some response is given print out the mode page name or number (in hex)
+if the name is not known.
 .TP
 -f
 Be "flexible". Some devices, bridges and/or drivers attempt crude
@@ -128,6 +133,9 @@ type of the device (e.g. 0 -> Direct Access Device (disk)) prior to
 sending a MODE SENSE command. This helps in decoding the block
 descriptor and mode pages.
 .PP
+When this utility succeeds its process exits with a status of 0;
+if problems are encountered the process status is 1 .
+.PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and SCSI DVDs) can also be specified. For example "sg_modes -a /dev/sda"
@@ -137,7 +145,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2005 Douglas Gilbert
+Copyright \(co 2000-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,6 +1,6 @@
-.TH SG_PERSIST "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
+.TH SG_PERSIST "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
-sg_persist \- use the Persistent Reservation In and Out SCSI commands
+sg_persist \- use the Persistent Reserve In and Out SCSI commands
 to manipulate registrations and reservations
 .SH SYNOPSIS
 .B sg_persist
@@ -11,8 +11,8 @@ to manipulate registrations and reservations
 This utility allows Persistent reservations and registrations to be
 queried and changed. Persistent reservations and registrations are
 queried by sub-commands (called "service actions" in SPC-3) of the Persistent
-Reservation In (PRIN) SCSI command. Persistent reservations and
-registrations are changed by sub-commands of the Persistent Reservation
+Reserve In (PRIN) SCSI command. Persistent reservations and
+registrations are changed by sub-commands of the Persistent Reserve
 Out (PROUT) SCSI command.
 .PP
 It is relatively safe to query the state of Persistent reservations and
@@ -64,11 +64,11 @@ Normally if the PRIN sub-command is recognised then the response
 will be decoded as per SPC-3.
 .TP
 --in | -i
-specify that a Persistent Reservation In SCSI command is required. This
+specify that a Persistent Reserve In SCSI command is required. This
 is the default.
 .TP
 --out | -o
-specify that a Persistent Reservation Out SCSI command is required.
+specify that a Persistent Reserve Out SCSI command is required.
 .TP
 --no-inquiry | -n
 the default action is to do a standard INQUIRY SCSI command and output
@@ -302,7 +302,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004 Douglas Gilbert
+Copyright \(co 2004-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

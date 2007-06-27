@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -5,6 +7,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <dirent.h>
+#include <libgen.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -14,7 +18,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999 - 2005 D. Gilbert
+*  Copyright (C) 1999 - 2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -38,7 +42,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.06 20051220";
+static char * version_str = "4.07 20060324";
 
 #define ME "sg_scan: "
 
@@ -50,6 +54,10 @@ static char * version_str = "4.06 20051220";
 
 #define EBUFF_SZ 256
 #define FNAME_SZ 64
+#define PRESENT_ARRAY_SIZE 4096
+
+static const char * sysfs_sg_dir = "/sys/class/scsi_generic";
+static int * gen_index_arr;
 
 typedef struct my_scsi_idlun {
 /* why can't userland see this structure ??? */
@@ -90,6 +98,33 @@ void usage()
     printf("           -x   extra information output about queuing\n");
     printf("      <sam_dev> name of device that understands SAM command"
            " set\n");
+}
+
+static int scandir_select(const struct dirent * s)
+{
+    int k;
+
+    if (1 == sscanf(s->d_name, "sg%d", &k)) {
+        if ((k >= 0) && (k < PRESENT_ARRAY_SIZE)) {
+            gen_index_arr[k] = 1;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int sysfs_sg_scan(const char * dir_name)
+{
+    struct dirent ** namelist;
+    int num, k;
+
+    num = scandir(dir_name, &namelist, scandir_select, NULL);
+    if (num < 0)
+        return -errno;
+    for (k = 0; k < num; ++k)
+        free(namelist[k]);
+    free(namelist);
+    return num;
 }
 
 void make_dev_name(char * fname, int k, int do_numeric)
@@ -145,12 +180,13 @@ int main(int argc, char * argv[])
     int flags;
     int emul = -1;
     int has_file_args = 0;
-    const int max_file_args = 2048;
-    int * argv_index_arr;
+    int has_sysfs_sg = 0;
+    const int max_file_args = PRESENT_ARRAY_SIZE;
     const char * cp;
+    struct stat a_stat;
 
-    if ((argv_index_arr = malloc(max_file_args * sizeof(int))))
-        memset(argv_index_arr, 0, max_file_args * sizeof(int));
+    if ((gen_index_arr = malloc(max_file_args * sizeof(int))))
+        memset(gen_index_arr, 0, max_file_args * sizeof(int));
     else {
         printf(ME "Out of memory\n");
         return 1;
@@ -208,35 +244,46 @@ int main(int argc, char * argv[])
         } else {
             if (j < max_file_args) {
                 has_file_args = 1;
-                argv_index_arr[j++] = k;
+                gen_index_arr[j++] = k;
             } else {
                 printf("Too many command line arguments\n");
                 return 1;
             }
         }
     }
-    
-    flags = writeable ? O_RDWR : O_RDONLY;
 
-    for (k = 0, res = 0, j = 0; 
+    if ((! has_file_args) && (stat(sysfs_sg_dir, &a_stat) >= 0) &&
+        (S_ISDIR(a_stat.st_mode)))
+        has_sysfs_sg = sysfs_sg_scan(sysfs_sg_dir);
+    
+    flags = O_NONBLOCK | (writeable ? O_RDWR : O_RDONLY);
+
+    for (k = 0, res = 0, j = 0, sg_fd = -1; 
          (k < max_file_args)  && (has_file_args || (num_errors < MAX_ERRORS));
-         ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
+         ++k, res = ((sg_fd >= 0) ? close(sg_fd) : 0)) {
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, ME "Error closing %s ", fname);
-            perror(ME "close error");
+            perror(ebuff);
             return 1;
         }
         if (has_file_args) {
-            if (argv_index_arr[j])
-                file_namep = argv[argv_index_arr[j++]];
+            if (gen_index_arr[j])
+                file_namep = argv[gen_index_arr[j++]];
             else
                 break;
+        } else if (has_sysfs_sg) {
+            if (0 == gen_index_arr[k]) {
+                sg_fd = -1;
+                continue;
+            }
+            make_dev_name(fname, k, 1);
+            file_namep = fname;
         } else {
             make_dev_name(fname, k, do_numeric);
             file_namep = fname;
         }
 
-        sg_fd = open(file_namep, flags | O_NONBLOCK);
+        sg_fd = open(file_namep, flags);
         if (sg_fd < 0) {
             if (EBUSY == errno) {
                 printf("%s: device busy (O_EXCL lock), skipping\n", file_namep);
@@ -296,7 +343,7 @@ int main(int argc, char * argv[])
             res = ioctl(sg_fd, SG_GET_SCSI_ID, &m_id);
             if (res < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "device %s failed "
-                         "SG_GET_SCSI_IDioctl(4), skip", file_namep);
+                         "SG_GET_SCSI_ID ioctl(4), skip", file_namep);
                 perror(ebuff);
                 ++num_errors;
                 continue;

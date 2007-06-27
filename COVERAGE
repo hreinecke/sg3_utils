@@ -8,21 +8,21 @@ SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
 GET CONFIGURATION   sg_get_config, ++
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
-		    sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
-		    sg_persist, sg_scan, sg_ses, ++
+                    sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
+                    sg_persist, sg_scan, sg_ses, ++
 FORMAT UNIT         sg_format, ++
 LOG SELECT          sg_logs('-r', '-scum' or '-sthr'), ++
 LOG SENSE           sg_logs, ++
 MODE SELECT(6)      sg_wr_mode, sginfo, sg_format,
-		    sg_emc_trespass, ++
+                    sg_emc_trespass, ++
 MODE SELECT(10)     sg_wr_mode, sginfo, sg_format,
-		    sg_emc_trespass, ++
+                    sg_emc_trespass, ++
 MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_format,
-		    sg_senddiag('-e'), ++
+                    sg_senddiag('-e'), ++
 MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_format,
-		    sg_senddiag('-e'), ++
-PERSISTENT IN       sg_persist ++
-PERSISTENT OUT      sg_persist ++
+                    sg_senddiag('-e'), ++
+PERSISTENT RESERVE IN       sg_persist ++
+PERSISTENT RESERVE OUT      sg_persist ++
 PREVENT ALLOW MEDIUM REMOVAL        sg_prevent, ++
 READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
@@ -66,4 +66,4 @@ IDENTIFY PACKET DEVICE     sg_inq
 ++  command wrapper found in sg_cmds.c for this command
 
 Doug Gilbert
-27th December 2005
+22nd March 2006

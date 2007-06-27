@@ -1,4 +1,4 @@
-.TH SG_MAP "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
+.TH SG_MAP "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
 sg_map \- displays mapping between sg and other SCSI devices
 .SH SYNOPSIS
@@ -17,7 +17,9 @@ name.
 .TP
 -a
 assume the sg devices have alphabetical device names and loop
-through /dev/sga, /dev/sgb, etc. Default is numeric scan
+through /dev/sga, /dev/sgb, etc. Default is numeric scan.
+Note that sg device nodes with an alphabetical index have been
+deprecated since the linux kernel 2.2 series.
 .TP
 -h
 print usage message then exit.
@@ -78,7 +80,23 @@ be /dev/sdb this is not necessarily so. Facilities associated
 with udev may assign major 8, minor 16 some other device node
 name. This version of sg_map has been extended to cope with
 sparse disk device node names of the form "/dev/sd<str>"
-where <str> can be one of [a-z,aa-zz,aaa-zzz].
+where <str> can be one of [a-z,aa-zz,aaa-zzz]. See the sg_map26
+utility for a more precise way (i.e. less directory scanning)
+for mapping between sg device names and higher level names;
+including finding user defined names.
+.PP
+This utility was written at a time when hotplugging of SCSI devices
+was not supported in Linux. It used a simple algorithm to scan sg
+device nodes in ascending numeric or alphabetical order, stopping
+after there were 5 consecutive errors.
+.PP
+In the linux kernel 2.6 series, this utility uses sysfs to find which
+sg device nodes are active and only checks those. Hence there can be
+large "holes" in the numbering of sg device nodes (e.g. after an
+adapter has been removed) and still all active sg device nodes will
+be listed. This utility assumes that sg device nodes are named using
+the normal conventions and searches from /dev/sg0 to /dev/sg4095
+inclusive.
 .SH EXAMPLES
 .PP
 My system has a SCSI disk, a cd writer and a dvd player:
@@ -137,11 +155,13 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000, 2001 Douglas Gilbert
+Copyright \(co 2000-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
+.B sg_map26(8)
+,
 .B scsi_info(8)
 ,
 .B scsidev(8)

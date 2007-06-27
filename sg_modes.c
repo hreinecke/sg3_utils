@@ -21,7 +21,7 @@
    
 */
 
-static char * version_str = "1.13 20060106";
+static char * version_str = "1.15 20060331";
 
 #define ME "sg_modes: "
 
@@ -394,6 +394,46 @@ static void list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     }
 }
 
+static int examine_pages(int sg_fd, int do_mode6, int inq_pdt, int inq_byte6,
+                         int verbose)
+{
+    int k, res, header;
+    unsigned char rbuf[4];
+    const char * cp;
+
+    for (header = 0, k = 0; k < 0x3f; ++k) {
+        if (do_mode6) {
+            res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0,
+                                    rbuf, sizeof(rbuf), 0, verbose);
+            if (SG_LIB_CAT_INVALID_OP == res) {
+                fprintf(stderr, ">>>>>> try again without the '-6' "
+                        "switch for a 10 byte MODE SENSE command\n");
+                return 1;
+            }
+        } else {
+            res = sg_ll_mode_sense10(sg_fd, 0, 0, 0, k,
+                                     0, rbuf, sizeof(rbuf), 1, verbose);
+            if (SG_LIB_CAT_INVALID_OP == res) {
+                fprintf(stderr, ">>>>>> try again with a '-6' "
+                        "switch for a 6 byte MODE SENSE command\n");
+                return 1;
+            }
+        }
+        if (0 == res) {
+            if (0 == header) {
+                printf("Discovered mode pages:\n");
+                header = 1;
+            }
+            cp = find_page_code_desc(k, 0, inq_pdt, inq_byte6, -1);
+            if (cp)
+                printf("    %s\n", cp);
+            else
+                printf("    [0x%x]\n", k);
+        }
+    }
+    return 0;
+}
+
 static const char * pg_control_str_arr[] = {
     "current",
     "changeable",
@@ -403,15 +443,16 @@ static const char * pg_control_str_arr[] = {
 
 static void usage()
 {
-    printf("Usage:  sg_modes [-a] [-A] [-c=<page_control] [-d] [-D] [-f] [-h] "
-           "[-H] [-l]\n\t\t"
-           " [-L] [-p=<page_number>[,<sub_page_code>]] [-r]"
+    printf("Usage:  sg_modes [-a] [-A] [-c=<page_control] [-d] [-D] [-f] "
+           "[-e] [-h] [-H]\n\t\t"
+           " [-l] [-L] [-p=<page_number>[,<sub_page_code>]] [-r]"
            "\n\t\t [-subp=<sub_page_code>] [-v] [-V] [-6] [<scsi_device>]\n"
            " where -a   get all mode pages supported by device\n"
            "       -A   get all mode pages and subpages supported by device\n"
            "       -c=<page_control> page control (def: 0 [current],"
            " 1 [changeable],\n            2 [default], 3 [saved])\n"
            "       -d   disable block descriptors (DBD field in cdb)\n"
+           "       -e   examine pages # 0 through to 0x3e, note if found\n"
            "       -D   disable block descriptor output\n"
            "       -f   be flexible, cope with MODE SENSE 6/10 response "
            "mixup\n");
@@ -452,6 +493,7 @@ int main(int argc, char * argv[])
     int do_all_sub = 0;
     int do_dbd = 0;
     int no_desc_out = 0;
+    int do_examine = 0;
     int flexible = 0;
     int do_hex = 0;
     int do_llbaa = 0;
@@ -460,7 +502,7 @@ int main(int argc, char * argv[])
     int do_raw = 0;
     int do_verbose = 0;
     int density_code_off, t_proto, inq_pdt, inq_byte6, resp_mode6;
-    int num_ua_pages, plen, jmp_out;
+    int num_ua_pages, plen, jmp_out, ret;
     unsigned char * ucp;
     unsigned char uc;
     struct sg_simple_inquiry_resp inq_out;
@@ -489,6 +531,9 @@ int main(int argc, char * argv[])
                     break;
                 case 'D':
                     no_desc_out = 1;
+                    break;
+                case 'e':
+                    do_examine = 1;
                     break;
                 case 'f':
                     flexible = 1;
@@ -605,6 +650,11 @@ int main(int argc, char * argv[])
         return 1;
     }
 
+    if (do_examine && (pg_code >= 0)) {
+        fprintf(stderr, "can't give '-e' and a page number\n");
+        return 1;
+    }
+
     /* The 6 bytes command only allows up to 252 bytes of response data */
     if (do_mode6) { 
         if (do_llbaa) {
@@ -615,7 +665,7 @@ int main(int argc, char * argv[])
         rsp_buff_size = 252;
     }
     /* If no pages or list selected than treat as 'a' */
-    if (! ((pg_code >= 0) || do_all || do_list))
+    if (! ((pg_code >= 0) || do_all || do_list || do_examine))
         do_all = 1;
 
     if ((sg_fd = sg_cmds_open_device(file_name, 1 /* ro */, do_verbose)) < 0) {
@@ -638,10 +688,14 @@ int main(int argc, char * argv[])
                sg_get_pdt_str(inq_pdt, sizeof(pdt_name), pdt_name), inq_pdt);
     if (do_list) {
         if (sub_pg_code_set)
-            list_page_codes(inq_pdt, inq_pdt, sub_pg_code);
+            list_page_codes(inq_pdt, inq_byte6, sub_pg_code);
         else
-            list_page_codes(inq_pdt, inq_pdt, -1);
+            list_page_codes(inq_pdt, inq_byte6, -1);
         return 0;
+    }
+    if (do_examine) {
+        ret = examine_pages(sg_fd, do_mode6, inq_pdt, inq_byte6, do_verbose);
+        goto finish;
     }
     if (PG_CODE_ALL == pg_code)
         do_all = 1;
@@ -684,9 +738,11 @@ int main(int argc, char * argv[])
             fprintf(stderr, "invalid field in cdb (perhaps subpages "
                     "or page control (PC) not supported)\n");
     }
+    ret = 1;
     if (0 == res) {
         int medium_type, specific, headerlen;
 
+        ret = 0;
         resp_mode6 = do_mode6;
         if (flexible) {
             num = rsp_buff[0];
@@ -847,6 +903,7 @@ int main(int argc, char * argv[])
             md_len -= len;
         }
     }
+finish:
     sg_cmds_close_device(sg_fd);
-    return 0;
+    return ret;
 }

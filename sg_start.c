@@ -26,13 +26,13 @@
  
 */
 
-static char * version_str = "0.48 20060125";
+static char * version_str = "0.49 20060406";
 
 
 void usage ()
 {
         fprintf(stderr, "Usage:  sg_start [0|--stop|1|--start] [--eject] "
-                "[--fl=<n>] [--imm=0|1]\n"
+                "[--fl=<n>] [-i] [--imm=0|1]\n"
                 "                 [--load] [--loej] [--pc=<n>] [-v] [-V] "
                 "<device>\n"
                 " where: 0         stop unit (e.g. spin down a disk or a "
@@ -41,6 +41,7 @@ void usage ()
                 "cd/dvd)\n"
                 "        --eject   stop then eject the medium\n"
                 "        --fl=<n>  format layer number (mmc5)\n"
+                "        -i        return immediately (same as '--imm=1')\n"
                 "        --imm=0|1   0->await completion(def), 1->return "
                 "immediately\n"
                 "        --load    load then start the medium\n"
@@ -87,6 +88,12 @@ int main(int argc, char * argv[])
                         for (--plen, ++cp, jmp_out = 0; plen > 0;
                              --plen, ++cp) {
                                 switch (*cp) {
+                                case 'i':
+                                        if ('\0' == *(cp + 1))
+                                                immed = 1;
+                                        else
+                                                jmp_out = 1;
+                                        break;
                                 case 'v':
                                         ++verbose;
                                         break;

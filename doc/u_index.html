@@ -62,22 +62,22 @@ class specific sets. The common set of commands is referred to as the
 SCSI Primary Commands (SPC) with SPC-3 being the most recent standard
 (or soon will be). The SCSI INQUIRY command whose support is mandatory
 for all SCSI devices is defined in SPC-3. The SCSI Block Commands (SBC)
-set covers direct access devices such as disks. The MultiMedia Commands
-(MMC) set covers CD and DVD drives and the media within them. SCSI
-command sets and transports
+cover direct access devices such as disks. The MultiMedia Commands
+(MMC) cover CD and DVD drives and the media within them. SCSI
+command sets and transport
 definitions can be found at the <a href="http://www.t10.org">www.t10.org</a>
-site with this page giving a good overview: <a
+site with this page giving a good diagrammatic overview: <a
  href="http://www.t10.org/scsi-3.htm">www.t10.org/scsi-3.htm</a> .<br>
 <br>
 The
 <span style="font-weight: bold;">sg3_utils</span> package targets the
 linux kernel 2.4 and 2.6 series and is
 still being enhanced. An earlier package called sg_utils
-targeted the&nbsp; linux kernel 2.2 series with some support for the
-2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>&nbsp;
+targeted the linux kernel 2.2 series with some support for the
+2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>
 for further information about sg_utils.&nbsp; This
 document describes
-<span style="font-weight: bold;">version 1.19</span> of <span
+<span style="font-weight: bold;">version 1.20</span> of <span
  style="font-weight: bold;">sg3_utils</span> .&nbsp; A subset of these
 utilities have been ported to the FreeBSD and Tru64 operating systems.<br>
 <br>
@@ -92,12 +92,12 @@ and
 ATAPI device)). The SCSI generic (sg) interface
 still represents a cleaner interface than the primary device names
 since the drivers behind primary device names have their
-own policies, may interfere with error processing and in some cases
+own policies, may interfere with error processing and, in some cases,
 run their own
 state machines.<br>
 <p>SCSI utility programs from other sources are listed and
 briefly described in
-the final section. </p>
+the final <a href="#mozTocId185822">section</a>. </p>
 <h2><a class="mozTocH2" name="mozTocId764860"></a> Contents of sg3_utils</h2>
 Here is a listing in alphabetical order of the utilities in the
 sg3_utils package:<br>
@@ -128,7 +128,7 @@ SCSI commands</span><br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">converts stdin (assumed binary)
-to ASCII hex and ASCII on stdout (like Unix <span
+to ASCII hex and ASCII, sending its output to stdout (like Unix <span
  style="font-weight: bold;">od</span> command)<br>
       </td>
     </tr>
@@ -266,8 +266,8 @@ asynchronous sg IO calls<br>
       </td>
       <td style="vertical-align: top;">Unix <span
  style="font-weight: bold;">dd</span> command variant, uses
-SG_IO ioctl to send SCSI commands to do reads and writes when
-instructed. See the <a href="sg_dd.html">sg_dd</a> page. </td>
+SG_IO ioctl to send SCSI commands to copy data. See the <a
+ href="sg_dd.html">sg_dd</a> page. </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">sg_emc_trepass<br>
@@ -380,8 +380,8 @@ and primary device node (if any). In lk 2.6 see <a
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">maps between single sg device
-and primary device node (and vice versa). Also does mapping in to and
-out of sysfs. For the linux 2.6 series.<br>
+and primary device node (and vice versa). Also does mapping in to, and
+out of, sysfs. For the linux 2.6 series.<br>
       </td>
     </tr>
     <tr>
@@ -411,12 +411,13 @@ supported task management functions<br>
     <tr>
       <td style="vertical-align: top;">sg_persist<br>
       </td>
-      <td style="vertical-align: top;">PERSISTENT RESERVATION IN/OUT<br>
+      <td style="vertical-align: top;">PERSISTENT RESERVE IN/OUT<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">fb,t64 </td>
-      <td style="vertical-align: top;">control reservations and report
+      <td style="vertical-align: top;">control persistent reservations
+and report
 reservation status<br>
       </td>
     </tr>
@@ -429,11 +430,12 @@ reservation status<br>
       </td>
       <td style="vertical-align: top;">fb,t64 </td>
       <td style="vertical-align: top;">control media removal, mainly
-for those SCSI devices which have removable media (mainly CD/DVD drives)<br>
+for those SCSI devices which have removable media (e.g. CD/DVD and tape
+drives)<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">sg_rbuff<br>
+      <td style="vertical-align: top;">sg_rbuf<br>
       </td>
       <td style="vertical-align: top;">READ BUFFER<br>
       </td>
@@ -456,7 +458,7 @@ Typically for testing the SCSI transport (for throughput or errors)<br>
       </td>
       <td style="vertical-align: top;">read continually from same
 offset. Syntax similar to sg_dd (without write side). Can test SCSI
-device cache and transport performance (like sg_rbuff).<br>
+device cache and transport performance (like sg_rbuf).<br>
       </td>
     </tr>
     <tr>
@@ -479,7 +481,7 @@ the individual block size for disks and CD/DVD media<br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">fb,t64 </td>
-      <td style="vertical-align: top;">read from given lba data which
+      <td style="vertical-align: top;">read data from given lba which
 includes the block and ECC data.<br>
       </td>
     </tr>
@@ -530,9 +532,9 @@ device (target or lun?) reset.<br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">fb,t64 </td>
-      <td style="vertical-align: top;">Relatively new&nbsp; command
+      <td style="vertical-align: top;">Relatively new command
 added to SPC-3. Format of response is vendor specific so this utility
-outputs it in hex.<br>
+outputs it in hex (default) or binary.<br>
       </td>
     </tr>
     <tr>
@@ -591,7 +593,7 @@ pages from, and sends some control pages to, a SCSI Enclosure Services
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">sg_simple1,2,3,4<br>
+      <td style="vertical-align: top;">sg_simple1,2,3,4,5<br>
       </td>
       <td style="vertical-align: top;">INQUIRY, TEST UNIT READY<br>
       </td>
@@ -749,6 +751,10 @@ should be taken not to interfere with a device while it is "active".
 For example invoking a "sg_format -F" utility on a disk with mounted
 file
 systems on it is going to cause damage.<br>
+<br>
+These command line utilities exit with process status 0 when
+successful. In most cases if an error is detected the process exits
+with a status value of 1 .<br>
 <h2><a class="mozTocH2" name="mozTocId143590"></a>Changing mode page
 settings</h2>
 SCSI devices store settings (metadata) that could possibly be changed
@@ -782,8 +788,9 @@ be edited. Low level but general.</li>
   <li><span style="font-weight: bold;">sdparm</span> (sdparm): uses
 acronyms (e.g. WCE) or numeric addressing to fetch and/or change mode
 page settings.
-Allows device to be reset to default settings in a specific mode page.
-The "saved" mode page values can also manipulated separately. The
+Allows device to be reset to default settings for a specific mode page.
+The user can choose whether changes are also made to the "saved" mode
+page values. The
 numeric addressing allows arbitrary fields to be changed (i.e. sdparm
 doesn't need to know about them in advance).<br>
   </li>
@@ -1034,7 +1041,6 @@ several Unix platforms (and NT), however it is only currently available
 in binary form. See&nbsp;<a class="moz-txt-link-freetext"
  href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
  style="font-family: monospace;"> </span>www.scsifaq.org/RMiller_Tools/index.html</a>
-or&nbsp; <a href="http://www.scsifaq.org/RMiller_Tools/index.html">http://www.scsifaq.org/RMiller_Tools/index.html</a>
 for more details.
 <h3><a class="mozTocH3" name="mozTocId668788"></a> dt</h3>
 The Data Test (DT) program is modelled on dd's syntax but <b>dt </b>can
@@ -1046,7 +1052,7 @@ See&nbsp;<a class="moz-txt-link-freetext"
  href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
  style="font-family: monospace;"></span>www.scsifaq.org/RMiller_Tools/index.html</a>&nbsp;for
 more details. Both <b>scu</b> and <b>dt </b>are written by Robin
-T. Miller &lt;Robin.Miller at hp dot com&gt;<br>
+T. Miller &lt;Robin.Miller at netapp dot com&gt;<br>
 <h3><a class="mozTocH3" name="mozTocId673853"></a>scsiinfo</h3>
 Older package that includes the <span style="font-weight: bold;">scsiinfo</span>
 and <span style="font-weight: bold;">scsiformat</span> utilities plus
@@ -1080,7 +1086,14 @@ This is another utility from&nbsp; Kurt Garloff &lt;garloff@suse.de&gt;
 for rescuing damaged media. It is a variant of dd that will continue
 passed errors on the input file. It is applicable to any device that
 can be read by dd (e.g. IDE and SCSI disks, cds and tapes). For more
-information see: <a href="http://www.garloff.de/kurt/linux/ddrescue">www.garloff.de/kurt/linux/ddrescue</a>
+information see: <a href="http://www.garloff.de/kurt/linux/ddrescue">www.garloff.de/kurt/linux/ddrescue</a><br>
+<br>
+There is also a GNU program of the same name that has a similar
+function. See <a href="http://ftp.gnu.org/gnu/ddrescue/">
+http://ftp.gnu.org/gnu/ddrescue/</a> . John Gilmour has some
+information on disk recovery utilities at&nbsp; <a
+ href="http://www.toad.com/gnu/sysadmin/">http://www.toad.com/gnu/sysadmin/</a>
+.<br>
 <h3><a class="mozTocH3" name="mozTocId380766"></a> mapscsi</h3>
 Michael Clark &lt;michael@metaparadigm.com&gt; describes his utility
 thus: "mapscsi is a small utility that creates a consistent mapping
@@ -1170,7 +1183,7 @@ monitoring tool for linux see: <a
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 27th January 2006<br>
+<p>Last updated: 11th April 2006<br>
 <br>
 </p>
 </center>

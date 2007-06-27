@@ -48,7 +48,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.04 20060106";
+static char * version_str = "1.05 20060312";
 
 #define ME "sg_reassign: "
 
@@ -113,14 +113,19 @@ long long get_llnum(const char * buf)
     int res, len;
     long long num;
     unsigned long long unum;
+    const char * commap;
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1LL;
     len = strlen(buf);
+    commap = strchr(buf + 1, ',');
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%llx", &unum);
         num = unum;
-    } else if ('H' == toupper(buf[len - 1])) {
+    } else if (commap && ('H' == toupper(*(commap - 1)))) {
+        res = sscanf(buf, "%llx", &unum);
+        num = unum;
+    } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
         res = sscanf(buf, "%llx", &unum);
         num = unum;
     } else
@@ -395,6 +400,11 @@ int main(int argc, char * argv[])
     if (got_addr) {
         if (dummy) {
             fprintf(stderr, ">>> dummy: REASSIGN BLOCKS not executed\n");
+            if (verbose) {
+                fprintf(stderr, "  Would have reassigned these blocks:\n");
+                for (j = 0; j < addr_arr_len; ++j) 
+                    printf("    0x%llx\n", addr_arr[j]);
+            }
             return 0;
         }
         res = sg_ll_reassign_blocks(sg_fd, eight, longlist, param_arr,

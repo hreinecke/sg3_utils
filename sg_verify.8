@@ -1,4 +1,4 @@
-.TH SG_VERIFY "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
+.TH SG_VERIFY "8" "March 2006" "sg3_utils-1.20" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
@@ -28,7 +28,7 @@ this value may be constrained by the maximum transfer length field
 in the block limits VPD page.
 .TP
 --dpo | -d
-disable page out changes the cache retention policy of blocks read on
+disable page out changes the cache retention priority of blocks read on
 the device's cache to the lowest priority. This means that blocks read by
 other commands are more likely to remain in the device's cache.
 .TP
@@ -65,7 +65,7 @@ form "x<n>" multiplies the leading number by <n>.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or has a trailing "h" or "H"). When hex numbers are
-given multipliers cannot be used.
+given, multipliers cannot be used.
 .PP
 The amount of error correction and the number of retries attempted
 before a block is considered defective are controlled in part by the
@@ -82,7 +82,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2005 Douglas Gilbert
+Copyright \(co 2004-2006 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -145,7 +145,7 @@ static void usage()
             "       --verbose|-v   output additional debug information\n"
             "       --version|-V   output version string\n"
             "       -?   output this usage message\n\n"
-            "Performs a PERSISTENT RESERVATION (IN or OUT) SCSI command\n");
+            "Performs a PERSISTENT RESERVE (IN or OUT) SCSI command\n");
 }
 
 static const char * pr_type_strs[] = {
@@ -474,7 +474,7 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
             strncpy(buff, prout_sa_strs[prout_sa], sizeof(buff));
         else
             snprintf(buff, sizeof(buff), "service action=0x%x", prout_sa);
-        fprintf(stderr, "Persistent Reservation Out command (%s) "
+        fprintf(stderr, "Persistent Reserve Out command (%s) "
                 "successful\n", buff);
     }
     return 0;
@@ -526,7 +526,7 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
             fprintf(stderr, "Persistent reserve out command failed\n");
         return 1;
     } else if (do_verbose)
-        fprintf(stderr, "Persistent Reservation Out 'register and move' "
+        fprintf(stderr, "Persistent Reserve Out 'register and move' "
                 "command successful\n");
     return 0;
 }
@@ -869,7 +869,7 @@ int main(int argc, char * argv[])
     } else if (want_prout) { /* syntax check on PROUT arguments */
         prin = 0;
         if ((1 != num_prout_sa) || (0 != num_prin_sa)) {
-            fprintf(stderr, ">> For Persistent Reservation Out one and "
+            fprintf(stderr, ">> For Persistent Reserve Out one and "
                     "only one appropriate\n>> service action must be "
                     "chosen (e.g. '--register')\n");
             return 1;
@@ -877,13 +877,13 @@ int main(int argc, char * argv[])
     } else { /* syntax check on PRIN arguments */
         if (num_prout_sa > 0) {
             fprintf(stderr, ">> When a service action for Persistent "
-                    "Reservation Out is chosen the\n"
+                    "Reserve Out is chosen the\n"
                     ">> '--out' option must be given (as a safeguard)\n");
             return 1;
         }
         if (0 == num_prin_sa) {
             fprintf(stderr, ">> No service action given; assume Persistent"
-                    " Reservations In command\n"
+                    " Reserve In command\n"
                     ">> with Read Keys service action\n");
             prin_sa = 0;
             ++num_prin_sa;

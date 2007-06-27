@@ -45,7 +45,7 @@
 
 */
 
-static char * version_str = "0.23 20060125";
+static char * version_str = "0.25 20060315";
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -119,23 +119,23 @@ static struct code_desc profile_desc_arr[] = {
         {0x11, "DVD-R sequential recording"},
         {0x12, "DVD-RAM"},
         {0x13, "DVD-RW restricted overwrite"},
-        {0x14, "DVD-RW restricted recording"},
-        {0x15, "DVD-R dual layer - sequental recording"},
-        {0x16, "DVD-R dual layer - recording"},
+        {0x14, "DVD-RW sequential recording"},
+        {0x15, "DVD-R dual layer sequental recording"},
+        {0x16, "DVD-R dual layer jump recording"},
         {0x1a, "DVD+RW"},
         {0x1b, "DVD+R"},
         {0x20, "DDCD-ROM"},
         {0x21, "DDCD-R"},
         {0x22, "DDCD-RW"},
         {0x2a, "DVD+RW dual layer"},
-        {0x2b, "DVD+R double layer"},
+        {0x2b, "DVD+R dual layer"},
         {0x40, "BD-ROM"},
-        {0x41, "BD-R sequential recording (SRM)"},
-        {0x42, "BD-R random recording (RRM)"},
+        {0x41, "BD-R SRM"},
+        {0x42, "BD-R RRM"},
         {0x43, "BD-RE"},
         {0x50, "HD DVD-ROM"},
         {0x51, "HD DVD-R"},
-        {0x52, "HD DVD-Rewritable"},
+        {0x52, "HD DVD-RAM"},
         {0xffff, "Non-conforming profile"},
 };
 
@@ -185,9 +185,9 @@ static struct code_desc feature_desc_arr[] = {
         {0x32, "Double density CD-RW write"},
         {0x33, "Layer jump recording"},
         {0x37, "CD-RW media write support"},
-        {0x38, "BD-R pseudo-overwrite (POW)"},
-        {0x3a, "DVD+RW double layer"},
-        {0x3b, "DVD+R double layer"},
+        {0x38, "BD-R POW"},
+        {0x3a, "DVD+RW dual layer"},
+        {0x3b, "DVD+R dual layer"},
         {0x40, "BD read"},
         {0x41, "BD write"},
         {0x42, "TSR (timely safe recording)"},
@@ -550,7 +550,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      CD-RW media sub-type support (bitmask)=0x%x\n", ucp[5]);
         break;
-    case 0x3a:     /* DVD+RW double layer */
+    case 0x3a:     /* DVD+RW dual layer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
@@ -561,7 +561,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      write=%d, quick_start=%d, close_only=%d\n",
                !!(ucp[4] & 0x1), !!(ucp[5] & 0x2), !!(ucp[5] & 0x1));
         break;
-    case 0x3b:     /* DVD+R double layer */
+    case 0x3b:     /* DVD+R dual layer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
@@ -606,6 +606,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
+        printf("      SVNR=%d\n", !!(ucp[4] & 0x1));
         printf("      Bitmaps for BD-RE write support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
                "Class 3=0x%x\n", (ucp[8] << 8) + ucp[9],
@@ -633,7 +634,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      HD DVD-R=%d, HD DVD-RW=%d\n", !!(ucp[4] & 0x1),
+        printf("      HD DVD-R=%d, HD DVD-RAM=%d\n", !!(ucp[4] & 0x1),
                !!(ucp[6] & 0x1));
         break;
     case 0x51:     /* HD DVD Write */
@@ -644,7 +645,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      HD DVD-R=%d, HD DVD-RW=%d\n", !!(ucp[4] & 0x1),
+        printf("      HD DVD-R=%d, HD DVD-RAM=%d\n", !!(ucp[4] & 0x1),
                !!(ucp[6] & 0x1));
         break;
     case 0x80:     /* Hybrid disc */

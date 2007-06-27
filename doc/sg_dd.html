@@ -18,14 +18,17 @@ sg_dd utility<br>
 <a href="#Conclusion"></a>
 <ol id="mozToc">
 <!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6--><li><a href="#mozTocId228087">
-The&nbsp; Linux sg_dd utility </a>
+The&nbsp; Linux
+sg_dd utility </a>
     <ol>
       <li><a href="#mozTocId370866">Introduction</a></li>
       <li><a href="#mozTocId352668">&nbsp;dd like features</a></li>
       <li><a href="#mozTocId703997">sg_dd extras</a></li>
-      <li><a href="#mozTocId437677">Continue on error (coe)</a></li>
+      <li><a href="#mozTocId437677">Continue on error
+(coe)</a></li>
       <li><a href="#mozTocId566094">Recovered errors</a></li>
       <li><a href="#mozTocId899152">Verbose</a></li>
+      <li><a href="#mozTocId443896">sgp_dd, sgm_dd and sg_read</a></li>
       <li><a href="#mozTocId157981">Conclusion</a></li>
     </ol>
   </li>
@@ -64,11 +67,10 @@ MMC-2,3,4,5) as their native command set. The fact that the most common
 transport for CD/DVD drives is ATAPI (i.e. the ATA packet interface) is
 irrelevant to
 the
-sg_dd utility; they are SCSI devices.<br>
+sg_dd utility; they use SCSI command sets.<br>
 <br>
-This page outlines the features of the sg_dd utility version 5.44 found
-in the <a href="u_index.html">sg3_utils</a> version 1.18 package. This
-was released on the 30th October 2005.<br>
+This page outlines the features of the sg_dd utility version 5.48 found
+in the <a href="u_index.html">sg3_utils</a> version 1.20 package.<br>
 <h2><a class="mozTocH2" name="mozTocId352668"></a>&nbsp;dd like features</h2>
 The basic syntax of the sg_dd utility is the same as the dd command in
 Unix. That said, the syntax of the dd command in Unix is different from
@@ -122,7 +124,8 @@ description</span><br>
       <td style="vertical-align: top;">stdout<br>
       </td>
       <td style="vertical-align: top;">file (or device) to write to.
-Doesn't bother writing anything if &lt;output_file&gt; is /dev/null or
+sg_dd doesn't bother writing anything if &lt;output_file&gt; is
+/dev/null or
 . (period).<br>
       </td>
     </tr>
@@ -130,7 +133,8 @@ Doesn't bother writing anything if &lt;output_file&gt; is /dev/null or
 </table>
 <br>
 <br>
-Both dd and sg_dd given these options with suitable arguments will copy
+When either dd or sg_dd are given these options with suitable
+arguments, they will copy
 (&lt;block_size&gt; *&lt;count_of_blocks&gt;) bytes from the beginning
 of &lt;input_file&gt; to the
 beginning of &lt;output_file&gt;. One restriction that sg_dd imposes
@@ -169,7 +173,8 @@ remaining length of the input and output files are done and the sg_dd
 will attempt to copy that number of blocks. A 'count=0' option is valid
 and all the normal preparations are made including files being opened
 but no copy takes place. Hence the 'count=0' option can be used to
-check the syntax is in order and that the files are present (see the
+check that the syntax is in order and that the files are present (see
+the
 "<a href="#mozTocId899152">Verbose</a>" section below).<br>
 <br>
 Other dd options supported by sg_dd:<br>
@@ -217,7 +222,7 @@ to option found in recent GNU dd versions, see below<br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">[new in sg3_utils 1.18] similar
-to option found in recent GNU dd versions,see below<br>
+to option found in recent GNU dd versions, see below<br>
       </td>
     </tr>
     <tr>
@@ -229,7 +234,7 @@ to option found in recent GNU dd versions,see below<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">seek=&lt;n_blocks_of&gt;</td>
+      <td style="vertical-align: top;">skip=&lt;n_blocks_of&gt;</td>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;">block number (origin 0) in
@@ -255,7 +260,8 @@ date then exit<br>
   </tbody>
 </table>
 <br>
-If ibs and obs are given to sg_dd then they must be the same as bs
+If either ibs and/or obs are given to sg_dd then they must be the same
+as bs
 (i.e. they are essentially dummies).&nbsp; The 'skip' option cannot be
 used on an input stream
 (e.g. stdin) while the 'seek' option cannot be used on an output stream
@@ -359,6 +365,10 @@ both be in hex and have a suffix multiplier. Hence "0x9" is interpreted
 as hexadecimal 9 [not (0 * 9)==0]. This is valid "2x4x0xa" and yields
 80 (but it isn't very clear).<br>
 <br>
+From sg3_utils version 1.19 (sg_dd version 5.46) hexadecimal numbers
+can also be indicated by a trailing "h" or "H". The "h" suffiz cannot
+be used together with a suffix multiplier.<br>
+<br>
 The "&lt;flags&gt;" argument of "iflag=" and "oflag=" is a comma
 separated list of items chosen from one or more entries in this table:<br>
 <br>
@@ -390,7 +400,7 @@ file</span><br>
       <td style="vertical-align: top;">applied on &lt;ofile&gt;<br>
       </td>
       <td style="vertical-align: top;">use O_APPEND open flag.
-Conflicts with 'seek=&lt;n&gt;'.<br>
+Conflicts with 'seek=&lt;n&gt;' when "n &gt; 0"<br>
       </td>
     </tr>
     <tr>
@@ -402,7 +412,8 @@ Conflicts with 'seek=&lt;n&gt;'.<br>
       <td style="vertical-align: top;">ignored<br>
       </td>
       <td style="vertical-align: top;">continue on error; best effort
-recovery then continue<br>
+recovery then continue. N.B. can be used multiple times (e.g.
+'iflag=coe,coe')<br>
       </td>
     </tr>
     <tr>
@@ -552,18 +563,22 @@ is 32. For block devices (bpt * bs) is constrained by <span
       </td>
       <td style="vertical-align: top;">cdb size of SCSI READ and/or
 WRITE commands. Only applicable to sg devices or when the SG_IO ioctl
-is being used (e.g. when blk_sgio=1)<br>
+is being used (e.g. when blk_sgio=1). Defaults to 10 byte cdb unless
+the largest address exceeds 32 bits or bpt exceeds 16 bits. In either
+case a 16 cdb is used.<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">coe=0|1<br>
+      <td style="vertical-align: top;">coe=0|1|2|3<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
-      <td style="vertical-align: top;">when set, continue_on_error for
+      <td style="vertical-align: top;">when non-zero, continue_on_error
+for
 sg devices and block devices using the SG_IO ioctl. May use 'iflag=coe'
 and/or 'oflag=coe'
-instead. </td>
+instead. An equivalent of 'coe=2' is 'iflag=coe,coe'<br>
+      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">dio=0|1<br>
@@ -579,8 +594,8 @@ nodes)<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
-      <td style="vertical-align: top;">force_unit_access, 1-&gt;if,
-2-&gt;of, 3-&gt;if+of . Better to use 'iflag=fua' and/or 'oflag=fua'. </td>
+      <td style="vertical-align: top;">force_unit_access, 1-&gt;of,
+2-&gt;if, 3-&gt;of+if . Better to use 'iflag=fua' and/or 'oflag=fua'. </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">odir=0|1<br>
@@ -606,7 +621,7 @@ via the SG_IO ioctl.<br>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;">when set print elapsed time and
-throughput after copy<br>
+throughput calculation at the completion of the copy<br>
       </td>
     </tr>
     <tr>
@@ -615,7 +630,8 @@ throughput after copy<br>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;">larger &lt;n&gt; is the greater
-the debug output<br>
+the debug output. 1 and 2 print the cdbs for setup commands; 3 and 4
+print the cdbs for all commands<br>
       </td>
     </tr>
   </tbody>
@@ -671,7 +687,7 @@ overwritten (not truncated).<br>
       <td style="vertical-align: top;">Unix read() write()<br>
       </td>
       <td style="vertical-align: top;">hence open() flags have no
-effect (e.g. 'oflag=direct')<br>
+effect (e.g. 'oflag=direct' is ignored)<br>
       </td>
     </tr>
     <tr>
@@ -704,7 +720,7 @@ written<br>
       <td style="vertical-align: top;">SCSI commands</td>
       <td style="vertical-align: top;">Opens input O_RDONLY if O_RDWR
 fails.&nbsp; The 'blk_sgio=1' option equates to both 'iflag=sgio' and
-'oflag=sgio'. Partition ignored. </td>
+'oflag=sgio'. Partitions ignored. </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">sg device<br>
@@ -770,7 +786,7 @@ detected. When the input or output file is a sg device then the
 'blk_sgio' option is ignored as IO with that file is always via SCSI
 commands. When 'blk_sgio=1' is used with a block device and the value
 given to 'bpt'
-is too high then the first read will report an EIO (input/output)
+is too high then the first read may report an EIO (input/output)
 error; the solution is to lower the 'bpt' value. [The EIO error
 occurred often with CD/DVD drives which have 2048 bytes sectors, so the
 'bpt' default value was reduced for block size &gt;= 2048 bytes.]<br>
@@ -786,7 +802,7 @@ logical block address 0 for the purposes of sg_dd (and its skip and
 seek options) is the beginning of the device while the calculated count
 (e.g. when a 'count' option is not given) is the extent of that device.<br>
 <br>
-Note about CDs and count (perhaps DVDs don't have this problem). When a
+<span style="font-weight: bold;"></span>When a
 CD is accessed via SCSI commands and the 'count' option is not given
 then the READ CAPACITY SCSI command is used by sg_dd to determine the
 number of blocks to read. Unfortunately some MMC standards allow a few
@@ -796,43 +812,8 @@ The isosize utility can be used to determine the actual size of an
 ISO9660 file system residing on such a CD. It is often a few blocks
 shorter than READ CAPACITY reports (for good reason).<br>
 <br>
-When an input or output file is being accessed via SCSI commands the
-following "extra" options being discussed in this section are active:<br>
-<ul>
-  <li>bpt: each cdb issued will be for this value or less blocks (with
-the block size implied)<br>
-  </li>
-  <li>cdbsz: defaults to a 10 byte cdb if IO fits in 32 bit lba space
-otherwise 16 byte cdb</li>
-  <li>coe: when set error on read get special treatment (see below)</li>
-  <li>dio: only active for sg devices (i.e. not block device with
-'blk_sgio=1')</li>
-  <li>fua: force_unit_access flag in cdb; 1-&gt;if, 2-&gt;of;
-3-&gt;if+of</li>
-  <li>odir: active when file is a block device (i.e. inactive for sg
-devices)<br>
-  </li>
-  <li>sync: when set issues SYNCHRONIZE CACHE command at the end of the
-copy</li>
-  <li>time</li>
-  <li>verbose: 1 and 2 print setup cdbs, 3 and 4 print all cdbs</li>
-</ul>
-When an input or output file is being accessed via normal Unix read()
-and write() commands the following "extra" options being discussed in
-this section are active:<br>
-<ul>
-  <li>append: one active on output file that are "normal" (i.e. neither
-devices nor streams)<br>
-  </li>
-  <li>bpt: each IO operation transfers (bs * bpt) bytes or less</li>
-  <li>odir: opens files with the O_DIRECT flag</li>
-  <li>time</li>
-  <li>verbose: 1 + 2 print setup system calls, 3 and 4 additional print
-read() and write() system calls<br>
-  </li>
-</ul>
 If a SIGUSR1 signal is sent to the process identifier (pid) of a
-running sg_dd utility then the number of blocks copies to that point is
+running sg_dd utility then the number of blocks copied to that point is
 output. The copy continues.<br>
 <br>
 When the 'time' option is set, the elapsed time for the copy plus the
@@ -845,47 +826,58 @@ throughput of the copy to that point is output and the copy continues.<br>
 (coe)</h2>
 Recent additions to the sg_dd utility allow it to be used as a copy "of
 last resort" from failing media. Read errors on an input file
-taking SCSI commands are "tolerated" when the 'coe' option is set.
+taking SCSI commands are "tolerated" when the 'coe' option is non-zero.
 Write errors from SCSI commands are reported and ignored and the sg_dd
-utility continues when the 'coe' option is set. [In the case where
-media errors are causing write errors the
-reader should check the setting of the AWRE bit in the SCSI "read write
-error recovery" mode page (see SBC-2 at http://www.t10.org).] As for
-errors in normal files the reader may wish to examine the
-"conv=noerror" option of the dd command.<br>
+utility continues when the 'coe' option is non-zero. [In the case where
+media errors are causing write errors the user should check the setting
+of the AWRE bit in the SCSI "read write
+error recovery" mode page (see SBC-2 at http://www.t10.org).]<br>
 <br>
-When a SCSI READ command detects an unrecoverable read error it&nbsp;
+When a SCSI READ command detects an unrecoverable read error it
 responds with a sense key of MEDIUM ERROR or HARDWARE ERROR.
 Additionally it responds with the logical block address of the first
 (lowest) block that it failed to read in the current READ command. Any
 valid blocks prior to the "bad" block may or may not have been
 transferred (depending on several other settings). If 'coe=0' then the
 sg_dd utility will simply terminate at this point (with a reasonable
-amount of debug information sent to stderr). If 'coe=1' then the first
-thing it will try to do is a truncated read up to but not including the
-bad block. The remaining discussion in this section assumes 'coe=1'.<br>
+amount of debug information sent to stderr) <span
+ style="font-weight: bold;">and</span> good blocks prior to the bad
+block may not be copied (depending on the setting of 'bpt'). If 'coe'
+is non-zero then the first
+thing sg_dd will try to do is a truncated read up to, but not
+including,
+the
+bad block. The remaining discussion in this section assumes 'coe' is
+non-zero.<br>
 <br>
 The "bad" block may or may not be readable by the device. If it is
 readable then most likely the associated ECC data indicates that it is
 corrupt and the ECC data cannot recover it. [It is possible that all
 the corruption is in the ECC data and the payload data is ok.] Such
-blocks can be retrieved with the READ LONG command which is what the
-sg_dd utility does. If the READ LONG fails then a block of zeroes is
-substituted for the bad block in the transfer buffer. Only SBC-2
+blocks can be retrieved with the READ LONG command. If the READ LONG
+fails then a block of zeroes is
+substituted for the bad block in the transfer buffer. When 'coe=1' then
+READ LONG is not attempted and the "bad" block is replaced by zeroes.
+When 'coe=2' (or 'iflag=coe,coe') then a READ LONG is attempted. When
+'coe=3' then a READ LONG with its CORRCT bit set is attempted. Only SBC
 devices (primarily SCSI disks) optionally support READ LONG. CD/DVD
-devices (covered in the MMC-4 (draft) standard) do not so a block of
-zeroes is substituted for them.<br>
+devices (covered in the MMC-4 (draft) standard) do not, so a block of
+zeroes is substituted for them. Even if READ LONG succeeds on a "bad"
+block, the recovered data may not be useful. There are no guarantees
+that the user data will appear "as is" in the first 512 bytes.<br>
 <br>
-There still remains blocks after the "bad" block in the initial
-transfer to be fetched. Further bad blocks may be detected and if so
+There still remain blocks after the "bad" block that need to be
+fetched. Further bad blocks may be detected and if so
 the algorithm in the last two paragraphs is repeated. The result of
 this
 process is an imperfect copy with blocks that were read properly placed
 in the correct relative position in the output. When the 'coe=1' option
 is given two addition counters are output on completion:<br>
 <ul>
-  <li>unrecovered errors</li>
-  <li>read_longs fetched part of unrecovered read errors</li>
+  <li>unrecovered errors (number of bad blocks)<br>
+  </li>
+  <li>read_longs that "successfully" fetched part of those bad blocks<br>
+  </li>
 </ul>
 The first counter is the number of unrecovered (read) errors
 encountered. Any number greater than zero flags an imperfect copy. The
@@ -895,7 +887,7 @@ is a CD or DVD then this number will be zero.<br>
 <br>
 <h2><a class="mozTocH2" name="mozTocId566094"></a>Recovered errors</h2>
 Often errors are recovered using ECC data or by the device retrying
-(usually re-reading) the media. Also at the first sign of trouble,
+(usually re-reading) the media. Typically at the first sign of trouble,
 recoverable errors lead to the block in question being reassigned to
 another location on the media (automatically when the AWRE and ARRE
 bits are set in the "read write error recovery" mode page).&nbsp; The
@@ -905,7 +897,8 @@ the "Read error counter" and "Write error counter" logs pages which can
 be viewed with smartctl (from smartmontools) and sg_logs (from the same
 sg3_utils package that sg_dd comes from). Any block that is
 automatically or manually re-assigned adds a new entry to the "grown"
-defect list which can be viewed with 'sginfo -G' (also found in the
+defect list which can be viewed with 'sginfo -G' or 'sg_reassign -g'
+(both found in the
 sg3_utils package).<br>
 <br>
 A disk can be instructed to report RECOVERED ERRORs by setting the PER
@@ -955,12 +948,12 @@ lot of output.</li>
 All verbose output is sent to stderr (so that sg_dd usage with "of=-"
 (copy output to stdout) is not corrupted).<br>
 <br>
-Following is an example of using "verbose=1" to find information about
-/dev/sda . If no copy is required then setting "count=0" will see to
+Following is an example of using 'verbose=1' to find information about
+/dev/sda . If no copy is required then setting 'count=0' will see to
 that. Since "dev/sda" is a block device then it would normally be
-accessed via Unix system commands. The "verbose=1" output is relatively
-short when "blk_sgio=0" (its default value). The second invocation is
-with "blk_sgio=1" and a lot more is output. That includes INQUIRY
+accessed via Unix system commands. The 'verbose=1' output is relatively
+short when 'blk_sgio=0' (its default value). The second invocation is
+with 'blk_sgio=1' and a lot more is output. That includes INQUIRY
 standard response data (e.g. "SEAGATE ..." line).
 See the SBC-2 drafts at <a href="http://www.t10.org/">www.t10.org</a>
 for more information.<br>
@@ -1007,6 +1000,37 @@ relates to the input file.<br>
 <br>
 Mode page settings can be examined and changed with a utility like <a
  href="sdparm.html">sdparm</a> .<br>
+<h2><a class="mozTocH2" name="mozTocId443896"></a>sgp_dd, sgm_dd and
+sg_read</h2>
+These three sg3_utils utilities are closely related to sg_dd . They all
+have their own man pages.<br>
+<br>
+<span style="font-weight: bold;">sgp_dd</span> uses POSIX threads
+(default: 4 threads) to potentially speed the copy. The syntax and
+semantics of sgp_dd are very similar to sg_dd. The "continue on error"
+processing in sgp_dd is simpler than what is described above for sg_dd.<br>
+<br>
+<span style="font-weight: bold;">sgm_dd</span> uses memory mapped IO to
+speed copies from or to sg device nodes. Memory mapped IO will bypass
+the kernel buffers used by the sg driver for normal data transfers.
+With memory mapped IO the Host Bus Adapter (HBA) DMA mechanism will
+transfer data directly from the external bus (e.g. fibre channel) to
+the user space. Even though this may seem like a major performance win,
+there are various low level details (e.g. alignment and signal
+processing) that complicate the picture.<br>
+<br>
+<span style="font-weight: bold;">sg_read</span> uses a similar syntax
+to sg_dd but has no 'of=&lt;ofile&gt;'. It is designed to measure the
+performance of device (e.g. disk) caches, the throughput of the
+transport and command overhead. It perform a read (either a SCSI READ
+command or a Unix read()) from the given skip block address (default
+logical block address 0) and continues doing reads until
+'count=&lt;blocks&gt;' is exhausted. If multiple reads are&nbsp;
+performed (i.e. when "count &gt; bpt") then they are all from the same
+logical address. For example, with SCSI READs, exactly the same READ
+cdb is issued for each read operation. The data is thrown away. Zero
+block reads can also be issued using a negative count value. This is
+useful for measuring SCSI command overhead.<br>
 <h2><a class="mozTocH2" name="mozTocId157981"></a>Conclusion</h2>
 The sg_dd utility maintains syntactic and semantic compatibility with
 the Unix/GNU dd command while allowing precise control over SCSI
@@ -1017,7 +1041,7 @@ MEDIUM errors, while recovering as much data as possible.<br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 18th November 2005<br>
+<p>Last updated: 4th April 2006<br>
 <br>
 </p>
 </center>

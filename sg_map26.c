@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005 Douglas Gilbert.
+ * Copyright (c) 2005-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
 #include <dirent.h>
@@ -53,7 +54,7 @@
 #include <sys/stat.h>
 #include <linux/major.h>
 
-static char * version_str = "1.01 20051229";
+static char * version_str = "1.03 20060323";
 
 #define ME "sg_map26: "
 
@@ -371,16 +372,18 @@ static int list_matching_nodes(const char * dir_name, int file_type,
         return num;
 }
 
-struct from_sg_item {
+struct sg_item_t {
         char name[NAME_LEN_MAX];
         int ft;
         int nt;
 };
 
-static struct from_sg_item from_sg;
+static struct sg_item_t from_sg;
 
 static int from_sg_scandir_select(const struct dirent * s)
 {
+        int len;
+
         if (FT_OTHER != from_sg.ft)
                 return 0;
         if (DT_LNK != s->d_type)
@@ -390,8 +393,8 @@ static int from_sg_scandir_select(const struct dirent * s)
                 from_sg.ft = FT_CHAR;
                 from_sg.nt = NT_CH;
                 return 1;
-        } else if (0 == strcmp("block", s->d_name)) {
-                strcpy(from_sg.name, s->d_name);
+        } else if (0 == strncmp("block", s->d_name, 5)) {
+                strncpy(from_sg.name, s->d_name, NAME_LEN_MAX);
                 from_sg.ft = FT_BLOCK;
                 return 1;
         } else if (0 == strcmp("tape", s->d_name)) {
@@ -399,6 +402,16 @@ static int from_sg_scandir_select(const struct dirent * s)
                 from_sg.ft = FT_CHAR;
                 from_sg.nt = NT_ST;
                 return 1;
+        } else if (0 == strncmp("scsi_tape:st", s->d_name, 12)) {
+                len = strlen(s->d_name);
+                if (isdigit(s->d_name[len - 1])) {
+                        /* want 'st<num>' symlink only */
+                        strcpy(from_sg.name, s->d_name);
+                        from_sg.ft = FT_CHAR;
+                        from_sg.nt = NT_ST;
+                        return 1;
+                } else
+                        return 0;
         } else if (0 == strncmp("onstream_tape:os", s->d_name, 16)) {
                 strcpy(from_sg.name, s->d_name);
                 from_sg.ft = FT_CHAR;
@@ -433,6 +446,39 @@ static int from_sg_scan(const char * dir_name, int verbose)
         return num;
 }
 
+static struct sg_item_t to_sg;
+
+static int to_sg_scandir_select(const struct dirent * s)
+{
+        if (FT_OTHER != to_sg.ft)
+                return 0;
+        if (DT_LNK != s->d_type)
+                return 0;
+        if (0 == strncmp("scsi_generic", s->d_name, 12)) {
+                strncpy(to_sg.name, s->d_name, NAME_LEN_MAX);
+                to_sg.ft = FT_CHAR;
+                to_sg.nt = NT_SG;
+                return 1;
+        } else
+                return 0;
+}
+
+static int to_sg_scan(const char * dir_name)
+{
+        struct dirent ** namelist;
+        int num, k;
+
+        to_sg.ft = FT_OTHER;
+        to_sg.nt = NT_NO_MATCH;
+        num = scandir(dir_name, &namelist, to_sg_scandir_select, NULL);
+        if (num < 0)
+                return -errno;
+        for (k = 0; k < num; ++k)
+                free(namelist[k]);
+        free(namelist);
+        return num;
+}
+
 /* Return 1 if directory, else 0 */
 static int if_directory_chdir(const char * dir_name, const char * base_name)
 {
@@ -442,6 +488,37 @@ static int if_directory_chdir(const char * dir_name, const char * base_name)
         strcpy(buff, dir_name);
         strcat(buff, "/");
         strcat(buff, base_name);
+        if (stat(buff, &a_stat) < 0)
+                return 0;
+        if (S_ISDIR(a_stat.st_mode)) {
+                if (chdir(buff) < 0)
+                        return 0;
+                return 1;
+        }
+        return 0;
+}
+
+/* Return 1 if directory, else 0 */
+static int if_directory_ch2generic(const char * dir_name)
+{
+        char buff[NAME_LEN_MAX];
+        struct stat a_stat;
+        const char * old_name = "generic";
+
+        strcpy(buff, dir_name);
+        strcat(buff, "/");
+        strcat(buff, old_name);
+        if ((stat(buff, &a_stat) >= 0) && S_ISDIR(a_stat.st_mode)) {
+                if (chdir(buff) < 0)
+                        return 0;
+                return 1;
+        }
+        /* No "generic", so now look for "scsi_generic:sg<n>" */
+        if (1 != to_sg_scan(dir_name))
+                return 0;
+        strcpy(buff, dir_name);
+        strcat(buff, "/");
+        strcat(buff, to_sg.name);
         if (stat(buff, &a_stat) < 0)
                 return 0;
         if (S_ISDIR(a_stat.st_mode)) {
@@ -566,7 +643,7 @@ static int map_sd(const char * device_name, const char * device_dir,
                         device_name);
                 return 1;
         }
-        if (if_directory_chdir(".", "generic")) {
+        if (if_directory_ch2generic(".")) {
                 if (1 == result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
@@ -626,7 +703,7 @@ static int map_sr(const char * device_name, const char * device_dir, int ma,
                         device_name);
                 return 1;
         }
-        if (if_directory_chdir(".", "generic")) {
+        if (if_directory_ch2generic(".")) {
                 if (1 == result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
@@ -687,7 +764,7 @@ static int map_st(const char * device_name, const char * device_dir, int ma,
                         device_name);
                 return 1;
         }
-        if (if_directory_chdir(".", "generic")) {
+        if (if_directory_ch2generic(".")) {
                 if (1 == result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
@@ -748,7 +825,7 @@ static int map_osst(const char * device_name, const char * device_dir, int ma,
                         device_name);
                 return 1;
         }
-        if (if_directory_chdir(".", "generic")) {
+        if (if_directory_ch2generic(".")) {
                 if (1 == result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
@@ -808,7 +885,7 @@ static int map_ch(const char * device_name, const char * device_dir, int ma,
                         device_name);
                 return 1;
         }
-        if (if_directory_chdir(".", "generic")) {
+        if (if_directory_ch2generic(".")) {
                 if (1 == result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';

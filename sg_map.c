@@ -1,9 +1,13 @@
+#define _GNU_SOURCE
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <dirent.h>
+#include <libgen.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -12,7 +16,7 @@
 #include "sg_io_linux.h"
 
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2005 D. Gilbert
+*  Copyright (C) 2000-2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -32,17 +36,19 @@
 */
 
 
-#ifndef SG_GET_RESERVED_SIZE
-#error "Need version 2 sg driver (linux kernel >= 2.2.6)"
-#endif
-
-static char * version_str = "1.04 20051220";
+static char * version_str = "1.05 20060405";
 
 static const char * devfs_id = "/dev/.devfsd";
 
 #define NUMERIC_SCAN_DEF 1   /* change to 0 to make alpha scan default */
 
 #define INQUIRY_RESP_INITIAL_LEN 36
+#define MAX_SG_DEVS 4096
+#define PRESENT_ARRAY_SIZE MAX_SG_DEVS
+
+static const char * sysfs_sg_dir = "/sys/class/scsi_generic";
+static char gen_index_arr[PRESENT_ARRAY_SIZE];
+static int has_sysfs_sg = 0;
 
 
 typedef struct my_map_info
@@ -57,7 +63,6 @@ typedef struct my_map_info
 } my_map_info_t;
 
 
-#define MAX_SG_DEVS 2048
 #define MAX_SD_DEVS (26 + 26*26 + 26*26*26) /* sdX, sdXX, sdXXX */
                  /* (26 + 676 + 17576) = 18278 */
 #define MAX_SR_DEVS 128
@@ -106,6 +111,32 @@ static void usage()
     printf("    If no '-s*' arguments given then show all mappings\n");
 }
 
+static int scandir_select(const struct dirent * s)
+{
+    int k;
+
+    if (1 == sscanf(s->d_name, "sg%d", &k)) {
+        if ((k >= 0) && (k < PRESENT_ARRAY_SIZE)) {
+            gen_index_arr[k] = 1;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int sysfs_sg_scan(const char * dir_name)
+{
+    struct dirent ** namelist;
+    int num, k;
+
+    num = scandir(dir_name, &namelist, scandir_select, NULL);
+    if (num < 0)
+        return -errno;
+    for (k = 0; k < num; ++k)
+        free(namelist[k]);
+    free(namelist);
+    return num;
+}
 
 static void make_dev_name(char * fname, const char * leadin, int k, 
                           int do_numeric)
@@ -160,7 +191,7 @@ int main(int argc, char * argv[])
     int num_silent = 0;
     int eacces_err = 0;
     int last_sg_ind = -1;
-    struct stat stat_buf;
+    struct stat a_stat;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp("-n", argv[k]))
@@ -204,7 +235,10 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (stat(devfs_id, &stat_buf) == 0)
+    if ((stat(sysfs_sg_dir, &a_stat) >= 0) && (S_ISDIR(a_stat.st_mode)))
+        has_sysfs_sg = sysfs_sg_scan(sysfs_sg_dir);
+
+    if (stat(devfs_id, &a_stat) == 0)
         printf("# Note: the devfs pseudo file system is present\n");
 
     for (k = 0, res = 0; (k < MAX_SG_DEVS) && (num_errors < MAX_ERRORS);
@@ -214,7 +248,14 @@ int main(int argc, char * argv[])
             perror("sg_map: close error");
             return 1;
         }
-        make_dev_name(fname, "/dev/sg", k, do_numeric);
+        if (has_sysfs_sg) {
+           if (0 == gen_index_arr[k]) {
+                sg_fd = -1;
+                continue;
+            }
+            make_dev_name(fname, "/dev/sg", k, 1);
+        } else
+            make_dev_name(fname, "/dev/sg", k, do_numeric);
 
         sg_fd = open(fname, O_RDONLY | O_NONBLOCK);
         if (sg_fd < 0) {
@@ -285,7 +326,13 @@ int main(int argc, char * argv[])
                       last_sg_ind);
 
     for (k = 0; k <= last_sg_ind; ++k) {
-        make_dev_name(fname, "/dev/sg", k, do_numeric);
+        if (has_sysfs_sg) {
+           if (0 == gen_index_arr[k]) {
+                continue;
+            }
+            make_dev_name(fname, "/dev/sg", k, 1);
+        } else
+            make_dev_name(fname, "/dev/sg", k, do_numeric);
         printf("%s", fname);
         switch (map_arr[k].active)
         {
@@ -296,7 +343,7 @@ int main(int argc, char * argv[])
             printf(do_extra ? "  -1 -1 -1 -1  -1" : "  not present");
             break;
         case 0:
-            printf(do_extra ? "  -3 -3 -3 -3  -3" : "  some error\n");
+            printf(do_extra ? "  -3 -3 -3 -3  -3" : "  some error");
             break;
         case 1:
             if (do_extra) 
@@ -397,12 +444,10 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
             if (EBUSY == errno) {
                 printf("Device %s is busy\n", fname);
                 ++num_errors;
-            }
-            else if ((ENODEV == errno) || (ENXIO == errno)) {
+            } else if ((ENODEV == errno) || (ENXIO == errno)) {
                 ++num_errors;
                 ++num_silent;
-            }
-            else if (ENOENT != errno) { /* ignore ENOENT for sparse names */
+            } else if (ENOENT != errno) { /* ignore ENOENT for sparse names */
                 snprintf(ebuff, EBUFF_SZ, "Error opening %s ", fname);
                 perror(ebuff);
                 ++num_errors;

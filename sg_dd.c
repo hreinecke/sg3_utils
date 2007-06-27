@@ -49,7 +49,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.46 20060103";
+static char * version_str = "5.49 20060405";
 
 #define ME "sg_dd: "
 
@@ -90,6 +90,7 @@ static char * version_str = "5.46 20060103";
 #define FT_DEV_NULL 8           /* either "/dev/null" or "." as filename */
 #define FT_ST 16                /* filetype is st char device (tape) */
 #define FT_BLOCK 32             /* filetype is block device */
+#define FT_ERROR 64             /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
 
@@ -97,6 +98,8 @@ static char * version_str = "5.46 20060103";
 #ifndef O_DIRECT
 #define O_DIRECT 0
 #endif
+
+#define MIN_RESERVED_SIZE 8192
 
 static int sum_of_resids = 0;
 
@@ -132,9 +135,9 @@ struct flags_t {
 static struct flags_t iflag;
 static struct flags_t oflag;
 
-static void calc_duration_throughput();
+static void calc_duration_throughput(int contin);
 
-static void install_handler (int sig_num, void (*sig_handler) (int sig))
+static void install_handler(int sig_num, void (*sig_handler) (int sig))
 {
     struct sigaction sigact;
     sigaction (sig_num, NULL, &sigact);
@@ -176,7 +179,7 @@ static void interrupt_handler(int sig)
     sigaction(sig, &sigact, NULL);
     fprintf(stderr, "Interrupted by signal,");
     if (do_time)
-        calc_duration_throughput();
+        calc_duration_throughput(0);
     print_stats("");
     kill(getpid (), sig);
 }
@@ -186,7 +189,7 @@ static void siginfo_handler(int sig)
     sig = sig;  /* dummy to stop -W warning messages */
     fprintf(stderr, "Progress report, continuing ...\n");
     if (do_time)
-        calc_duration_throughput();
+        calc_duration_throughput(1);
     print_stats("  ");
 }
 
@@ -198,7 +201,7 @@ static int dd_filetype(const char * filename)
     if ((1 == len) && ('.' == filename[0]))
         return FT_DEV_NULL;
     if (stat(filename, &st) < 0)
-        return FT_OTHER;
+        return FT_ERROR;
     if (S_ISCHR(st.st_mode)) {
         if ((MEM_MAJOR == major(st.st_rdev)) && 
             (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
@@ -229,21 +232,23 @@ static char * dd_filetype_str(int ft, char * buff)
     if (FT_RAW & ft)
         off += snprintf(buff + off, 32, "raw device ");
     if (FT_OTHER & ft)
-        off += snprintf(buff + off, 32, "other (perhaps name file) ");
+        off += snprintf(buff + off, 32, "other (perhaps ordinary file) ");
+    if (FT_ERROR & ft)
+        off += snprintf(buff + off, 32, "unable to 'stat' file ");
     return buff;
 }
 
 static void usage()
 {
     fprintf(stderr, "Usage: "
-           "sg_dd  [bs=<n>] [count=<n>] [ibs=<n>] [if=<infile>]"
+           "sg_dd  [bs=<n>] [count=<n>] [ibs=<n>] [if=<ifile>]"
            " [iflag=<flags>]\n"
            "              [obs=<n>] [of=<ofile>] [oflag=<flags>]"
            "[seek=<n>] [skip=<n>]\n"
            "              [--help] [--version]\n\n"
            "              [append=0|1] [bpt=<n>] [blk_sgio=0|1]"
            " [cdbsz=6|10|12|16]\n"
-           "              [coe=0|1] [dio=0|1] [fua=0|1|2|3] [odir=0|1]"
+           "              [coe=0|1|2|3] [dio=0|1] [fua=0|1|2|3] [odir=0|1]"
            " [sync=0|1]\n"
            "              [time=0|1] [verbose=<n>]\n"
            " where:\n"
@@ -255,7 +260,8 @@ static void usage()
     fprintf(stderr,
            "  cdbsz   size of SCSI READ or WRITE command (default is 10)\n"
            "  coe     0->exit on error (def), 1->continue on sg error (zero\n"
-           "          fill), try read_long on unrecovered read block\n"
+           "          fill), 2->also try read_long on unrecovered reads,\n"
+           "          3->and set the CORRCT bit on the read long\n"
            "  dio     for direct IO, 1->attempt, 0->indirect IO (def)\n"
            "  fua     force unit access: 0->don't(def), 1->of, 2->if, "
            "3->of+if\n"
@@ -288,6 +294,7 @@ static void usage()
 static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 {
     int k, res;
+    unsigned int ui;
     unsigned char rcBuff[RCAP16_REPLY_LEN];
     int verb;
 
@@ -312,8 +319,10 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         *sect_sz = (rcBuff[8] << 24) | (rcBuff[9] << 16) |
                    (rcBuff[10] << 8) | rcBuff[11];
     } else {
-        *num_sect = 1 + ((rcBuff[0] << 24) | (rcBuff[1] << 16) |
-                    (rcBuff[2] << 8) | rcBuff[3]);
+        ui = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
+              rcBuff[3]);
+        /* take care not to sign extend values > 0x7fffffff */
+        *num_sect = (long long)ui + 1;
         *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
                    (rcBuff[6] << 8) | rcBuff[7];
     }
@@ -454,7 +463,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         break;
     default:
         fprintf(stderr, ME "expected cdb size of 6, 10, 12, or 16 but got"
-                        "=%d\n", cdb_sz);
+                        " %d\n", cdb_sz);
         return 1;
     }
     return 0;
@@ -640,36 +649,39 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         }
         bp += (blks * bs);
         lba += blks;
-        if (0 != pdt) {
+        if ((0 != pdt) || (iflag.coe < 2)) {
             fprintf(stderr, ">> unrecovered read error at blk=%lld, "
                     "pdt=%d, use zeros\n", lba, pdt);
             memset(bp, 0, bs);
         } else if (io_addr < UINT_MAX) {
             unsigned char * buffp;
-            int offset, nl, r, ok;
+            int offset, nl, r, ok, corrct;
 
             buffp = malloc(bs * 2);
             if (NULL == buffp) {
                 fprintf(stderr, ">> heap problems\n");
                 return -1;
             }
-            res = sg_ll_read_long10(sg_fd, 0 /*corrct */, lba,
-                                    buffp, bs + 8, &offset, 1, verbose);
+            corrct = (iflag.coe > 2) ? 1 : 0;
+            res = sg_ll_read_long10(sg_fd, corrct, lba, buffp, bs + 8,
+                                    &offset, 1, verbose);
             ok = 0;
             switch (res) {
             case 0:
                 ok = 1;
                 ++read_longs;
                 break;
-            case 1:
+            case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
                 nl = bs + 8 - offset;
                 if ((nl < 32) || (nl > (bs * 2))) {
                     fprintf(stderr, ">> read_long(10) len=%d unexpected\n",
                             nl);
                     break;
                 }
-                r = sg_ll_read_long10(sg_fd, 0 /*corrct */, lba,
-                                      buffp, nl, &offset, 1, verbose);
+                if (verbose)
+                    fprintf(stderr, "read_long(10): adjusted len=%d\n", nl);
+                r = sg_ll_read_long10(sg_fd, corrct, lba, buffp, nl,
+                                      &offset, 1, verbose);
                 if (0 == r) {
                     ok = 1;
                     ++read_longs;
@@ -802,7 +814,7 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
     return 0;
 }
 
-static void calc_duration_throughput()
+static void calc_duration_throughput(int contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
@@ -818,8 +830,9 @@ static void calc_duration_throughput()
         a = res_tm.tv_sec;
         a += (0.000001 * res_tm.tv_usec);
         b = (double)blk_sz * (req_count - dd_count);
-        fprintf(stderr, " time to transfer data: %d.%06d secs",
-               (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+        fprintf(stderr, "time to transfer data%s: %d.%06d secs",
+                (contin ? " so far" : ""), (int)res_tm.tv_sec,
+                (int)res_tm.tv_usec);
         if ((a > 0.00001) && (b > 511))
             fprintf(stderr, " at %.2f MB/sec\n", b / (a * 1000000.0));
         else
@@ -847,7 +860,7 @@ static int process_flags(const char * arg, struct flags_t * fp)
         if (0 == strcmp(cp, "append"))
             fp->append = 1;
         else if (0 == strcmp(cp, "coe"))
-            fp->coe = 1;
+            ++fp->coe;
         else if (0 == strcmp(cp, "direct"))
             fp->direct = 1;
         else if (0 == strcmp(cp, "dpo"))
@@ -889,6 +902,7 @@ int main(int argc, char * argv[])
     int dio_incomplete = 0;
     int scsi_cdbsz_in = DEF_SCSI_CDBSZ;
     int scsi_cdbsz_out = DEF_SCSI_CDBSZ;
+    int cdbsz_given = 0;
     int do_sync = 0;
     int verb = 0;
     int res, k, t, buf_sz, dio_tmp, flags, fl;
@@ -911,14 +925,14 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    for(k = 1; k < argc; k++) {
+    for (k = 1; k < argc; k++) {
         if (argv[k]) {
             strncpy(str, argv[k], STR_SZ);
             str[STR_SZ - 1] = '\0';
         }
         else
             continue;
-        for(key = str, buf = key; *buf && *buf != '=';)
+        for (key = str, buf = key; *buf && *buf != '=';)
             buf++;
         if (*buf)
             *buf++ = '\0';
@@ -944,6 +958,7 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key, "cdbsz")) {
             scsi_cdbsz_in = sg_get_num(buf);
             scsi_cdbsz_out = scsi_cdbsz_in;
+            cdbsz_given = 1;
         } else if (0 == strcmp(key, "coe")) {
             iflag.coe = sg_get_num(buf);
             oflag.coe = iflag.coe;
@@ -1007,7 +1022,8 @@ int main(int argc, char * argv[])
         else if (0 == strncmp(key, "verb", 4)) {
             verbose = sg_get_num(buf);
             verb = (verbose ? verbose - 1: 0);
-        } else if (0 == strncmp(key, "--help", 7)) {
+        } else if ((0 == strncmp(key, "--help", 7)) ||
+                   (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
         } else if (0 == strncmp(key, "--vers", 6)) {
@@ -1050,10 +1066,10 @@ int main(int argc, char * argv[])
     fprintf(stderr, ME "if=%s skip=%lld of=%s seek=%lld count=%lld\n",
            inf, skip, outf, seek, dd_count);
 #endif
-    install_handler (SIGINT, interrupt_handler);
-    install_handler (SIGQUIT, interrupt_handler);
-    install_handler (SIGPIPE, interrupt_handler);
-    install_handler (SIGUSR1, siginfo_handler);
+    install_handler(SIGINT, interrupt_handler);
+    install_handler(SIGQUIT, interrupt_handler);
+    install_handler(SIGPIPE, interrupt_handler);
+    install_handler(SIGUSR1, siginfo_handler);
 
     infd = STDIN_FILENO;
     outfd = STDOUT_FILENO;
@@ -1064,8 +1080,10 @@ int main(int argc, char * argv[])
         if (verbose)
             fprintf(stderr, " >> Input file type: %s\n",
                     dd_filetype_str(in_type, ebuff));
-
-        if ((FT_BLOCK & in_type) && iflag.sgio)
+        if (FT_ERROR & in_type) {
+            fprintf(stderr, ME "unable access %s\n", inf);
+            return 1;
+        } else if ((FT_BLOCK & in_type) && iflag.sgio)
             in_type |= FT_SG;
 
         if (FT_ST & in_type) {
@@ -1354,17 +1372,19 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Couldn't calculate count, please give one\n");
         return 1;
     }
-    if ((FT_SG & in_type) && ((dd_count + skip) > UINT_MAX) &&
-        (MAX_SCSI_CDBSZ != scsi_cdbsz_in)) {
-        fprintf(stderr, "Note: SCSI command size increased to 16 bytes "
-                "(for 'if')\n");
-        scsi_cdbsz_in = MAX_SCSI_CDBSZ;
-    }
-    if ((FT_SG & out_type) && ((dd_count + seek) > UINT_MAX) &&
-        (MAX_SCSI_CDBSZ != scsi_cdbsz_out)) {
-        fprintf(stderr, "Note: SCSI command size increased to 16 bytes "
-                "(for 'of')\n");
-        scsi_cdbsz_out = MAX_SCSI_CDBSZ;
+    if (! cdbsz_given) {
+        if ((FT_SG & in_type) && (MAX_SCSI_CDBSZ != scsi_cdbsz_in) &&
+            (((dd_count + skip) > UINT_MAX) || (bpt > USHRT_MAX))) {
+            fprintf(stderr, "Note: SCSI command size increased to 16 bytes "
+                    "(for 'if')\n");
+            scsi_cdbsz_in = MAX_SCSI_CDBSZ;
+        }
+        if ((FT_SG & out_type) && (MAX_SCSI_CDBSZ != scsi_cdbsz_out) &&
+            (((dd_count + seek) > UINT_MAX) || (bpt > USHRT_MAX))) {
+            fprintf(stderr, "Note: SCSI command size increased to 16 bytes "
+                    "(for 'of')\n");
+            scsi_cdbsz_out = MAX_SCSI_CDBSZ;
+        }
     }
 
     if (dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
@@ -1412,6 +1432,8 @@ int main(int argc, char * argv[])
                     perror("RESERVED_SIZE ioctls failed");
                     break;
                 }
+                if (buf_sz < MIN_RESERVED_SIZE)
+                    buf_sz = MIN_RESERVED_SIZE;
                 blocks_per = (buf_sz + blk_sz - 1) / blk_sz;
                 if (blocks_per < blocks) {
                     blocks = blocks_per;
@@ -1472,6 +1494,8 @@ int main(int argc, char * argv[])
                     perror("RESERVED_SIZE ioctls failed");
                     break;
                 }
+                if (buf_sz < MIN_RESERVED_SIZE)
+                    buf_sz = MIN_RESERVED_SIZE;
                 blocks_per = (buf_sz + blk_sz - 1) / blk_sz;
                 if (blocks_per < blocks) {
                     blocks = blocks_per;
@@ -1532,7 +1556,7 @@ int main(int argc, char * argv[])
     } /* end of main loop that does the copy ... */
 
     if (do_time)
-        calc_duration_throughput();
+        calc_duration_throughput(0);
 
     if (do_sync) {
         if (FT_SG & out_type) {

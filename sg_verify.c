@@ -42,7 +42,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.05 20060105";
+static char * version_str = "1.06 20060322";
 
 #define ME "sg_verify: "
 
@@ -66,7 +66,7 @@ static void usage()
           "  where: --bpc=<n>|-b <n>   max blocks per verify command "
           "(def 128)\n"
           "         --count=<n>|-c <n> count of blocks to verify (def 1)\n"
-          "         --dpo|-d           disable page out (cache retension "
+          "         --dpo|-d           disable page out (cache retention "
           "priority)\n"
           "         --help|-h          print out usage message\n"
           "         --lba=<n>|-l <n>   logical block address to start "
