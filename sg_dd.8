@@ -1,4 +1,4 @@
-.TH SG_DD "8" "June 2004" "sg3_utils-1.07" SG3_UTILS
+.TH SG_DD "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -68,7 +68,7 @@ then ignore and continue. Only applies to errors on sg devices (e.g.
 errors on normal files will stop sg_dd). Error messages are still sent to
 stderr. Similar to "conv=noerror" in the
 .B dd(1) 
-command. Default is 0 which implies stop on error.
+utility. Default is 0 which implies stop on error.
 .TP
 count=BLOCKS
 copy this number of blocks from 'if' to 'of'. Default is the 
@@ -211,7 +211,7 @@ is an offset into the IDE disk /dev/hda . The exact number of blocks
 read from /dev/sg0 are written to /dev/hda (i.e. no padding).
 .PP
 To time a streaming read of the first 1 GB (2 ** 30 bytes) on a disk
-this command could be used:
+this utility could be used:
 .PP
    sg_dd if=/dev/sg0 of=/dev/null bs=512 count=2m time=1
 .PP
@@ -219,9 +219,10 @@ On completion this will output a line like:
 "time to transfer data was 18.779506 secs, 57.18 MB/sec". The "MB/sec"
 in this case is 1,000,000 bytes per second.
 .SH NOTES
-For sg devices this command issues READ_10 and WRITE_10 SCSI commands which
-are appropriate for disks and CDROM players. Those commands are not
-formatted correctly for tape devices so sg_dd should not be used on
+For sg devices (and block devices when blk_sgio=1 is given) this utility
+issues READ and WRITE (SBC) SCSI commands which
+are appropriate for disks and reading from CD/DVD drives. Those commands
+are not formatted correctly for tape devices so sg_dd should not be used on
 tape devices. If the largest block address of the requested transfer
 exceeds a 32 bit block number (i.e 0xffff) then a warning is issued and
 the sg device is accessed via READ_16 and WRITE_16 SCSI commands.
@@ -247,7 +248,7 @@ Copyright \(co 2000-2004 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-A POSIX threads version of this command called
+A POSIX threads version of this utility called
 .B sgp_dd
 is in the sg3_utils package. Another version from that package is called
 .B sgm_dd

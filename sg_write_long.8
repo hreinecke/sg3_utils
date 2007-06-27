@@ -1,0 +1,87 @@
+.TH SG_WRITE_LONG "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
+.SH NAME
+sg_write_long \- send the SCSI command write long
+.SH SYNOPSIS
+.B sg_write_long
+[\fI--help\fR] [\fI--in=<name>\fR] [\fI--lba=<num>\fR] [\fI--verbose\fR]
+[\fI--version\fR] [\fI--xfer_len=<num>\fR] \fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send WRITE LONG command to a Linux SCSI device. The
+buffer to be written to the device is filled with byte
+.B 0xff
+or read from the given file. This buffer includes the sector data and
+the ECC bytes.
+.PP
+This utility can be used generate a MEDIUM ERROR at a specific logical
+block address. This can be useful for testing. Prior to testing, the
+.B sg_dd
+utility could be used to copy the original contents of the logical
+block address to some safe location. After testing the
+.B sg_dd
+utility could be used to write back the original contents of the
+logical block address. An alternate strategy would be to read the "long"
+contents of the logical block address with
+.B sg_read_long
+utility prior to testing and restore it with this utility after testing.
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--in=<name> | -i <name>
+read data (binary) from given file <name> and use it for the WRITE LONG
+SCSI command. If <name> is "-" then stdin is read. If this option is
+not given then a buffer of 0xff bytes is written.
+.TP
+--lba=<num> | -l <num>
+the logical block address of the sector to corrupt. Defaults to lba 0
+which is a dangerous block to overwrite on a disk that is in use.
+.TP
+--verbose | -v
+increase the degree of verbosity (debug messages).
+.TP
+--version | -V
+output version string then exit.
+.TP
+--xfer_len=<num>|-x <num>
+the transfer length in bytes (default to 520). If the given value (or the
+default) does not match the "long" block size of the device, nothing is
+written to the device and the appropriate xfer_len value is derived from the
+error response and printed (to stderr).
+.PP
+The lba and xfer_len numerical arguments may be followed by the following
+multiplicative suffixes:
+c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
+g *1,073,741,824; and G *1,000,000,000
+.PP
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X". When hex numbers are given multipliers cannot be
+used.
+.SH "NOTES"
+To read from a defective sector (that, for example, has been filled with
+0xff bytes by this utility) use:
+.PP
+  sg_dd if=<scsi_device> skip=<lba> of=/dev/null bs=512 count=1
+.PP
+To overwrite to a defective sector use:
+.PP
+  sg_dd of=<scsi_device> seek=<lba> if=/dev/zero bs=512 count=1    
+.PP
+This will result in a sector (block) with 512 bytes of 0x0 without a
+MEDIUM ERROR since the ECC and associated data will be well formed.
+.PP
+The 10 byte WRITE LONG SCSI command is implemented (not the 16
+byte variant). This limits the logical block address to a 32 bit
+quantity.
+.SH AUTHORS
+Written by Saeed Bishara.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_read_long, sg_dd

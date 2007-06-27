@@ -5,6 +5,8 @@ Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
 	written by Joerg Schilling). isosize is now found in the util-linux
 	package and in the archive directory of this package.
 
+Clayton Weaver <cgweav at email dot com> contributed safe_strerror().
+
 Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
 	sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
 	sg_turs and sginfo
@@ -28,6 +30,8 @@ Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
 Peter Allworth <linsol at zeta dot org dot au> original dd clone design used by
 	sg3_utils's dd variants (e.g. sg_dd).
 
+Saeed Bishara contributed sg_write_long
+
 Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
 	to sort defect list by head.
 
@@ -36,4 +40,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-8th July 2004
+10th July 2004

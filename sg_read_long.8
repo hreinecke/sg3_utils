@@ -1,0 +1,63 @@
+.TH SG_READ_LONG "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
+.SH NAME
+sg_read_long \- send the scsi command read long
+.SH SYNOPSIS
+.B sg_read_long
+[\fI--correct\fR] [\fI--help\fR] [\fI--lba=<num>\fR] [\fI--out=<name>\fR]
+[\fI--verbose\fR] [\fI--version\fR] [\fI--xfer_len=<num>\fR]
+\fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send READ LONG command to a Linux SCSI device. The read
+buffer is output in hex and ASCII to stdout or placed in a file..
+.TP
+--correct | -c
+sets the 'CORRCT' bit in the READ LONG SCSI command. When set the data is
+corrected by the ECC before being transferred back to this utility. The
+default is to leave the 'CORRCT' bit clear in which case the data is
+not corrected.
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--lba=<num> | -l <num>
+the logical block address of the sector to read. Defaults to lba 0.
+.TP
+--out=<name> | -o <name>
+instead of outputting ASCII hex to stdout, try to send it to the file
+called <name>. If '-' is given as the <name> then the (binary) output
+is sent to stdout. Note that all informative and error output is
+sent to stderr.
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output).
+.TP
+--version | -V
+print the version string and then exit.
+.TP
+--xfer_len=<num> | -x <num>
+the transfer length in bytes (default to 520). If the given value (or the
+default) does not match the "long" block size of the device, the
+appropriate xfer_len value is derived from the error response and
+printed (to stderr).
+.PP
+The lba and xfer_len numerical arguments may be followed by the following
+multiplicative suffixes:
+c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
+g *1,073,741,824; and G *1,000,000,000
+.PP
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X". When hex numbers are given multipliers cannot be
+used.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_write_long, sg_dd

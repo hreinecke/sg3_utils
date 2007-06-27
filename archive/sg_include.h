@@ -1,4 +1,9 @@
+#ifndef SG_INCLUDES_H
+#define SG_INCLUDES_H
+
 #ifdef SG_KERNEL_INCLUDES
+  #define __user
+  typedef unsigned char u8;
   #include "/usr/src/linux/include/scsi/sg.h"
   #include "/usr/src/linux/include/scsi/scsi.h"
 #else
@@ -8,6 +13,13 @@
   #else
     #include <scsi/sg.h>
     #include <scsi/scsi.h>
+  #endif
+#endif
+
+#ifdef BLKGETSIZE64
+  #ifndef u64
+    #include <stdint.h>   /* C99 header for exact integer types */
+    typedef uint64_t u64; /* problems with BLKGETSIZE64 ioctl in lk 2.4 */
   #endif
 #endif
 
@@ -38,5 +50,7 @@
   Sorry about the inconvenience. Typically neither SG_KERNEL_INCLUDES
   nor SG_TRICK_GNU_INCLUDES is defined.
 
-  dpg 20010415
+  dpg 20010415, 20030522
 */
+
+#endif

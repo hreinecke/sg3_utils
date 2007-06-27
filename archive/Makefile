@@ -14,7 +14,7 @@ MAN_PGS = isosize.8
 MAN_PREF = man8
 
 CFLAGS = -g -O2 -W -Wall -D_REENTRANT
-# CFLAGS = -g -O2 -Wall -pedantic -D_REENTRANT
+# CFLAGS = -g -O2 -Wall -pedantic -std=c99 -D_REENTRANT
 
 LDFLAGS =
 

@@ -6,12 +6,12 @@
 
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.07
+Version: 1.08
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL
 Group: Utilities/System
-Source: ftp://www.torque.net/sg/p/sg3_utils-1.07.tgz
+Source: ftp://www.torque.net/sg/p/sg3_utils-1.08.tgz
 Url: http://www.torque.net/sg/u_index.html
 Provides: sg_utils
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
@@ -53,7 +53,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%attr(-,root,root) %doc CREDITS README README.sg_start CHANGELOG INSTALL
+%attr(-,root,root) %doc CREDITS README README.sg_start
+%attr(-,root,root) %doc CHANGELOG INSTALL COVERAGE
 %attr(755,root,root) %{_bindir}/sg_dd
 %attr(755,root,root) %{_bindir}/sg_inq
 %attr(755,root,root) %{_bindir}/sg_scan
@@ -73,6 +74,8 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_senddiag
 %attr(755,root,root) %{_bindir}/sg_opcodes
 %attr(755,root,root) %{_bindir}/sg_persist
+%attr(755,root,root) %{_bindir}/sg_write_long
+%attr(755,root,root) %{_bindir}/sg_read_long
 # Mandrake compresses man pages with bzip2, RedHat with gzip
 %attr(-,root,root) %doc %{_mandir}/man8/sg_dd.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sgp_dd.8*
@@ -93,9 +96,14 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_senddiag.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_opcodes.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_persist.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_write_long.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_read_long.8*
  
 
 %changelog
+* Tue Aug 31 2004 - dgilbert at interlog dot com
+- 'register+move' in sg_persist, sg_opcodes sorts, sg_write_long
+  * sg3_utils-1.08
 * Thu Jul 08 2004 - dgilbert at interlog dot com
 - add '-fHead' to sginfo, '-i' for sg_inq, new sg_opcodes + sg_persist
   * sg3_utils-1.07
