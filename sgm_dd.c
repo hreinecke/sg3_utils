@@ -54,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.19 20050309";
+static char * version_str = "1.20 20050511";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -360,7 +360,6 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
-    int res;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, 0)) {
         fprintf(stderr, ME "bad rd cdb build, from_block=%lld, blocks=%d\n",
@@ -382,6 +381,12 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
     if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
 
+#if 1
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        perror(ME "SG_IO error (sg_read)");
+        return -1;
+    }
+#else
     while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
            (EINTR == errno))
         ;
@@ -399,6 +404,7 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
         perror("reading (rd) on sg device, error");
         return -1;
     }
+#endif
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
@@ -426,7 +432,6 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
-    int res;
 
     if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, 1, fua, 0)) {
         fprintf(stderr, ME "bad wr cdb build, to_block=%lld, blocks=%d\n",
@@ -451,6 +456,12 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
 
+#if 1
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        perror(ME "SG_IO error (sg_write)");
+        return -1;
+    }
+#else
     while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
            (EINTR == errno))
         ;
@@ -468,6 +479,7 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
         perror("writing (rd) on sg device, error");
         return -1;
     }
+#endif
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
@@ -657,7 +669,7 @@ int main(int argc, char * argv[])
             return 1;
         }
         else if (FT_SG == in_type) {
-            if ((infd = open(inf, O_RDWR)) < 0) {
+            if ((infd = open(inf, O_RDWR | O_NONBLOCK)) < 0) {
                 snprintf(ebuff, EBUFF_SZ, 
                          ME "could not open %s for sg reading", inf);
                 perror(ebuff);
@@ -719,7 +731,7 @@ int main(int argc, char * argv[])
             return 1;
         }
         else if (FT_SG == out_type) {
-            if ((outfd = open(outf, O_RDWR)) < 0) {
+            if ((outfd = open(outf, O_RDWR | O_NONBLOCK)) < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
                          "sg writing", outf);
                 perror(ebuff);

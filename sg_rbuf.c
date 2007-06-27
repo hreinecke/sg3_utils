@@ -24,19 +24,9 @@
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   This program uses the SCSI command READ BUFFER on the given sg
+   This program uses the SCSI command READ BUFFER on the given
    device, first to find out how big it is and then to read that
-   buffer. The '-q' option skips the data transfer from the kernel
-   DMA buffers to the user space. The '-b=num' option allows the
-   buffer size (in KiB) to be specified (default is to use the
-   number obtained from READ BUFFER (descriptor) SCSI command).
-   The '-s=num' option allows the total size of the transfer to be
-   set (in megabytes, the default is 200 MiB). The '-d' option requests
-   direct io (and is overridden by '-q').
-   The '-m' option request mmap-ed IO (and overrides the '-q' and '-d'
-   options if they are also given).
-   The ability to time transfers internally (based on gettimeofday()) has
-   been added with the '-t' option.
+   buffer (data mode, buffer id 0).
 */
 
 
@@ -55,12 +45,12 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.80 20050329";
+static char * version_str = "4.82 20050601";
 
 static void usage()
 {
     printf("Usage: sg_rbuf [-b=num] [[-q] | [-d] | [-m]] [-s=num] [-t] "
-           "[-v] [-V]\n               <generic_device>\n");
+           "[-v] [-V]\n               <scsi_device>\n");
     printf("  where  -b=num   num is buffer size to use (in KiB)\n");
     printf("         -d       requests dio ('-q' overrides it)\n");
     printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
@@ -71,11 +61,13 @@ static void usage()
     printf("         -t       time the data transfer\n");
     printf("         -v       increase verbosity (more debug)\n");
     printf("         -V       print version string then exit\n");
+    printf("Use SCSI READ BUFFER command (data mode, buffer id 0) "
+           "repeatedly\n");
 }
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, j, m;
+    int sg_fd, res, j, m, plen, jmp_out;
     unsigned int k, num;
     unsigned char rbCmdBlk [RB_CMD_LEN];
     unsigned char * rbBuff = NULL;
@@ -89,7 +81,8 @@ int main(int argc, char * argv[])
     int verbose = 0;
     int buf_size = 0;
     unsigned int total_size_mib = RB_MIB_TO_READ;
-    char * file_name = 0;
+    const char * file_name = 0;
+    const char * cp;
     size_t psz = getpagesize();
     int dio_incomplete = 0;
     struct sg_io_hdr io_hdr;
@@ -99,56 +92,82 @@ int main(int argc, char * argv[])
 #endif
 
     for (j = 1; j < argc; ++j) {
-        if (0 == strncmp("-b=", argv[j], 3)) {
-            m = 3;
-            num = sscanf(argv[j] + m, "%d", &buf_size);
-            if ((1 != num) || (buf_size <= 0)) {
-                printf("Couldn't decode number after '-b' switch\n");
-                file_name = 0;
-                break;
+        cp = argv[j];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case 'd':
+                    do_dio = 1;
+                    break;
+                case 'm':
+                    do_mmap = 1;
+                    break;
+                case 'q':
+                    do_quick = 1;
+                    break;
+                case 't':
+                    do_time = 1;
+                    break;
+                case 'v':
+                    ++verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case '?':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-            buf_size *= 1024;
-        }
-        else if (0 == strncmp("-s=", argv[j], 3)) {
-            m = 3;
-            num = sscanf(argv[j] + m, "%u", &total_size_mib);
-            if (1 != num) {
-                printf("Couldn't decode number after '-s' switch\n");
-                file_name = 0;
-                break;
+            if (plen <= 0)
+                continue;
+            if (0 == strncmp("b=", cp, 2)) {
+                m = 2;
+                num = sscanf(cp + m, "%d", &buf_size);
+                if ((1 != num) || (buf_size <= 0)) {
+                    printf("Couldn't decode number after 'b=' option\n");
+                    usage();
+                    return 1;
+                }
+                buf_size *= 1024;
             }
+            else if (0 == strncmp("s=", cp, 2)) {
+                m = 2;
+                num = sscanf(cp + m, "%u", &total_size_mib);
+                if (1 != num) {
+                    printf("Couldn't decode number after 's=' option\n");
+                    usage();
+                    return 1;
+                }
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
+            }
+        } else if (0 == file_name)
+            file_name = cp;
+        else {
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
+            usage();
+            return 1;
         }
-        else if (0 == strcmp("-q", argv[j]))
-            do_quick = 1;
-        else if (0 == strcmp("-d", argv[j]))
-            do_dio = 1;
-        else if (0 == strcmp("-m", argv[j]))
-            do_mmap = 1;
-        else if (0 == strcmp("-t", argv[j]))
-            do_time = 1;
-        else if (0 == strcmp("-v", argv[j]))
-            ++verbose;
-        else if (0 == strcmp("-vv", argv[j]))
-            verbose += 2;
-        else if (0 == strcmp("-vvv", argv[j]))
-            verbose += 3;
-        else if (0 == strcmp("-V", argv[j])) {
-            fprintf(stderr, ME "version: %s\n", version_str);
-            return 0;
-        } else if (*argv[j] == '-') {
-            printf("Unrecognized switch: %s\n", argv[j]);
-            file_name = 0;
-            break;
-        }
-        else
-            file_name = argv[j];
     }
     if (0 == file_name) {
+        fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
         return 1;
     }
 
-    sg_fd = open(file_name, O_RDONLY);
+    sg_fd = open(file_name, O_RDONLY | O_NONBLOCK);
     if (sg_fd < 0) {
         perror(ME "open error");
         return 1;
@@ -166,7 +185,7 @@ int main(int argc, char * argv[])
 
     memset(rbCmdBlk, 0, RB_CMD_LEN);
     rbCmdBlk[0] = RB_OPCODE;
-    rbCmdBlk[1] = RB_MODE_DESC;
+    rbCmdBlk[1] = RB_MODE_DESC; /* data mode, buffer id 0 */
     rbCmdBlk[8] = RB_DESC_LEN;
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
@@ -178,8 +197,14 @@ int main(int argc, char * argv[])
     io_hdr.cmdp = rbCmdBlk;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
-    /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
+    if (verbose) {
+        fprintf(stderr, "    Read buffer cdb: ");
+        for (k = 0; k < RB_CMD_LEN; ++k)
+            fprintf(stderr, "%02x ", rbCmdBlk[k]);
+        fprintf(stderr, "\n");
+    }
 
+    /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
         perror(ME "SG_IO READ BUFFER descriptor error");
         if (rawp) free(rawp);
@@ -287,6 +312,12 @@ int main(int argc, char * argv[])
             io_hdr.flags |= SG_FLAG_DIRECT_IO;
         else if (do_quick)
             io_hdr.flags |= SG_FLAG_NO_DXFER;
+        if (verbose > 1) {
+            fprintf(stderr, "    Read buffer cdb: ");
+            for (k = 0; k < RB_CMD_LEN; ++k)
+                fprintf(stderr, "%02x ", rbCmdBlk[k]);
+            fprintf(stderr, "\n");
+        }
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
             if (ENOMEM == errno)

@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.18 20050329";
+static char * version_str = "0.19 20050601";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -223,9 +223,9 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
 static void usage()
 {
     fprintf(stderr,
-            "Usage: 'sg_opcodes [-a] [-o=<opcode> [-s=<service_action>] ]"
+            "Usage:  sg_opcodes [-a] [-o=<opcode> [-s=<service_action>] ]"
             " [-t] [-u] [-v]\n"
-            "                   [-V] <scsi_device>'\n"
+            "                   [-V] <scsi_device>\n"
             " where -a   output list of operation codes sorted "
             "alphabetically\n"
             "       -o=<opcode>  first byte of command to query (in hex)\n"
@@ -388,8 +388,8 @@ void list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, cd_len;
-    char * file_name = 0;
+    int sg_fd, k, num, cd_len, plen, jmp_out;
+    const char * file_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char rsoc_buff[MX_ALLOC_LEN];
     unsigned char * ucp;
@@ -406,57 +406,72 @@ int main(int argc, char * argv[])
     struct sg_simple_inquiry_resp inq_resp;
 
     for (k = 1; k < argc; ++k) {
-        if (0 == strncmp("-o=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", (unsigned int *)&do_opcode);
-            if ((1 != num) || (do_opcode > 255)) {
-                fprintf(stderr, "Bad number after '-o' switch\n");
-                file_name = 0;
-                break;
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case 'a':
+                    do_alpha = 1;
+                    break;
+                case 't':
+                    do_taskman = 1;
+                    break;
+                case 'u':
+                    do_unsorted = 1;
+                    break;
+                case 'v':
+                    ++do_verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case 'h':
+                case '?':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-        }
-        else if (0 == strncmp("-s=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", (unsigned int *)&do_servact);
-            if (1 != num) {
-                fprintf(stderr, "Bad number after '-s' switch\n");
-                file_name = 0;
-                break;
+            if (plen <= 0)
+                continue;
+            if (0 == strncmp("o=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", (unsigned int *)&do_opcode);
+                if ((1 != num) || (do_opcode > 255)) {
+                    fprintf(stderr, "Bad number after 'o=' option\n");
+                    usage();
+                    return 1;
+                }
+            } else if (0 == strncmp("s=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", (unsigned int *)&do_servact);
+                if (1 != num) {
+                    fprintf(stderr, "Bad number after 's=' option\n");
+                    usage();
+                    return 1;
+                }
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
             }
-        }
-        else if (0 == strcmp("-a", argv[k]))
-            do_alpha = 1;
-        else if (0 == strcmp("-t", argv[k]))
-            do_taskman = 1;
-        else if (0 == strcmp("-u", argv[k]))
-            do_unsorted = 1;
-        else if (0 == strcmp("-v", argv[k]))
-            ++do_verbose;
-        else if (0 == strcmp("-vv", argv[k]))
-            do_verbose += 2;
-        else if (0 == strcmp("-vvv", argv[k]))
-            do_verbose += 3;
-        else if (0 == strcmp("-?", argv[k])) {
-            file_name = 0;
-            break;
-        }
-        else if (0 == strcmp("-V", argv[k])) {
-            fprintf(stderr, "Version string: %s\n", version_str);
-            exit(0);
-        }
-        else if (*argv[k] == '-') {
-            fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
-        }
-        else if (0 == file_name)
-            file_name = argv[k];
+        } else if (0 == file_name)
+            file_name = cp;
         else {
-            fprintf(stderr, "too many arguments\n");
-            file_name = 0;
-            break;
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
+            usage();
+            return 1;
         }
     }
     
     if (0 == file_name) {
+        fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
         return 1;
     }

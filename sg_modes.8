@@ -1,11 +1,11 @@
-.TH SG_MODES "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_MODES "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_modes \- reads SCSI MODE SENSE pages
 .SH SYNOPSIS
 .B sg_modes
 [\fI-a\fR] [\fI-A\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-D\fR]
-[\fI-h\fR] [\fI-l\fR] [\fI-p=<page_code>\fR]
-[\fI-p=<page_code>,<sub_page_code>\fR]
+[\fI-f\fR] [\fI-h\fR] [\fI-H\fR] [\fI-l\fR] [\fI-L\fR]
+[\fI-p=<page_code>\fR] [\fI-p=<page_code>,<sub_page_code>\fR]
 [\fI-r\fR] [\fI-subp=<sub_page_code>\fR] [\fI-v\fR] [\fI-V\fR] [\fI-6\fR]
 [\fI-?\fR] [\fI<scsi_device>\fR]
 .SH DESCRIPTION
@@ -43,8 +43,21 @@ alternatively they may ignore it.
 disable outputting block descriptors. Irrespective of whether block
 descriptors are present in the response or not, they are not output.
 .TP
+-f
+Be "flexible". Some devices, bridges and/or drivers attempt crude
+switches between mode sense 6 and 10 byte commands without correcting
+the response. This will cause the response to be mis-interpreted (usually
+with an error saying the response is malformed). With this option, the
+length of the response is checked, and if it looks wrong, the response
+is then decoded as if the other mode sense (cdb length) was sent.
+.TP
 -h
-currently only suppresses the printing out of known page code descriptions
+The default action is to decode known mode page numbers (and subpage
+numbers) into text. With this option mode page numbers (and subpage
+numbers) are output in hexadecimal.
+.TP
+-H
+same action as the '-h' option.
 .TP
 -l
 lists all common page and subpage codes and their names that are found in
@@ -59,6 +72,14 @@ devices. Additionally if a sub_page_code is given then it is interpreted as
 a transport identifier and command transport specific mode page codes and
 their names are listed following the main mode page list.
 Other options are ignored.
+.TP
+-L
+set the Long LBA Accepted (LLBAA) bit in the MODE SENSE (10) cdb. This
+bit is not defined in the MODE SENSE (6) cdb so setting the '-L'
+and '-6' options is reported as an error. When set the given device
+may respond with 16 byte block descriptors as indicated by
+the 'LongLBA' field in the response. In almost all cases setting
+this option is not needed.
 .TP
 -p=<page_code>
 page code to fetch. Should be a hexadecimal number between 0 and 3f

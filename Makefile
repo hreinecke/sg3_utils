@@ -92,7 +92,7 @@ sg_readcap: sg_readcap.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sgp_dd.o: sgp_dd.c
-	$(CC) $(INCLUDES) $(CFLAGS) $(CFLAGS_PTHREADS) -o $@ -c $^
+	$(CC) $(INCLUDES) $(CFLAGS) $(CFLAGS_PTHREADS) -c $<
 
 sgp_dd: sgp_dd.o llseek.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ -lpthread

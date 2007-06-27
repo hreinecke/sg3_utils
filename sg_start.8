@@ -1,53 +1,63 @@
-.TH SG_START "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_START "8" "June 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_start \- starts (spins-up) or stops (spins down) SCSI devices
 .SH SYNOPSIS
 .B sg_start
 [\fI-imm=0|1\fR] [\fI-loej\fR] [\fI-pc=<n>\fR]
-[\fI-v\fR] [\fI-V\fR] \fI0|1\fR \fI<scsi_device>\fR
+[\fI-start\fR] [\fI-start\fR] [\fI-v\fR] [\fI-V\fR] [\fI0|1\fR]
+\fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 sg_start sends a START STOP UNIT SCSI command to the given device with
-the selected options. The most used options are "0" to spin down a disk
-and "1" to spin up a disk. Using "sg_start 1 /dev/sg0" on a disk that
-is already spinning is harmless. There is also finer grain control
+the selected options. The most used options are "-stop" to spin down a disk
+and "-start" to spin up a disk. Using "sg_start -start /dev/sda" on a disk
+that is already spinning is harmless. There is also finer grain control
 with "power conditions": active, idle and standby. In some contexts
 the "stop" state can be considered an additional power condition. 
 .PP
 Devices that contain removable media such as cd/dvds can use the '-loej'
-flag to load the media when used in conjunction with "1" (i.e. load media
-then spin up). Alternatively '-loej' may be used to eject the media when
-used alone or when used in conjunction with "0" (i.e. spin down then eject
-media).
+flag to load the media when used in conjunction with "-start" (i.e. load
+media then spin up). Alternatively '-loej' may be used to eject the media
+when used alone or when used in conjunction with "-stop" (i.e. spin down
+then eject media).
 .TP
 0
-stop (spin-down) given device. Active when '-pc=0' or is not given.
+stop (spin-down) given device.
+Active when '-pc=" is not given or '-pc=0'.
 .TP
 1
-start (spin-up) given device. Active when '-pc=0' or is not given.
+start (spin-up) given device.
+Active when '-pc=" is not given or '-pc=0'. Harmless if device has
+already started (or is in the process of starting).
 .TP
 -imm=0|1
 when the immediate bit is 1 (default) then this command (and hence this
 utility) return immediately after the device has received the command.
-When this switch is 0 then the command returns when the action it
+When this option is 0 then the command returns when the action it
 requests has been completed.
 .TP
 -loej
 load the media when the unit is started or eject it when the unit is
 stopped. This option is ignored if 'pc > 0'. Default is off (i.e. don't
 attempt to load or eject media). If a start/start indication is not
-given (neither "0" nor "1") and this option is given then a stop and
-eject action is assumed.
+given (neither "-start" nor "-stop") and this option is given then a
+stop and eject action is assumed.
 .TP
 -pc=<n>
 set the 'power conditions' value (in hex); 0 to f (inclusive) are valid.
 Default value is 0.
-When '-pc=0' then the start value (i.e. 0 or 1) and '-loej' are active.
+When '-pc=0' then '-start', '-stop' and '-loej' are active.
 Some common values are 1 for the active power condition; 2 for the idle
 power condition; 3 for the standby power condition, 7 for LU_CONTROL,
 a (hex == decimal 10) for FORCE_IDLE_0 and b (hex) for FORCE_STANDBY_0.
 See recent SBC-2 or SAS drafts at www.t10.org for more information.
+.TP
+-start
+start (spin-up) given device. Same meaning as "1" argument.
+.TP
+-stop
+stop (spin-down) given device. Same meaning as "0" argument.
 .TP
 -v
 verbose: outputs SCSI command in hex to console before with executing
@@ -56,12 +66,14 @@ it. '-vv' and '-vvv' are also accepted yielding greater verbosity.
 -V
 print out version string then exit.
 .PP
+Only one of "0", "1", "-start" and "-stop" is accepted to avoid confusion.
+.PP
 There is an associated "power condition" mode page (0x1a) in which timer
 values can be set for transitioning to either idle or standby state after
-a period of inactivity. The sg_modes utility can be used to view the
+a period of inactivity. The sdparm utility can be used to view the
 power condition mode page and the sginfo utility can view and change it.
 If a device is in either idle or standby power condition state then
-a REQUEST SENSE command (se the sg_requests utility) should yield 
+a REQUEST SENSE command (see the sg_requests utility) should yield 
 a sense key of "no sense" and an additional sense code of "Low
 power condition on".
 .PP
@@ -90,5 +102,5 @@ Copyright \(co 2002-2005 Kurt Garloff, Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_prevent(sg3_utils), sg_requests(sg3_utils), sg_modes(sg3_utils),
+.B sg_prevent(sg3_utils), sg_requests(sg3_utils), sdparm(sdparm),
 .B sginfo(sg3_utils)

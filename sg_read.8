@@ -42,7 +42,7 @@ read this number of blocks. This argument must be given
 dio=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
-at completion. This option is only actice if <ifile> is an sg device.
+at completion. This option is only active if <ifile> is an sg device.
 If direct IO is selected and /proc/scsi/sg/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
@@ -112,7 +112,7 @@ because the "skip" argument was not given. This will continue until
 1,000,000 blocks are read. The idea behind using "time=2" is that the 
 first 64 KiB read operation will involve reading the magnetic media
 while the remaining read operations will "hit" the disk's cache. The 
-output of thid command will look like this:
+output of third command will look like this:
 .PP
   time from second command to end was 8.51 secs, 60.19 MB/sec
 .br

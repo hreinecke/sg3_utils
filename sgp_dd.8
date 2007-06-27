@@ -166,13 +166,13 @@ equivalent to:
    dd if=/dev/sda of=t bs=512 count=1000000
 .PP
 although dd's speed may improve if bs was larger and count was suitably
-reduced. Using a raw device to do something similar on a IDE disk:
+reduced. Using a raw device to do something similar on a ATA disk:
 .PP
    raw /dev/raw/raw1 /dev/hda
 .br
    sgp_dd if=/dev/raw/raw1 of=t bs=512 count=1MB
 .PP
-To copy a SCSI disk partition to an IDE disk partition:
+To copy a SCSI disk partition to an ATA disk partition:
 .PP
    raw /dev/raw/raw2 /dev/hda3
 .br

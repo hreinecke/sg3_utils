@@ -20,10 +20,11 @@
    This program send either device, bus or host resets to device,
    or bus or host associated with the given sg device.
 
-   Version 0.53 (20041229)
 */
 
 #define ME "sg_reset: "
+
+static char * version_str = "0.54 20050517";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -53,21 +54,25 @@ int main(int argc, char * argv[])
             do_bus_reset = 1;
         else if (0 == strcmp("-h", argv[k]))
             do_host_reset = 1;
-        else if (*argv[k] == '-') {
+        else if (0 == strcmp("-V", argv[k])) {
+            fprintf(stderr, "Version string: %s\n", version_str);
+            exit(0);
+        } else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
             break;
-        }
-        else
+        } else
             file_name = argv[k];
     }
     if (0 == file_name) {
         printf(
-        "Usage: 'sg_reset [-d] [-b] [-h] <generic_device>'\n");
-        printf("  where: -d       attempt a SCSI device reset\n");
-        printf("         -b       attempt a SCSI bus reset\n");
+        "Usage: 'sg_reset [-b] [-d] [-h] [-V] <scsi_device>'\n");
+        printf("  where: -b       attempt a SCSI bus reset\n");
+        printf("         -d       attempt a SCSI device reset\n");
         printf("         -h       attempt a host adapter reset\n");
+        printf("         -V       print version string then exit");
         printf("   {if no switch given then check if reset underway}\n");
+        printf("To reset use '-d' first, then '-b' then '-h'\n");
         return 1;
     }
 

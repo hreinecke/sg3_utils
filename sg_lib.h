@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.09 [20050504]
+/* Version 1.10 [20050521]
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file

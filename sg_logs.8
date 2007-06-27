@@ -1,9 +1,9 @@
-.TH SG_LOGS "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_LOGS "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_logs \- read SCSI device log pages
 .SH SYNOPSIS
 .B sg_logs
-[\fI-a\fR] [\fI-c=<page_control>\fR] [\fI-h\fR] [\fI-l\fR]
+[\fI-a\fR] [\fI-c=<page_control>\fR] [\fI-h\fR] [\fI-H\fR] [\fI-l\fR]
 [\fI-p=<page_code>\fR] [\fI-paramp=<parameter_pointer>\fR] [\fI-pcb\fR]
 [\fI-ppc\fR] [\fI-r\fR] [\fI-sp\fR] [\fI-t\fR] [\fI-v\fR] [\fI-V\fR]
 [\fI-?\fR] \fI<scsi_device>\fR
@@ -20,14 +20,17 @@ parameters back to the device manufacturer's default values.
 outputs all the log pages supported by the device.
 .TP
 -c=page_control
-accepts 0, 1, 2 or 3 as an argument. 0 for current threshhold values,
-1 for current cumulative values, 2 for default threshhold values and 3
-for default cumulative values. The default is 1 (i.e. current threshhold
+accepts 0, 1, 2 or 3 as an argument. 0 for current threshold values,
+1 for current cumulative values, 2 for default threshold values and 3
+for default cumulative values. The default is 1 (i.e. current threshold
 values).
 .TP
 -h
 suppresses decoding of known log sense pages and prints out the
 response in hex instead.
+.TP
+-H
+same action as '-h'.
 .TP
 -l
 lists the names of all logs sense pages supported by this device.
@@ -53,7 +56,7 @@ use LOG SELECT SCSI command to reset all implemented parameter values
 to be the device defined (i.e. manufacturer's) default values. In most
 cases the default values are zeroes. This option seems to
 clear error counter log pages but leaves pages like self-test results,
-start-stop cycle counter and temperature log pages uneffected.
+start-stop cycle counter and temperature log pages unaffected.
 This option may be required to clear log pages if a counter reaches its
 maximum value since the log page in which the counter is found will
 remain "stuck" until something is done.

@@ -49,7 +49,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.39 20050329";
+static char * version_str = "5.41 20050523";
 
 #define ME "sg_dd: "
 
@@ -960,17 +960,25 @@ static void print_scsi_dev_info(int sg_fd, int pdt)
     unsigned char def_mp[DEF_MODE_RESP_LEN];
     unsigned char sav_mp[DEF_MODE_RESP_LEN];
     int mode6;
+    void * pc_arr[4];
 
     mode6 = (6 == DEF_MODE_CDB_SZ) ? 1 : 0;
     verb = (verbose > 0) ? verbose - 1 : 0;
-    res = sg_get_mode_page_types(sg_fd, mode6, RW_ERR_RECOVERY_MP,
-                           0 /* subpage */ , DEF_MODE_RESP_LEN,
-                           &smask, cur_mp, cha_mp, def_mp, sav_mp, verb);
+    pc_arr[0] = cur_mp;
+    pc_arr[1] = cha_mp;
+    pc_arr[2] = def_mp;
+    pc_arr[3] = sav_mp;
+    res = sg_get_mode_page_controls(sg_fd, mode6, RW_ERR_RECOVERY_MP,
+                                    0 /* subpage */, 0 /*dbd */,
+                                    1 /* flexible */, DEF_MODE_RESP_LEN,
+                                    &smask, pc_arr, NULL /* rep_len */, verb);
     if (SG_LIB_CAT_INVALID_OP == res) {
         mode6 = !mode6;         /* flip between mode sense(10) and (6) */
-        res = sg_get_mode_page_types(sg_fd, mode6, RW_ERR_RECOVERY_MP,
-                               0 /* subpage */ , DEF_MODE_RESP_LEN,
-                               &smask, cur_mp, cha_mp, def_mp, sav_mp, verb);
+        res = sg_get_mode_page_controls(sg_fd, mode6, RW_ERR_RECOVERY_MP,
+                                        0 /* subpage */, 0 /* dbd */,
+                                        1 /* flexible */, DEF_MODE_RESP_LEN,
+                                        &smask, pc_arr, NULL /* rep_len */,
+                                        verb);
     }
     if (0 == (smask & 1)) {
         if (verbose > 1)
@@ -997,9 +1005,10 @@ static void print_scsi_dev_info(int sg_fd, int pdt)
         print_mp_bit("    DCR:       ", smask, 2, 0x1, cur_mp, cha_mp,
                      def_mp, sav_mp);
     }
-    res = sg_get_mode_page_types(sg_fd, mode6, CACHING_MP,
-                           0 /* subpage */ , DEF_MODE_RESP_LEN,
-                           &smask, cur_mp, cha_mp, def_mp, sav_mp, verb);
+    res = sg_get_mode_page_controls(sg_fd, mode6, CACHING_MP, 0 /* subpage */,
+                                    0 /* dbd */, 1 /* flexible */,
+                                    DEF_MODE_RESP_LEN, &smask, pc_arr,
+                                    NULL /* rep_len */, verb);
     if (0 == (smask & 1)) {
         if (verbose > 1)
             fprintf(stderr, "  Caching mode page not "
@@ -1014,9 +1023,10 @@ static void print_scsi_dev_info(int sg_fd, int pdt)
         print_mp_bit("    RCD:       ", smask, 2, 0x1, cur_mp, cha_mp,
                      def_mp, sav_mp);
     }
-    res = sg_get_mode_page_types(sg_fd, mode6, CONTROL_MP,
-                           0 /* subpage */ , DEF_MODE_RESP_LEN,
-                           &smask, cur_mp, cha_mp, def_mp, sav_mp, verb);
+    res = sg_get_mode_page_controls(sg_fd, mode6, CONTROL_MP, 0 /* subpage */,
+                                    0 /* dbd */, 1 /* flexible */,
+                                    DEF_MODE_RESP_LEN, &smask, pc_arr,
+                                    NULL /* rep_len */, verb);
     if (0 == (smask & 1)) {
         if (verbose > 1)
             fprintf(stderr, "  Control mode page not "
@@ -1213,11 +1223,11 @@ int main(int argc, char * argv[])
             return 1;
         }
         else if (FT_SG & in_type) {
-            flags = O_RDWR;
+            flags = O_RDWR | O_NONBLOCK;
             if ((do_odir && (FT_BLOCK & in_type)))
                 flags |= O_DIRECT;
             if ((infd = open(inf, flags)) < 0) {
-                flags = O_RDONLY;
+                flags = O_RDONLY | O_NONBLOCK;
                 if ((do_odir && (FT_BLOCK & in_type)))
                     flags |= O_DIRECT;
                 if ((infd = open(inf, flags)) < 0) {
@@ -1303,7 +1313,7 @@ int main(int argc, char * argv[])
             return 1;
         }
         else if (FT_SG & out_type) {
-            flags = O_RDWR;
+            flags = O_RDWR | O_NONBLOCK;
             if ((do_odir && (FT_BLOCK & out_type)))
                 flags |= O_DIRECT;
             if ((outfd = open(outf, flags)) < 0) {

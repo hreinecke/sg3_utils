@@ -47,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.06 20050210";
+static char * version_str = "1.07 20050511";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 
@@ -134,7 +134,7 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    sg_fd = open(device_name, O_RDONLY);
+    sg_fd = open(device_name, O_RDONLY | O_NONBLOCK);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: ", device_name);
         perror("");

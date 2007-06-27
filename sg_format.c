@@ -67,7 +67,7 @@ static unsigned char sbuff[MAX_SENSE_SZ];
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.03 20050405";
+static char * version_str = "1.04 20050511";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -505,7 +505,7 @@ int main(int argc, char **argv)
         ** o verify SCSI device is a disk (get inquiry data first)
         */
 
-        if ((fd = open(device_name, O_RDWR)) < 0) {
+        if ((fd = open(device_name, O_RDWR | O_NONBLOCK)) < 0) {
                 char ebuff[128];
                 sprintf(ebuff, "error opening device file: %s", device_name);
                 perror(ebuff);

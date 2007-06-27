@@ -47,7 +47,7 @@
  * tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.16 20050506";
+static char * version_str = "1.17 20050512";
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -279,7 +279,7 @@ static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
         printf("    Subenclosure identifier: %d\n", ucp[1]);
         printf("      relative ES process id: %d, number of ES processes"
                ": %d\n", ((ucp[0] & 0x70) >> 4), (ucp[0] & 0x7));
-        printf("      number of element types supported: %d\n", ucp[2]);
+        printf("      number of element type descriptor headers: %d\n", ucp[2]);
         if (el < 40) {
             fprintf(stderr, "      enc descriptor len=%d ??\n", el);
             continue;
@@ -443,7 +443,7 @@ static char * find_sas_connector_type(int conn_type, char * buff,
         else if (conn_type < 0x80)
             snprintf(buff, buff_len, "vendor specific connector type: 0x%x",
                      conn_type);
-        else
+        else    /* conn_type comes from a 7 bit field, so this is imposs */
             snprintf(buff, buff_len, "unexpected connector type: 0x%x",
                      conn_type);
         break;
@@ -995,19 +995,20 @@ static char * sas_device_type[] = {
 static void ses_transport_proto(const unsigned char * ucp, int len,
                                 int elem_num)
 {
-    int ports, phys, j, m, desc_type;
+    int ports, phys, j, m, desc_type, eip_off;
     const unsigned char * per_ucp;
 
+    eip_off = (0x10 & ucp[0]) ? 2 : 0;
     switch (0xf & ucp[0]) {
     case 0:     /* FCP */
-        ports = ucp[4];
+        ports = ucp[2 + eip_off];
         printf("   [%d] Transport protocol: FCP, number of ports: %d\n",
                elem_num + 1, ports);
         printf("    node_name: ");
         for (m = 0; m < 8; ++m)
-            printf("%02x", ucp[8 + m]);
+            printf("%02x", ucp[6 + eip_off + m]);
         printf("\n");
-        per_ucp = ucp + 16;
+        per_ucp = ucp + 14 + eip_off;
         for (j = 0; j < ports; ++j, per_ucp += 16) {
             printf("    [%d] port loop position: %d, port requested hard "
                    "address: %d\n", j + 1, per_ucp[0], per_ucp[4]);
@@ -1020,14 +1021,14 @@ static void ses_transport_proto(const unsigned char * ucp, int len,
         }
         break;
     case 6:     /* SAS */
-        desc_type = (ucp[5] >> 6) & 0x3;
+        desc_type = (ucp[3 + eip_off] >> 6) & 0x3;
         printf("   [%d] Transport protocol: SAS, ", elem_num + 1);
         if (0 == desc_type) {
-            phys = ucp[4];
+            phys = ucp[2 + eip_off];
             printf("SAS and SATA device descriptor type [%d]\n", desc_type);
             printf("    number of phys: %d, not all phys: %d\n", phys,
-                   ucp[3] & 1);
-            per_ucp = ucp + 8;
+                   ucp[3 + eip_off] & 1);
+            per_ucp = ucp + 4 + eip_off + eip_off;
             for (j = 0; j < phys; ++j, per_ucp += 28) {
                 printf("    [%d] device type: %s\n", phys + 1,
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
@@ -1050,14 +1051,14 @@ static void ses_transport_proto(const unsigned char * ucp, int len,
                 printf("\n      phy identifier: 0x%x\n", per_ucp[20]);
             }
         } else if (1 == desc_type) {
-            phys = ucp[4];
+            phys = ucp[2 + eip_off];
             printf("expander descriptor type [%d]\n", desc_type);
             printf("    number of phys: %d\n", phys);
             printf("    SAS address: ");
             for (m = 0; m < 8; ++m)
-                printf("%02x", ucp[8 + m]);
+                printf("%02x", ucp[6 + eip_off + m]);
             printf("\n");
-            per_ucp = ucp + 16;
+            per_ucp = ucp + 14 + eip_off;
             for (j = 0; j < phys; ++j, per_ucp += 2) {
                 printf("    [%d] ", phys + 1);
                 if (0xff == per_ucp[0])
@@ -1085,7 +1086,7 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
                          int num_telems, unsigned int ref_gen_code,
                          const unsigned char * resp, int resp_len)
 {
-    int j, k, desc_len, elem_type, invalid, proto, desc_type;
+    int j, k, desc_len, elem_type, invalid, proto, desc_type, eip;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -1120,13 +1121,22 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
                    ehp[k].etype, ehp[k].se_id);
         for (j = 0; j < ehp[k].num_elements; ++j, ucp += desc_len) {
             invalid = !!(ucp[0] & 0x80);
+            eip = !!(ucp[0] & 0x10);
             proto = (ucp[0] & 0xf);
-            desc_type = (ucp[5] >> 6) & 0x3;
-            if ((0x6 == proto) && (0 == desc_type))  /* SAS non expander */
-                printf("    element index: %d [0x%x], bay number: %d "
-                       "[0x%x]\n", ucp[3], ucp[3], ucp[7], ucp[7]);
-            else
-                printf("    element index: %d [0x%x]\n", ucp[3], ucp[3]);
+            if (0x6 == proto) {  /* SAS */
+                desc_type = ((eip ? ucp[5] : ucp[3]) >> 6) & 0x3;
+                if (eip) {
+                    if (0 == desc_type) /* non expander */
+                        printf("    element index: %d [0x%x], bay number: %d"
+                               " [0x%x]\n", ucp[3], ucp[3], ucp[7], ucp[7]);
+                    else
+                        printf("    element index: %d [0x%x]\n", ucp[3],
+                               ucp[3]);
+                }
+            } else {  /* FCP most likely */
+                if (eip)
+                    printf("    element index: %d [0x%x]\n", ucp[3], ucp[3]);
+            }
             desc_len = ucp[1] + 2;
             if (invalid)
                 printf("      flagged as invalid (no further information)\n");

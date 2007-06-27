@@ -1,4 +1,4 @@
-.TH SG_RBUF "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_RBUF "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_rbuf \- reads data using SCSI READ BUFFER command
 .SH SYNOPSIS
@@ -8,35 +8,43 @@ sg_rbuf \- reads data using SCSI READ BUFFER command
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This command reads data with the SCSI READ BUFFER command via
-the sg driver and then discards it. Typically the data being 
-read is from a disk's memory cache. It is assumed that the data
+This command reads data with the SCSI READ BUFFER command
+and then discards it. Typically the data being read is from
+a disk's memory cache. It is assumed that the data
 is sourced quickly (although this is not guaranteed by the SCSI
-standards). This command is designed for timing transfer speeds
-across a SCSI bus.
+standards) so that it is faster than reading data from the
+media. This command is designed for timing transfer speeds
+across a SCSI transport.
 .TP
 -b=<num_KiB>
 size of each transfer (in Kilobytes == 1024). The default is
-the actual available buffer size returned by the READ BUFFER
-command. The maximum is the same as the default, hence this
-argument can only be used to reduce the size of each transfer
-to less than the device's actual available buffer size.
+the actual available buffer size returned by the READ
+BUFFER (descriptor) command. The maximum is the same as the
+default, hence this argument can only be used to reduce the size
+of each transfer to less than the device's actual available buffer
+size.
 .TP
 -d
-use direct IO if available. In this case the sg driver will attempt
+use direct IO if available. This option is only available if
+the given device is a sg driver device node (e.g. /dev/sg1).
+In this case the sg driver will attempt
 to configure the DMA from the SCSI adapter to transfer directly
 into user memory. This will eliminate the copy via kernel buffers.
 If not available then this will be reported and indirect IO will
 be done instead.
 .TP
 -m
-use memory mapped IO if available. In this case the sg driver will attempt
+use memory mapped IO if available. This option is only available if
+the given device is a sg driver device node (e.g. /dev/sg1).
+In this case the sg driver will attempt
 to configure the DMA from the SCSI adapter to transfer directly
 into user memory. This will eliminate the copy via kernel buffers.
 .TP
 -q
 only transfer the data into kernel buffers (typically by DMA from
 the SCSI adapter card) and do not move it into the user space.
+This option is only available if the given device is a sg driver
+device node (e.g. /dev/sg1).
 .TP
 -s=<num_MiB>
 size of total transfer (in Megabytes == 1024^2). The default is
@@ -52,7 +60,8 @@ calculation.
 .TP
 -v
 increase level of verbosity (print out SCSI command bytes before
-executing it). '-vv' and '-vvv' are also accepted yielding greater verbosity.
+executing it). '-vv' and '-vvv' are also accepted yielding greater
+verbosity.
 .TP
 -V
 print out version string then exit.
@@ -60,14 +69,10 @@ print out version string then exit.
 This command is typically used on modern SCSI disks which have
 a RAM cache on their drive electronics. If no IO to the magnetic
 media, or slower devices like flash RAM, is involved then
-the disk should be able to source data fast enough to saturate
-the bandwidth of the host machine. The bottleneck may then be
-the SCSI bus, the Linux drivers or the host machine's hardware
-(e.g. speed of RAM). Using time(1) in front of a
-sg_rbuf command is one way to do such measurements.
-.PP
-Note that maximum bandwidths given by SCSI standards (e.g. UW ==
-40 MB/sec) take "Mega" to mean 10^6 .
+the disk may be able to source data fast enough to saturate
+the bandwidth of the SCSI transport. The bottleneck may then be
+the DMA element in the HBA, the Linux drivers or the host machine's
+hardware (e.g. speed of RAM).
 .SH EXAMPLES
 .PP
 On the test system /dev/sg0 corresponds to a fast disk
@@ -106,9 +111,9 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000, 2001 Douglas Gilbert
+Copyright \(co 2000-2005 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B time(1)
+.B sg_test_rwbuf(sg3_utils)

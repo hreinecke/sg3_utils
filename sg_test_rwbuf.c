@@ -35,7 +35,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.01 20050310";
+static char * version_str = "1.02 20050511";
 
 #define BPI (signed)(sizeof(int))
 
@@ -468,7 +468,7 @@ int main (int argc, char * argv[])
                 return 1;
         }
    
-        sg_fd = open(device_name, O_RDWR);
+        sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
         if (sg_fd < 0) {
                 perror("sg_test_rwbuf: open error");
                 return 1;

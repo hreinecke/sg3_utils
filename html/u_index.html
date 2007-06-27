@@ -13,7 +13,8 @@
 <h1> The&nbsp; Linux sg3_utils package</h1>
 </center>
 <a href="#intro">Introduction</a> <br>
-<a href="#contents">Contents </a><br>
+<a href="#contents">Contents</a><br>
+<a href="#Changing_mode_page_settings">Changing mode page settings</a><br>
 <a href="#Examples"><span style="text-decoration: underline;">Examples</span></a><br>
 <a href="#notes">Notes</a> <br>
 <a href="#download">Download</a> <br>
@@ -24,7 +25,7 @@ The <span style="font-weight: bold;">sg3_utils</span> package contains
 utilities
 that send SCSI commands to Linux devices. As well as devices on SCSI
 transports (e.g. Fibre channel and the SCSI parallel interface) many
-other devices use SCSI command sets. Examples are ATAPI cd/dvd writers
+other devices use SCSI command sets. Examples are ATAPI cd/dvd drives
 and SATA disks (typically via a translation layer or bridge device).
 SCSI command sets are divided into what are called "primary" commands
 (e.g. SPC-3) and device class specific sets (e.g. SBC-2 for disks and
@@ -33,16 +34,16 @@ definitions can be found at <a href="http://www.t10.org">www.t10.org</a>
 .<br>
 <br>
 The
-<span style="font-weight: bold;">sg3_utils</span> pacakge targets the
+<span style="font-weight: bold;">sg3_utils</span> package targets the
 linux kernel 2.4 and 2.6 series and is
 still under active development. An earlier package called sg_utils
 targeted the&nbsp; linux kernel 2.2 series with some support for the
 2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>&nbsp;
 for further information about sg_utils.&nbsp; This
 document describes
-version 1.13 of sg3_utils . <br>
+version 1.15 of sg3_utils . <br>
 <br>
-In the linux kernel 2.4 series these utilities must be
+In the linux kernel 2.4 series most these utilities must be
 used with a SCSI generic (sg) driver device name (e.g. <span
  style="font-family: monospace;">/dev/sg0</span>). In
 the lk 2.6 series almost all of these utilities can be used with the
@@ -136,6 +137,17 @@ SCSI_IOCTL_SEND_COMMAND ioctl<br>
       </td>
     </tr>
     <tr>
+      <td style="vertical-align: top;">sdparm<br>
+      </td>
+      <td style="vertical-align: top;">MODE SENSE/SELECT, INQUIRY<br>
+      </td>
+      <td style="vertical-align: top;">****<br>
+      </td>
+      <td style="vertical-align: top;">was in sg3_utils for a short
+time; now in own package, see <a href="sdparm.html">sdparm</a><br>
+      </td>
+    </tr>
+    <tr>
       <td style="vertical-align: top;">sginfo<br>
       </td>
       <td style="vertical-align: top;">MODE SENSE/SELECT, READ DEFECT<br>
@@ -143,7 +155,9 @@ SCSI_IOCTL_SEND_COMMAND ioctl<br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">symbolic decoding (optional
-changing) of mode pages. Can also output (disk) defect lists<br>
+changing) of mode pages. Can also output (disk) defect lists. In lk 2.4
+can be given primary device nodes (e.g. /dev/sda) as well as sg device
+nodes.<br>
       </td>
     </tr>
     <tr>
@@ -230,8 +244,8 @@ cd/dvd drive and/or its current media<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fetch standard reponse, VPD
-pages (including device identification) or version decsriptors<br>
+      <td style="vertical-align: top;">fetch standard response, VPD
+pages (including device identification) or version descriptors<br>
       </td>
     </tr>
     <tr>
@@ -392,6 +406,18 @@ device (target or lun?) reset.<br>
       </td>
     </tr>
     <tr>
+      <td style="vertical-align: top;">sg_rmsn<br>
+      </td>
+      <td style="vertical-align: top;">READ MEDIA SERIAL NUMBER<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Relatively new&nbsp; command
+added to SPC-3. Format of response is vendor specific so this utility
+outputs it in hex.<br>
+      </td>
+    </tr>
+    <tr>
       <td style="vertical-align: top;">sg_rtpg<br>
       </td>
       <td style="vertical-align: top;">REPORT TARGET PORT GROUPS<br>
@@ -538,7 +564,9 @@ sg_read_long utility.<br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">writes mode pages supplied in
-ASCII hex (e.g. from "sg_modes -r") to the given SCSI device<br>
+ASCII hex (e.g. from "sg_modes -r") to the given SCSI device. See <a
+ href="sdparm.html">sdparm</a> for another method of setting mode page
+parameters.<br>
       </td>
     </tr>
   </tbody>
@@ -564,18 +592,80 @@ pages.<br>
 In the above table all utilities in the main directory except sgp_dd
 issue SG_IO ioctls when they want to send SCSI commands to the given
 device. The sgp_dd utility will only issue SCSI commands using the sg
-driver's asynchronous (write()/read() ) interface to device nodes that
+driver's asynchronous ( write()/read() ) interface to device nodes that
 have the sg driver's major device number (i.e. "char" major 21). This
 means that all utilities in the main directory are "safe" with any
 given device node. If the device node does not support the SG_IO ioctl
-then that is reported and the utility exits.<br>
+then that is reported and the utility exits. [In version 1.14 sgm_dd
+also use the sg
+driver's asynchronous ( write()/read() ) interface but that has been
+changed to the SG_IO ioctl in version 1.15 since the asynchronous
+action is not needed. sgm_dd will only use mmapped IO on sg device
+nodes.]<br>
 <br>
 Irrespective of the Unix device node used to access a device, care
 should be taken not to interfere with a device while it is "active".
 Obviously invoking a "sg_format -F" utility a disk with mounted file
 systems on it is going to cause damage.<br>
+<h2><a name="Changing_mode_page_settings"></a>Changing mode page
+settings</h2>
+SCSI devices store settings (metadata) that could possibly be changed
+by the user (called the "application client" in SCSI speak) in mode
+pages. It is a common requirement to find mode page settings and in
+some cases change them. An example is the Writeback Cache Enable (WCE)
+bit
+in the Caching mode page of SCSI disks. Usually the manufacturer's
+default setting for WCE is set (on) but the user may want it off. <br>
+<br>
+Generic command line tools to change mode page settings tend to be
+difficult to use (which in some small part is due to the SCSI rules for
+manipulating mode pages). Here is a list of some utilities for changing
+mode pages followed by some notes:<br>
+<ul>
+  <li><span style="font-weight: bold;">scsiinfo</span> (old utility):
+awkward command line interface with double invocation (first to get,
+second to set). Only mode page fields that the utility knows about can
+be changed.<br>
+  </li>
+  <li><span style="font-weight: bold;">sginfo</span> (sg3_utils version
+of scsiinfo): same awkward interface as scsiinfo but the mode pages are
+more up to date. Supports other modern features such as mode subpages.<br>
+  </li>
+  <li><span style="font-weight: bold;">sg_wr_mode</span> (sg3_utils):
+low level mode page settings based on ASCII hex representation. Used
+with sg_modes to get a mode page in raw form and assumes ACSII hex will
+be edited. Low level but general.</li>
+  <li><span style="font-weight: bold;">sdparm</span> (sdparm): uses
+acronyms (e.g. WCE) or numeric addressing to change mode page settings.
+Allows device to be reset to default settings in a specific mode page.
+The "saved" mode page values can also manipulated separately. The
+numeric addressing allows arbitrary fields to be changed (i.e. sdparm
+doesn't need to know about them in advance).<br>
+  </li>
+  <li><span style="font-weight: bold;">sgmode</span> (scsirastools):
+interactive utility for setting mode pages with data held in preset
+".mdf" files. Useful to setting a large number of disks to preset mode
+page values but awkward for manipulating a specific mode page field.</li>
+  <li><span style="font-weight: bold;">hdparm</span> (hdparm):
+abstracts over ATA (mainly) and SCSI (where convenient) disks. Write
+caching can be turned on and off but that is one of the few mode fields
+that can be changed.</li>
+  <li><span style="font-weight: bold;">blktool</span> (blktool): much
+newer and cleaner version of hdparm which targets the lk 2.6 series.
+For SCSI devices only a relatively small (but important) number of mode
+page fields can be changed.</li>
+  <li>vendor specific (e.g. seatools from Seagate): several vendors
+have utilities like this. Worth investigating and often useful with
+disks from other manufacturers. Vendor extensions can be controlled
+(e.g. Seagate's desktop/server mode (also see sdparm's man page about
+this particular feature)).<br>
+  </li>
+</ul>
+The author's recommendation is to use <a href="sdparm.html">sdparm</a>
+unless the features of
+another utility better suit your needs.<br>
 <h2><a name="Examples"></a>Examples</h2>
-The fundemental SCSI command whose support is mandatory for all SCSI
+The fundamental SCSI command whose support is mandatory for all SCSI
 devices is INQUIRY. All devices should respond to a "standard" (i.e.
 when no Vital Product Pages are requested) INQUIRY.<br>
 <br>
@@ -779,7 +869,8 @@ devices and support the SG_IO ioctl from lk 2.6.6 onwards.<br>
 each package. </p>
 <h2> <a name="download"></a>Download</h2>
 Various tarballs that include the source, a README, CHANGELOG, INSTALL
-and a Makefile can be found in the <u>sg_utils tables</u> on the main
+and a Makefile can be found in the <span
+ style="text-decoration: underline;">table 2</span> on the main
 page (link at the bottom of this page). There are also source,
 i386 binary rpm and deb packages available. Both sg3_utils and the
 older sg_utils packages can
@@ -792,18 +883,22 @@ peripherals. Some of its features include: formatting, scanning for
 (and reassigning) bad blocks, downloading new firmware, executing
 diagnostics and obtaining performance information. It is available on
 several Unix platforms (and NT), however it is only currently available
-in binary form. See <a
- href="http://www.bit-net.com/%7Ermiller/scu.html">www.bit-net.com/~rmiller/scu.html</a>
+in binary form. See&nbsp;<a class="moz-txt-link-freetext"
+ href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
+ style="font-family: monospace;"> </span>www.scsifaq.org/RMiller_Tools/index.html</a>
+or&nbsp; <a href="http://www.scsifaq.org/RMiller_Tools/index.html">http://www.scsifaq.org/RMiller_Tools/index.html</a>
 for more details.
 <h3> dt</h3>
 The Data Test (DT) program is modelled on dd's syntax but <b>dt </b>can
 do a lot more than sequential copies. It is a comprehensive data test
 program for SCSI devices such as disks, tapes and cdrom/dvds. It is
 available on several Unix platforms (and NT), and its source is
-available (unlike its stable mate <b>scu</b> discussed earlier). See <a
- href="http://www.bit-net.com/%7Ermiller/dt.html">www.bit-net.com/~rmiller/dt.html</a>
-for more details. Both <b>scu</b> and <b>dt </b>are written by Robin
-T. Miller &lt;Robin.Miller@hp.com&gt;
+available (unlike its stable mate <b>scu</b> discussed earlier).
+See&nbsp;<a class="moz-txt-link-freetext"
+ href="http://www.scsifaq.org/RMiller_Tools/index.html"><span
+ style="font-family: monospace;"></span>www.scsifaq.org/RMiller_Tools/index.html</a>&nbsp;for
+more details. Both <b>scu</b> and <b>dt </b>are written by Robin
+T. Miller &lt;Robin.Miller at hp dot com&gt;
 <h3> scsidev</h3>
 Kurt Garloff &lt;garloff@suse.de&gt; describes this utility thus: "This
 program scans the SCSI bus and creates device nodes in /dev/scsi/,
@@ -905,7 +1000,7 @@ This utility allows arbitrary SCSI commands to be sent to a device. See
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 13th March 2005, 13:00<br>
+<p>Last updated: 5th June 2005<br>
 <br>
 </p>
 </center>

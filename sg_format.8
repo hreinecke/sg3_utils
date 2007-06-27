@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_FORMAT "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
@@ -20,11 +20,13 @@ reassignment of logical block addresses during the life of the disk.
 .PP
 This utility can format modern SCSI disks and potentially change their
 block size (if permitted) and the block count (i.e. number of accessible
-blocks on the media). Resizing the block count while not changing the
-block size may not require a format operation. Recent changes to the SBC-2
-draft standard (see www.t10.org) have obsoleted the "format device" mode
-page. Many of the low level details found in that mode page are now left
-up to the discretion of the manufacturer.
+blocks on the media also known as "resizing"). Resizing a disk to less
+than the manufacturer's recommended block count is sometimes called "short
+stroking" (see NOTES section). Resizing the block count while not changing
+the block size may not require a format operation. Recent changes to the
+SBC-2 draft standard (see www.t10.org) have obsoleted the "format device"
+mode page. Many of the low level details found in that mode page are now
+left up to the discretion of the manufacturer.
 .PP
 When this utility is used without options (apart from a device name)
 then it prints out the existing block size and block count derived
@@ -44,17 +46,43 @@ are associated with protection information and can be set by this
 utility.
 .TP
 --count=<n> | -c <n>
-count of blocks to be formatted (or media to be resized to). Defaults
-to zero whose interpretation depends on the block size:
+count of blocks to be formatted or media to be resized to. Can be
+used with either "--format" or "--resize". With "--format" this
+option need not be given in which case it is assumed to be zero.
+With "--format" the interpretation of <n> is:
 .br
-  - [block size unchanged]: use existing block count
+  (n > 0) : only format the first <n> blocks and READ
 .br
-  - [block size changed]: recommended maximum block count
+            CAPACITY will report <n> blocks after format
 .br
-If '-1' is given then disk manufacturer's recommended (maximum) count
-is used (see NOTES section) for a "--resize". This option only has an
-effect when used with either "--format" or "--resize". When the "--resize"
-option is used, this option is mandatory.
+  (n = 0) and block size unchanged : use existing block count
+.br
+  (n = 0) and block size changed : recommended maximum block
+.br
+                                   count for new block size
+.br
+  (n = -1) : use recommended maximum block count
+.br
+  (n < -1) : illegal
+.br
+With "--resize" this option must be given and <n> has this
+interpretation:
+.br
+  (n > 0) : after resize READ CAPACITY will report <n>
+.br
+            blocks
+.br
+  (n = 0) : after resize READ CAPACITY will report 0 blocks
+.br
+  (n = -1) : after resize READ CAPACITY will report its
+.br
+             maximum number of blocks
+.br
+  (n < -1) : illegal
+.br
+In both cases if the given <n> exceeds the maximum number of
+blocks (for the block size) then the disk reports an error.
+See NOTES section below.
 .TP
 --early | -e
 this option is active when "--format" is given. The default action of this
@@ -92,8 +120,11 @@ unless '--format' is given.
 --resize | -r
 rather than format the disk, it can be resized. This means changing the
 number of blocks on the device reported by the READ CAPACITY command.
-This option cannot be used together with either "--format" or a "--size"
-whose argument is different to the existing block size. 
+This option should be used with the '--count=<new_blk_count>' option.
+The contents of all logical blocks on the media remain unchanged when
+this option is used. This means that any resize operation can be
+reversed. This option cannot be used together with either "--format"
+or a "--size" whose argument is different to the existing block size. 
 .TP
 --rto_req | -R
 instructs a format to enable application client ownership of
@@ -108,7 +139,8 @@ in a MODE SENSE command.  This option is only active when the "--format"
 option is also given. If the block size given by this option is different
 from the current value then a MODE SELECT command is used to change it
 prior to the FORMAT command being started (as recommended in the draft
-standard).
+standard). Recent SCSI disks usually have 512 byte sectors by default
+and allow up to 16 bytes extra in a sector (i.e. 528 byte sectors).
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output). "-vvv" gives
@@ -187,6 +219,17 @@ to be set back to the manufacturer's maximum recommended value. To see
 exactly which SCSI commands are being executed and parameters passed
 add "-vvv" to the sg_format command line.
 .PP
+Short stroking is a technique to trade off capacity for performance.
+Disk performance is usually highest on the outer tracks (i.e. lower
+logical block addresses) so by resizing or reformatting a disk to
+a smaller capacity, average performance will usually be increased.
+.PP
+Other utilities may be useful in finding information associated with
+formatting. These include sg_inq to fetch standard INQUIRY
+information (e.g. the PROTECT bit) and to fetch the extended INQUIRY
+VPD page (e.g. RTO and GRD_CHK bits). The sdparm (or sginfo) utility can be
+used to access and potentially change the now obsolete format mode page.
+.PP
 The argument to "--count" is a number which may be followed by one of
 these multiplicative suffixes: c C *1; w W *2; b B *512; k K KiB *1,024;
 KB *1,000; m M MiB *1,048,576; MB *1,000,000 . This pattern continues
@@ -195,7 +238,7 @@ leading number by <n>. Alternatively numerical values can be given in
 hexadecimal preceded by either "0x" or "0X". When hex numbers are given,
 multipliers cannot be used.
 .SH EXAMPLES
-First, do nothing, but print out the existing block count and size
+First, do not alter anything but print out the existing block count and size
 derived from two sources: a block descriptor in a MODE SELECT command
 response and from the response of a READ CAPACITY commands:
 .PP
@@ -219,10 +262,11 @@ the block size:
 .PP
    sg_format --format --size=520 /dev/sdm
 .PP
-Now a resize operation to hide all but the first 0x1000 (4096)
-blocks on a disk:
+Now a resize operation so that only the first 0x10000 (65536)
+blocks on a disk are accessible. The remaining blocks remain
+unaltered.
 .PP
-   sg_format --resize --count=0x1000 /dev/sdm
+   sg_format --resize --count=0x10000 /dev/sdm
 .PP
 Now resize the disk back to its normal (maximum) block count:
 .PP
@@ -239,4 +283,4 @@ This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg_turs, sg_requests, sg_inq, sg_modes, sginfo, sg_wr_mode
-(all in sg3_utils)
+.B (all in sg3_utils), sdparm
