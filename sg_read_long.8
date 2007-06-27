@@ -1,72 +1,75 @@
-.TH SG_READ_LONG "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_READ_LONG "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_read_long \- calls a READ LONG command on a SCSI device
+sg_read_long \- send a SCSI READ LONG command
 .SH SYNOPSIS
 .B sg_read_long
-[\fI--16\fR] [\fI--correct\fR] [\fI--help\fR] [\fI--lba=<num>\fR]
-[\fI--out=<name>\fR] [\fI--pblock\fR] [\fI--verbose\fR] [\fI--version\fR]
-[\fI--xfer_len=<num>\fR] \fI<scsi_device>\fR
+[\fI\-\-16\fR] [\fI\-\-correct\fR] [\fI\-\-help\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-out=OF\fR] [\fI\-\-pblock\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-xfer_len=BTL\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send READ LONG command to a SCSI device. The read
-buffer is output in hex and ASCII to stdout or placed in a file.
-Note that the data returned includes the logical block data (typically
-512 bytes for a disk) plus ECC information (whose format is proprietary)
-plus optionally other proprietary data.
+Send SCSI READ LONG command to \fIDEVICE\fR. The read buffer is output in hex
+and ASCII to stdout or placed in a file. Note that the data returned includes
+the logical block data (typically 512 bytes for a disk) plus ECC
+information (whose format is proprietary) plus optionally other proprietary
+data.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---16 | -S
-attempts a READ LONG(16) SCSI command. The default action is to attempt
-a READ LONG(10) SCSI command. The READ LONG(10) command has a 32 bit
-field for the lba while READ LONG(16) has a 64 bit field.
+\fB\-S\fR, \fB\-\-16\fR
+uses a SCSI READ LONG(16) command. The default action is to use a SCSI
+READ LONG(10) command. The READ LONG(10) command has a 32 bit field for
+the lba while READ LONG(16) has a 64 bit field.
 .TP
---correct | -c
-sets the 'CORRCT' bit in the READ LONG SCSI command. When set the data is
+\fB\-c\fR, \fB\-\-correct\fR
+sets the 'CORRCT' bit in the SCSI READ LONG command. When set the data is
 corrected by the ECC before being transferred back to this utility. The
 default is to leave the 'CORRCT' bit clear in which case the data is
 not corrected.
 .TP
---help | -h
+\fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
---lba=<num> | -l <num>
-the logical block address of the sector to read. Assumed to be in
-decimal unless prefixed with '0x'. Defaults to lba 0. If the lba is
-larger than can fit in 32 bits then the '--16' form should be used.
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the logical block address of the sector to read. Assumed
+to be in decimal unless prefixed with '0x' (or has a trailing 'h'). Defaults
+to lba 0. If the lba is larger than can fit in 32 bits then the \fI\-\-16\fR
+option should be used.
 .TP
---out=<name> | -o <name>
-instead of outputting ASCII hex to stdout, try to send it to the file
-called <name>. If '-' is given as the <name> then the (binary) output
-is sent to stdout. Note that all informative and error output is
+\fB\-o\fR, \fB\-\-out\fR=\fIOF\fR
+instead of outputting ASCII hex to stdout, send it in binary to the
+file called \fIOF\fR. If '\-' is given for \fIOF\fR then the (binary)
+output is sent to stdout. Note that all informative and error output is
 sent to stderr.
 .TP
---pblock | -p
-sets the 'PBLOCK' bit in the READ LONG SCSI command. When set the
+\fB\-p\fR, \fB\-\-pblock\fR
+sets the 'PBLOCK' bit in the SCSI READ LONG command. When set the
 physical block (plus ECC data) containing the requested logical block
 address is read. The default is to leave the 'PBLOCK' bit clear in
 which case the logical block (plus any ECC data) is read.
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
 .TP
---xfer_len=<num> | -x <num>
-the transfer length in bytes (default to 520). If the given value (or the
-default) does not match the "long" block size of the device, the
-appropriate xfer_len value is derived from the error response and
+\fB\-x\fR, \fB\-\-xfer_len\fR=\fIBTL\fR
+where \fIBTL\fR is the byte transfer length (default to 520). If the
+given value (or the default) does not match the "long" block size of the
+device, the appropriate \fIBTL\fR is deduced from the error response and
 printed (to stderr). The idea is that the user will retry this utility
 with the correct transfer length.
-.PP
+.SH NOTES
 If a defective block is found and its contents, if any, has been
 retrieved then "sg_reassign" could be used to map out the defective
 block. Associated with such an action the number of elements in
-the "grown" defect list could be monitored (with "sg_reassign --grown")
+the "grown" defect list could be monitored (with "sg_reassign \-\-grown")
 as the disk could be nearing the end of its useful lifetime.
 .PP
-The lba and xfer_len numerical arguments may be followed by the following
-multiplicative suffixes:
+The \fILBA\fR and \fIBTL\fR (transfer length) arguments may be followed by
+the following multiplicative suffixes:
 c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
 MB *1,000,000; g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix
 of the form "x<n>" multiplies the leading number by <n>.
@@ -86,7 +89,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2006 Douglas Gilbert
+Copyright \(co 2004\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

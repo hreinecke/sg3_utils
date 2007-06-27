@@ -1,96 +1,172 @@
-.TH SG_OPCODES "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_OPCODES "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_opcodes \- reports information on supported SCSI commands or
-supported task management functions
+task management functions
 .SH SYNOPSIS
 .B sg_opcodes
-[\fI-a\fR] [\fI-o=<opcode>\fR [\fI-s=<service_action>\fR ] ] [\fI-u\fR]
-[\fI-u\fR] [\fI-v\fR] [\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
+[\fI\-\-alpha\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-opcode=OP\fR]
+[\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR]
+[\fI\-\-unsorted\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_opcodes
+[\fI\-a\fR] [\fI\-o=OP\fR] [\fI\-R\fR] [\fI\-s=SA\fR] [\fI\-t\fR] [\fI\-u\fR]
+[\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility sends a REPORT SUPPORTED OPERATION CODES or a
-REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS SCSI command to the
-given device and then outputs the response. The default action is
-to report supported operation codes. In this mode it will either
-list all supported commands or give detailed information on a specific
-command identified by the "-o" option (perhaps with additional
-information from the "-s" option).
+This utility sends a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT
+SUPPORTED TASK MANAGEMENT FUNCTIONS command to the \fIDEVICE\fR and then
+outputs the response. The default action is to report supported operation
+codes. In this mode it will either list all supported commands or give
+detailed information on a specific command identified by the
+\fI\-\-opcode=OP\fR option (perhaps with additional information from the
+\fI\-\-sa=SA\fR option).
 .PP
-The name of a SCSI command depends on its peripheral device type (e.g.
-a disk) which is obtained from a standard SCSI INQUIRY command. Further
-the REPORT SUPPORTED OPERATION CODES and REPORT SUPPORTED TASK
-MANAGEMENT FUNCTIONS commands are not supported in the MMC command set
-for CD and DVD devices. This utility does an INQUIRY to obtain the
-peripheral device type and prints out the vendor, product and revision
-strings.
+The name of a SCSI command depends on its peripheral device type (e.g. a
+disk). The REPORT SUPPORTED OPERATION CODES and REPORT SUPPORTED TASK
+MANAGEMENT FUNCTIONS commands are not supported in the MMC command set for
+CD and DVD devices. This utility does an INQUIRY to obtain the peripheral
+device type and prints out the vendor, product and revision strings.
 .PP
-A similar facility to query supported operation codes used to be available
+A similar facility to query supported operation codes previously was available
 via the CmdDt bit in the SCSI INQUIRY command (see sg_inq(8)). However that
 facility was made obsolete and replaced by the REPORT SUPPORTED OPERATION
-CODES SCSI command in SPC-3 (revision 4) in February 2002.
+CODES command in SPC\-3 (revision 4) during February 2002.
+.PP
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later section
+on the old command line syntax outlines the second group of options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
--a
+\fB\-a\fR, \fB\-\-alpha\fR
 when all supported commands are being listed there is no requirement for
-the device server (i.e. the target) to sort the list of commands. When
+the device server (i.e. the \fIDEVICE\fR) to sort the list of commands. When
 this option is given the list of supported commands is sorted by
-name (alphabetically). When this option and the '-u' option are
+name (alphabetically). When this option and the \fB\-\-unsorted\fR option are
 both _not_ given then the list of supported commands is sorted
 numerically (first by operation code and then by service action).
 .TP
--o=<opcode>
-the given device will be queried for the given operation code ("opcode")
-which is the first byte of a SCSI command. Argument
-is hexadecimal and expected to be in the range 0 to ff inclusive.
-When this option is not given then all available SCSI commands supported
-by the target are listed.
+\fB\-h\fR, \fB\-\-help\fR
+outputs the usage message summarizing command line options
+then exits. Ignores \fIDEVICE\fR if given.
 .TP
--s=<service_action>
-the given device will be queried for a command with the given service 
-action ("service_action"). Used in conjunction with the '-o=<opcode>'
-option. If '-s' is not given, '-o' is given and the command in question
-does have a service action then a value of 0 will be assumed.
-The "<service_action>" argument is hexadecimal and expected to be in the
-range 0 to ffff inclusive.
+\fB\-H\fR, \fB\-\-hex\fR
+outputs the response in ASCII hexadecimal to stdout.
 .TP
--t
-list supported task management functions. When this option is chosen
-the '-a', '-o' and '-u' options are ignored.
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
 .TP
--u
+\fB\-o\fR, \fB\-\-opcode\fR=\fIOP\fR
+the \fIDEVICE\fR will be queried for the given operation code ( i.e. the
+\fIOP\fR value) which is the first byte of a SCSI command. \fIOP\fR is
+decimal unless prefixed by "0x" or it has a trailing "h". \fIOP\fR should
+be in the range 0 to 255 (0xff) inclusive. When this option is not given
+then all available SCSI commands supported by the \fIDEVICE\fR are listed.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output the response in binary to stdout. Error messages and warnings, if
+any, are sent to stderr.
+.TP
+\fB\-R\fR, \fB\-\-rctd\fR
+set report command timeout descriptor (RCTD) bit in the cdb. The response
+may or may not contain command timeout descriptors. If available they are
+output. If supported there are two values: a nominal command timeout
+and a recommended command timeout. Both have units of seconds. A value
+of zero means that no timeout is indicated and this is shown in
+the corresponding decoded output as "-".
+.TP
+\fB\-s\fR, \fB\-\-sa\fR=\fISA\fR
+the \fIDEVICE\fR will be queried for a command with the given service 
+action (i.e. the \fISA\fR value). Used in conjunction with the
+\fI\-\-opcode=OP\fR option. If this option is not given, \fI\-\-opcode=OP\fR
+is given and the command in question does have a service action then a value
+of 0 will be assumed. \fISA\fR is decimal and expected to be in the range 0
+to 65535 (0xffff) inclusive.
+.TP
+\fB\-t\fR, \fB\-\-tmf\fR
+list supported task management functions. This is done with the SCSI REPORT
+SUPPORTED TASK MANAGEMENT FUNCTIONS command.  When this option is chosen
+the \fI\-\-alpha\fR, \fI\-\-opcode=OP\fR, \fI\-\-rctd\fR, \fI\-\-sa=SA\fR
+and \fI\-\-unsorted\fR options are ignored.
+.TP
+\fB\-u\fR, \fB\-\-unsorted\fR
 when all supported commands are being listed there is no requirement for
-the device server (i.e. the target) to sort the list of commands. When
-this option is given the list of supported commands is in the order
-given by the target. When this option is not given the supported commands
-are sorted numerically (first by operation code and then by service action). 
+the device server (i.e. the \fIDEVICE\fR) to sort the list of commands. When
+this option is given the list of supported commands is in the order given by
+the \fIDEVICE\fR. When this option is not given the supported commands
+are sorted numerically (first by operation code and then by service action).
 .TP
--v
-verbose: print out cdb of issued commands prior to execution. '-vv'
-and '-vvv' are also accepted yielding greater verbosity.
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level of verbosity. Can be used multiple times.
 .TP
--V
-print out version string
-.TP
--?
-output usage message. Ignore all other parameters.
-.PP
-As of SPC-4 revision 1 the recognized task management functions are:
+\fB\-V\fR, \fB\-\-version\fR
+print out version string then exit.
+.SH NOTES
+As of SPC\-4 revision 7a the recognized task management functions are:
 abort set, abort task set, clear ACA, clear task set, I_T nexus reset,
 logical unit reset, query task, target reset and wakeup.
 .PP
-In the 2.4 series of Linux kernels the given device must be
-a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
-and SCSI DVDs) can also be specified. For example "sg_opcodes /dev/sda"
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
+generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
+and DVD drives) can also be specified. For example "sg_opcodes /dev/sda"
 will work in the 2.6 series kernels.
 .SH EXIT STATUS
 The exit status of sg_opcodes is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.TP
+\fB\-a\fR
+sort command alphabetically. Equivalent to \fI\-\-alpha\fR in main
+description.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-o\fR=\fIOP\fR
+the \fIDEVICE\fR will be queried for the given operation code (i.e.
+\fIOP\fR) which is the first byte of a SCSI command. \fIOP\fR is
+hexadecimal and expected to be in the range 0 to ff inclusive.
+When this option is not given then all available SCSI commands supported
+by the \fIDEVICE\fR are listed.
+.TP
+\fB\-R\fR
+set the report command timeout descriptor (RCTD) bit in cdb. Equivalent
+to \fI\-\-rctd\fR in main description.
+.TP
+\fB\-s\fR=\fISA\fR
+the \fIDEVICE\fR will be queried for a command with the given service 
+action (i.e. \fISA\fR). Used in conjunction with the \fI\-o=OP\fR
+option. If this option is not given, \fI\-o=OP\fR is given and the command
+in question does have a service action then a value of 0 will be assumed.
+\fISA\fR is hexadecimal and expected to be in the range 0 to ffff inclusive.
+.TP
+\fB\-t\fR
+list supported task management functions. Equivalent to \fI\-\-tmf\fR in
+the main description.
+.TP
+\fB\-u\fR
+output all supported commands in the order given by \fIDEVICE\fR.
+Equivalent to \fI\-\-unsorted\fR in main description.
+.TP
+\fB\-v\fR
+increase level of verbosity. Can be used multiple times.
+.TP
+\fB\-V\fR
+print out version string then exit.
+.TP
+\fB\-?\fR
+output usage message. Ignore all other parameters.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2006 Douglas Gilbert
+Copyright \(co 2004\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.07 20061012";
+static char * version_str = "1.08 20070127";
 
 #define ME "sg_wr_mode: "
 
@@ -70,39 +70,39 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_wr_mode [--contents=<h>,<h>...] [--dbd] [--force] [--help]\n"
-          "                  [--len=<10|6>] [--mask=<h>,<h>...]\n"
-          "                  [--page=<page_code>[,<subpage_code]] [--save]\n"
-          "                  [--verbose] [--version] <scsi_device>\n"
+          "sg_wr_mode [--contents=H,H...] [--dbd] [--force] [--help]\n"
+          "                  [--len=10|6] [--mask=M,M...] "
+          "[--page=PG[,SPG]] [--save]\n"
+          "                  [--verbose] [--version] DEVICE\n"
           "  where:\n"
-          "    --contents=<h>,<h>... | -c <h>,<h>...  comma separated "
-          "string of hex\n"
-          "                          numbers that is mode page contents"
-          " to write\n"
+          "    --contents=H,H... | -c H,H...    comma separated string "
+          "of hex numbers\n"
+          "                                     that is mode page contents "
+          "to write\n"
           "    --contents=- | -c -   read stdin for mode page contents"
           " to write\n"
           "    --dbd | -d            disable block descriptors (DBD bit"
           " in cdb)\n"
           "    --force | -f          force the contents to be written\n"
           "    --help | -h           print out usage message\n"
-          "    --len=<10|6> | -l <10|6>   use 10 byte (def) or 6 byte "
+          "    --len=10|6 | -l 10|6    use 10 byte (def) or 6 byte "
           "variants of\n"
-          "                          MODE SENSE/SELECT\n"
-          "    --mask=<h>,<h>... | -m <h>,<h>...   comma separated "
+          "                            SCSI MODE SENSE/SELECT commands\n"
+          "    --mask=M,M... | -m M,M...   comma separated "
           "string of hex\n"
-          "                          numbers that mask contents"
+          "                                numbers that mask contents"
           " to write\n"
-          "    --page=<page_code> | -p <page_code>  page_code to be "
-          "written (in hex)\n"
-          "    --page=<page_code>,<subpage_code | -p <pc>,<spc>  page "
-          "and subpage\n"
-          "                          code to be written (in hex)\n"
+          "    --page=PG | -p PG     page_code to be written (in hex)\n"
+          "    --page=PG,SPG | -p PG,SPG    page and subpage code to "
+          "be\n"
+          "                                 written (in hex)\n"
           "    --save | -s           set 'save page' (SP) bit; default "
           "don't so\n"
           "                          only 'current' values changed\n"
           "    --verbose | -v        increase verbosity\n"
           "    --version | -V        print version string and exit\n\n"
-          "writes given mode page to device with MODE SELECT (6 or 10)\n"
+          "writes given mode page with SCSI MODE SELECT (10 or 6) "
+          "command\n"
           );
 }
 

@@ -1,70 +1,71 @@
-.TH SG_TEST_RWBUF "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_TEST_RWBUF "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_test_rwbuf \- Tests the SCSI host adapter by issuing write and read 
 operations on a device's buffer and calculating checksums.
 .SH SYNOPSIS
 .B sg_test_rwbuf
-[\fI--addrd=<n>\fR] [\fI--addwr=<n>\fR] [\fI--help\fR]
-[\fI--quick\fR] \fI--size=<sz>\fR [\fI--times=<n>\fR] [\fI--verbose\fR]
-[\fI--version\fR] \fI<scsi_device>\fR
-.br
-or (an older deprecated format)
-.br
+[\fI\-\-addrd=AR\fR] [\fI\-\-addwr=AW\fR] [\fI\-\-help\fR]
+[\fI\-\-quick\fR] \fI\-\-size=SZ\fR [\fI\-\-times=NUM\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+or an older deprecated format
 .B sg_test_rwbuf
-\fI<scsi_device>\fR \fI<sz>\fR [\fI<addwr>\fR] [\fI<addrd>\fR]
+\fIDEVICE\fR \fISZ\fR [\fIAW\fR] [\fIAR\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-sg_test_rwbuf writes and reads back sz bytes to the internal buffer of
-<\fIscsi_device\fR> (e.g. /dev/sda or /dev/sg0). A pseudo random pattern is
+sg_test_rwbuf writes and reads back \fISZ\fR bytes to the internal buffer of
+\fIDEVICE\fR (e.g. /dev/sda or /dev/sg0). A pseudo random pattern is
 written to the data buffer on the device then read back. If the same pattern
 is found 'Success' is reported. If they do not match (checksums unequal) then
 this is reported and up to 24 bytes from the first point of mismatch are
 reported; the first line shows what was written and the second line shows
-what was received. For testing purposes, you can ask it to write <addwr> or
-read <addrd> additional bytes.
+what was received. For testing purposes, you can ask it to write \fIAW\fR or
+read \fIAR\fR additional bytes.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---addrd=<n> | -r <n>
-Read an additional <n> bytes (than indicated by <sz>) from the data buffer.
-Checksum is performed over the first <sz> bytes.
+\fB\-r\fR, \fB\-\-addrd\fR=\fIAR\fR
+Read an additional \fIAR\fR bytes (than indicated by \fISZ\fR) from the data
+buffer. Checksum is performed over the first \fISZ\fR bytes.
 .TP
---addwr=<n> | -w <n>
-Write an additional <n> bytes (than indicated by <sz>) of zeroes into the
-data buffer.  Checksum is generated over the first <sz> bytes.
+\fB\-w\fR, \fB\-\-addwr\fR=\fIAW\fR
+Write an additional \fIAW\fR bytes (than indicated by \fISZ\fR) of zeros
+into the data buffer. Checksum is generated over the first \fISZ\fR bytes.
 .TP
---help | -h
+\fB\-h\fR, \fB\-\-help\fR
 Print out a usage message the exit.
 .TP
---quick | -q
+\fB\-q\fR, \fB\-\-quick\fR
 Perform a READ BUFFER descriptor command to find out the available data
 buffer length and offset, print them out then exit (without testing
 with write/read sequences).
 .TP
---size=<sz> | -s <sz>
-Size of buffer in bytes to be written then read and checked. This number
-needs to be less than on equal to the size of the device's data buffer
-which can be seen from the '--quick' option. Either this option or
-the '--quick' option should be given.
+\fB\-s\fR, \fB\-\-size\fR=\fISZ\fR
+where \fISZ\fRis teh size of buffer in bytes to be written then read and
+checked. This number needs to be less than on equal to the size of the
+device's data buffer which can be seen from the \fI\-\-quick\fR option.
+Either this option or the \fI\-\-quick\fR option should be given.
 .TP
---times=<n> | -t <n>
-Number of times to repeat the write/read to buffer test. Default value
-is 1 .
+\fB\-t\fR, \fB\-\-times\fR=\fINUM\fR
+where \fINUM\fR is the number of times to repeat the write/read to buffer
+test. Default value is 1 .
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increase verbosity of output.
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 print version number (and data of last change) then exit.
-.PP
+.SH NOTES
 The microcode in a SCSI device is _not_ modified by doing a WRITE BUFFER
 command with its mode set to "data" (0x2) as done by this utility. Therefore
 this utility is safe in that respect. [Mode values 0x4, 0x5, 0x6 and 0x7
-are the dangerous ones :-)]
+are the dangerous ones :\-)]
 .PP
 \fBWARNING\fR: If you access the device at the same time (e.g. because it's
 a hard disk with a mounted file system on it) the device's buffer may be
 used by the device itself for other data at the same time, and overwriting
-it may or may not cause data corruption! \fBHOWEVER\fR the SPC-3 draft
+it may or may not cause data corruption! \fBHOWEVER\fR the SPC\-3 draft
 standard does state in its WRITE BUFFER command: "This command shall not
 alter any medium of the logical unit when data mode ... is specified". This
 implies that it _is_ safe to use this utility with devices that have mounted
@@ -78,7 +79,7 @@ the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert and K. Garloff
 .SH COPYRIGHT
-Copyright \(co 2000-2005 Douglas Gilbert, Kurt Garloff
+Copyright \(co 2000\-2006 Douglas Gilbert, Kurt Garloff
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,43 +1,45 @@
-.TH SG_RMSN "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_RMSN "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_rmsn \- read media serial number
+sg_rmsn \- sends a SCSI READ MEDIA SERIAL NUMBER command
 .SH SYNOPSIS
 .B sg_rmsn
-[\fI--help\fR] [\fI--raw\fR]
-[\fI--verbose\fR] [\fI--version\fR] \fI<scsi_device>\fR
+[\fI\-\-help\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send a READ MEDIA SERIAL NUMBER SCSI command to the given device and
-outputs the response. 
+Send a SCSI READ MEDIA SERIAL NUMBER command to \fIDEVICE\fR and outputs
+the response. 
 .PP
-This command is described in SPC-3 found at www.t10.org . It was
-originally added to SPC-3 in revision 11 (2003/2/12). It is not an
+This command is described in SPC\-3 found at www.t10.org . It was
+originally added to SPC\-3 in revision 11 (2003/2/12). It is not an
 mandatory command and the author has not seen any SCSI devices
 that support it.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---help | -h
+\fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
---raw | -r
+\fB\-r\fR, \fB\-\-raw\fR
 sends the serial number (if found) to stdout. This output may contain
-non-printable characters (e.g. the serial number is padded with NULLs
+non\-printable characters (e.g. the serial number is padded with NULLs
 at the end so its length is a multiple of 4). The default action is
-to print the serial number out in ASCII-HEX with ASCII characters to
+to print the serial number out in ASCII\-HEX with ASCII characters to
 the right. All error messages are sent to stderr.
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
-.PP
+.SH NOTES
 Device identification information is also found in a standard INQUIRY
 response and its VPD pages (see sg_vpd). The relevant VPD pages are
 the "device identification page" (VPD page 0x83) and the "unit serial
 number" page (VPD page 0x80).
 .PP
-The MMC-4 command set for CDs and DVDs has a "media serial number"
+The MMC\-4 command set for CDs and DVDs has a "media serial number"
 feature (0x109) [and a "logical unit serial number" feature]. These
 can be viewed with sg_get_config.
 .SH EXIT STATUS
@@ -48,7 +50,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005-2006 Douglas Gilbert
+Copyright \(co 2005\-2007 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

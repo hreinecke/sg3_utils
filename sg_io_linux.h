@@ -31,7 +31,7 @@
  */
 
 /*
- * Version 1.01 [20060621]
+ * Version 1.02 [20070121]
  */
 
 /*
@@ -43,6 +43,9 @@
 #include "sg_lib.h"
 #include "sg_linux_inc.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* The following are 'host_status' codes */
 #ifndef DID_OK
@@ -179,5 +182,9 @@ extern int sg_err_category3(struct sg_io_hdr * hp);
    Linux has traditionally used a 1 bit right shifted and masked 
    version of SCSI standard status codes. Now CHECK_CONDITION
    and friends (in <scsi/scsi.h>) are deprecated. */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

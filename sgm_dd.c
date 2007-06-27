@@ -1,5 +1,7 @@
 #define _XOPEN_SOURCE 500
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -21,12 +23,11 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
-#include "llseek.h"
 
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2006 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2007 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -54,7 +55,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.28 20061003";
+static char * version_str = "1.31 20070123";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -246,33 +247,46 @@ static char * dd_filetype_str(int ft, char * buff)
 void usage()
 {
    fprintf(stderr, "Usage: "
-           "sgm_dd  [bs=<n>] [count=<n>] [ibs=<n>] [if=<ifile>]"
-           " [iflag=<flags>]\n"
-           "               [obs=<n>] [of=<ofile>] [oflag=<flags>] "
-           "[seek=<n>] [skip=<n>]\n"
+           "sgm_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
+           " [iflag=FLAGS]\n"
+           "               [obs=BS] [of=OFILE] [oflag=FLAGS] "
+           "[seek=SEEK] [skip=SKIP]\n"
            "               [--help] [--version]\n\n");
     fprintf(stderr,
-           "               [bpt=<num>] [cdbsz=6|10|12|16] [dio=0|1] "
+           "               [bpt=BPT] [cdbsz=6|10|12|16] [dio=0|1] "
            "[fua=0|1|2|3]\n"
-           "               [sync=0|1] [time=<n>] [verbose=<n>]\n\n"
-           " where:\n"
-           "  bpt     is blocks_per_transfer (default is 128)\n"
-           "  bs      must be device block size (default 512)\n"
-           "  cdbsz   size of SCSI READ or WRITE command (default is 10)\n"
-           "  dio     0->indirect IO on write, 1->direct IO on write\n"
-           "          (only when read side is sg device (using mmap))\n"
-           "  fua     force unit access: 0->don't(def), 1->of, 2->if, "
-           "3->of+if\n");
+           "               [sync=0|1] [time=0|1] [verbose=VERB]\n\n"
+           "  where:\n"
+           "    bpt         is blocks_per_transfer (default is 128)\n"
+           "    bs          must be device block size (default 512)\n"
+           "    cdbsz       size of SCSI READ or WRITE cdb (default is 10)\n"
+           "    count       number of blocks to copy (def: device size)\n"
+           "    dio         0->indirect IO on write, 1->direct IO on write\n"
+           "                (only when read side is sg device (using mmap))\n"
+           "    fua         force unit access: 0->don't(def), 1->OFILE, "
+           "2->IFILE,\n"
+           "                3->OFILE+IFILE\n"
+           "    if          file or device to read from (def: stdin)\n");
     fprintf(stderr, 
-           "  iflag   comma separated list from: [direct,dpo,dsync,excl,"
-           "fua]\n"
-           "  oflag   comma separated list from: [append,direct,dpo,"
+           "    iflag       comma separated list from: [direct,dpo,dsync,"
+           "excl,fua]\n"
+           "    of          file or device to write to (def: stdout), "
+           "OFILE of '.'\n"
+           "                treated as /dev/null\n"
+           "    oflag       comma separated list from: [append,direct,dpo,"
            "dsync,excl,fua]\n"
-           "  sync    0->no sync(def), 1->SYNCHRONIZE CACHE after xfer\n"
-           "  time    0->no timing(def), 1->time plus calculate "
+           "    seek        block position to start writing to OFILE\n"
+           "    skip        block position to start reading from IFILE\n"
+           "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
+           "after copy\n"
+           "    time        0->no timing(def), 1->time plus calculate "
            "throughput\n"
-           "  verbose  0->quiet(def), 1->some noise, 2->more noise, etc\n"
-           "  --version  print version information then exit\n");
+           "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
+           "etc\n"
+           "    --help      print usage message then exit\n"
+           "    --version   print version information then exit\n\n"
+           "Copy from IFILE to OFILE, similar to dd command\n"
+           "specialized for SCSI devices for which mmap-ed IO attemped\n");
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
@@ -707,6 +721,7 @@ int main(int argc, char * argv[])
     int scsi_cdbsz_in = DEF_SCSI_CDBSZ;
     int scsi_cdbsz_out = DEF_SCSI_CDBSZ;
     int cdbsz_given = 0;
+    int do_coe = 0;     /* dummy, just accept + ignore */
     int do_sync = 0;
     int do_dio = 0;
     int num_dio_not_done = 0;
@@ -750,7 +765,9 @@ int main(int argc, char * argv[])
             scsi_cdbsz_in = sg_get_num(buf);
             scsi_cdbsz_out = scsi_cdbsz_in;
             cdbsz_given = 1;
-        } else if (0 == strcmp(key,"count")) {
+        } else if (0 == strcmp(key,"coe"))
+            do_coe = sg_get_num(buf);   /* dummy, just accept + ignore */
+        else if (0 == strcmp(key,"count")) {
             dd_count = sg_get_llnum(buf);
             if (-1LL == dd_count) {
                 fprintf(stderr, ME "bad argument to 'count'\n");
@@ -914,8 +931,8 @@ int main(int argc, char * argv[])
                     return SG_LIB_FILE_ERROR;
                 }
             }
-            wrkMmap = mmap(NULL, in_res_sz, PROT_READ | PROT_WRITE, 
-                           MAP_SHARED, infd, 0);
+            wrkMmap = (unsigned char *)mmap(NULL, in_res_sz,
+                                 PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
             if (MAP_FAILED == wrkMmap) {
                 snprintf(ebuff, EBUFF_SZ,
                          ME "error using mmap() on file: %s", inf);
@@ -938,18 +955,19 @@ int main(int argc, char * argv[])
                 return SG_LIB_FILE_ERROR;
             }
             else if (skip > 0) {
-                llse_loff_t offset = skip;
+                off64_t offset = skip;
 
                 offset *= blk_sz;       /* could exceed 32 bits here! */
-                if (llse_llseek(infd, offset, SEEK_SET) < 0) {
+                if (lseek64(infd, offset, SEEK_SET) < 0) {
                     snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
                              "required position on %s", inf);
                     perror(ebuff);
                     return SG_LIB_FILE_ERROR;
                 }
                 if (verbose)
-                    fprintf(stderr, "  >> skip: llseek SEEK_SET, "
-                            "byte offset=0x%llx\n", offset);
+                    fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
+                            "byte offset=0x%llx\n",
+                            (unsigned long long)offset);
             }
         }
     }
@@ -997,8 +1015,8 @@ int main(int argc, char * argv[])
                 }
             }
             if (NULL == wrkMmap) {
-                wrkMmap = mmap(NULL, out_res_sz, PROT_READ | PROT_WRITE, 
-                               MAP_SHARED, outfd, 0);
+                wrkMmap = (unsigned char *)mmap(NULL, out_res_sz,
+                                PROT_READ | PROT_WRITE, MAP_SHARED, outfd, 0);
                 if (MAP_FAILED == wrkMmap) {
                     snprintf(ebuff, EBUFF_SZ,
                              ME "error using mmap() on file: %s", outf);
@@ -1036,24 +1054,25 @@ int main(int argc, char * argv[])
                 }
             }
             if (seek > 0) {
-                llse_loff_t offset = seek;
+                off64_t offset = seek;
 
                 offset *= blk_sz;       /* could exceed 32 bits here! */
-                if (llse_llseek(outfd, offset, SEEK_SET) < 0) {
+                if (lseek64(outfd, offset, SEEK_SET) < 0) {
                     snprintf(ebuff, EBUFF_SZ, ME "couldn't seek to "
                              "required position on %s", outf);
                     perror(ebuff);
                     return SG_LIB_FILE_ERROR;
                 }
                 if (verbose)
-                    fprintf(stderr, "   >> seek: llseek SEEK_SET, "
-                            "byte offset=0x%llx\n", offset);
+                    fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
+                            "byte offset=0x%llx\n",
+                            (unsigned long long)offset);
             }
         }
     }
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
-        fprintf(stderr, 
-                "Can't have both 'if' as stdin _and_ 'of' as stdout\n");
+        fprintf(stderr, "Won't default both IFILE to stdin _and_ OFILE "
+                "to as stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -1187,7 +1206,7 @@ int main(int argc, char * argv[])
         wrkPos = wrkMmap;
     else {
         if ((FT_RAW == in_type) || (FT_RAW == out_type)) {
-            wrkBuff = malloc(blk_sz * bpt + psz);
+            wrkBuff = (unsigned char *)malloc(blk_sz * bpt + psz);
             if (0 == wrkBuff) {
                 fprintf(stderr, "Not enough user memory for raw\n");
                 return SG_LIB_FILE_ERROR;
@@ -1196,7 +1215,7 @@ int main(int argc, char * argv[])
                                        (~(psz - 1)));
         }
         else {
-            wrkBuff = malloc(blk_sz * bpt);
+            wrkBuff = (unsigned char *)malloc(blk_sz * bpt);
             if (0 == wrkBuff) {
                 fprintf(stderr, "Not enough user memory\n");
                 return SG_LIB_FILE_ERROR;

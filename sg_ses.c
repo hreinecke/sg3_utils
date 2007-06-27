@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,13 +38,12 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
- *
+/*
  * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
- *commands tailored for SES (enclosure) devices.
+ * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.29 20061012";    /* ses2r15 */
+static char * version_str = "1.32 20070128";    /* ses2r15 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -75,18 +74,20 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_ses [--byte1=<n>] [--control] [--data=<h>...] [--filter] "
+          "sg_ses [--byte1=B1] [--control] [--data=H,H...] [--filter] "
           "[--help]\n"
-          "              [--hex] [--inner-hex] [--list] [--page=<n>] [--raw] "
+          "              [--hex] [--inner-hex] [--list] [--page=PG] [--raw] "
           "[--status]\n"
-          "              [--verbose] [--version] <scsi_device>\n"
+          "              [--verbose] [--version] DEVICE\n"
           "  where:\n"
-          "    --byte1=<n>|-b <n>  byte 1 (2nd byte) for some control "
+          "    --byte1=B1|-b B1  byte 1 (2nd byte) for some control "
           "pages\n"
           "    --control|-c        send control information (def: fetch "
           "status)\n"
-          "    --data=<h>,<h>...|-d <h>...  string of hex for control "
-          "pages\n"
+          "    --data=H,H...|-d H,H...    string of ASCII hex bytes for "
+          "control pages\n"
+          "    --data=- | -d -     fetch string of ASCII hex bytes from "
+          "stdin\n"
           "    --filter|-f         filter out enclosure status clear "
           "flags\n"
           "    --help|-h           print out usage message\n"
@@ -95,10 +96,12 @@ static void usage()
           " status page in hex\n"
           "    --list|-l           list known pages and elements (ignore"
           " device)\n"
-          "    --page=<n>|-p <n>   page code <n> (prefix with '0x' "
+          "    --page=PG|-p PG     SES page code PG (prefix with '0x' "
           "for hex; def: 0)\n"
-          "    --raw|-r            print status page in hex suitable "
-          "for '-d'\n"
+          "    --raw|-r            print status page in ASCII hex suitable "
+          "for '-d';\n"
+          "                        when used twice outputs page in binary "
+          "to stdout\n"
           "    --status|-s         fetch status information\n"
           "    --verbose|-v        increase verbosity\n"
           "    --version|-V        print version string and exit\n\n"
@@ -252,6 +255,14 @@ struct element_hdr {
 };
 
 static struct element_hdr element_hdr_arr[MX_ELEM_HDR];
+
+static void dStrRaw(const char* str, int len)
+{
+    int k;
+
+    for (k = 0 ; k < len; ++k)
+        printf("%c", str[k]);
+}
 
 static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
 {
@@ -670,16 +681,26 @@ static void print_element_status(const char * pad,
                    "Crit Under=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x8), !!(statp[1] & 0x4),!!(statp[1] & 0x2),
                    !!(statp[1] & 0x1));
+#ifdef SG3_UTILS_MINGW
+        printf("%sVoltage: %g volts\n", pad,
+               ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+#else
         printf("%sVoltage: %.2f volts\n", pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+#endif
         break;
     case 0x13:   /* Current sensor */
         if ((! filter) || (0x8a & statp[1]))
             printf("%sIdent=%d, Warn Over=%d, Crit Over=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x8),
                    !!(statp[1] & 0x2));
+#ifdef SG3_UTILS_MINGW
+        printf("%sCurrent: %g amps\n", pad,
+               ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+#else
         printf("%sCurrent: %.2f amps\n", pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+#endif
         break;
     case 0x14:   /* SCSI target port */
         if ((! filter) || ((0x80 & statp[1]) || (0x1 & statp[2]) ||
@@ -862,14 +883,26 @@ static void ses_threshold_helper(const char * pad, const unsigned char *tp,
         printf("low critical=%s (in minutes)\n", b);
         break;
     case 0x12: /* voltage */
+#ifdef SG3_UTILS_MINGW
+        printf("%s%s: high critical=%g %%, high warning=%g %%\n", pad,
+               buff, 0.5 * tp[0], 0.5 * tp[1]);
+        printf("%s  low warning=%g %%, low critical=%g %% (from nominal "
+               "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
+#else
         printf("%s%s: high critical=%.1f %%, high warning=%.1f %%\n", pad,
                buff, 0.5 * tp[0], 0.5 * tp[1]);
         printf("%s  low warning=%.1f %%, low critical=%.1f %% (from nominal "
                "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
+#endif
         break;
     case 0x13: /* current */
+#ifdef SG3_UTILS_MINGW
+        printf("%s%s: high critical=%g %%, high warning=%g %%\n", pad,
+               buff, 0.5 * tp[0], 0.5 * tp[1]);
+#else
         printf("%s%s: high critical=%.1f %%, high warning=%.1f %%\n", pad,
                buff, 0.5 * tp[0], 0.5 * tp[1]);
+#endif
         printf("%s  (above nominal current)\n", pad);
         break;
     default:
@@ -1144,8 +1177,6 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
     }
     ucp = resp + 8;
     for (k = 0; k < num_telems; ++k) {
-        if ((ucp + 1) > last_ucp)
-            goto truncated;
         elem_type = ehp[k].etype;
         if (! ((1 == elem_type) ||      /* device */
                (0x14 == elem_type) ||   /* scsi target */
@@ -1153,6 +1184,8 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
                (0x17 == elem_type) ||   /* array */
                (0x18 == elem_type)))    /* SAS expander */
             continue;   /* skip if not one of above element types */
+        if ((ucp + 1) > last_ucp)
+            goto truncated;
         cp = find_element_desc(elem_type);
         if (cp)
             printf("  Element type: %s, subenclosure id: %d\n",
@@ -1443,9 +1476,12 @@ static int ses_process_status(int sg_fd, int page_code, int do_raw,
                         "but got 0x%x\n", page_code, rsp_buff[0]);
                 dStrHex((const char *)rsp_buff, rsp_len, 0);
             }
-        } else if (do_raw)
-            dStrHex((const char *)rsp_buff + 4, rsp_len - 4, -1);
-        else if (do_hex) {
+        } else if (do_raw) {
+            if (1 == do_raw)
+                dStrHex((const char *)rsp_buff + 4, rsp_len - 4, -1);
+            else
+                dStrRaw((const char *)rsp_buff, rsp_len);
+        } else if (do_hex) {
             if (cp)
                 printf("Response in hex from diagnostic page: %s\n", cp);
             else
@@ -1613,7 +1649,7 @@ int main(int argc, char * argv[])
             }
             break;
         case 'c':
-            do_control = 1;
+            ++do_control;
             break;
         case 'd':
             memset(data_arr, 0, sizeof(data_arr));
@@ -1634,10 +1670,10 @@ int main(int argc, char * argv[])
             ++do_hex;
             break;
         case 'i':
-            inner_hex = 1;
+            ++inner_hex;
             break;
         case 'l':
-            do_list = 1;
+            ++do_list;
             break;
         case 'p':
             page_code = sg_get_num(optarg);
@@ -1648,10 +1684,10 @@ int main(int argc, char * argv[])
             }
             break;
         case 'r':
-            do_raw = 1;
+            ++do_raw;
             break;
         case 's':
-            do_status = 1;
+            ++do_status;
             break;
         case 'v':
             ++verbose;
@@ -1700,7 +1736,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "cannot have both '--control' and '--status'\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
-    } else if (1 == do_control) {
+    } else if (do_control) {
         if (! do_data) {
             fprintf(stderr, "need to give '--data' in control mode\n");
             usage();

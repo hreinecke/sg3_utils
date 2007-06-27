@@ -1,53 +1,95 @@
-.TH SG_TURS "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_TURS "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_turs \- executes a user specified number of TEST UNIT READY commands on
-the given device
+sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
 .B sg_turs
-[\fI-n=<number of commands to send>\fR] [\fI-p\fR]  [\fI-t\fR] [\fI-v\fR]
-[\fI-V\fR] <\fIscsi_device\fR>
+[\fI\-\-help\fR] [\fI\-\-number=NUM\fR] [\fI\-\-progress\fR] [\fI\-\-time\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_turs
+[\fI\-n=NUM\fR] [\fI\-p\fR]  [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-sg_turs sends a number of TEST UNIT READY commands to a given SCSI
-device. Useful for timing the per command overhead. Note that
-TEST UNIT READY has no associated data, just a 6 byte command and a
-returned SCSI status value. If the SCSI status value is CHECK CONDITION
-then most modern initiators fetch sense data from the device (i.e.
-autosense).
+This utility sends one or more SCSI TEST UNIT READY commands to the
+\fIDEVICE\fR. This may be useful for timing the per command overhead.
+Note that TEST UNIT READY has no associated data, just a 6 byte command
+and a returned SCSI status value. If the SCSI status value is CHECK
+CONDITION then most modern initiators fetch sense data from
+the device (i.e. autosense).
+.PP
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later section
+on the old command line syntax outlines the second group of options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
--n=<num>
-performs TEST UNIT READY "<num>" times. If not given defaults to 1.
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-n\fR, \fB\-\-number\fR=\fINUM\fR
+performs TEST UNIT READY \fINUM\fR times. If not given defaults to 1.
 These suffix multipliers are permitted: c C *1; w W *2; b B *512;
 k K KiB *1,024; KB *1,000; m M MiB *1,048,576; MB *1,000,000;
 g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix of the
 form "x<n>" multiplies the leading number by <n>. Alternatively a hex
-number may be given, prefixed by either '0x' or '0X' (or has a
-trailing 'h' or 'H').
+number may be given, prefixed by either '0x' or has a trailing 'h'.
 .TP
--p
-show progress indication (a percentage) if available. If <num> greater
-than one waits 30 seconds before subsequent checks. Exits when <num>
-is reached or there is no more progress indication. Ignores '-t' option.
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
 .TP
--t
+\fB\-p\fR, \fB\-\-progress\fR
+show progress indication (a percentage) if available.  If \fI\-\-number=NUM\fR
+is given and \fINUM\fR is greater than 1 then waits 30 seconds before
+subsequent checks. Exits when \fINUM\fR is reached or there is no more
+progress indication. Ignores \fI\-\-time\fR option.
+.TP
+\fB\-t\fR, \fB\-\-time\fR
 after completing the requested number of TEST UNIT READY commands, outputs
 the total duration and the average number of commands executed per second.
 .TP
--v
-increase level of verbosity: print out SCSI commands in hex prior to
-sending them to the device. '-vv' and '-vvv' are also accepted yielding
-greater verbosity.
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level or verbosity.
 .TP
--V
-print out version string then exit.
+\fB\-V\fR, \fB\-\-version\fR
+print version string then exit.
 .SH EXIT STATUS
-The exit status of sg_verify is 0 when it is successful. Otherwise see
+The exit status of sg_turs is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.TP
+\fB\-n\fR=\fINUM\fR
+performs TEST UNIT READY \fINUM\fR times. If not given defaults to 1.
+Equivalent to \fI\-\-number=NUM\fR in the main description.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-p\fR
+show progress indication (a percentage) if available.
+Equivalent to \fI\-\-progress\fR in the main description.
+.TP
+\fB\-t\fR
+after completing the requested number of TEST UNIT READY commands, outputs
+the total duration and the average number of commands executed per second.
+Equivalent to \fI\-\-time\fR in the main description.
+.TP
+\fB\-v\fR
+increase level of verbosity.
+.TP
+\fB\-V\fR
+print out version string then exit.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000-2006 Douglas Gilbert
+Copyright \(co 2000\-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq(sg3_utils)

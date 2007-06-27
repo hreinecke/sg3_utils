@@ -100,21 +100,33 @@ Tru64.
 
 Windows
 =======
-In Windows only the Windows 2000, 2003 and XP operating systems (and their
-variants) are currently supported. The source tarball can be built in a
-cygwin environment on Windows. See http://www.cygwin.com for more
-information. Various extras such as 'gcc' (the GNU C compiler) and 'make'
-need to be loaded as they are not in the minimal cygwin default distribution.
-The build command is "make -f Makefile.win32" and to install (for a cygwin
-environment) use "make -f Makefile.win32 install". Currently the make
-doesn't build a dll (cf shared libraries are built on Linux and FreeBSD) so
-the executable files are bigger than they need to be. Once built, the
-various ".exe" commands can either be executed in a cygwin shell (typically
-"bash") or a DOS shell. If cygwin has not been installed on the target
-machine then the "cygwin1.dll" (obtained from www.cygwin.com ) is required.
-The various device names that the sg3_utils utilities will accept in Windows
-can be seen by running the sg_scan utility (and perhaps looking at its man
-page (i.e. sg_scan.8 or sg_scan.8w)).
+In Windows only the Windows NT, 2000, 2003 and XP operating systems (and
+their variants) are currently supported. The various device names that the
+sg3_utils utilities will accept in Windows can be seen by running the
+sg_scan utility (and perhaps looking at its man page (i.e. sg_scan.8 or
+sg_scan.8w)).
+
+The source tarball can be built in a cygwin or MinGW environment on Windows.
+
+For cygwin see http://www.cygwin.com for more information. Various extras
+such as 'gcc' (the GNU C compiler) and 'make' need to be loaded as they are
+not in the minimal cygwin default distribution. The build command
+is "make -f Makefile.win32" and to install (for a cygwin environment)
+use "make -f Makefile.win32 install". Currently the make doesn't build a
+dll (cf shared libraries are built on Linux and FreeBSD) so the executable
+files are bigger than they need to be. Once built, the various ".exe"
+commands can either be executed in a cygwin shell (typically "bash") or a
+DOS shell. If cygwin has not been installed on the target machine then
+the "cygwin1.dll" (obtained from http://www.cygwin.com ) is required.
+
+There is also the "Minimalist Gnu for Windows" (MinGW) and its associated
+shell (MSYS) that can serve as a build environment for sg3_utils. This
+removes the dependence on the proprietary cygwin1.dll at the expense
+of some timing features. In a MSYS shell untar the sg3_utils tarball and
+in its top level directory use "make -f Makefile.mingw". The executables
+will be placed in that directory. They can be executed in a MSYS or "cmd"
+shell.
 
 
-5th October 2006
+21st January 2007
+Doug Gilbert

@@ -1,10 +1,11 @@
-.TH SG_SCAN "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_SCAN "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_scan \- scan scsi devices, volume names, physical drives,
 cdrom/dvd drives and tapes and show relationships
 .SH SYNOPSIS
 .B sg_scan
-[\fI--help\fR] [\fI--letter=<vl>\fR] [\fI--verbose\fR] [\fI--version\fR]
+[\fI\-\-help\fR] [\fI\-\-letter=VL\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -21,7 +22,7 @@ starting at 0 allocated in ascending order as devices are discovered (and
 sometimes rediscovered).
 .PP
 Then there is a lower level device name which starts with a SCSI (pseudo)
-adapter name of the form "SCSI<n>:". To this is added sub-addressing
+adapter name of the form "SCSI<n>:". To this is added sub\-addressing
 in the form of a "bus" number, a "target" identifier and a lun (logical
 unit number). The "bus" number is also known as a "PathId". These
 components are combined by the utility to make a device name of the
@@ -49,8 +50,8 @@ the "scsi" device name or blanks if there is none. Next follows the volume
 letter (if any) optionally followed by a "+" to indicate more volume letters
 map to this device. Next is one of the class device names or blanks followed
 by a concatenation of the INQUIRY response strings. Windows often
-manufactures INQUIRY response strings for non-SCSI devices (e.g. a parallel
-ATA disk at "C:") and doesn't quite obey the SCSI-2 rules for an INQUIRY
+manufactures INQUIRY response strings for non\-SCSI devices (e.g. a parallel
+ATA disk at "C:") and doesn't quite obey the SCSI\-2 rules for an INQUIRY
 response. If this utility sees that it places a "*" after the INQUIRY
 response strings.
 .PP
@@ -61,26 +62,27 @@ An educated guess could be made but could be tricked, for example,
 by two USB sticks with the same model and manufacturer.
 .PP
 For more information see the NOTES section below.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
---help | -h
+\fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options
 then exits.
 .TP
---letter=<vl> | -l <vl>
+\fB\-l\fR, \fB\-\-letter\fR=\fIVL\fR
 normally when a device a multiple volume names (e.g. a disk with two
 partitions recognized by Windows) then the lowest letter volume name in
 alphabetical order is output, followed by a "+". Hence subsequent matching
 volume letters are not shown. If the user is interested in a particular
-volume name then its letter can be given as the "<vl>" argument and if
+volume name then its letter can be given as the \fIVL\fR argument and if
 found it will be output rather than the lowest volume name.
 .TP
---verbose | -v
+\fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.
 .TP
---version | -V
+\fB\-V\fR, \fB\-\-version\fR
 print out version string
 .SH NOTES
-.PP
 This utility uses the SCSI Pass Through (direct) [SPT] interface rather
 than Adaptec's ASPI32. ASPI32 requires a dll not distributed with
 Windows. Using the SPT interface requires that a user has administrative
@@ -89,19 +91,19 @@ earlier Windows operating systems). The target Windows operating systems
 are currently Windows 2000, 2003 and XP (and their variants).
 .PP
 If no class device name is found then "pdt=<num>" is placed at the end
-of the line. This is the SCSI "peripheral device type" (see SPC-4 at
-http://www.t10.org). Some values are: 0 -> disks, 1 -> tapes, 3 ->
-processor, 5 -> cd/dvds, 8 -> medium changers, 13 -> SES devices.
+of the line. This is the SCSI "peripheral device type" (see SPC\-4 at
+http://www.t10.org). Some values are: 0 \-> disks, 1 \-> tapes, 3 \->
+processor, 5 \-> cd/dvds, 8 \-> medium changers, 13 \-> SES devices.
 .PP
 The DOS device names given the the CreateFile() call all start with a "\\.\"
 string. That can be given but if not will be supplied automatically. For
 the SCSI lower level interface the adapter name (e.g. "SCSI2:") is given
-to the CreateFile() call and the sub-addressing (i.e. bus, target and lun)
+to the CreateFile() call and the sub\-addressing (i.e. bus, target and lun)
 is given to each SCSI pass through command.
 .PP
 Scanning devices that are hot unplugged and replugged often can be
 problematic, especially with the class device names. Each time a device is
-removed and re-added it gets a larger class device name (e.g. "PD3"
+removed and re\-added it gets a larger class device name (e.g. "PD3"
 becomes "PD4" leaving "PD3" unused). This utility stops scanning class
 devices after it find 8 consecutive "holes". If this turns out to be a
 problem then adjustments will be made.

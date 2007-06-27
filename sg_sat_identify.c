@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Douglas Gilbert.
+ * Copyright (c) 2006-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,9 +47,9 @@
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
-#define SAT_ATA_PASS_THROUGH12 0xa1
+#define SAT_ATA_PASS_THROUGH12 0xa1     /* clashes with MMC BLANK comand */
 #define SAT_ATA_PASS_THROUGH12_LEN 12
-#define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) descriptor */
+#define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
 
 #define ATA_IDENTIFY_DEVICE 0xec
 #define ATA_IDENTIFY_PACKET_DEVICE 0xa1
@@ -59,7 +59,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.02 20061015";
+static char * version_str = "1.03 20070130";
 
 static struct option long_options[] = {
         {"chk_cond", 0, 0, 'c'},
@@ -76,22 +76,23 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sat_identify [--chk_cond] [--help] [--hex] [--len=<n>] "
+          "sg_sat_identify [--chk_cond] [--help] [--hex] [--len=16|12] "
           "[--packet]\n"
           "                       [--raw] [--verbose] [--version] "
-          "<device>\n"
+          "DEVICE\n"
           "  where:\n"
-          "    --chk_cond|-c     sets chk_cond bit in cdb (def: 0)\n"
-          "    --help|-h         print out usage message then exit\n"
-          "    --hex|-H          output response in hex\n"
-          "    --len=<n>|-l <n>  cdb length, 12 or 16 bytes (default: 16)\n"
-          "    --packet|-p       do IDENTIFY PACKET DEVICE (def: IDENTIFY "
+          "    --chk_cond|-c    sets chk_cond bit in cdb (def: 0)\n"
+          "    --help|-h        print out usage message then exit\n"
+          "    --hex|-H         output response in hex\n"
+          "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
+          "(default: 16)\n"
+          "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
           "DEVICE) command\n"
-          "    --raw|-r          output response in binary to stdout\n"
-          "    --verbose|-v      increase verbosity\n"
-          "    --version|-V      print version string and exit\n\n"
-          "Performs a IDENTIFY (PACKET) DEVICE ATA command via a SAT "
-          "pass through\n");
+          "    --raw|-r         output response in binary to stdout\n"
+          "    --verbose|-v     increase verbosity\n"
+          "    --version|-V     print version string and exit\n\n"
+          "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
+          "layer\n");
 }
 
 static void dStrRaw(const char* str, int len)
@@ -182,8 +183,8 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                 if ((0x0 == ssh.asc) && (0x1d == ssh.ascq)) {
                     if (SAT_ATA_RETURN_DESC != ata_return_desc[0]) {
                         if (verbose)
-                            fprintf(stderr, "did not find ATA return sense "
-                                    "descriptor\n");
+                            fprintf(stderr, "did not find ATA Return "
+                                    "(sense) Descriptor\n");
                         return SG_LIB_CAT_RECOVERED;
                     }
                     got_ard = 1;

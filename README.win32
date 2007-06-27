@@ -5,6 +5,17 @@ to Linux. In some cases a utility could be ported but requires more work. An
 example is sg_dd which needs more work beyond the SCSI command pass through
 mechanism.
 
+Two build environments are caterered for: cygwin (see www.cygwin.com) and
+MinGW ("Minimalist GNU for Windows", see www.mingw.org). Both are based in
+the gcc compiler (although other C compilers should have little problem with
+the source code). Cygwin is a more sophisticated, commercial product that
+results in executables that depend on cygwin1.dll . No licensing is required
+since sg3_utils is open source (with either BSD or GPL licenses) but users
+will need to fetch that dll. On the other hand MinGW (and its companion MSYS
+shell) builds freestanding console executables. The Unix library support is
+not as advanced with MinGW which has led to some timing functions being
+compiled out when sg3_utils is built for MinGW.
+
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
@@ -16,8 +27,10 @@ Here is a list of utilities that have been ported:
     sg_luns
     sg_modes
     sg_persist
+    sg_opcodes
     sg_prevent
     sg_rdac
+    sg_read_buffer
     sg_read_long
     sg_readcap
     sg_reassign
@@ -34,6 +47,7 @@ Here is a list of utilities that have been ported:
     sg_verify
     sg_vpd
     sg_wr_mode
+    sg_write_buffer
     sg_write_long
 
 Most utility names are indicative of the main SCSI command that they execute.
@@ -97,9 +111,21 @@ shown in Windows documentation, may be used but "PD" is obviously
 quicker to type.
 
 Finally sg_scan does not manage to put all device names for USB and
-ISS 1394 devices on one line. The last two lines of output are actually
+IEEE 1394 devices on one line. The last two lines of output are actually
 the same device.
+
+Several utilities have conditional compilation sections based on
+the SG3_UTILS_MINGW define. For those who want to try native C compilers
+on Windows setting the SG3_UTILS_MINGW define may help.
+
+Build environments
+==================
+This package has various Makefiles so that these utilities can be built
+in either a cygwin and MinGW environment, called Makefile.win32 and
+Makefile.mingw respectively. The executables produced are console
+applications that can be executed in either a cygwin, MSYS or "cmd" shell.
+See the INSTALL file for more details.
 
 
 Doug Gilbert
-16th October 2006
+21st January 2007

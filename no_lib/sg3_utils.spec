@@ -1,6 +1,6 @@
-Summary: Utilities for SCSI devices in Linux
+Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.22
+Version: 1.23
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -86,6 +86,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_map26
 %attr(755,root,root) %{_bindir}/sg_vpd
 %attr(755,root,root) %{_bindir}/sg_rdac
+%attr(755,root,root) %{_bindir}/sg_sat_identify
+%attr(755,root,root) %{_bindir}/sg_read_buffer
+%attr(755,root,root) %{_bindir}/sg_write_buffer
 # Mandrake compresses man pages with bzip2, RedHat with gzip
 %attr(-,root,root) %doc %{_mandir}/man8/sg_dd.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sgp_dd.8*
@@ -125,10 +128,17 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_map26.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_vpd.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_rdac.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_sat_identify.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_read_buffer.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_write_buffer.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg3_utils.8*
  
 
 %changelog
+* Wed Jan 31 2007 - dgilbert at interlog dot com
+- add sg_read_buffer + sg_write_buffer
+  * sg3_utils-1.23
+
 * Mon Oct 16 2006 - dgilbert at interlog dot com
 - add sg_sat_identify, expand sg_format and sg_requests
   * sg3_utils-1.22

@@ -2,7 +2,7 @@
 #define SG_CMDS_BASIC_H
 
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  *
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 /* Invokes a SCSI INQUIRY command and yields the response
@@ -123,7 +127,7 @@ extern int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
 /* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Luns not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
 extern int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
                              int mx_resp_len, int noisy, int verbose);
 
@@ -217,7 +221,7 @@ extern int sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other failure.
- * If success_mask pointer is not NULL then zeroes it then sets bit 0, 1,
+ * If success_mask pointer is not NULL then zeros it then sets bit 0, 1,
  * 2 and/or 3 if the current, changeable, default and saved values
  * respectively have been fetched. If error on current page
  * then stops and returns that error; otherwise continues if an error is
@@ -250,5 +254,9 @@ extern const char * sg_cmds_version();
 extern int sg_cmds_process_resp(void * ptvp, const char * leadin, int res,
                                 int mx_resp_len, const unsigned char * sense_b,
                                 int noisy, int verbose, int * o_sense_cat);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -11,7 +11,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999-2006 D. Gilbert
+*  Copyright (C) 1999-2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
 
 #define ME "sg_reset: "
 
-static char * version_str = "0.54 20061015";
+static char * version_str = "0.55 20070125";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -66,7 +66,7 @@ int main(int argc, char * argv[])
     }
     if (0 == file_name) {
         printf(
-        "Usage: 'sg_reset [-b] [-d] [-h] [-V] <scsi_device>'\n");
+        "Usage: sg_reset  [-b] [-d] [-h] [-V] DEVICE\n");
         printf("  where: -b       attempt a SCSI bus reset\n");
         printf("         -d       attempt a SCSI device reset\n");
         printf("         -h       attempt a host adapter reset\n");

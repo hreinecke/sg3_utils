@@ -1,0 +1,48 @@
+#!/bin/bash
+
+################################################
+#
+#  Send a TEST UNIT READY SCSI command to each given device.
+#
+#  This script assumes the sg3_utils package is installed.
+#
+###############################################
+
+verbose=""
+
+usage()
+{
+  echo "Usage: scsi_ready [-h] [-v] <device>+"
+  echo "  where:"
+  echo "    -h, --help           print usage message"
+  echo "    -v, --verbose        more verbose output"
+  echo ""
+  echo "Send SCSI TEST UNIT READY to each <device>"
+}
+
+if (( $# < 1 ))
+  then
+    usage
+    exit 1
+fi
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    h|-help) usage ; exit 0 ;;
+    v|-verbose) verbose="-v" ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+for i
+do
+	echo "sg_turs $verbose $i"
+	echo -n "    "
+        if sg_turs $verbose $i ; then
+		echo "ready"
+	fi
+done

@@ -3,7 +3,9 @@
  */
 #ifdef SG3_UTILS_LINUX
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -23,7 +25,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999 - 2006 D. Gilbert
+*  Copyright (C) 1999 - 2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -47,7 +49,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.08 20060623";
+static char * version_str = "4.09 20070125";
 
 #define ME "sg_scan: "
 
@@ -92,17 +94,17 @@ static unsigned char inqCmdBlk[INQ_CMD_LEN] =
 
 void usage()
 {
-    printf("Usage: 'sg_scan [-a] [-i] [-n] [-v] [-V] [-w] [-x] "
-           "[<sam_dev>]*'\n");
-    printf("    where: -a   do alpha scan (ie sga, sgb, sgc)\n");
-    printf("           -i   do SCSI INQUIRY, output results\n");
-    printf("           -n   do numeric scan (ie sg0, sg1...) [default]\n");
-    printf("           -v   increase verbosity\n");
-    printf("           -V   output version string then exit\n");
-    printf("           -w   force open with read/write flag\n");
-    printf("           -x   extra information output about queuing\n");
-    printf("      <sam_dev> name of device that understands SAM command"
-           " set\n");
+    printf("Usage: sg_scan [-a] [-i] [-n] [-v] [-V] [-w] [-x] "
+           "[DEVICE]*\n");
+    printf("  where:\n");
+    printf("    -a    do alpha scan (ie sga, sgb, sgc)\n");
+    printf("    -i    do SCSI INQUIRY, output results\n");
+    printf("    -n    do numeric scan (ie sg0, sg1...) [default]\n");
+    printf("    -v    increase verbosity\n");
+    printf("    -V    output version string then exit\n");
+    printf("    -w    force open with read/write flag\n");
+    printf("    -x    extra information output about queuing\n");
+    printf("   DEVICE    name of device\n");
 }
 
 static int scandir_select(const struct dirent * s)
@@ -190,7 +192,7 @@ int main(int argc, char * argv[])
     const char * cp;
     struct stat a_stat;
 
-    if ((gen_index_arr = malloc(max_file_args * sizeof(int))))
+    if ((gen_index_arr = (int *)malloc(max_file_args * sizeof(int))))
         memset(gen_index_arr, 0, max_file_args * sizeof(int));
     else {
         printf(ME "Out of memory\n");
@@ -649,8 +651,8 @@ int try_ata_identity(const char * file_namep, int ata_fd, int do_inq)
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
-#include <errno.h>
 #include <ctype.h>
 #include <getopt.h>
 
@@ -668,7 +670,7 @@ int try_ata_identity(const char * file_namep, int ata_fd, int do_inq)
 #define INQUIRY_CMD 0x12
 #define INQUIRY_CMDLEN 6
 
-static char * version_str = "1.01 (win32) 20061014";
+static char * version_str = "1.04 (win32) 20070101";
 
 struct w_scsi_elem {
     char    in_use;
@@ -692,7 +694,7 @@ struct w_scsi_elem {
     unsigned char inq_resp[SCSI2_INQ_RESP_LEN];
 };
 
-static struct w_scsi_elem w_scsi_arr[MAX_SCSI_ELEMS];
+static struct w_scsi_elem * w_scsi_arr;
 
 static int next_unused_scsi_elem = 0;
 static int next_elem_after_scsi_adapter_valid = 0;
@@ -709,10 +711,11 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr,
-            "Usage: sg_scan  [--help] [--verbose] [--version]\n");
+            "Usage: sg_scan  [--help] [--letter=VL] [--verbose] "
+            "[--version]\n");
     fprintf(stderr,
             "       --help|-h       output this usage message then exit\n"
-            "       --letter=<vl>|-l <vl>  volume letter (e.g. 'F' for F:) "
+            "       --letter=VL|-l VL    volume letter (e.g. 'F' for F:) "
             "to find\n"
             "       --verbose|-v    increase verbosity\n"
             "       --version|-V    print version string and exit\n\n"
@@ -886,10 +889,13 @@ static int sg_do_wscan(char letter, int verbose)
                             sep->dubious_scsi = 1;
 
                         if (verbose > 1) {
-                            fprintf(stderr, "%s: PathId=%d TargetId=%d Lun=%d ",
-                                    adapter_name, pid->PathId, pid->TargetId, pid->Lun);
-                            fprintf(stderr, "  DeviceClaimed=%d\n", pid->DeviceClaimed);
-                            dStrHex((const char *)(pid->InquiryData), pid->InquiryDataLength, 0);
+                            fprintf(stderr, "%s: PathId=%d TargetId=%d "
+                                    "Lun=%d ", adapter_name, pid->PathId,
+                                    pid->TargetId, pid->Lun);
+                            fprintf(stderr, "  DeviceClaimed=%d\n",
+                                    pid->DeviceClaimed);
+                            dStrHex((const char *)(pid->InquiryData),
+                                    pid->InquiryDataLength, 0);
                         }
                         off = pid->NextInquiryDataOffset;
                     }
@@ -921,8 +927,8 @@ static int sg_do_wscan(char letter, int verbose)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff, sizeof(inqDataBuff),
-                                       &dummy, FALSE);
+                                       NULL, 0, inqDataBuff,
+                                       sizeof(inqDataBuff), &dummy, FALSE);
             if (success) {
                 PSCSI_ADDRESS pa;
 
@@ -967,7 +973,8 @@ static int sg_do_wscan(char letter, int verbose)
                 if (verbose > 1) {
                     err = GetLastError();
                     fprintf(stderr, "%c: IOCTL_SCSI_GET_ADDRESS err=%lu\n\t"
-                            "%s", 'C' + k, err, get_err_str(err, sizeof(b), b));
+                            "%s", 'C' + k, err,
+                            get_err_str(err, sizeof(b), b));
                 }
             }
             if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw,
@@ -1008,15 +1015,16 @@ static int sg_do_wscan(char letter, int verbose)
     for (k = 0; k < MAX_PHYSICALDRIVE_NUM; ++k) {
         matched = 0;
         sep = NULL;
-        snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\PhysicalDrive%d", k);
+        snprintf(adapter_name, sizeof (adapter_name),
+                 "\\\\.\\PhysicalDrive%d", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             hole_count = 0;
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff, sizeof(inqDataBuff),
-                                       &dummy, FALSE);
+                                       NULL, 0, inqDataBuff,
+                                       sizeof(inqDataBuff), &dummy, FALSE);
             if (success) {
                 PSCSI_ADDRESS pa;
 
@@ -1111,8 +1119,8 @@ static int sg_do_wscan(char letter, int verbose)
         if (fh != INVALID_HANDLE_VALUE) {
             hole_count = 0;
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff, sizeof(inqDataBuff),
-                                       &dummy, FALSE);
+                                       NULL, 0, inqDataBuff,
+                                       sizeof(inqDataBuff), &dummy, FALSE);
             if (success) {
                 PSCSI_ADDRESS pa;
 
@@ -1150,8 +1158,9 @@ static int sg_do_wscan(char letter, int verbose)
             } else {
                 if (verbose > 1) {
                     err = GetLastError();
-                    fprintf(stderr, "CDROM%d: IOCTL_SCSI_GET_ADDRESS err=%lu\n\t"
-                            "%s", k, err, get_err_str(err, sizeof(b), b));
+                    fprintf(stderr, "CDROM%d: IOCTL_SCSI_GET_ADDRESS "
+                            "err=%lu\n\t%s", k, err,
+                            get_err_str(err, sizeof(b), b));
                 }
             }
             if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw,
@@ -1207,8 +1216,8 @@ static int sg_do_wscan(char letter, int verbose)
         if (fh != INVALID_HANDLE_VALUE) {
             hole_count = 0;
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff, sizeof(inqDataBuff),
-                                       &dummy, FALSE);
+                                       NULL, 0, inqDataBuff,
+                                       sizeof(inqDataBuff), &dummy, FALSE);
             if (success) {
                 PSCSI_ADDRESS pa;
 
@@ -1343,7 +1352,7 @@ static int sg_do_wscan(char letter, int verbose)
 
 int main(int argc, char * argv[])
 {
-    int c;
+    int c, ret;
     int verbose = 0;
     int vol_letter = 0;
 
@@ -1391,7 +1400,12 @@ int main(int argc, char * argv[])
         }
     }
 
-    return sg_do_wscan(vol_letter, verbose);
+    w_scsi_arr = malloc(sizeof(struct w_scsi_elem) * MAX_SCSI_ELEMS);
+
+    ret = sg_do_wscan(vol_letter, verbose);
+
+    free(w_scsi_arr);
+    return ret;
 }
 
 #endif

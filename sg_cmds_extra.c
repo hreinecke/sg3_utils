@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2006 Douglas Gilbert.
+ * Copyright (c) 1999-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,8 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
-#include <sys/ioctl.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -87,6 +88,10 @@
 #define ATA_PT_12_CMDLEN 12
 #define ATA_PT_16_CMD 0x85
 #define ATA_PT_16_CMDLEN 16
+#define READ_BUFFER_CMD 0x3c
+#define READ_BUFFER_CMDLEN 10
+#define WRITE_BUFFER_CMD 0x3b
+#define WRITE_BUFFER_CMDLEN 10
 
 
 
@@ -125,7 +130,7 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     }
     set_scsi_pt_cdb(ptvp, rtpgCmdBlk, sizeof(rtpgCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "report Target port group", res,
                                mx_resp_len, sense_b, noisy, verbose,
@@ -186,7 +191,7 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
         if ((verbose > 1) && paramp && param_len) {
             fprintf(sg_warnings_strm, "    Send diagnostic parameter "
                     "block:\n");
-            dStrHex(paramp, param_len, -1);
+            dStrHex((const char *)paramp, param_len, -1);
         }
     }
 
@@ -197,7 +202,7 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
     }
     set_scsi_pt_cdb(ptvp, senddiagCmdBlk, sizeof(senddiagCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, 
                      (long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT),
                      verbose);
@@ -265,7 +270,7 @@ int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
     }
     set_scsi_pt_cdb(ptvp, rcvdiagCmdBlk, sizeof(rcvdiagCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "receive diagnostic results", res,
                                mx_resp_len, sense_b, noisy, verbose,
@@ -334,7 +339,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
     }
     set_scsi_pt_cdb(ptvp, rdefCmdBlk, sizeof(rdefCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "read defect (10)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -361,7 +366,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    read defect (10): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -405,7 +410,7 @@ int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
     }
     set_scsi_pt_cdb(ptvp, rmsnCmdBlk, sizeof(rmsnCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "read media serial number", res,
                                mx_resp_len, sense_b, noisy, verbose,
@@ -433,7 +438,7 @@ int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    read media serial number: respon"
                     "se%s\n", (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -480,7 +485,7 @@ int sg_ll_report_id_info(int sg_fd, int itype, void * resp,
     }
     set_scsi_pt_cdb(ptvp, riiCmdBlk, sizeof(riiCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, max_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, max_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "report identifying information", res,
                                max_resp_len, sense_b, noisy, verbose,
@@ -508,7 +513,7 @@ int sg_ll_report_id_info(int sg_fd, int itype, void * resp,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    report identifying information: "
                     "response%s\n", (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -547,7 +552,7 @@ int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
         if ((verbose > 1) && paramp && param_len) {
             fprintf(sg_warnings_strm, "    Set identifying information "
                     "parameter block:\n");
-            dStrHex(paramp, param_len, -1);
+            dStrHex((const char *)paramp, param_len, -1);
         }
     }
 
@@ -559,7 +564,7 @@ int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
     }
     set_scsi_pt_cdb(ptvp, siiCmdBlk, sizeof(siiCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "set identifying information", res, 0,
                                sense_b, noisy, verbose, &sense_cat);
@@ -638,7 +643,7 @@ int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
     }
     set_scsi_pt_cdb(ptvp, fuCmdBlk, sizeof(fuCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, "format unit", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
@@ -703,7 +708,7 @@ int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist,
     }
     set_scsi_pt_cdb(ptvp, reassCmdBlk, sizeof(reassCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "reassign blocks", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
@@ -781,7 +786,7 @@ int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     }
     set_scsi_pt_cdb(ptvp, gcCmdBlk, sizeof(gcCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "get configuration", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -807,7 +812,7 @@ int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    get configuration: response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -850,7 +855,7 @@ int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
     }
     set_scsi_pt_cdb(ptvp, prinCmdBlk, sizeof(prinCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "persistent reservation in", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -876,7 +881,7 @@ int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    persistent reserve in: "
                     "response%s\n", (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -913,7 +918,7 @@ int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
         fprintf(sg_warnings_strm, "\n");
         if (verbose > 1) {
             fprintf(sg_warnings_strm, "    Persistent Reservation Out parameters:\n");
-            dStrHex(paramp, param_len, 0);
+            dStrHex((const char *)paramp, param_len, 0);
         }
     }
 
@@ -924,7 +929,7 @@ int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
     }
     set_scsi_pt_cdb(ptvp, proutCmdBlk, sizeof(proutCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "persistent reserve out", res, 0,
                                sense_b, noisy, verbose, &sense_cat);
@@ -1015,7 +1020,7 @@ int sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
     }
     set_scsi_pt_cdb(ptvp, readLongCmdBlk, sizeof(readLongCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, xfer_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "read long (10)", res, xfer_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -1047,8 +1052,8 @@ int sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%llx, "
-                                " valid: %d, ili: %d\n", ull, valid, ili);
+                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                                ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }
             }
@@ -1113,7 +1118,7 @@ int sg_ll_read_long16(int sg_fd, int pblock, int correct,
     }
     set_scsi_pt_cdb(ptvp, readLongCmdBlk, sizeof(readLongCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, resp, xfer_len);
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "read long (16)", res, xfer_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -1145,8 +1150,8 @@ int sg_ll_read_long16(int sg_fd, int pblock, int correct,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%llx, "
-                                " valid: %d, ili: %d\n", ull, valid, ili);
+                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                                ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }
             }
@@ -1209,7 +1214,7 @@ int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
     }
     set_scsi_pt_cdb(ptvp, writeLongCmdBlk, sizeof(writeLongCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, data_out, xfer_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "write long(10)", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1241,8 +1246,8 @@ int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%llx, "
-                                " valid: %d, ili: %d\n", ull, valid, ili);
+                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                                ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }
             }
@@ -1311,7 +1316,7 @@ int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
     }
     set_scsi_pt_cdb(ptvp, writeLongCmdBlk, sizeof(writeLongCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, data_out, xfer_len);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "write long(16)", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1343,8 +1348,8 @@ int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%llx, "
-                                " valid: %d, ili: %d\n", ull, valid, ili);
+                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                                ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }
             }
@@ -1405,7 +1410,7 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
     set_scsi_pt_cdb(ptvp, vCmdBlk, sizeof(vCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     if (data_out_len > 0)
-        set_scsi_pt_data_out(ptvp, data_out, data_out_len);
+        set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, data_out_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "verify (10)", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1525,9 +1530,9 @@ int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
     set_scsi_pt_sense(ptvp, sp, slen);
     if (dlen > 0) {
         if (dinp)
-            set_scsi_pt_data_in(ptvp, dinp, dlen);
+            set_scsi_pt_data_in(ptvp, (unsigned char *)dinp, dlen);
         else if (doutp)
-            set_scsi_pt_data_out(ptvp, doutp, dlen);
+            set_scsi_pt_data_out(ptvp, (unsigned char *)doutp, dlen);
     }
     res = do_scsi_pt(ptvp, sg_fd,
                      ((timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT),
@@ -1605,6 +1610,153 @@ int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
     }
 
 out:
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI READ BUFFER command (SPC). Return of 0 ->
+ * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+int sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
+                      void * resp, int mx_resp_len, int noisy, int verbose)
+{
+    int res, k, ret, sense_cat;
+    unsigned char rbufCmdBlk[READ_BUFFER_CMDLEN] = 
+        {READ_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    rbufCmdBlk[1] = (unsigned char)(mode & 0x1f);
+    rbufCmdBlk[2] = (unsigned char)(buffer_id & 0xff);
+    rbufCmdBlk[3] = (unsigned char)((buffer_offset >> 16) & 0xff);
+    rbufCmdBlk[4] = (unsigned char)((buffer_offset >> 8) & 0xff);
+    rbufCmdBlk[5] = (unsigned char)(buffer_offset & 0xff);
+    rbufCmdBlk[6] = (unsigned char)((mx_resp_len >> 16) & 0xff);
+    rbufCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    rbufCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    read buffer cdb: ");
+        for (k = 0; k < READ_BUFFER_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", rbufCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "read buffer: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, rbufCmdBlk, sizeof(rbufCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "read buffer", res, mx_resp_len,
+                               sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read buffer: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
+        ret = 0;
+    }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
+ * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
+                       void * paramp, int param_len, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char wbufCmdBlk[WRITE_BUFFER_CMDLEN] = 
+        {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    wbufCmdBlk[1] = (unsigned char)(mode & 0x1f);
+    wbufCmdBlk[2] = (unsigned char)(buffer_id & 0xff);
+    wbufCmdBlk[3] = (unsigned char)((buffer_offset >> 16) & 0xff);
+    wbufCmdBlk[4] = (unsigned char)((buffer_offset >> 8) & 0xff);
+    wbufCmdBlk[5] = (unsigned char)(buffer_offset & 0xff);
+    wbufCmdBlk[6] = (unsigned char)((param_len >> 16) & 0xff);
+    wbufCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
+    wbufCmdBlk[8] = (unsigned char)(param_len & 0xff);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Write buffer cmd: ");
+        for (k = 0; k < WRITE_BUFFER_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", wbufCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_strm, "    Write buffer parameter block%s:\n",
+                    ((param_len > 256) ? " (first 256 bytes)" : ""));
+            dStrHex((const char *)paramp,
+                    ((param_len > 256) ? 256 : param_len), -1);
+        }
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "write buffer: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, wbufCmdBlk, sizeof(wbufCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "write buffer", res, 0, sense_b,
+                               noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }

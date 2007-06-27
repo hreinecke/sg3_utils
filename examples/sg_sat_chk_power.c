@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Douglas Gilbert.
+ * Copyright (c) 2006-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,7 @@
 
 /* This program performs a ATA PASS-THROUGH (16) SCSI command in order
    to perform an ATA CHECK POWER MODE command. See http://www.t10.org
-   SAT draft at time of writing: sat-r08.pdf
+   SAT draft at time of writing: sat-r09.pdf
 
    Invocation: sg_sat_chk_power [-v] [-V] <device>
 
@@ -49,13 +49,13 @@
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
-#define SAT_STATUS_RETURN_DESC 9  /* ATA status return (sense) descriptor */
+#define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
 
 #define ATA_CHECK_POWER_MODE 0xe5
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.02 20061014";
+static char * version_str = "1.03 20070129";
 
 int main(int argc, char * argv[])
 {
@@ -81,6 +81,8 @@ int main(int argc, char * argv[])
             ++verbose;
         else if (0 == strcmp(argv[k], "-vv"))
             verbose += 2;
+        else if (0 == strcmp(argv[k], "-vvv"))
+            verbose += 3;
         else if (0 == strcmp(argv[k], "-V")) {
             fprintf(stderr, "version: %s\n", version_str);
             exit(0);
@@ -146,15 +148,18 @@ int main(int argc, char * argv[])
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
-    case SG_LIB_CAT_RECOVERED:
-    case SG_LIB_CAT_NO_SENSE:
+    case SG_LIB_CAT_RECOVERED:  /* sat-r09 (latest) uses this sk */
+    case SG_LIB_CAT_NO_SENSE:   /* earlier SAT drafts used this */
         /* XXX: Until the spec decides which one to go with. 20060607 */
         ucp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
-                                      SAT_STATUS_RETURN_DESC);
-        if (NULL == ucp)
+                                      SAT_ATA_RETURN_DESC);
+        if (NULL == ucp) {
+            if (verbose > 1)
+                printf("ATA Return Descriptor expected in sense but not "
+                       "found\n");
             sg_chk_n_print3("ATA_16 command error", &io_hdr, 1);
-        else if (verbose)
-            sg_chk_n_print3("status return descriptor, as expected",
+        } else if (verbose)
+            sg_chk_n_print3("ATA Return Descriptor, as expected",
                              &io_hdr, 1);
         if (ucp && ucp[3]) {
             if (ucp[3] & 0x4)
@@ -166,11 +171,11 @@ int main(int argc, char * argv[])
     default:
         fprintf(stderr, "unexpected SCSI sense category\n");
         ucp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
-                                      SAT_STATUS_RETURN_DESC);
+                                      SAT_ATA_RETURN_DESC);
         if (NULL == ucp)
             sg_chk_n_print3("ATA_16 command error", &io_hdr, 1);
         else if (verbose)
-            sg_chk_n_print3("status return descriptor, as expected",
+            sg_chk_n_print3("ATA Return Descriptor, as expected",
                              &io_hdr, 1);
         if (ucp && ucp[3]) {
             if (ucp[3] & 0x4)
@@ -203,8 +208,8 @@ int main(int argc, char * argv[])
             break;
         }
     } else
-        fprintf(stderr, "Expecting a special error return and didn't "
-                "receive it\n");
+        fprintf(stderr, "Expecting a ATA Return Descriptor in sense and "
+                "didn't receive it\n");
 
     close(sg_fd);
     return 0;

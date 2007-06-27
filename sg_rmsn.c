@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2006 Douglas Gilbert.
+ * Copyright (c) 2005-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.04 20061012";
+static char * version_str = "1.06 20070127";
 
 #define ME "sg_rmsn: "
 
@@ -63,13 +63,14 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_rmsn   [--help] [--raw] [--verbose] [--version] <scsi_device>\n"
-          "  where: --help|-h       print out usage message\n"
-          "         --raw|-r        output serial number to stdout "
+          "sg_rmsn   [--help] [--raw] [--verbose] [--version] DEVICE\n"
+          "  where:\n"
+          "    --help|-h       print out usage message\n"
+          "    --raw|-r        output serial number to stdout "
           "(potentially binary)\n"
-          "         --verbose|-v    increase verbosity\n"
-          "         --version|-V    print version string and exit\n\n"
-          "Performs a READ MEDIA SERIAL NUMBER SCSI command\n"
+          "    --verbose|-v    increase verbosity\n"
+          "    --version|-V    print version string and exit\n\n"
+          "Performs a SCSI READ MEDIA SERIAL NUMBER command\n"
           );
 }
 
@@ -160,7 +161,7 @@ int main(int argc, char * argv[])
             goto err_out;
         }
         sn_len += 4;
-        ucp = malloc(sn_len);
+        ucp = (unsigned char *)malloc(sn_len);
         if (NULL == ucp) {
             fprintf(stderr, "    Out of memory (ram)\n");
             goto err_out;
@@ -193,7 +194,8 @@ int main(int argc, char * argv[])
             fprintf(stderr, "Read Media Serial Number failed, aborted "
                     "command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Read Media Serial Number cdb\n");
+            fprintf(stderr, "bad field in Read Media Serial Number cdb "
+                    "including unsupported service action\n");
         else {
             fprintf(stderr, "Read Media Serial Number failed\n");
             if (0 == verbose)

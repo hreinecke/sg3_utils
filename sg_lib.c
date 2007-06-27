@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2006 Douglas Gilbert.
+ * Copyright (c) 1999-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,10 +65,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+
 #include "sg_lib.h"
 
 
-static char * version_str = "1.26 20061015";    /* spc-4 rev 7a */
+static char * version_str = "1.32 20070129";    /* spc-4 rev 8 */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -206,6 +209,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0x87, 0, "Access control out"},
     {0x88, 0, "Read(16)"},
     {0x8a, 0, "Write(16)"},
+    {0x8b, 0, "Orwrite(16)"},
     {0x8c, 0, "Read attribute"},
     {0x8d, 0, "Write attribute"},
     {0x8e, 0, "Write and verify(16)"},
@@ -281,6 +285,7 @@ static const struct value_name_t maint_in_arr[] = {
     {0xd, 0, "Report supported task management functions"},
     {0xe, 0, "Report priority"},
     {0xf, 0, "Report timestamp"},
+    {0x10, 0, "Maintenance in"},
 };
 
 #define MAINT_IN_SZ \
@@ -293,6 +298,7 @@ static const struct value_name_t maint_out_arr[] = {
     {0xb, 0, "Change aliases"},
     {0xe, 0, "Set priority"},
     {0xf, 0, "Set timestamp"},
+    {0x10, 0, "Maintenance out"},
 };
 
 #define MAINT_OUT_SZ \
@@ -435,8 +441,8 @@ void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
         case 0x2: ccp = "Check Condition"; break;
         case 0x4: ccp = "Condition Met"; break;
         case 0x8: ccp = "Busy"; break;
-        case 0x10: ccp = "Intermediate"; break;
-        case 0x14: ccp = "Intermediate-Condition Met"; break;
+        case 0x10: ccp = "Intermediate (obsolete)"; break;
+        case 0x14: ccp = "Intermediate-Condition Met (obs)"; break;
         case 0x18: ccp = "Reservation Conflict"; break;
         case 0x22: ccp = "Command Terminated (obsolete)"; break;
         case 0x28: ccp = "Task set Full"; break;
@@ -1520,7 +1526,7 @@ void sg_get_sense_str(const char * leadin,
     --buff_len;
     n = 0;
     if (sb_len < 1) {
-            snprintf(buff, n, "sense buffer empty\n");
+            snprintf(buff, buff_len, "sense buffer empty\n");
             return;
     }
     if (leadin) {
@@ -2307,13 +2313,13 @@ long long sg_get_llnum(const char * buf)
         return -1LL;
     len = strlen(buf);
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%llx", &unum);
+        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
         num = unum;
     } else if ('H' == toupper(buf[len - 1])) {
-        res = sscanf(buf, "%llx", &unum);
+        res = sscanf(buf, "%" SCNx64 "", &unum);
         num = unum;
     } else
-        res = sscanf(buf, "%lld%c%c%c", &num, &c, &c2, &c3);
+        res = sscanf(buf, "%" SCNd64 "%c%c%c", &num, &c, &c2, &c3);
     if (res < 1)
         return -1LL;
     else if (1 == res)

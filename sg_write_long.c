@@ -5,13 +5,15 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2006 D. Gilbert
+   *  Copyright (C) 2004-2007 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +28,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.12 20061015";
+static char * version_str = "1.14 20070129";
 
 
 #define MAX_XFER_LEN 10000
@@ -54,30 +56,30 @@ static struct option long_options[] = {
 static void usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_write_long [--16] [--cor_dis] [--help] [--in=<name>] "
-          "[--lba=<num>]\n"
+          "sg_write_long [--16] [--cor_dis] [--help] [--in=IF] "
+          "[--lba=LBA]\n"
           "                     [--pblock] [--verbose] [--version] "
           "[--wr_uncor]\n"
-          "                     [--xfer_len=<num>] <scsi_device>\n"
+          "                     [--xfer_len=BTL] DEVICE\n"
           "  where:\n"
-          "    --16|-S           do WRITE LONG(16) (default: 10)\n"
-          "    --cor_dis|-c      set correction disabled bit\n"
-          "    --help|-h         print out usage message\n"
-          "    --in=<name>|-i <name> input from file <name> (default: "
-          "write multiple\n"
-          "                          0xff bytes)\n"
-          "    --lba=<num>|-l <num>  logical block address "
+          "    --16|-S              do WRITE LONG(16) (default: 10)\n"
+          "    --cor_dis|-c         set correction disabled bit\n"
+          "    --help|-h            print out usage message\n"
+          "    --in=IF|-i IF        input from file called IF (default: "
+          "use\n"
+          "                         0xff bytes as fill)\n"
+          "    --lba=LBA|-l LBA     logical block address "
           "(default: 0)\n"
-          "    --pblock|-p       physical block (default: logical "
+          "    --pblock|-p          physical block (default: logical "
           "block)\n"
-          "    --verbose|-v      increase verbosity\n"
-          "    --version|-V      print version string then exit\n"
-          "    --wr_uncore|-w    set an uncorrectable error (no "
+          "    --verbose|-v         increase verbosity\n"
+          "    --version|-V         print version string then exit\n"
+          "    --wr_uncor|-w        set an uncorrectable error (no "
           "data transferred)\n"
-          "    --xfer_len=<num>|-x <num>  transfer length (< 10000) "
+          "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000) "
           "(default:\n"
-          "                                520 bytes)\n\n"
-          "Performs a WRITE LONG (10 or 16) SCSI command\n"
+          "                             520 bytes)\n\n"
+          "Performs a SCSI WRITE LONG (10 or 16) command\n"
           );
 }
 
@@ -98,7 +100,7 @@ int main(int argc, char * argv[])
     char device_name[256];
     char file_name[256];
     char ebuff[EBUFF_SZ];
-    char * ten_or;
+    const char * ten_or;
     int ret = 1;
     
     memset(device_name, 0, sizeof device_name);
@@ -199,11 +201,11 @@ int main(int argc, char * argv[])
                     "'-in=' is ignored\n");
     } else {
         if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
-            fprintf(stderr, ME "out of memory (query)\n");
-            sg_cmds_close_device(sg_fd);
-            return SG_LIB_SYNTAX_ERROR;
+            fprintf(stderr, ME "out of memory\n");
+            ret = SG_LIB_FILE_ERROR;
+            goto err_out;
         }
-        writeLongBuff = rawp;
+        writeLongBuff = (unsigned char *)rawp;
         memset(rawp, 0xff, MAX_XFER_LEN);
         if (file_name[0]) {
             got_stdin = (0 == strcmp(file_name, "-")) ? 1 : 0;
@@ -222,6 +224,8 @@ int main(int argc, char * argv[])
                 snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
                          file_name);
                 perror(ebuff);
+                if (! got_stdin)
+                    close(infd);
                 goto err_out;
             }
             if (res < xfer_len) {
@@ -235,9 +239,9 @@ int main(int argc, char * argv[])
     }
     if (verbose)
         fprintf(stderr, ME "issue write long to device %s\n\t\txfer_len= %d "
-                "(0x%x), lba=%llu (0x%llx)\n    cor_dis=%d, wr_uncor=%d, "
-                "pblock=%d\n", device_name, xfer_len, xfer_len, llba, llba,
-                cor_dis, wr_uncor, pblock);
+                "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 ")\n    cor_dis=%d, "
+                "wr_uncor=%d, pblock=%d\n", device_name, xfer_len, xfer_len,
+                llba, llba, cor_dis, wr_uncor, pblock);
 
     ten_or = do_16 ? "16" : "10";
     if (do_16)

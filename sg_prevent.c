@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,11 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -46,7 +42,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.05 20061012";
+static char * version_str = "1.06 20070129";
 
 #define ME "sg_prevent: "
 
@@ -63,20 +59,20 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_prevent [--allow] [--help] [--prevent=<n>] [--verbose] "
+          "sg_prevent [--allow] [--help] [--prevent=PC] [--verbose] "
           "[--version]\n"
-          "                   <scsi_device>\n"
+          "                  DEVICE\n"
           "  where:\n"
           "    --allow|-a            allow media removal\n"
-          "    --help|-h             print out usage message\n"
-          "    --prevent=<n>|-p <n>  prevention level (def: 1 -> "
+          "    --help|-h             print usage message then exit\n"
+          "    --prevent=PC|-p PC    prevent code value (def: 1 -> "
           "prevent)\n"
           "                            0 -> allow, 1 -> prevent\n"
           "                            2 -> persistent allow, 3 -> "
           "persistent prevent\n"
           "    --verbose|-v          increase verbosity\n"
           "    --version|-V          print version string and exit\n\n"
-          "Performs a PREVENT ALLOW MEDIUM REMOVAL SCSI command\n"
+          "Performs a SCSI PREVENT ALLOW MEDIUM REMOVAL command\n"
           );
 
 }

@@ -1,0 +1,50 @@
+#!/bin/bash
+
+################################################
+#
+#  Spin down the given SCS disk(s).
+#
+#  SCSI disks (or disks that understand SCSI commands)
+#  are assumed. The immediate bit is set so the command
+#  should return immediately. The disk however will take
+#  10 seconds or more to spin down.
+#
+#  This script assumes the sg3_utils package is installed.
+#
+###############################################
+
+verbose=""
+
+usage()
+{
+  echo "Usage: scsi_stop [-h] [-v] <device>+"
+  echo "  where:"
+  echo "    -h, --help           print usage message"
+  echo "    -v, --verbose        more verbose output"
+  echo ""
+  echo "Send SCSI START STOP UNIT command to stop each <device>"
+}
+
+if (( $# < 1 ))
+  then
+    usage
+    exit 1
+fi
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    h|-help) usage ; exit 0 ;;
+    v|-verbose) verbose="-v" ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+for i
+do
+        echo "sg_start -i 0 $verbose $i"
+        sg_start -i 0 $verbose $i
+done

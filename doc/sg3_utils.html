@@ -16,12 +16,13 @@ sg3_utils package</h1>
 </center>
 <a href="#intro"></a>
 <ol id="mozToc">
-<!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6--><li><a href="#mozTocId697451">
-The&nbsp; Linux
+<!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6-->
+  <li><a href="#mozTocId697451"> The&nbsp; Linux
 sg3_utils package</a>
     <ol>
       <li><a href="#mozTocId746876"> Introduction</a></li>
       <li><a href="#mozTocId832900"> Contents of sg3_utils</a></li>
+      <li><a href="#mozTocId736867">Exit status</a></li>
       <li><a href="#mozTocId143590">Changing mode page
 settings</a></li>
       <li><a href="#mozTocId301018">Examples</a></li>
@@ -33,11 +34,14 @@ settings</a></li>
 <h2><a class="mozTocH2" name="mozTocId746876"></a> Introduction</h2>
 The <span style="font-weight: bold;">sg3_utils</span> package contains
 utilities
-that send SCSI commands to "SCSI" devices. As well as devices on
-transports associated with SCSI (e.g. Fibre Channel (FCP) and the SCSI
+that send SCSI commands to devices. As well as devices on
+transports traditionally associated with SCSI (e.g. Fibre Channel
+(FCP), Serial
+Attached SCSI (SAS) and the SCSI
 Parallel Interface(SPI)) many
 other devices use SCSI command sets. ATAPI cd/dvd drives
-and SATA disks that use a translation layer or bridge device are
+and SATA disks that connect via a translation layer or a bridge device
+are
 examples of devices that use SCSI command sets.<br>
 <br>
 SCSI command sets are divided into a common set and several device
@@ -60,9 +64,10 @@ targeted the linux kernel 2.2 series with some support for the
 2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>
 for further information about sg_utils.&nbsp; This
 document describes
-<span style="font-weight: bold;">version 1.22</span> of <span
+<span style="font-weight: bold;">version 1.23</span> of <span
  style="font-weight: bold;">sg3_utils</span> .&nbsp; A subset of these
-utilities have been ported to the FreeBSD, Tru64 and Windows operating
+utilities have been ported to the FreeBSD, Tru64 and the Windows
+operating
 systems.<br>
 <br>
 In the linux kernel 2.4 series most of these utilities must be
@@ -84,12 +89,20 @@ of this page has been moved to the <a href="tools.html">tools</a> page.<span
  style="font-weight: bold;"><br>
 </span></p>
 <h2><a class="mozTocH2" name="mozTocId832900"></a> Contents of sg3_utils</h2>
-Here is a listing in alphabetical order of the utilities in the
+This package contains over 30 utilities, their "man" pages, build files
+and general documentation (e.g. several README files). The utilities
+have a command line interface which in general has this form:<br>
+<br>
+<span style="font-family: monospace;">UTILITY_NAME [OPTIONS] DEVICE</span><br>
+<br>
+No more than one DEVICE name can be given (and in a few cases, no
+DEVICE name is required). Here is a listing in alphabetical order of
+the utilities in the
 sg3_utils package:<br>
 <br>
 <table style="width: 100%; text-align: left;" border="1" cellpadding="2"
  cellspacing="2">
-  <caption align="bottom"><span style="font-weight: bold;">Table 1
+  <caption><span style="font-weight: bold;">Table 1
 Utilities in sg3_utils</span><br>
   </caption> <tbody>
     <tr>
@@ -98,8 +111,10 @@ Utilities in sg3_utils</span><br>
       <td style="vertical-align: top;"><span style="font-weight: bold;">Main
 SCSI commands</span><br>
       </td>
-      <td style="vertical-align: top;"><span style="font-weight: bold;">subdirectory<br>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">directory<br>
       </span> </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">CLI</span><br>
+      </td>
       <td style="vertical-align: top;"><span style="font-weight: bold;">Ported</span><br>
       </td>
       <td style="vertical-align: top;"><span style="font-weight: bold;">Notes</span><br>
@@ -112,10 +127,12 @@ SCSI commands</span><br>
       </td>
       <td style="vertical-align: top;">utils<br>
       </td>
-      <td style="vertical-align: top;"><br>
+      <td style="vertical-align: top;">adhoc<br>
+      </td>
+      <td style="vertical-align: top;">fb<br>
       </td>
       <td style="vertical-align: top;">converts stdin (assumed binary)
-to ASCII hex and ASCII, sending its output to stdout (like Unix <span
+to ASCII hex and ASCII, sending its output to stdout (like the Unix <span
  style="font-weight: bold;">od</span> command)<br>
       </td>
     </tr>
@@ -125,6 +142,8 @@ to ASCII hex and ASCII, sending its output to stdout (like Unix <span
       <td style="vertical-align: top;">-<br>
       </td>
       <td style="vertical-align: top;">archive<br>
+      </td>
+      <td style="vertical-align: top;">adhoc<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -139,6 +158,8 @@ script<br>
       </td>
       <td style="vertical-align: top;">examples<br>
       </td>
+      <td style="vertical-align: top;">adhoc<br>
+      </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">uses deprecated
@@ -150,9 +171,11 @@ SCSI_IOCTL_SEND_COMMAND ioctl<br>
       </td>
       <td style="vertical-align: top;">MODE SENSE/SELECT, INQUIRY<br>
       </td>
-      <td style="vertical-align: top;">****<br>
+      <td style="vertical-align: top;">--&gt;<br>
       </td>
-      <td style="vertical-align: top;"><br>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
+      <td style="vertical-align: top;">fb,t64,w<br>
       </td>
       <td style="vertical-align: top;">was in sg3_utils for a short
 time; now in own package, see <a href="sdparm.html">sdparm</a> .
@@ -167,10 +190,13 @@ commands.<br>
       </td>
       <td style="vertical-align: top;">utils<br>
       </td>
-      <td style="vertical-align: top;"><br>
+      <td style="vertical-align: top;">getopt<br>
       </td>
-      <td style="vertical-align: top;">check asc/ascq codes from
-www.t10.org page against sg3_utils table<br>
+      <td style="vertical-align: top;">fb<br>
+      </td>
+      <td style="vertical-align: top;">check asc/ascq codes from <a
+ href="http://www.t10.org">www.t10.org</a> page against
+sg3_utils table<br>
       </td>
     </tr>
     <tr>
@@ -180,13 +206,16 @@ www.t10.org page against sg3_utils table<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">adhoc<br>
+      </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">symbolic decoding (optional
 changing) of mode pages. Can also output (disk) defect lists. In lk 2.4
-can be given primary device nodes (e.g. /dev/sda) as well as sg device
-nodes. See <span style="font-weight: bold;">scsiinfo</span> package
-notes below.<br>
+can be given primary device nodes (e.g. <span
+ style="font-family: monospace;">/dev/sda</span>) as well as sg device
+nodes. Port of older <span style="font-weight: bold;">scsiinfo</span>
+utility.<br>
       </td>
     </tr>
     <tr>
@@ -196,10 +225,12 @@ notes below.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">dd<br>
+      </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">sg_dd variant that uses memory
-mapped IO (only on sg devices)<br>
+mapped IO (only on linux sg devices)<br>
       </td>
     </tr>
     <tr>
@@ -208,6 +239,8 @@ mapped IO (only on sg devices)<br>
       <td style="vertical-align: top;">READ, WRITE<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">dd<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -221,6 +254,8 @@ threads<br>
       <td style="vertical-align: top;">READ, WRITE<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">dd<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -236,6 +271,8 @@ SG_IO ioctl to send SCSI commands to copy data. See the <a
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">adhoc<br>
+      </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">utility specialized for EMC
@@ -249,6 +286,8 @@ Clariion series<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w<br>
       </td>
       <td style="vertical-align: top;">format or resize a SCSI disk<br>
@@ -261,6 +300,8 @@ Clariion series<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch features and profiles of a
 cd/dvd drive and/or its current media<br>
@@ -269,13 +310,17 @@ cd/dvd drive and/or its current media<br>
     <tr>
       <td style="vertical-align: top;">sg_ident<br>
       </td>
-      <td style="vertical-align: top;">REPORT/SET DEVICE IDENTIFIER<br>
+      <td style="vertical-align: top;">REPORT/SET IDENTIFYING
+INFORMATION<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">default is to report (fetch) the
-device identifier. With the '--set' option a new identifier is sent
+device identifier. With the '<span style="font-family: monospace;">--set</span>'
+option a new identifier is sent
 to the device.<br>
       </td>
     </tr>
@@ -286,11 +331,13 @@ to the device.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt+<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch standard response, VPD
-pages (including device identification) or version descriptors. Also
-can perform IDENTIFY (PACKET) DEVICE ATA command. VPD page decoding now
-also performed by sg_vpd .<br>
+pages or version descriptors. Also
+can perform IDENTIFY (PACKET) DEVICE ATA command. VPD page decoding
+also performed by sg_vpd and sdparm.<br>
       </td>
     </tr>
     <tr>
@@ -300,9 +347,11 @@ also performed by sg_vpd .<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt+<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch log sense pages, decode
-standard pages<br>
+standard and some vendor pages<br>
       </td>
     </tr>
     <tr>
@@ -311,6 +360,8 @@ standard pages<br>
       <td style="vertical-align: top;">REPORT LUNS<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch luns reported by a device
@@ -323,6 +374,8 @@ standard pages<br>
       <td style="vertical-align: top;">INQUIRY<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">adhoc<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -338,9 +391,12 @@ and primary device node (if any). In lk 2.6 see <a
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">maps between single sg device
+      <td style="vertical-align: top;">maps between single linux sg
+device
 and primary device node (and vice versa). Also does mapping in to, and
 out of, sysfs. For the linux 2.6 series.<br>
       </td>
@@ -352,8 +408,10 @@ out of, sysfs. For the linux 2.6 series.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt+<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
-      <td style="vertical-align: top;">dump mode pages (mainly in hex)<br>
+      <td style="vertical-align: top;">fetch mode pages (mainly in hex)<br>
       </td>
     </tr>
     <tr>
@@ -363,7 +421,9 @@ out of, sysfs. For the linux 2.6 series.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;"><br>
+      <td style="vertical-align: top;">getopt+<br>
+      </td>
+      <td style="vertical-align: top;">fb,t64,w<br>
       </td>
       <td style="vertical-align: top;">fetch supported SCSI commands or
 supported task management functions<br>
@@ -375,6 +435,8 @@ supported task management functions<br>
       <td style="vertical-align: top;">PERSISTENT RESERVE IN/OUT<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">control persistent reservations
@@ -389,6 +451,8 @@ reservation status<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">control media removal, mainly
 for those SCSI devices which have removable media (e.g. CD/DVD and tape
@@ -401,6 +465,8 @@ drives)<br>
       <td style="vertical-align: top;">READ BUFFER<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt+<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -415,6 +481,8 @@ Typically for testing the SCSI transport (for throughput or errors)<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">adhoc<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w</td>
       <td style="vertical-align: top;">display or modify RDAC redundant
 controller mode page<br>
@@ -427,11 +495,13 @@ controller mode page<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">dd<br>
+      </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">read continually from same
 offset. Syntax similar to sg_dd (without write side). Can test SCSI
-device cache and transport performance (like sg_rbuf).<br>
+device cache and transport performance.<br>
       </td>
     </tr>
     <tr>
@@ -441,9 +511,25 @@ device cache and transport performance (like sg_rbuf).<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt+<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch the number of blocks and
 the individual block size for disks and CD/DVD media<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_read_buffer<br>
+      </td>
+      <td style="vertical-align: top;">READ BUFFER<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
+      <td style="vertical-align: top;">fb,t64,w<br>
+      </td>
+      <td style="vertical-align: top;">read descriptors or data<br>
       </td>
     </tr>
     <tr>
@@ -452,6 +538,8 @@ the individual block size for disks and CD/DVD media<br>
       <td style="vertical-align: top;">READ LONG<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">read data from given lba which
@@ -464,6 +552,8 @@ includes the block and ECC data.<br>
       <td style="vertical-align: top;">REASSIGN BLOCKS<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">reassign a lba from one sector
@@ -478,10 +568,12 @@ if it is recoverable.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch sense data from the given
-SCSI device. Useful if no autosense , to get progress indication (e.g.
-during a format) or find the power condition state.<br>
+device. Modern uses include getting a progress indication (e.g.
+during a format) or finding the power condition state.<br>
       </td>
     </tr>
     <tr>
@@ -490,6 +582,8 @@ during a format) or find the power condition state.<br>
       <td style="vertical-align: top;">-<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">adhoc<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -504,6 +598,8 @@ device (target or lun?) reset.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Relatively new command
 added to SPC-3. Format of response is vendor specific so this utility
@@ -517,6 +613,8 @@ outputs it in hex (default) or binary.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Specialized for multi-ported
 SCSI devices where one port (or a group of them) is preferred for IO
@@ -528,6 +626,8 @@ over another (or others).<br>
       </td>
       <td style="vertical-align: top;">ATA PASS-THROUGH</td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w<br>
       </td>
@@ -541,6 +641,8 @@ IDENTIFY PACKET DEVICE ATA commands via the SAT ATA PASS-THROUGH (16 or
       <td style="vertical-align: top;">ATA PASS-THROUGH<br>
       </td>
       <td style="vertical-align: top;">examples<br>
+      </td>
+      <td style="vertical-align: top;">adhoc<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -557,10 +659,14 @@ examples subdirectory.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">adhoc<br>
+[win:<br>
+getopt]<br>
+      </td>
       <td style="vertical-align: top;">w<br>
       </td>
       <td style="vertical-align: top;">maps each sg device name to
-the corresponding numeric &lt;host, channel, target', lun&gt; tuple. In
+the corresponding numeric &lt;host, channel, target, lun&gt; tuple. In
 lk 2.6 series the "<a href="scsi/lsscsi.html">lsscsi</a> -g" command is
 similar. In Windows shows one device per line, with the device's
 various names and INQUIRY response string on that line.<br>
@@ -572,6 +678,8 @@ various names and INQUIRY response string on that line.<br>
       <td style="vertical-align: top;">SEND DIAGNOSTIC<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt+<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Issues either a default self
@@ -588,6 +696,8 @@ pages.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Fetches status diagnostic
 pages from, and sends some control pages to, a SCSI Enclosure Services
@@ -600,6 +710,8 @@ pages from, and sends some control pages to, a SCSI Enclosure Services
       <td style="vertical-align: top;">INQUIRY, TEST UNIT READY<br>
       </td>
       <td style="vertical-align: top;">examples<br>
+      </td>
+      <td style="vertical-align: top;">adhoc<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -614,6 +726,8 @@ the scsi generic (sg) driver interface<br>
       </td>
       <td style="vertical-align: top;">examples<br>
       </td>
+      <td style="vertical-align: top;">adhoc<br>
+      </td>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">Simple code example of sending a
@@ -627,9 +741,12 @@ the scsi generic (sg) driver interface<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt+<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Controls the power condition
-state of a SCSI device. Primary use is to spin up and down SCSI disks.<br>
+state of a SCSI device. Primary use is to spin up and down SCSI disks.
+Can also load and eject removable media.<br>
       </td>
     </tr>
     <tr>
@@ -638,6 +755,8 @@ state of a SCSI device. Primary use is to spin up and down SCSI disks.<br>
       <td style="vertical-align: top;">SYNCHRONIZE CACHE<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Causes disk caches to be flushed
@@ -650,6 +769,8 @@ to media<br>
       <td style="vertical-align: top;">READ/WRITE BUFFER<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
@@ -665,6 +786,8 @@ corruption.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt+<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Issue one or more Test Unit
 Ready commands. Can be used to time SCSI command overhead.<br>
@@ -674,6 +797,8 @@ Ready commands. Can be used to time SCSI command overhead.<br>
       <td style="vertical-align: top;">sg_verify</td>
       <td style="vertical-align: top;">VERIFY</td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">reads indicated blocks on a SCSI
@@ -687,10 +812,27 @@ for media scans.</td>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w<br>
       </td>
       <td style="vertical-align: top;">Decodes standard and some vendor
 Vital Product Data (VPD) pages.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_write_buffer<br>
+      </td>
+      <td style="vertical-align: top;">WRITE BUFFER<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
+      <td style="vertical-align: top;">fb,t64,w<br>
+      </td>
+      <td style="vertical-align: top;">write data; can be used to
+download firmware<br>
       </td>
     </tr>
     <tr>
@@ -699,6 +841,8 @@ Vital Product Data (VPD) pages.<br>
       <td style="vertical-align: top;">WRITE LONG<br>
       </td>
       <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">getopt<br>
       </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">writes to a lba, data which
@@ -714,19 +858,23 @@ sg_read_long utility.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
+      <td style="vertical-align: top;">getopt<br>
+      </td>
       <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">writes mode pages supplied in
-ASCII hex (e.g. from "sg_modes -r") to the given SCSI device. See <a
- href="sdparm.html">sdparm</a> for another method of setting mode page
+ASCII hex (e.g. from "<span style="font-family: monospace;">sg_modes -r</span>")
+to the&nbsp; SCSI device. See <a href="sdparm.html">sdparm</a> for
+another method of setting mode page
 parameters.<br>
       </td>
     </tr>
   </tbody>
 </table>
 <br>
-More SCSI commands may be issued than shown in the "main SCSI
-commands" column. For example many utilities issue a SCSI INQUIRY
-command to find out the peripheral device type of the given SCSI
+More SCSI commands may be issued than shown in the <span
+ style="font-weight: bold;">Main SCSI
+commands</span> column. For example many utilities issue a SCSI INQUIRY
+command to find out the peripheral device type of the given
 device. Some SCSI commands listed above are only relevant to a specific
 device type (e.g. FORMAT UNIT) and should not be sent to a device
 belonging to other peripheral device types (and in some cases these
@@ -736,23 +884,51 @@ directory of the tarball for a more exhaustive list of SCSI (and ATA)
 commands
 issued by the sg3_utils utilities.<br>
 <br>
-If the "subdirectory"
+If the <span style="font-weight: bold;">directory</span>
 column is empty in the above table then that utility is in the main
 directory and more
-documentation can be found in its "man" page. All utilities in the main
-directory have "man" pages and some in the subdirectories have "man"
-pages. <br>
+documentation can be found in its "man" page. Some utilities in the
+subdirectories have "man"
+pages.<br>
 <br>
-If the "Ported" column is empty then the utility is only found in
+The <span style="font-weight: bold;">CLI</span> column indicates what
+kind of command line interface the utility has. Recent utilities have a
+cli based on the getopt_long() function which offers both long option
+names (e.g. "<span style="font-family: monospace;">--verbose</span>")
+and a short form (e.g. '<span style="font-family: monospace;">-v</span>'),
+both forms can
+take an argument. Experience has led to consistent use of various
+options such as "<span style="font-family: monospace;">--help</span>", "<span
+ style="font-family: monospace;">--verbose</span>" and "<span
+ style="font-family: monospace;">--version</span>" across these
+utilities. Utilities with this type of cli are marked with "getopt".
+The original utilities had an "ad hoc" type cli that unfortunately
+lacked consistency and had a mix of long and short forms (with the long
+form sometime prefixed with "-" and on other occasions with "--".
+Utilities with this type of cli are marked with "adhoc". There is also
+a group of utilities that are related to the Unix dd command and share
+its quirky cli. Finally a group of well used utilities with ad hoc
+command line interfaces had a getop_long() based interface added in
+sg3_utils version 1.23 . These utilities include sg_inq, sg_logs and
+sg_modes. The default cli for this group is "getopt" but by using
+"<span style="font-family: monospace;">--old</span>" or "-O" as the
+first option the older ad hoc options can be
+used. This group will default to the older ad hoc interface if the
+environment variable SG3_UTILS_OLD_OPTS is defined. Utilities with this
+type of cli are marked with "getopt+".<br>
+<br>
+If the <span style="font-weight: bold;">Ported</span> column is empty
+then the utility is only found in
 Linux. Support for other ports is indicated by "fb" for FreeBSD, "t64"
 for Tru64 (OSF) and "w" for Windows. See the README.freebsd,
 README.tru64 and README.win32 files
 for more information.<br>
 <br>
-This paragraph contains Linux specific information. In the above table
-all utilities in the main directory except sgp_dd
-issue SG_IO ioctls when they want to send SCSI commands to the given
-device. The sgp_dd utility issues SCSI commands using the sg
+This paragraph contains Linux specific information. All utilities that
+issue SCSI commands and that appear in the main directory of table 1,
+with the exception of sgp_dd,
+issue SG_IO ioctls. The sgp_dd utility issues SCSI commands using the
+sg
 driver's asynchronous ( write()/read() ) interface to device nodes that
 have the sg driver's major device number (i.e. "char" major 21). This
 means that all utilities in the main directory are "safe" with any
@@ -766,14 +942,20 @@ nodes.]<br>
 <br>
 Irrespective of the device node used to access a device, care
 should be taken not to interfere with a device while it is "active".
-For example invoking a "sg_format -F" utility on a disk with mounted
+For example invoking a "<span style="font-family: monospace;">sg_format
+-F</span>" utility on a disk with mounted
 file
-systems on it is going to cause damage.<br>
-<br>
-Each process containing one of these command line utilities completes
-with an exit status 0 when
+systems on it is obviously going to cause damage.<br>
+<h2><a class="mozTocH2" name="mozTocId736867"></a>Exit status</h2>
+Each process containing one of sg3_utils' command line utilities
+completes
+with an exit status of 0 when
 successful. Prior to version 1.21 all errors yielded an exit status of
-1. From version 1.21 the exit status is one of:<br>
+1. Having finer grain error reporting via the exit status from
+relatively low level sg3_utils utilities allows higher level scripts
+and other program wrappers to do more useful error processing.<br>
+<br>
+From version 1.22 the exit status value is one of:<br>
 <ul>
   <li><span style="font-weight: bold;">1</span>&nbsp;&nbsp; syntax
 error in command line options or their arguments, or an illegal
@@ -810,10 +992,11 @@ successful.<br>
   </li>
   <li><span style="font-weight: bold;">15</span> &nbsp; the utility is
 unable to open, close or use the given device. The given file name
-could be incorrect or there may be permission problems. Adding the '-v'
+could be incorrect or there may be permission problems. Adding the '<span
+ style="font-family: monospace;">-v</span>'
 option may give more information.</li>
-  <li><span style="font-weight: bold;">20</span>&nbsp;&nbsp; the
-&lt;scsi_device&gt; reports it has a check condition but "no sense".
+  <li><span style="font-weight: bold;">20</span>&nbsp;&nbsp; the DEVICE
+reports it has a check condition but "no sense".
 Some polling commands (e.g. REQUEST SENSE) can react this way. It is
 unlikely that this value will occur as an exit status.</li>
   <li><span style="font-weight: bold;">21</span>&nbsp;&nbsp; the device
@@ -835,10 +1018,13 @@ This includes transport and operating system errors.<br>
   </li>
 </ul>
 Many of the above exit statuses will be repeatable so executing the
-utility again with one or more '-v' options may yield more information.
+utility again with one or more '<span style="font-family: monospace;">-v</span>'
+options may yield more information.
 Unit attentions (exit status 6) are only reported once per condition.
 Notice that some of the lower exit status values correspond to the SCSI
-sense key values that they correspond to.<br>
+sense key values. Some examples of bash scripts that use these exit
+values see the <span style="font-style: italic;">scripts</span>
+subdirectory.<br>
 <h2><a class="mozTocH2" name="mozTocId143590"></a>Changing mode page
 settings</h2>
 SCSI devices store settings (metadata) that could possibly be changed
@@ -1049,7 +1235,8 @@ transport: Serial Attached SCSI (SAS)</span><br
 <span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 Relative target port: 0x2</span><br>
 <br>
-The sg_scan and sg_map utilities show the relationships between sg
+The sg_scan and sg_map utilities show the relationships between linux
+sg
 devices and their &lt;bus, channel, target, lun&gt; tuples and their
 primary device node names:<br>
 <p>Example: given these 3 SCSI devices: <br>
@@ -1104,63 +1291,245 @@ lun=0&nbsp; type=0</tt><span style="font-family: monospace;"> </span><tt
  style="font-family: monospace;">
 <tt style="font-family: monospace;">/dev/sg2: scsi2 channel=0 id=6
 lun=0&nbsp; type=5</tt> </p>
-<p>INQUIRY data can be added to that output with the "-i" option. The
+<p>INQUIRY data can be added to that output with the '<span
+ style="font-family: monospace;">-i</span>' option. The
 sg_map utility shows the mapping between scsi generic (sg) devices and
 the corresponding primary device node. For some peripheral device
 types, SCSI enclosures for example, there is no mapping and the
 enclosure device must be accessed via a sg device node.<br>
 </p>
-<p style="font-family: monospace;">$ sg_map <br>
+<p></p>
+<p style="font-family: monospace;"><code>$ sg_map <br>
 /dev/sg0&nbsp; /dev/sda <br>
 /dev/sg1&nbsp; /dev/scd0 <br>
-/dev/sg2&nbsp; /dev/scd1</p>
+/dev/sg2&nbsp; /dev/scd1</code></p>
 In the lk 2.6 series of kernels sg_scan and sg_map are less important
 as most
 utilities in the sg3_utils package can be issued directly against the
-primary device node (e.g. /dev/sda).&nbsp; However the sg driver is
+primary device node (e.g. <span style="font-family: monospace;">/dev/sda</span>).&nbsp;
+However the sg driver is
 still needed to "talk" to devices such as enclosures which have no
 specialized driver in linux.<br>
+<br>
+The Windows port has its own sg_scan utility which attempts to place
+all the device names for one device on a line. Here is an example:<br>
+<span style="font-family: monospace;">$ sg_scan</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">SCSI0:0,0,0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+C:&nbsp;&nbsp;&nbsp; PD0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+IC25N040ATCS05-0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CS4O&nbsp; *</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">SCSI1:0,0,0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+D:&nbsp;&nbsp;&nbsp; CDROM0&nbsp;&nbsp; HITACHI DVD-ROM GD-S200 0034</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">SCSI2:0,0,0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+I: +&nbsp; PD5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; QUANTUM
+LPS525S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3110</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">SCSI2:0,6,0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+TAPE0&nbsp;&nbsp;&nbsp; SONY&nbsp;&nbsp;&nbsp;
+SDT-7000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0192</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+E:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Generic USB SD Reader&nbsp;&nbsp; 1.00&nbsp; pdt=0</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+PD1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Generic USB SD Reader&nbsp;&nbsp; 1.00</span><br>
+<br>
+The first half of each line contains the various device names for a
+device. The second half are INQUIRY reponse strings. So device names
+like "PD1" (or the longer "physicalDrive1" form), "D:" and "TAPE0" can
+be used in the Windows port. <br>
 <h2><a class="mozTocH2" name="mozTocId585558"></a> Notes</h2>
-Starting with sg3_utils-1.09 a library called libsgutils is built and
-is required by most utilities. The library is made up of two source
-files: sg_lib.c and sg_cmds.c; and their associated header files . The
-sg_lib.c file contains SCSI
-command,
+Starting with sg3_utils-1.09 a library called libsgutils is built in
+some environments and
+is required by most utilities. The library is made up of three source
+files: <span style="font-family: monospace;">sg_lib.c</span>, <span
+ style="font-family: monospace;">sg_cmds_basic.c</span> and <span
+ style="font-family: monospace;">sg_cmds_extra.c</span>; and their
+associated header files . The
+<span style="font-family: monospace;">sg_lib.c</span> file contains
+tables of SCSI
+command names,
 sense key and additional sense code strings and various related helper
-functions. The sg_cmds.c file contains low level wrapper functions for
-commonly used SCSI commands. The library is built both as a shared
+functions. The <span style="font-family: monospace;">sg_cmds_basic.c</span>
+file contains low level wrapper
+functions for
+commonly used SCSI commands. The <span style="font-family: monospace;">sg_cmds_extra.c</span>
+file contains low
+level wrapper functions for
+less commonly used SCSI commands. The library can be built both as a
+shared
 object and a static library. The binary rpm package only contains the
 shared library while the sg3_utils-devel rpm package contains the
-static library, sg_lib.h and sg_cmds.h . If users do not want libraries
+static library, <span style="font-family: monospace;">sg_lib.h</span>,
+<span style="font-family: monospace;">sg_cmds.h</span>, <span
+ style="font-family: monospace;">sg_cmds_basic.h</span>, <span
+ style="font-family: monospace;">sg_cmds_extra.h</span>
+and some header files associated with the generic SCSI pass through
+interface. If users do not want libraries
 (shared or static) then they can refer to the "no_lib" subdirectory
 in the tarball which contains "no_lib" versions of the Makefile and the
 rpm "spec" file.<br>
 <br>
-Many of the utilities in the sg3_utils package use the SG_IO ioctl
+In Linux many of the utilities in the sg3_utils package ultimately use
+the SG_IO ioctl
 (rather than the older write()/read() interface) in the sg driver. In
 the lk 2.6&nbsp; series the SG_IO ioctl (or at least a stripped
-down version of it) has been implemented in the block subsystem. That
-means that commands that previously only worked on sg device names will
-now work on block device names as well (e.g. "sg_inq /dev/sda"). To use
+down version of it) has been implemented in the block subsystem (see <a
+ href="sg_io.html">sg_io.html</a> for more information). This
+means that commands which previously only worked on sg device names
+will
+now work on block device names as well (e.g. "<span
+ style="font-family: monospace;">sg_inq /dev/sda</span>"). To use
 this facility safely version sg3_utils-1.02 or later should be used.
 Note that SCSI tape devices (both st and osst device drivers) are char
 devices and support the SG_IO ioctl from lk 2.6.6 onwards.<br>
 <p>See the notes about header file problems in the README file inside
 each package. </p>
 <h2><a class="mozTocH2" name="mozTocId479511"></a> Download</h2>
-Various tarballs that include the source, a README, CHANGELOG, INSTALL
-and a Makefile can be found in the <a
- href="http://www.torque.net/sg/index.html#mozTocId566194"><span
- style="text-decoration: underline;">table 2</span></a> on the <a
- href="index.html">main</a>
-page. There are also source,
-i386 binary rpm and deb packages available. There is no './configure'
-logic so the correct Makefile must be chosen for the OS.<br>
+Several recent versions of the sg3_utils package are listed below. The
+tarballs contain README, CHANGELOG, INSTALL
+files and man pages as well as source and build files. The build files
+include Makefiles for various architectures, a linux rpm "spec" file
+and a debian directory for building "deb" packages.&nbsp; Here is the
+most recently released sg3_utils <a href="p/sg3_utils.CHANGELOG">CHANGELOG</a>
+.<br>
+<br>
+<table border="1" width="100%">
+  <caption><b>Table 2. sg3_utils tarballs and packages</b></caption> <tbody>
+    <tr>
+      <td><span style="font-weight: bold;">sg3_utils version</span><br>
+release date<br>
+      </td>
+      <td valign="top">&nbsp; <b>tarballs</b>&nbsp;<br>
+      </td>
+      <td><b>rpm source rpms **<br>
+      </b></td>
+      <td><b>i386 rpm binaries **<br>
+      </b></td>
+      <td valign="top">&nbsp;&nbsp; <span style="font-weight: bold;">debian
+packages</span><br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">1.20</span><br>
+20060418<br>
+      </td>
+      <td style="vertical-align: top;"><a href="p/sg3_utils-1.20.tgz">sg3_utils-1.20.tgz</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3_utils-1.20-1.src.rpm">sg3_utils-1.20-1.src.rpm</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3_utils-1.20-1.i386.rpm">sg3_utils-1.20-1.i386.rpm</a><br>
+      <a href="p/libsgutils-1_0-1.20-1.i386.rpm">libsgutils-1_0-1.20-1.i386.rpm</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3-utils_1.20-0.1_i386.deb">sg3-utils_1.20-0.1_i386.deb</a><br>
+      <a href="p/libsgutils1-0_1.20-0.1_i386.deb">libsgutils1-0_1.20-0.1_i386.deb</a></td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">1.21<br>
+      </span>20060706<span style="font-weight: bold;"><br>
+      </span></td>
+      <td style="vertical-align: top;"><a href="p/sg3_utils-1.21.tgz">sg3_utils-1.21.tgz</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3_utils-1.21-1.src.rpm">sg3_utils-1.21-1.src.rpm</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3_utils-1.21-1.i386.rpm">sg3_utils-1.21-1.i386.rpm</a><br>
+      <a href="p/libsgutils-1_0-1.21-1.i386.rpm">libsgutils-1_0-1.21-1.i386.rpm</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3-utils_1.21-0.1_i386.deb">sg3-utils_1.21-0.1_i386.deb</a><br>
+      <a href="p/libsgutils1-0_1.21-0.1_i386.deb">libsgutils1-0_1.21-0.1_i386.deb</a></td>
+    </tr>
+    <tr>
+      <td><b>1.22<br>
+      </b>20061016<b><br>
+      </b></td>
+      <td valign="top"><a href="p/sg3_utils-1.22.tgz">sg3_utils-1.22.tgz</a><br>
+      </td>
+      <td><a href="p/sg3_utils-1.22-1.src.rpm">sg3_utils-1.22-1.src.rpm</a></td>
+      <td><a href="p/sg3_utils-1.22-1.i386.rpm">sg3_utils-1.22-1.i386.rpm</a><br>
+      <a href="p/libsgutils-1_0-1.22-1.i386.rpm">libsgutils-1_0-1.22-1.i386.rpm</a><br>
+      </td>
+      <td valign="top"><a href="p/sg3-utils_1.22-0.1_i386.deb">sg3-utils_1.22-0.1_i386.deb</a><br>
+      <a href="p/libsgutils1-0_1.22-0.1_i386.deb">libsgutils1-0_1.22-0.1_i386.deb</a><br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">1.23</span><br>
+20070127<br>
+      <b> </b></td>
+      <td style="vertical-align: top;"><a href="p/sg3_utils-1.23.tgz">sg3_utils-1.23.tgz</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3_utils-1.23-1.src.rpm">sg3_utils-1.23-1.src.rpm</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3_utils-1.23-1.i386.rpm">sg3_utils-1.23-1.i386.rpm</a><br>
+      <a href="p/sg3_utils-libs-1.23-1.i386.rpm">sg3_utils-libs-1.23-1.i386.rpm</a><br>
+      </td>
+      <td style="vertical-align: top;"><a
+ href="p/sg3-utils_1.23-0.1_i386.deb">sg3-utils_1.23-0.1_i386.deb</a><br>
+      <a href="p/libsgutils1-0_1.23-0.1_i386.deb">libsgutils1-0_1.23-0.1_i386.deb</a></td>
+    </tr>
+  </tbody>
+</table>
+<br>
+This <a href="p/sg3_utils_exe.zip">sg3_utils_exe.zip</a> file is a zip
+archive of the most recent version Windows executables made in a MinGW
+environment. This <a href="p/sg3_utils_man_html.tgz">sg3_utils_man_html.tgz</a>
+file is a tarball of man pages converted to html by man2html.<br>
+<br>
+Version 1.14 of sg3_utils introduced a shared object (library) called
+libsgutils. When binary packages are built then libsgutils is in its
+own package (and there is another "libsgutils*-devel" package which
+contains C header files and a static libsgutils.o library). The
+sg3_utils binaries for version 1.14 to 1.23 normally require the
+libsgutils library but can be built without it. In the future
+other utilities such as <a href="sdparm.html">sdparm</a> may also
+depend on the libsgutils
+package.<br>
+<br>
+** Some browsers (e.g. firefox) may interpret a file with an extension
+of "rpm" as an audio file. In which case press the right button over
+the link and select "Save link as ..." to download the file.<br>
+<br>
+Below is the most recent version of the sg_utils package which targets
+the linux kernel 2.2 series with some support for the lk 2.0 series. No
+further work is being done on this package.<br>
+<table border="1" width="100%">
+  <caption><b>Table 3.&nbsp; sg_utils tarballs and packages</b></caption>
+  <tbody>
+    <tr>
+      <td><span style="font-weight: bold;">sg_utils</span><br
+ style="font-weight: bold;">
+      <span style="font-weight: bold;">version</span><br>
+      </td>
+      <td valign="top">&nbsp; <b>tarballs</b>&nbsp;<br>
+      </td>
+      <td><b>rpm source rpms **<br>
+      </b></td>
+      <td><b>i386 rpm binaries **<br>
+      </b></td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><b>1.02</b></td>
+      <td style="vertical-align: top;"><a href="p/sg_utils-1.02.tgz">sg_utils-1.02.tgz</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg_utils-1.02-1.src.rpm">sg_utils-1.02-1.src.rpm</a></td>
+      <td style="vertical-align: top;"><a
+ href="p/sg_utils-1.02-1.i386.rpm">sg_utils-1.02-1.i386.rpm</a></td>
+    </tr>
+  </tbody>
+</table>
+<br>
+There is no '<span style="font-family: monospace;">./configure</span>'
+logic in sg3_utils so the correct Makefile must be chosen taking into
+account the
+operating system and several other attributes.<br>
 <br>
 <table style="width: 100%; text-align: left;" border="1" cellpadding="2"
  cellspacing="2">
-  <caption align="bottom"><span style="font-weight: bold;">Table 2
-Building from source tarball</span><br>
+  <caption><span style="font-weight: bold;">Table 4.&nbsp;
+Building from a source tarball</span><br>
   </caption><tbody>
     <tr>
       <td style="vertical-align: top;"><span style="font-weight: bold;">OS</span><br>
@@ -1224,9 +1593,22 @@ subdirectory included<br>
       </td>
       <td style="vertical-align: top;">&nbsp;<br>
       </td>
-      <td style="vertical-align: top;">Windows NT and latter supported
+      <td style="vertical-align: top;">Windows NT and later supported
 (uses SPT interface). Builds in a cygwin environment and requires
 cygwin1.dll to run.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Windows</span><br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">make -f Makefile.mingw<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">Builds in a MinGW/MSYS
+environment and requires no third party dll<br>
       </td>
     </tr>
   </tbody>
@@ -1235,11 +1617,16 @@ cygwin1.dll to run.<br>
 <br>
 Both sg3_utils and the
 older sg_utils packages can
-be found on http://freshmeat.net .<br>
+be found on <a href="http://freshmeat.net">http://freshmeat.net</a> .
+Most of the above invocations can
+take the name of a specific utility (e.g. "<span
+ style="font-family: monospace;">make sg_inq</span>") to build only
+that utility. There are also
+"install", "uninstall" and "clean" targets in most Makefiles.<br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 14th October 2006<br>
+<p>Last updated: 31st January 2007<br>
 <br>
 </p>
 </center>

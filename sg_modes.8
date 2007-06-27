@@ -1,156 +1,258 @@
-.TH SG_MODES "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
+.TH SG_MODES "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_modes \- reads SCSI MODE SENSE pages
+sg_modes \- reads mode pages with SCSI MODE SENSE command
 .SH SYNOPSIS
 .B sg_modes
-[\fI-a\fR] [\fI-A\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-D\fR]
-[\fI-e\fR] [\fI-f\fR] [\fI-h\fR] [\fI-H\fR] [\fI-l\fR] [\fI-L\fR]
-[\fI-p=<page_code>\fR] [\fI-p=<page_code>,<sub_page_code>\fR]
-[\fI-r\fR] [\fI-subp=<sub_page_code>\fR] [\fI-v\fR] [\fI-V\fR] [\fI-6\fR]
-[\fI-?\fR] [\fI<scsi_device>\fR]
+[\fI\-\-all\fR] [\fI\-\-control=PC\fR] [\fI\-\-dbd\fR] [\fI\-\-dbout\fR]
+[\fI\-\-examine\fR] [\fI\-\-flexible\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-list\fR] [\fI\-\-llbaa\fR] [\fI\-\-page=PG[,SPG]\fR]
+[\fI\-\-raw\fR] [\fI\-R\fR] [\fI\-\-six\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fIDEVICE\fR]
+.PP
+.B sg_modes
+[\fI\-6\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-c=PC\fR] [\fI\-d\fR] [\fI\-D\fR]
+[\fI\-e\fR] [\fI\-f\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-l\fR] [\fI\-L\fR]
+[\fI\-p=PG[,SPG]\fR] [\fI\-r\fR] [\fI\-subp=SPG\fR] [\fI\-v\fR] [\fI\-V\fR]
+[\fI\-?\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility sends a MODE SENSE SCSI command (the 10 byte variant
-by default) to the given device and then outputs the response. There
-is no facility to change the page or descriptor data with this utility.
-If no page is given (and '-l' is not selected) then '-a' is assumed.
+This utility sends a MODE SENSE SCSI command to the \fIDEVICE\fR and
+outputs the response. There is a 6 byte and 10 byte (cdb) variant of
+the MODE SENSE command, this utility defaults to the 10 byte variant.
+.PP
+This utility decodes mode page headers and block descriptors but outputs
+the contents of each mode page in hex. It also has no facility to change
+the mode page contents or block descriptor data. Mode page contents are
+decoded and can be changed by the
+.B sdparm
+utility.
+.PP
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later
+section on the old command line syntax outlines the second group of
+options.
+.PP
+If no page is given (and \fI\-\-list\fR is not selected) then \fI\-\-all\fR
+is assumed. The \fI\-\-all\fR option requests all mode pages (but not
+subpages) in a single response.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
--a
-output all the mode pages supported by the given device.
+\fB\-a\fR, \fB\-\-all\fR
+output all the mode pages reported by the \fIDEVICE\fR. This is what the
+page code 63 (0x3f) is defined to do. When used once, mode subpages are
+not fetched. When used twice (e.g. '\-aa'), all mode pages and subpages
+are requested which is equivalent to '\-\-page=63,255'.
 .TP
--A
-output all the mode pages and subpages supported by the device.
+\fB\-c\fR, \fB\-\-control\fR=\fIPC\fR
+\fIPC\fR is the page control value. Up to four different versions of each
+page are held by the device: the current values [0] (i.e. those active at
+the moment), the changeable values [1] (bit mask showing which fields could
+be changed with a MODE SELECT), default values [2] (the manufacturer's
+settings). Finally there are the saved values [3] which are the values that
+will be re\-instated the next time the device is power cycled. If this option
+is not given then current values [0] are assumed.
 .TP
--c=page_control
-up to four different versions of each page are held by the device:
-the current values [0] (i.e. those active at the moment), the changeable
-values [1] (bit mask showing which sections could be changed with a MODE
-SELECT), default values [2] (the manufacturer's settings) and saved
-values [3] (the values that will be re-instated the next time the device
-is power cycled). If this option is not given then current values [0]
-are assumed.
+\fB\-d\fR, \fB\-\-dbd\fR
+disable block descriptors. By default, block descriptors (usually
+one (for disks) or none) are returned in a MODE SENSE response. This option
+sets the "disable block descriptors" (DBD) bit in the cdb which instructs
+the device not to return any block descriptors in its response. Older
+devices may not support this setting and may return an "illegal request"
+sense key; alternatively they may ignore it. Oddly the Reduced Block Command
+set (RBC) requires this bit set.
 .TP
--d
-disable block descriptors. By default, block descriptors (usually one or
-none) are returned in a MODE SENSE response. This option sets the "disable
-block descriptors" (DBD) bit in the cdb which instructs the device not
-to return any block descriptors in its response. Older devices may not
-support this setting and should return an "illegal request" status;
-alternatively they may ignore it.
-.TP
--D
+\fB\-D\fR, \fB\-\-dbout\fR
 disable outputting block descriptors. Irrespective of whether block
 descriptors are present in the response or not, they are not output.
 .TP
--e
+\fB\-e\fR, \fB\-\-examine\fR
 examine each mode page in the range 0 through to 62 (inclusive).
-If some response is given print out the mode page name or number (in hex)
-if the name is not known.
+If some response is given then print out the mode page name or
+number (in hex) if the name is not known.
 .TP
--f
-Be "flexible". Some devices, bridges and/or drivers attempt crude
-switches between mode sense 6 and 10 byte commands without correcting
-the response. This will cause the response to be mis-interpreted (usually
-with an error saying the response is malformed). With this option, the
-length of the response is checked, and if it looks wrong, the response
-is then decoded as if the other mode sense (cdb length) was sent.
+\fB\-f\fR, \fB\-\-flexible\fR
+Some devices, bridges and/or drivers attempt crude translations between
+MODE SENSE 6 and 10 byte commands without correcting the response. This
+will cause the response to be mis\-interpreted (usually with an error saying
+the response is malformed). With this option, the length of the response
+is checked, and if it looks wrong, the response is then decoded as if the
+other mode sense (cdb length) was sent.
 .TP
--h
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
 The default action is to decode known mode page numbers (and subpage
-numbers) into text. With this option mode page numbers (and subpage
-numbers) are output in hexadecimal.
+numbers) into text. When this option is used once, the response is output
+in hexadecimal. When this option is used twice, mode page numbers and
+page control values are output in hex.
 .TP
--H
-same action as the '-h' option.
-.TP
--l
+\fB\-l\fR, \fB\-\-list\fR
 lists all common page and subpage codes and their names that are found in
-the command set that matches the peripheral type of the given device.
-If no device and no page_code is given then the common page and
-subpage codes and their names for the disk command set are listed.
-If no device is given and a page_code is given then the common page and
-subpage codes and their names for the command set whose peripheral device
-type matches the value given to page_code are listed. For
-example 'sg_mode -l -p=1' lists the command mode pages and subpages for tape
-devices. Additionally if a sub_page_code is given then it is interpreted as
-a transport identifier and command transport specific mode page codes and
-their names are listed following the main mode page list.
+the command set that matches the peripheral type of the given \fIDEVICE\fR.
+If no \fIDEVICE\fR and no \fI\-\-page=PG\fR is given then the common page and
+subpage codes and their names are listed for SBC (e.g. a disk). If no
+\fIDEVICE\fR is given and a \fI\-\-page=PG\fR is given then the
+common page and subpage codes and their names are listed for the command set
+whose peripheral device type matches the value given to \fIPG\fR. For
+example 'sg_mode \-\-list \-\-page=1' lists the command mode pages and
+subpages for tape devices. Additionally if a sub_page_code is given then it
+is interpreted as a transport identifier and command transport specific mode
+page codes and their names are listed following the main mode page list.
 Other options are ignored.
 .TP
--L
+\fB\-L\fR, \fB\-\-llbaa\fR
 set the Long LBA Accepted (LLBAA) bit in the MODE SENSE (10) cdb. This
-bit is not defined in the MODE SENSE (6) cdb so setting the '-L'
-and '-6' options is reported as an error. When set the given device
+bit is not defined in the MODE SENSE (6) cdb so setting the '\-L'
+and '\-\-six' options is reported as an error. When set the \fIDEVICE\fR
 may respond with 16 byte block descriptors as indicated by
-the 'LongLBA' field in the response. In almost all cases setting
-this option is not needed.
+the 'LongLBA' field in the response. In most cases setting this option
+is not needed.
 .TP
--p=<page_code>
-page code to fetch. Should be a hexadecimal number between 0 and 3f
-inclusive (0 to 63 decimal). The default value is 0.
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
 .TP
--p=<page_code>,<sub_page_code>
-page code and subpage code values to fetch. The page code should be a
-hexadecimal number between 0 and 3f inclusive. The subpage code should
-be a hexadecimal number between 0 and ff inclusive. The default value
-of both is 0.
+\fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
+page code to fetch. The \fIPG\fR is assumed to be a decimal value unless
+prefixed by '0x' or has a trailing 'h'. It should be a value between 0
+and 63 (inclusive). When not given and a default is required then
+a value of 63 (0x3f), which fetches all mode pages, is used.
 .TP
--r
+\fB\-p\fR, \fB\-\-page\fR=\fIPG,SPG\fR
+page code and subpage code values to fetch. Both arguments are assumed
+to be decimal unless flagged as hexadecimal. The page code should be
+between 0 and 63 inclusive. The subpage code should be between 0 and 255
+inclusive. The default value for the subpage code is 0.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output the response in binary to stdout. Error messages and warnings, if
+any, are sent to stderr. When this option is used twice (e.g. '\-rr')
+then has the same action as '\-R'
+.TP
+\fB\-R\fR
 output the selected mode page to stdout a byte per line. Each line contains
-two hexadecimal digits (e.g. "0a"). Useful as input (after editing) to
+two hexadecimal digits (e.g. "3e"). Useful as input (after editing) to
 the sg_wr_mode utility.
 .TP
--subp=<sub_page_code>
-sub page code to fetch. Should be a hexadecimal number between 0 and 
-0xff inclusive. The default value is 0.
+\fB\-6\fR, \fB\-\-six\fR
+by default this utility sends a 10 byte MODE SENSE command to
+the \fIDEVICE\fR. However some SCSI devices only support 6 byte MODE SENSE
+commands (e.g. SCSI\-2 tape drives). This parameter forces the use
+of 6 byte MODE SENSE commands.
 .TP
--v
-verbose: output cdbs in hex before executing them. '-vv'
-and '-vvv' are also accepted yielding greater verbosity.
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level of verbosity. Can be used multiple times.
 .TP
--V
-print out version string
-.TP
--6
-by default this utility sends out a 10 byte MODE SENSE command. However
-some SCSI devices only support 6 byte MODE SENSE commands (e.g. SCSI-2
-tape drives). This parameter forces the use of 6 byte MODE SENSE commands.
-.TP
--?
-output usage message. Ignore all other parameters.
-.PP
+\fB\-V\fR, \fB\-\-version\fR
+print out version string then exit.
+.SH NOTES
 If the normal sg_modes utility fails with "illegal command
-operation code" then try the "-6" parameter.
-.PP
-Mode pages cannot be modified with this utility. Mode pages (and subpages)
-can be modified with the sg_wr_mode and sginfo utilities in the sg3_utils
-package. See the sdparm utility and those other utilities that are
-listed in the "SEE ALSO" section below.
+operation code" then try the '\-\-six' (or '\-6') option.
 .PP
 This utility performs a SCSI INQUIRY command to determine the peripheral
-type of the device (e.g. 0 -> Direct Access Device (disk)) prior to
+type of the device (e.g. 0 \-> Direct Access Device (disk)) prior to
 sending a MODE SENSE command. This helps in decoding the block
 descriptor and mode pages.
 .PP
-In the 2.4 series of Linux kernels the given device must be
-a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
-and SCSI DVDs) can also be specified. For example "sg_modes -a /dev/sda"
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
+generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
+and DVD drives) can also be specified. For example "sg_modes \-a /dev/sda"
 will work in the 2.6 series kernels.
 .SH EXIT STATUS
 The exit status of sg_modes is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.TP
+\fB\-6\fR
+by default this utility sends a 10 byte MODE SENSE command to
+the \fIDEVICE\fR. This parameter forces the use of 6 byte MODE SENSE commands.
+See \fI\-\-six\fR in the main description.
+.TP
+\fB\-a\fR
+see \fI\-\-all\fR in the main description.
+.TP
+\fB\-A\fR
+output all the mode pages and subpages supported by the \fIDEVICE\fR. Same
+as '\-\-all \-\-all' in the new syntax.
+.TP
+\fB\-c\fR=\fIPC\fR
+\fIPC\fR is the page control value. See \fB\-\-control\fR=\fIPC\fR in
+the main description.
+.TP
+\fB\-d\fR
+see \fB\-\-dbd\fR in the main description.
+.TP
+\fB\-D\fR
+see \fB\-\-dbout\fR in the main description.
+.TP
+\fB\-e\fR
+see \fB\-\-examine\fR in the main description.
+.TP
+\fB\-f\fR
+see \fB\-\-flexible\fR in the main description.
+.TP
+\fB\-h\fR
+The default action is to decode known mode page numbers (and subpage
+numbers) into text. With this option mode page numbers (and subpage
+numbers) are output in hexadecimal.
+.TP
+\fB\-H\fR
+same action as the '\-h' option.
+.TP
+\fB\-l\fR
+see \fB\-\-list\fR in the main description.
+.TP
+\fB\-L\fR
+see \fB\-\-llbaa\fR in the main description.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-p\fR=\fIPG\fR
+\fIPG\fR is page code to fetch. Should be a hexadecimal number between 0
+and 3f inclusive (0 to 63 decimal). The default value when required is
+3f (fetch all mode pages).
+.TP
+\fB\-p\fR=\fIPG,SPG\fR
+page code and subpage code values to fetch. The page code should be a
+hexadecimal number between 0 and 3f inclusive. The subpage code should
+be a hexadecimal number between 0 and ff inclusive. The default value
+for the subpage code is 0.
+.TP
+\fB\-r\fR
+output the selected mode page to stdout a byte per line. Each line contains
+two hexadecimal digits (e.g. "3e"). Useful as input (after editing) to
+the sg_wr_mode utility.
+.TP
+\fB\-subp\fR=\fISPG\fR
+sub page code to fetch. Should be a hexadecimal number between 0 and 
+0xff inclusive. The default value is 0.
+.TP
+\fB\-v\fR
+increase verbosity of output.
+.TP
+\fB\-V\fR
+print out version string then exit.
+.TP
+\fB\-?\fR
+output usage message then exit. Ignore all other parameters.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2006 Douglas Gilbert
+Copyright \(co 2000\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(net), sg_wr_mode(sg3_utils), sginfo(sg3_utils),
+.B sdparm(sdparm), sg_wr_mode(sg3_utils), sginfo(sg3_utils),
 .B sgmode(scsirastools), scsiinfo(net), scu(net),
 .B seatools(seagate)
 .PP

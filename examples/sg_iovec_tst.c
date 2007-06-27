@@ -13,7 +13,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 2003 D. Gilbert
+*  Copyright (C) 2003-2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
    normal file. The purpose is to test the sg_iovec mechanism within the
    sg_io_hdr structure.
 
-   Version 0.11 (20060622)
+   Version 0.12 (20070121)
 */
 
 
@@ -171,7 +171,7 @@ int main(int argc, char * argv[])
         return 1;
     }
     dxfer_len = count * blk_size;
-    buffp = malloc(dxfer_len);
+    buffp = (unsigned char *)malloc(dxfer_len);
     if (buffp) {
         if (0 == sg_read(sg_fd, buffp, count, 0, blk_size)) {
             if (write(fd, buffp, dxfer_len) < 0)

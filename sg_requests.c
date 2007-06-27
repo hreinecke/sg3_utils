@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.16 20061012";
+static char * version_str = "1.17 20070127";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 
@@ -67,15 +67,15 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_requests [--desc] [--help] [--hex] [--num=<n>] [--raw]\n"
+          "sg_requests [--desc] [--help] [--hex] [--num=NUM] [--raw]\n"
           "                   [--status] [--time] [--verbose] [--version] "
-          "<scsi_device>\n"
+          "DEVICE\n"
           "  where:\n"
           "     --desc|-d         set flag for descriptor sense "
           "format\n"
           "     --help|-h         print out usage message\n"
           "     --hex|-H          output in hexadecimal\n"
-          "     --num=<n>|-n <n>  number of REQUEST SENSE commands "
+          "     --num=NUM|-n NUM  number of REQUEST SENSE commands "
           "to send (def: 1)\n"
           "     --raw|-r          output in binary (to stdout)\n"
           "     --status|-s       set exit status from parameter data "
@@ -85,7 +85,7 @@ static void usage()
           "per second\n"
           "     --verbose|-v      increase verbosity\n"
           "     --version|-V      print version string and exit\n\n"
-          "Perform a REQUEST SENSE SCSI command\n"
+          "Performs a SCSI REQUEST SENSE command\n"
           );
 
 }
@@ -111,7 +111,9 @@ int main(int argc, char * argv[])
     int verbose = 0;
     char device_name[256];
     int ret = 0;
+#ifndef SG3_UTILS_MINGW
     struct timeval start_tm, end_tm;
+#endif
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -188,11 +190,13 @@ int main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
+#ifndef SG3_UTILS_MINGW
     if (do_time) {
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
         gettimeofday(&start_tm, NULL);
     }
+#endif
 
     requestSenseBuff[0] = '\0';
     requestSenseBuff[7] = '\0';
@@ -242,6 +246,7 @@ int main(int argc, char * argv[])
             }
         }
     }
+#ifndef SG3_UTILS_MINGW
     if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
         double a, b;
@@ -263,6 +268,7 @@ int main(int argc, char * argv[])
         else
             printf("\n");
     }
+#endif
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));

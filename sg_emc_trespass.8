@@ -1,46 +1,48 @@
-.TH SG_EMC_TRESPASS "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_EMC_TRESPASS "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_emc_trespass \- Changes ownership of a LUN from another
-Service-Processor to this one.
+Service\-Processor to this one.
 .SH SYNOPSIS
 .B sg_emc_trespass
-[\fI-d\fR] [\fI-hr\fR] [\fI-s\fR] 
-[\fI-V\fR] \fI<sg_device>\fR
+[\fI\-d\fR] [\fI\-hr\fR] [\fI\-s\fR] 
+[\fI\-V\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-sg_emc_trespass sends an EMC-specific Trespass Command to the given
-device with the selected options. This Mode Select changes the ownership
-of the LUN of the device from another Service-Processor to the one the
-command was received on.
+sg_emc_trespass sends an EMC-specific Trespass Command to the \fIDEVICE\fR
+with the selected options. This Mode Select changes the ownership of the LUN
+of the device from another Service-Processor to the one the command was
+received on.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
--d
+\fB\-d\fR
 outputs some extra debug information associated with executing this command
 .TP
--hr
+\fB\-hr\fR
 Sets the 'Honor Reservation' bit in the command. If set, the trespass
 will only succeed to change the ownership from the Peer SP if the Peer
 SP does not have an outstanding SCSI reservation for the LUN. By
 default, the reservation state will be ignored.
 .TP
--s
+\fB\-s\fR
 Send the short version of the trespass command instead of the long
 version. The short version is supported on the EMC FC5300, FC4500 and
 FC4700. The long version (default) is supported on the CLARiiON CX and
 AX family arrays.
 .TP
--V
+\fB\-V\fR
 print out version string then exit.
 .PP
-In the 2.4 series of Linux kernels the given device must be
-a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
-and SCSI DVDs) can also be specified. For example "sg_start 0 /dev/sda"
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
+generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
+and DVD drives) can also be specified. For example "sg_start 0 /dev/sda"
 will work in the 2.6 series kernels.
 .SH EXIT STATUS
 The exit status of sg_emc_trespass is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH AUTHOR
-Written by Lars Marowsky-Bree, based on sg_start.
+Written by Lars Marowsky\-Bree, based on sg_start.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT

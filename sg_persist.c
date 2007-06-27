@@ -5,13 +5,16 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004-2006 D. Gilbert
+*  Copyright (C) 2004-2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -21,7 +24,7 @@
 
 */
 
-static char * version_str = "0.27 20061015";
+static char * version_str = "0.31 20070129";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -45,8 +48,8 @@ static struct option long_options[] = {
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"in", 0, 0, 'i'},
-        {"out", 0, 0, 'o'},
         {"no-inquiry", 0, 0, 'n'},
+        {"out", 0, 0, 'o'},
         {"param-alltgpt", 0, 0, 'Y'},
         {"param-aptpl", 0, 0, 'Z'},
         {"param-rk", 1, 0, 'K'},
@@ -104,50 +107,51 @@ static const int num_prout_sa_strs = sizeof(prout_sa_strs) /
 static void usage()
 {
     fprintf(stderr,
-            "Usage: 'sg_persist [<options>] [<scsi_device>]\n\n"
-            " where Persistent Reserve (PR) <options> include:\n"
-            "   --clear|-C                 PR Out: Clear\n"
-            "   --device=<scsi_device>     device to query or change\n"
-            "   -d <scsi_device>           device to query or change "
-            "('-d' optional)\n"
-            "   --help|-h                  output this usage message\n"
-            "   --hex|-H                   output response in hex\n"
-            "   --in|-i                    request PR In command (default)\n"
-            "   --out|-o                   request PR Out command\n"
-            "   --no-inquiry|-n            skip INQUIRY (default: do "
+            "Usage: sg_persist [OPTIONS] [DEVICE]\n"
+            "  where OPTIONS include:\n"
+            "    --clear|-C                 PR Out: Clear\n"
+            "    --device=DEVICE|-d DEVICE    query or change DEVICE\n"
+            "    --help|-h                  output this usage message\n"
+            "    --hex|-H                   output response in hex\n"
+            "    --in|-i                    request PR In command (default)\n"
+            "    --no-inquiry|-n            skip INQUIRY (default: do "
             "INQUIRY)\n"
-            "   --param-alltgpt|-Y         PR Out parameter 'ALL_TG_PT'\n"
-            "   --param-aptpl|-Z           PR Out parameter 'APTPL'\n"
-            "   --param-rk=<h>|-K <h>      PR Out parameter reservation key\n"
-            "                              (argument in hex)\n"
-            "   --param-sark=<h>|-S <h>    PR Out parameter service action\n"
-            "                              reservation key (argument in hex)\n"
-            "   --preempt|-P               PR Out: Preempt\n"
-            "   --preempt-abort|-A         PR Out: Preempt and Abort\n"
-            "   --prout-type=<h>|-T <n>    PR Out command type\n"
-            "   --read-full-status|-s      PR In: Read Full Status\n"
-            "   --read-keys|-k             PR In: Read Keys\n"
-            "   --read-reservation|-r      PR In: Read Reservation\n"
-            "   --read-status|-s           PR In: Read Full Status\n"
-            "   --register|-G              PR Out: Register\n"
-            "   --register-ignore|-I       PR Out: Register and Ignore\n"
-            "   --register-move|-M         PR Out: Register and Move\n"
-            "   --relative-target-port=<h>|-Q <h>  PR Out parameter for "
-            "'-M'\n"
-            "   --release|-L               PR Out: Release\n"
-            "   --report-capabilities|-c   PR In: Report Capabilities\n"
-            "   --reserve|-R               PR Out: Reserve\n"
-            "   --transport-id=<h>,<h>...|-X <h>,<h>...  TransportID "
+            "    --out|-o                   request PR Out command\n"
+            "    --param-alltgpt|-Y         PR Out parameter 'ALL_TG_PT'\n"
+            "    --param-aptpl|-Z           PR Out parameter 'APTPL'\n"
+            "    --param-rk=RK|-K RK        PR Out parameter reservation key\n"
+            "                               (RK in hex)\n"
+            "    --param-sark=SARK|-S SARK    PR Out parameter service "
+            "action\n"
+            "                               reservation key (SARK in "
+            "hex)\n"
+            "    --preempt|-P               PR Out: Preempt\n"
+            "    --preempt-abort|-A         PR Out: Preempt and Abort\n"
+            "    --prout-type=TYPE|-T TYPE    PR Out command type\n"
+            "    --read-full-status|-s      PR In: Read Full Status\n"
+            "    --read-keys|-k             PR In: Read Keys\n"
+            "    --read-reservation|-r      PR In: Read Reservation\n"
+            "    --read-status|-s           PR In: Read Full Status\n"
+            "    --register|-G              PR Out: Register\n"
+            "    --register-ignore|-I       PR Out: Register and Ignore\n"
+            "    --register-move|-M         PR Out: Register and Move\n"
+            "    --relative-target-port=RTPI|-Q RTPI    relative target port "
+            "identifier\n"
+            "                               for '--register-move'\n"
+            "    --release|-L               PR Out: Release\n"
+            "    --report-capabilities|-c   PR In: Report Capabilities\n"
+            "    --reserve|-R               PR Out: Reserve\n"
+            "    --transport-id=H,H...|-X H,H...    TransportID "
             "hex number(s),\n"
-            "                              comma separated list\n"
-            "   --transport-id=-|-X -      read TransportID from stdin\n"
-            "   --unreg|-U                 optional with PR Out Register "
+            "                               comma separated list\n"
+            "    --transport-id=-|-X -      read TransportID from stdin\n"
+            "    --unreg|-U                 optional with PR Out Register "
             "and Move\n"
-            "   --verbose|-v               output additional debug "
+            "    --verbose|-v               output additional debug "
             "information\n"
-            "   --version|-V               output version string\n"
-            "   -?                         output this usage message\n\n"
-            "Performs a PERSISTENT RESERVE (IN or OUT) SCSI command\n");
+            "    --version|-V               output version string\n"
+            "    -?                         output this usage message\n\n"
+            "Performs a SCSI PERSISTENT RESERVE (IN or OUT) command\n");
 }
 
 static const char * pr_type_strs[] = {
@@ -171,7 +175,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
     unsigned long long ull;
     int bump;
 
-    for (k = 0, bump; k < len; k += bump, ucp += bump) {
+    for (k = 0, bump = 24; k < len; k += bump, ucp += bump) {
         if ((len < 24) || (0 != (len % 4)))
             printf("%sTransport Id short or not multiple of 4 "
                    "[length=%d]:\n", leadin, len);
@@ -240,7 +244,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                     ull <<= 8;
                 ull |= ucp[4 + j];
             }
-            printf("%s  SAS address: 0x%llx\n", leadin, ull);
+            printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
@@ -281,16 +285,16 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                                       sizeof(pr_buff), 1, do_verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Persistent reserve in, command not "
-                    "supported\n");
+            fprintf(stderr, "PR in: command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "Persistent reserve in: bad field in cdb\n");
+            fprintf(stderr, "PR in: bad field in cdb including "
+                    "unsupported service action\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            fprintf(stderr, "Persistent reserve in: unit attention\n");
+            fprintf(stderr, "PR in: unit attention\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "Persistent reserve in: aborted command\n");
+            fprintf(stderr, "PR in: aborted command\n");
         else
-            fprintf(stderr, "Persistent reserve in, command failed\n");
+            fprintf(stderr, "PR in: command failed\n");
         return 1;
     }
     if (PRIN_RCAP_SA == prin_sa) {
@@ -365,7 +369,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                             ull <<= 8;
                         ull |= ucp[j];
                     }
-                    printf("    0x%llx\n", ull);
+                    printf("    0x%" PRIx64 "\n", ull);
                 }
             } else
                 printf("there are NO registered reservation keys\n");
@@ -381,7 +385,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                         ull <<= 8;
                     ull |= ucp[j];
                 }
-                printf("    Key=0x%llx\n", ull);
+                printf("    Key=0x%" PRIx64 "\n", ull);
                 j = ((ucp[13] >> 4) & 0xf);
                 if (0 == j)
                     printf("    scope: LU_SCOPE, ");
@@ -404,7 +408,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                         ull <<= 8;
                     ull |= ucp[j];
                 }
-                printf("    Key=0x%llx\n", ull);
+                printf("    Key=0x%" PRIx64 "\n", ull);
                 if (ucp[12] & 0x2)
                     printf("      All target ports bit set\n");
                 else {
@@ -468,15 +472,16 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
                                        pr_buff, len, 1, do_verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Persistent reserve out, command not supported\n");
+            fprintf(stderr, "PR out:, command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "Persistent reserve out, bad field in cdb\n");
+            fprintf(stderr, "PR out: bad field in cdb including "
+                    "unsupported service action\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            fprintf(stderr, "Persistent reserve out, unit attention\n");
+            fprintf(stderr, "PR out: unit attention\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "Persistent reserve out, aborted command\n");
+            fprintf(stderr, "PR out: aborted command\n");
         else
-            fprintf(stderr, "Persistent reserve out, command failed\n");
+            fprintf(stderr, "PR out: command failed\n");
         return 1;
     } else if (do_verbose) {
         char buff[64];
@@ -485,8 +490,7 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
             strncpy(buff, prout_sa_strs[prout_sa], sizeof(buff));
         else
             snprintf(buff, sizeof(buff), "service action=0x%x", prout_sa);
-        fprintf(stderr, "Persistent Reserve Out command (%s) "
-                "successful\n", buff);
+        fprintf(stderr, "PR out: command (%s) successful\n", buff);
     }
     return 0;
 }
@@ -530,18 +534,19 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
                                        do_verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Persistent reserve out command not supported\n");
+            fprintf(stderr, "PR out: command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "Persistent reserve out, bad field in cdb\n");
+            fprintf(stderr, "PR out: bad field in cdb including "
+                    "unsupported service action\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            fprintf(stderr, "Persistent reserve out, unit attention\n");
+            fprintf(stderr, "PR out: unit attention\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "Persistent reserve out, aborted command\n");
+            fprintf(stderr, "PR out: aborted command\n");
         else
-            fprintf(stderr, "Persistent reserve out command failed\n");
+            fprintf(stderr, "PR out: command failed\n");
         return 1;
     } else if (do_verbose)
-        fprintf(stderr, "Persistent Reserve Out 'register and move' "
+        fprintf(stderr, "PR out: 'register and move' "
                 "command successful\n");
     return 0;
 }
@@ -757,7 +762,7 @@ int main(int argc, char * argv[])
             ++num_prin_sa;
             break;
         case 'K':
-            if (1 != sscanf(optarg, "%llx", &param_rk)) {
+            if (1 != sscanf(optarg, "%" SCNx64 "", &param_rk)) {
                 fprintf(stderr, "bad argument to '--param-rk'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -806,7 +811,7 @@ int main(int argc, char * argv[])
             ++num_prin_sa;
             break;
         case 'S':
-            if (1 != sscanf(optarg, "%llx", &param_sark)) {
+            if (1 != sscanf(optarg, "%" SCNx64 "", &param_sark)) {
                 fprintf(stderr, "bad argument to '--param-sark'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

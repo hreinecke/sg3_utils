@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
@@ -43,7 +45,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.08 20061015";
+static char * version_str = "1.10 20070128";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -64,14 +66,14 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_luns    [--decode] [--help] [--hex] [--raw] [--select=<n>]\n"
-          "                  [--verbose] [--version] <scsi_device>\n"
+          "sg_luns    [--decode] [--help] [--hex] [--raw] [--select=SR]\n"
+          "                  [--verbose] [--version] DEVICE\n"
           "  where:\n"
-          "    --decode|-d        decode all luns into parts\n"
+          "    --decode|-d        decode all luns into component parts\n"
           "    --help|-h          print out usage message\n"
           "    --hex|-H           output in hexadecimal\n"
           "    --raw|-r           output in binary\n"
-          "    --select=<n>|-s <n>  select report <n> (def: 0)\n"
+          "    --select=SR|-s SR    select report SR (def: 0)\n"
           "                          0 -> luns apart from 'well "
           "known' lus\n"
           "                          1 -> only 'well known' "
@@ -79,7 +81,7 @@ static void usage()
           "                          2 -> all luns\n"
           "    --verbose|-v       increase verbosity\n"
           "    --version|-V       print version string and exit\n\n"
-          "Performs a REPORT LUNS SCSI command\n"
+          "Performs a SCSI REPORT LUNS command\n"
           );
 
 }
@@ -181,8 +183,8 @@ static void decode_lun(const char * leadin, unsigned char * lunp)
                         ull |= lunp[1 + j];
                     }
                     printf("%sExtended logical unit addressing: length=%d, "
-                           "e. a. method=%d, value=0x%llx\n", l_leadin, len,
-                           e_a_method, ull);
+                           "e. a. method=%d, value=0x%" PRIx64 "\n",
+                           l_leadin, len, e_a_method, ull);
                 }
             }
             break;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2006 Douglas Gilbert.
+ * Copyright (c) 2005-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static char * version_str = "1.04 20061013";
+static char * version_str = "1.06 20070127";
 
 #define ME "sg_ident: "
 
@@ -94,25 +94,23 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_ident   [--ascii] [--clear] [--help] [--itype] [--raw] "
+          "sg_ident   [--ascii] [--clear] [--help] [--itype=IT] [--raw] "
           "[--set]\n"
-          "                  [--verbose] [--version] <scsi_device>\n"
-          "  where: --ascii|-A      report identifying information as ASCII "
-          "(or UTF8)\n"
-          "                         string\n"
-          "         --clear|-C      clear (set to zero length) identifying "
+          "                  [--verbose] [--version] DEVICE\n"
+          "  where:\n"
+          "    --ascii|-A      report identifying information as ASCII "
+          "(or UTF8) string\n"
+          "    --clear|-C      clear (set to zero length) identifying "
           "information\n"
-          "         --help|-h       print out usage message\n"
-          "         --itype=<n>|-i <n>  specify information type\n"
-          "         --raw|-r        output identifying information to "
-          "stdout or\n"
-          "                         fetch from stdin (when '--set')\n"
-          "         --set|-S        invoke set identifying information with "
-          "data from\n"
-          "                         stdin\n"
-          "         --verbose|-v    increase verbosity of output\n"
-          "         --version|-V    print version string and exit\n\n"
-          "Performs a REPORT or SET IDENTIFYING INFORMATION SCSI command\n"
+          "    --help|-h       print out usage message\n"
+          "    --itype=IT|-i IT    specify information type\n"
+          "    --raw|-r        output identifying information to "
+          "stdout\n"
+          "    --set|-S        invoke set identifying information with "
+          "data from stdin\n"
+          "    --verbose|-v    increase verbosity of output\n"
+          "    --version|-V    print version string and exit\n\n"
+          "Performs a SCSI REPORT (or SET) IDENTIFYING INFORMATION command\n"
           );
 }
 
@@ -255,7 +253,7 @@ int main(int argc, char * argv[])
                         "command\n");
             else if (SG_LIB_CAT_ILLEGAL_REQ == res)
                 fprintf(stderr, "bad field in Set identifying information "
-                        "cdb\n");
+                        "cdb including unsupported service action\n");
             else {
                 fprintf(stderr, "Set identifying information command "
                         "failed\n");
@@ -309,7 +307,8 @@ int main(int argc, char * argv[])
                         "not supported\n");
             else if (SG_LIB_CAT_ILLEGAL_REQ == ret)
                 fprintf(stderr, "bad field in Report identifying "
-                        "information cdb\n");
+                        "information cdb including unsupported service "
+                        "action\n");
             else {
                 fprintf(stderr, "Report identifying information command "
                         "failed\n");

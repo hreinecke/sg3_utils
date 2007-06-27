@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2007 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.08 20060907";
+static char * version_str = "1.11 20070127";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -86,6 +86,7 @@ static struct option long_options[] = {
         {"decode", 0, 0, 'd'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
+        {"raw", 0, 0, 'r'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -94,16 +95,27 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_rtpg   [--decode] [--help] [--hex] [--verbose] [--version]\n"
-          "                   <scsi_device>\n"
-          "  where: --decode|-d        decode status and asym. access state\n"
-          "         --help|-h          print out usage message\n"
-          "         --hex|-H           print out response in hex\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n\n"
-          "Performs a REPORT TARGET PORT GROUPS SCSI command\n"
+          "sg_rtpg   [--decode] [--help] [--hex] [--raw] [--verbose] "
+          "[--version]\n"
+          "                 DEVICE\n"
+          "  where:\n"
+          "    --decode|-d        decode status and asym. access state\n"
+          "    --help|-h          print out usage message\n"
+          "    --hex|-H           print out response in hex\n"
+          "    --raw|-r           output response in binary to stdout\n"
+          "    --verbose|-v       increase verbosity\n"
+          "    --version|-V       print version string and exit\n\n"
+          "Performs a SCSI REPORT TARGET PORT GROUPS command\n"
           );
 
+}
+
+static void dStrRaw(const char* str, int len)
+{
+    int k;
+
+    for (k = 0 ; k < len; ++k)
+        printf("%c", str[k]);
 }
 
 static void decode_status(const int st)
@@ -155,6 +167,7 @@ int main(int argc, char * argv[])
     unsigned char * ucp;
     int decode = 0;
     int hex = 0;
+    int raw = 0;
     int verbose = 0;
     char device_name[256];
     int ret = 0;
@@ -163,7 +176,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHvV", long_options,
+        c = getopt_long(argc, argv, "dhHrvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -178,6 +191,9 @@ int main(int argc, char * argv[])
             return 0;
         case 'H':
             hex = 1;
+            break;
+        case 'r':
+            raw = 1;
             break;
         case 'v':
             ++verbose;
@@ -234,16 +250,22 @@ int main(int argc, char * argv[])
                      (reportTgtGrpBuff[1] << 16) + 
                      (reportTgtGrpBuff[2] << 8) +
                      reportTgtGrpBuff[3] + 4;
-        printf("Report list length = %d\n", report_len);
         if (report_len > (int)sizeof(reportTgtGrpBuff)) {
             trunc = 1;
-            printf("  <<report too long for internal buffer,"
-                  " output truncated\n");
+            fprintf(stderr, "  <<report too long for internal buffer,"
+                    " output truncated\n");
+            report_len = (int)sizeof(reportTgtGrpBuff);
         }
+        if (raw) {
+            dStrRaw((const char *)reportTgtGrpBuff, report_len);
+            goto err_out;
+        }
+        if (verbose)
+            printf("Report list length = %d\n", report_len);
         if (hex) {
-            fprintf(stderr, "\nOutput response in hex\n");
-            dStrHex((const char *)reportTgtGrpBuff,
-                    (trunc ? (int)sizeof(reportTgtGrpBuff) : report_len), 1);
+            if (verbose)
+                fprintf(stderr, "\nOutput response in hex:\n");
+            dStrHex((const char *)reportTgtGrpBuff, report_len, 1);
             goto err_out;
         }
         printf("Report target port groups:\n");
@@ -288,7 +310,8 @@ int main(int argc, char * argv[])
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Target Port Groups command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "bad field in Report Target Port Groups cdb\n");
+        fprintf(stderr, "bad field in Report Target Port Groups cdb "
+                "including unsupported service action\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "Report Target Port Groups, unit attention\n");
     else if (SG_LIB_CAT_ABORTED_COMMAND == res)

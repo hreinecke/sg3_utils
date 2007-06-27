@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
@@ -43,7 +45,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.08 20061012";
+static char * version_str = "1.09 20070121";
 
 #define ME "sg_verify: "
 
@@ -62,22 +64,23 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_verify [--bpc=<n>] [--count=<n>] [--dpo] [--help] [--lba=<n>]\n"
-          "                 [--verbose] [--version] <scsi_device>\n"
+          "sg_verify [--bpc=BPC] [--count=COUNT] [--dpo] [--help] "
+          "[--lba=LBA]\n"
+          "                 [--verbose] [--version] DEVICE\n"
           "  where:\n"
-          "    --bpc=<n>|-b <n>   max blocks per verify command "
+          "    --bpc=BPC|-b BPC    max blocks per verify command "
           "(def 128)\n"
-          "    --count=<n>|-c <n> count of blocks to verify (def 1)\n"
-          "    --dpo|-d           disable page out (cache retention "
+          "    --count=COUNT|-c COUNT    count of blocks to verify "
+          "(def 1)\n"
+          "    --dpo|-d            disable page out (cache retention "
           "priority)\n"
-          "    --help|-h          print out usage message\n"
-          "    --lba=<n>|-l <n>   logical block address to start "
+          "    --help|-h           print out usage message\n"
+          "    --lba=LBA|-l LBA    logical block address to start "
           "verify (def 0)\n"
-          "    --verbose|-v       increase verbosity\n"
-          "    --version|-V       print version string and exit\n\n"
-          "Performs a VERIFY(10) SCSI command\n"
+          "    --verbose|-v        increase verbosity\n"
+          "    --version|-V        print version string and exit\n\n"
+          "Performs a SCSI VERIFY(10) command\n"
           );
-
 }
 
 int main(int argc, char * argv[])
@@ -107,15 +110,15 @@ int main(int argc, char * argv[])
 
         switch (c) {
         case 'b':
-           bpc = sg_get_num(optarg);
-           if (bpc < 1) {
+            bpc = sg_get_num(optarg);
+            if (bpc < 1) {
                 fprintf(stderr, "bad argument to '--bpc'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'c':
-           count = sg_get_llnum(optarg);
-           if (count < 0) {
+            count = sg_get_llnum(optarg);
+            if (count < 0) {
                 fprintf(stderr, "bad argument to '--count'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -128,8 +131,8 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         case 'l':
-           ll = sg_get_llnum(optarg);
-           if (-1 == ll) {
+            ll = sg_get_llnum(optarg);
+            if (-1 == ll) {
                 fprintf(stderr, "bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -207,19 +210,19 @@ int main(int argc, char * argv[])
                 break;
             case SG_LIB_CAT_ILLEGAL_REQ:
                 fprintf(stderr, "bad field in Verify(10) cdb, near "
-                        "lba=0x%llx\n", lba);
+                        "lba=0x%" PRIx64 "\n", lba);
                 break;
             case SG_LIB_CAT_MEDIUM_HARD:
                 fprintf(stderr, "medium or hardware error near "
-                        "lba=0x%llx\n", lba);
+                        "lba=0x%" PRIx64 "\n", lba);
                 break;
             case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
                 fprintf(stderr, "medium or hardware error, reported "
                         "lba=0x%lx\n", info);
                 break;
             default:
-                fprintf(stderr, "Verify(10) failed near lba=%llu [0x%llx]\n",
-                        lba, lba);
+                fprintf(stderr, "Verify(10) failed near lba=%" PRIu64
+                        " [0x%" PRIx64 "]\n", lba, lba);
                 break;
             }
             break;
@@ -227,9 +230,10 @@ int main(int argc, char * argv[])
     }
 
     if (verbose && (0 == ret) && (orig_count > 1))
-        fprintf(stderr, "Verified %lld [0x%llx] blocks from lba %llu "
-                "[0x%llx]\n    without error\n", orig_count,
-                (unsigned long long)orig_count, orig_lba, orig_lba);
+        fprintf(stderr, "Verified %" PRId64 " [0x%" PRIx64 "] blocks from "
+                "lba %" PRIu64 " [0x%" PRIx64 "]\n    without error\n",
+                orig_count, (unsigned long long)orig_count, orig_lba,
+                orig_lba);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

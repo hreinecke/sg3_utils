@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2006 Douglas Gilbert.
+ * Copyright (c) 2005-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,9 @@
 
 /* #define _XOPEN_SOURCE 500 */
 /* needed to see DT_REG and friends when compiled with: c99 pedantic */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -56,7 +58,7 @@
 
 #include "sg_lib.h"
 
-static char * version_str = "1.03 20061003";
+static char * version_str = "1.05 20070127";
 
 #define ME "sg_map26: "
 
@@ -137,30 +139,31 @@ static const char * nt_names[] = {
 static void usage()
 {
         fprintf(stderr, "Usage: "
-                "sg_map26   [--dev_dir=<dir>] [--given_is=<n>] [--help] "
-                "[--result=<n>]\n"
-                "                  [--symlink] [--verbose] [--version] "
-                "<device>\n"
+                "sg_map26 [--dev_dir=DIR] [--given_is=0|1] [--help] "
+                "[--result=0|1|2|3]\n"
+                "                [--symlink] [--verbose] [--version] "
+                "DEVICE\n"
                 "  where:\n"
-                "    --dev_dir=<dir>|-d <dir>  search in <dir> for "
+                "    --dev_dir=DIR|-d DIR    search in DIR for "
                 "resulting special\n"
-                "                         (def: directory of <device> "
+                "                            (def: directory of DEVICE "
                 "or '/dev')\n"
-                "    --given_is=<n>|-g <n>     variety of given "
-                "<device>\n"
-                "                         0->block or char special "
+                "    --given_is=0|1|-g 0|1    variety of given "
+                "DEVICE\n"
+                "                             0->block or char special "
                 "(or symlink to)\n"
-                "                         1->sysfs device, 'dev' or "
+                "                             1->sysfs device, 'dev' or "
                 "parent\n"
                 "    --help|-h       print out usage message\n"
-                "    --result=<n>|-r <n>    variety of file(s) to "
+                "    --result=0|1|2|3|-r 0|1|2|3    variety of file(s) to "
                 "find\n"
-                "                         0->mapped block or char "
+                "                                   0->mapped block or char "
                 "special(def)\n"
-                "                         1->mapped sysfs parent\n"
-                "                         2->matching block or char "
-                "special\n"
-                "                         3->matching sysfs parent\n"
+                "                                   1->mapped sysfs path\n"
+                "                                   2->matching block or "
+                "char special\n"
+                "                                   3->matching sysfs "
+                "path\n"
                 "    --symlink|-s    symlinks to special included in "
                 "result\n"
                 "    --verbose|-v    set device identifier\n"

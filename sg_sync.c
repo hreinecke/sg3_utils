@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
  * (e.g. disks).
  */
 
-static char * version_str = "1.06 20061012";
+static char * version_str = "1.07 20070127";
 
 
 #define ME "sg_sync: "
@@ -66,20 +66,19 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sync    [--count=<n>] [--group=<n>] [--help] [--immed]"
-          " [--lba=<n>]\n"
-          "                  [--sync-nv] [--verbose] [--version]"
-          " <scsi_device>\n"
+          "sg_sync    [--count=COUNT] [--group=GROUP] [--help] [--immed]\n"
+          "                  [--lba=LBA] [--sync-nv] [--verbose] [--version] "
+          "DEVICE\n"
           "  where:\n"
-          "    --count=<n>|-c <n>  number of blocks to sync (def: 0 "
+          "    --count=COUNT|-c COUNT    number of blocks to sync (def: 0 "
           "which implies\n"
-          "                        rest of device)\n"
-          "    --group=<n>|-g <n>  set group number (def: 0)\n"
+          "                              rest of device)\n"
+          "    --group=GROUP|-g GROUP  set group number (def: 0)\n"
           "    --help|-h           print out usage message\n"
           "    --immed|-i          command returns immediately when set "
           "else wait\n"
           "                        for 'sync' to complete\n"
-          "    --lba=<n>|-l <n>    logical block address to start sync "
+          "    --lba=LBA|-l LBA    logical block address to start sync "
           "operation\n"
           "                        from (def: 0)\n"
           "    --sync-nv|-s        synchronize to non-volatile storage "
@@ -87,7 +86,7 @@ static void usage()
           "                        from medium)\n"
           "    --verbose|-v        increase verbosity\n"
           "    --version|-V        print version string and exit\n\n"
-          "Performs a SYNCHRONIZE CACHE(10) SCSI command\n"
+          "Performs a SCSI SYNCHRONIZE CACHE(10) command\n"
           );
 }
 

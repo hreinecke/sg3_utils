@@ -1,5 +1,7 @@
 #define _XOPEN_SOURCE 500
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -21,12 +23,11 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
-#include "llseek.h"
 
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2006 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2007 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -49,7 +50,7 @@
 
 */
 
-static char * version_str = "5.33 20061012";
+static char * version_str = "5.36 20070121";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -316,42 +317,50 @@ static int dd_filetype(const char * filename)
 static void usage()
 {
    fprintf(stderr, "Usage: "
-           "sgp_dd  [bs=<n>] [count=<n>] [ibs=<n>] [if=<ifile>]"
-           " [iflag=<flags>]\n"
-           "               [obs=<n>] [of=<ofile>] [oflag=<flags>] "
-           "[seek=<n>] [skip=<n>]\n"
+           "sgp_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
+           " [iflag=FLAGS]\n"
+           "               [obs=BS] [of=OFILE] [oflag=FLAGS] "
+           "[seek=SEEK] [skip=SKIP]\n"
            "               [--help] [--version]\n\n");
     fprintf(stderr,
-           "               [bpt=<num>] [cdbsz=6|10|12|16] [coe=0|1] "
-           "[deb=<n>] [dio=0|1]\n"
-           "               [fua=0|1|2|3] [sync=0|1] [thr=<n>] "
-           "[time=0|1] [verbose=<n>]\n\n"
-           " where:\n"
-           "    bpt      is blocks_per_transfer (default is 128)\n"
-           "    bs       must be device block size (default 512)\n"
-           "    cdbsz    size of SCSI READ or WRITE command (default is 10)\n"
-           "    coe      continue on error, 0->exit (def), "
+           "               [bpt=BPT] [cdbsz=6|10|12|16] [coe=0|1] "
+           "[deb=VERB] [dio=0|1]\n"
+           "               [fua=0|1|2|3] [sync=0|1] [thr=THR] "
+           "[time=0|1] [verbose=VERB]\n"
+           "  where:\n"
+           "    bpt         is blocks_per_transfer (default is 128)\n"
+           "    bs          must be device block size (default 512)\n"
+           "    cdbsz       size of SCSI READ or WRITE cdb (default is 10)\n"
+           "    coe         continue on error, 0->exit (def), "
            "1->zero + continue\n"
-           "    deb      for debug, 0->none (def), > 0->varying degrees of "
+           "    count       number of blocks to copy (def: device size)\n"
+           "    deb         for debug, 0->none (def), > 0->varying degrees of "
            "debug\n");
     fprintf(stderr,
-           "    dio      is direct IO, 1->attempt, 0->indirect IO (def)\n"
-           "    fua      force unit access: 0->don't(def), 1->of, 2->if, "
-           "3->of+if\n"
-           "    iflag    comma separated list from: [coe,direct,dpo,dsync,"
+           "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
+           "    fua         force unit access: 0->don't(def), 1->OFILE, "
+           "2->IFILE,\n"
+           "                3->OFILE+IFILE\n"
+           "    if          file or device to read from (def: stdin)\n"
+           "    iflag       comma separated list from: [coe,direct,dpo,dsync,"
            "excl,fua]\n"
-           "    oflag    comma separated list from: [append,coe,direct,dpo,"
+           "    of          file or device to write to (def: stdout), "
+           "OFILE of '.'\n"
+           "                treated as /dev/null\n"
+           "    oflag       comma separated list from: [append,coe,direct,dpo,"
            "dsync,excl,\n"
-           "             fua]\n"
-           "    sync     0->no sync(def), 1->SYNCHRONIZE CACHE on of after "
-           "xfer\n"
-           "    thr      is number of threads, must be > 0, default 4, "
+           "                fua]\n"
+           "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
+           "after copy\n"
+           "    thr         is number of threads, must be > 0, default 4, "
            "max 16\n"
-           "    time     0->no timing(def), 1->time plus calculate "
+           "    time        0->no timing(def), 1->time plus calculate "
            "throughput\n"
-           "    verbose  same as 'deb=<n>', increase verbosity\n"
-           "    --help   output this usage message then exit\n"
-           "    --version  output version string then exit\n");
+           "    verbose     same as 'deb=VERB': increase verbosity\n"
+           "    --help      output this usage message then exit\n"
+           "    --version   output version string then exit\n"
+           "Copy from IFILE to OFILE, similar to dd command\n"
+           "specialized for SCSI devices, uses multiple POSIX threads\n");
 }
 
 static void guarded_stop_in(Rq_coll * clp)
@@ -497,7 +506,7 @@ static void * read_write_thread(void * v_clp)
 
     memset(rep, 0, sizeof(Rq_elem));
     psz = getpagesize();
-    if (NULL == (rep->alloc_bp = malloc(sz + psz)))
+    if (NULL == (rep->alloc_bp = (unsigned char *)malloc(sz + psz)))
         err_exit(ENOMEM, "out of memory creating user buffers\n");
     rep->buffp = (unsigned char *)(((unsigned long)rep->alloc_bp + psz - 1) &
                                    (~(psz - 1)));
@@ -1144,14 +1153,14 @@ int main(int argc, char * argv[])
         if (0 == strcmp(key,"bpt")) {
             rcoll.bpt = sg_get_num(buf);
             if (-1 == rcoll.bpt) {
-                fprintf(stderr, ME "bad argument to 'bpt'\n");
+                fprintf(stderr, ME "bad argument to 'bpt='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             bpt_given = 1;
         } else if (0 == strcmp(key,"bs")) {
             rcoll.bs = sg_get_num(buf);
             if (-1 == rcoll.bs) {
-                fprintf(stderr, ME "bad argument to 'bs'\n");
+                fprintf(stderr, ME "bad argument to 'bs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"cdbsz")) {
@@ -1164,7 +1173,7 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key,"count")) {
             dd_count = sg_get_llnum(buf);
             if (-1LL == dd_count) {
-                fprintf(stderr, ME "bad argument to 'count'\n");
+                fprintf(stderr, ME "bad argument to 'count='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if ((0 == strncmp(key,"deb", 3)) ||
@@ -1181,7 +1190,7 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
             if (-1 == ibs) {
-                fprintf(stderr, ME "bad argument to 'ibs'\n");
+                fprintf(stderr, ME "bad argument to 'ibs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"if") == 0) {
@@ -1192,13 +1201,13 @@ int main(int argc, char * argv[])
                 strncpy(inf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &rcoll.in_flags)) {
-                fprintf(stderr, ME "bad argument to 'iflag'\n");
+                fprintf(stderr, ME "bad argument to 'iflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"obs")) {
             obs = sg_get_num(buf);
             if (-1 == obs) {
-                fprintf(stderr, ME "bad argument to 'obs'\n");
+                fprintf(stderr, ME "bad argument to 'obs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"of") == 0) {
@@ -1209,19 +1218,19 @@ int main(int argc, char * argv[])
                 strncpy(outf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &rcoll.out_flags)) {
-                fprintf(stderr, ME "bad argument to 'oflag'\n");
+                fprintf(stderr, ME "bad argument to 'oflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"seek")) {
             seek = sg_get_llnum(buf);
             if (-1LL == seek) {
-                fprintf(stderr, ME "bad argument to 'seek'\n");
+                fprintf(stderr, ME "bad argument to 'seek='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if (-1LL == skip) {
-                fprintf(stderr, ME "bad argument to 'skip'\n");
+                fprintf(stderr, ME "bad argument to 'skip='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"sync"))
@@ -1331,10 +1340,10 @@ int main(int argc, char * argv[])
                 return SG_LIB_FILE_ERROR;
             }
             else if (skip > 0) {
-                llse_loff_t offset = skip;
+                off64_t offset = skip;
 
                 offset *= rcoll.bs;       /* could exceed 32 here! */
-                if (llse_llseek(rcoll.infd, offset, SEEK_SET) < 0) {
+                if (lseek64(rcoll.infd, offset, SEEK_SET) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                         ME "couldn't skip to required position on %s", inf);
                     perror(ebuff);
@@ -1399,10 +1408,10 @@ int main(int argc, char * argv[])
                 }
             }
             if (seek > 0) {
-                llse_loff_t offset = seek;
+                off64_t offset = seek;
 
                 offset *= rcoll.bs;       /* could exceed 32 bits here! */
-                if (llse_llseek(rcoll.outfd, offset, SEEK_SET) < 0) {
+                if (lseek64(rcoll.outfd, offset, SEEK_SET) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                         ME "couldn't seek to required position on %s", outf);
                     perror(ebuff);
@@ -1412,7 +1421,7 @@ int main(int argc, char * argv[])
         }
     }
     if ((STDIN_FILENO == rcoll.infd) && (STDOUT_FILENO == rcoll.outfd)) {
-        fprintf(stderr, "Can't have both 'if' as stdin _and_ 'of' as "
+        fprintf(stderr, "Won't default both IFILE to stdin _and_ OFILE to "
                 "stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;

@@ -9,7 +9,7 @@
  * somebody else in the meantime.
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Doug Gilbert's sg_rbuf program.
- * (c) 1999-2006 Doug Gilbert
+ * (c) 1999-2007 Doug Gilbert
  * 
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@
 #include "sg_io_linux.h"
 
 
-static char * version_str = "1.03 20060811";
+static char * version_str = "1.05 20070121";
 
 #define BPI (signed)(sizeof(int))
 
@@ -211,7 +211,7 @@ int read_buffer (int sg_fd, unsigned size)
         int res, k;
         unsigned char rbCmdBlk[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = size + addread;
-        unsigned char * rbBuff = malloc(bufSize);
+        unsigned char * rbBuff = (unsigned char *)malloc(bufSize);
         unsigned char sense_buffer[32];
         struct sg_io_hdr io_hdr;
 
@@ -267,7 +267,7 @@ int write_buffer (int sg_fd, unsigned size)
 {
         unsigned char wbCmdBlk[] = {WRITE_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = size + addwrite;
-        unsigned char * wbBuff = malloc(bufSize);
+        unsigned char * wbBuff = (unsigned char *)malloc(bufSize);
         unsigned char sense_buffer[32];
         struct sg_io_hdr io_hdr;
         int k, res;
@@ -322,23 +322,22 @@ int write_buffer (int sg_fd, unsigned size)
 
 void usage ()
 {
-        printf ("Usage: sg_test_rwbuf [--addrd=<n>] [--addwr=<n>] [--help] "
+        printf ("Usage: sg_test_rwbuf [--addrd=AR] [--addwr=AW] [--help] "
                 "[--quick]\n");
-        printf ("                     --size=<sz> [--times=<n>] [--verbose] "
+        printf ("                     --size=SZ [--times=NUM] [--verbose] "
                 "[--version]\n"
-                "                     <scsi_device>\n"
+                "                     DEVICE\n"
                 " or\n"
-                "       sg_test_rwbuf <scsi_device> <sz> [<addwr>] "
-                "[<addrd>]\n");
+                "       sg_test_rwbuf DEVICE SZ [AW] [AR]\n");
         printf ("  where:\n"
-                "    --addrd=<n>      extra bytes to fetch during READ "
+                "    --addrd=AR       extra bytes to fetch during READ "
                 "BUFFER\n"
-                "    --addwr=<n>      extra bytes to send to WRITE BUFFER\n"
+                "    --addwr=AW       extra bytes to send to WRITE BUFFER\n"
                 "    --help           output this usage message then exit\n"
                 "    --quick          output read buffer size then exit\n"
-                "    --size=<sz>      size of buffer (in bytes) to write "
+                "    --size=SZ        size of buffer (in bytes) to write "
                 "then read back\n"
-                "    --times=<n>      number of times to run test "
+                "    --times=NUM      number of times to run test "
                 "(default 1)\n"
                 "    --verbose        increase verbosity of output\n"
                 "    --verbose        output version then exit\n");
@@ -349,7 +348,7 @@ void usage ()
         printf (" for other data at the same time, and overwriting it may or "
                 "may not\n");
         printf (" cause data corruption!\n");
-        printf ("(c) Douglas Gilbert, Kurt Garloff, 2000-2006, GNU GPL\n");
+        printf ("(c) Douglas Gilbert, Kurt Garloff, 2000-2007, GNU GPL\n");
 }
 
 
@@ -494,7 +493,7 @@ int main (int argc, char * argv[])
                 goto err_out;
         }
         
-        cmpbuf = malloc (size);
+        cmpbuf = (unsigned char *)malloc(size);
         for (k = 0; k < times; ++k) {
                 ret = write_buffer (sg_fd, size);
                 if (ret) {

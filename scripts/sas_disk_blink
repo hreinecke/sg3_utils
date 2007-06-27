@@ -1,0 +1,104 @@
+#!/bin/bash
+# sas_disk_blink
+#
+# Script to blink the LED on a SAS disk.
+# By default it blinks the LED for 30 seconds, thereafter leaving
+# the LED in the state it was prior to this command being called.
+# The blink is one second on, one second off, etc.
+#
+# Uses sdparm rather than sg3_utils as the former is simpler to
+# use for setting mode page value.
+#
+# Douglas Gilbert 20061208
+
+
+seconds=30
+
+usage()
+{
+  echo "Usage: sas_disk_blink [-h] [-s <n>] <sas_device>"
+  echo "  where:"
+  echo "    -h, --help           print usage message"
+  echo "    -s <n>, --set <n>    where <n> is:"
+  echo "                           0  - set RLM to 0"
+  echo "                           1  - set RLM to 1"
+  echo "                           >1 - blink LED for <n> seconds"
+  echo "                                (default: blink for 30 seconds)"
+  echo ""
+  echo "Use Ready LED Meaning (RLM) mode page field to blink SAS device LED"
+}
+
+if (( $# < 1 ))
+  then
+    usage
+    exit 1
+fi 
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    h|-help) usage ; exit 0 ;;
+    s|-set) shift ; let seconds=$1 ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+if ( which sdparm >/dev/null 2>&1 ) ; then
+  true
+else
+  echo "sdparm not found"
+  sdparm
+fi
+
+if [ $seconds = "0" ]
+then
+    sdparm -t sas -c RLM $1
+    exit $?
+elif [ $seconds = "1" ]
+then
+    sdparm -t sas -s RLM $1
+    exit $?
+elif [ $seconds -gt 1 ]
+then
+    outt=$(sdparm -t sas -g RLM -H $1)
+    let res=$?
+    if [ $res -ne 0 ]
+    then
+        exit $res
+    fi
+    if [ ${outt:0:4} = "0x00" ]
+    then
+        let start=0
+    else
+        let start=1
+    fi
+    echo "start blinking for $seconds seconds"
+    for (( times = 1; times < $seconds; times=$times+2 )); do
+        if [ $start -eq 0 ]
+        then
+            sdparm -q -t sas -s RLM $1
+            let res=$?
+            if [ $res -ne 0 ]
+            then
+                exit $res
+            fi
+            sleep 1
+            sdparm -q -t sas -c RLM $1
+            sleep 1
+        else
+            sdparm -q -t sas -c RLM $1
+            let res=$?
+            if [ $res -ne 0 ]
+            then
+                exit $res
+            fi
+            sleep 1
+            sdparm -q -t sas -s RLM $1
+            sleep 1
+        fi
+    done
+    echo "stop blinking"
+fi

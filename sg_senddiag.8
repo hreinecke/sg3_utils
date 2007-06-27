@@ -1,154 +1,241 @@
-.TH SG_SENDDIAG "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_SENDDIAG "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
 .B sg_senddiag
-[\fI-doff\fR] [\fI-e\fR] [\fI-h\fR] [\fI-H\fR] [\fI-l\fR] [\fI-pf\fR]
-[\fI-raw=<h>,<h>... | -raw=-\fR]
-[\fI-s=<self_test_code>\fR] [\fI-t\fR] [\fI-uoff\fR] [\fI-v\fR]
-[\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
+[\fI\-\-doff\fR] [\fI\-\-extdur\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-list\fR] [\fI\-\-pf\fR] [\fI\-\-raw=H,H...\fR] [\fI\-\-raw=\-\fR]
+[\fI\-\-selftest=ST\fR] [\fI\-\-test\fR] [\fI\-\-uoff\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_senddiag
+[\fI\-doff\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-l\fR] [\fI\-pf\fR]
+[\fI\-raw=H,H...\fR] [\fI\-raw=\-\fR] [\fI\-s=ST\fR] [\fI\-t\fR]
+[\fI\-uoff\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility sends a SEND DIAGNOSTIC SCSI command to the given device.
-It can issue self tests, find supported diagnostic pages or
-send arbitrary diagnostic pages.
+This utility sends a SCSI SEND DIAGNOSTIC command to the \fIDEVICE\fR. It
+can issue self-tests, find supported diagnostic pages or send arbitrary
+diagnostic pages.
 .PP
-When the '-l' option and a <scsi_device> are given then the utility
-sends a RECEIVE DIAGNOSTIC RESULTS SCSI command to fetch the response (i.e.
+When the \fI\-\-list\fR option and a \fIDEVICE\fR are given then the utility
+sends a SCSI RECEIVE DIAGNOSTIC RESULTS command to fetch the response (i.e.
 the page numbers of supported diagnostic pages).
 .PP
-When the '-l' option is given without a <scsi_device> then a
-list of diagnostic page names and their numbers, known by this
-utility, are listed.
+When the \fI\-\-list\fR option is given without a \fIDEVICE\fR then a list of
+diagnostic page names and their numbers, known by this utility, are listed.
+.PP
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later section
+on the old command line syntax outlines the second group of options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
 .TP
--doff
+\fB\-d\fR, \fB\-\-doff\fR
 set the Device Offline (DevOffL) bit (default is clear). Only significant 
-when '-t' option is set for the default self test. When set other operations
-on any logical units controlled by the this device server (target) may be
-affected (delayed) while a default self test is underway.
+when \fI\-\-test\fR option is set for the default self-test. When set other
+operations on any logical units controlled by the this device server (target)
+may be affected (delayed) while a default self-test is underway.
 .TP
--e
-outputs the expected extended self test duration. The duration
-is given in seconds (and minutes in parentheses). This figure is obtained
-from mode page 0xa (control page).
+\fB\-e\fR, \fB\-\-extdur\fR
+outputs the expected extended self-test duration. The duration is given in
+seconds (and minutes in parentheses). This figure is obtained from mode page
+0xa (i.e. the control mode page).
 .TP
--h
-outputs response from RECEIVE DIAGNOSTIC RESULTS in hex rather than decode
-it.
+\fB\-h\fR, \fB\-\-help\fR
+print usage message then exit.
 .TP
--H
+\fB\-H\fR, \fB\-\-hex\fR
 outputs response from RECEIVE DIAGNOSTIC RESULTS in hex rather than decode it.
 .TP
--l
-when a <scsi_device> is also given lists the names of all diagnostic
-pages supported by this device. The request is sent via a SEND DIAGNOSTIC
-command (with the "pf" bit set) and the response is fetched by a RECEIVE
-DIAGNOSTIC RESULTS command. When used in the absence of a <scsi_device>
+\fB\-l\fR, \fB\-\-list\fR
+when a \fIDEVICE\fR is also given lists the names of all diagnostic pages
+supported by this device. The request is sent via a SEND DIAGNOSTIC
+command (with the "pF" bit set) and the response is fetched by a RECEIVE
+DIAGNOSTIC RESULTS command. When used in the absence of a \fI\-\-list\fR
 argument then a list of diagnostic page names and their numbers, known
 by this utility, are listed.
 .TP
--pf
-set Page Format (PF) bit. By default it is clear (i.e. 0) unless
-the list ('-l') option is given in which case the Page Format
-bit is set (as required by SPC-3).
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
 .TP
--raw=<h>,<h>...
+\fB\-p\fR, \fB\-\-pf\fR
+set Page Format (PF) bit. By default it is clear (i.e. 0) unless the
+list \fI\-\-list\fR option is given in which case the Page Format
+bit is set (as required by SPC\-3).
+.TP
+\fB\-r\fR, \fB\-\-raw\fR=\fIH,H...\fR
 string of comma separated hex numbers each of which should resolve to
 a byte value (i.e. 0 to ff inclusive). This sequence forms a diagnostic
-page to be sent with the SEND DIAGNOSTIC SCSI command. Mostly likely
-the '-pf' option should also be given.
+page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly likely
+the \fI\-\-pf\fR option should also be given.
 .TP
--raw=-
+\fB\-r\fR, \fB\-\-raw=\-\fR
 reads sequence of bytes from stdin. The sequence may be comma, space, tab
 or linefeed (newline) separated. If a line contains "#" then the remaining
 characters on that line are ignored. Otherwise each non separator character
 should resolve to a byte value (i.e. 0 to ff inclusive). This sequence forms
-a diagnostic page to be sent with the SEND DIAGNOSTIC SCSI command. Mostly
-likely the '-pf' option should also be given.
+a diagnostic page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly
+likely the \fI\-\-pf\fR option should also be given.
 .TP
--s=<self_test_code>
-the default value is 0 which is inactive. A value of 1 selects a background
-short self test; 2 selects a background extended self test; 5 selects a 
-foreground short self test; 6 selects a foreground extended test. A value
-of 4 will abort a (background) self test that is in progress. This
-option is mutually exclusive with default self test (i.e. '-t').
+\fB\-s\fR, \fB\-\-selftest\fR=\fIST\fR
+where \fIST\fR is the self-test code. The default value is 0 which is
+inactive. A value of 1 selects a background short self-test; 2 selects a
+background extended self-test; 5 selects a foreground short self-test; 6
+selects a foreground extended test. A value of 4 will abort a (background)
+self-test that is in progress. This option is mutually exclusive with
+default self-test (i.e. \fI\-\-test\fR).
 .TP
--t
+\fB\-t\fR, \fB\-\-test\fR
 sets the _default_ Self Test (SelfTest) bit. By default this is clear (0).
-The '-s=<num>' option should not be active together with this option.
-Both the '-doff' and/or '-uoff' options can be used with this option.
+The \fI\-\-selftest=ST\fR option should not be active together with this
+option. Both the \fI\-\-doff\fR and/or \fI\-\-uoff\fR options can be used
+with this option.
 .TP
--uoff
+\fB\-u\fR, \fB\-\-uoff\fR
 set the Unit Offline (UnitOffL) bit (default is clear). Only significant 
-when '-t' option is set for the default self test. When set other operations
-on this logical unit may be affected (delayed) while a default self test
-is underway. Some devices (e.g. Fujitsu disks) do more tests when this
-bit is set.
+when \fI\-\-test\fR option is set for the default self-test. When set other
+operations on this logical unit may be affected (delayed) while a default
+self-test is underway. Some devices (e.g. Fujitsu disks) do more tests
+when this bit is set.
 .TP
--v
-increase level of verbosity: print out SCSI commands in hex prior to
-sending them to the device.
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level of verbosity. Can be used multiple times.
 .TP
--V
+\fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.
-.TP
--?
-output usage message. Ignore all other parameters.
+.SH NOTES
+All devices should support the default self-test. The 'short' self-test
+codes should complete in 2 minutes or less. The 'extended' self-test
+codes' maximum duration is vendor specific (e.g. a little over 10 minutes
+with the author's disks). The foreground self-test codes wait until they
+are completed while the background self-test codes return immediately. The
+results of both foreground and background self-test codes are placed in
+the 'self-test results' log page (see sg_logs). The SCSI command timeout
+for this utility is set to 60 minutes to allow for slow foreground extended
+self-tests.
 .PP
-All devices should support the default self test. The 'short' self test
-codes should complete in 2 minutes or less. The 'extended' self test
-codes' maximum duration is vendor specific (e.g. a little over 10
-minutes with my disks). The foreground self test codes wait until they
-are completed while the background self test codes return immediately.
-The results of both foreground and background self test codes are
-placed in the 'self test results' log page (see sg_logs). The SCSI command
-timeout for this utility is set to 60 minutes to allow for slow foreground
-extended self tests.
+If the \fIDEVICE\fR is a disk then no file systems residing on that disk
+should be mounted during a foreground self-test. The reason is that other
+SCSI commands may become queued behind the foreground self-test and timeout.
 .PP
-If the given device is a disk then no file systems residing on that disk
-should be mounted during a foreground self test. The reason is that
-other SCSI commands may become queued behind the foreground self test and
-timeout.
-.PP
-When the '-raw=' option is given then self tests should not be
-selected. However the '-pf' (i.e. "page format") option should be given.
-The length of the diagnostic page to be sent is derived from the number
-of bytes given to the '-raw=' option. The diagnostic page code (number)
-should be the first byte of the sequence (i.e. as dictated by SPC-3
-diagnostic page format). The SAS 1.1 protocol specific diagnostic page
-could be sent with this option, for example. The examples subdirectory
-in the sg3_utils packages contains two example scripts that turn on
-the CJTPAT (jitter pattern) on some SAS disks (one script for each phy).
-One possible invocation
-is: 'sg_senddiag -pf -raw=- /dev/sg2 < .../sdiag_sas_p1_cjtpat.txt'
+When the \fI\-\-raw=H,H...\fR option is given then self-tests should not
+be selected. However the \fB\-\-pf\fR (i.e. "page format") option should be
+given. The length of the diagnostic page to be sent is derived from the
+number of bytes given to the \fI\-\-raw=H,H...\fR option. The diagnostic
+page code (number) should be the first byte of the sequence (i.e. as
+dictated by SPC\-3 diagnostic page format). The SAS 1.1 protocol specific
+diagnostic page could be sent with this option, for example. The examples
+subdirectory in the sg3_utils packages contains two example scripts that
+turn on the CJTPAT (jitter pattern) on some SAS disks (one script for each
+phy). One possible invocation
+is: 'sg_senddiag \-\-pf \-\-raw=\- /dev/sg2 < .../sdiag_sas_p1_cjtpat.txt'
 .PP
 Arbitrary diagnostic pages can be read (in hex) with the sg_ses
-utility (not only those defined in SES-2).
+utility (not only those defined in SES\-2).
 .PP
 If the utility is used with no options (e.g. "sg_senddiag /dev/sg1")
-Then a degenerate SEND DIAGNOSTIC SCSI command is sent with zero
+Then a degenerate SCSI SEND DIAGNOSTIC command is sent with zero
 in all its fields apart from the opcode. Some devices report this
 as an error while others ignore it. It is not entirely clear from
-SPC-3 if it is invalid to send such a command.
+SPC\-3 if it is invalid to send such a command.
 .PP
-In the 2.4 series of Linux kernels the given device must be
-a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
-and SCSI DVDs) can also be specified. For example 'sg_senddiag -t /dev/sda'
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
+generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks and
+DVD drives) can also be specified. For example 'sg_senddiag \-t /dev/sda'
 will work in the 2.6 series kernels.
 .PP
 To access SCSI enclosures see the sg_ses utility. sg_ses uses the
-SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS SCSI commands as outlined
-in the SES-2 (draft) standard.
+SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS commands as outlined
+in the SES\-2 (draft) standard.
 .SH EXIT STATUS
 The exit status of sg_senddiag is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.TP
+\fB\-doff\fR
+set the Device Offline (DevOffL) bit (default is clear). Only significant 
+when \fI\-t\fR option is set for the default self-test. Equivalent to
+\fI\-\-doff\fR in the main description.
+.TP
+\fB\-e\fR
+outputs the expected extended self-test duration. Equivalent to
+\fI\-\-extdur\fR in the main description.
+.TP
+\fB\-h\fR
+outputs response from RECEIVE DIAGNOSTIC RESULTS in hex rather than decode
+it.
+.TP
+\fB\-H\fR
+outputs response from RECEIVE DIAGNOSTIC RESULTS in hex rather than decode it.
+.TP
+\fB\-l\fR
+when a \fIDEVICE\fR is also given lists the names of all diagnostic
+pages supported by this device. The request is sent via a SEND DIAGNOSTIC
+command (with the "pf" bit set) and the response is fetched by a RECEIVE
+DIAGNOSTIC RESULTS command. When used in the absence of a \fIDEVICE\fR
+argument then a list of diagnostic page names and their numbers, known
+by this utility, are listed.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-pf\fR
+set Page Format (PF) bit. By default it is clear (i.e. 0) unless
+the \fI\-l\fR option is given in which case the Page Format bit is set
+(as required by SPC\-3).
+.TP
+\fB\-raw\fR=\fIH,H...\fR
+string of comma separated hex numbers each of which should resolve to
+a byte value (i.e. 0 to ff inclusive). This sequence forms a diagnostic
+page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly likely
+the \fI\-pf\fR option should also be given.
+.TP
+\fB\-raw=-\fR
+reads sequence of bytes from stdin. The sequence may be comma, space, tab
+or linefeed (newline) separated. If a line contains "#" then the remaining
+characters on that line are ignored. Otherwise each non separator character
+should resolve to a byte value (i.e. 0 to ff inclusive). This sequence forms
+a diagnostic page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly
+likely the \fI\-pf\fR option should also be given.
+.TP
+\fB\-s\fR=\fIST\fR
+where \fIST\fR is the self-test code. The default value is 0 which is
+inactive. A value of 1 selects a background short self-test; 2 selects
+a background extended self-test; 5 selects a foreground short self-test;
+6 selects a foreground extended test. A value of 4 will abort
+a (background) self-test that is in progress. This option is mutually
+exclusive with default self-test (i.e. \fI\-t\fR).
+.TP
+\fB\-t\fR
+sets the _default_ Self Test (SelfTest) bit. By default this is clear (0).
+The \fI\-s=ST\fR option should not be active together with this option.
+Both the \fI\-doff\fR and/or \fI\-uoff\fR options can be used with this
+option.
+.TP
+\fB\-uoff\fR
+set the Unit Offline (UnitOffL) bit (default is clear). Equivalent to
+\fI\-\-uoff\fR in the main description.
+.TP
+\fB\-v\fR
+increase level of verbosity. Can be used multiple times.
+.TP
+\fB\-V\fR
+print out version string then exit.
+.TP
+\fB\-?\fR
+output usage message. Ignore all other parameters.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003-2006 Douglas Gilbert
+Copyright \(co 2003\-2007 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

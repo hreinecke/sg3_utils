@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -16,7 +18,7 @@
 #include "sg_io_linux.h"
 
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2006 D. Gilbert
+*  Copyright (C) 2000-2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +38,7 @@
 */
 
 
-static char * version_str = "1.07 20060907";
+static char * version_str = "1.08 20070125";
 
 static const char * devfs_id = "/dev/.devfsd";
 
@@ -95,20 +97,21 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 
 static void usage()
 {
-    printf("Usage: 'sg_map [-a] [-h] [-i] [-n] [-sd] [-scd or -sr] [-st] "
-           "[-V] [-x]'\n");
-    printf("    where: -a   do alphabetic scan (ie sga, sgb, sgc)\n");
-    printf("           -h or -?  show this usage message then exit\n");
-    printf("           -i   also show device INQUIRY strings\n");
-    printf("           -n   do numeric scan (i.e. sg0, sg1, sg2) "
+    printf("Usage: sg_map [-a] [-h] [-i] [-n] [-sd] [-scd or -sr] [-st] "
+           "[-V] [-x]\n");
+    printf("  where:\n");
+    printf("    -a      do alphabetic scan (ie sga, sgb, sgc)\n");
+    printf("    -h or -?    show this usage message then exit\n");
+    printf("    -i      also show device INQUIRY strings\n");
+    printf("    -n      do numeric scan (i.e. sg0, sg1, sg2) "
            "(default)\n");
-    printf("           -sd  show mapping to disks\n");
-    printf("           -scd show mapping to cdroms (look for /dev/scd<n>\n");
-    printf("           -sr  show mapping to cdroms (look for /dev/sr<n>\n");
-    printf("           -st  show mapping to tapes (st and osst devices)\n");
-    printf("           -V   print version string then exit\n");
-    printf("           -x   also show bus,chan,id,lun and type\n");
-    printf("    If no '-s*' arguments given then show all mappings\n");
+    printf("    -sd     show mapping to disks\n");
+    printf("    -scd    show mapping to cdroms (look for /dev/scd<n>\n");
+    printf("    -sr     show mapping to cdroms (look for /dev/sr<n>\n");
+    printf("    -st     show mapping to tapes (st and osst devices)\n");
+    printf("    -V      print version string then exit\n");
+    printf("    -x      also show bus,chan,id,lun and type\n");
+    printf("  If no '-s*' arguments given then show all mappings\n");
 }
 
 static int scandir_select(const struct dirent * s)
