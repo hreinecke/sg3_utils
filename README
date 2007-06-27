@@ -99,7 +99,7 @@ in this package:
   3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
      sg_modes, sg_logs, sg_senddiag, sg_reset, sg_opcodes, sg_persist,
      sg_write_long, sg_read_long, sg_requests, sg_ses, sg_verify,
-     sg_emc_trespass and sg_luns
+     sg_emc_trespass, sg_luns, sg_sync, sg_prevent and sg_get_config
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
@@ -298,6 +298,24 @@ mode page.
 and outputs the response. The '--select' options allows the "select
 report" field to be specified.
 
+"sg_luns" sends a REPORT LUNS SCSI command to the given device and
+outputs the luns returned in the reponse. When the '--decode' option
+is given the luns are decoded as defined in the SAM-3 draft standard.
+
+"sg_sync" sends a SYNCHRONIZE CACHE SCSI command to the given device.
+Various options allow part of the cache (and range of logical block
+addresses) and synchronized.
+
+"sg_prevent" sends a PREVENT ALLOW MEDIUM REMOVAL SCSI command to the
+given device. Implemented for general removable SCSI devices (see SPC-3)
+with a specialization for cd/dvd devices (see MMC-4).
+
+"sg_get_config" sends a GET CONFIGURATION SCSI command to the given device
+and decodes the response. The command is only implemented for devices that
+use the Multi-Media command set (MMC 3,4,5) such as CDs and DVDs. Even
+though this is a SCSI command set it is commonly found on ATAPI, USB and
+ieee1394 transports.
+
 
 4) Timing and testing
 ---------------------
@@ -414,10 +432,9 @@ in scsirastools are:
 
 plscsi
 ======
-The author is considering implementing FreeBSD's camcontrol utility
-which can issue arbitrary SCSI commands (i.e. supplied by user). There is
-a similar utility called "plscsi" which is available for Linux and other
-operating systems. See http://members.aol.com/plscsi .
+This is a utility which can issue arbitrary SCSI commands (i.e. supplied by
+user). It is available for Linux and other operating systems.
+See http://members.aol.com/plscsi .
 
 Doug Gilbert
-30th October 2004
+26th November 2004

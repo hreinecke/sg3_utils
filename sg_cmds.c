@@ -54,7 +54,7 @@
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
-static char * version_str = "1.02 20041030";
+static char * version_str = "1.03 20041126";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -153,8 +153,14 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
         if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
 
-            snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt=%d, "
-                     "VPD=%d, page_opcode=%x ", cmddt, evpd, pg_op);
+            if (evpd)
+                snprintf(ebuff, EBUFF_SZ, "Inquiry error, VPD page=0x%x",
+                         pg_op);
+            else if (cmddt)
+                snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt opcode=0x%x",
+                         pg_op);
+            else
+                snprintf(ebuff, EBUFF_SZ, "Inquiry error, [standard]");
             sg_chk_n_print3(ebuff, &io_hdr);
         }
         return -2;
@@ -283,8 +289,9 @@ int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
 
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command */
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
-int sg_ll_sync_cache(int sg_fd, int sync_nv, int immed, int noisy,
-                     int verbose)
+int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
+                        unsigned int lba, unsigned int count, int noisy,
+                        int verbose)
 {
     int res, k;
     unsigned char scCmdBlk[SYNCHRONIZE_CACHE_CMDLEN] =
@@ -296,11 +303,23 @@ int sg_ll_sync_cache(int sg_fd, int sync_nv, int immed, int noisy,
         scCmdBlk[1] |= 4;
     if (immed)
         scCmdBlk[1] |= 2;
+    scCmdBlk[2] = (lba >> 24) & 0xff;
+    scCmdBlk[3] = (lba >> 16) & 0xff;
+    scCmdBlk[4] = (lba >> 8) & 0xff;
+    scCmdBlk[5] = lba & 0xff;
+    scCmdBlk[6] = group & 0x1f;
     if (NULL == sg_warnings_str)
         sg_warnings_str = stderr;
+    if (count > 0xffff) {
+        fprintf(sg_warnings_str, "count too big\n");
+        return -1;
+    }
+    scCmdBlk[7] = (count >> 8) & 0xff;
+    scCmdBlk[8] = count & 0xff;
+
     if (verbose) {
-        fprintf(sg_warnings_str, "        synchronize cache cdb: ");
-        for (k = 0; k < INQUIRY_CMDLEN; ++k)
+        fprintf(sg_warnings_str, "        synchronize cache(10) cdb: ");
+        for (k = 0; k < SYNCHRONIZE_CACHE_CMDLEN; ++k)
             fprintf(sg_warnings_str, "%02x ", scCmdBlk[k]);
         fprintf(sg_warnings_str, "\n");
     }
@@ -802,6 +821,12 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
         rsCmdBlk[1] |= 0x1;
     if (NULL == sg_warnings_str)
         sg_warnings_str = stderr;
+    if (mx_resp_len > 0xfc) {
+        fprintf(sg_warnings_str, "SPC-3 says request sense allocation "
+                "length should be <= 252\n");
+        return -1;
+    }
+    rsCmdBlk[4] = mx_resp_len & 0xff;
     if (verbose) {
         fprintf(sg_warnings_str, "    Request Sense cmd: ");
         for (k = 0; k < REQUEST_SENSE_CMDLEN; ++k)
@@ -833,6 +858,12 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
         if (verbose && io_hdr.resid)
             fprintf(sg_warnings_str, "    request sense: resid=%d\n",
                     io_hdr.resid);
+        if ((mx_resp_len >= 8) && (io_hdr.resid > (mx_resp_len - 8))) {
+            if (verbose)
+                fprintf(sg_warnings_str, "    request sense: resid=%d "
+                        "indicates response too short\n", io_hdr.resid);
+            return -1;
+        }
         return 0;
     case SG_LIB_CAT_RECOVERED:
         fprintf(sg_warnings_str, "Recovered error on REQUEST SENSE command, "

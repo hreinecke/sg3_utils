@@ -1,0 +1,58 @@
+.TH SG_PREVENT "8" "November 2004" "sg3_utils-1.11" SG3_UTILS
+.SH NAME
+sg_prevent \- invoke SCSI PREVENT ALLOW MEDIUM REMOVAL command on a device
+.SH SYNOPSIS
+.B sg_prevent
+[\fI--allow\fR] [\fI--help\fR] [\fI--prevent=<n>\fR] [\fI--verbose\fR]
+[\fI--version\fR] \fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command to the given Linux SCSI
+device. The default action of this utility is to allow the user and the SCSI
+command START STOP UNIT (see sg_start) to remove or eject
+the medium from a drive. Typical examples are a removable disk, a tape
+or a cd/dvd drive. The definition of the "prevent" codes for this command
+differ between disks and tapes (covered by SPC-3) and cd/dvd drives (covered
+by MMC-4). At the time of writing there are moves to remove these differences.
+The "prevent codes" described here are from MMC-4 which seems to be close
+to the proposed merged definition.
+.TP
+--allow | -a
+allow medium removal. This is equivalent to setting the argument
+to '--prevent' to 2. Cannot be used with '--prevent' option (i.e. use
+no options (hence prevent removal), this option or '--prevent').
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--prevent=<n> | -p <n>
+prevent codes: 0 allows removal, 1 prevents removal (default), 2 allows
+persistent removal while 3 prevents persistent removal. "Persistent" in this
+context means that the initiator (port) that successfully uses code 3 blocks
+other initiators (ports) from allowing removal. A "persistent prevent" state
+can be cleared by owner allowing persistent removal (code 2) or a power
+cycle (or anything that resets the device (lun)) or some special
+commands (e.g. various service actions of Persistent Reserve Out, see SPC-3).
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output).
+.TP
+--version | -V
+print the version string and then exit.
+.PP
+In some cases removable media can be ejected by an application (see
+sg_start and its '-loej' option). Often a user with physical access
+to the drive can attempt to eject the media by pressing a button on
+the drive.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_start(sg3_utils), sg_persist(sg3_utils)

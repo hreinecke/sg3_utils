@@ -1,0 +1,85 @@
+.TH SG_SYNC "8" "November 2004" "sg3_utils-1.11" SG3_UTILS
+.SH NAME
+sg_sync \- send the scsi command synchronize cache
+.SH SYNOPSIS
+.B sg_sync
+[\fI--count=<n>\fR] [\fI--group=<n>\fR] [\fI--help\fR] [\fI--immed\fR]
+[\fI--lba=<n>\fR] [\fI--sync-nv\fR] [\fI--verbose\fR] [\fI--version\fR]
+\fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send SYNCHRONIZE CACHE (10) command to a Linux SCSI device.
+This command is defined for SCSI block devices (see SBC-2). If successful
+this command makes sure that any blocks whose latest versions are held
+in (volatile) cache are written to (also termed as "synchronized with")
+the medium. If the '--sync-nv' option is given and the device has a
+non-volatile cache then any blocks whose latest versions are held
+in volatile cache are written to non-volatile cache.
+.PP
+If the arguments to '--lba' and '--count' are both zero (their defaults)
+then all blocks in the cache are synchronized. If '--lba' is greater than
+zero while '--count' is zero then blocks in the cache whose address
+is from and including the '--lba' argument to the highest lba on the
+device are synchronized. If both '--lba' and '--count' are non zero
+then blocks in the cache whose addresses lie in the range lba_argument to 
+lba_argument+count_argument-1 inclusive are synchronized with the medium.
+.TP
+--count=<n> | -c <n>
+number of block to synchronize from and including the '--lba' argument.
+Default value is 0. When 0 then all blocks in the (volatile) cache from
+and including the '--lba' argument to the highest block address are
+synchronized.
+.TP
+--group=<n> | -g <n>
+the group number can be between 0 and 31 inclusive. The default value is 0 .
+Group numbers are used to segregate data collected within the device.
+This is a new feature in SBC-2 and can probably be ignored for the time
+being.
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--imm | -i
+sets the "imm" bit in the SYNCHRONIZE CACHE command. This instructs the
+device, if the format of the command is acceptable, to return a GOOD
+status immediately rather than wait for the blocks in the (volatile)
+cache to be synchronized with (i.e. written to) the medium (or the
+non-volatile cache).
+.TP
+--lba=<n> | -l <n>
+the lowest logical block address in the (volatile) cache to synchronize
+to the medium (or the non-volatile cache). Default value is 0 .
+.TP
+--sync-nv | -s
+synchronize the (volatile) cache with the non-volatile cache. Without this
+option (or if there is no non-volatile cache in the device) the synchronization
+is with the medium.
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output).
+.TP
+--version | -V
+print the version string and then exit.
+.PP
+The arguments to --count, --group and --lba may be followed by one of these
+multiplicative suffixes:
+c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
+g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
+T *1,000,000,000,000 (the latter two can only be used for --count
+and --lba).
+.PP
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X". When hex numbers are given multipliers cannot be
+used.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_start(sg3_utils)

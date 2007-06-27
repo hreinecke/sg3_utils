@@ -106,7 +106,7 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * sginfo_version_str = "sginfo version 2.06 [20041011]";
+static const char * sginfo_version_str = "sginfo version 2.07 [20041126]";
 
 #include <stdio.h>
 #include <string.h>
@@ -2906,11 +2906,35 @@ static int do_inquiry(int * peri_type, int inquiry_level)
 
 static int do_serial_number()
 {
-    int status, i, pagelen;
+    int status, pagelen;
     unsigned char cmd[6];
     unsigned char *pagestart;
     struct scsi_cmnd_io sci;
     const unsigned char serial_vpd = 0x80;
+    const unsigned char supported_vpd = 0x0;
+
+    /* check supported VPD pages + unit serial number well formed */
+    cmd[0] = 0x12;              /* INQUIRY */
+    cmd[1] = 0x01;              /* evpd=1 */
+    cmd[2] = supported_vpd;
+    cmd[3] = 0x00;              /* (reserved) */
+    cmd[4] = 0x04;              /* allocation length */
+    cmd[5] = 0x00;              /* control */
+
+    sci.cmnd = cmd;
+    sci.cmnd_len = sizeof(cmd);
+    sci.dxfer_dir = DXFER_FROM_DEVICE;
+    sci.dxfer_len = 4;
+    sci.dxferp = cbuffer;
+    status = do_scsi_io(&sci);
+    if (status) {
+        printf("No serial number (error doing INQUIRY, supported VPDs)\n\n");
+        return status;
+    }
+    if (! ((supported_vpd == cbuffer[1]) && (0 == cbuffer[2]))) {
+        printf("No serial number (bad format for supported VPDs)\n\n");
+        return -1;
+    }
 
     cmd[0] = 0x12;              /* INQUIRY */
     cmd[1] = 0x01;              /* evpd=1 */
@@ -2926,11 +2950,11 @@ static int do_serial_number()
     sci.dxferp = cbuffer;
     status = do_scsi_io(&sci);
     if (status) {
-        printf("Error doing INQUIRY (evpd=1, serial number)\n\n");
+        printf("No serial number (error doing INQUIRY, serial number)\n\n");
         return status;
     }
-    if (serial_vpd != cbuffer[1]) {
-        printf("doesn't understand request for serial number\n\n");
+    if (! ((serial_vpd == cbuffer[1]) && (0 == cbuffer[2]))) {
+        printf("No serial number (bad format for serial number)\n\n");
         return -1;
     }
 
@@ -2952,7 +2976,7 @@ static int do_serial_number()
     sci.dxferp = cbuffer;
     status = do_scsi_io(&sci);
     if (status) {
-        printf("Error doing INQUIRY (evpd=1, serial number\n\n");
+        printf("No serial number (error doing INQUIRY, serial number)\n\n");
         return status;
     }
     if (trace_cmd > 1) {
@@ -2960,11 +2984,8 @@ static int do_serial_number()
         dump(cbuffer, pagelen);
     }
 
-    printf("Serial Number '");
-    for (i = 0; i < pagestart[3]; i++)
-        printf("%c", pagestart[4 + i]);
-    printf("'\n");
-    printf("\n");
+    pagestart[pagestart[3] + 4] = '\0';
+    printf("Serial Number '%s'\n\n", pagestart + 4);
     return status;
 }
 

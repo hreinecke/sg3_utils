@@ -2,6 +2,21 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.11 [20041126]
+  - sg_sync: new utility: invokes the synchronize cache command
+  - sg_prevent: new utility: invokes the prevent allow medium removal command
+  - sg_get_config: new utility: get configuration command for dvds and cds
+  - sg_request: fix, allocation length wasn't set
+  - sg_start: remove '-s', as start_stop_unit implicitly syncs caches
+  - sg_ses: add SAS expander element type
+  - sg_inq: add sanity check to unit serial number (VPD page 0x80)
+        - output ANSI version string (e.g. "SPC-2", previously was number)
+        - add '-s' option to decode SCSI Ports VPD page
+  - sg_logs: decoding of format status and non-volatile cache log
+        pages (0x8 and 0x17 in sbc-2)
+  - sg_dd: handle compile error when O_DIRECT not defined
+  - sginfo: tighten sanity checks around Unit serial number VPD page
+
 Changelog for sg3_utils-1.10 [20041030]
   - sg_readcap, sg_dd, sgm_dd, sgp_dd: fix sg_ll_readcap_10+16 (sg_cmds.c)
   - sg_luns: new utility to report luns
@@ -19,8 +34,8 @@ Changelog for sg3_utils-1.09 [20041022]
       - decode last n error events and last n deferred errors pages
       - add names of ADC log pages
   - sg_inq: update to SPC-3 rev 21
-      - decode Extended INQUIRY VPD page [0x86]
-      - decode Unit Path Report VPD page [0xc0] (EMC)
+      - decode Extended INQUIRY VPD page [0x86] {'-x'}
+      - decode Unit Path Report VPD page [0xc0] (EMC) {'-P'}
   - sginfo: decode SAS protocol specific lu mode page
   - sg_err: convert to sg_lib + update to SPC-3 rev 21
       - change GPL to FreeBSD license
@@ -36,7 +51,7 @@ Changelog for sg3_utils-1.09 [20041022]
 
 Changelog for sg3_utils-1.08 [20040831]
   - sg_inq: fix noisy message when EVPD and raw modes set
-      - for VPD page 0, list supported page names if known
+      - for VPD page 0, list supported page names if known {'-e'}
       - add '-d' option to list version descriptors
   - sg_opcodes: numerically sort list of opcodes unless '-u' given
       - add '-a' to sort alphabetically list of opcode names

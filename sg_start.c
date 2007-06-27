@@ -8,7 +8,6 @@
 #include <sys/types.h>
 #include "sg_include.h"
 #include "sg_lib.h"
-#include "sg_cmds.h"
 
 /* This program is modeled on the example code in the SCSI Programming
    HOWTO V1.5 by Heiko Eissfeldt dated 7 May 1996.
@@ -31,16 +30,18 @@
  
 */
 
-static char * version_str = "0.39 20041029";
+static char * version_str = "0.41 20041106";
 
-#define START_STOP              0x1b
-
+#define START_STOP_CMD          0x1b
+#define START_STOP_CMDLEN       6
 #define DEF_TIMEOUT 120000       /* 120,000 millisecs == 2 minutes */
 
-static void do_start_stop(int fd, int start, int immed, int loej,
-                          int power_conditions, int verbose)
+
+/* Returns 0 if successful, else -1. */
+static int do_start_stop(int fd, int start, int immed, int loej,
+                         int power_conditions, int verbose)
 {
-        unsigned char cmdblk [6] = { 
+        unsigned char cmdblk[START_STOP_CMDLEN] = { 
                 START_STOP,     /* Command */
                 0,              /* Resvd/Immed */
                 0,              /* Reserved */
@@ -73,49 +74,53 @@ static void do_start_stop(int fd, int start, int immed, int loej,
         
         if (ioctl(fd, SG_IO, &io_hdr) < 0) {
                 perror("start_stop (SG_IO) error");
-                return;
+                return -1;
         }
         res = sg_err_category3(&io_hdr);
         if (SG_LIB_CAT_MEDIA_CHANGED == res) {
                 fprintf(stderr, "media change report, try start_stop again\n");
                 if (ioctl(fd, SG_IO, &io_hdr) < 0) {
                         perror("start_stop (SG_IO) error");
-                        return;
+                        return -1;
                 }
+                res = sg_err_category3(&io_hdr);
         }
         if (SG_LIB_CAT_CLEAN != res) {
                 sg_chk_n_print3("start_stop", &io_hdr);
-                return;
+                return -1;
         }
-        if (verbose)
-                fprintf(stderr, "start_stop [%s] successful\n",
-                        start ? "start" : "stop");
+        return 0;
 }
 
 void usage ()
 {
-        fprintf(stderr, "Usage:  sg_start [-imm=0|1] [-loej] [-pc=<n>] "
-                        "[-s] [-v] [-V] 0|1 <device>\n"
-               "    -imm=0|1: 0->await completion, 1->return "
+        fprintf(stderr, "Usage:  sg_start [0|1] [-imm=0|1] [-loej] "
+                        "[-pc=<n>] [-v] [-V] <scsi_device>\n"
+               " where: 0: stop unit (e.g. spin down a disk or a cd/dvd)\n"
+               "        1: start unit (e.g. spin up a disk or a cd/dvd)\n"
+               "        -imm=0|1: 0->await completion, 1->return "
                "immediately(def)\n"
-               "    -loej: load on start, eject of stop\n"
-               "    -pc=<n>: power conditions (in hex, default 0)\n"
-               "    -s: send the synchronize cache command before start/stop\n"
-               "    -v: verbose (print out SCSI commands)\n"
-               "    -V: print version string then exit\n"
-               "     0: stop (spin-down)\n"
-               "     1: start (spin-up)\n"
-               "     <device> sg or block device (latter in lk 2.6.*)\n"
-               "        Example: sg_start /dev/sg2 1\n");
+               "        -loej: load the medium if start option '1' is also "
+               "given\n"
+               "                or stop unit and eject\n"
+               "        -pc=<n>: power conditions (in hex, default 0 -> no "
+               "power condition)\n"
+               "                 1 -> active, 2 -> idle, 3 -> standby\n"
+               "        -v: verbose (print out SCSI commands)\n"
+               "        -V: print version string then exit\n"
+               "         <scsi_device>\n\n"
+               "    Example: 'sg_start 0 /dev/sdb' stops unit\n"
+               "             'sg_start -loej /dev/sdb' stops unit and "
+               "ejects\n");
         exit (1);
 }
 
 int main(int argc, char * argv[])
 {
         char **argptr;
-        int startstop = -1, synccache = 0;
+        int startstop = -1;
         char * file_name = 0;
-        int k, fd, num;
+        int k, fd, num, res;
         unsigned int u;
         int immed = 1;
         int loej = 0;
@@ -129,8 +134,6 @@ int main(int argc, char * argv[])
                 argptr = argv + k;
                 if (!strcmp (*argptr, "-loej"))
                         loej = 1;
-                else if (!strcmp (*argptr, "-s"))
-                        synccache = 1;
                 else if (0 == strncmp("-imm=", argv[k], 5)) {
                         num = sscanf(argv[k] + 5, "%x", &u);
                         if ((1 != num) || (u > 1)) {
@@ -153,7 +156,7 @@ int main(int argc, char * argv[])
                         printf("Version string: %s\n", version_str);
                         exit(0);
                 } else if (!strcmp (*argptr, "-v"))
-			++verbose;
+                        ++verbose;
                 else if (!strcmp (*argptr, "0"))
                         startstop = 0;
                 else if (!strcmp (*argptr, "1"))
@@ -175,8 +178,14 @@ int main(int argc, char * argv[])
                 usage();
                 return 1;
         }
-        if (!synccache && (startstop == -1) && (0 == power_conds))
+        if ((startstop == -1) && loej)
+                startstop = 0;
+        if ((startstop == -1) && (0 == power_conds)) {
+                fprintf(stderr, "need either start/stop indication (0|1) or"
+                        " non-zero power condition\n");
                 usage ();
+                return 1;
+        }
                 
         fd = open(file_name, O_RDWR | O_NONBLOCK);
         if (fd < 0) {
@@ -185,14 +194,12 @@ int main(int argc, char * argv[])
                 return 2;
         }
         
-        if (synccache)
-                sg_ll_sync_cache(fd, 0, 0, 1, verbose);
-        
+        res = 0;
         if (power_conds > 0)
-                do_start_stop(fd, 0, immed, 0, power_conds, verbose);
+                res = do_start_stop(fd, 0, immed, 0, power_conds, verbose);
         else if (startstop != -1)
-                do_start_stop(fd, startstop, immed, loej, 0, verbose);
+                res = do_start_stop(fd, startstop, immed, loej, 0, verbose);
         
         close (fd);
-        return 0;
+        return res ? 1 : 0;
 }

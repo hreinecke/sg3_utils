@@ -13,14 +13,15 @@ EXECS = sg_dd sgp_dd sgm_dd sg_read sg_map sg_scan sg_rbuf \
  	sginfo sg_readcap sg_turs sg_inq sg_test_rwbuf \
  	sg_start sg_reset sg_modes sg_logs sg_senddiag sg_opcodes \
  	sg_persist sg_write_long sg_read_long sg_requests sg_ses \
-	sg_verify sg_emc_trespass sg_luns
+	sg_verify sg_emc_trespass sg_luns sg_sync sg_prevent \
+	sg_get_config
 
 MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sginfo.8 sg_readcap.8 sg_turs.8 sg_inq.8 sg_test_rwbuf.8 \
 	sg_start.8 sg_reset.8 sg_modes.8 sg_logs.8 sg_senddiag.8 \
 	sg_opcodes.8 sg_persist.8 sg_write_long.8 sg_read_long.8 \
 	sg_requests.8 sg_ses.8 sg_verify.8 sg_emc_trespass.8 \
-	sg_luns.8
+	sg_luns.8 sg_sync.8 sg_prevent.8 sg_get_config.8
 MAN_PREF = man8
 
 HEADERS = sg_lib.h sg_cmds.h
@@ -133,6 +134,15 @@ sg_emc_trespass: sg_emc_trespass.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_luns: sg_luns.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_sync: sg_sync.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_prevent: sg_prevent.o libsgutils.la
+	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
+
+sg_get_config: sg_get_config.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)

@@ -1,4 +1,4 @@
-.TH SG_REQUESTS "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
+.TH SG_REQUESTS "8" "November 2004" "sg3_utils-1.11" SG3_UTILS
 .SH NAME
 sg_requests \- send the scsi command request sense
 .SH SYNOPSIS
@@ -27,6 +27,14 @@ increase the level of verbosity, (i.e. debug output).
 .TP
 --version | -V
 print the version string and then exit.
+.PP
+Some time ago the REQUEST SENSE command was very important for error
+and warning processing in SCSI. The autosense capability rendered this
+command almost superfluous. However recent SCSI drafts (e.g. SBC-2 rev
+16) increase the utility of the REQUEST SENSE command. Idle and standby
+power conditions can now be detected with this command. Interestingly
+the sense key is set to "no sense" while the asc/ascq code convey the
+information (e.g. 0x5e/0x4 "Standby condition activated by command").
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

@@ -30,7 +30,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "5.36 20041011";
+static char * version_str = "5.36 20041106";
 
 #define WRITE_LONG_OPCODE 0x3F
 #define WRITE_LONG_CMD_LEN 10
@@ -205,7 +205,7 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    sg_fd = open(device_name, O_RDWR);
+    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
         perror(ME "open error");
         return 1;
