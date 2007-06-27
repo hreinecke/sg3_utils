@@ -1,10 +1,11 @@
-.TH SG_MODES "8" "December 2004" "sg3_utils-1.12" SG3_UTILS
+.TH SG_MODES "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sg_modes \- reads SCSI MODE SENSE pages
 .SH SYNOPSIS
 .B sg_modes
-[\fI-a\fR] [\fI-A\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-h\fR]
-[\fI-l\fR] [\fI-p=<page_code>\fR] [\fI-p=<page_code>,<sub_page_code>\fR]
+[\fI-a\fR] [\fI-A\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-D\fR]
+[\fI-h\fR] [\fI-l\fR] [\fI-p=<page_code>\fR]
+[\fI-p=<page_code>,<sub_page_code>\fR]
 [\fI-r\fR] [\fI-subp=<sub_page_code>\fR] [\fI-v\fR] [\fI-V\fR] [\fI-6\fR]
 [\fI-?\fR] [\fI<scsi_device>\fR]
 .SH DESCRIPTION
@@ -31,8 +32,16 @@ is power cycled). If this option is not given then current values [0]
 are assumed.
 .TP
 -d
-disable block descriptors. By default MODE SENSE returns in its response
-block descriptors and this parameter can be used to suppress them.
+disable block descriptors. By default, block descriptors (usually one or
+none) are returned in a MODE SENSE response. This option sets the "disable
+block descriptors" (DBD) bit in the cdb which instructs the device not
+to return any block descriptors in its response. Older devices may not
+support this setting and should return an "illegal request" status;
+alternatively they may ignore it.
+.TP
+-D
+disable outputting block descriptors. Irrespective of whether block
+descriptors are present in the response or not, they are not output.
 .TP
 -h
 currently only suppresses the printing out of known page code descriptions

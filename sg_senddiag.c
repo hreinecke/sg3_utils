@@ -22,7 +22,7 @@
    command.
 */
 
-static char * version_str = "0.21 20050120";
+static char * version_str = "0.22 20050309";
 
 #define ME "sg_senddiag: "
 
@@ -78,8 +78,10 @@ static int do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("Send diagnostic, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     default:
         if (noisy) {
@@ -130,8 +132,10 @@ static int do_rcvdiag(int sg_fd, int pcv, int pg_code, void * resp,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("Receive diagnostic, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     default:
         if (noisy) {
@@ -158,6 +162,9 @@ static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
                                  resp, mx_resp_len, noisy, verbose);
     if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Mode sense (%s) command not supported\n",
+                (mode6 ? "6" : "10"));
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "bad field in Mode sense (%s) command\n",
                 (mode6 ? "6" : "10"));
     return res;
 }

@@ -1,16 +1,25 @@
-.TH SG_READ "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
+.TH SG_READ "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sg_read \- read blocks of data continually from same offset
 .SH SYNOPSIS
-.B sg_read
-[\fIOPTION\fR]...
+.B sg_dd
+[\fIblk_sgio=0|1\fR] [\fIbpt=<n>\fR] [\fIbs=<n>\fR] [\fIcdbsz=6|10|12|16\fR]
+\fIcount=<n>\fR [\fIdio=0|1\fR] [\fIif=<ifile>\fR] [\fIodir=0|1\fR]
+[\fIskip=<n>\fR] [\fItime=<n>\fR] [\fI--version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Read data from a Linux SCSI generic (sg) device, a raw devices or
-a normal file with each read command issued to the same offset. This 
-will test (or time) disk caching and/or SCSI (or some other) bus 
+Read data from a Linux SCSI generic (sg) device, a block device, a raw
+device or a normal file with each read command issued to the same offset.
+This will test (or time) disk caching and/or SCSI (or some other) bus 
 throughput.
+.TP
+blk_sgio=0 | 1
+The default action of this utility is to use the Unix read() command when
+the <ifile> is a block device. In lk 2.6 many block devices can handle
+SCSI commands issued via the SG_IO ioctl. So when this option is set
+the SG_IO ioctl sends SCSI READ commands to <ifile> if it is a block
+device.
 .TP
 bpt=BLOCKS
 each read operation will be made using this number of blocks (or less if 
@@ -20,11 +29,12 @@ starts at the same offset (as given by skip or 0).
 bs=BYTES
 this
 .B must
-be the block size of the physical device (defaults to 512)
+be the block size of the physical device (defaults to 512) if SCSI commands
+are being issued to <ifile>.
 .TP
 cdbsz=6 | 10 | 12 | 16
 size of SCSI READ commands issued on sg device names.
-Default is 10 byte SCSI READ command blocks
+Default is 10 byte SCSI READ cdbs
 .TP
 count=BLOCKS
 read this number of blocks. This argument must be given
@@ -32,26 +42,36 @@ read this number of blocks. This argument must be given
 dio=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
-at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
+at completion. This option is only actice if <ifile> is an sg device.
+If direct IO is selected and /proc/scsi/sg/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
-if=FILE
-read from this FILE. This argument must be given
+if=<ifile>
+read from this <ifile>. This argument must be given. If the <ifile> is a
+normal file then it must be seekable (if (count > bpt) or skip is given).
+Hence stdin is not acceptable (and giving "-" as the <ifile> argument is
+reported as an error).
 .TP
 mmap= 0 | 1
 default is 0 which selects indirect IO. Value of 1 causes memory mapped
-IO to be performed. Selecting both dio and mmap is an error
+IO to be performed. Selecting both dio and mmap is an error. This option
+is only active if <ifile> is an sg device.
+.TP
+odir= 0 | 1
+when set opens an <ifile> which is a block device with an additional
+O_DIRECT flag. Active when blk_sgio is either 0 or 1. The default value
+is 0 (i.e. don't open block devices O_DIRECT).
 .TP
 skip=BLOCKS
 all read operations will start offset by BLOCKS bs-sized blocks 
 from the start of input (file or device)
 .TP
-time=0 | 1 | 2
+time=<n>
 When 0 (default) doesn't perform timing.
 when 1, times transfer and does throughput calculation, starting at the
 first issued command until completion. When 2, times transfer and does 
 throughput calculation, starting at the second issued command until 
-completion
+completion. When 3 times from third command, etc.
 .PP
 The input file must be either a sg device, a raw device or a normal file.
 A raw device must be bound to a block device prior to using sg_raw.
@@ -59,10 +79,16 @@ See
 .B raw(8)
 for more information about binding raw devices.
 .PP
-BYTES and BLOCKS may be followed by the following multiplicative suffixes:
-c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
-g *1,073,741,824; and G *1,000,000,000 . Alternatively a hex number may
-be given, prefixed by either 0x or 0X.
+BYTES and BLOCKS may be followed by one of these multiplicative suffixes:
+c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
+MB *1,000,000; g G Gib *(2**30); GB *(10**9). Also a suffix of
+the form "x<n>" multiplies the leading number by <n>. These multiplicative
+suffixes are compatible with GNU's dd command (since 2002) which claims
+compliance with SI and with IEC 60027-2.
+.PP
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X". When hex numbers are given multipliers cannot be
+used.
 .PP
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
@@ -78,7 +104,7 @@ configuration change to activate it. This is typically done with
 Let us assume that /dev/sg0 is a disk and we wish to time the disk's
 cache performance.
 .PP
-   sg_read if=/dev/sg0 bs=512 count=1M mmap=1 time=2
+   sg_read if=/dev/sg0 bs=512 count=1MB mmap=1 time=2
 .PP
 This command will continually read 128 512 byte blocks from block 0. 
 The "128" is the default value for "bpt" while "block 0" is chosen 

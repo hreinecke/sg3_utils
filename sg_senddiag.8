@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
+.TH SG_SENDDIAG "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -16,9 +16,10 @@ diagnostic pages). This utility is mainly used to make the device do
 self tests.
 .TP
 -doff
-set the Device Offline (DevOfl) bit (default is clear). Only significant 
-when '-t' option is set for the default self test. In this sense the 'Device'
-is a target (with all contained logical units potentially impacted).
+set the Device Offline (DevOffL) bit (default is clear). Only significant 
+when '-t' option is set for the default self test. When set other operations
+on any logical units controlled by the this device server (target) may be
+effected (delayed) while a default self test is underway.
 .TP
 -e
 outputs the expected extended self test duration. The duration
@@ -49,9 +50,11 @@ The '-s=<num>' option should not be active together with this option.
 Both the '-doff' and/or '-uoff' options can be used with this option.
 .TP
 -uoff
-set the Unit Offline (DevOfl) bit (default is clear). Only significant 
-when '-t' option is set for the default self test. In this sense the 'Unit'
-is a logical units on a target. 
+set the Unit Offline (UnitOffL) bit (default is clear). Only significant 
+when '-t' option is set for the default self test. When set other operations
+on this logical unit may be effected (delayed) while a default self test
+is underway. Some devices (e.g. Fujitsu disks) do more tests when this
+bit is set.
 .TP
 -v
 increase level of verbosity: print out SCSI commands in hex prior to

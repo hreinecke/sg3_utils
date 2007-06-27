@@ -27,10 +27,13 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.04 20050118";
+static char * version_str = "1.05 20050309";
 
 #define WRITE_LONG_OPCODE 0x3F
 #define WRITE_LONG_CMD_LEN 10
+
+#define MAX_XFER_LEN 10000
+#define SENSE_BUFF_LEN 64
 
 /* #define SG_DEBUG */
 
@@ -59,7 +62,7 @@ static void usage()
           "         --lba=<num>|-l <num>  logical block address (default 0)\n"
           "         --verbose|-v      increase verbosity\n"
           "         --version|-V      print version string then exit\n"
-          "         --xfer_len=<num>|-x <num>  transfer length (<1000) "
+          "         --xfer_len=<num>|-x <num>  transfer length (< 10000) "
           "default 520\n"
           "\n To read from a defected sector use:\n"
           "    sg_dd if=<scsi_device> skip=<lba> of=/dev/null bs=512 "
@@ -92,7 +95,7 @@ static int info_offset(unsigned char * sensep, int sb_len)
     return 0;
 }
 
-static int has_ili(unsigned char * sensep, int sb_len)
+static int has_blk_ili(unsigned char * sensep, int sb_len)
 {
     int resp_code;
     const unsigned char * cup;
@@ -115,7 +118,7 @@ int main(int argc, char * argv[])
     unsigned char writeLongCmdBlk [WRITE_LONG_CMD_LEN];
     unsigned char * writeLongBuff = NULL;
     void * rawp = NULL;
-    unsigned char sense_buffer[64];
+    unsigned char sense_buffer[SENSE_BUFF_LEN];
     int xfer_len = 520;
     unsigned int lba = 0;
     int verbose = 0;
@@ -190,9 +193,9 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    if (xfer_len >= 1000){
-        fprintf(stderr, "xfer_len (%d) is out of range ( < 1000)\n",
-                xfer_len);
+    if (xfer_len >= MAX_XFER_LEN){
+        fprintf(stderr, "xfer_len (%d) is out of range ( < %d)\n",
+                xfer_len, MAX_XFER_LEN);
         usage();
         return 1;
     }
@@ -203,13 +206,13 @@ int main(int argc, char * argv[])
         return 1;
     }
   
-    if (NULL == (rawp = malloc(1000))) {
+    if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
         fprintf(stderr, ME "out of memory (query)\n");
         close(sg_fd);
         return 1;
     }
     writeLongBuff = rawp;
-    memset(rawp, 0xff, 1000);
+    memset(rawp, 0xff, MAX_XFER_LEN);
     if (file_name[0]) {
         got_stdin = (0 == strcmp(file_name, "-")) ? 1 : 0;
         if (got_stdin)
@@ -279,11 +282,10 @@ int main(int argc, char * argv[])
     sb_len = io_hdr.sb_len_wr;
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
-        case SG_LIB_CAT_CLEAN:
-        break;
     case SG_LIB_CAT_RECOVERED:
-        fprintf(stderr, "Recovered error on WRITE LONG command, "
-                "continuing\n");
+        sg_chk_n_print3("WRITE LONG, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         break;
     default: /* won't bother decoding other categories */
         if ((sg_normalize_sense(&io_hdr, &ssh)) &&
@@ -294,7 +296,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "<<< nothing written to device >>>\n");
             fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
                     ">>>\n", xfer_len - offset);
-            if (! has_ili(io_hdr.sbp, io_hdr.sb_len_wr))
+            if (! has_blk_ili(io_hdr.sbp, io_hdr.sb_len_wr))
                 fprintf(stderr, "    [Invalid Length Indication (ILI) flag "
                         "expected but not found]\n");
             goto err_out;

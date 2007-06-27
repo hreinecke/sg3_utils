@@ -296,6 +296,8 @@ int main(int argc, char * argv[])
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Luns command not supported (support "
                 "mandatory in SPC-3)\n");
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "Report Luns command has bad fields in cdb\n");
 
     res = close(sg_fd);
     if (res < 0) {

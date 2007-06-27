@@ -25,10 +25,12 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.04 20050118";
+static char * version_str = "1.05 20050309";
 
 #define READ_LONG_OPCODE 0x3E
 #define READ_LONG_CMD_LEN 10
+#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define MAX_XFER_LEN 10000
 
 #define ME "sg_read_long: "
 
@@ -61,7 +63,7 @@ static void usage()
           "         --verbose|-v               increase verbosity\n"
           "         --version|-V               print version string and"
           " exit\n"
-          "         --xfer_len=<num>|-x <num>  transfer length (<1000)"
+          "         --xfer_len=<num>|-x <num>  transfer length (< 10000)"
           " default 520\n"
           );
 }
@@ -73,7 +75,7 @@ static int info_offset(unsigned char * sensep, int sb_len)
     if (sb_len < 8)
         return 0;
     resp_code = (0x7f & sensep[0]);
-    if (resp_code>= 0x72) { /* descriptor format */
+    if (resp_code >= 0x72) { /* descriptor format */
         unsigned long long ull = 0;
 
         /* if Information field, fetch it; contains signed number */
@@ -88,7 +90,7 @@ static int info_offset(unsigned char * sensep, int sb_len)
     return 0;
 }
 
-static int has_ili(unsigned char * sensep, int sb_len)
+static int has_blk_ili(unsigned char * sensep, int sb_len)
 {
     int resp_code;
     const unsigned char * cup;
@@ -96,7 +98,7 @@ static int has_ili(unsigned char * sensep, int sb_len)
     if (sb_len < 8)
         return 0;
     resp_code = (0x7f & sensep[0]);
-    if (resp_code>= 0x72) { /* descriptor format */
+    if (resp_code >= 0x72) { /* descriptor format */
         /* find block command descriptor */
         if ((cup = sg_scsi_sense_desc_find(sensep, sb_len, 0x5)))
             return ((cup[3] & 0x20) ? 1 : 0);
@@ -105,27 +107,134 @@ static int has_ili(unsigned char * sensep, int sb_len)
     return 0;
 }
 
+/* Invokes a SCSI READ LONG (10) command. Return of 0 -> success,
+ * 1 -> ILLEGAL REQUEST with info field written to offsetp,
+ * SG_LIB_CAT_INVALID_OP -> Verify(10) not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+static int sg_ll_read_long10(int sg_fd, int correct, unsigned long lba,
+                             void * data_out, int xfer_len, int * offsetp,
+                             int verbose)
+{
+    int k, res, offset;
+    unsigned char readLongCmdBlk[READ_LONG_CMD_LEN];
+    struct sg_io_hdr io_hdr;
+    struct sg_scsi_sense_hdr ssh;
+    unsigned char sense_buffer[SENSE_BUFF_LEN];
+
+    memset(readLongCmdBlk, 0, READ_LONG_CMD_LEN);
+    readLongCmdBlk[0] = READ_LONG_OPCODE;
+    if (correct)
+        readLongCmdBlk[1] |= 0x2;
+
+    /*lba*/
+    readLongCmdBlk[2] = (lba & 0xff000000) >> 24;
+    readLongCmdBlk[3] = (lba & 0x00ff0000) >> 16;
+    readLongCmdBlk[4] = (lba & 0x0000ff00) >> 8;
+    readLongCmdBlk[5] = (lba & 0x000000ff);
+    /*size*/
+    readLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
+    readLongCmdBlk[8] = (xfer_len & 0x000000ff);
+
+    if (verbose) {
+        fprintf(stderr, "    Read Long (10) cmd: ");
+        for (k = 0; k < READ_LONG_CMD_LEN; ++k)
+            fprintf(stderr, "%02x ", readLongCmdBlk[k]);
+        fprintf(stderr, "\n");
+    }
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(readLongCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_buffer);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = xfer_len;
+    io_hdr.dxferp = data_out;
+    io_hdr.cmdp = readLongCmdBlk;
+    io_hdr.sbp = sense_buffer;
+    io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        perror(ME "SG_IO ioctl READ LONG(10) error");
+        return -1;
+    }
+
+    /* now for the error processing */
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+        if (verbose > 1)
+            sg_chk_n_print3("READ LONG(10) command problem", &io_hdr);
+        return res;
+    default:
+        if (verbose > 1)
+            sg_chk_n_print3("READ LONG(10) sense", &io_hdr);
+        if ((sg_normalize_sense(&io_hdr, &ssh)) &&
+            (ssh.sense_key == ILLEGAL_REQUEST) &&
+            ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {
+            if (has_blk_ili(io_hdr.sbp, io_hdr.sb_len_wr)) {
+                if (offsetp)
+                        *offsetp = offset;
+                return 1;
+            } else if (verbose)
+                fprintf(stderr, "  info field [%d], but ILI clear ??\n",
+                        offset);
+        }
+        if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            return res;
+        return -1;
+    }
+}
+
+/* Returns 0 if successful, else -1 */
+static int process_read_long(int sg_fd, int correct, unsigned long lba,
+                             void * data_out, int xfer_len, int verbose)
+{
+    int offset, res;
+
+    res = sg_ll_read_long10(sg_fd, correct, lba, data_out, xfer_len,
+                            &offset, verbose);
+    switch (res) {
+    case 0:
+        return 0;
+    case 1:
+        fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
+                ">>>\n", xfer_len - offset);
+        return -1;
+    case SG_LIB_CAT_INVALID_OP:
+        fprintf(stderr, "  SCSI READ LONG (10) command not supported\n");
+        return -1;
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        fprintf(stderr, "  SCSI READ LONG (10) command, bad field in cdb\n");
+        return -1;
+    default:
+        fprintf(stderr, "  SCSI READ LONG (10) command error\n");
+        return -1;
+    }
+}
+
+
 int main(int argc, char * argv[])
 {
-    int sg_fd, outfd, res, c, k, offset;
-    unsigned char readLongCmdBlk [READ_LONG_CMD_LEN];
+    int sg_fd, outfd, res, c;
     unsigned char * readLongBuff = NULL;
     void * rawp = NULL;
-    unsigned char sense_buffer[32];
     int correct = 0;
     int xfer_len = 520;
     unsigned int lba = 0;
     int verbose = 0;
     int got_stdout;
     char device_name[256];
-    char file_name[256];
+    char out_fname[256];
     char ebuff[EBUFF_SZ];
-    struct sg_io_hdr io_hdr;
-    struct sg_scsi_sense_hdr ssh;
     int ret = 1;
 
     memset(device_name, 0, sizeof device_name);
-    memset(file_name, 0, sizeof file_name);
+    memset(out_fname, 0, sizeof out_fname);
     while (1) {
         int option_index = 0;
 
@@ -150,7 +259,7 @@ int main(int argc, char * argv[])
             }
             break;
         case 'o':
-            strncpy(file_name, optarg, sizeof(file_name));
+            strncpy(out_fname, optarg, sizeof(out_fname));
             break;
         case 'v':
             ++verbose;
@@ -191,9 +300,9 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    if (xfer_len >= 1000){
-        fprintf(stderr, "xfer_len (%d) is out of range ( < 1000)\n",
-                xfer_len);
+    if (xfer_len >= MAX_XFER_LEN){
+        fprintf(stderr, "xfer_len (%d) is out of range ( < %d)\n",
+                xfer_len, MAX_XFER_LEN);
         usage();
         return 1;
     }
@@ -204,97 +313,40 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    if (NULL == (rawp = malloc(1000))) {
+    if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
         fprintf(stderr, ME "out of memory (query)\n");
         close(sg_fd);
         return 1;
     }
     readLongBuff = rawp;
-    memset(rawp, 0x0, 1000);
-    memset(readLongCmdBlk, 0, READ_LONG_CMD_LEN);
-    readLongCmdBlk[0] = READ_LONG_OPCODE;
-    if (correct)
-        readLongCmdBlk[1] |= 0x2;
-
-    /*lba*/
-    readLongCmdBlk[2] = (lba & 0xff000000) >> 24;
-    readLongCmdBlk[3] = (lba & 0x00ff0000) >> 16;
-    readLongCmdBlk[4] = (lba & 0x0000ff00) >> 8;
-    readLongCmdBlk[5] = (lba & 0x000000ff);
-    /*size*/
-    readLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
-    readLongCmdBlk[8] = (xfer_len & 0x000000ff);
+    memset(rawp, 0x0, MAX_XFER_LEN);
 
     fprintf(stderr, ME "issue read long to device %s\n\t\txfer_len=%d "
             "(0x%x), lba=%d (0x%x), correct=%d\n", device_name, xfer_len,
             xfer_len, lba, lba, correct);
 
-    if (verbose) {
-        fprintf(stderr, "    Read Long (10) cmd: ");
-        for (k = 0; k < READ_LONG_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", readLongCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(readLongCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_buffer);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = xfer_len;
-    io_hdr.dxferp = readLongBuff;
-    io_hdr.cmdp = readLongCmdBlk;
-    io_hdr.sbp = sense_buffer;
-    io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
-    /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror(ME "SG_IO ioctl READ LONG error");
+    if (process_read_long(sg_fd, correct, lba, readLongBuff, xfer_len,
+                          verbose))
         goto err_out;
-    }
 
-    /* now for the error processing */
-    switch (sg_err_category3(&io_hdr)) {
-    case SG_LIB_CAT_CLEAN:
-        break;
-    case SG_LIB_CAT_RECOVERED:
-        fprintf(stderr, "Recovered error on READ LONG command, "
-                "continuing\n");
-        break;
-    default: /* won't bother decoding other categories */
-        if ((sg_normalize_sense(&io_hdr, &ssh)) &&
-            (ssh.sense_key == ILLEGAL_REQUEST) &&
-            ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {
-            if (verbose)
-                sg_chk_n_print3("READ LONG command problem", &io_hdr);
-            fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
-                    ">>>\n", xfer_len - offset);
-            if (! has_ili(io_hdr.sbp, io_hdr.sb_len_wr))
-                fprintf(stderr, "    [Invalid Length Indication (ILI) flag "
-                        "expected but not found]\n");
-            goto err_out;
-        }
-        sg_chk_n_print3("READ LONG command problem", &io_hdr);
-        goto err_out;
-    }
-    if ('\0' == file_name[0])
+    if ('\0' == out_fname[0])
         dStrHex(rawp, xfer_len, 0);
     else {
-        got_stdout = (0 == strcmp(file_name, "-")) ? 1 : 0;
+        got_stdout = (0 == strcmp(out_fname, "-")) ? 1 : 0;
         if (got_stdout)
             outfd = 1;
         else {
-            if ((outfd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC,
+            if ((outfd = open(out_fname, O_WRONLY | O_CREAT | O_TRUNC,
                               0666)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for writing", file_name);
+                         ME "could not open %s for writing", out_fname);
                 perror(ebuff);
                 goto err_out;
             }
         }
         res = write(outfd, readLongBuff, xfer_len);
         if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, ME "couldn't write to %s", file_name);
+            snprintf(ebuff, EBUFF_SZ, ME "couldn't write to %s", out_fname);
             perror(ebuff);
             goto err_out;
         }

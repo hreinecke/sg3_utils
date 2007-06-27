@@ -48,7 +48,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.02 20050117";
+static char * version_str = "1.03 20050309";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -64,8 +64,8 @@ static char * version_str = "1.02 20050117";
 #define STATUS_CODE_CHANGED_BY_SET 0x1
 #define STATUS_CODE_CHANGED_BY_IMPLICIT 0x2
 
-// <<<<<<<<<<<<<<< start of test code
-// #define TEST_CODE
+/* <<<<<<<<<<<<<<< start of test code */
+/* #define TEST_CODE */
 
 #ifdef TEST_CODE
 
@@ -83,7 +83,7 @@ unsigned char dummy_resp[32] = {
 };
 
 #endif
-// <<<<<<<<<<<<<<< end of test code
+/* <<<<<<<<<<<<<<< end of test code */
 
 static struct option long_options[] = {
         {"decode", 0, 0, 'd'},
@@ -224,7 +224,7 @@ int main(int argc, char * argv[])
     trunc = 0;
 
 #ifndef TEST_CODE
-    res = sg_ll_report_tgt_grp(sg_fd, reportTgtGrpBuff,
+    res = sg_ll_report_tgt_prt_grp(sg_fd, reportTgtGrpBuff,
                             sizeof(reportTgtGrpBuff), 1, verbose);
 #else
     memcpy(reportTgtGrpBuff, dummy_resp, sizeof(dummy_resp));
@@ -289,6 +289,8 @@ int main(int argc, char * argv[])
         ret = 0;
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Target Port Groups command not supported\n");
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "bad field in Report Target Port Groups cdb\n");
 
 err_out:
     res = close(sg_fd);

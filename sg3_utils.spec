@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.12
+Version: 1.13
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -27,9 +27,7 @@ incorrect usage may render your system inoperable.
 Authors:
 --------
     Doug Gilbert <dgilbert at interlog dot com>
-    Kurt Garloff <garloff at suse dot de>  [sg_test_rwbuff]
-    Peter Allworth  [contribution to sg_dd and sgp_dd]
-    Martin Schwenke <martin at meltin dot net> [contribution to sg_inq]
+    See CREDITS file
 
 %package devel
 Summary: Files needed for developing applications using the SCSI command set
@@ -91,6 +89,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_wr_mode
 %attr(755,root,root) %{_bindir}/sg_rtpg
 %attr(755,root,root) %{_bindir}/sg_reassign
+%attr(755,root,root) %{_bindir}/sg_format
 %attr(755,root,root) %{_libdir}/libsgutils.so
 %attr(755,root,root) %{_libdir}/libsgutils.so.1
 %attr(755,root,root) %{_libdir}/libsgutils.so.1.0.0
@@ -127,6 +126,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_wr_mode.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_rtpg.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_reassign.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_format.8*
 
 %files devel
 %defattr(-,root,root)
@@ -137,6 +137,10 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Sun Mar 13 2005 - dgilbert at interlog dot com
+- add sg_format, sg_dd extensions
+  * sg3_utils-1.13
+
 * Fri Jan 21 2005 - dgilbert at interlog dot com
 - add sg_wr_mode, sg_rtpg + sg_reassign; sginfo sas tweaks
   * sg3_utils-1.12

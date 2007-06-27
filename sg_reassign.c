@@ -50,7 +50,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.00 20050109";
+static char * version_str = "1.01 20050309";
 
 #define ME "sg_reassign: "
 
@@ -107,7 +107,8 @@ static void usage()
 }
 
 /* Invokes a SCSI REASSIGN BLOCKS command.  Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, -1 -> other failure */
+ * SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
                           int param_len, int noisy, int verbose, int dummy)
 {
@@ -153,10 +154,13 @@ int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("Reassign blocks, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("Reassign blocks error", &io_hdr);
         return res;
@@ -441,6 +445,9 @@ int main(int argc, char * argv[])
                                 param_len, 1, verbose, dummy);
     if (SG_LIB_CAT_INVALID_OP == res) {
         fprintf(stderr, "REASSIGN BLOCKS not supported\n");
+        goto err_out;
+    } else if (SG_LIB_CAT_INVALID_OP == res) {
+        fprintf(stderr, "bad field in REASSIGN BLOCKS cdb\n");
         goto err_out;
     } else if (0 != res) {
         fprintf(stderr, "REASSIGN BLOCKS failed\n");

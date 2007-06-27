@@ -1,4 +1,4 @@
-.TH SGINFO "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
+.TH SGINFO "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -82,7 +82,8 @@ Access information in the Format Device mode page.
 .TP
 -Farg
 Format of the defect lists:
-                -Flogical  - logical blocks
+                -Flogical  - logical block addresses (32 bit)
+                -Flba64    - logical block addresses (64 bit)
                 -Fphysical - physical blocks
                 -Findex    - defect bytes from index
                 -Fhead     - sort by head 

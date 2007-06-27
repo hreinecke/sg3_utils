@@ -19,8 +19,9 @@ SENSE command then the same block descriptors are written back with the
 following MODE SELECT command.
 .PP
 If a contents argument is not given then the various components (i.e.
-header, block descriptor(s) and mode page) of the existing mode page
-are printed out. In this case the mode page is not altered on the device.
+header, block descriptor(s) and mode page) of the "current" values of
+the existing mode page are printed out. In this case the mode page is
+not altered on the device.
 .PP
 If the contents are specified, and a mask is not specified, then the contents
 must match the existing mode page in various aspects unless the '--force'
@@ -58,12 +59,12 @@ contents of the mode page to be written to the device, potentially filtered
 by the mask string.
 .TP
 --dbd | -d
-disable block descriptors. Some device types include block descriptors
-in the mode data returned by a MODE SENSE command. If so the same
-block descriptors are written by the MODE SELECT command. This option
-instructs the MODE SENSE command not to return any block descriptors.
-This would be a sensible default for this utility apart from the fact
-that not all SCSI devices support this flag.
+disable block descriptors (DBD flag in cdb). Some device types include
+block descriptors in the mode data returned by a MODE SENSE command. If
+so the same block descriptors are written by the MODE SELECT command.
+This option instructs the MODE SENSE command not to return any block
+descriptors. This would be a sensible default for this utility apart
+from the fact that not all SCSI devices support the DBD bit in the cdb.
 .TP
 --force | -f
 force the contents string to be taken as the new mode page, or at least

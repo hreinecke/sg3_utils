@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Douglas Gilbert.
+ * Copyright (c) 2004-2005 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.01 20041229";
+static char * version_str = "1.02 20050309";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -92,7 +92,7 @@ static void usage()
    command not supported */
 int sg_ll_prevent(int sg_fd, int prevent, int verbose)
 {
-    int k;
+    int k, res;
     unsigned char pCmdBlk[PREVENT_REMOVAL_CMDLEN] = 
                 {PREVENT_REMOVAL_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -126,15 +126,19 @@ int sg_ll_prevent(int sg_fd, int prevent, int verbose)
                 safe_strerror(errno));
         return -1;
     }
-    switch (sg_err_category3(&io_hdr)) {
-    case SG_LIB_CAT_CLEAN:
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("Prevent allow medium removal", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose > 1)
             sg_chk_n_print3("Prevent allow medium removal command problem",
                             &io_hdr);
-        return SG_LIB_CAT_INVALID_OP;
+        return res;
     default:
         sg_chk_n_print3("Prevent allow medium removal command problem",
                         &io_hdr);

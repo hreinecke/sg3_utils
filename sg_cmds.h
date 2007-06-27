@@ -41,8 +41,8 @@ extern int sg_ll_request_sense(int sg_fd, int desc, void * resp,
 extern int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
                              int mx_resp_len, int noisy, int verbose);
 
-extern int sg_ll_report_tgt_grp(int sg_fd, void * resp,
-                                int mx_resp_len, int noisy, int verbose);
+extern int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
+                                    int mx_resp_len, int noisy, int verbose);
 
 extern int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                            int paramp, unsigned char * resp, int mx_resp_len,
@@ -73,4 +73,10 @@ extern int sg_simple_inquiry(int sg_fd,
 extern int sg_mode_page_offset(const unsigned char * resp, int resp_len,
                                int mode_sense_6, char * err_buff,
                                int err_buff_len);
+
+extern int sg_get_mode_page_types(int sg_fd, int mode6, int pg_code,
+                                  int sub_pg_code, int mx_mpage_len,
+                                  int * success_mask, void * current_mp,
+                                  void * changeable_mp, void * default_mp,
+                                  void * saved_mp, int verbose);
 #endif

@@ -13,7 +13,7 @@
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2004 D. Gilbert
+*  Copyright (C) 2000-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "0.37 20041209";
+static char * version_str = "0.38 20050305";
 
 #define ME "sg_logs: "
 
@@ -36,7 +36,9 @@ static char * version_str = "0.37 20041209";
    actual length of response; then a second time requesting the
    min(actual_len, mx_resp_len) bytes. If the calculated length for the
    second fetch is odd then it is incremented (perhaps should be made modulo 4
-   in the future for SAS). */
+   in the future for SAS). Returns 0 if ok, SG_LIB_CAT_INVALID_OP for
+   log_sense not supported, SG_LIB_CAT_ILLEGAL_REQ for bad field in log sense
+   command nd -1 for other errors. */
 static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code, 
                    int paramp, unsigned char * resp, int mx_resp_len, 
                    int noisy, int verbose)
@@ -47,8 +49,8 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
     memset(resp, 0, mx_resp_len);
     if ((res = sg_ll_log_sense(sg_fd, ppc, sp, pc, pg_code, paramp, resp,
                                4, noisy, verbose))) {
-        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "log_sense: not supported\n");
+        if ((SG_LIB_CAT_INVALID_OP == res) || (SG_LIB_CAT_ILLEGAL_REQ == res))
+            return res;
         return -1;
     }
     actual_len = (resp[2] << 8) + resp[3] + 4;
@@ -59,8 +61,8 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
         actual_len = mx_resp_len;
     if ((res = sg_ll_log_sense(sg_fd, ppc, sp, pc, pg_code, paramp, resp,
                                actual_len, noisy, verbose))) {
-        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "log_sense: not supported (b)\n");
+        if ((SG_LIB_CAT_INVALID_OP == res) || (SG_LIB_CAT_ILLEGAL_REQ == res))
+            return res;
         return -1;
     }
     return 0;
@@ -231,43 +233,47 @@ static void show_buffer_under_overrun_page(unsigned char * resp, int len,
     while (num > 3) {
         pl = ucp[3] + 4;
         count_basis = (ucp[1] >> 5) & 0x7;
-        printf("  Count basis: ");
-        switch (count_basis) {
-        case 0 : printf("undefined"); break;
-        case 1 : printf("per command"); break;
-        case 2 : printf("per failed reconnect"); break;
-        case 3 : printf("per unit of time"); break;
-        default: printf("reserved [0x%x]", count_basis); break;
-        }
         cause = (ucp[1] >> 1) & 0xf;
-        printf(", Cause: ");
-        switch (cause) {
-        case 0 : printf("undefined"); break;
-        case 1 : printf("bus busy"); break;
-        case 2 : printf("transfer rate too slow"); break;
-        default: printf("reserved [0x%x]", cause); break;
+        if ((0 == count_basis) && (0 == cause))
+            printf("Count basis+Cause both undefined(0), unsupported??");
+        else {
+            printf("  Count basis: ");
+            switch (count_basis) {
+            case 0 : printf("undefined"); break;
+            case 1 : printf("per command"); break;
+            case 2 : printf("per failed reconnect"); break;
+            case 3 : printf("per unit of time"); break;
+            default: printf("reserved [0x%x]", count_basis); break;
+            }
+            printf(", Cause: ");
+            switch (cause) {
+            case 0 : printf("undefined"); break;
+            case 1 : printf("bus busy"); break;
+            case 2 : printf("transfer rate too slow"); break;
+            default: printf("reserved [0x%x]", cause); break;
+            }
+            printf(", Type: ");
+            if (ucp[1] & 1)
+                printf("over-run");
+            else
+                printf("under-run");
+            printf(", count");
+            k = pl - 4;
+            xp = ucp + 4;
+            if (k > (int)sizeof(ull)) {
+                xp += (k - sizeof(ull));
+                k = sizeof(ull);
+            }
+            ull = 0;
+            for (j = 0; j < k; ++j) {
+                if (j > 0)
+                    ull <<= 8;
+                ull |= xp[j];
+            }
+            printf(" = %llu", ull);
         }
-        printf(", Type: ");
-        if (ucp[1] & 1)
-            printf("over-run");
-        else
-            printf("under-run");
-        pcb = ucp[2];
-        printf(", count");
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
-        }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
-        printf(" = %llu", ull);
         if (show_pcb) {
+            pcb = ucp[2];
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("  <%s>\n", pcb_str);
         } else
@@ -310,7 +316,7 @@ static void show_error_counter_page(unsigned char * resp, int len,
         pcb = ucp[2];
         pl = ucp[3] + 4;
         switch (pc) {
-        case 0: printf("  Errors corrected without substantion delay"); break;
+        case 0: printf("  Errors corrected without substantial delay"); break;
         case 1: printf("  Errors corrected with possible delays"); break;
         case 2: printf("  Total operations"); break;
         case 3: printf("  Total errors corrected"); break;
@@ -463,12 +469,12 @@ static void show_last_n_deferred_error_page(unsigned char * resp,
     }
 }
 
-const char * self_test_code[] = {
+static const char * self_test_code[] = {
     "default", "background short", "background extended", "reserved",
     "aborted background", "foreground short", "foreground extended",
     "reserved"};
 
-const char * self_test_result[] = {
+static const char * self_test_result[] = {
     "completed without error", 
     "aborted by SEND DIAGNOSTIC", 
     "aborted other than by SEND DIAGNOSTIC", 
@@ -880,7 +886,8 @@ static void show_non_volatile_cache_page(unsigned char * resp, int len,
             } else
                 printf("<unexpected parameter length=%d>\n", ucp[4]);
             break;
-        case 1: printf("  Maximum non-volatile time: ");
+        case 1:
+            printf("  Maximum non-volatile time: ");
             if (3 == ucp[4]) {
                 j = (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
                 switch (j) {
@@ -909,6 +916,205 @@ static void show_non_volatile_cache_page(unsigned char * resp, int len,
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("    <%s>\n", pcb_str);
         }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static const char * bms_status[] = {
+    "no scans active", 
+    "background medium scan is active", 
+    "pre-scan is active", 
+    "scan halted due to fatal error", 
+    "scan halted due to unusual pattern of error", 
+    "scan halted due to medium formatted without P-List", 
+    "scan halted - vendor specific cause", 
+    "scan halted due to temperature out of range", 
+    "scan suspended until BMS Interval Time expires", 
+};
+
+static const char * reassign_status[] = {
+    "No assignment needed",
+    "Reassignment pending receipt of Reassign command or Write command",
+    "LBA successfully reassigned by drive",
+    "Reassign status: Reserved [0x3]",
+    "Reassignment failed",
+    "LBA recovered via re-write",
+};
+
+static void show_background_scan_results_page(unsigned char * resp, int len,
+                                              int show_pcb, int verbose)
+{
+    int j, m, num, pl, pc, pcb;
+    unsigned char * ucp;
+    char str[128];
+
+    printf("Background scan results page (sbc-2) [0x15]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        switch (pc) {
+        case 0:
+            printf("  Power on time: ");
+            j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+            printf("%d minutes [%d:%d]\n", j, (j / 60), (j % 60));
+            break;
+            printf("    BMS status: ");
+            j = ucp[9];
+            if (j < (int)(sizeof(bms_status) / sizeof(bms_status[0])))
+                printf("%s\n", bms_status[j]);
+            else
+                printf("unknown [0x%x]\n", j);
+            printf("    Number of scan performed: %d\n",
+                   (ucp[10] << 8) + ucp[11]);
+            printf("    Progress of medium scan: %d%%\n",
+                   ((ucp[12] << 8) + ucp[13]) * 100 / 65536);
+
+            break;
+        default:
+            printf("  Medium scan parameter # %d\n", pc);
+            if (pl < 24) {
+                fprintf(stderr, "    parameter length >= 24 expected, "
+                        "got %d\n", pl);
+                break;
+            }
+            printf("    Power on time when error detected: ");
+            j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+            printf("%d minutes [%d:%d]\n", j, (j / 60), (j % 60));
+            j = (ucp[8] >> 4) & 0xf;
+            if (j < 
+                (int)(sizeof(reassign_status) / sizeof(reassign_status[0])))
+                printf("    %s\n", reassign_status[j]);
+            else
+                printf("    Reassign status: reserved [0x%x]\n", j);
+            printf("    sense key: %s   sk,asc,ascq: 0x%x,0x%x,0x%x\n",
+                   sg_get_sense_key_str(ucp[8] & 0xf, sizeof(str), str),
+                   ucp[8] & 0xf, ucp[9], ucp[10]);
+            printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
+                                                     sizeof(str), str));
+            if (verbose) {
+                printf("    vendor bytes [11 -> 15]: ");
+                for (m = 0; m < 5; ++m)
+                    printf("0x%02x ", ucp[11 + m]);
+                printf("\n");
+            }
+            printf("    LBA  (of medium error):  0x");
+            for (m = 0; m < 8; ++m)
+                printf("%02x", ucp[16 + m]);
+            printf("\n");
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("    <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static void show_sequential_access_page(unsigned char * resp, int len, 
+                                        int show_pcb, int verbose)
+{
+    int k, j, num, pl, pc, pcb;
+    unsigned char * ucp;
+    unsigned char * xp;
+    unsigned long long ull, gbytes;
+    char pcb_str[64];
+
+    printf("Sequential access device page (ssc-3)\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        k = pl - 4;
+        xp = ucp + 4;
+        if (k > (int)sizeof(ull)) {
+            xp += (k - sizeof(ull));
+            k = sizeof(ull);
+        }
+        ull = 0;
+        for (j = 0; j < k; ++j) {
+            if (j > 0)
+                ull <<= 8;
+            ull |= xp[j];
+        }
+        gbytes = ull / 1000000000;
+        switch (pc) {
+        case 0: 
+            printf("  Data bytes received with WRITE commands: %llu GB",
+                   gbytes);
+            if (verbose)
+                printf(" [%llu bytes]", ull);
+            printf("\n");
+            break;
+        case 1: 
+            printf("  Data bytes written to media by WRITE commands: %llu "
+                   "GB", gbytes);
+            if (verbose)
+                printf(" [%llu bytes]", ull);
+            printf("\n");
+            break;
+        case 2: 
+            printf("  Data bytes read from media by READ commands: %llu "
+                   "GB", gbytes);
+            if (verbose)
+                printf(" [%llu bytes]", ull);
+            printf("\n");
+            break;
+        case 3: 
+            printf("  Data bytes transferred by READ commands: %llu "
+                   "GB", gbytes);
+            if (verbose)
+                printf(" [%llu bytes]", ull);
+            printf("\n");
+            break;
+        case 4: 
+            printf("  Native capacity from BOP to EOD: %llu MB\n", ull);
+            break;
+        case 5: 
+            printf("  Native capacity from BOP to EW of current partition: "
+                   "%llu MB\n", ull);
+            break;
+        case 6: 
+            printf("  Minimum native capacity from EW to EOP of current "
+                   "partition: %llu MB\n", ull);
+            break;
+        case 7: 
+            printf("  Native capacity from BOP to current position: %llu "
+                   "MB\n", ull);
+            break;
+        case 8: 
+            printf("  Maximum native capacity in device object buffer: %llu "
+                   "MB\n", ull);
+            break;
+        case 0x100: 
+            if (ull > 0)
+                printf("  Cleaning action required\n");
+            else
+                printf("  Cleaning action not required (or completed)\n");
+            if (verbose)
+                printf("    cleaning value: %llu\n", ull);
+            break;
+        default:
+            if (pc >= 0x8000)
+                printf("  Vendor specific parameter [0x%x] value: %llu\n",
+                       pc, ull);
+            else
+                printf("  Reserved parameter [0x%x] value: %llu\n",
+                       pc, ull);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("  <%s>\n", pcb_str);
+        } else
+            printf("\n");
         num -= pl;
         ucp += pl;
     }
@@ -1014,7 +1220,8 @@ static void show_seagate_factory_page(unsigned char * resp, int len,
 }
 
 static void show_ascii_page(unsigned char * resp, int len, int show_pcb, 
-                            struct sg_simple_inquiry_resp * inq_dat)
+                            struct sg_simple_inquiry_resp * inq_dat,
+                            int verbose)
 {
     int k, num, done;
 
@@ -1057,8 +1264,22 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
                 break;
             }
         }
+        break;
     case 0xb:
         show_last_n_deferred_error_page(resp, len, show_pcb);
+        break;
+    case 0xc:
+        {
+            switch (inq_dat->peripheral_type) {
+            case 1: case 2: case 8:
+                /* tape, (printer) and medium changer type devices */
+                show_sequential_access_page(resp, len, show_pcb, verbose);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
         break;
     case 0xd:
         show_Temperature_page(resp, len, show_pcb, 1, 1);
@@ -1068,6 +1289,20 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
         break;
     case 0x10:
         show_self_test_page(resp, len, show_pcb);
+        break;
+    case 0x15:
+        {
+            switch (inq_dat->peripheral_type) {
+            case 0: case 4: case 7: case 0xe:
+                /* disk (direct access) type devices */
+                show_background_scan_results_page(resp, len, show_pcb,
+                                                  verbose);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
         break;
     case 0x17:
         {
@@ -1110,7 +1345,7 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
                 break;
             case 1: case 2: case 8:
                 /* streaming or medium changer devices */
-                // call ssc_device_status_log_page()
+                /* call ssc_device_status_log_page() */
                 break;
             default:
                 done = 0;
@@ -1156,7 +1391,7 @@ static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, pg_len;
+    int sg_fd, k, num, pg_len, res;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char rsp_buff[MX_ALLOC_LEN];
@@ -1271,9 +1506,9 @@ int main(int argc, char * argv[])
             fprintf(stderr, "log_select: not supported\n");
         return k ?  1 : 0;
     }
-    if (0 == do_logs(sg_fd, do_ppc, do_sp, pc, pg_code, paramp,
-                     rsp_buff, MX_ALLOC_LEN, 1, do_verbose))
-    {
+    res = do_logs(sg_fd, do_ppc, do_sp, pc, pg_code, paramp, rsp_buff,
+                  MX_ALLOC_LEN, 1, do_verbose);
+    if (0 == res) {
         pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
         if ((pg_len + 4) > MX_ALLOC_LEN) {
             printf("Only fetched %d bytes of response, truncate output\n",
@@ -1286,8 +1521,13 @@ int main(int argc, char * argv[])
             dStrHex((const char *)rsp_buff, pg_len + 4, 1);
         }
         else
-            show_ascii_page(rsp_buff, pg_len + 4, do_pcb, &inq_out);
-    }
+            show_ascii_page(rsp_buff, pg_len + 4, do_pcb, &inq_out,
+                            do_verbose);
+    } else if (SG_LIB_CAT_INVALID_OP == res)
+        fprintf(stderr, "log_sense: not supported\n");
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        fprintf(stderr, "log_sense: field in cdb illegal\n");
+
     if (do_all && (pg_len > 1)) {
         int my_len = pg_len - 1;
         unsigned char parr[256];
@@ -1311,7 +1551,8 @@ int main(int argc, char * argv[])
                     dStrHex((const char *)rsp_buff, pg_len + 4, 1);
                 }
                 else
-                    show_ascii_page(rsp_buff, pg_len + 4, do_pcb, &inq_out);
+                    show_ascii_page(rsp_buff, pg_len + 4, do_pcb, &inq_out,
+                                    do_verbose);
             }
         }
     }

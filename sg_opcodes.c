@@ -13,7 +13,7 @@
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004 D. Gilbert
+*  Copyright (C) 2004-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.16 20041210";
+static char * version_str = "0.17 20050309";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -43,8 +43,8 @@ static char * version_str = "0.16 20041210";
 
 static int peri_type = 0; /* ugly but not easy to pass to alpha compare */
 
-// <<<<<<<<<<<<<<< start of test code
-// #define TEST_CODE
+/* <<<<<<<<<<<<<<< start of test code */
+/* #define TEST_CODE */
 
 #ifdef TEST_CODE
 
@@ -88,7 +88,7 @@ static unsigned char dummy_1_cmd[] = {
 static unsigned char dummy_rsmft_r0 = 0xff;
 
 #endif
-// <<<<<<<<<<<<<<< end of test code
+/* <<<<<<<<<<<<<<< end of test code */
 
 
 /* Report Supported Operation Codes */
@@ -139,8 +139,10 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("Report supported operation codes", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     default:
         if (noisy | verbose) {
@@ -199,8 +201,10 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_LIB_CAT_CLEAN:
     case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3("Report supported task management fns", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
         return 0;
     default:
         if (noisy | verbose) {
@@ -251,18 +255,15 @@ static const char * scsi_ptype_strs[] = {
     "automation/driver interface",
     "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
+    "well known logical unit",
+    "no physical device on this lu",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
 {
     int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
 
-    if (0x1f == scsi_ptype)
-        return "no physical device on this lu";
-    else if (0x1e == scsi_ptype)
-        return "well known logical unit";
-    else
-        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 /* returns -1 when left < right, 0 when left == right, else returns 1 */

@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "October 2004" "sg3_utils-1.10" SG3_UTILS
+.TH SGP_DD "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
 .SH NAME
 sgp_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -120,11 +120,13 @@ Raw device partition information can often be found with
 .B fdisk(8)
 [the "-ul" argument is useful in this respect].
 .PP
-BYTES and BLOCKS may be followed by the following multiplicative suffixes:
-c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
-g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
-T *1,000,000,000,000 (the latter two can only be used for count, skip
-and seek values).
+BYTES and BLOCKS may be followed by one of these multiplicative suffixes:
+c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
+MB *1,000,000 . This pattern continues for "G", "T" and "P". The latter two
+suffixes can only be used for count, skip and seek values). Also a suffix of
+the form "x<n>" multiplies the leading number by <n>. These multiplicative
+suffixes are compatible with GNU's dd command (since 2002) which claims
+compliance with SI and with IEC 60027-2.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X". When hex numbers are given multipliers cannot be
@@ -154,7 +156,7 @@ which has a negative impact on other machine activity.
 .PP
 Looks quite similar in usage to dd:
 .PP
-   sgp_dd if=/dev/sg0 of=t bs=512 count=1M
+   sgp_dd if=/dev/sg0 of=t bs=512 count=1MB
 .PP
 This will copy 1 million 512 byte blocks from the device associated with
 /dev/sg0 (which should have 512 byte blocks) to a file called t.
@@ -168,7 +170,7 @@ reduced. Using a raw device to do something similar on a IDE disk:
 .PP
    raw /dev/raw/raw1 /dev/hda
 .br
-   sgp_dd if=/dev/raw/raw1 of=t bs=512 count=1M
+   sgp_dd if=/dev/raw/raw1 of=t bs=512 count=1MB
 .PP
 To copy a SCSI disk partition to an IDE disk partition:
 .PP
@@ -190,7 +192,7 @@ Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000-2004 Douglas Gilbert
+Copyright \(co 2000-2005 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
