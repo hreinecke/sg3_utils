@@ -99,7 +99,8 @@ in this package:
   3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
      sg_modes, sg_logs, sg_senddiag, sg_reset, sg_opcodes, sg_persist,
      sg_write_long, sg_read_long, sg_requests, sg_ses, sg_verify,
-     sg_emc_trespass, sg_luns, sg_sync, sg_prevent and sg_get_config
+     sg_emc_trespass, sg_luns, sg_sync, sg_prevent, sg_get_config,
+     sg_wr_mode, sg_rtpg and sg_reassign
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
@@ -316,6 +317,24 @@ use the Multi-Media command set (MMC 3,4,5) such as CDs and DVDs. Even
 though this is a SCSI command set it is commonly found on ATAPI, USB and
 ieee1394 transports.
 
+"sg_wr_mode" allows mode pages to be altered. It views a mode page as a
+string of bytes which may have been obtained from 'sg_modes -r'. There
+is also a facility to change mode pages in sginfo however the facility
+in sg_wr_mode is lower level and more general. [sginfo can only modify
+known fields in known (i.e. standard) mode pages.]
+
+"sg_rtpg" sends a REPORT TARGET PORT GROUPS SCSI command to the given device
+and decodes the response. Useful for dual ported devices especially if
+the access is asymmetric (i.e. one port on FC and the other on iSCSI).
+
+"sg_reassign" sends a REASSIGN BLOCKS SCSI command to the given device.
+This command is defined in SBC-2 so it is only relevant for direct
+access devices (e.g. a disk). It is intended to reassign one or more
+logical blocks addresses from defective parts of the media to blocks
+held in reserve. Blocks with recoverable errors will be reassigned
+automatically if the ARRE (for reads) and/or AWRE (for writes) bits
+are set in the "Read Write Error Recovery" mode page.
+
 
 4) Timing and testing
 ---------------------
@@ -437,4 +456,4 @@ user). It is available for Linux and other operating systems.
 See http://members.aol.com/plscsi .
 
 Doug Gilbert
-26th November 2004
+21st January 2005

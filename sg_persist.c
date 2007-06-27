@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.19 20041124";
+static char * version_str = "0.21 20041224";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -405,7 +405,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                        format_code);
             bump = 24;
             break;
-        case 7: /* Automation/Drive Interface Transport Protocol */
+        case 7: /* Automation/Drive Interface */
             printf("%s  ADT:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
@@ -670,7 +670,8 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
 }
 
 static int build_transportid(const char * inp, unsigned char * tid_arr,
-                             int * tid_arr_len, int * num_tids)
+                             int * tid_arr_len, int * num_tids,
+                             int max_arr_len)
 {
     int in_len, k, j, m;
     unsigned int h;
@@ -713,7 +714,7 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
             if ('#' == *lcp)
                 continue;
             k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-            if (in_len != k) {
+            if ((k < in_len) && ('#' != lcp[k])) {
                 fprintf(stderr, "build_transportid: syntax error at "
                         "line %d, pos %d\n", j + 1, m + k + 1);
                 return 1;
@@ -726,6 +727,11 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
                                 j + 1, (int)(lcp - line + 1));
                         return 1;
                     }
+                    if ((off + k) >= max_arr_len) {
+                        fprintf(stderr, "build_transportid: array length "
+                                "exceeded\n");
+                        return 1;
+                    }
                     tid_arr[off + k] = h;
                     lcp = strpbrk(lcp, " ,\t");
                     if (NULL == lcp)
@@ -734,6 +740,10 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
                     if ('\0' == *lcp)
                         break;
                 } else {
+                    if ('#' == *lcp) {
+                        --k;
+                        break;
+                    }
                     fprintf(stderr, "build_transportid: error in "
                             "line %d, at pos %d\n", j + 1,
                             (int)(lcp - line + 1));
@@ -757,7 +767,7 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
                     k + 1);
             return 1;
         }
-        for (k = 0; k < 1024; ++k) {
+        for (k = 0; k < max_arr_len; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
                     fprintf(stderr, "build_transportid: hex number larger "
@@ -782,6 +792,10 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
         *tid_arr_len = k;
         if (num_tids)
             *num_tids = 1;
+        if (k >= max_arr_len) {
+            fprintf(stderr, "build_transportid: array length exceeded\n");
+            return 1;
+        }
     }
     return 0;
 }
@@ -941,7 +955,8 @@ int main(int argc, char * argv[])
             memset(transportid_arr, 0, sizeof(transportid_arr));
             if (0 != build_transportid(optarg, transportid_arr, 
                                        &transportid_arr_len, 
-                                       &num_transportids)) {
+                                       &num_transportids,
+                                       sizeof(transportid_arr))) {
                 fprintf(stderr, "bad argument to '--transport-id'\n");
                 return 1;
             }

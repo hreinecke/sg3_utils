@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "0.36 20041117";
+static char * version_str = "0.37 20041209";
 
 #define ME "sg_logs: "
 
@@ -99,22 +99,22 @@ static void show_page_name(int page_no,
     /* first process log pages that do not depend on peripheral type */
     done = 1;
     switch (page_no) {
-    case 0x0 : printf("    0x00    Supported log pages\n"); break;
-    case 0x1 : printf("    0x01    Buffer over-run/under-run\n"); break;
-    case 0x2 : printf("    0x02    Error counters (write)\n"); break;
-    case 0x3 : printf("    0x03    Error counters (read)\n"); break;
-    case 0x4 : printf("    0x04    Error counters (read reverse)\n"); break;
-    case 0x5 : printf("    0x05    Error counters (verify)\n"); break;
-    case 0x6 : printf("    0x06    Non-medium errors\n"); break;
-    case 0x7 : printf("    0x07    Last n error events\n"); break;
-    case 0xb : printf("    0x0b    Last n deferred errors or "
+    case 0x0: printf("    0x00    Supported log pages\n"); break;
+    case 0x1: printf("    0x01    Buffer over-run/under-run\n"); break;
+    case 0x2: printf("    0x02    Error counters (write)\n"); break;
+    case 0x3: printf("    0x03    Error counters (read)\n"); break;
+    case 0x4: printf("    0x04    Error counters (read reverse)\n"); break;
+    case 0x5: printf("    0x05    Error counters (verify)\n"); break;
+    case 0x6: printf("    0x06    Non-medium errors\n"); break;
+    case 0x7: printf("    0x07    Last n error events\n"); break;
+    case 0xb: printf("    0x0b    Last n deferred errors or "
                 "asynchronous events\n"); break;
-    case 0xd : printf("    0x0d    Temperature\n"); break;
-    case 0xe : printf("    0x0e    Start-stop cycle counter\n"); break;
-    case 0xf : printf("    0x0f    Application client\n"); break;
-    case 0x10 : printf("    0x10    Self-test results\n"); break;
-    case 0x18 : printf("    0x18    Protocol specific port\n"); break;
-    case 0x2f : printf("    0x2f    Informational exceptions (SMART)\n");
+    case 0xd: printf("    0x0d    Temperature\n"); break;
+    case 0xe: printf("    0x0e    Start-stop cycle counter\n"); break;
+    case 0xf: printf("    0x0f    Application client\n"); break;
+    case 0x10: printf("    0x10    Self-test results\n"); break;
+    case 0x18: printf("    0x18    Protocol specific port\n"); break;
+    case 0x2f: printf("    0x2f    Informational exceptions (SMART)\n");
         break;
     default : done = 0; break;
     }
@@ -127,18 +127,28 @@ static void show_page_name(int page_no,
         /* disk (direct access) type devices */
         {
             switch (page_no) {
-            case 0x8 : printf("    0x08    Format status (sbc-2)\n"); break;
-            case 0x17 : printf("    0x17    Non-volatile cache (sbc-2)\n");
+            case 0x8:
+                printf("    0x08    Format status (sbc-2)\n");
                 break;
-            case 0x30 : printf("    0x30    Performance counters (Hitachi)"
-                               "\n");
+            case 0x15:
+                printf("    0x15    Background scan results (sbc-2)\n");
                 break;
-            case 0x37 : printf("    0x37    Cache (Seagate), Miscellaneous"
+            case 0x17:
+                printf("    0x17    Non-volatile cache (sbc-2)\n");
+                break;
+            case 0x30:
+                printf("    0x30    Performance counters (Hitachi)\n");
+                break;
+            case 0x37:
+                printf("    0x37    Cache (Seagate), Miscellaneous"
                                " (Hitachi)\n");
                 break;
-            case 0x3e : printf("    0x3e    Factory (Seagate/Hitachi)\n");
+            case 0x3e:
+                printf("    0x3e    Factory (Seagate/Hitachi)\n");
                 break;
-            default: done = 0; break;
+            default:
+                done = 0;
+                break;
             }
         }
         break;
@@ -146,19 +156,35 @@ static void show_page_name(int page_no,
         /* tape (streaming) and medium changer type devices */
         {
             switch (page_no) {
-            case 0xc : printf("    0x0c    Sequential Access (ssc-2)\n"); break;
-            case 0x2e : printf("    0x2e    Tape alerts (ssc-2)\n"); break;
-            default: done = 0; break;
+            case 0xc:
+                printf("    0x0c    Sequential Access (ssc-2)\n");
+                break;
+            case 0x2e:
+                printf("    0x2e    Tape alerts (ssc-2)\n");
+                break;
+            default:
+                done = 0;
+                break;
             }
         }
     case 0x12: /* Automation Device interface (ADC) */
         {
             switch (page_no) {
-            case 0x11 : printf("    0x11    DTD status (adc)\n"); break;
-            case 0x12 : printf("    0x12    Tape alert response (adc)\n"); break;
-            case 0x13 : printf("    0x13    Requested recovery (adc)\n"); break;
-            case 0x14 : printf("    0x14    Device statistics (adc)\n"); break;
-            default: done = 0; break;
+            case 0x11:
+                printf("    0x11    DTD status (adc)\n");
+                break;
+            case 0x12:
+                printf("    0x12    Tape alert response (adc)\n");
+                break;
+            case 0x13:
+                printf("    0x13    Requested recovery (adc)\n");
+                break;
+            case 0x14:
+                printf("    0x14    Device statistics (adc)\n");
+                break;
+            default:
+                done = 0;
+                break;
             }
         }
 

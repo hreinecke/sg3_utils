@@ -22,9 +22,9 @@ drafts support for this page has been flagged as mandatory. The '-i'
 option decodes this page.
 .PP
 If <scsi_device> exists and the SCSI INQUIRY fails (because the SG_IO
-ioctl is unknown) then an ATA IDENTITY is tried. If it succeeds then
+ioctl is unknown) then an ATA IDENTIFY is tried. If it succeeds then
 device identification strings are output. If the "-r" option is given
-then the 256 byte IDENTITY block is output in binary.
+then the 256 byte IDENTIFY block is output in binary.
 .PP
 The reference document used for interpreting an INQUIRY is T10/1416-D Revision 
 21a (9th November 2004) found at http://www.t10.org . Obsolete items in the
@@ -99,7 +99,7 @@ page response in hex use '-o=c0 -h'.
 .TP
 -r
 outputs the INQUIRY response in binary. If the SCSI INQUIRY has failed
-and an ATA IDENTITY succeeds then the 256 byte IDENTITY response is
+and an ATA IDENTIFY succeeds then the 256 byte IDENTIFY response is
 output in hex. Standard output should be redirected
 to a file or some other program that can process binary data.
 .TP

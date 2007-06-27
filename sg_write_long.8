@@ -1,4 +1,4 @@
-.TH SG_WRITE_LONG "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
+.TH SG_WRITE_LONG "8" "January 2005" "sg3_utils-1.12" SG3_UTILS
 .SH NAME
 sg_write_long \- send the SCSI command write long
 .SH SYNOPSIS
@@ -37,6 +37,8 @@ not given then a buffer of 0xff bytes is written.
 --lba=<num> | -l <num>
 the logical block address of the sector to corrupt. Defaults to lba 0
 which is a dangerous block to overwrite on a disk that is in use.
+Assumed to be in decimal unless prefixed with '0x'. Only 32 bit
+lbas currently supported.
 .TP
 --verbose | -v
 increase the degree of verbosity (debug messages).

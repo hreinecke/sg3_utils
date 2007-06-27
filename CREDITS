@@ -2,28 +2,28 @@ The author of sg3_utils would like to thank the following people who
 have made contributions:
 
 Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
-	written by Joerg Schilling). isosize is now found in the util-linux
-	package and in the archive directory of this package.
+        written by Joerg Schilling). isosize is now found in the util-linux
+        package and in the archive directory of this package.
 
 Clayton Weaver <cgweav at email dot com> contributed safe_strerror().
 
 Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
-	sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
-	sg_turs and sginfo
+        sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
+        sg_turs and sginfo
 
 Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
-	is based.
+        is based.
 
 F. Jansen: additions to sg_scan
 
 Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example 
-	programs for the original sg driver
+        programs for the original sg driver
 
 Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
-	Additions to sginfo and sg_map.
+        Additions to sginfo and sg_map.
 
 Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
-	page decoding in sg_inq (vendor specific: EMC) and sg_emc_trespass
+        page decoding in sg_inq (vendor specific: EMC) and sg_emc_trespass
         utility
 
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
@@ -32,16 +32,19 @@ Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
         values in sg_dd (and friends); also problems when reading /dev/null
 
 Peter Allworth <linsol at zeta dot org dot au> original dd clone design used by
-	sg3_utils's dd variants (e.g. sg_dd).
+        sg3_utils's dd variants (e.g. sg_dd).
 
 Saeed Bishara contributed sg_write_long
 
 Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
-	to sort defect list by head.
+        to sort defect list by head.
 
 Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific" 
-	data and "-6" switch for sg_modes
+        data and "-6" switch for sg_modes
+
+Christophe Varoqui <christophe dot varoqui at free dot fr> original sg_rtpg
+        [20041229]
 
 
 Doug Gilbert
-19th October 2004
+30th December 2004

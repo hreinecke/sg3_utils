@@ -30,7 +30,7 @@
 
    Note: This program requires sg version 2 or better.
 
-   Version 0.18 20030812
+   Version 0.19 20041203
         - additions for osst [Kurt Garloff <garloff at suse dot de>]
 */
 
@@ -273,9 +273,11 @@ int main(int argc, char * argv[])
         scan_dev_type("/dev/scd", MAX_SR_DEVS, 1, LIN_DEV_TYPE_SCD, 
                       last_sg_ind);
     if (do_all_s || do_st)
-        scan_dev_type("/dev/st", MAX_ST_DEVS, 1, LIN_DEV_TYPE_ST, last_sg_ind);
+        scan_dev_type("/dev/nst", MAX_ST_DEVS, 1, LIN_DEV_TYPE_ST,
+		      last_sg_ind);
     if (do_all_s || do_osst)
-        scan_dev_type("/dev/osst", MAX_OSST_DEVS, 1, LIN_DEV_TYPE_OSST, last_sg_ind);
+        scan_dev_type("/dev/osst", MAX_OSST_DEVS, 1, LIN_DEV_TYPE_OSST,
+		      last_sg_ind);
 
     for (k = 0; k <= last_sg_ind; ++k) {
         make_dev_name(fname, "/dev/sg", k, do_numeric);
@@ -303,7 +305,7 @@ int main(int argc, char * argv[])
                 printf("  %s", fname);
                 break;
             case LIN_DEV_TYPE_ST:
-                make_dev_name(fname, "/dev/st" , map_arr[k].oth_dev_num, 1);
+                make_dev_name(fname, "/dev/nst" , map_arr[k].oth_dev_num, 1);
                 printf("  %s", fname);
                 break;
             case LIN_DEV_TYPE_OSST:

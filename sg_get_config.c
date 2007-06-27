@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Douglas Gilbert.
+ * Copyright (c) 2004-2005 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.10 20041118";
+static char * version_str = "0.13 20050110";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -140,6 +140,8 @@ static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
             fprintf(stderr, "      get config: resid=%d\n", io_hdr.resid);
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+        if (verbose > 1)
+            sg_chk_n_print3("get config error", &io_hdr);
         return SG_LIB_CAT_INVALID_OP;
     default:
         if (verbose | noisy) {
@@ -156,24 +158,27 @@ static void usage()
     fprintf(stderr,
             "Usage: 'sg_get_config [--brief] [--help] [--hex] [--inner-hex] "
             "[--list]\n"
-            "                      [--rt=<num>] [--starting=<num>] [-v] [-V] "
-            "<device>'\n"
-            " where --brief     only give feature names of <device> (don't "
-            "decode features)\n"
-            "       --help      output usage message\n"
-            "       --hex       output response in hex\n"
-            "       --inner-hex decode to feature name, then output feature "
-            "in hex\n"
-            "       --list      list all known features and profiles "
+            "                      [--rt=<num>] [--starting=<num>] "
+            "[--verbose]\n"
+            "                      [--version] <device>'\n"
+            " where --brief | -b     only give feature names of <device> "
+            "(don't decode)\n"
+            "       --help | -h      output usage message\n"
+            "       --hex | -H       output response in hex\n"
+            "       --inner-hex | -i  decode to feature name, then output "
+            "features in hex\n"
+            "       --list | -l      list all known features + profiles "
             "(ignore <device>)\n"
-            "       --rt=<num>  0 -> all feature descriptors (regardless "
+            "       --rt=<num> | -r <num>\n"
+            "                 0 -> all feature descriptors (regardless "
             "of currency)\n"
-            "                   1 -> all current feature descriptors\n"
-            "                   2 -> only feature descriptor matching "
+            "                 1 -> all current feature descriptors\n"
+            "                 2 -> only feature descriptor matching "
             "'starting'\n"
-            "       --starting=<num>  starting from feature <num>\n"
-            "       --v         verbose\n"
-            "       --V         output version string\n");
+            "       --starting=<num> | -s <num>  starting from feature "
+            "<num>\n"
+            "       --verbose | -v   verbose\n"
+            "       --version | -V   output version string\n");
 }
 
 static const char * scsi_ptype_strs[] = {
@@ -193,9 +198,11 @@ static const char * scsi_ptype_strs[] = {
     "enclosure services device",
     "simplified direct access device",
     "optical card reader/writer device",
-    /* 0x10 */ "bridging expander",
+    /* 0x10 */ "bridge controller commands",
     "object based storage",
     "automation/driver interface",
+    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
+    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
@@ -230,11 +237,14 @@ static struct code_desc profile_desc_arr[] = {
         {0x12, "DVD-RAM"},
         {0x13, "DVD-RW restricted overwrite"},
         {0x14, "DVD-RW restricted recording"},
+        {0x15, "DVD-R dual layer sequental recording"},
+        {0x16, "DVD-R dual layer layer jump recording"},
         {0x1a, "DVD+RW"},
         {0x1b, "DVD+R"},
         {0x20, "DDCD-ROM"},
         {0x21, "DDCD-R"},
         {0x22, "DDCD-RW"},
+        {0x2b, "DVD+R double layer"},
         {0x40, "BD-ROM"},
         {0x41, "BD-R sequential recording"},
         {0x42, "BD-R random recording"},
@@ -286,6 +296,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x30, "Double density CD read"},
         {0x31, "Double density CD-R write"},
         {0x32, "Double density CD-RW write"},
+        {0x33, "Layer jump recording"},
         {0x37, "CD-RW media write support"},
         {0x3b, "DVD+R double layer"},
         {0x40, "BD read"},
@@ -600,8 +611,9 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      BUF=%d, Test write=%d, DVD-RW=%d\n",
-               !!(ucp[4] & 0x40), !!(ucp[4] & 0x4), !!(ucp[4] & 0x2));
+        printf("      BUF=%d, Dual-R=%d, Test write=%d, DVD-RW=%d\n",
+               !!(ucp[4] & 0x40), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
+               !!(ucp[4] & 0x2));
         break;
     case 0x37:     /* CD-RW media write support */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -699,7 +711,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         num = len - 4;
         n = sizeof(buff) - 1;
         n = ((num < n) ? num : n);
-        strncpy(buff, ucp + 4, n);
+        strncpy(buff, (const char *)(ucp + 4), n);
         buff[n] = '\0';
         printf("      Logical unit serial number: %s\n", buff);
         break;

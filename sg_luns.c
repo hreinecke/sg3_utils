@@ -28,7 +28,6 @@
  */
 
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,8 +37,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/time.h>
 #include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
@@ -50,7 +47,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.01 20041110";
+static char * version_str = "1.02 20041229";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -258,7 +255,8 @@ int main(int argc, char * argv[])
     }
     sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
-        perror(ME "open error");
+        fprintf(stderr, ME "open error: %s: ", device_name);
+        perror("");
         return 1;
     }
 

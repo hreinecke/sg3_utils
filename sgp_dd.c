@@ -17,7 +17,7 @@
 #include <sys/sysmacros.h>
 #include <sys/time.h>
 #include <linux/major.h>
-#include <linux/fs.h>
+#include <linux/fs.h>   /* <sys/mount.h> */
 #include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
@@ -26,7 +26,7 @@
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2004 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2005 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "5.20 20041102";
+static char * version_str = "5.21 20050113";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -294,36 +294,40 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
     return 0;
 }
 
-/* Return of 0 -> success, -1 -> failure */
+/* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
+/* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
 int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 {
-#ifdef BLKGETSIZE64
-    unsigned long long ull;
-
-    if (ioctl(sg_fd, BLKGETSIZE64, &ull) < 0) {
-
-        perror("BLKGETSIZE64 ioctl error");
-        return -1;
-    }
-    if (ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) {
+#ifdef BLKSSZGET
+    if ((ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) && (*sect_sz > 0)) {
         perror("BLKSSZGET ioctl error");
         return -1;
-    }
-    *num_sect = ((long long)ull / (long long)*sect_sz);
-#else
-    unsigned long ul;
+    } else {
+ #ifdef BLKGETSIZE64
+        unsigned long long ull;
 
-    if (ioctl(sg_fd, BLKGETSIZE, &ul) < 0) {
-        perror("BLKGETSIZE ioctl error");
-        return -1;
+        if (ioctl(sg_fd, BLKGETSIZE64, &ull) < 0) {
+
+            perror("BLKGETSIZE64 ioctl error");
+            return -1;
+        }
+        *num_sect = ((long long)ull / (long long)*sect_sz);
+ #else
+        unsigned long ul;
+
+        if (ioctl(sg_fd, BLKGETSIZE, &ul) < 0) {
+            perror("BLKGETSIZE ioctl error");
+            return -1;
+        }
+        *num_sect = (long long)ul;
+ #endif
     }
-    *num_sect = (long long)ul;
-    if (ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) {
-        perror("BLKSSZGET ioctl error");
-        return -1;
-    }
-#endif
     return 0;
+#else
+    *num_sect = 0;
+    *sect_sz = 0;
+    return -1;
+#endif
 }
 
 void * sig_listen_thread(void * v_clp)

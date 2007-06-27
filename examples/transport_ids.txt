@@ -6,7 +6,7 @@
 # they are well formed) use the verbose flag 3 times (i.e. "... -vvv ...").
 
 # Here is a simple example (for SPI) of a comma separted hex list:
-1,0,0,7,0,0,0,1
+1,0,0,7,0,0,0,1  	# SPI, initiator address=0x7, relative_port_num=1
 
         # Leading spaces and tabs before a '#' or ok
              

@@ -1,5 +1,4 @@
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,13 +8,11 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/time.h>
 #include "sg_include.h"
 #include "sg_lib.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004 D. Gilbert
+   *  Copyright (C) 2004-2005 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +27,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "5.36 20041106";
+static char * version_str = "1.04 20050118";
 
 #define WRITE_LONG_OPCODE 0x3F
 #define WRITE_LONG_CMD_LEN 10
@@ -76,22 +73,16 @@ static void usage()
 static int info_offset(unsigned char * sensep, int sb_len)
 {
     int resp_code;
-    const unsigned char * cup;
 
     if (sb_len < 8)
         return 0;
     resp_code = (0x7f & sensep[0]);
     if (resp_code>= 0x72) { /* descriptor format */
-        /* find Information descriptor */
-        if ((cup = sg_scsi_sense_desc_find(sensep, sb_len, 0x0))) {
-            if ((0 == cup[4]) && (0 == cup[5]) && (0 == cup[6]) &&
-                (0 == cup[7]) && (0 == cup[8]) && (0 == cup[9]))
-                return ((cup[10] << 8) + cup[11]);
-            else if ((0xff == cup[4]) && (0xff == cup[5]) &&
-                     (0xff == cup[6]) && (0xff == cup[7]) &&
-                     (0xff == cup[8]) && (0xff == cup[9]))
-                return ((cup[10] << 8) + cup[11] - (int)0x10000);
-        }
+       unsigned long long ull = 0;
+
+        /* if Information field, fetch it; contains signed number */
+        if (sg_get_sense_info_fld(sensep, sb_len, &ull))
+            return (int)(long long)ull;
     } else if (sensep[0] & 0x80) { /* fixed, valid set */
         if ((0 == sensep[3]) && (0 == sensep[4]))
             return ((sensep[5] << 8) + sensep[6]);
@@ -207,7 +198,8 @@ int main(int argc, char * argv[])
     }
     sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
-        perror(ME "open error");
+        fprintf(stderr, ME "open error: %s: ", device_name);
+        perror("");
         return 1;
     }
   

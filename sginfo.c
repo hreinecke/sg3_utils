@@ -13,7 +13,7 @@
  * -C    access Control Page.
  * -d    display defect lists (default format: index).
  * -D    access disconnect-reconnect page.
- * -e    access error recovery page.
+ * -e    access Read-Write error recovery page.
  * -E    access Control Extension page.
  * -f    access Format Device Page.
  * -Farg defect list format (-Flogical, -Fphysical, -Findex, -Fhead)
@@ -106,7 +106,7 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * sginfo_version_str = "sginfo version 2.07 [20041126]";
+static const char * sginfo_version_str = "sginfo version 2.09 [20050119]";
 
 #include <stdio.h>
 #include <string.h>
@@ -295,13 +295,13 @@ static const int mpage_ses_len = sizeof(mpage_ses) / sizeof(mpage_ses[0]);
 static char * transport_proto_arr[] =
 {
     "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-5)",
+    "Parallel SCSI (SPI-4)",
     "SSA (SSA-S3P)",
     "IEEE 1394 (SBP-3)",
     "Remote Direct Memory Access (RDMA)",
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface Transport Protocol (ADT)",
+    "Automation/Drive Interface (ADT)",
     "ATA Packet Interface (ATA/ATAPI-7)",
     "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"
@@ -1608,7 +1608,7 @@ static int disk_cache(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 20, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 21, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -1635,6 +1635,7 @@ static int disk_cache(struct mpage_info * mpi, const char * prefix)
     bitfield(pagestart + 12, "FSW", 1, 7);
     bitfield(pagestart + 12, "LBCSS", 1, 6);
     bitfield(pagestart + 12, "DRA", 1, 5);
+    bitfield(pagestart + 12, "NV_DIS", 1, 0);
     intfield(pagestart + 13, 1, "Number of Cache Segments");
     intfield(pagestart + 14, 2, "Cache Segment size");
     intfield(pagestart + 17, 3, "Non-Cache Segment size");
@@ -2317,7 +2318,7 @@ static int fcp_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 2, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -2328,7 +2329,6 @@ static int fcp_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
                mpi->page);
         printf("----------------------------------------------------\n");
     }
-    bitfield(pagestart + 2, "Protocol identifier", 0xf, 0);
     bitfield(pagestart + 3, "EPDC", 1, 0);
 
     if (x_interface && replace)
@@ -2343,7 +2343,7 @@ static int sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 2, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -2353,7 +2353,6 @@ static int sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
         printf("%s mode page (0x%x)\n", "SAS logical unit", mpi->page);
         printf("----------------------------------------------------\n");
     }
-    bitfield(pagestart + 2, "Protocol identifier", 0xf, 0);
     bitfield(pagestart + 2, "Transport Layer Retries", 1, 4);
 
     if (x_interface && replace)
@@ -2383,7 +2382,7 @@ static int fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 11, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 10, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -2394,7 +2393,6 @@ static int fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
                mpi->page);
         printf("----------------------------------------------------\n");
     }
-    bitfield(pagestart + 2, "Protocol identifier", 0xf, 0);
     bitfield(pagestart + 3, "DTFD", 1, 7);
     bitfield(pagestart + 3, "PLPB", 1, 6);
     bitfield(pagestart + 3, "DDIS", 1, 5);
@@ -2418,7 +2416,7 @@ static int spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     int status;
     unsigned char *pagestart;
 
-    status = setup_mode_page(mpi, 2, cbuffer, &pagestart);
+    status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
         return status;
 
@@ -2428,7 +2426,6 @@ static int spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
         printf("%s mode page (0x%x)\n", "SPI-4 port control", mpi->page);
         printf("-----------------------------------\n");
     }
-    bitfield(pagestart + 2, "Protocol identifier", 0xf, 0);
     intfield(pagestart + 4, 2, "Synchronous transfer time-out");
 
     if (x_interface && replace)
@@ -2438,6 +2435,7 @@ static int spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
+/* Protocol specific mode page for SAS, short format (subpage 0) */
 static int sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
@@ -2453,7 +2451,7 @@ static int sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
         printf("%s mode page (0x%x)\n", "SAS SSP port control", mpi->page);
         printf("-------------------------------------\n");
     }
-    bitfield(pagestart + 5, "Protocol identifier", 0xf, 0);
+    bitfield(pagestart + 2, "Ready LED meaning", 0x1, 4);
     intfield(pagestart + 4, 2, "I_T Nexus Loss time");
     intfield(pagestart + 6, 2, "Initiator response time-out");
 
@@ -2510,6 +2508,7 @@ static int spi4_margin_control(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
+/* Protocol specific mode page for SAS, phy control + discover (subpage 1) */
 static int sas_phy_control_discover(struct mpage_info * mpi, 
                                     const char * prefix)
 {
@@ -3262,7 +3261,8 @@ static int open_sg_io_dev(char * devname)
 
 static void usage(char *errtext)
 {
-    fprintf(stderr, "Error: sginfo - %s\n", errtext);
+    if (errtext)
+        fprintf(stderr, "Error: sginfo: %s\n", errtext);
     fprintf(stderr, "Usage: sginfo [-options] [device] [replacement_values]\n");
     fputs("\tAllowed options are:\n"
           "\t-6    Do 6 byte mode sense and select commands (def: 10 bytes).\n"
@@ -3272,7 +3272,7 @@ static void usage(char *errtext)
           "\t-C    Access Control Mode Page.\n"
           "\t-d    Display defect lists (default format: index).\n"
           "\t-D    Access Disconnect-Reconnect Page.\n"
-          "\t-e    Access Error Recovery page.\n"
+          "\t-e    Access Read-Write Error Recovery page.\n"
           "\t-E    Access Control Extension page.\n"
           "\t-f    Access Format Device Page.\n"
           "\t-Farg Format of the defect list:\n"
@@ -3324,7 +3324,7 @@ int main(int argc, char *argv[])
     int found = 0;
 
     if (argc < 2)
-        usage("too few arguments");
+        usage(NULL);
     memset(&mp_i, 0, sizeof(mp_i));
     while ((k = getopt(argc, argv, "6aAcCdDeEfgGiIlmMnNPRsSTvVXzF:t:u:")) !=
            EOF) {

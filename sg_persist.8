@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
+.TH SG_PERSIST "8" "December 2004" "sg3_utils-1.12" SG3_UTILS
 .SH NAME
 sg_persist \- use the Persistent Reservation In and Out SCSI commands
 to manipulate registrations and reservations
@@ -199,8 +199,9 @@ a transportID is required for the PROUT 'register and move' sub-command
 and is optional for the PROUT 'register' and 'register and ignore
 existing key' sub-commands. The latter two sub-commands can take multiple
 transportIDs in a list. The argument is '-' which indicates
-stdin should be read for the transportID(s). Empty lines and those starting
-with '#' are ignored. Leading spaces and tabs are ignored. All numbers
+stdin should be read for the transportID(s). Empty lines are ignored.
+Everything from and including a "#" on a line is ignored.
+Leading spaces and tabs are ignored. All numbers
 are assumed to be hexadecimal and can be separated by space, comma or
 tab. There can be one transportID per line. TranportIDs will be padded
 out with zeroes to 24 bytes which is the minimum length of a

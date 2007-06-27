@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2004 Douglas Gilbert.
+ * Copyright (c) 1999-2005 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,7 +67,7 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.03 20041114";
+static char * version_str = "1.05 20050120";
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -198,7 +198,6 @@ static const struct value_name_t normal_opcodes[] = {
     {0x82, 0, "Regenerate(16)"},
     {0x83, 0, "Extended copy"},
     {0x84, 0, "Receive copy results"},
-    {0x85, 0, "ATA command pass through(16)"},
     {0x86, 0, "Access control in"},
     {0x87, 0, "Access control out"},
     {0x88, 0, "Read(16)"},
@@ -214,10 +213,12 @@ static const struct value_name_t normal_opcodes[] = {
     {0x92, 1, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, 1, "Erase(16)"},
+    {0x98, 0, "ATA command pass through(16)"},  /* was 0x85 */
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
     {0xa0, 0, "Report luns"},
     {0xa1, 0, "ATA command pass through(12)"},
+    {0xa1, 5, "Blank"},
     {0xa2, 0, "Trusted computing in"},
     {0xa3, 0, "Maintenance in"},
     {0xa3, 5, "Send key"},
@@ -459,566 +460,573 @@ struct error_info2{
 
 static struct error_info2 additional2[] =
 {
-  {0x40,0x00,0x7f,"Ram failure [0x%x]"},
-  {0x40,0x80,0xff,"Diagnostic failure on component [0x%x]"},
-  {0x41,0x00,0xff,"Data path failure [0x%x]"},
-  {0x42,0x00,0xff,"Power-on or self-test failure [0x%x]"},
-  {0x4d,0x00,0xff,"Tagged overlapped commands [0x%x]"},
-  {0x70,0x00,0xff,"Decompression exception short algorithm id of 0x%x"},
-  {0, 0, 0, NULL}
+    {0x40,0x01,0x7f,"Ram failure [0x%x]"},
+    {0x40,0x80,0xff,"Diagnostic failure on component [0x%x]"},
+    {0x41,0x01,0xff,"Data path failure [0x%x]"},
+    {0x42,0x01,0xff,"Power-on or self-test failure [0x%x]"},
+    {0x4d,0x00,0xff,"Tagged overlapped commands [0x%x]"},
+    {0x70,0x00,0xff,"Decompression exception short algorithm id of 0x%x"},
+    {0, 0, 0, NULL}
 };
 
 static struct error_info additional[] =
 {
-  {0x00,0x00,"No additional sense information"},
-  {0x00,0x01,"Filemark detected"},
-  {0x00,0x02,"End-of-partition/medium detected"},
-  {0x00,0x03,"Setmark detected"},
-  {0x00,0x04,"Beginning-of-partition/medium detected"},
-  {0x00,0x05,"End-of-data detected"},
-  {0x00,0x06,"I/O process terminated"},
-  {0x00,0x11,"Audio play operation in progress"},
-  {0x00,0x12,"Audio play operation paused"},
-  {0x00,0x13,"Audio play operation successfully completed"},
-  {0x00,0x14,"Audio play operation stopped due to error"},
-  {0x00,0x15,"No current audio status to return"},
-  {0x00,0x16,"operation in progress"},
-  {0x00,0x17,"Cleaning requested"},
-  {0x00,0x18,"Erase operation in progress"},
-  {0x00,0x19,"Locate operation in progress"},
-  {0x00,0x1a,"Rewind operation in progress"},
-  {0x00,0x1b,"Set capacity operation in progress"},
-  {0x00,0x1c,"Verify operation in progress"},
-  {0x01,0x00,"No index/sector signal"},
-  {0x02,0x00,"No seek complete"},
-  {0x03,0x00,"Peripheral device write fault"},
-  {0x03,0x01,"No write current"},
-  {0x03,0x02,"Excessive write errors"},
-  {0x04,0x00,"Logical unit not ready, cause not reportable"},
-  {0x04,0x01,"Logical unit is in process of becoming ready"},
-  {0x04,0x02,"Logical unit not ready, " 
+    {0x00,0x00,"No additional sense information"},
+    {0x00,0x01,"Filemark detected"},
+    {0x00,0x02,"End-of-partition/medium detected"},
+    {0x00,0x03,"Setmark detected"},
+    {0x00,0x04,"Beginning-of-partition/medium detected"},
+    {0x00,0x05,"End-of-data detected"},
+    {0x00,0x06,"I/O process terminated"},
+    {0x00,0x11,"Audio play operation in progress"},
+    {0x00,0x12,"Audio play operation paused"},
+    {0x00,0x13,"Audio play operation successfully completed"},
+    {0x00,0x14,"Audio play operation stopped due to error"},
+    {0x00,0x15,"No current audio status to return"},
+    {0x00,0x16,"operation in progress"},
+    {0x00,0x17,"Cleaning requested"},
+    {0x00,0x18,"Erase operation in progress"},
+    {0x00,0x19,"Locate operation in progress"},
+    {0x00,0x1a,"Rewind operation in progress"},
+    {0x00,0x1b,"Set capacity operation in progress"},
+    {0x00,0x1c,"Verify operation in progress"},
+    {0x01,0x00,"No index/sector signal"},
+    {0x02,0x00,"No seek complete"},
+    {0x03,0x00,"Peripheral device write fault"},
+    {0x03,0x01,"No write current"},
+    {0x03,0x02,"Excessive write errors"},
+    {0x04,0x00,"Logical unit not ready, cause not reportable"},
+    {0x04,0x01,"Logical unit is in process of becoming ready"},
+    {0x04,0x02,"Logical unit not ready, " 
                 "initializing command required"},
-  {0x04,0x03,"Logical unit not ready, " 
+    {0x04,0x03,"Logical unit not ready, " 
                 "manual intervention required"},
-  {0x04,0x04,"Logical unit not ready, format in progress"},
-  {0x04,0x05,"Logical unit not ready, rebuild in progress"},
-  {0x04,0x06,"Logical unit not ready, recalculation in progress"},
-  {0x04,0x07,"Logical unit not ready, operation in progress"},
-  {0x04,0x08,"Logical unit not ready, long write in progress"},
-  {0x04,0x09,"Logical unit not ready, self-test in progress"},
-  {0x04,0x0a,"Logical unit " 
+    {0x04,0x04,"Logical unit not ready, format in progress"},
+    {0x04,0x05,"Logical unit not ready, rebuild in progress"},
+    {0x04,0x06,"Logical unit not ready, recalculation in progress"},
+    {0x04,0x07,"Logical unit not ready, operation in progress"},
+    {0x04,0x08,"Logical unit not ready, long write in progress"},
+    {0x04,0x09,"Logical unit not ready, self-test in progress"},
+    {0x04,0x0a,"Logical unit " 
                 "not accessible, asymmetric access state transition"},
-  {0x04,0x0b,"Logical unit " 
+    {0x04,0x0b,"Logical unit " 
                 "not accessible, target port in standby state"},
-  {0x04,0x0c,"Logical unit " 
+    {0x04,0x0c,"Logical unit " 
                 "not accessible, target port in unavailable state"},
-  {0x04,0x10,"Logical unit not ready, "
+    {0x04,0x10,"Logical unit not ready, "
                 "auxiliary memory not accessible"},
-  {0x04,0x11,"Logical unit not ready, "
+    {0x04,0x11,"Logical unit not ready, "
                 "notify (enable spinup) required"},
-  {0x04,0x12,"Logical unit not ready, offline"},
-  {0x05,0x00,"Logical unit does not respond to selection"},
-  {0x06,0x00,"No reference position found"},
-  {0x07,0x00,"Multiple peripheral devices selected"},
-  {0x08,0x00,"Logical unit communication failure"},
-  {0x08,0x01,"Logical unit communication time-out"},
-  {0x08,0x02,"Logical unit communication parity error"},
-  {0x08,0x03,"Logical unit communication CRC error (Ultra-DMA/32)"},
-  {0x08,0x04,"Unreachable copy target"},
-  {0x09,0x00,"Track following error"},
-  {0x09,0x01,"Tracking servo failure"},
-  {0x09,0x02,"Focus servo failure"},
-  {0x09,0x03,"Spindle servo failure"},
-  {0x09,0x04,"Head select fault"},
-  {0x0A,0x00,"Error log overflow"},
-  {0x0B,0x00,"Warning"},
-  {0x0B,0x01,"Warning - specified temperature exceeded"},
-  {0x0B,0x02,"Warning - enclosure degraded"},
-  {0x0C,0x00,"Write error"},
-  {0x0C,0x01,"Write error - recovered with auto reallocation"},
-  {0x0C,0x02,"Write error - auto reallocation failed"},
-  {0x0C,0x03,"Write error - recommend reassignment"},
-  {0x0C,0x04,"Compression check miscompare error"},
-  {0x0C,0x05,"Data expansion occurred during compression"},
-  {0x0C,0x06,"Block not compressible"},
-  {0x0C,0x07,"Write error - recovery needed"},
-  {0x0C,0x08,"Write error - recovery failed"},
-  {0x0C,0x09,"Write error - loss of streaming"},
-  {0x0C,0x0A,"Write error - padding blocks added"},
-  {0x0C,0x0B,"Auxiliary memory write error"},
-  {0x0C,0x0C,"Write error - unexpected unsolicited data"},
-  {0x0C,0x0D,"Write error - not enough unsolicited data"},
-  {0x0D,0x00,"Error detected by third party temporary initiator"},
-  {0x0D,0x01,"Third party device failure"},
-  {0x0D,0x02,"Copy target device not reachable"},
-  {0x0D,0x03,"Incorrect copy target device"},
-  {0x0D,0x04,"Copy target device underrun"},
-  {0x0D,0x05,"Copy target device overrun"},
-  {0x0E,0x00,"Invalid information unit"},
-  {0x0E,0x01,"Information unit too short"},
-  {0x0E,0x02,"Information unit too long"},
-  {0x10,0x00,"Id CRC or ECC error"},
-  {0x10,0x01,"Data block guard check failed"},
-  {0x10,0x02,"Data block application tag check failed"},
-  {0x10,0x03,"Data block reference tag check failed"},
-  {0x11,0x00,"Unrecovered read error"},
-  {0x11,0x01,"Read retries exhausted"},
-  {0x11,0x02,"Error too long to correct"},
-  {0x11,0x03,"Multiple read errors"},
-  {0x11,0x04,"Unrecovered read error - auto reallocate failed"},
-  {0x11,0x05,"L-EC uncorrectable error"},
-  {0x11,0x06,"CIRC unrecovered error"},
-  {0x11,0x07,"Data re-synchronization error"},
-  {0x11,0x08,"Incomplete block read"},
-  {0x11,0x09,"No gap found"},
-  {0x11,0x0A,"Miscorrected error"},
-  {0x11,0x0B,"Unrecovered read error - recommend reassignment"},
-  {0x11,0x0C,"Unrecovered read error - recommend rewrite the data"},
-  {0x11,0x0D,"De-compression CRC error"},
-  {0x11,0x0E,"Cannot decompress using declared algorithm"},
-  {0x11,0x0F,"Error reading UPC/EAN number"},
-  {0x11,0x10,"Error reading ISRC number"},
-  {0x11,0x11,"Read error - loss of streaming"},
-  {0x11,0x12,"Auxiliary memory read error"},
-  {0x11,0x13,"Read error - failed retransmission request"},
-  {0x12,0x00,"Address mark not found for id field"},
-  {0x13,0x00,"Address mark not found for data field"},
-  {0x14,0x00,"Recorded entity not found"},
-  {0x14,0x01,"Record not found"},
-  {0x14,0x02,"Filemark or setmark not found"},
-  {0x14,0x03,"End-of-data not found"},
-  {0x14,0x04,"Block sequence error"},
-  {0x14,0x05,"Record not found - recommend reassignment"},
-  {0x14,0x06,"Record not found - data auto-reallocated"},
-  {0x14,0x07,"Locate operation failure"},
-  {0x15,0x00,"Random positioning error"},
-  {0x15,0x01,"Mechanical positioning error"},
-  {0x15,0x02,"Positioning error detected by read of medium"},
-  {0x16,0x00,"Data synchronization mark error"},
-  {0x16,0x01,"Data sync error - data rewritten"},
-  {0x16,0x02,"Data sync error - recommend rewrite"},
-  {0x16,0x03,"Data sync error - data auto-reallocated"},
-  {0x16,0x04,"Data sync error - recommend reassignment"},
-  {0x17,0x00,"Recovered data with no error correction applied"},
-  {0x17,0x01,"Recovered data with retries"},
-  {0x17,0x02,"Recovered data with positive head offset"},
-  {0x17,0x03,"Recovered data with negative head offset"},
-  {0x17,0x04,"Recovered data with retries and/or circ applied"},
-  {0x17,0x05,"Recovered data using previous sector id"},
-  {0x17,0x06,"Recovered data without ecc - data auto-reallocated"},
-  {0x17,0x07,"Recovered data without ecc - recommend reassignment"},
-  {0x17,0x08,"Recovered data without ecc - recommend rewrite"},
-  {0x17,0x09,"Recovered data without ecc - data rewritten"},
-  {0x18,0x00,"Recovered data with error correction applied"},
-  {0x18,0x01,"Recovered data with error corr. & retries applied"},
-  {0x18,0x02,"Recovered data - data auto-reallocated"},
-  {0x18,0x03,"Recovered data with CIRC"},
-  {0x18,0x04,"Recovered data with L-EC"},
-  {0x18,0x05,"Recovered data - recommend reassignment"},
-  {0x18,0x06,"Recovered data - recommend rewrite"},
-  {0x18,0x07,"Recovered data with ecc - data rewritten"},
-  {0x18,0x08,"Recovered data with linking"},
-  {0x19,0x00,"Defect list error"},
-  {0x19,0x01,"Defect list not available"},
-  {0x19,0x02,"Defect list error in primary list"},
-  {0x19,0x03,"Defect list error in grown list"},
-  {0x1A,0x00,"Parameter list length error"},
-  {0x1B,0x00,"Synchronous data transfer error"},
-  {0x1C,0x00,"Defect list not found"},
-  {0x1C,0x01,"Primary defect list not found"},
-  {0x1C,0x02,"Grown defect list not found"},
-  {0x1D,0x00,"Miscompare during verify operation"},
-  {0x1E,0x00,"Recovered id with ecc correction"},
-  {0x1F,0x00,"Partial defect list transfer"},
-  {0x20,0x00,"Invalid command operation code"},
-  {0x20,0x01,"Access denied - initiator pending-enrolled"},
-  {0x20,0x02,"Access denied - no access rights"},
-  {0x20,0x03,"Access denied - no mgmt id key"},
-  {0x20,0x04,"Illegal command while in write capable state"},
-  {0x20,0x05,"Obsolete"},
-  {0x20,0x06,"Illegal command while in explicit address mode"},
-  {0x20,0x07,"Illegal command while in implicit address mode"},
-  {0x20,0x08,"Access denied - enrollment conflict"},
-  {0x20,0x09,"Access denied - invalid LU identifier"},
-  {0x20,0x0A,"Access denied - invalid proxy token"},
-  {0x20,0x0B,"Access denied - ACL LUN conflict"},
-  {0x21,0x00,"Logical block address out of range"},
-  {0x21,0x01,"Invalid element address"},
-  {0x21,0x02,"Invalid address for write"},
-  {0x22,0x00,"Illegal function (use 20 00,24 00,or 26 00)"},
-  {0x24,0x00,"Invalid field in cdb"},
-  {0x24,0x01,"CDB decryption error"},
-  {0x24,0x04,"Security audit value frozen"},
-  {0x24,0x05,"Security working key frozen"},
-  {0x24,0x06,"Nonce not unique"},
-  {0x24,0x07,"Nonce timestamp out of range"},
-  {0x25,0x00,"Logical unit not supported"},
-  {0x26,0x00,"Invalid field in parameter list"},
-  {0x26,0x01,"Parameter not supported"},
-  {0x26,0x02,"Parameter value invalid"},
-  {0x26,0x03,"Threshold parameters not supported"},
-  {0x26,0x04,"Invalid release of persistent reservation"},
-  {0x26,0x05,"Data decryption error"},
-  {0x26,0x06,"Too many target descriptors"},
-  {0x26,0x07,"Unsupported target descriptor type code"},
-  {0x26,0x08,"Too many segment descriptors"},
-  {0x26,0x09,"Unsupported segment descriptor type code"},
-  {0x26,0x0A,"Unexpected inexact segment"},
-  {0x26,0x0B,"Inline data length exceeded"},
-  {0x26,0x0C,"Invalid operation for copy source or destination"},
-  {0x26,0x0D,"Copy segment granularity violation"},
-  {0x26,0x0E,"Invalid parameter while port is enabled"},
-  {0x26,0x0F,"Invalid data-out buffer integrity"},
-  {0x27,0x00,"Write protected"},
-  {0x27,0x01,"Hardware write protected"},
-  {0x27,0x02,"Logical unit software write protected"},
-  {0x27,0x03,"Associated write protect"},
-  {0x27,0x04,"Persistent write protect"},
-  {0x27,0x05,"Permanent write protect"},
-  {0x27,0x06,"Conditional write protect"},
-  {0x28,0x00,"Not ready to ready change, medium may have changed"},
-  {0x28,0x01,"Import or export element accessed"},
-  {0x29,0x00,"Power on, reset, or bus device reset occurred"},
-  {0x29,0x01,"Power on occurred"},
-  {0x29,0x02,"SCSI bus reset occurred"},
-  {0x29,0x03,"Bus device reset function occurred"},
-  {0x29,0x04,"Device internal reset"},
-  {0x29,0x05,"Transceiver mode changed to single-ended"},
-  {0x29,0x06,"Transceiver mode changed to lvd"},
-  {0x29,0x07,"I_T nexus loss occurred"},
-  {0x2A,0x00,"Parameters changed"},
-  {0x2A,0x01,"Mode parameters changed"},
-  {0x2A,0x02,"Log parameters changed"},
-  {0x2A,0x03,"Reservations preempted"},
-  {0x2A,0x04,"Reservations released"},
-  {0x2A,0x05,"Registrations preempted"},
-  {0x2A,0x06,"Asymmetric access state changed"},
-  {0x2A,0x07,"Implicit asymmetric access state transition failed"},
-  {0x2A,0x08,"Priority changed"},
-  {0x2A,0x09,"Capacity data has changed"},
-  {0x2B,0x00,"Copy cannot execute since host cannot disconnect"},
-  {0x2C,0x00,"Command sequence error"},
-  {0x2C,0x01,"Too many windows specified"},
-  {0x2C,0x02,"Invalid combination of windows specified"},
-  {0x2C,0x03,"Current program area is not empty"},
-  {0x2C,0x04,"Current program area is empty"},
-  {0x2C,0x05,"Illegal power condition request"},
-  {0x2C,0x06,"Persistent prevent conflict"},
-  {0x2C,0x07,"Previous busy status"},
-  {0x2C,0x08,"Previous task set full status"},
-  {0x2C,0x09,"Previous reservation conflict status"},
-  {0x2C,0x0A,"Partition or collection contains user objects"},
-  {0x2C,0x0B,"Not reserved"},
-  {0x2D,0x00,"Overwrite error on update in place"},
-  {0x2E,0x00,"Insufficient time for operation"},
-  {0x2F,0x00,"Commands cleared by another initiator"},
-  {0x30,0x00,"Incompatible medium installed"},
-  {0x30,0x01,"Cannot read medium - unknown format"},
-  {0x30,0x02,"Cannot read medium - incompatible format"},
-  {0x30,0x03,"Cleaning cartridge installed"},
-  {0x30,0x04,"Cannot write medium - unknown format"},
-  {0x30,0x05,"Cannot write medium - incompatible format"},
-  {0x30,0x06,"Cannot format medium - incompatible medium"},
-  {0x30,0x07,"Cleaning failure"},
-  {0x30,0x08,"Cannot write - application code mismatch"},
-  {0x30,0x09,"Current session not fixated for append"},
-  {0x30,0x0A,"Cleaning request rejected"},
-  {0x30,0x0C,"WORM medium, overwrite attempted"},
-  {0x30,0x10,"Medium not formatted"},
-  {0x31,0x00,"Medium format corrupted"},
-  {0x31,0x01,"Format command failed"},
-  {0x31,0x02,"Zoned formatting failed due to spare linking"},
-  {0x32,0x00,"No defect spare location available"},
-  {0x32,0x01,"Defect list update failure"},
-  {0x33,0x00,"Tape length error"},
-  {0x34,0x00,"Enclosure failure"},
-  {0x35,0x00,"Enclosure services failure"},
-  {0x35,0x01,"Unsupported enclosure function"},
-  {0x35,0x02,"Enclosure services unavailable"},
-  {0x35,0x03,"Enclosure services transfer failure"},
-  {0x35,0x04,"Enclosure services transfer refused"},
-  {0x35,0x05,"Enclosure services checksum error"},
-  {0x36,0x00,"Ribbon,ink,or toner failure"},
-  {0x37,0x00,"Rounded parameter"},
-  {0x38,0x00,"Event status notification"},
-  {0x38,0x02,"Esn - power management class event"},
-  {0x38,0x04,"Esn - media class event"},
-  {0x38,0x06,"Esn - device busy class event"},
-  {0x39,0x00,"Saving parameters not supported"},
-  {0x3A,0x00,"Medium not present"},
-  {0x3A,0x01,"Medium not present - tray closed"},
-  {0x3A,0x02,"Medium not present - tray open"},
-  {0x3A,0x03,"Medium not present - loadable"},
-  {0x3A,0x04,"Medium not present - medium auxiliary memory accessible"},
-  {0x3B,0x00,"Sequential positioning error"},
-  {0x3B,0x01,"Tape position error at beginning-of-medium"},
-  {0x3B,0x02,"Tape position error at end-of-medium"},
-  {0x3B,0x03,"Tape or electronic vertical forms unit not ready, "},
-  {0x3B,0x04,"Slew failure"},
-  {0x3B,0x05,"Paper jam"},
-  {0x3B,0x06,"Failed to sense top-of-form"},
-  {0x3B,0x07,"Failed to sense bottom-of-form"},
-  {0x3B,0x08,"Reposition error"},
-  {0x3B,0x09,"Read past end of medium"},
-  {0x3B,0x0A,"Read past beginning of medium"},
-  {0x3B,0x0B,"Position past end of medium"},
-  {0x3B,0x0C,"Position past beginning of medium"},
-  {0x3B,0x0D,"Medium destination element full"},
-  {0x3B,0x0E,"Medium source element empty"},
-  {0x3B,0x0F,"End of medium reached"},
-  {0x3B,0x11,"Medium magazine not accessible"},
-  {0x3B,0x12,"Medium magazine removed"},
-  {0x3B,0x13,"Medium magazine inserted"},
-  {0x3B,0x14,"Medium magazine locked"},
-  {0x3B,0x15,"Medium magazine unlocked"},
-  {0x3B,0x16,"Mechanical positioning or changer error"},
-  {0x3B,0x17,"Read past end of user object"},
-  {0x3D,0x00,"Invalid bits in identify message"},
-  {0x3E,0x00,"Logical unit has not self-configured yet"},
-  {0x3E,0x01,"Logical unit failure"},
-  {0x3E,0x02,"Timeout on logical unit"},
-  {0x3E,0x03,"Logical unit failed self-test"},
-  {0x3E,0x04,"Logical unit unable to update self-test log"},
-  {0x3F,0x00,"Target operating conditions have changed"},
-  {0x3F,0x01,"Microcode has been changed"},
-  {0x3F,0x02,"Changed operating definition"},
-  {0x3F,0x03,"Inquiry data has changed"},
-  {0x3F,0x04,"Component device attached"},
-  {0x3F,0x05,"Device identifier changed"},
-  {0x3F,0x06,"Redundancy group created or modified"},
-  {0x3F,0x07,"Redundancy group deleted"},
-  {0x3F,0x08,"Spare created or modified"},
-  {0x3F,0x09,"Spare deleted"},
-  {0x3F,0x0A,"Volume set created or modified"},
-  {0x3F,0x0B,"Volume set deleted"},
-  {0x3F,0x0C,"Volume set deassigned"},
-  {0x3F,0x0D,"Volume set reassigned"},
-  {0x3F,0x0E,"Reported luns data has changed"},
-  {0x3F,0x10,"Medium loadable"},
-  {0x3F,0x11,"Medium auxiliary memory accessible"},
-  /*
-   * ASC 0x40, 0x41 and 0x42 overridden by "additional2" array entries
-   * so there is no need to have them here.
-   */
-  /* {0x40,0x00,D,"Ram failure (should use 40 nn)"}, */
-  /* {0x40,0x80,SC_ALL_DEVS,"Diagnostic failure on component nn (80h-ffh)"}, */
-  /* {0x41,0x00,D,"Data path failure (should use 40 nn)"}, */
-  {0x42,0x00,"Power-on or self-test failure (should use 40 nn)"},
-  {0x43,0x00,"Message error"},
-  {0x44,0x00,"Internal target failure"},
-  {0x45,0x00,"Select or reselect failure"},
-  {0x46,0x00,"Unsuccessful soft reset"},
-  {0x47,0x00,"SCSI parity error"},
-  {0x47,0x01,"Data phase CRC error detected"},
-  {0x47,0x02,"SCSI parity error detected during st data phase"},
-  {0x47,0x03,"Information unit CRC error detected"},
-  {0x47,0x04,"Asynchronous information protection error detected"},
-  {0x47,0x05,"Protocol service CRC error"},
-  {0x47,0x7F,"Some commands cleared by iSCSI protocol event"},
-  {0x48,0x00,"Initiator detected error message received"},
-  {0x49,0x00,"Invalid message error"},
-  {0x4A,0x00,"Command phase error"},
-  {0x4B,0x00,"Data phase error"},
-  {0x4B,0x01,"Invalid target port transfer tag received"},
-  {0x4B,0x02,"Too much write data"},
-  {0x4B,0x03,"Ack/nak timeout"},
-  {0x4B,0x04,"Nak received"},
-  {0x4B,0x05,"Data offset error"},
-  {0x4B,0x06,"Initiator response timeout"},
-  {0x4C,0x00,"Logical unit failed self-configuration"},
-  /*
-   * ASC 0x4D overridden by an "additional2" array entry
-   * so there is no need to have them here.
-   */
-  /* {0x4D,0x00,SC_ALL_DEVS,"Tagged overlapped commands (nn = queue tag)"}, */
-  {0x4E,0x00,"Overlapped commands attempted"},
-  {0x50,0x00,"Write append error"},
-  {0x50,0x01,"Write append position error"},
-  {0x50,0x02,"Position error related to timing"},
-  {0x51,0x00,"Erase failure"},
-  {0x51,0x01,"Erase failure - incomplete erase operation detected"},
-  {0x52,0x00,"Cartridge fault"},
-  {0x53,0x00,"Media load or eject failed"},
-  {0x53,0x01,"Unload tape failure"},
-  {0x53,0x02,"Medium removal prevented"},
-  {0x54,0x00,"SCSI to host system interface failure"},
-  {0x55,0x00,"System resource failure"},
-  {0x55,0x01,"System buffer full"},
-  {0x55,0x02,"Insufficient reservation resources"},
-  {0x55,0x03,"Insufficient resources"},
-  {0x55,0x04,"Insufficient registration resources"},
-  {0x55,0x05,"Insufficient access control resources"},
-  {0x55,0x06,"Auxiliary memory out of space"},
-  {0x55,0x07,"Quota error"},
-  {0x57,0x00,"Unable to recover table-of-contents"},
-  {0x58,0x00,"Generation does not exist"},
-  {0x59,0x00,"Updated block read"},
-  {0x5A,0x00,"Operator request or state change input"},
-  {0x5A,0x01,"Operator medium removal request"},
-  {0x5A,0x02,"Operator selected write protect"},
-  {0x5A,0x03,"Operator selected write permit"},
-  {0x5B,0x00,"Log exception"},
-  {0x5B,0x01,"Threshold condition met"},
-  {0x5B,0x02,"Log counter at maximum"},
-  {0x5B,0x03,"Log list codes exhausted"},
-  {0x5C,0x00,"Rpl status change"},
-  {0x5C,0x01,"Spindles synchronized"},
-  {0x5C,0x02,"Spindles not synchronized"},
-  {0x5D,0x00,"Failure prediction threshold exceeded"},
-  {0x5D,0x01,"Media failure prediction threshold exceeded"},
-  {0x5D,0x02,"Logical unit failure prediction threshold exceeded"},
-  {0x5D,0x03,"spare area exhaustion prediction threshold exceeded"},
-  {0x5D,0x10,"Hardware impending failure general hard drive failure"},
-  {0x5D,0x11,"Hardware impending failure drive error rate too high" },
-  {0x5D,0x12,"Hardware impending failure data error rate too high" },
-  {0x5D,0x13,"Hardware impending failure seek error rate too high" },
-  {0x5D,0x14,"Hardware impending failure too many block reassigns"},
-  {0x5D,0x15,"Hardware impending failure access times too high" },
-  {0x5D,0x16,"Hardware impending failure start unit times too high" },
-  {0x5D,0x17,"Hardware impending failure channel parametrics"},
-  {0x5D,0x18,"Hardware impending failure controller detected"},
-  {0x5D,0x19,"Hardware impending failure throughput performance"},
-  {0x5D,0x1A,"Hardware impending failure seek time performance"},
-  {0x5D,0x1B,"Hardware impending failure spin-up retry count"},
-  {0x5D,0x1C,"Hardware impending failure drive calibration retry count"},
-  {0x5D,0x20,"Controller impending failure general hard drive failure"},
-  {0x5D,0x21,"Controller impending failure drive error rate too high" },
-  {0x5D,0x22,"Controller impending failure data error rate too high" },
-  {0x5D,0x23,"Controller impending failure seek error rate too high" },
-  {0x5D,0x24,"Controller impending failure too many block reassigns"},
-  {0x5D,0x25,"Controller impending failure access times too high" },
-  {0x5D,0x26,"Controller impending failure start unit times too high" },
-  {0x5D,0x27,"Controller impending failure channel parametrics"},
-  {0x5D,0x28,"Controller impending failure controller detected"},
-  {0x5D,0x29,"Controller impending failure throughput performance"},
-  {0x5D,0x2A,"Controller impending failure seek time performance"},
-  {0x5D,0x2B,"Controller impending failure spin-up retry count"},
-  {0x5D,0x2C,"Controller impending failure drive calibration retry count"},
-  {0x5D,0x30,"Data channel impending failure general hard drive failure"},
-  {0x5D,0x31,"Data channel impending failure drive error rate too high" },
-  {0x5D,0x32,"Data channel impending failure data error rate too high" },
-  {0x5D,0x33,"Data channel impending failure seek error rate too high" },
-  {0x5D,0x34,"Data channel impending failure too many block reassigns"},
-  {0x5D,0x35,"Data channel impending failure access times too high" },
-  {0x5D,0x36,"Data channel impending failure start unit times too high" },
-  {0x5D,0x37,"Data channel impending failure channel parametrics"},
-  {0x5D,0x38,"Data channel impending failure controller detected"},
-  {0x5D,0x39,"Data channel impending failure throughput performance"},
-  {0x5D,0x3A,"Data channel impending failure seek time performance"},
-  {0x5D,0x3B,"Data channel impending failure spin-up retry count"},
-  {0x5D,0x3C,"Data channel impending failure drive calibration retry count"},
-  {0x5D,0x40,"Servo impending failure general hard drive failure"},
-  {0x5D,0x41,"Servo impending failure drive error rate too high" },
-  {0x5D,0x42,"Servo impending failure data error rate too high" },
-  {0x5D,0x43,"Servo impending failure seek error rate too high" },
-  {0x5D,0x44,"Servo impending failure too many block reassigns"},
-  {0x5D,0x45,"Servo impending failure access times too high" },
-  {0x5D,0x46,"Servo impending failure start unit times too high" },
-  {0x5D,0x47,"Servo impending failure channel parametrics"},
-  {0x5D,0x48,"Servo impending failure controller detected"},
-  {0x5D,0x49,"Servo impending failure throughput performance"},
-  {0x5D,0x4A,"Servo impending failure seek time performance"},
-  {0x5D,0x4B,"Servo impending failure spin-up retry count"},
-  {0x5D,0x4C,"Servo impending failure drive calibration retry count"},
-  {0x5D,0x50,"Spindle impending failure general hard drive failure"},
-  {0x5D,0x51,"Spindle impending failure drive error rate too high" },
-  {0x5D,0x52,"Spindle impending failure data error rate too high" },
-  {0x5D,0x53,"Spindle impending failure seek error rate too high" },
-  {0x5D,0x54,"Spindle impending failure too many block reassigns"},
-  {0x5D,0x55,"Spindle impending failure access times too high" },
-  {0x5D,0x56,"Spindle impending failure start unit times too high" },
-  {0x5D,0x57,"Spindle impending failure channel parametrics"},
-  {0x5D,0x58,"Spindle impending failure controller detected"},
-  {0x5D,0x59,"Spindle impending failure throughput performance"},
-  {0x5D,0x5A,"Spindle impending failure seek time performance"},
-  {0x5D,0x5B,"Spindle impending failure spin-up retry count"},
-  {0x5D,0x5C,"Spindle impending failure drive calibration retry count"},
-  {0x5D,0x60,"Firmware impending failure general hard drive failure"},
-  {0x5D,0x61,"Firmware impending failure drive error rate too high" },
-  {0x5D,0x62,"Firmware impending failure data error rate too high" },
-  {0x5D,0x63,"Firmware impending failure seek error rate too high" },
-  {0x5D,0x64,"Firmware impending failure too many block reassigns"},
-  {0x5D,0x65,"Firmware impending failure access times too high" },
-  {0x5D,0x66,"Firmware impending failure start unit times too high" },
-  {0x5D,0x67,"Firmware impending failure channel parametrics"},
-  {0x5D,0x68,"Firmware impending failure controller detected"},
-  {0x5D,0x69,"Firmware impending failure throughput performance"},
-  {0x5D,0x6A,"Firmware impending failure seek time performance"},
-  {0x5D,0x6B,"Firmware impending failure spin-up retry count"},
-  {0x5D,0x6C,"Firmware impending failure drive calibration retry count"},
-  {0x5D,0xFF,"Failure prediction threshold exceeded (false)"},
-  {0x5E,0x00,"Low power condition on"},
-  {0x5E,0x01,"Idle condition activated by timer"},
-  {0x5E,0x02,"Standby condition activated by timer"},
-  {0x5E,0x03,"Idle condition activated by command"},
-  {0x5E,0x04,"Standby condition activated by command"},
-  {0x5E,0x41,"Power state change to active"},
-  {0x5E,0x42,"Power state change to idle"},
-  {0x5E,0x43,"Power state change to standby"},
-  {0x5E,0x45,"Power state change to sleep"},
-  {0x5E,0x47,"Power state change to device control"},
-  {0x60,0x00,"Lamp failure"},
-  {0x61,0x00,"Video acquisition error"},
-  {0x61,0x01,"Unable to acquire video"},
-  {0x61,0x02,"Out of focus"},
-  {0x62,0x00,"Scan head positioning error"},
-  {0x63,0x00,"End of user area encountered on this track"},
-  {0x63,0x01,"Packet does not fit in available space"},
-  {0x64,0x00,"Illegal mode for this track"},
-  {0x64,0x01,"Invalid packet size"},
-  {0x65,0x00,"Voltage fault"},
-  {0x66,0x00,"Automatic document feeder cover up"},
-  {0x66,0x01,"Automatic document feeder lift up"},
-  {0x66,0x02,"Document jam in automatic document feeder"},
-  {0x66,0x03,"Document miss feed automatic in document feeder"},
-  {0x67,0x00,"Configuration failure"},
-  {0x67,0x01,"Configuration of incapable logical units failed"},
-  {0x67,0x02,"Add logical unit failed"},
-  {0x67,0x03,"Modification of logical unit failed"},
-  {0x67,0x04,"Exchange of logical unit failed"},
-  {0x67,0x05,"Remove of logical unit failed"},
-  {0x67,0x06,"Attachment of logical unit failed"},
-  {0x67,0x07,"Creation of logical unit failed"},
-  {0x67,0x08,"Assign failure occurred"},
-  {0x67,0x09,"Multiply assigned logical unit"},
-  {0x67,0x0A,"Set target port groups command failed"},
-  {0x68,0x00,"Logical unit not configured"},
-  {0x69,0x00,"Data loss on logical unit"},
-  {0x69,0x01,"Multiple logical unit failures"},
-  {0x69,0x02,"Parity/data mismatch"},
-  {0x6A,0x00,"Informational, refer to log"},
-  {0x6B,0x00,"State change has occurred"},
-  {0x6B,0x01,"Redundancy level got better"},
-  {0x6B,0x02,"Redundancy level got worse"},
-  {0x6C,0x00,"Rebuild failure occurred"},
-  {0x6D,0x00,"Recalculate failure occurred"},
-  {0x6E,0x00,"Command to logical unit failed"},
-  {0x6F,0x00,"Copy protection key exchange failure - authentication failure"},
-  {0x6F,0x01,"Copy protection key exchange failure - key not present"},
-  {0x6F,0x02,"Copy protection key exchange failure - key not established"},
-  {0x6F,0x03,"Read of scrambled sector without authentication"},
-  {0x6F,0x04,"Media region code is mismatched to logical unit region"},
-  {0x6F,0x05,"Drive region must be permanent/region reset count error"},
-  /*
-   * ASC 0x70 overridden by an "additional2" array entry
-   * so there is no need to have them here.
-   */
-  /* {0x70,0x00,T,"Decompression exception short algorithm id of nn"}, */
-  {0x71,0x00,"Decompression exception long algorithm id"},
-  {0x72,0x00,"Session fixation error"},
-  {0x72,0x01,"Session fixation error writing lead-in"},
-  {0x72,0x02,"Session fixation error writing lead-out"},
-  {0x72,0x03,"Session fixation error - incomplete track in session"},
-  {0x72,0x04,"Empty or partially written reserved track"},
-  {0x72,0x05,"No more track reservations allowed"},
-  {0x73,0x00,"Cd control error"},
-  {0x73,0x01,"Power calibration area almost full"},
-  {0x73,0x02,"Power calibration area is full"},
-  {0x73,0x03,"Power calibration area error"},
-  {0x73,0x04,"Program memory area update failure"},
-  {0x73,0x05,"Program memory area is full"},
-  {0x73,0x06,"RMA/PMA is full"},
-  {0, 0, NULL}
+    {0x04,0x12,"Logical unit not ready, offline"},
+    {0x05,0x00,"Logical unit does not respond to selection"},
+    {0x06,0x00,"No reference position found"},
+    {0x07,0x00,"Multiple peripheral devices selected"},
+    {0x08,0x00,"Logical unit communication failure"},
+    {0x08,0x01,"Logical unit communication time-out"},
+    {0x08,0x02,"Logical unit communication parity error"},
+    {0x08,0x03,"Logical unit communication CRC error (Ultra-DMA/32)"},
+    {0x08,0x04,"Unreachable copy target"},
+    {0x09,0x00,"Track following error"},
+    {0x09,0x01,"Tracking servo failure"},
+    {0x09,0x02,"Focus servo failure"},
+    {0x09,0x03,"Spindle servo failure"},
+    {0x09,0x04,"Head select fault"},
+    {0x0A,0x00,"Error log overflow"},
+    {0x0B,0x00,"Warning"},
+    {0x0B,0x01,"Warning - specified temperature exceeded"},
+    {0x0B,0x02,"Warning - enclosure degraded"},
+    {0x0C,0x00,"Write error"},
+    {0x0C,0x01,"Write error - recovered with auto reallocation"},
+    {0x0C,0x02,"Write error - auto reallocation failed"},
+    {0x0C,0x03,"Write error - recommend reassignment"},
+    {0x0C,0x04,"Compression check miscompare error"},
+    {0x0C,0x05,"Data expansion occurred during compression"},
+    {0x0C,0x06,"Block not compressible"},
+    {0x0C,0x07,"Write error - recovery needed"},
+    {0x0C,0x08,"Write error - recovery failed"},
+    {0x0C,0x09,"Write error - loss of streaming"},
+    {0x0C,0x0A,"Write error - padding blocks added"},
+    {0x0C,0x0B,"Auxiliary memory write error"},
+    {0x0C,0x0C,"Write error - unexpected unsolicited data"},
+    {0x0C,0x0D,"Write error - not enough unsolicited data"},
+    {0x0D,0x00,"Error detected by third party temporary initiator"},
+    {0x0D,0x01,"Third party device failure"},
+    {0x0D,0x02,"Copy target device not reachable"},
+    {0x0D,0x03,"Incorrect copy target device"},
+    {0x0D,0x04,"Copy target device underrun"},
+    {0x0D,0x05,"Copy target device overrun"},
+    {0x0E,0x00,"Invalid information unit"},
+    {0x0E,0x01,"Information unit too short"},
+    {0x0E,0x02,"Information unit too long"},
+    {0x10,0x00,"Id CRC or ECC error"},
+    {0x10,0x01,"Data block guard check failed"},
+    {0x10,0x02,"Data block application tag check failed"},
+    {0x10,0x03,"Data block reference tag check failed"},
+    {0x11,0x00,"Unrecovered read error"},
+    {0x11,0x01,"Read retries exhausted"},
+    {0x11,0x02,"Error too long to correct"},
+    {0x11,0x03,"Multiple read errors"},
+    {0x11,0x04,"Unrecovered read error - auto reallocate failed"},
+    {0x11,0x05,"L-EC uncorrectable error"},
+    {0x11,0x06,"CIRC unrecovered error"},
+    {0x11,0x07,"Data re-synchronization error"},
+    {0x11,0x08,"Incomplete block read"},
+    {0x11,0x09,"No gap found"},
+    {0x11,0x0A,"Miscorrected error"},
+    {0x11,0x0B,"Unrecovered read error - recommend reassignment"},
+    {0x11,0x0C,"Unrecovered read error - recommend rewrite the data"},
+    {0x11,0x0D,"De-compression CRC error"},
+    {0x11,0x0E,"Cannot decompress using declared algorithm"},
+    {0x11,0x0F,"Error reading UPC/EAN number"},
+    {0x11,0x10,"Error reading ISRC number"},
+    {0x11,0x11,"Read error - loss of streaming"},
+    {0x11,0x12,"Auxiliary memory read error"},
+    {0x11,0x13,"Read error - failed retransmission request"},
+    {0x12,0x00,"Address mark not found for id field"},
+    {0x13,0x00,"Address mark not found for data field"},
+    {0x14,0x00,"Recorded entity not found"},
+    {0x14,0x01,"Record not found"},
+    {0x14,0x02,"Filemark or setmark not found"},
+    {0x14,0x03,"End-of-data not found"},
+    {0x14,0x04,"Block sequence error"},
+    {0x14,0x05,"Record not found - recommend reassignment"},
+    {0x14,0x06,"Record not found - data auto-reallocated"},
+    {0x14,0x07,"Locate operation failure"},
+    {0x15,0x00,"Random positioning error"},
+    {0x15,0x01,"Mechanical positioning error"},
+    {0x15,0x02,"Positioning error detected by read of medium"},
+    {0x16,0x00,"Data synchronization mark error"},
+    {0x16,0x01,"Data sync error - data rewritten"},
+    {0x16,0x02,"Data sync error - recommend rewrite"},
+    {0x16,0x03,"Data sync error - data auto-reallocated"},
+    {0x16,0x04,"Data sync error - recommend reassignment"},
+    {0x17,0x00,"Recovered data with no error correction applied"},
+    {0x17,0x01,"Recovered data with retries"},
+    {0x17,0x02,"Recovered data with positive head offset"},
+    {0x17,0x03,"Recovered data with negative head offset"},
+    {0x17,0x04,"Recovered data with retries and/or circ applied"},
+    {0x17,0x05,"Recovered data using previous sector id"},
+    {0x17,0x06,"Recovered data without ecc - data auto-reallocated"},
+    {0x17,0x07,"Recovered data without ecc - recommend reassignment"},
+    {0x17,0x08,"Recovered data without ecc - recommend rewrite"},
+    {0x17,0x09,"Recovered data without ecc - data rewritten"},
+    {0x18,0x00,"Recovered data with error correction applied"},
+    {0x18,0x01,"Recovered data with error corr. & retries applied"},
+    {0x18,0x02,"Recovered data - data auto-reallocated"},
+    {0x18,0x03,"Recovered data with CIRC"},
+    {0x18,0x04,"Recovered data with L-EC"},
+    {0x18,0x05,"Recovered data - recommend reassignment"},
+    {0x18,0x06,"Recovered data - recommend rewrite"},
+    {0x18,0x07,"Recovered data with ecc - data rewritten"},
+    {0x18,0x08,"Recovered data with linking"},
+    {0x19,0x00,"Defect list error"},
+    {0x19,0x01,"Defect list not available"},
+    {0x19,0x02,"Defect list error in primary list"},
+    {0x19,0x03,"Defect list error in grown list"},
+    {0x1A,0x00,"Parameter list length error"},
+    {0x1B,0x00,"Synchronous data transfer error"},
+    {0x1C,0x00,"Defect list not found"},
+    {0x1C,0x01,"Primary defect list not found"},
+    {0x1C,0x02,"Grown defect list not found"},
+    {0x1D,0x00,"Miscompare during verify operation"},
+    {0x1E,0x00,"Recovered id with ecc correction"},
+    {0x1F,0x00,"Partial defect list transfer"},
+    {0x20,0x00,"Invalid command operation code"},
+    {0x20,0x01,"Access denied - initiator pending-enrolled"},
+    {0x20,0x02,"Access denied - no access rights"},
+    {0x20,0x03,"Access denied - no mgmt id key"},
+    {0x20,0x04,"Illegal command while in write capable state"},
+    {0x20,0x05,"Obsolete"},
+    {0x20,0x06,"Illegal command while in explicit address mode"},
+    {0x20,0x07,"Illegal command while in implicit address mode"},
+    {0x20,0x08,"Access denied - enrollment conflict"},
+    {0x20,0x09,"Access denied - invalid LU identifier"},
+    {0x20,0x0A,"Access denied - invalid proxy token"},
+    {0x20,0x0B,"Access denied - ACL LUN conflict"},
+    {0x21,0x00,"Logical block address out of range"},
+    {0x21,0x01,"Invalid element address"},
+    {0x21,0x02,"Invalid address for write"},
+    {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
+    {0x24,0x00,"Invalid field in cdb"},
+    {0x24,0x01,"CDB decryption error"},
+    {0x24,0x04,"Security audit value frozen"},
+    {0x24,0x05,"Security working key frozen"},
+    {0x24,0x06,"Nonce not unique"},
+    {0x24,0x07,"Nonce timestamp out of range"},
+    {0x25,0x00,"Logical unit not supported"},
+    {0x26,0x00,"Invalid field in parameter list"},
+    {0x26,0x01,"Parameter not supported"},
+    {0x26,0x02,"Parameter value invalid"},
+    {0x26,0x03,"Threshold parameters not supported"},
+    {0x26,0x04,"Invalid release of persistent reservation"},
+    {0x26,0x05,"Data decryption error"},
+    {0x26,0x06,"Too many target descriptors"},
+    {0x26,0x07,"Unsupported target descriptor type code"},
+    {0x26,0x08,"Too many segment descriptors"},
+    {0x26,0x09,"Unsupported segment descriptor type code"},
+    {0x26,0x0A,"Unexpected inexact segment"},
+    {0x26,0x0B,"Inline data length exceeded"},
+    {0x26,0x0C,"Invalid operation for copy source or destination"},
+    {0x26,0x0D,"Copy segment granularity violation"},
+    {0x26,0x0E,"Invalid parameter while port is enabled"},
+    {0x26,0x0F,"Invalid data-out buffer integrity"},
+    {0x27,0x00,"Write protected"},
+    {0x27,0x01,"Hardware write protected"},
+    {0x27,0x02,"Logical unit software write protected"},
+    {0x27,0x03,"Associated write protect"},
+    {0x27,0x04,"Persistent write protect"},
+    {0x27,0x05,"Permanent write protect"},
+    {0x27,0x06,"Conditional write protect"},
+    {0x28,0x00,"Not ready to ready change, medium may have changed"},
+    {0x28,0x01,"Import or export element accessed"},
+    {0x29,0x00,"Power on, reset, or bus device reset occurred"},
+    {0x29,0x01,"Power on occurred"},
+    {0x29,0x02,"SCSI bus reset occurred"},
+    {0x29,0x03,"Bus device reset function occurred"},
+    {0x29,0x04,"Device internal reset"},
+    {0x29,0x05,"Transceiver mode changed to single-ended"},
+    {0x29,0x06,"Transceiver mode changed to lvd"},
+    {0x29,0x07,"I_T nexus loss occurred"},
+    {0x2A,0x00,"Parameters changed"},
+    {0x2A,0x01,"Mode parameters changed"},
+    {0x2A,0x02,"Log parameters changed"},
+    {0x2A,0x03,"Reservations preempted"},
+    {0x2A,0x04,"Reservations released"},
+    {0x2A,0x05,"Registrations preempted"},
+    {0x2A,0x06,"Asymmetric access state changed"},
+    {0x2A,0x07,"Implicit asymmetric access state transition failed"},
+    {0x2A,0x08,"Priority changed"},
+    {0x2A,0x09,"Capacity data has changed"},
+    {0x2B,0x00,"Copy cannot execute since host cannot disconnect"},
+    {0x2C,0x00,"Command sequence error"},
+    {0x2C,0x01,"Too many windows specified"},
+    {0x2C,0x02,"Invalid combination of windows specified"},
+    {0x2C,0x03,"Current program area is not empty"},
+    {0x2C,0x04,"Current program area is empty"},
+    {0x2C,0x05,"Illegal power condition request"},
+    {0x2C,0x06,"Persistent prevent conflict"},
+    {0x2C,0x07,"Previous busy status"},
+    {0x2C,0x08,"Previous task set full status"},
+    {0x2C,0x09,"Previous reservation conflict status"},
+    {0x2C,0x0A,"Partition or collection contains user objects"},
+    {0x2C,0x0B,"Not reserved"},
+    {0x2D,0x00,"Overwrite error on update in place"},
+    {0x2E,0x00,"Insufficient time for operation"},
+    {0x2F,0x00,"Commands cleared by another initiator"},
+    {0x30,0x00,"Incompatible medium installed"},
+    {0x30,0x01,"Cannot read medium - unknown format"},
+    {0x30,0x02,"Cannot read medium - incompatible format"},
+    {0x30,0x03,"Cleaning cartridge installed"},
+    {0x30,0x04,"Cannot write medium - unknown format"},
+    {0x30,0x05,"Cannot write medium - incompatible format"},
+    {0x30,0x06,"Cannot format medium - incompatible medium"},
+    {0x30,0x07,"Cleaning failure"},
+    {0x30,0x08,"Cannot write - application code mismatch"},
+    {0x30,0x09,"Current session not fixated for append"},
+    {0x30,0x0A,"Cleaning request rejected"},
+    {0x30,0x0C,"WORM medium, overwrite attempted"},
+    {0x30,0x10,"Medium not formatted"},
+    {0x31,0x00,"Medium format corrupted"},
+    {0x31,0x01,"Format command failed"},
+    {0x31,0x02,"Zoned formatting failed due to spare linking"},
+    {0x32,0x00,"No defect spare location available"},
+    {0x32,0x01,"Defect list update failure"},
+    {0x33,0x00,"Tape length error"},
+    {0x34,0x00,"Enclosure failure"},
+    {0x35,0x00,"Enclosure services failure"},
+    {0x35,0x01,"Unsupported enclosure function"},
+    {0x35,0x02,"Enclosure services unavailable"},
+    {0x35,0x03,"Enclosure services transfer failure"},
+    {0x35,0x04,"Enclosure services transfer refused"},
+    {0x35,0x05,"Enclosure services checksum error"},
+    {0x36,0x00,"Ribbon,ink,or toner failure"},
+    {0x37,0x00,"Rounded parameter"},
+    {0x38,0x00,"Event status notification"},
+    {0x38,0x02,"Esn - power management class event"},
+    {0x38,0x04,"Esn - media class event"},
+    {0x38,0x06,"Esn - device busy class event"},
+    {0x39,0x00,"Saving parameters not supported"},
+    {0x3A,0x00,"Medium not present"},
+    {0x3A,0x01,"Medium not present - tray closed"},
+    {0x3A,0x02,"Medium not present - tray open"},
+    {0x3A,0x03,"Medium not present - loadable"},
+    {0x3A,0x04,"Medium not present - medium auxiliary memory accessible"},
+    {0x3B,0x00,"Sequential positioning error"},
+    {0x3B,0x01,"Tape position error at beginning-of-medium"},
+    {0x3B,0x02,"Tape position error at end-of-medium"},
+    {0x3B,0x03,"Tape or electronic vertical forms unit not ready, "},
+    {0x3B,0x04,"Slew failure"},
+    {0x3B,0x05,"Paper jam"},
+    {0x3B,0x06,"Failed to sense top-of-form"},
+    {0x3B,0x07,"Failed to sense bottom-of-form"},
+    {0x3B,0x08,"Reposition error"},
+    {0x3B,0x09,"Read past end of medium"},
+    {0x3B,0x0A,"Read past beginning of medium"},
+    {0x3B,0x0B,"Position past end of medium"},
+    {0x3B,0x0C,"Position past beginning of medium"},
+    {0x3B,0x0D,"Medium destination element full"},
+    {0x3B,0x0E,"Medium source element empty"},
+    {0x3B,0x0F,"End of medium reached"},
+    {0x3B,0x11,"Medium magazine not accessible"},
+    {0x3B,0x12,"Medium magazine removed"},
+    {0x3B,0x13,"Medium magazine inserted"},
+    {0x3B,0x14,"Medium magazine locked"},
+    {0x3B,0x15,"Medium magazine unlocked"},
+    {0x3B,0x16,"Mechanical positioning or changer error"},
+    {0x3B,0x17,"Read past end of user object"},
+    {0x3D,0x00,"Invalid bits in identify message"},
+    {0x3E,0x00,"Logical unit has not self-configured yet"},
+    {0x3E,0x01,"Logical unit failure"},
+    {0x3E,0x02,"Timeout on logical unit"},
+    {0x3E,0x03,"Logical unit failed self-test"},
+    {0x3E,0x04,"Logical unit unable to update self-test log"},
+    {0x3F,0x00,"Target operating conditions have changed"},
+    {0x3F,0x01,"Microcode has been changed"},
+    {0x3F,0x02,"Changed operating definition"},
+    {0x3F,0x03,"Inquiry data has changed"},
+    {0x3F,0x04,"Component device attached"},
+    {0x3F,0x05,"Device identifier changed"},
+    {0x3F,0x06,"Redundancy group created or modified"},
+    {0x3F,0x07,"Redundancy group deleted"},
+    {0x3F,0x08,"Spare created or modified"},
+    {0x3F,0x09,"Spare deleted"},
+    {0x3F,0x0A,"Volume set created or modified"},
+    {0x3F,0x0B,"Volume set deleted"},
+    {0x3F,0x0C,"Volume set deassigned"},
+    {0x3F,0x0D,"Volume set reassigned"},
+    {0x3F,0x0E,"Reported luns data has changed"},
+    {0x3F,0x0F,"Echo buffer overwritten"},
+    {0x3F,0x10,"Medium loadable"},
+    {0x3F,0x11,"Medium auxiliary memory accessible"},
+
+    /*
+     * ASC 0x40, 0x41 and 0x42 overridden by "additional2" array entries
+     * for ascq > 1. Preferred error message for this group is
+     * "Diagnostic failure on component nn (80h-ffh)".
+     */
+    {0x40,0x00,"Ram failure (should use 40 nn)"},
+    {0x41,0x00,"Data path failure (should use 40 nn)"},
+    {0x42,0x00,"Power-on or self-test failure (should use 40 nn)"},
+
+    {0x43,0x00,"Message error"},
+    {0x44,0x00,"Internal target failure"},
+    {0x45,0x00,"Select or reselect failure"},
+    {0x46,0x00,"Unsuccessful soft reset"},
+    {0x47,0x00,"SCSI parity error"},
+    {0x47,0x01,"Data phase CRC error detected"},
+    {0x47,0x02,"SCSI parity error detected during st data phase"},
+    {0x47,0x03,"Information unit CRC error detected"},
+    {0x47,0x04,"Asynchronous information protection error detected"},
+    {0x47,0x05,"Protocol service CRC error"},
+    {0x47,0x7F,"Some commands cleared by iSCSI protocol event"},
+    {0x48,0x00,"Initiator detected error message received"},
+    {0x49,0x00,"Invalid message error"},
+    {0x4A,0x00,"Command phase error"},
+    {0x4B,0x00,"Data phase error"},
+    {0x4B,0x01,"Invalid target port transfer tag received"},
+    {0x4B,0x02,"Too much write data"},
+    {0x4B,0x03,"Ack/nak timeout"},
+    {0x4B,0x04,"Nak received"},
+    {0x4B,0x05,"Data offset error"},
+    {0x4B,0x06,"Initiator response timeout"},
+    {0x4C,0x00,"Logical unit failed self-configuration"},
+    /*
+     * ASC 0x4D overridden by an "additional2" array entry
+     * so there is no need to have them here.
+     */
+    /* {0x4D,0x00,"Tagged overlapped commands (nn = queue tag)"}, */
+
+    {0x4E,0x00,"Overlapped commands attempted"},
+    {0x50,0x00,"Write append error"},
+    {0x50,0x01,"Write append position error"},
+    {0x50,0x02,"Position error related to timing"},
+    {0x51,0x00,"Erase failure"},
+    {0x51,0x01,"Erase failure - incomplete erase operation detected"},
+    {0x52,0x00,"Cartridge fault"},
+    {0x53,0x00,"Media load or eject failed"},
+    {0x53,0x01,"Unload tape failure"},
+    {0x53,0x02,"Medium removal prevented"},
+    {0x53,0x03,"Data transfer element prevented medium removal"},
+    {0x54,0x00,"SCSI to host system interface failure"},
+    {0x55,0x00,"System resource failure"},
+    {0x55,0x01,"System buffer full"},
+    {0x55,0x02,"Insufficient reservation resources"},
+    {0x55,0x03,"Insufficient resources"},
+    {0x55,0x04,"Insufficient registration resources"},
+    {0x55,0x05,"Insufficient access control resources"},
+    {0x55,0x06,"Auxiliary memory out of space"},
+    {0x55,0x07,"Quota error"},
+    {0x57,0x00,"Unable to recover table-of-contents"},
+    {0x58,0x00,"Generation does not exist"},
+    {0x59,0x00,"Updated block read"},
+    {0x5A,0x00,"Operator request or state change input"},
+    {0x5A,0x01,"Operator medium removal request"},
+    {0x5A,0x02,"Operator selected write protect"},
+    {0x5A,0x03,"Operator selected write permit"},
+    {0x5B,0x00,"Log exception"},
+    {0x5B,0x01,"Threshold condition met"},
+    {0x5B,0x02,"Log counter at maximum"},
+    {0x5B,0x03,"Log list codes exhausted"},
+    {0x5C,0x00,"Rpl status change"},
+    {0x5C,0x01,"Spindles synchronized"},
+    {0x5C,0x02,"Spindles not synchronized"},
+    {0x5D,0x00,"Failure prediction threshold exceeded"},
+    {0x5D,0x01,"Media failure prediction threshold exceeded"},
+    {0x5D,0x02,"Logical unit failure prediction threshold exceeded"},
+    {0x5D,0x03,"spare area exhaustion prediction threshold exceeded"},
+    {0x5D,0x10,"Hardware impending failure general hard drive failure"},
+    {0x5D,0x11,"Hardware impending failure drive error rate too high" },
+    {0x5D,0x12,"Hardware impending failure data error rate too high" },
+    {0x5D,0x13,"Hardware impending failure seek error rate too high" },
+    {0x5D,0x14,"Hardware impending failure too many block reassigns"},
+    {0x5D,0x15,"Hardware impending failure access times too high" },
+    {0x5D,0x16,"Hardware impending failure start unit times too high" },
+    {0x5D,0x17,"Hardware impending failure channel parametrics"},
+    {0x5D,0x18,"Hardware impending failure controller detected"},
+    {0x5D,0x19,"Hardware impending failure throughput performance"},
+    {0x5D,0x1A,"Hardware impending failure seek time performance"},
+    {0x5D,0x1B,"Hardware impending failure spin-up retry count"},
+    {0x5D,0x1C,"Hardware impending failure drive calibration retry count"},
+    {0x5D,0x20,"Controller impending failure general hard drive failure"},
+    {0x5D,0x21,"Controller impending failure drive error rate too high" },
+    {0x5D,0x22,"Controller impending failure data error rate too high" },
+    {0x5D,0x23,"Controller impending failure seek error rate too high" },
+    {0x5D,0x24,"Controller impending failure too many block reassigns"},
+    {0x5D,0x25,"Controller impending failure access times too high" },
+    {0x5D,0x26,"Controller impending failure start unit times too high" },
+    {0x5D,0x27,"Controller impending failure channel parametrics"},
+    {0x5D,0x28,"Controller impending failure controller detected"},
+    {0x5D,0x29,"Controller impending failure throughput performance"},
+    {0x5D,0x2A,"Controller impending failure seek time performance"},
+    {0x5D,0x2B,"Controller impending failure spin-up retry count"},
+    {0x5D,0x2C,"Controller impending failure drive calibration retry count"},
+    {0x5D,0x30,"Data channel impending failure general hard drive failure"},
+    {0x5D,0x31,"Data channel impending failure drive error rate too high" },
+    {0x5D,0x32,"Data channel impending failure data error rate too high" },
+    {0x5D,0x33,"Data channel impending failure seek error rate too high" },
+    {0x5D,0x34,"Data channel impending failure too many block reassigns"},
+    {0x5D,0x35,"Data channel impending failure access times too high" },
+    {0x5D,0x36,"Data channel impending failure start unit times too high" },
+    {0x5D,0x37,"Data channel impending failure channel parametrics"},
+    {0x5D,0x38,"Data channel impending failure controller detected"},
+    {0x5D,0x39,"Data channel impending failure throughput performance"},
+    {0x5D,0x3A,"Data channel impending failure seek time performance"},
+    {0x5D,0x3B,"Data channel impending failure spin-up retry count"},
+    {0x5D,0x3C,"Data channel impending failure drive calibration retry count"},
+    {0x5D,0x40,"Servo impending failure general hard drive failure"},
+    {0x5D,0x41,"Servo impending failure drive error rate too high" },
+    {0x5D,0x42,"Servo impending failure data error rate too high" },
+    {0x5D,0x43,"Servo impending failure seek error rate too high" },
+    {0x5D,0x44,"Servo impending failure too many block reassigns"},
+    {0x5D,0x45,"Servo impending failure access times too high" },
+    {0x5D,0x46,"Servo impending failure start unit times too high" },
+    {0x5D,0x47,"Servo impending failure channel parametrics"},
+    {0x5D,0x48,"Servo impending failure controller detected"},
+    {0x5D,0x49,"Servo impending failure throughput performance"},
+    {0x5D,0x4A,"Servo impending failure seek time performance"},
+    {0x5D,0x4B,"Servo impending failure spin-up retry count"},
+    {0x5D,0x4C,"Servo impending failure drive calibration retry count"},
+    {0x5D,0x50,"Spindle impending failure general hard drive failure"},
+    {0x5D,0x51,"Spindle impending failure drive error rate too high" },
+    {0x5D,0x52,"Spindle impending failure data error rate too high" },
+    {0x5D,0x53,"Spindle impending failure seek error rate too high" },
+    {0x5D,0x54,"Spindle impending failure too many block reassigns"},
+    {0x5D,0x55,"Spindle impending failure access times too high" },
+    {0x5D,0x56,"Spindle impending failure start unit times too high" },
+    {0x5D,0x57,"Spindle impending failure channel parametrics"},
+    {0x5D,0x58,"Spindle impending failure controller detected"},
+    {0x5D,0x59,"Spindle impending failure throughput performance"},
+    {0x5D,0x5A,"Spindle impending failure seek time performance"},
+    {0x5D,0x5B,"Spindle impending failure spin-up retry count"},
+    {0x5D,0x5C,"Spindle impending failure drive calibration retry count"},
+    {0x5D,0x60,"Firmware impending failure general hard drive failure"},
+    {0x5D,0x61,"Firmware impending failure drive error rate too high" },
+    {0x5D,0x62,"Firmware impending failure data error rate too high" },
+    {0x5D,0x63,"Firmware impending failure seek error rate too high" },
+    {0x5D,0x64,"Firmware impending failure too many block reassigns"},
+    {0x5D,0x65,"Firmware impending failure access times too high" },
+    {0x5D,0x66,"Firmware impending failure start unit times too high" },
+    {0x5D,0x67,"Firmware impending failure channel parametrics"},
+    {0x5D,0x68,"Firmware impending failure controller detected"},
+    {0x5D,0x69,"Firmware impending failure throughput performance"},
+    {0x5D,0x6A,"Firmware impending failure seek time performance"},
+    {0x5D,0x6B,"Firmware impending failure spin-up retry count"},
+    {0x5D,0x6C,"Firmware impending failure drive calibration retry count"},
+    {0x5D,0xFF,"Failure prediction threshold exceeded (false)"},
+    {0x5E,0x00,"Low power condition on"},
+    {0x5E,0x01,"Idle condition activated by timer"},
+    {0x5E,0x02,"Standby condition activated by timer"},
+    {0x5E,0x03,"Idle condition activated by command"},
+    {0x5E,0x04,"Standby condition activated by command"},
+    {0x5E,0x41,"Power state change to active"},
+    {0x5E,0x42,"Power state change to idle"},
+    {0x5E,0x43,"Power state change to standby"},
+    {0x5E,0x45,"Power state change to sleep"},
+    {0x5E,0x47,"Power state change to device control"},
+    {0x60,0x00,"Lamp failure"},
+    {0x61,0x00,"Video acquisition error"},
+    {0x61,0x01,"Unable to acquire video"},
+    {0x61,0x02,"Out of focus"},
+    {0x62,0x00,"Scan head positioning error"},
+    {0x63,0x00,"End of user area encountered on this track"},
+    {0x63,0x01,"Packet does not fit in available space"},
+    {0x64,0x00,"Illegal mode for this track"},
+    {0x64,0x01,"Invalid packet size"},
+    {0x65,0x00,"Voltage fault"},
+    {0x66,0x00,"Automatic document feeder cover up"},
+    {0x66,0x01,"Automatic document feeder lift up"},
+    {0x66,0x02,"Document jam in automatic document feeder"},
+    {0x66,0x03,"Document miss feed automatic in document feeder"},
+    {0x67,0x00,"Configuration failure"},
+    {0x67,0x01,"Configuration of incapable logical units failed"},
+    {0x67,0x02,"Add logical unit failed"},
+    {0x67,0x03,"Modification of logical unit failed"},
+    {0x67,0x04,"Exchange of logical unit failed"},
+    {0x67,0x05,"Remove of logical unit failed"},
+    {0x67,0x06,"Attachment of logical unit failed"},
+    {0x67,0x07,"Creation of logical unit failed"},
+    {0x67,0x08,"Assign failure occurred"},
+    {0x67,0x09,"Multiply assigned logical unit"},
+    {0x67,0x0A,"Set target port groups command failed"},
+    {0x68,0x00,"Logical unit not configured"},
+    {0x69,0x00,"Data loss on logical unit"},
+    {0x69,0x01,"Multiple logical unit failures"},
+    {0x69,0x02,"Parity/data mismatch"},
+    {0x6A,0x00,"Informational, refer to log"},
+    {0x6B,0x00,"State change has occurred"},
+    {0x6B,0x01,"Redundancy level got better"},
+    {0x6B,0x02,"Redundancy level got worse"},
+    {0x6C,0x00,"Rebuild failure occurred"},
+    {0x6D,0x00,"Recalculate failure occurred"},
+    {0x6E,0x00,"Command to logical unit failed"},
+    {0x6F,0x00,"Copy protection key exchange failure - authentication "
+               "failure"},
+    {0x6F,0x01,"Copy protection key exchange failure - key not present"},
+    {0x6F,0x02,"Copy protection key exchange failure - key not established"},
+    {0x6F,0x03,"Read of scrambled sector without authentication"},
+    {0x6F,0x04,"Media region code is mismatched to logical unit region"},
+    {0x6F,0x05,"Drive region must be permanent/region reset count error"},
+    /*
+     * ASC 0x70 overridden by an "additional2" array entry
+     * so there is no need to have them here.
+     */
+    /* {0x70,0x00,"Decompression exception short algorithm id of nn"}, */
+
+    {0x71,0x00,"Decompression exception long algorithm id"},
+    {0x72,0x00,"Session fixation error"},
+    {0x72,0x01,"Session fixation error writing lead-in"},
+    {0x72,0x02,"Session fixation error writing lead-out"},
+    {0x72,0x03,"Session fixation error - incomplete track in session"},
+    {0x72,0x04,"Empty or partially written reserved track"},
+    {0x72,0x05,"No more track reservations allowed"},
+    {0x73,0x00,"Cd control error"},
+    {0x73,0x01,"Power calibration area almost full"},
+    {0x73,0x02,"Power calibration area is full"},
+    {0x73,0x03,"Power calibration area error"},
+    {0x73,0x04,"Program memory area update failure"},
+    {0x73,0x05,"Program memory area is full"},
+    {0x73,0x06,"RMA/PMA is full"},
+    {0, 0, NULL}
 };
 
 static const char *sense_key_desc[] = {
@@ -1038,13 +1046,13 @@ static const char *sense_key_desc[] = {
     "Copy Aborted",             /* COPY or COMPARE was aborted */
     "Aborted Command",          /* The target aborted the command */
     "Equal",                    /* SEARCH DATA found data equal (obsolete) */
-    "Volume Overflow",          /* Medium full with still data to be written */
+    "Volume Overflow",          /* Medium full with data to be written */
     "Miscompare",               /* Source data and data on the medium
                                    do not agree */
     "Key=15"                    /* Reserved */
 };
 
-void sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
+char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
     int k, num, rlen;
     int found = 0;
@@ -1061,31 +1069,30 @@ void sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
             rlen = buff_len - num;
             num += snprintf(buff + num, ((rlen > 0) ? rlen : 0),
                             ei2p->text, ascq);
-            rlen = buff_len - num;
-            snprintf(buff + num, ((rlen > 0) ? rlen : 0), "\n");
         }
     }
     if (found)
-        return;
+        return buff;
 
     for (k = 0; additional[k].text; ++k) {
         eip = &additional[k];
         if (eip->code1 == asc &&
             eip->code2 == ascq) {
             found = 1;
-            snprintf(buff, buff_len, "Additional sense: %s\n", eip->text);
+            snprintf(buff, buff_len, "Additional sense: %s", eip->text);
         }
     }
     if (! found) {
         if (asc >= 0x80)
-            snprintf(buff, buff_len, "vendor specific ASC=%2x, ASCQ=%2x\n",
+            snprintf(buff, buff_len, "vendor specific ASC=%2x, ASCQ=%2x",
                      asc, ascq);
         else if (ascq >= 0x80)
-            snprintf(buff, buff_len, "ASC=%2x, vendor specific ASCQ=%2x\n",
-                     asc, ascq);
+            snprintf(buff, buff_len, "ASC=%2x, vendor specific qualification "
+                     "ASCQ=%2x", asc, ascq);
         else
-            snprintf(buff, buff_len, "ASC=%2x, ASCQ=%2x\n", asc, ascq);
+            snprintf(buff, buff_len, "ASC=%2x, ASCQ=%2x", asc, ascq);
     }
+    return buff;
 }
 
 const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
@@ -1094,8 +1101,9 @@ const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
     int add_sen_len, add_len, desc_len, k;
     const unsigned char * descp;
 
-    if ((sense_len < 8) || ((sensep[0] & 0x7f) >= 0x72) ||
-        (0 == (add_sen_len = sensep[7])))
+    if ((sense_len < 8) || (0 == (add_sen_len = sensep[7])))
+        return NULL;
+    if ((sensep[0] < 0x72) || (sensep[0] > 0x73))
         return NULL;
     add_sen_len = (add_sen_len < (sense_len - 8)) ?
                          add_sen_len : (sense_len - 8);
@@ -1112,12 +1120,51 @@ const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
     return NULL;
 }
 
+int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
+                          unsigned long long * info_outp)
+{
+    int j;
+    const unsigned char * ucp;
+    unsigned long long ull;
+
+    if (sb_len < 7)
+        return 0;
+    switch (sensep[0] & 0x7f) {
+    case 0x70:
+    case 0x71:
+        if (sensep[0] & 0x80) {
+            if (info_outp)
+                *info_outp = (sensep[3] << 24) + (sensep[4] << 16) +
+                             (sensep[5] << 8) + sensep[6];
+            return 1;
+        } else
+            return 0;
+    case 0x72:
+    case 0x73:
+        ucp = sg_scsi_sense_desc_find(sensep, sb_len, 0 /* info desc */);
+        if (ucp && (0xa == ucp[1])) {
+            ull = 0;
+            for (j = 0; j < 8; ++j) {
+                if (j > 0)
+                    ull <<= 8;
+                ull |= ucp[4 + j];
+            }
+            if (info_outp)
+                *info_outp = ull;
+            return 1;
+        } else
+            return 0;
+    default:
+        return 0;
+    }
+}
+
 /* Print descriptor format sense descriptors (assumes sense buffer is
    in descriptor format) */
 static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
                                        int sb_len)
 {
-    int add_sen_len, add_len, desc_len, k, j, sense_key;
+    int add_sen_len, add_len, desc_len, k, j, sense_key, processed, progress;
     const unsigned char * descp;
 
     if (NULL == sg_warnings_str)
@@ -1132,6 +1179,7 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
         add_len = (k < (add_sen_len - 1)) ? descp[1]: -1;
         desc_len = add_len + 2;
         fprintf(sg_warnings_str, "  Descriptor type: ");
+        processed = 1;
         switch (descp[0]) {
         case 0:
             fprintf(sg_warnings_str, "Information\n");
@@ -1140,7 +1188,8 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
                 for (j = 0; j < 8; ++j)
                     fprintf(sg_warnings_str, "%02x", descp[4 + j]);
                 fprintf(sg_warnings_str, "\n");
-            }
+            } else
+                processed = 0;
             break;
         case 1:
             fprintf(sg_warnings_str, "Command specific\n");
@@ -1149,15 +1198,18 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
                 for (j = 0; j < 8; ++j)
                     fprintf(sg_warnings_str, "%02x", descp[4 + j]);
                 fprintf(sg_warnings_str, "\n");
-            }
+            } else
+                processed = 0;
             break;
         case 2:
             fprintf(sg_warnings_str, "Sense key specific:");
             switch (sense_key) {
             case ILLEGAL_REQUEST:
                 fprintf(sg_warnings_str, " Field pointer\n");
-                if (add_len < 6)
+                if (add_len < 6) {
+                    processed = 0;
                     break;
+                }
                 fprintf(sg_warnings_str, "    Error in %s byte %d",
                         (descp[4] & 0x40) ? "Command" : "Data",
                         (descp[5] << 8) | descp[6]);
@@ -1170,35 +1222,44 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
             case MEDIUM_ERROR:
             case RECOVERED_ERROR:
                 fprintf(sg_warnings_str, " Actual retry count\n");
-                if (add_len < 6)
+                if (add_len < 6) {
+                    processed = 0;
                     break;
+                }
                 fprintf(sg_warnings_str, "    0x%02x%02x\n", descp[5],
                         descp[6]);
                 break;
             case NO_SENSE:
             case NOT_READY:
-                fprintf(sg_warnings_str, " Progress indication\n");
-                if (add_len < 6)
+                fprintf(sg_warnings_str, " Progress indication: ");
+                if (add_len < 6) {
+                    processed = 0;
+                    fprintf(sg_warnings_str, " field too short\n");
                     break;
-                fprintf(sg_warnings_str, "    0x%02x%02x\n", descp[5],
-                        descp[6]);
+                }
+                progress = (descp[5] << 8) + descp[6];
+                fprintf(sg_warnings_str, "%d %%\n", 
+                        (progress * 100) / 0x10000);
                 break;
             case COPY_ABORTED:
                 fprintf(sg_warnings_str, " Segment pointer\n");
-                if (add_len < 6)
+                if (add_len < 6) {
+                    processed = 0;
                     break;
+                }
                 fprintf(sg_warnings_str, "    Relative to start of %s, byte %d",
                         (descp[4] & 0x20) ? "segment descriptor" : 
                                             "parameter list",
                         (descp[5] << 8) | descp[6]);
-                if (descp[4] & 0x08) {
+                if (descp[4] & 0x08)
                     fprintf(sg_warnings_str, " bit %d\n", descp[4] & 0x07);
-                } else
+                else
                     fprintf(sg_warnings_str, "\n");
                 break;
             default:
                 fprintf(sg_warnings_str, " Sense_key: 0x%x unexpected\n",
                         sense_key);
+                processed = 0;
                 break;
             }
             break;
@@ -1206,6 +1267,8 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
             fprintf(sg_warnings_str, "Field replaceable unit\n");
             if (add_len >= 2)
                 fprintf(sg_warnings_str, "    0x%x\n", descp[3]);
+            else
+                processed = 0;
             break;
         case 4:
             fprintf(sg_warnings_str, "Stream commands\n");
@@ -1218,29 +1281,62 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
                     fprintf(sg_warnings_str, "    Incorrect Length Indicator "
                             "(ILI)");
                 fprintf(sg_warnings_str, "\n");
-            }
+            } else
+                processed = 0;
             break;
         case 5:
             fprintf(sg_warnings_str, "Block commands\n");
             if (add_len >= 2)
                 fprintf(sg_warnings_str, "    Incorrect Length Indicator "
                         "(ILI) %s\n", (descp[3] & 0x20) ? "set" : "clear");
+            else
+                processed = 0;
             break;
         case 6:
             fprintf(sg_warnings_str, "OSD object identification\n");
+            processed = 0;
             break;
         case 7:
             fprintf(sg_warnings_str, "OSD response integrity check value\n");
+            processed = 0;
             break;
         case 8:
             fprintf(sg_warnings_str, "OSD attribute identification\n");
+            processed = 0;
             break;
         case 9:
             fprintf(sg_warnings_str, "ATA return\n");
+            if (add_len >= 14) {
+                int extended, sector_count, lba_low, lba_mid, lba_high;
+
+                extended = descp[2] & 1;
+                sector_count = descp[5];
+                lba_low = descp[7];
+                lba_mid = descp[9];
+                lba_high = descp[11];
+                if (extended) {
+                    sector_count += (descp[4] << 8);
+                    lba_low += (descp[6] << 8);
+                    lba_mid += (descp[8] << 8);
+                    lba_high += (descp[10] << 8);
+                }
+                fprintf(sg_warnings_str, "    extended=%d  error=0x%x "
+                        " sector_count=0x%x\n", extended, descp[3],
+                        sector_count);
+                fprintf(sg_warnings_str, "    lba_low=0x%x  lba_mid=0x%x "
+                        " lba_high=0x%x\n", lba_low, lba_mid, lba_high);
+                fprintf(sg_warnings_str, "    device=0x%x  status=0x%x\n",
+                        descp[12], descp[13]);
+            } else
+                processed = 0;
             break;
         default:
             fprintf(sg_warnings_str, "Unknown or vendor specific [0x%x]\n",
                     descp[0]);
+            processed = 0;
+            break;
+        }
+        if (! processed) {
             if (add_len > 0) {
                 fprintf(sg_warnings_str, "    ");
                 for (j = 0; (j < add_len) && ((k + j + 2) < add_sen_len);
@@ -1251,7 +1347,6 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
                 }
                 fprintf(sg_warnings_str, "\n");
             }
-            break;
         }
         if (add_len < 0) {
             fprintf(sg_warnings_str, "    short descriptor\n");
@@ -1264,7 +1359,7 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
 void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     int sb_len)
 {
-    int len, valid;
+    int len, valid, progress;
     unsigned int info;
     int descriptor_format = 0;
     const char * error = NULL;
@@ -1314,16 +1409,15 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
         fprintf(sg_warnings_str, " %s;  Sense key: %s\n ", error,
                 sense_key_desc[ssh.sense_key]);
         if (descriptor_format) {
-            sg_get_asc_ascq_str(ssh.asc, ssh.ascq, sizeof(add_sense),
-                                add_sense);
-            fprintf(sg_warnings_str, "%s", add_sense);
+            fprintf(sg_warnings_str, "%s\n",
+                    sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
+                                        sizeof(add_sense), add_sense));
             sg_print_sense_descriptors(sense_buffer, len);
         } else if (len > 2) {   /* fixed format */
-            if (len > 12) {
-                sg_get_asc_ascq_str(ssh.asc, ssh.ascq, sizeof(add_sense),
-                                    add_sense);
-                fprintf(sg_warnings_str, "%s", add_sense);
-            }
+            if (len > 12)
+                fprintf(sg_warnings_str, "%s\n",
+                        sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
+                                            sizeof(add_sense), add_sense));
             valid = sense_buffer[0] & 0x80;
             if (len > 6) {
                 info = (unsigned int)((sense_buffer[3] << 24) |
@@ -1336,27 +1430,60 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     fprintf(sg_warnings_str, "  vendor specific Info "
                             "fld=0x%x ", info);
             }
-            if (sense_buffer[2] & 0x80)
-               fprintf(sg_warnings_str, " FMK");
-                        /* current command has read a filemark */
-            if (sense_buffer[2] & 0x40)
-               fprintf(sg_warnings_str, " EOM");
-                        /* end-of-medium condition exists */
-            if (sense_buffer[2] & 0x20)
-               fprintf(sg_warnings_str, " ILI");
-                        /* incorrect block length requested */
-            fprintf(sg_warnings_str, "\n");
-            if ((ssh.sense_key == ILLEGAL_REQUEST) && (len >= 18) &&
-                (sense_buffer[15] & 0x80)) {
-                fprintf(sg_warnings_str, "  Sense Key Specific: Error in "
-                        "%s byte %d",
-                        (sense_buffer[15] & 0x40) ? "Command" : "Data",
-                        (sense_buffer[16] << 8) | sense_buffer[17]);
-                if (sense_buffer[15] & 0x08) {
-                    fprintf(sg_warnings_str, " bit %d\n",
-                            sense_buffer[15] & 0x07);
-                } else {
-                    fprintf(sg_warnings_str, "\n");
+            if (sense_buffer[2] & 0xe0) {
+                if (sense_buffer[2] & 0x80)
+                   fprintf(sg_warnings_str, " FMK");
+                            /* current command has read a filemark */
+                if (sense_buffer[2] & 0x40)
+                   fprintf(sg_warnings_str, " EOM");
+                            /* end-of-medium condition exists */
+                if (sense_buffer[2] & 0x20)
+                   fprintf(sg_warnings_str, " ILI");
+                            /* incorrect block length requested */
+                fprintf(sg_warnings_str, "\n");
+            }
+            if ((len >= 18) && (sense_buffer[15] & 0x80)) {
+                switch (ssh.sense_key) {
+                case ILLEGAL_REQUEST:
+                    fprintf(sg_warnings_str, "  Sense Key Specific: Error in "
+                            "%s byte %d",
+                            (sense_buffer[15] & 0x40) ? "Command" : "Data",
+                            (sense_buffer[16] << 8) | sense_buffer[17]);
+                    if (sense_buffer[15] & 0x08)
+                        fprintf(sg_warnings_str, " bit %d\n",
+                                sense_buffer[15] & 0x07);
+                    else
+                        fprintf(sg_warnings_str, "\n");
+                    break;
+                case NO_SENSE:
+                case NOT_READY:
+                    progress = (sense_buffer[16] << 8) + sense_buffer[17];
+                    fprintf(sg_warnings_str, "  Progress indication: %d %%\n",
+                            (progress * 100) / 0x10000);
+                    break;
+                case HARDWARE_ERROR:
+                case MEDIUM_ERROR:
+                case RECOVERED_ERROR:
+                    fprintf(sg_warnings_str, "  Actual retry count: "
+                            "0x%02x%02x\n", sense_buffer[16],
+                            sense_buffer[17]);
+                    break;
+                case COPY_ABORTED:
+                    fprintf(sg_warnings_str, "  Segment pointer: ");
+                    fprintf(sg_warnings_str, "Relative to start of %s, byte %d",
+                            (sense_buffer[15] & 0x20) ? "segment descriptor" : 
+                                                "parameter list",
+                            (sense_buffer[16] << 8) + sense_buffer[17]);
+                    if (sense_buffer[15] & 0x08)
+                        fprintf(sg_warnings_str, " bit %d\n",
+                                sense_buffer[15] & 0x07);
+                    else
+                        fprintf(sg_warnings_str, "\n");
+                    break;
+                default:
+                    fprintf(sg_warnings_str, "  Sense_key: 0x%x unexpected\n",
+                            ssh.sense_key);
+                    break;
                 }
             }
         } else 
@@ -1804,7 +1931,7 @@ char * safe_strerror(int errnum)
 }
 
 
-/* Note the ASCII-hex output goes to stdin. [All other output from functions
+/* Note the ASCII-hex output goes to stdout. [All other output from functions
    in this file go to sg_warnings_str (default stderr).] 
    'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 16 ASCII-hex bytes
@@ -1914,7 +2041,7 @@ static void dStrHexErr(const char* str, int len)
 /* If the number in 'buf' can be decoded or the multiplier is unknown
    then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
    multiplier suffix. */
-int sg_get_num(char * buf)
+int sg_get_num(const char * buf)
 {
     int res, num;
     unsigned int unum;
@@ -1963,7 +2090,7 @@ int sg_get_num(char * buf)
 /* If the number in 'buf' can be decoded or the multiplier is unknown
    then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
    multiplier suffix. */
-long long sg_get_llnum(char * buf)
+long long sg_get_llnum(const char * buf)
 {
     int res;
     long long num;

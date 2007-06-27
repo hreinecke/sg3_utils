@@ -28,7 +28,6 @@
  */
 
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,8 +37,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/time.h>
 #include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
@@ -50,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.04 20041101";
+static char * version_str = "1.05 20041229";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 
@@ -139,7 +136,8 @@ int main(int argc, char * argv[])
     }
     sg_fd = open(device_name, O_RDONLY);
     if (sg_fd < 0) {
-        perror(ME "open error");
+        fprintf(stderr, ME "open error: %s: ", device_name);
+        perror("");
         return 1;
     }
 

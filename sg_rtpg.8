@@ -1,0 +1,48 @@
+.TH SG_RTPG "8" "January 2005" "sg3_utils-1.12" SG3_UTILS
+.SH NAME
+sg_rtpg \- report target port groups
+.SH SYNOPSIS
+.B sg_rtpg
+[\fI--decode\fR] [\fI--help\fR] [\fI--hex\fR]
+[\fI--verbose\fR] [\fI--version\fR] \fI<scsi_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send a REPORT TARGET PORT GROUPS SCSI command to the given device and
+outputs the response. 
+.PP
+Target port group access is described in SPC-3 found at www.t10.org
+in section 5.8 (in rev 21c dated 2005/1/15). The Report Target Port
+Groups command is also described in that document.
+.TP
+--decode | -d
+decodes the status code and asymmetric access state from each
+target port group descriptor returned. The default action is not
+to decode these values.
+.TP
+--help | -h
+output the usage message then exit.
+.TP
+--hex | -H
+output response in hex (rather than partially or fully decode it).
+.TP
+--verbose | -v
+increase the level of verbosity, (i.e. debug output).
+.TP
+--version | -V
+print the version string and then exit.
+.PP
+The Report Target Port Groups command should be supported whenever the TPGS
+bits in a standard INQUIRY response are greater than zero. [View with
+sg_inq utility.]
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004-2005 Christophe Varoqui and Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq(sg3_utils)

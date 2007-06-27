@@ -28,7 +28,6 @@
  */
 
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,8 +37,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/time.h>
 #include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
@@ -50,7 +47,7 @@
  * tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.09 20041111";
+static char * version_str = "1.10 20041229";
 
 #define SEND_DIAGNOSTIC_CMD     0x1d
 #define SEND_DIAGNOSTIC_CMDLEN  6
@@ -94,9 +91,10 @@ static void usage()
           "              [--verbose] [--version] <scsi_device>\n"
           "  where: --byte1=<n>|-b <n> byte 1 (2nd byte) for some control "
           "pages\n"
-          "         --control|-c       send control information\n"
+          "         --control|-c       send control information (def: fetch "
+          "status)\n"
           "         --help|-h          print out usage message\n"
-          "         --data=<h>...|-d <h>...    string of hex for control "
+          "         --data=<h>,<h>...|-d <h>...  string of hex for control "
           "pages\n"
           "         --filter|-f        filter out enclosure status clear "
           "flags\n"
@@ -105,7 +103,8 @@ static void usage()
           " status page in hex\n"
           "         --list|-l          list known pages and elements (ignore"
           " device)\n"
-          "         --page=<n>|-p <n>  page code value <n> (def: 0)\n"
+          "         --page=<n>|-p <n>  page code <n> (prefix with '0x' "
+          "for hex; def: 0)\n"
           "         --raw|-r           print status page in hex suitable "
           "for '-d'\n"
           "         --status|-s        fetch status information\n"
@@ -238,9 +237,11 @@ static const char * scsi_ptype_strs[] = {
     "enclosure services device",
     "simplified direct access device",
     "optical card reader/writer device",
-    /* 0x10 */ "bridging expander",
+    /* 0x10 */ "bridge controller commands",
     "object based storage",
     "automation/driver interface",
+    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
+    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
 };
 
 static const char * get_ptype_str(int scsi_ptype)
@@ -274,6 +275,7 @@ static struct page_code_desc pc_desc_arr[] = {
         {0xb, "Subenclosure help text (SES-2)"},
         {0xc, "Subenclosure string In/Out (SES-2)"},
         {0xd, "Supported SES diagnostic pages (SES-2)"},
+        {0xe, "Download microcode (SES-2)"},
         {0x3f, "Protocol specific SAS (SAS-1)"},
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
@@ -1002,7 +1004,7 @@ static const char * transport_proto_arr[] = {
     "Remote Direct Memory Access (RDMA)",
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface Transport Protocol (ADT)",
+    "Automation/Drive Interface (ADT)",
     "ATA Packet Interface (ATA/ATAPI-7)",
     "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"
@@ -1580,7 +1582,8 @@ int main(int argc, char * argv[])
 
     sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
-        perror(ME "open error");
+        fprintf(stderr, ME "open error: %s: ", device_name);
+        perror("");
         return 1;
     }
     if (! do_raw) {

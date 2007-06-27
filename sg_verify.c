@@ -28,7 +28,6 @@
  */
 
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,8 +37,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/time.h>
 #include "sg_include.h"
 #include "sg_lib.h"
 
@@ -48,7 +45,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.00 20041106";
+static char * version_str = "1.01 20041229";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -154,6 +151,8 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
                 "continuing\n");
         return 0;
     case SG_LIB_CAT_INVALID_OP:
+        if (verbose > 1)
+            sg_chk_n_print3("VERIFY(10) command problem", &io_hdr);
         return SG_LIB_CAT_INVALID_OP;
     default:
         sg_chk_n_print3("VERIFY(10) command problem", &io_hdr);
@@ -257,7 +256,8 @@ int main(int argc, char * argv[])
     }
     sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
-        perror(ME "open error");
+        fprintf(stderr, ME "open error: %s: ", device_name);
+        perror("");
         return 1;
     }
 
