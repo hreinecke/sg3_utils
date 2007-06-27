@@ -22,8 +22,8 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing! The relevant sections of the
-SCSI Primary Commands document (SPC-3 most recent draft revision 20a
-dated 17th August 2004) are sections 5.6 (general information), 6.11 (for
+SCSI Primary Commands document (SPC-3 most recent draft revision 21
+dated 22nd September 2004) are sections 5.6 (general information), 6.11 (for
 PRIN) and 6.12 (for PROUT). To safeguard against accidental use,
 the '--out' option must be given when a PROUT sub-command (e.g. '--register')
 is used.
@@ -47,7 +47,8 @@ the potential confusion the term "sub-command" has been introduced.
 --clear | -C
 Clear is a sub-command of the PROUT command. It releases the
 persistent reservation (if any) and clears all registrations from the
-device. [Typically also requires the --param-rk=<h> option.]
+device. It is required to supply a reservation key that is registered
+for this I_T_L nexus (identified by --param-rk).
 .TP
 --device=<scsi_device> | -d <scsi_device>
 This utility needs to have a scsi_device to be specified. This can either
@@ -98,16 +99,16 @@ Default value is 0. This option is needed by some PROUT sub-commands.
 --preempt | -P
 Preempt is a sub-command of the PROUT command. Preempts
 the existing persistent reservation (identified by '--param-sark') with
-the current I_T_L nexus (identified by '--param-rk'). The 
-associated '--prout-type<h>' option needs to match the type of the
-reservation.
+the registration key that is registered for this I_T_L nexus (identified
+by '--param-rk'). The associated '--prout-type<h>' option needs to match
+the type of the reservation.
 .TP
 --preempt-abort | -A
 Preempt and Abort is a sub-command of the PROUT command. Preempts
 the existing persistent reservation (identified by '--param-sark') with
-the current I_T_L nexus (identified by '--param-rk'). The
-associated '--prout-type<h>' option needs to match the type of the
-reservation. ACA and other pending tasks are aborted.
+the registration key that is registered for this I_T_L nexus (identified
+by '--param-rk'). The associated '--prout-type<h>' option needs to match
+the type of the reservation. ACA and other pending tasks are aborted.
 .TP
 --prout-type=<h> | -T <h>
 specify the PROUT command's 'type' argument. Required by 

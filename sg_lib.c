@@ -67,7 +67,7 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.00 20041020";
+static char * version_str = "1.01 20041024";
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -983,7 +983,7 @@ static struct error_info additional[] =
   {0x69,0x00,"Data loss on logical unit"},
   {0x69,0x01,"Multiple logical unit failures"},
   {0x69,0x02,"Parity/data mismatch"},
-  {0x6A,0x00,"Informational,refer to log"},
+  {0x6A,0x00,"Informational, refer to log"},
   {0x6B,0x00,"State change has occurred"},
   {0x6B,0x01,"Redundancy level got better"},
   {0x6B,0x02,"Redundancy level got worse"},
@@ -1043,7 +1043,7 @@ static const char *sense_key_desc[] = {
 
 void sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
-    int k, num;
+    int k, num, rlen;
     int found = 0;
     struct error_info * eip;
     struct error_info2 * ei2p;
@@ -1055,8 +1055,11 @@ void sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
             (ascq <= ei2p->code2_max)) {
             found = 1;
             num = snprintf(buff, buff_len, "Additional sense: ");
-            num += snprintf(buff + num, buff_len - num, ei2p->text, ascq);
-            snprintf(buff + num, buff_len - num, "\n");
+            rlen = buff_len - num;
+            num += snprintf(buff + num, ((rlen > 0) ? rlen : 0),
+                            ei2p->text, ascq);
+            rlen = buff_len - num;
+            snprintf(buff + num, ((rlen > 0) ? rlen : 0), "\n");
         }
     }
     if (found)
@@ -1074,7 +1077,7 @@ void sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
         if (asc >= 0x80)
             snprintf(buff, buff_len, "vendor specific ASC=%2x, ASCQ=%2x\n",
                      asc, ascq);
-        else if (ascq >= 0x30)
+        else if (ascq >= 0x80)
             snprintf(buff, buff_len, "ASC=%2x, vendor specific ASCQ=%2x\n",
                      asc, ascq);
         else
@@ -1645,7 +1648,7 @@ int sg_get_command_size(unsigned char opcode)
 void sg_get_command_name(const unsigned char * cmdp, int peri_type,
                          int buff_len, char * buff)
 {
-    unsigned char service_action;
+    int service_action;
 
     if ((NULL == buff) || (buff_len < 1))
         return;

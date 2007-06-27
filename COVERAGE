@@ -27,6 +27,7 @@ READ DEFECT(10)     sginfo
 READ DEFECT(12)     sginfo
 READ LONG           sg_read_long
 RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses
+REPORT LUNS         sg_luns
 REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REQUEST SENSE       sg_requests
@@ -49,4 +50,4 @@ IDENTITY            sg_inq, sg_scan
 
 
 Doug Gilbert
-20th October 2004
+26th October 2004

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2004 Douglas Gilbert.
+ * Copyright (c) 2004 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.02 20041015";
+static char * version_str = "1.03 20041026";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 

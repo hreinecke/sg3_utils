@@ -57,7 +57,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.14 20041011";
+static char * version_str = "1.15 20041029";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -74,7 +74,7 @@ static char * version_str = "1.14 20041011";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
-#define RCAP16_REPLY_LEN 12
+#define RCAP16_REPLY_LEN 32
 
 #ifndef SERVICE_ACTION_IN
 #define SERVICE_ACTION_IN     0x9e
@@ -1018,11 +1018,11 @@ int main(int argc, char * argv[])
     if (do_sync) {
         if (FT_SG == out_type) {
             fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
-            res = sg_ll_sync_cache(outfd, 0, 0, 0);
+            res = sg_ll_sync_cache(outfd, 0, 0, 0, 0);
             if (2 == res) {
                 fprintf(stderr,
                         "Unit attention, media changed(in), continuing\n");
-                res = sg_ll_sync_cache(outfd, 0, 0, 0);
+                res = sg_ll_sync_cache(outfd, 0, 0, 0, 0);
             }
             if (0 != res)
                 fprintf(stderr, "Unable to synchronize cache\n");

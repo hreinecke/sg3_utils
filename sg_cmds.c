@@ -40,6 +40,8 @@
  * CHANGELOG
  *      v1.00 (20041018)
  *        fetch low level command execution code from other utilities
+ *      v1.01 (20041026)
+ *        fix "ll" read capacity calls, add sg_ll_report_luns
  */
 
 #include <stdio.h>
@@ -52,7 +54,7 @@
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
-static char * version_str = "1.00 20041019";
+static char * version_str = "1.02 20041030";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -67,7 +69,7 @@ static char * version_str = "1.00 20041019";
 #define SERVICE_ACTION_IN_16_CMDLEN 16
 #define READ_CAPACITY_16_SA 0x10
 #define READ_CAPACITY_10_CMD 0x25
-#define READ_CAPACITY_10_CMDLEN 0x10
+#define READ_CAPACITY_10_CMDLEN 10
 #define MODE_SENSE6_CMD      0x1a
 #define MODE_SENSE6_CMDLEN   6
 #define MODE_SENSE10_CMD     0x5a
@@ -78,6 +80,14 @@ static char * version_str = "1.00 20041019";
 #define MODE_SELECT10_CMDLEN  10
 #define REQUEST_SENSE_CMD 0x3
 #define REQUEST_SENSE_CMDLEN 6
+#define REPORT_LUNS_CMD 0xa0
+#define REPORT_LUNS_CMDLEN 12
+#define LOG_SENSE_CMD     0x4d
+#define LOG_SENSE_CMDLEN  10
+#define LOG_SELECT_CMD     0x4c
+#define LOG_SELECT_CMDLEN  10
+#define TUR_CMD  0x0
+#define TUR_CMDLEN  6
 
 #define MODE6_RESP_HDR_LEN 4
 #define MODE10_RESP_HDR_LEN 8
@@ -115,6 +125,7 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
         fprintf(sg_warnings_str, "\n");
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(inqCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
@@ -176,6 +187,7 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
         fprintf(sg_warnings_str, "\n");
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(inqCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
@@ -222,9 +234,57 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     }
 }
 
+/* Invokes a SCSI TEST UNIT READY command.
+ * 'pack_id' is just for diagnostics, safe to set to 0.
+ * Return of 0 -> success, -1 -> failure */
+int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
+{
+    int res, k;
+    unsigned char turCmbBlk[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_str, "        test unit ready cdb: ");
+        for (k = 0; k < TUR_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", turCmbBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(turCmbBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_NONE;
+    io_hdr.dxfer_len = 0;
+    io_hdr.dxferp = NULL;
+    io_hdr.cmdp = turCmbBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+    io_hdr.pack_id = pack_id;   /* diagnostic: safe to set to 0 */
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        fprintf(sg_warnings_str, "test_unit_ready (SG_IO) error: %s\n",
+                safe_strerror(errno));
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("test unit ready", &io_hdr);
+        return -1;
+    }
+}
+
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command */
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
-int sg_ll_sync_cache(int sg_fd, int sync_nv, int immed, int verbose)
+int sg_ll_sync_cache(int sg_fd, int sync_nv, int immed, int noisy,
+                     int verbose)
 {
     int res, k;
     unsigned char scCmdBlk[SYNCHRONIZE_CACHE_CMDLEN] =
@@ -245,6 +305,7 @@ int sg_ll_sync_cache(int sg_fd, int sync_nv, int immed, int verbose)
         fprintf(sg_warnings_str, "\n");
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(scCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
@@ -261,12 +322,16 @@ int sg_ll_sync_cache(int sg_fd, int sync_nv, int immed, int verbose)
         return -1;
     }
     res = sg_err_category3(&io_hdr);
-    if (SG_LIB_CAT_MEDIA_CHANGED == res)
+    switch (res) {
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    case SG_LIB_CAT_MEDIA_CHANGED:
         return 2; /* probably have another go ... */
-    else if (SG_LIB_CAT_INVALID_OP == res)
+    case SG_LIB_CAT_INVALID_OP:
         return res;
-    else if (SG_LIB_CAT_CLEAN != res) {
-        sg_chk_n_print3("synchronize cache", &io_hdr);
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("synchronize cache", &io_hdr);
         return -1;
     }
     return 0;
@@ -297,7 +362,11 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
         rcCmdBlk[8] = (llba >> 8) & 0xff;
         rcCmdBlk[9] = llba & 0xff;
     }
-    rcCmdBlk[13] = 12;  /* Allocation length */
+    /* Allocation length, no guidance in SBC-2 rev 15b */
+    rcCmdBlk[10] = (mx_resp_len >> 24) & 0xff;
+    rcCmdBlk[11] = (mx_resp_len >> 16) & 0xff;
+    rcCmdBlk[12] = (mx_resp_len >> 8) & 0xff;
+    rcCmdBlk[13] = mx_resp_len & 0xff;
     if (NULL == sg_warnings_str)
         sg_warnings_str = stderr;
     if (verbose) {
@@ -307,6 +376,7 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
         fprintf(sg_warnings_str, "\n");
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(rcCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
@@ -368,6 +438,7 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
         fprintf(sg_warnings_str, "\n");
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(rcCmdBlk);
     io_hdr.mx_sb_len = sizeof(sense_b);
@@ -457,7 +528,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     case SG_LIB_CAT_INVALID_OP:
         return res;
     default:
-        if (noisy | verbose) {
+        if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "Mode sense (6) error, dbd=%d "
@@ -527,7 +598,7 @@ int sg_ll_mode_sense10(int sg_fd, int dbd, int pc, int pg_code,
     case SG_LIB_CAT_INVALID_OP:
         return res;
     default:
-        if (noisy | verbose) {
+        if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "Mode sense (10) error, dbd=%d "
@@ -594,7 +665,7 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
     case SG_LIB_CAT_INVALID_OP:
         return res;
     default:
-        if (noisy | verbose) {
+        if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "Mode select (6) error, pf=%d "
@@ -661,7 +732,7 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
     case SG_LIB_CAT_INVALID_OP:
         return res;
     default:
-        if (noisy | verbose) {
+        if (noisy || verbose) {
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "Mode select (10) error, pf=%d "
@@ -717,7 +788,7 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
 
 /* Invokes a SCSI REQUEST SENSE command */
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Request Sense not
- *  supported??, -1 -> other failure */
+ * supported??, -1 -> other failure */
 int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
                         int verbose)
 {
@@ -739,6 +810,7 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     }
 
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = REQUEST_SENSE_CMDLEN;
     io_hdr.mx_sb_len = sizeof(sense_b);
@@ -773,6 +845,207 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
         return SG_LIB_CAT_INVALID_OP;
     default:
         sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr);
+        return -1;
+    }
+}
+
+/* Invokes a SCSI REPORT LUNS command */
+/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Report Luns not
+ * supported, -1 -> other failure */
+int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
+                      int mx_resp_len, int noisy, int verbose)
+{
+    int k, res;
+    unsigned char rlCmdBlk[REPORT_LUNS_CMDLEN] =
+                         {REPORT_LUNS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    rlCmdBlk[2] = select_report & 0xff;
+    rlCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
+    rlCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
+    rlCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
+    rlCmdBlk[9] = mx_resp_len & 0xff;
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_str, "        report luns cdb: ");
+        for (k = 0; k < REPORT_LUNS_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", rlCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(rlCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = mx_resp_len;
+    io_hdr.dxferp = resp;
+    io_hdr.cmdp = rlCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        fprintf(sg_warnings_str, "report_luns (SG_IO) error: %s\n",
+                safe_strerror(errno));
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_RECOVERED:
+        if (verbose && io_hdr.resid)
+            fprintf(sg_warnings_str, "    report_luns: resid=%d\n",
+                    io_hdr.resid);
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+        return res;
+    case SG_LIB_CAT_MEDIA_CHANGED:
+        return 2;
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("REPORT LUNS command error", &io_hdr);
+        return -1;
+    }
+}
+
+/* Invokes a SCSI LOG SENSE command */
+/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Log Sense not
+ * supported, -1 -> other failure */
+int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code, 
+                    int paramp, unsigned char * resp, int mx_resp_len, 
+                    int noisy, int verbose)
+{
+    int res, k;
+    unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] = 
+        {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (mx_resp_len > 0xffff) {
+        fprintf(sg_warnings_str, "mx_resp_len too big\n");
+        return -1;
+    }
+    logsCmdBlk[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
+    logsCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
+    logsCmdBlk[5] = (unsigned char)((paramp >> 8) & 0xff);
+    logsCmdBlk[6] = (unsigned char)(paramp & 0xff);
+    logsCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    logsCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+    if (verbose) {
+        fprintf(sg_warnings_str, "        log sense cdb: ");
+        for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", logsCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(logsCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = mx_resp_len;
+    io_hdr.dxferp = resp;
+    io_hdr.cmdp = logsCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        fprintf(sg_warnings_str, "log sense (SG_IO) error: %s\n",
+                safe_strerror(errno));
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_RECOVERED:
+        if (verbose && io_hdr.resid)
+            fprintf(sg_warnings_str, "    log_sense: resid=%d\n",
+                    io_hdr.resid);
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+        return SG_LIB_CAT_INVALID_OP;
+    default:
+        if (noisy || verbose) {
+            char ebuff[EBUFF_SZ];
+            snprintf(ebuff, EBUFF_SZ, "log_sense: ppc=%d, sp=%d, "
+                     "pc=%d, page_code=%x, paramp=%x\n    ", ppc, sp, pc, 
+                     pg_code, paramp);
+            sg_chk_n_print3(ebuff, &io_hdr);
+        }
+        return -1;
+    }
+}
+
+
+/* Invokes a SCSI LOG SELECT command */
+/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Log Select not
+ * supported, -1 -> other failure */
+int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
+                     unsigned char * paramp, int param_len, 
+                     int noisy, int verbose)
+{
+    int res, k;
+    unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] = 
+        {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (param_len > 0xffff) {
+        fprintf(sg_warnings_str, "log select: param_len too big\n");
+        return -1;
+    }
+    logsCmdBlk[1] = (unsigned char)((pcr ? 2 : 0) | (sp ? 1 : 0));
+    logsCmdBlk[2] = (unsigned char)((pc << 6) & 0xc0);
+    logsCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
+    logsCmdBlk[8] = (unsigned char)(param_len & 0xff);
+    if (verbose) {
+        fprintf(sg_warnings_str, "        log select cdb: ");
+        for (k = 0; k < LOG_SELECT_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", logsCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(logsCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = param_len ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
+    io_hdr.dxfer_len = param_len;
+    io_hdr.dxferp = paramp;
+    io_hdr.cmdp = logsCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        fprintf(sg_warnings_str, "log select (SG_IO) error: %s\n",
+                safe_strerror(errno));
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_RECOVERED:
+        if (verbose && io_hdr.resid)
+            fprintf(sg_warnings_str, "    log_select: resid=%d\n",
+                    io_hdr.resid);
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+        return SG_LIB_CAT_INVALID_OP;
+    default:
+        if (noisy || verbose) {
+            char ebuff[EBUFF_SZ];
+            snprintf(ebuff, EBUFF_SZ, "log_select: pcr=%d, sp=%d, "
+                     "pc=%d\n    ", pcr, sp, pc);
+            sg_chk_n_print3(ebuff, &io_hdr);
+        }
         return -1;
     }
 }

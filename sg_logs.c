@@ -23,21 +23,12 @@
    
 */
 
-static char * version_str = "0.32 20041012";
+static char * version_str = "0.34 20041028";
 
 #define ME "sg_logs: "
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-
-#define LOG_SENSE_CMD     0x4d
-#define LOG_SENSE_CMDLEN  10
-#define LOG_SELECT_CMD     0x4c
-#define LOG_SELECT_CMDLEN  10
 #define MX_ALLOC_LEN (1024 * 17)
-
 #define PG_CODE_ALL 0x00
-
 #define EBUFF_SZ 256
 
 
@@ -50,165 +41,26 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
                    int paramp, unsigned char * resp, int mx_resp_len, 
                    int noisy, int verbose)
 {
-    int res, k;
-    unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] = 
-        {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char logsCmdBlk2[LOG_SENSE_CMDLEN]; 
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
     int actual_len;
+    int res;
 
-    logsCmdBlk[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
-    logsCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
-    logsCmdBlk[5] = (unsigned char)((paramp >> 8) & 0xff);
-    logsCmdBlk[6] = (unsigned char)(paramp & 0xff);
-    if (mx_resp_len > 0xffff) {
-        printf( ME "mx_resp_len too big\n");
-        return -1;
-    }
-    memcpy(logsCmdBlk2, logsCmdBlk, sizeof(logsCmdBlk));
-    logsCmdBlk[8] = 4;
-    if (verbose) {
-        fprintf(stderr, "        log sense cdb: ");
-        for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", logsCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    if (mx_resp_len > 3)
-        memset(resp, 0, 4);
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(logsCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = 4;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = logsCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (log sense) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_CLEAN:
-    case SG_LIB_CAT_RECOVERED:
-        break;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, ME "log_sense(short): ppc=%d, sp=%d, "
-                     "pc=%d, page_code=%x, paramp=%x\n    ", ppc, sp, pc, 
-                     pg_code, paramp);
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
+    memset(resp, 0, mx_resp_len);
+    if ((res = sg_ll_log_sense(sg_fd, ppc, sp, pc, pg_code, paramp, resp,
+                               4, noisy, verbose))) {
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "log_sense: not supported\n");
         return -1;
     }
     actual_len = (resp[2] << 8) + resp[3] + 4;
-    if (actual_len < 4)
-        return 0;
     /* Some HBAs don't like odd transfer lengths */
     if (actual_len % 2)
         actual_len += 1;
     if (actual_len > mx_resp_len)
         actual_len = mx_resp_len;
-    logsCmdBlk2[7] = (unsigned char)((actual_len >> 8) & 0xff);
-    logsCmdBlk2[8] = (unsigned char)(actual_len & 0xff);
-    if (verbose) {
-        fprintf(stderr, "        log sense cdb: ");
-        for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", logsCmdBlk2[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(logsCmdBlk2);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = actual_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = logsCmdBlk2;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (log sense) error");
-        return -1;
-    }
-#if 0
-    printf("SG_IO ioctl: log_sense: status=%d, info=%d, sb_len_wr=%d\n", 
-           io_hdr.status, io_hdr.info, io_hdr.sb_len_wr);
-#endif
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_CLEAN:
-    case SG_LIB_CAT_RECOVERED:
-        return 0;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, ME "log_sense: ppc=%d, sp=%d, "
-                     "pc=%d, page_code=%x, paramp=%x\n    ", ppc, sp, pc, 
-                     pg_code, paramp);
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
-        return -1;
-    }
-}
-
-/* Return 0 if successful, else -1 */
-static int do_logselect(int sg_fd, int pcr, int sp, int pc,
-                        unsigned char * paramp, int param_len, 
-                        int noisy, int verbose)
-{
-    int res, k;
-    unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] = 
-        {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    logsCmdBlk[1] = (unsigned char)((pcr ? 2 : 0) | (sp ? 1 : 0));
-    logsCmdBlk[2] = (unsigned char)((pc << 6) & 0xc0);
-    logsCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
-    logsCmdBlk[8] = (unsigned char)(param_len & 0xff);
-    if (verbose) {
-        fprintf(stderr, "        log select cdb: ");
-        for (k = 0; k < LOG_SELECT_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", logsCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(logsCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = param_len ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = logsCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (log select) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_CLEAN:
-    case SG_LIB_CAT_RECOVERED:
-        break;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, ME "log_select: pcr=%d, sp=%d, "
-                     "pc=%d\n    ", pcr, sp, pc);
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
+    if ((res = sg_ll_log_sense(sg_fd, ppc, sp, pc, pg_code, paramp, resp,
+                               actual_len, noisy, verbose))) {
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "log_sense: not supported (b)\n");
         return -1;
     }
     return 0;
@@ -643,7 +495,7 @@ static void show_self_test_page(unsigned char * resp, int len, int show_pcb)
 }
 
 static void show_Temperature_page(unsigned char * resp, int len, 
-                                  int show_pcb, int hdr)
+                                  int show_pcb, int hdr, int show_unknown)
 {
     int k, num, extra, pc, pcb;
     unsigned char * ucp;
@@ -680,10 +532,11 @@ static void show_Temperature_page(unsigned char * resp, int len,
                     printf("  Reference temperature = <not available>");
             }
 
-        } else {
+        } else if (show_unknown) {
             printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
-        }
+        } else
+            continue;
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("  <%s>\n", pcb_str);
@@ -1025,7 +878,7 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
         show_last_n_deferred_error_page(resp, len, show_pcb);
         break;
     case 0xd:
-        show_Temperature_page(resp, len, show_pcb, 1);
+        show_Temperature_page(resp, len, show_pcb, 1, 1);
         break;
     case 0xe:
         show_Start_Stop_page(resp, len, show_pcb);
@@ -1092,7 +945,7 @@ static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
     int res = 0;
 
     if (0 == do_logs(sg_fd, 0, 0, 1, 0xd, 0, resp, max_len, 0, verbose))
-        show_Temperature_page(resp, (resp[2] << 8) + resp[3] + 4, 0, 0);
+        show_Temperature_page(resp, (resp[2] << 8) + resp[3] + 4, 0, 0, 0);
     else if (0 == do_logs(sg_fd, 0, 0, 1, 0x2f, 0, resp, max_len, 0, verbose))
         show_IE_page(resp, (resp[2] << 8) + resp[3] + 4, 0, 0);
     else {
@@ -1216,10 +1069,12 @@ int main(int argc, char * argv[])
     if (1 == do_temp)
         return fetchTemperature(sg_fd, rsp_buff, MX_ALLOC_LEN, do_verbose);
 
-    if (1 == do_pcreset)
-        return do_logselect(sg_fd, 1, do_sp, pc, NULL, 0, 1, do_verbose) ?
-               1 : 0;
-
+    if (1 == do_pcreset) {
+        k = sg_ll_log_select(sg_fd, 1, do_sp, pc, NULL, 0, 1, do_verbose);
+        if (SG_LIB_CAT_INVALID_OP == k)
+            fprintf(stderr, "log_select: not supported\n");
+        return k ?  1 : 0;
+    }
     if (0 == do_logs(sg_fd, do_ppc, do_sp, pc, pg_code, paramp,
                      rsp_buff, MX_ALLOC_LEN, 1, do_verbose))
     {
