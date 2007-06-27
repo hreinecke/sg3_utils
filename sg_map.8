@@ -1,0 +1,128 @@
+.TH SG_MAP "8" "December 2000" "sg3_utils-0.91" SG3_UTILS
+.SH NAME
+sg_map \- displays mapping between sg and other SCSI devices
+.SH SYNOPSIS
+.B sg_map
+[\fI-a\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR] [\fI-sr\fR] [\fI-st\fR]
+[\fI-x\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sometimes it is difficult to determine which SCSI device a sg device
+name (e.g. /dev/sg0) refers to. This command loops through the
+sg devices and finds the corresponding SCSI disk, cdrom or tape
+device name (if any). Scanners are an example of SCSI devices
+that have no alternate SCSI device name apart from their sg device
+name.
+.TP
+-a
+assume the sg devices have alphabetical device names and loop
+through /dev/sga, /dev/sgb, etc. Default is numeric scan
+.TP
+-n
+assume the sg devices have numeric device names and loop
+through /dev/sg0, /dev/sg1, etc. Default is numeric scan
+.TP
+-sd
+display mappings to SCSI disk device names
+.TP
+-scd
+display mappings to SCSI cdrom device names of the form
+/dev/scd0, /dev/scd1 etc
+.TP
+-sr
+display mappings to SCSI cdrom device names of the form
+/dev/sr0, /dev/sr1 etc
+.TP
+-st
+display mappings to SCSI tape device names
+.TP
+-x
+after each active sg device name is displayed there are
+five digits: <host_number> <bus> <scsi_id> <lun> <scsi_type>
+.PP
+If no options starting with "-s" are given then the mapping to
+all SCSI disk, cdrom and tape device names is shown.
+.PP
+If the device file system (devfs) is present a line noting
+this is output. The "native" devfs scsi hierarchy makes the
+relationship between a sg device name and any corresponding
+disk, cdrom or tape device name easy to establish. This
+replaces the need for this command. However many applications
+will continue to look for Linux SCSI device names in their
+traditional places. [Devfs supplies a compatibility daemon
+called devfsd whose default configuration adds back the
+Linux device names in their traditional positions.
+.PP
+Quite often the mapping information can be derived by
+observing the output of the command: "cat /proc/scsi/scsi".
+However if devices have been added since boot this can
+be deceptive.
+.SH EXAMPLES
+.PP
+My system has a SCSI disk, a cd writer and a dvd player:
+.br
+   $ sg_map
+.br
+   # Note: the devfs pseudo file system is present
+.br
+   /dev/sg0  /dev/sda
+.br
+   /dev/sg1  /dev/sr0
+.br
+   /dev/sg2  /dev/sr1
+.PP
+In order to find which sg device name corresponds to the disk:
+.br
+   $ sg_map -sd
+.br
+   # Note: the devfs pseudo file system is present
+.br
+   /dev/sg0  /dev/sda
+.br
+   /dev/sg1
+.br
+   /dev/sg2
+.PP
+The "-x" option gives the following output:
+.br
+   sg_map -x
+.br
+   # Note: the devfs pseudo file system is present
+.br
+   /dev/sg0  1 0 1 0  0  /dev/sda
+.br
+   /dev/sg1  2 0 4 0  5  /dev/sr0
+.br
+   /dev/sg2  2 0 6 0  5  /dev/sr1
+.PP
+When a SCSI scanner is added the output becomes:
+.br
+   $ sg_map
+.br
+   # Note: the devfs pseudo file system is present
+.br
+   /dev/sg0  /dev/sda
+.br
+   /dev/sg1  /dev/sr0
+.br
+   /dev/sg2  /dev/sr1
+.br
+   /dev/sg3
+.PP
+By process of elimination /dev/sg3 must be the scanner.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert@interlog.com>.
+.SH COPYRIGHT
+Copyright \(co 2000 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B scsi_info(8)
+,
+.B scsidev(8)
+,
+.B devfsd(8)

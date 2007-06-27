@@ -1,0 +1,96 @@
+.TH SG_RBUF "8" "December 2000" "sg3_utils-0.91" SG_UTILS
+.SH NAME
+sg_rbuf \- reads data using SCSI READ BUFFER command
+.SH SYNOPSIS
+.B sg_rbuf
+[\fI-q\fR] [\fI-d\fR] [\fI-s=<num_MB>\fR] [\fI-b=<num_KB>\fR] 
+\fI<sg_device>\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This command reads data with the SCSI READ BUFFER command via
+the sg driver and then discards it. Typically the data being 
+read is from a disk's memory cache. It is assumed that the data
+is sourced quickly (although this is not guaranteed by the SCSI
+standards). This command is designed for timing transfer speeds
+across a SCSI bus.
+.TP
+-q
+only transfer the data into kernel buffers (typically by DMA from
+the SCSI adapter card) and do not move it into the user space.
+.TP
+-d
+use direct IO if available. In this case the sg driver will attempt
+to configure the DMA from the SCSI adapter to transfer directly
+into user memory. This will eliminate the copy via kernel buffers.
+If not available then this will be reported and indirect IO will
+be done instead.
+.TP
+-s=<num_MB>
+size of total transfer (in Megabytes == 1024^2). The default is
+200 MB, the maximum is 4095 MB. The actual number of bytes
+transferred may be slightly less since all transfers are the
+same size (and an integer division is involved rounding towards zero).
+.TP
+-b=<num_KB>
+size of each transfer (in Kilobytes == 1024). The default is
+the actual available buffer size returned by the READ BUFFER
+command. The maximum is the same as the default, hence this
+argument can only be used to reduce the size of each transfer
+to less than the device's actual available buffer size.
+.PP
+This command is typically used on modern SCSI disks which have
+a RAM cache on their drive electronics. If no IO to the magnetic
+media, or slower devices like flash RAM, is involved then
+the disk should be able to source data fast enough to saturate
+the bandwidth of the host machine. The bottleneck may then be
+the SCSI bus, the Linux drivers or the host machine's hardware
+(e.g. speed of RAM). Using time(1) in front of a
+sg_rbuf command is one way to do such measurements.
+.PP
+Note that maximum bandwidths given by SCSI standards (e.g. UW ==
+40 MB/sec) take "Mega" to mean 10^6 .
+.SH EXAMPLES
+.PP
+On the test system /dev/sg0 corresponds to a fast disk
+on a U2W SCSI bus (max 80 MB/sec). The disk specifications
+state that its cache is 4 MB.
+.br
+   $ time ./sg_rbuf /dev/sg0
+.br
+READ BUFFER reports: buffer capacity=3434944,
+.br
+    offset boundary=6
+.br
+Read 200 MBytes (actual 199 MB, 209531584 bytes),
+.br
+    buffer size=3354 KBytes
+.br
+real 0m5.072s, user 0m0.000s, sys 0m2.280s
+.PP
+So that is approximately 40 MB/sec at 40 % utilization. Now with
+the addition of the "-q" option this throughput improves and the
+utilization drops to 0%.
+.br
+   $ time ./sg_rbuf -q /dev/sg0
+.br
+READ BUFFER reports: buffer capacity=3434944,
+.br
+    offset boundary=6
+.br
+Read 200 MBytes (actual 199 MB, 209531584 bytes),
+.br
+    buffer size=3354 KBytes
+.br
+real 0m2.784s, user 0m0.000s, sys 0m0.000s
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert@interlog.com>.
+.SH COPYRIGHT
+Copyright \(co 2000 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B time(1)

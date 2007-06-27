@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <ctype.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -43,7 +44,7 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
    This version should compile with Linux sg drivers with version numbers
    >= 30000 .
 
-   Version 5.10 20001208
+   Version 5.11 20001220
 */
 
 #define DEF_BLOCK_SIZE 512
@@ -65,6 +66,51 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
 
 static int sum_of_resids = 0;
 
+static int dd_count = -1;
+static int in_full = 0;
+static int in_partial = 0;
+static int out_full = 0;
+static int out_partial = 0;
+
+static void install_handler (int sig_num, void (*sig_handler) (int sig))
+{
+    struct sigaction sigact;
+    sigaction (sig_num, NULL, &sigact);
+    if (sigact.sa_handler != SIG_IGN)
+    {
+        sigact.sa_handler = sig_handler;
+        sigemptyset (&sigact.sa_mask);
+        sigact.sa_flags = 0;
+        sigaction (sig_num, &sigact, NULL);
+    }
+}
+
+void print_stats()
+{
+    if (0 != dd_count)
+        fprintf(stderr, "  remaining block count=%d\n", dd_count);
+    fprintf(stderr, "%d+%d records in\n", in_full, in_partial);
+    fprintf(stderr, "%d+%d records out\n", out_full, out_partial);
+}
+
+static void interrupt_handler(int sig)
+{
+    struct sigaction sigact;
+
+    sigact.sa_handler = SIG_DFL;
+    sigemptyset (&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    sigaction (sig, &sigact, NULL);
+    fprintf(stderr, "Interrupted by signal,");
+    print_stats ();
+    kill (getpid (), sig);
+}
+
+static void siginfo_handler(int sig)
+{
+    fprintf(stderr, "Progress report, continuing ...\n");
+    print_stats ();
+}
 
 int dd_filetype(const char * filename)
 {
@@ -314,7 +360,6 @@ int main(int argc, char * argv[])
     int ibs = 0;
     int obs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
-    int count = -1;
     char str[512];
     char * key;
     char * buf;
@@ -331,10 +376,6 @@ int main(int argc, char * argv[])
     int in_num_sect = 0;
     int out_num_sect = 0;
     int in_sect_sz, out_sect_sz;
-    int in_full = 0;
-    int in_partial = 0;
-    int out_full = 0;
-    int out_partial = 0;
     char ebuff[256];
     int blocks_per;
 
@@ -371,7 +412,7 @@ int main(int argc, char * argv[])
         else if (0 == strcmp(key,"seek"))
             seek = get_num(buf);
         else if (0 == strcmp(key,"count"))
-            count = get_num(buf);
+            dd_count = get_num(buf);
         else if (0 == strcmp(key,"dio"))
             dio = get_num(buf);
         else {
@@ -395,8 +436,13 @@ int main(int argc, char * argv[])
     }
 #ifdef SG_DEBUG
     fprintf(stderr, "sg_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
-           inf, skip, outf, seek, count);
+           inf, skip, outf, seek, dd_count);
 #endif
+    install_handler (SIGINT, interrupt_handler);
+    install_handler (SIGQUIT, interrupt_handler);
+    install_handler (SIGPIPE, interrupt_handler);
+    install_handler (SIGUSR1, siginfo_handler);
+
     infd = STDIN_FILENO;
     outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
@@ -498,9 +544,9 @@ int main(int argc, char * argv[])
         return 1;
     }
 #endif
-    if (0 == count)
+    if (0 == dd_count)
         return 0;
-    else if (count < 0) {
+    else if (dd_count < 0) {
         if (FT_SG == in_type) {
             res = read_capacity(infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
@@ -544,19 +590,19 @@ int main(int argc, char * argv[])
 #ifdef SG_DEBUG
     fprintf(stderr, 
 	    "Start of loop, count=%d, in_num_sect=%d, out_num_sect=%d\n", 
-            count, in_num_sect, out_num_sect);
+            dd_count, in_num_sect, out_num_sect);
 #endif
         if (in_num_sect > 0) {
             if (out_num_sect > 0)
-                count = (in_num_sect > out_num_sect) ? out_num_sect :
+                dd_count = (in_num_sect > out_num_sect) ? out_num_sect :
                                                        in_num_sect;
             else
-                count = in_num_sect;
+                dd_count = in_num_sect;
         }
         else
-            count = out_num_sect;
+            dd_count = out_num_sect;
     }
-    if (count <= 0) {
+    if (dd_count <= 0) {
         fprintf(stderr, "Couldn't calculate count, please give one\n");
         return 1;
     }
@@ -583,10 +629,10 @@ int main(int argc, char * argv[])
     blocks_per = bpt;
 #ifdef SG_DEBUG
     fprintf(stderr, "Start of loop, count=%d, blocks_per=%d\n", 
-	    count, blocks_per);
+	    dd_count, blocks_per);
 #endif
-    while (count > 0) {
-        blocks = (count > blocks_per) ? blocks_per : count;
+    while (dd_count > 0) {
+        blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG == in_type) {
             dio_tmp = dio;
             res = sg_read(infd, wrkPos, blocks, skip, bs, &dio_tmp);
@@ -626,7 +672,7 @@ int main(int argc, char * argv[])
                 break;
             }
             else if (res < blocks * bs) {
-                count = 0;
+                dd_count = 0;
                 blocks = res / bs;
                 if ((res % bs) > 0) {
                     blocks++;
@@ -685,8 +731,8 @@ int main(int argc, char * argv[])
             else
                 out_full += blocks;
         }
-        if (count > 0)
-            count -= blocks;
+        if (dd_count > 0)
+            dd_count -= blocks;
         skip += blocks;
         seek += blocks;
     }
@@ -697,12 +743,11 @@ int main(int argc, char * argv[])
     if (STDOUT_FILENO != outfd)
         close(outfd);
     res = 0;
-    if (0 != count) {
-        fprintf(stderr, "Some error occurred, remaining count=%d\n", count);
+    if (0 != dd_count) {
+        fprintf(stderr, "Some error occurred,");
 	res = 2;
     }
-    fprintf(stderr, "%d+%d records in\n", in_full, in_partial);
-    fprintf(stderr, "%d+%d records out\n", out_full, out_partial);
+    print_stats();
     if (dio_incomplete)
         fprintf(stderr, ">> Direct IO requested but incomplete %d times\n", 
                 dio_incomplete);

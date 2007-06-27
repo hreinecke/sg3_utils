@@ -28,7 +28,7 @@
    set (in megabytes, the default is 200 MB). The '-d' option requests
    direct io (and is overridden by '-q').
 
-   Version 3.68 (20000102)
+   Version 3.69 (20001220)
 */
 
 
@@ -238,8 +238,9 @@ int main(int argc, char * argv[])
     }
     if (dio_incomplete)
         printf(">> direct IO requested but not done\n");
-    printf("Read %u MBytes, buffer size=%d KBytes\n", total_size_mb,
-           buf_size / 1024);
+    printf("Read %u MBytes (actual %u MB, %u bytes), buffer size=%d KBytes\n",
+	   total_size_mb, (num * buf_size) / 1048576, num * buf_size,
+	   buf_size / 1024);
 
     if (rbBuff) free(rbBuff);
     res = close(sg_fd);
