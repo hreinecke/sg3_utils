@@ -1,0 +1,76 @@
+.TH SG_MODES "8" "March 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sg_modes \- reads SCSI MODE SENSE pages
+.SH SYNOPSIS
+.B sg_modes
+[\fI-a\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-h\fR] [\fI-l\fR]
+[\fI-p=<page_code>\fR] [\fI-V\fR] [\fI-6\fR] [\fI-?\fR] [\fI<sg_device>\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This command sends a MODE SENSE SCSI command (the 10 byte variant)
+to the given device and then outputs the response. There is no facility
+to change the page or descriptor data with this command.
+.TP
+-a
+lists all the mode pages supported by the device.
+.TP
+-c=page_control
+up to four different versions os each page are held by the device:
+the current values [0] are the default (i.e. when this parameter is
+not given), the changeable values [1] (bit mask showing which parts
+could be changed with a MODE SELECT), default value [2] (from the
+manufacturer?) and saved values [4] (when this device was last power
+cycled?).
+.TP
+-d
+disable block descriptors. By default MODE SENSE returns in its response
+block descriptors and this parameter can be used to suppress them.
+.TP
+-h
+currently only suppresses the printing out of known page code descriptions
+.TP
+-l
+lists all known page codes. These are mainly for direct access 
+devices (disks) and those that apply to all devices. Ignores the given
+device and most other parameters.
+.TP
+-p=<page_code>
+page code to fetch. Should be a hexadecimal number between 0 and 0x3f
+inclusive.
+.TP
+-V
+print out version string
+.TP
+-6
+by default this command sends out a 10 byte MODE SENSE command. However
+some SCSI devices only support 6 byte MODE SENSE commands (e.g. SCSI-2
+tape drives). This parameter forces the use of 6 byte MODE SENSE commands.
+.TP
+-?
+output usage message. Ignore all other parameters.
+.PP
+If the normal sg_modes command fails with "illegal command
+operation code" then try the "-6" parameter. To alter page settings
+see the program listed in the "See Also" section below.
+.PP
+This command performs a SCSI INQUIRY command to determine the peripheral
+type of the device (e.g. 0 -> Direct Access Device (disk)) prior to
+sending a MODE SENSE command. This helps in decoding the block
+descriptor and mode pages.
+.PP
+In the 2.4 series of Linux kernels the given device must be
+a SCSI generic (sg) device. In the 2.5 series block devices (e.g. disks
+and SCSI DVDs) can also be specified. For example "sg_modes -a /dev/sda"
+will work in the 2.5 series kernels.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert@interlog.com>.
+.SH COPYRIGHT
+Copyright \(co 2000-2003 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sginfo(this package), sgmode(scsirastools), scsiinfo(see net), scu(see net)

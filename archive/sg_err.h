@@ -3,9 +3,7 @@
 
 /* Feel free to copy and modify this GPL-ed code into your applications. */
 
-/* Version 0.87 (20020616) 
-	- all output now sent to stderr rather thatn stdout
-	- remove header files included in this file
+/* Version 0.89 (20030313) 
 */
 
 
