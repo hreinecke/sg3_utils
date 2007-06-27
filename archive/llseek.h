@@ -1,3 +1,5 @@
+#ifndef LLSEEK_H
+#define LLSEEK_H
 
 #if defined(__GNUC__) || defined(HAS_LONG_LONG)
 typedef long long llse_loff_t;
@@ -7,4 +9,6 @@ typedef long      llse_loff_t;
 
 extern llse_loff_t llse_llseek(unsigned int fd,
                                llse_loff_t offset,
-			       unsigned int origin);
+                               unsigned int origin);
+
+#endif

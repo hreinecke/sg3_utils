@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "January 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_LOGS "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_logs \- read SCSI device log pages
 .SH SYNOPSIS
@@ -59,7 +59,14 @@ maximum value since the log page in which the counter is found will
 remain "stuck" until something is done.
 .TP
 -sp
-sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared).
+sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared). When
+set this instructs the device to store the current log page 
+parameters (as indicated by the DS and TSD parameter codes) in some
+non-volatile location. Hence the log parameters will be preserved
+across power cycles. This option is typically not needed, especially
+if the GLTSD flag is clear in the control mode page as this instructs
+the device to periodically save all saveable log parameters to
+non-volatile locations.
 .TP
 -t
 outputs the temperature. First looks in the temperature log page and if
@@ -67,7 +74,8 @@ that is not available tries the Informational Exceptions page which may also
 have the current temperature (especially in older disks).
 .TP
 -v
-verbose: show SCSI command blocks prior to execution.
+verbose: show SCSI command blocks prior to execution.  '-vv'
+and '-vvv' are also accepted yielding greater verbosity.
 .TP
 -V
 print out version string

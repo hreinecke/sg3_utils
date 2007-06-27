@@ -18,134 +18,32 @@
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   This program outputs information provided by a SCSI RECEIVE DIAGNOSTIC
-   command.
+   This program issues the SCSI SEND DIAGNOSTIC command and in one case
+   the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.22 20050309";
+static char * version_str = "0.24 20050323";
 
 #define ME "sg_senddiag: "
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-#define LONG_TIMEOUT 3600000    /* 3,600,000 millisecs == 60 minutes */
-
-#define SEND_DIAGNOSTIC_CMD     0x1d
-#define SEND_DIAGNOSTIC_CMDLEN  6
-#define RECEIVE_DIAGNOSTIC_CMD     0x1c
-#define RECEIVE_DIAGNOSTIC_CMDLEN  6
 #define MX_ALLOC_LEN (1024 * 4)
-
 #define EBUFF_SZ 256
 
 
+/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
+ * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other
+ * failure */
 static int do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
                        int devofl_bit, int unitofl_bit, void * outgoing_pg, 
                        int outgoing_len, int noisy, int verbose)
 {
-    int k, res;
-    unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] = 
-        {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    int long_duration = 0;
 
-    senddiagCmdBlk[1] = (unsigned char)((sf_code << 5) | (pf_bit << 4) |
-                        (sf_bit << 2) | (devofl_bit << 1) | unitofl_bit);
-    senddiagCmdBlk[3] = (unsigned char)((outgoing_len >> 8) & 0xff);
-    senddiagCmdBlk[4] = (unsigned char)(outgoing_len & 0xff);
-
-    if (verbose) {
-        fprintf(stderr, "    Send diagnostic cmd: ");
-        for (k = 0; k < SEND_DIAGNOSTIC_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", senddiagCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = SEND_DIAGNOSTIC_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = outgoing_len ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
-    io_hdr.dxfer_len = outgoing_len;
-    io_hdr.dxferp = outgoing_pg;
-    io_hdr.cmdp = senddiagCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = LONG_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (send diagnostic) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Send diagnostic, continuing", &io_hdr);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "Send diagnostic error, sf_code=0x%x, "
-                     "pf_bit=%d, sf_bit=%d ", sf_code, pf_bit, sf_bit);
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
-        return -1;
-    }
-}
-
-static int do_rcvdiag(int sg_fd, int pcv, int pg_code, void * resp, 
-                      int mx_resp_len, int noisy, int verbose)
-{
-    int k, res;
-    unsigned char rcvdiagCmdBlk[RECEIVE_DIAGNOSTIC_CMDLEN] = 
-        {RECEIVE_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    rcvdiagCmdBlk[1] = (unsigned char)(pcv ? 0x1 : 0);
-    rcvdiagCmdBlk[2] = (unsigned char)(pg_code);
-    rcvdiagCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    rcvdiagCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
-
-    if (verbose) {
-        fprintf(stderr, "    Receive diagnostic cmd: ");
-        for (k = 0; k < RECEIVE_DIAGNOSTIC_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", rcvdiagCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = RECEIVE_DIAGNOSTIC_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rcvdiagCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (receive diagnostic) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Receive diagnostic, continuing", &io_hdr);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "Receive diagnostic error, pcv=%d, "
-                     "page_code=%x ", pcv, pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr);
-        }
-        return -1;
-    }
+    if ((0 == sf_bit) && ((5 == sf_code) || (6 == sf_code)))
+        long_duration = 1;      /* foreground self tests */
+    return sg_ll_send_diag(sg_fd, sf_code, pf_bit, sf_bit, devofl_bit,
+                           unitofl_bit, long_duration, outgoing_pg,
+                           outgoing_len, noisy, verbose);
 }
 
 /* Get expected extended self-test time from mode page 0xa (for '-e' option) */
@@ -169,6 +67,122 @@ static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
     return res;
 }
 
+/* Read hex numbers from command line (comma separated list) or from */
+/* stdin (one per line, comma separated list or space separated list). */
+/* Returns 0 if ok, or 1 if error. */
+static int build_diag_page(const char * inp, unsigned char * mp_arr,
+                           int * mp_arr_len, int max_arr_len)
+{
+    int in_len, k, j, m;
+    unsigned int h;
+    const char * lcp;
+    char * cp;
+
+    if ((NULL == inp) || (NULL == mp_arr) ||
+        (NULL == mp_arr_len))
+        return 1;
+    lcp = inp;
+    in_len = strlen(inp);
+    if (0 == in_len)
+        *mp_arr_len = 0;
+    if ('-' == inp[0]) {        /* read from stdin */
+        char line[512];
+        int off = 0;
+
+        for (j = 0; j < 512; ++j) {
+            if (NULL == fgets(line, sizeof(line), stdin))
+                break;
+            in_len = strlen(line);
+            if (in_len > 0) {
+                if ('\n' == line[in_len - 1]) {
+                    --in_len;
+                    line[in_len] = '\0';
+                }
+            }
+            if (0 == in_len)
+                continue;
+            lcp = line;
+            m = strspn(lcp, " \t");
+            if (m == in_len)
+                continue;
+            lcp += m;
+            in_len -= m;
+            if ('#' == *lcp)
+                continue;
+            k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
+            if ((k < in_len) && ('#' != lcp[k])) {
+                fprintf(stderr, "build_diag_page: syntax error at "
+                        "line %d, pos %d\n", j + 1, m + k + 1);
+                return 1;
+            }
+            for (k = 0; k < 1024; ++k) {
+                if (1 == sscanf(lcp, "%x", &h)) {
+                    if (h > 0xff) {
+                        fprintf(stderr, "build_diag_page: hex number "
+                                "larger than 0xff in line %d, pos %d\n",
+                                j + 1, (int)(lcp - line + 1));
+                        return 1;
+                    }
+                    if ((off + k) >= max_arr_len) {
+                        fprintf(stderr, "build_diag_page: array length "
+                                "exceeded\n");
+                        return 1;
+                    }
+                    mp_arr[off + k] = h;
+                    lcp = strpbrk(lcp, " ,\t");
+                    if (NULL == lcp)
+                        break;
+                    lcp += strspn(lcp, " ,\t");
+                    if ('\0' == *lcp)
+                        break;
+                } else {
+                    if ('#' == *lcp) {
+                        --k;
+                        break;
+                    }
+                    fprintf(stderr, "build_diag_page: error in "
+                            "line %d, at pos %d\n", j + 1,
+                            (int)(lcp - line + 1));
+                    return 1;
+                }
+            }
+            off += (k + 1);
+        }
+        *mp_arr_len = off;
+    } else {        /* hex string on command line */
+        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        if (in_len != k) {
+            fprintf(stderr, "build_diag_page: error at pos %d\n", k + 1);
+            return 1;
+        }
+        for (k = 0; k < max_arr_len; ++k) {
+            if (1 == sscanf(lcp, "%x", &h)) {
+                if (h > 0xff) {
+                    fprintf(stderr, "build_diag_page: hex number larger "
+                            "than 0xff at pos %d\n", (int)(lcp - inp + 1));
+                    return 1;
+                }
+                mp_arr[k] = h;
+                cp = strchr(lcp, ',');
+                if (NULL == cp)
+                    break;
+                lcp = cp + 1;
+            } else {
+                fprintf(stderr, "build_diag_page: error at pos %d\n",
+                        (int)(lcp - inp + 1));
+                return 1;
+            }
+        }
+        *mp_arr_len = k + 1;
+        if (k == max_arr_len) {
+            fprintf(stderr, "build_diag_page: array length exceeded\n");
+            return 1;
+        }
+    }
+    return 0;
+}
+
+
 struct page_code_desc {
         int page_code;
         const char * desc;
@@ -184,10 +198,12 @@ static struct page_code_desc pc_desc_arr[] = {
         {0x7, "Element descriptor (SES)"},
         {0x8, "Short enclosure status (SES)"},
         {0x9, "Enclosure busy (SES-2)"},
-        {0xa, "Device element status (SES-2)"},
+        {0xa, "Additional (device) element status (SES-2)"},
         {0xb, "Subenclosure help text (SES-2)"},
         {0xc, "Subenclosure string In/Out (SES-2)"},
         {0xd, "Supported SES diagnostic pages (SES-2)"},
+        {0xe, "Download microcode diagnostic pages (SES-2)"},
+        {0xf, "Subenclosure nickname diagnostic pages (SES-2)"},
         {0x3f, "Protocol specific SAS (SAS-1)"},
         {0x40, "Translate address (direct access)"},
         {0x41, "Device status (direct access)"},
@@ -223,13 +239,18 @@ static void list_page_codes()
 static void usage()
 {
     printf("Usage: 'sg_senddiag [-doff] [-e] [-h] [-l] [-pf]"
-           " [-s=<self_test_code>]\n"
-           "                    [-t] [-uoff] [-v] [-V] [<sg_device>]'\n"
+           " [-raw=<h>,<h>...]\n"
+           "                    [-s=<self_test_code>] [-t] [-uoff] [-v] "
+           "[-V]\n"
+           "                    [<scsi_device>]'\n"
            " where -doff device online (def: 0, only with '-t')\n"
            "       -e   duration of an extended test (from mode page 0xa)\n"
            "       -h   output in hex\n"
            "       -l   list supported page codes\n"
            "       -pf  set PF bit (def: 0)\n"
+           "       -raw=<h>,<h>...  sequence of bytes to form diag page to "
+           "send\n"
+           "       -raw=-           read stdin for sequence of bytes to send\n"
            "       -s=<self_test_code> (def: 0)\n"
            "          1->background short, 2->background extended,"
            " 4->abort test\n"
@@ -244,7 +265,7 @@ static void usage()
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len;
+    int sg_fd, k, num, rsp_len, read_in_len;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char rsp_buff[MX_ALLOC_LEN];
@@ -258,9 +279,12 @@ int main(int argc, char * argv[])
     int do_def_test = 0;
     int do_uoff = 0;
     int do_ext_time = 0;
+    int do_raw = 0;
     int verbose = 0;
     int oflags = O_RDWR | O_NONBLOCK;
     const char * cp;
+    unsigned char read_in[MX_ALLOC_LEN];
+    int ret = 1;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strncmp("-s=", argv[k], 3)) {
@@ -272,7 +296,14 @@ int main(int argc, char * argv[])
             }
             self_test_code = u;
         }
-        else if (0 == strcmp("-pf", argv[k]))
+        else if (0 == strncmp("-raw=", argv[k], 5)) {
+            if (build_diag_page(argv[k] + 5, read_in, &read_in_len, sizeof(read_in))) {
+                printf("Bad sequence after '-raw'\n");
+                file_name = 0;
+                break;
+            }
+            do_raw = 1;
+        } else if (0 == strcmp("-pf", argv[k]))
             do_pf = 1;
         else if (0 == strcmp("-doff", argv[k]))
             do_doff = 1;
@@ -316,6 +347,17 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
+    if (do_raw) {
+        if ((self_test_code > 0) || do_def_test || do_ext_time || do_list) {
+            printf("'--raw=' cannot be used with self tests, '-e' or "
+                   "'-l'\n");
+            usage();
+            return 1;
+        }
+        if (! do_pf)
+            printf(">>> warning, '-pf' probably should be used with "
+                   "'--raw='\n");
+    }
     if (0 == file_name) {
         if (do_list) {
             list_page_codes();
@@ -342,16 +384,16 @@ int main(int argc, char * argv[])
                        "(%.2f minutes)\n", secs, secs / 60.0);
             } else
                 printf("Extended self-test duration not available\n");
-        } else
+        } else {
             printf("Extended self-test duration (mode page 0xa) failed\n");
-        return 0;
-    }
-    if (do_list) {
+            goto err_out;
+        }
+    } else if (do_list) {
         memset(rsp_buff, 0, sizeof(rsp_buff));
         if (0 == do_senddiag(sg_fd, 0, do_pf, 0, 0, 0, rsp_buff, 4, 1,
                              verbose)) {
-            if (0 == do_rcvdiag(sg_fd, 0, 0, rsp_buff, rsp_buff_size, 1,
-                                verbose)) {
+            if (0 == sg_ll_receive_diag(sg_fd, 0, 0, rsp_buff,
+                                        rsp_buff_size, 1, verbose)) {
                 printf("Supported diagnostic pages response:\n");
                 rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
                 if (do_hex)
@@ -364,14 +406,21 @@ int main(int argc, char * argv[])
                 }
             }
         }
-    } 
-    else if (0 == do_senddiag(sg_fd, self_test_code, do_pf, do_def_test, 
-                              do_doff, do_uoff, NULL, 0, 1, verbose)) {
+    } else if (do_raw) {
+        if (do_senddiag(sg_fd, 0, do_pf, 0, 0, 0, read_in, read_in_len, 1,
+                        verbose))
+            goto err_out;
+    } else if (0 == do_senddiag(sg_fd, self_test_code, do_pf, do_def_test,
+                                do_doff, do_uoff, NULL, 0, 1, verbose)) {
         if ((5 == self_test_code) || (6 == self_test_code))
             printf("Foreground self test returned GOOD status\n");
         else if (do_def_test && (! do_doff) && (! do_uoff))
             printf("Default self test returned GOOD status\n");
-    }
+    } else
+        goto err_out;
+    ret = 0;
+
+err_out:
     close(sg_fd);
-    return 0;
+    return ret;
 }

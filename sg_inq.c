@@ -35,7 +35,7 @@ in the future.
    
 */
 
-static char * version_str = "0.46 20050215";
+static char * version_str = "0.49 20050426";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -69,16 +69,17 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
 static void usage()
 {
     fprintf(stderr,
-            "Usage: 'sg_inq [-c] [-cl] [-d] [-e] [-h|-r] [-i] "
+            "Usage: 'sg_inq [-c] [-cl] [-d] [-e] [-h] [-H] [-i] "
             "[-o=<opcode_page>]\n"
-            "               [-p=<vpd_page>] [-P] [-s] [-v] [-V] [-x] [-36]"
-            " [-?]\n"
+            "               [-p=<vpd_page>] [-P] [-r] [-s] [-v] [-V] [-x] "
+            "[-36] [-?]\n"
             "               <scsi_device>'\n"
             " where -c   set CmdDt mode (use -o for opcode) [obsolete]\n"
             "       -cl  list supported commands using CmdDt mode [obsolete]\n"
             "       -d   list version descriptors\n"
             "       -e   set VPD mode (use -p for page code)\n"
             "       -h   output in hex (ASCII to the right)\n"
+            "       -H   output in hex (ASCII to the right) [same as '-h']\n"
             "       -i   decode device identification VPD page (0x83)\n"
             "       -o=<opcode_page> opcode or page code in hex (def: 0)\n"
             "       -p=<vpd_page> vpd page code in hex (def: 0)\n"
@@ -286,8 +287,8 @@ static const char * code_set_arr[] =
 static const char * assoc_arr[] =
 {
     "addressed logical unit",
-    "SCSI target port",
-    "SCSI target device",
+    "target port that received request",
+    "target device that contains addressed lu",
     "reserved [0x3]",
 };
 
@@ -421,6 +422,10 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                        d_id);
                 printf("      IEEE Company_id: 0x%x\n", c_id);
                 printf("      vendor specific identifier B: 0x%x\n", vsi);
+                printf("      [0x");
+                for (m = 0; m < 8; ++m)
+                    printf("%02x", (unsigned int)ip[m]);
+                printf("]\n");
             } else if (5 == naa) {
                 if (8 != i_len) {
                     printf("      << expected NAA 5 identifier length: "
@@ -438,6 +443,10 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                 printf("      NAA 5, IEEE Company_id: 0x%x\n", c_id);
                 printf("      Vendor Specific Identifier: 0x%llx\n",
                        vsei);
+                printf("      [0x");
+                for (m = 0; m < 8; ++m)
+                    printf("%02x", (unsigned int)ip[m]);
+                printf("]\n");
             } else if (6 == naa) {
                 if (16 != i_len) {
                     printf("      << expected NAA 6 identifier length: "
@@ -463,6 +472,10 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                 }
                 printf("      Vendor Specific Identifier Extension: "
                        "0x%llx\n", vsei);
+                printf("      [0x");
+                for (m = 0; m < 16; ++m)
+                    printf("%02x", (unsigned int)ip[m]);
+                printf("]\n");
             }
             break;
         case 4: /* Relative target port */
@@ -515,7 +528,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
             /* does %s print out UTF-8 ok??
              * Seems to depend on the locale. Looks ok here with my
              * locale setting: en_AU.UTF-8
-	     */
+             */
             printf("      %s\n", (const char *)ip);
             break;
         default: /* reserved */
@@ -810,10 +823,10 @@ static const char * get_ansi_version_str(int version, char * buff,
 
 /* Returns 0 if successful */
 static int process_std_inq(int sg_fd, const char * file_name, int do_36,
-                           int peri_type, int do_vdescriptors, int do_hex,
-                           int do_raw, int do_verbose)
+                           int do_vdescriptors, int do_hex, int do_raw,
+                           int do_verbose)
 {
-    int res, len, act_len, ansi_version, ret, k, j;
+    int res, len, act_len, pqual, peri_type, ansi_version, ret, k, j;
     const char * cp;
     int vdesc_arr[8];
     char buff[32];
@@ -821,8 +834,20 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
     res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, 36, 0, do_verbose);
     if (0 == res) {
-        if (!do_raw)
-            printf("standard INQUIRY:\n");
+        pqual = (rsp_buff[0] & 0xe0) >> 5;
+        if (! do_raw) {
+            if (0 == pqual)
+                printf("standard INQUIRY:\n");
+            else if (1 == pqual)
+                printf("standard INQUIRY: [qualifier indicates no connected "
+                       "lu]\n");
+            else if (3 == pqual)
+                printf("standard INQUIRY: [qualifier indicates not capable "
+                       "of supporting lu]\n");
+            else
+                printf("standard INQUIRY: [reserved or vendor specific "
+                       "qualifier [%d]\n", pqual);
+        }
         len = rsp_buff[4] + 5;
         ansi_version = rsp_buff[2] & 0x7;
         peri_type = rsp_buff[0] & 0x1f;
@@ -850,8 +875,8 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
             dStrRaw((const char *)rsp_buff, len);
         else {
             printf("  PQual=%d  Device_type=%d  RMB=%d  version=0x%02x ",
-                   (rsp_buff[0] & 0xe0) >> 5, peri_type,
-                   !!(rsp_buff[1] & 0x80), (unsigned int)rsp_buff[2]);
+                   pqual, peri_type, !!(rsp_buff[1] & 0x80),
+                   (unsigned int)rsp_buff[2]);
             printf(" [%s]\n", get_ansi_version_str(ansi_version, buff,
                                                    sizeof(buff)));
             printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
@@ -859,17 +884,18 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
                    !!(rsp_buff[3] & 0x80), !!(rsp_buff[3] & 0x40),
                    !!(rsp_buff[3] & 0x20), !!(rsp_buff[3] & 0x10),
                    rsp_buff[3] & 0x0f, !!(rsp_buff[5] & 0x80));
-            printf("ACC=%d  TGPS=%d  3PC=%d  Protect=%d\n",
+            printf("ACC=%d  TGPS=%d  3PC=%d  Protect=%d ",
                    !!(rsp_buff[5] & 0x40), ((rsp_buff[5] & 0x30) >> 4),
                    !!(rsp_buff[5] & 0x08), !!(rsp_buff[5] & 0x01));
-            printf("  BQue=%d  EncServ=%d  MultiP=%d  MChngr=%d  "
-                   "[ACKREQQ=%d]  ",
-                   !!(rsp_buff[6] & 0x80), !!(rsp_buff[6] & 0x40), 
-                   !!(rsp_buff[6] & 0x10), !!(rsp_buff[6] & 0x08), 
-                   !!(rsp_buff[6] & 0x04));
-            printf("Addr16=%d\n  [RelAdr=%d]  ",
-                   !!(rsp_buff[6] & 0x01),
-                   !!(rsp_buff[7] & 0x80));
+            printf(" BQue=%d\n  EncServ=%d  ", !!(rsp_buff[6] & 0x80),
+                   !!(rsp_buff[6] & 0x40));
+            if (rsp_buff[6] & 0x10)
+                printf("MultiP=1 (VS=%d)  ", !!(rsp_buff[6] & 0x20));
+            else
+                printf("MultiP=0  "); 
+            printf("MChngr=%d  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
+                   !!(rsp_buff[6] & 0x08), !!(rsp_buff[6] & 0x04),
+                   !!(rsp_buff[6] & 0x01), !!(rsp_buff[7] & 0x80));
             printf("WBus16=%d  Sync=%d  Linked=%d  [TranDis=%d]  ",
                    !!(rsp_buff[7] & 0x20), !!(rsp_buff[7] & 0x10),
                    !!(rsp_buff[7] & 0x08), !!(rsp_buff[7] & 0x04));
@@ -961,10 +987,9 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
 
 /* Returns 0 if successful */
 static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
-                         int peri_type, int do_hex, int do_raw,
-                         int do_verbose)
+                         int do_hex, int do_raw, int do_verbose)
 {
-    int k, j, num, len, reserved_cmddt, support_num;
+    int k, j, num, len, peri_type, reserved_cmddt, support_num;
     char op_name[128];
 
     if (do_cmdlst) {
@@ -972,6 +997,7 @@ static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
         for (k = 0; k < 256; ++k) {
             if (0 == sg_ll_inquiry(sg_fd, 1, 0, k, rsp_buff, DEF_ALLOC_LEN,
                                    1, do_verbose)) {
+                peri_type = rsp_buff[0] & 0x1f;
                 support_num = rsp_buff[1] & 7;
                 reserved_cmddt = rsp_buff[4];
                 if ((3 == support_num) || (5 == support_num)) {
@@ -1001,15 +1027,16 @@ static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
         }
     }
     else {
-        if (! do_raw) {
-            printf("CmdDt INQUIRY, opcode=0x%.2x:  [", num_opcode);
-            sg_get_opcode_name((unsigned char)num_opcode, peri_type, 
-                               sizeof(op_name) - 1, op_name);
-            op_name[sizeof(op_name) - 1] = '\0';
-            printf("%s]\n", op_name);
-        }
         if (0 == sg_ll_inquiry(sg_fd, 1, 0, num_opcode, rsp_buff, 
                                DEF_ALLOC_LEN, 1, do_verbose)) {
+            peri_type = rsp_buff[0] & 0x1f;
+            if (! do_raw) {
+                printf("CmdDt INQUIRY, opcode=0x%.2x:  [", num_opcode);
+                sg_get_opcode_name((unsigned char)num_opcode, peri_type, 
+                                   sizeof(op_name) - 1, op_name);
+                op_name[sizeof(op_name) - 1] = '\0';
+                printf("%s]\n", op_name);
+            }
             len = rsp_buff[5] + 6;
             reserved_cmddt = rsp_buff[4];
             if (do_hex)
@@ -1053,6 +1080,13 @@ static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
             }
         }
         else {
+            if (! do_raw) {
+                printf("CmdDt INQUIRY, opcode=0x%.2x:  [", num_opcode);
+                sg_get_opcode_name((unsigned char)num_opcode, 0, 
+                                   sizeof(op_name) - 1, op_name);
+                op_name[sizeof(op_name) - 1] = '\0';
+                printf("%s]\n", op_name);
+            }
             fprintf(stderr,
                     "CmdDt INQUIRY on opcode=0x%.2x: failed\n",
                     num_opcode);
@@ -1063,10 +1097,10 @@ static int process_cmddt(int sg_fd, int do_cmdlst, int num_opcode,
 }
 
 /* Returns 0 if successful */
-static int process_evpd(int sg_fd, int num_opcode, int peri_type,
-                        int do_hex, int do_raw, int do_verbose)
+static int process_evpd(int sg_fd, int num_opcode, int do_hex,
+                        int do_raw, int do_verbose)
 {
-    int ret, len, num, k, vpd;
+    int ret, len, num, k, peri_type, vpd;
     const char * cp;
 
     if (!do_raw)
@@ -1148,7 +1182,6 @@ int main(int argc, char * argv[])
     int decode = 0;
     int oflags = O_RDONLY | O_NONBLOCK;
     int ret = 0;
-    int peri_type = 0;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp("-36", argv[k]))
@@ -1163,6 +1196,8 @@ int main(int argc, char * argv[])
         else if (0 == strcmp("-e", argv[k]))
             do_evpd = 1;
         else if (0 == strcmp("-h", argv[k]))
+            do_hex = 1;
+        else if (0 == strcmp("-H", argv[k]))
             do_hex = 1;
         else if (0 == strcmp("-i", argv[k]))
             do_di_vpd = 1;
@@ -1192,6 +1227,10 @@ int main(int argc, char * argv[])
             do_scsi_ports_vpd = 1;
         else if (0 == strcmp("-v", argv[k]))
             ++do_verbose;
+        else if (0 == strcmp("-vv", argv[k]))
+            do_verbose += 2;
+        else if (0 == strcmp("-vvv", argv[k]))
+            do_verbose += 3;
         else if (0 == strcmp("-x", argv[k]))
             do_xtended = 1;
         else if (0 == strcmp("-?", argv[k])) {
@@ -1259,16 +1298,15 @@ int main(int argc, char * argv[])
 
     if (! (do_cmddt || do_evpd || decode)) {
         /* So it's a Standard INQUIRY */
-        if (process_std_inq(sg_fd, file_name, do_36, peri_type,
-                            do_vdescriptors, do_hex, do_raw, do_verbose))
+        if (process_std_inq(sg_fd, file_name, do_36, do_vdescriptors,
+                            do_hex, do_raw, do_verbose))
             return 1;
     } else if (do_cmddt) {
-        if (process_cmddt(sg_fd, do_cmdlst, num_opcode, peri_type,
-                          do_hex, do_raw, do_verbose))
+        if (process_cmddt(sg_fd, do_cmdlst, num_opcode, do_hex, do_raw,
+                          do_verbose))
             return 1;
     } else if (do_evpd) {
-        if (process_evpd(sg_fd, num_opcode, peri_type,
-                          do_hex, do_raw, do_verbose))
+        if (process_evpd(sg_fd, num_opcode, do_hex, do_raw, do_verbose))
             return 1;
     } else if (do_di_vpd) {
         if (!do_raw)

@@ -67,7 +67,7 @@ static unsigned char sbuff[MAX_SENSE_SZ];
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.03 20050313";
+static char * version_str = "1.03 20050405";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -172,6 +172,8 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
                 perror("FORMAT UNIT ioctl error");
                 return -1;
         }
+        if (verbose > 2)
+                fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
         res = sg_err_category3(&io_hdr);
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
@@ -335,8 +337,8 @@ static void usage()
                 "                 <scsi_disk>\n"
                 "  where:\n"
                 "    --count=<block count> | -c <block count>\n"
-                "                   best left alone (defaults to "
-                "max allowable)\n"
+                "                   best left alone during format (defaults "
+                "to max allowable)\n"
                 "    --early | -e   exit once format started (user can "
                 "monitor progress)\n"
                 "    --format | -F  format unit (default report current count"
@@ -361,8 +363,8 @@ static void usage()
                 "                   use multiple time for more verbosity\n"
                 "    --version | -V print version details and exit\n"
                 "    --wait | -w    format command waits till complete (def: "
-                "poll)\n"
-                "\t(e.g. sg_format -s 512 /dev/sdc)\n");
+                "poll)\n\n"
+                "\tExample: sg_format --format /dev/sdc\n");
         printf("\nWARNING: This program will destroy all the data on the "
                 "target device when\n\t '--format' is given. Check that you "
                 "have the correct device.\n");

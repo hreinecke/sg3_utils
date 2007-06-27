@@ -1,4 +1,4 @@
-.TH SG_DD "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_DD "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -46,7 +46,10 @@ bpt=BLOCKS
 each IO transaction will be made using this number of blocks (or less if 
 near the end of count). Default is 128. So for bs=512 the reads and writes
 will each convey 64 KiB of data by default (less if near the end of the
-transfer or memory restrictions).
+transfer or memory restrictions). When cd/dvd drives are accessed, the
+block size is typically 2048 bytes and the default bpt value may be too
+high, especially when blk_sgio is set. The solution is to reduce the bpt
+value (64 or 32 may be more appropriate).
 .TP
 bs=BYTES
 this
@@ -266,6 +269,8 @@ Copyright \(co 2000-2005 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
+There is a web page discussing sg_dd at http://www.torque.net/sg/sg_dd.html
+.PP
 A POSIX threads version of this utility called
 .B sgp_dd
 is in the sg3_utils package. Another version from that package is called

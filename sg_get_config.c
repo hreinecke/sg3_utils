@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.15 20050309";
+static char * version_str = "0.16 20050324";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -247,7 +247,7 @@ static struct code_desc profile_desc_arr[] = {
         {0x22, "DDCD-RW"},
         {0x2b, "DVD+R double layer"},
         {0x40, "BD-ROM"},
-        {0x41, "BD-R sequential recording"},
+        {0x41, "BD-R sequential recording (SRM)"},
         {0x42, "BD-R random recording (RRM)"},
         {0x43, "BD-RE"},
         {0xffff, "Non-conforming profile"},
@@ -299,7 +299,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x32, "Double density CD-RW write"},
         {0x33, "Layer jump recording"},
         {0x37, "CD-RW media write support"},
-        {0x38, "BD-R Pseudo-overwrite (POW)"},
+        {0x38, "BD-R pseudo-overwrite (POW)"},
         {0x3b, "DVD+R double layer"},
         {0x40, "BD read"},
         {0x41, "BD write"},
@@ -317,6 +317,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x10b, "DVD CPRM"},
         {0x10c, "Firmware information"},
         {0x110, "VCPS"},
+        {0x120, "BD CPS"},
 };
 
 static const char * get_feature_str(int feature_num, char * buff)
@@ -429,8 +430,8 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      WDCB=%d, SPWP=%d, SSWPP=%d\n", !!(ucp[4] & 0x4),
-               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+        printf("      DWP=%d, WDCB=%d, SPWP=%d, SSWPP=%d\n", !!(ucp[4] & 0x8),
+               !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
     case 0x10:     /* Random readable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -491,8 +492,8 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      Data block types supported=0x%x, BUF=%d\n",
-               ((ucp[4] << 8) + ucp[5]), !!(ucp[6] & 0x1));
+        printf("      Data block types supported=0x%x, ARSV=%d, BUF=%d\n",
+               ((ucp[4] << 8) + ucp[5]), !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
         num = ucp[7];
         printf("      Number of link sizes=%d\n", num);
         for (k = 0; k < num; ++k)
@@ -801,6 +802,18 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      %.2s%.2s/%.2s/%.2s %.2s:%.2s:%.2s\n", ucp + 4,
                ucp + 6, ucp + 8, ucp + 10, ucp + 12, ucp + 14, ucp + 16);
+        break;
+    case 0x120:    /* BD CPS */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      BD CPS major:minor version number=%d:%d, max open "
+               "SACs=%d\n", ((ucp[5] >> 4) & 0xf), (ucp[5] & 0xf),
+               ucp[6] & 0x3);
         break;
     default:
         printf("    Unknown feature [0x%x], version=%d persist=%d, "

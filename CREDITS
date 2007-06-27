@@ -49,6 +49,9 @@ Remy Card has his copyright notice on llseek.c which is borrowed from the
 
 Saeed Bishara contributed sg_write_long
 
+Time Hunt <tim at timhunt dot net> increased number of (sd and sg) devices
+        that sginfo could detect.
+
 Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
         to sort defect list by head.
 
@@ -57,4 +60,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-11th March 2005
+26th April 2005

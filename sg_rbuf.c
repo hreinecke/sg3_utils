@@ -55,7 +55,7 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.79 20050309";
+static char * version_str = "4.80 20050329";
 
 static void usage()
 {
@@ -128,6 +128,10 @@ int main(int argc, char * argv[])
             do_time = 1;
         else if (0 == strcmp("-v", argv[j]))
             ++verbose;
+        else if (0 == strcmp("-vv", argv[j]))
+            verbose += 2;
+        else if (0 == strcmp("-vvv", argv[j]))
+            verbose += 3;
         else if (0 == strcmp("-V", argv[j])) {
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
@@ -182,6 +186,8 @@ int main(int argc, char * argv[])
         return 1;
     }
 
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_RECOVERED:
@@ -292,6 +298,9 @@ int main(int argc, char * argv[])
             return 1;
         }
 
+        if (verbose > 2)
+            fprintf(stderr, "      duration=%u ms\n",
+                    io_hdr.duration);
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
         case SG_LIB_CAT_CLEAN:

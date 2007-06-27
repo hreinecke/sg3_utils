@@ -2,6 +2,31 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.14 [20050506]
+  - sg_rmsn: new utility to read media serial number
+  - sg_rtpg: add T_SUP bit report
+  - sg_ses: ses-2 rev 11 changes (mainly to additional element status)
+        - add 'bay number' to SAS additional element status
+  - sg_modes: recognise attached enclosure and medium changer
+  - sg_inq: spell out non-zero peripheral qualifiers
+        - note VS bit preceding MultiP(ort) when latter set
+        - VPD page 0x83: output naa addresses in hex as well
+  - sginfo: recognise attached enclosure and medium changer
+        - increase device mapping capability (to 78 disks)
+          [Tim Hunt]
+  - sg_senddiag: add option to send raw diagnostic page
+  - sg_get_config: update some BD information
+  - sg_reasign: add '-g' option to give grown defect list length
+  - sg_dd: note default bpt value (128) may be too high for cd/dvds
+  - sg_lib: sync with SPC-3 rev 22a [opcodes + asc/q]
+        - add DID_IMM_RETRY and DID_REQUEUE [linux specific "host" bytes]
+  - sg_cmds: add send+receive diagnostic, read defect data commands
+        - add duration output on some commands when verbose > 2
+  - spec: change to produce libsgutils (and -devel variant) as well as
+          sg3_utils binary rpms
+  - sdparm: new utility like hdparm but for SCSI disks (or other devices)
+        - moved to its own package called: sdparm
+
 Changelog for sg3_utils-1.13 [20050313]
   - sg_format: new utility to format disks (perhaps change block size)
   - sg_ses: rename "device element" to "additional element" [SES-2 rev 10]
@@ -14,12 +39,12 @@ Changelog for sg3_utils-1.13 [20050313]
   - sginfo: add "-flba64" option for outputting 64 bit lba defect lists
   - sg_get_config: additions for BD from MMC-5 rev 1b
   - sg_lib: add SG_LIB_CAT_ILLEGAL_REQ sense category
-	- add sg_get_sense_progress_fld()
-	- SPC-3 rev21d updates: report + set timestamp
-	- sg_get_num() + sg_get_llnum(): switch to multipliers that
+        - add sg_get_sense_progress_fld()
+        - SPC-3 rev21d updates: report + set timestamp
+        - sg_get_num() + sg_get_llnum(): switch to multipliers that
           are compatible with SI and with IEC 60027-2. Used modern
-	  GNU's dd command as guide.
-	- report field replaceable unit code in fixed format
+          GNU's dd command as guide.
+        - report field replaceable unit code in fixed format
   - sg_dd: add logic to use read_long on unrecovered read errors when
            'coe' set, read just prior to error if 'coe' clear
         - both 'odir' and 'blk_sgio" are honoured on block devices
@@ -30,7 +55,7 @@ Changelog for sg3_utils-1.13 [20050313]
   - sg_wr_mode: clear mode data length in mode select(10)
   - sg_test_rwbuf: add long options, allow test to run multiple times
   - sg_cmds: add sg_get_mode_page_types() [get current, changeable, etc]
-  - llseek.c: add Makefile rule to no "-std=c99", breaks on some archs
+  - llseek.c: add Makefile rule without "-std=c99", breaks on some archs
 
 Changelog for sg3_utils-1.12 [20050121]
   - sg_wr_mode: new utility to modify (i.e. write to) mode pages
@@ -44,12 +69,12 @@ Changelog for sg3_utils-1.12 [20050121]
   - sg_lib: ATA return sense descriptor
         - add sg_get_sense_info_fld() to fetch info field from sense data
         - fix bug in sg_scsi_sense_desc_find()
-	- add sense key specific decoding for fixed format sense data
+        - add sense key specific decoding for fixed format sense data
   - sg_modes: extend '-p' option to allow '-p=<page_code>,<subpage_code>'
         - add '-A' option to output all mode pages and subpages
         - extend '-l' option to show subpages, selected command set pages
   - sg_inq: fix LUN WWN output in unit path report VPD page (emc)
-	    [Hergen Lange]
+            [Hergen Lange]
   - sg_get_config: some additions for DVD-R dual layer
   - sg_modes: show write protect (WP) and DpoFua flags for disks
   - sg_cmds: add llbaa argument to sg_ll_mode_sense10()

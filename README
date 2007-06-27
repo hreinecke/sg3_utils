@@ -121,9 +121,9 @@ of the sg3_utils directory:
   - sginfo, sgm_dd, sgp_dd, sg_dd, sg_emc_trespass, sg_get_config,
     sg_format, sg_inq, sg_logs, sg_luns, sg_map, sg_modes, sg_opcodes,
     sg_persist, sg_prevent, sg_rbuff, sg_read, sg_readcap, sg_read_long,
-    sg_reassign, sg_request, sg_reset, sg_rtpg, sg_scan, sg_senddiag,
-    sg_ses, sg_start, sg_sync, sg_test_rwbuff, sg_turs, sg_verify,
-    sg_write_long, sg_wr_mode
+    sg_reassign, sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_scan,
+    sg_senddiag, sg_ses, sg_start, sg_sync, sg_test_rwbuff, sg_turs,
+    sg_verify, sg_write_long, sg_wr_mode
 
 These utilities and the libsgutils.so library which they depend on are built
 by the Makefile in the main directory. This Makefile does not invoke the
@@ -242,4 +242,4 @@ user). It is available for Linux and other operating systems.
 See http://members.aol.com/plscsi .
 
 Doug Gilbert
-13th March 2005
+6th May 2005

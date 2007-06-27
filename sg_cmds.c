@@ -54,11 +54,12 @@
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
-static char * version_str = "1.06 20050309";
+static char * version_str = "1.09 20050419";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
+#define LONG_TIMEOUT 7200000    /* 7,200,000 millisecs == 120 minutes */
 #define EBUFF_SZ 256
 
 #define INQUIRY_CMD     0x12
@@ -91,6 +92,15 @@ static char * version_str = "1.06 20050309";
 #define LOG_SELECT_CMDLEN  10
 #define TUR_CMD  0x0
 #define TUR_CMDLEN  6
+#define SEND_DIAGNOSTIC_CMD   0x1d
+#define SEND_DIAGNOSTIC_CMDLEN  6
+#define RECEIVE_DIAGNOSTICS_CMD   0x1c
+#define RECEIVE_DIAGNOSTICS_CMDLEN  6
+#define READ_DEFECT10_CMD     0x37
+#define READ_DEFECT10_CMDLEN    10
+#define SERVICE_ACTION_IN_12_CMD 0xab
+#define SERVICE_ACTION_IN_12_CMDLEN 12
+#define READ_MEDIA_SERIAL_NUM_SA 0x1
 
 #define MODE6_RESP_HDR_LEN 4
 #define MODE10_RESP_HDR_LEN 8
@@ -146,6 +156,8 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
                     safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -212,10 +224,13 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "SG_IO (inquiry) error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "SG_IO (inquiry) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -282,10 +297,13 @@ int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
     io_hdr.pack_id = pack_id;   /* diagnostic: safe to set to 0 */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "test_unit_ready (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "test_unit_ready (SG_IO) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_CLEAN:
@@ -347,10 +365,13 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "synchronize_cache (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "synchronize_cache (SG_IO) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_CLEAN:
@@ -420,10 +441,13 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "read_capacity16 (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (verbose)
+            fprintf(sg_warnings_str, "read_capacity16 (SG_IO) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -488,10 +512,13 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "read_capacity (10) (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (verbose)
+            fprintf(sg_warnings_str, "read_capacity (10) (SG_IO) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -557,10 +584,13 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "mode sense (6) SG_IO error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "mode sense (6) SG_IO error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -642,10 +672,13 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "mode sense (10) SG_IO error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "mode sense (10) SG_IO error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -727,10 +760,13 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "mode select (6) SG_IO error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "mode select (6) SG_IO error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -801,10 +837,13 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "mode select (10) SG_IO error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "mode select (10) SG_IO error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -873,6 +912,83 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
     return offset;
 }
 
+/* Fetches current, changeable, default and/or saveable modes pages as
+ * indicated (by those "*_mp" arguments that are not NULL).
+ * Return of 0 -> overall success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure.
+ * If success_mask pointer is not NULL then zeroes it then sets bit 0 if
+ * current fetched ok, bit 1 if changeable fetched ok, bit 2 if default
+ * fetched ok and bit 3 if saved fetched ok. If error on current page
+ * then stops and returns that error; otherwise continues if an error is
+ * detected but returns the first error encountered.  */
+int sg_get_mode_page_types(int sg_fd, int mode6, int pg_code,
+                           int sub_pg_code, int mx_mpage_len,
+                           int * success_mask, void * current_mp,
+                           void * changeable_mp, void * default_mp,
+                           void * saved_mp, int verbose)
+{
+    int k, res, offset, calc_len;
+    unsigned char buff[MODE_RESP_ARB_LEN];
+    char ebuff[EBUFF_SZ];
+    void * pc_arr[4];
+    int first_err = 0;
+    int mx_mode_resp_len;
+
+    if (success_mask)
+        *success_mask = 0;
+    if (mx_mpage_len < 4)
+        return 0;
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (mode6)
+        mx_mode_resp_len =
+                (MODE_RESP_ARB_LEN < 252) ? MODE_RESP_ARB_LEN : 252;
+    else
+        mx_mode_resp_len = MODE_RESP_ARB_LEN;
+    memset(ebuff, 0, sizeof(ebuff));
+    pc_arr[0] = current_mp;
+    pc_arr[1] = changeable_mp;
+    pc_arr[2] = default_mp;
+    pc_arr[3] = saved_mp;
+    for (k = 0; k < 4; ++k) {
+        if (NULL == pc_arr[k])
+            continue;
+        if (mode6)
+            res = sg_ll_mode_sense6(sg_fd, 0 /* dbd */, k /* pc */,
+                                    pg_code, sub_pg_code, buff,
+                                    mx_mode_resp_len, 0, verbose);
+        else
+            res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, 0 /* dbd */,
+                                     k /* pc */, pg_code, sub_pg_code,
+                                     buff, mx_mode_resp_len, 0, verbose);
+        if (0 != res) {
+            if (0 == first_err)
+                first_err = res;
+            if (0 == k)
+                break;  /* if problem on current page, it won't improve */
+            else
+                continue;
+        }
+        offset = sg_mode_page_offset(buff, mx_mode_resp_len, mode6,
+                                     ebuff, EBUFF_SZ);
+        if (verbose && (offset < 0)) {
+            if (('\0' != ebuff[0]) && (verbose > 0))
+                fprintf(sg_warnings_str, "sg_get_mode_page_types: "
+                        "pc=%d: %s\n", k, ebuff);
+            return offset;
+        }
+        calc_len = mode6 ? (buff[0] + 1) : ((buff[0] << 8) + buff[1] + 2);
+        calc_len = (calc_len < MODE_RESP_ARB_LEN) ? calc_len :
+                                                    MODE_RESP_ARB_LEN;
+        calc_len -= offset;
+        calc_len = (calc_len < mx_mpage_len) ? calc_len : mx_mpage_len;
+        memcpy(pc_arr[k], buff + offset, calc_len);
+        if (success_mask)
+            *success_mask |= (1 << k);
+    }
+    return first_err;
+}
+
 /* Invokes a SCSI REQUEST SENSE command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Request Sense not * supported??,
  * SG_LIB_CAT_ILEGAL_REQ -> bad field in cdb, -1 -> other failure */
@@ -915,11 +1031,14 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "request sense SG_IO error: %s\n",
-                safe_strerror(errno));
+        if (verbose)
+            fprintf(sg_warnings_str, "request sense SG_IO error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
 
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     /* shouldn't get errors on Request Sense but it is best to be safe */
     res =  sg_err_category3(&io_hdr);
     switch (res) {
@@ -985,10 +1104,13 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "report_luns (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "report_luns (SG_IO) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -1059,10 +1181,13 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "log sense (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "log sense (SG_IO) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -1121,6 +1246,10 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
             fprintf(sg_warnings_str, "%02x ", logsCmdBlk[k]);
         fprintf(sg_warnings_str, "\n");
     }
+    if ((verbose > 1) && (param_len > 0)) {
+        fprintf(sg_warnings_str, "    log select parameter block\n");
+        dStrHex((const char *)paramp, param_len, -1);
+    }
 
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     memset(sense_b, 0, sizeof(sense_b));
@@ -1135,10 +1264,13 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "log select (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "log select (SG_IO) error: %s\n",
+                    safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -1204,10 +1336,13 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "report_tgt_prt_grp (SG_IO) error: %s\n",
-                safe_strerror(errno));
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "report_tgt_prt_grp (SG_IO) error: "
+                    "%s\n", safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -1231,75 +1366,305 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     }
 }
 
-/* Fetches current, changeable, default and/or saveable modes pages as
- * indicated (by those "*_mp" arguments that are not NULL).
- * Return of 0 -> overall success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure.
- * If success_mask pointer is not NULL then zeroes it then sets bit 0 if
- * current fetched ok, bit 1 if changeable fetched ok, bit 2 if default
- * fetched ok and bit 3 if saved fetched ok. Continues if an error is
- * detected but returns the first error encountered.  */
-int sg_get_mode_page_types(int sg_fd, int mode6, int pg_code,
-                           int sub_pg_code, int mx_mpage_len,
-                           int * success_mask, void * current_mp,
-                           void * changeable_mp, void * default_mp,
-                           void * saved_mp, int verbose)
+/* Invokes a SCSI SEND DIAGNOSTIC command. Foreground, extended self tests can
+ * take a long time, if so set long_duration flag. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Send diagnostic not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
+                    int devofl_bit, int unitofl_bit, int long_duration,
+                    void * paramp, int param_len, int noisy,
+                    int verbose)
 {
-    int k, res, offset, calc_len;
-    unsigned char buff[MODE_RESP_ARB_LEN];
-    char ebuff[EBUFF_SZ];
-    void * pc_arr[4];
-    int first_err = 0;
-    int mx_mode_resp_len;
+    int k, res;
+    unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] = 
+        {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
 
-    if (success_mask)
-        *success_mask = 0;
-    if (mx_mpage_len < 4)
-        return 0;
+    senddiagCmdBlk[1] = (unsigned char)((sf_code << 5) | (pf_bit << 4) |
+                        (sf_bit << 2) | (devofl_bit << 1) | unitofl_bit);
+    senddiagCmdBlk[3] = (unsigned char)((param_len >> 8) & 0xff);
+    senddiagCmdBlk[4] = (unsigned char)(param_len & 0xff);
+
     if (NULL == sg_warnings_str)
         sg_warnings_str = stderr;
-    if (mode6)
-        mx_mode_resp_len =
-                (MODE_RESP_ARB_LEN < 252) ? MODE_RESP_ARB_LEN : 252;
-    else
-        mx_mode_resp_len = MODE_RESP_ARB_LEN;
-    memset(ebuff, 0, sizeof(ebuff));
-    pc_arr[0] = current_mp;
-    pc_arr[1] = changeable_mp;
-    pc_arr[2] = default_mp;
-    pc_arr[3] = saved_mp;
-    for (k = 0; k < 4; ++k) {
-        if (NULL == pc_arr[k])
-            continue;
-        if (mode6)
-            res = sg_ll_mode_sense6(sg_fd, 0 /* dbd */, k /* pc */,
-                                    pg_code, sub_pg_code, buff,
-                                    mx_mode_resp_len, 0, verbose);
-        else
-            res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, 0 /* dbd */,
-                                     k /* pc */, pg_code, sub_pg_code,
-                                     buff, mx_mode_resp_len, 0, verbose);
-        if (0 != res) {
-            if (0 == first_err)
-                first_err = res;
-            continue;
+    if (verbose) {
+        fprintf(sg_warnings_str, "    Send diagnostic cmd: ");
+        for (k = 0; k < SEND_DIAGNOSTIC_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", senddiagCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_str, "    Send diagnostic parameter "
+                    "block:\n");
+            dStrHex(paramp, param_len, -1);
         }
-        offset = sg_mode_page_offset(buff, mx_mode_resp_len, mode6,
-                                     ebuff, EBUFF_SZ);
-        if (verbose && (offset < 0)) {
-            if (('\0' != ebuff[0]) && (verbose > 0))
-                fprintf(sg_warnings_str, "sg_get_mode_page_types: "
-                        "pc=%d: %s\n", k, ebuff);
-            return offset;
-        }
-        calc_len = mode6 ? (buff[0] + 1) : ((buff[0] << 8) + buff[1] + 2);
-        calc_len = (calc_len < MODE_RESP_ARB_LEN) ? calc_len :
-                                                    MODE_RESP_ARB_LEN;
-        calc_len -= offset;
-        calc_len = (calc_len < mx_mpage_len) ? calc_len : mx_mpage_len;
-        memcpy(pc_arr[k], buff + offset, calc_len);
-        if (success_mask)
-            *success_mask |= (1 << k);
     }
-    return first_err;
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = SEND_DIAGNOSTIC_CMDLEN;
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = param_len ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
+    io_hdr.dxfer_len = param_len;
+    io_hdr.dxferp = paramp;
+    io_hdr.cmdp = senddiagCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = long_duration ? LONG_TIMEOUT : DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "send diagnostic (SG_IO) error: %s\n",
+                    safe_strerror(errno));
+        return -1;
+    }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Send diagnostic, continuing", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("SEND DIAGNOSTIC", &io_hdr);
+        return res;
+    default:
+        if (noisy) {
+            char ebuff[EBUFF_SZ];
+            snprintf(ebuff, EBUFF_SZ, "Send diagnostic error, sf_code=0x%x, "
+                     "pf_bit=%d, sf_bit=%d ", sf_code, pf_bit, sf_bit);
+            sg_chk_n_print3(ebuff, &io_hdr);
+        }
+        return -1;
+    }
+}
+
+/* Invokes a SCSI RECEIVE DIAGNOSTICS RESULTS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Receive diagnostics results not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp, 
+                       int mx_resp_len, int noisy, int verbose)
+{
+    int k, res;
+    unsigned char rcvdiagCmdBlk[RECEIVE_DIAGNOSTICS_CMDLEN] = 
+        {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    rcvdiagCmdBlk[1] = (unsigned char)(pcv ? 0x1 : 0);
+    rcvdiagCmdBlk[2] = (unsigned char)(pg_code);
+    rcvdiagCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    rcvdiagCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
+
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_str, "    Receive diagnostics results cmd: ");
+        for (k = 0; k < RECEIVE_DIAGNOSTICS_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", rcvdiagCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = RECEIVE_DIAGNOSTICS_CMDLEN;
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = mx_resp_len;
+    io_hdr.dxferp = resp;
+    io_hdr.cmdp = rcvdiagCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "receive diagnostics results (SG_IO) "
+                    "error: %s\n", safe_strerror(errno));
+        return -1;
+    }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Receive diagnostics results, continuing",
+                            &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("RECEIVE DIAGNOSTICS RESULTS", &io_hdr);
+        return res;
+    default:
+        if (noisy) {
+            char ebuff[EBUFF_SZ];
+            snprintf(ebuff, EBUFF_SZ, "Receive diagnostics results error, "
+                     "pcv=%d, page_code=%x ", pcv, pg_code);
+            sg_chk_n_print3(ebuff, &io_hdr);
+        }
+        return -1;
+    }
+}
+
+/* Invokes a SCSI READ DEFECT DATA (10) command (SBC). Return of 0 ->
+ * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
+                        int dl_format, void * resp, int mx_resp_len,
+                        int noisy, int verbose)
+{
+    int res, k;
+    unsigned char rdefCmdBlk[READ_DEFECT10_CMDLEN] = 
+        {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    rdefCmdBlk[2] = (unsigned char)(((req_plist << 4) & 0x10) |
+                         ((req_glist << 3) & 0x8) | (dl_format & 0x7));
+    rdefCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    rdefCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (mx_resp_len > 0xffff) {
+        fprintf(sg_warnings_str, "mx_resp_len too big\n");
+        return -1;
+    }
+    if (verbose) {
+        fprintf(sg_warnings_str, "    read defect (10) cdb: ");
+        for (k = 0; k < READ_DEFECT10_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", rdefCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = READ_DEFECT10_CMDLEN;
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = mx_resp_len;
+    io_hdr.dxferp = resp;
+    io_hdr.cmdp = rdefCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "read defect (10) SG_IO error: %s\n",
+                    safe_strerror(errno));
+        return -1;
+    }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Read defect (10)", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        if (verbose && io_hdr.resid)
+            fprintf(sg_warnings_str, "    read defect (10): resid=%d\n",
+                    io_hdr.resid);
+        if (verbose > 2) {
+            k = mx_resp_len - io_hdr.resid;
+            if (k > 0) {
+                fprintf(sg_warnings_str, "    read defect (10): response%s\n",
+                        (k > 256 ? ", first 256 bytes" : ""));
+                dStrHex(resp, (k > 256 ? 256 : k), -1);
+            }
+        }
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("Read defect (10) error", &io_hdr);
+        return res;
+    default:
+        if (noisy || verbose) {
+            char ebuff[EBUFF_SZ];
+
+            snprintf(ebuff, EBUFF_SZ, "Read defect (10) error, req_plist=%d "
+                    "req_glist=%d dl_format=%x\n     ", req_plist, req_glist,
+                    dl_format);
+            sg_chk_n_print3(ebuff, &io_hdr);
+        }
+        return -1;
+    }
+}
+
+/* Invokes a SCSI READ MEDIA SERIAL NUMBER command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_read_media_serial_num(int sg_fd, void * resp,
+                                int mx_resp_len, int noisy, int verbose)
+{
+    int k, res;
+    unsigned char rmsnCmdBlk[SERVICE_ACTION_IN_12_CMDLEN] =
+                         {SERVICE_ACTION_IN_12_CMD, READ_MEDIA_SERIAL_NUM_SA,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_io_hdr io_hdr;
+
+    rmsnCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
+    rmsnCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
+    rmsnCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
+    rmsnCmdBlk[9] = mx_resp_len & 0xff;
+    if (NULL == sg_warnings_str)
+        sg_warnings_str = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_str, "    read media serial number cdb: ");
+        for (k = 0; k < SERVICE_ACTION_IN_12_CMDLEN; ++k)
+            fprintf(sg_warnings_str, "%02x ", rmsnCmdBlk[k]);
+        fprintf(sg_warnings_str, "\n");
+    }
+    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
+    memset(sense_b, 0, sizeof(sense_b));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(rmsnCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = mx_resp_len;
+    io_hdr.dxferp = resp;
+    io_hdr.cmdp = rmsnCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = DEF_TIMEOUT;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        if (noisy || verbose)
+            fprintf(sg_warnings_str, "read_media_serial_num (SG_IO) error:"
+                    " %s\n", safe_strerror(errno));
+        return -1;
+    }
+    if (verbose > 2)
+        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
+    res = sg_err_category3(&io_hdr);
+    switch (res) {
+    case SG_LIB_CAT_RECOVERED:
+        if (noisy || verbose)
+            sg_chk_n_print3("Read media serial number", &io_hdr);
+        /* fall through */
+    case SG_LIB_CAT_CLEAN:
+        if (verbose && io_hdr.resid)
+            fprintf(sg_warnings_str, "    read_media_serial_num: resid=%d\n",
+                    io_hdr.resid);
+        return 0;
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose > 1)
+            sg_chk_n_print3("READ MEDIA SERIAL NUMBER", &io_hdr);
+        return res;
+    default:
+        if (noisy || verbose)
+            sg_chk_n_print3("READ MEDIA SERIAL NUMBER command error",
+                            &io_hdr);
+        return -1;
+    }
 }

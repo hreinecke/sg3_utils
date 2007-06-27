@@ -1,9 +1,10 @@
-.TH SG_SENDDIAG "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_SENDDIAG "8" "March 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
 .B sg_senddiag
 [\fI-doff\fR] [\fI-e\fR] [\fI-h\fR] [\fI-l\fR] [\fI-pf\fR] 
+[\fI-raw=<h>,<h>... | -raw=-\fR]
 [\fI-s=<self_test_code>\fR] [\fI-t\fR] [\fI-uoff\fR] [\fI-v\fR]
 [\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
@@ -12,8 +13,8 @@ sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 This utility sends a SEND DIAGNOSTIC SCSI command to the given device.
 In the case of '-l' option it then sends a RECEIVE DIAGNOSTIC SCSI
 command to fetch the response (i.e. the page numbers of supported
-diagnostic pages). This utility is mainly used to make the device do
-self tests.
+diagnostic pages). This utility can issue self tests, find supported
+diagnostic pages or send arbitrary diagnostic pages.
 .TP
 -doff
 set the Device Offline (DevOffL) bit (default is clear). Only significant 
@@ -36,6 +37,20 @@ is fetched by a RECEIVE DIAGNOSTIC command.
 .TP
 -pf
 set Page Format (PF) bit. By default it is clear (i.e. 0).
+.TP
+-raw=<h>,<h>...
+string of comma separated hex numbers each of which should resolve to
+a byte value (i.e. 0 to ff inclusive). This sequence forms a diagnostic
+page to be sent with the SEND DIAGNOSTIC SCSI command. Mostly likely
+the '-pf' option should also be given.
+.TP
+-raw=-
+reads sequence of bytes from stdin. The sequence may be comma, space, tab
+or linefeed (newline) separated. If a line contains "#" then the remaining
+characters on that line are ignored. Otherwise each non separator character
+should resolve to a byte value (i.e. 0 to ff inclusive). This sequence forms
+a diagnostic page to be sent with the SEND DIAGNOSTIC SCSI command. Mostly
+likely the '-pf' option should also be given.
 .TP
 -s=<self_test_code>
 the default value is 0 which is inactive. A value of 1 selects a background
@@ -61,7 +76,7 @@ increase level of verbosity: print out SCSI commands in hex prior to
 sending them to the device.
 .TP
 -V
-print out version string
+print out version string then exit.
 .TP
 -?
 output usage message. Ignore all other parameters.
@@ -81,6 +96,18 @@ should be mounted during a foreground self test. The reason is that
 other SCSI commands may become queued behind the foreground self test and
 timeout.
 .PP
+When the '-raw=' option is given then self tests should not be
+selected. However the '-pf' (i.e. "page format") option should be given.
+The length of the diagnostic page to be sent is derived from the number
+of bytes given to the '-raw=' option. The diagnostic page code (number)
+should be the first byte of the sequence (i.e. as dictated by SPC-3
+diagnostic page format). The SAS 1.1 protocol specific diagnostic page
+could be sent with this option, for example. Advanced SES control
+diagnostic pages could also be sent.
+.PP
+Arbitrary diagnostic pages can be read (in hex) with the sg_ses
+utility (not only those defined in SES-2).
+.PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and SCSI DVDs) can also be specified. For example 'sg_senddiag -t /dev/sda'
@@ -94,7 +121,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003-2004 Douglas Gilbert
+Copyright \(co 2003-2005 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

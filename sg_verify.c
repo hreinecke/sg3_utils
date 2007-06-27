@@ -45,7 +45,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.02 20050309";
+static char * version_str = "1.03 20050404";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -143,6 +143,8 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
                 safe_strerror(errno));
         return -1;
     }
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:

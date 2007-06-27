@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.14
+Version: 1.13
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -29,17 +29,26 @@ Authors:
     Doug Gilbert <dgilbert at interlog dot com>
     See CREDITS file
 
+%package devel
+Summary: Files needed for developing applications using the SCSI command set
+Group: Development/Libraries
+Requires: %{name} = %{version}-%{release}
+
+%description devel
+sg3_utils-devel contains a static library (libsgutils.a) and header files
+to support using the SCSI command set on devices in Linux.
+
 %prep
 %setup
 
 %build
-make
+make LIBDIR=/usr/lib
 
 %install
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
         rm -rf $RPM_BUILD_ROOT
 fi
-make install INSTDIR=$RPM_BUILD_ROOT/usr/bin MANDIR=$RPM_BUILD_ROOT/usr/share/man
+make install INSTDIR=$RPM_BUILD_ROOT/usr/bin MANDIR=$RPM_BUILD_ROOT/usr/share/man LIBDIR=$RPM_BUILD_ROOT/usr/lib INCLUDEDIR=$RPM_BUILD_ROOT/usr/include
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -81,7 +90,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_rtpg
 %attr(755,root,root) %{_bindir}/sg_reassign
 %attr(755,root,root) %{_bindir}/sg_format
-%attr(755,root,root) %{_bindir}/sg_rmsn
+%attr(755,root,root) %{_libdir}/libsgutils.so
+%attr(755,root,root) %{_libdir}/libsgutils.so.1
+%attr(755,root,root) %{_libdir}/libsgutils.so.1.0.0
 # Mandrake compresses man pages with bzip2, RedHat with gzip
 %attr(-,root,root) %doc %{_mandir}/man8/sg_dd.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sgp_dd.8*
@@ -116,14 +127,16 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_rtpg.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_reassign.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_format.8*
-%attr(-,root,root) %doc %{_mandir}/man8/sg_rmsn.8*
+
+%files devel
+%defattr(-,root,root)
+%attr(644,root,root) %{_includedir}/scsi/sg_lib.h
+%attr(644,root,root) %{_includedir}/scsi/sg_cmds.h
+%attr(755,root,root) %{_libdir}/libsgutils.la
+%attr(644,root,root) %{_libdir}/libsgutils.a
  
 
 %changelog
-* Fri May 06 2005 - dgilbert at interlog dot com
-- add sg_rmsn; sg_ses update to SES-2 rev 11
-  * sg3_utils-1.14
-
 * Sun Mar 13 2005 - dgilbert at interlog dot com
 - add sg_format, sg_dd extensions
   * sg3_utils-1.13
@@ -136,12 +149,12 @@ rm -rf $RPM_BUILD_ROOT
 - add sg_sync, sg_prevent and sg_get_config; fix sg_requests
   * sg3_utils-1.11
 
-* Tue Oct 26 2004 - dgilbert at interlog dot com
-- read_capacity (10+16) fix, add sg_luns
+* Sat Oct 30 2004 - dgilbert at interlog dot com
+- fix read capacity (10+16), add sg_luns
   * sg3_utils-1.10
 
 * Thu Oct 21 2004 - dgilbert at interlog dot com
-- sg_requests, sg_ses, sg_verify, sg_err->sg_lib
+- sg_requests, sg_ses, sg_verify, libsgutils(sg_lib.c+sg_cmds.c), devel rpm
   * sg3_utils-1.09
 
 * Tue Aug 31 2004 - dgilbert at interlog dot com
@@ -217,5 +230,5 @@ rm -rf $RPM_BUILD_ROOT
   * sg3_utils-0.91
 
 * Mon Dec 11 2000 - dgilbert at interlog dot com
-- Initial version of package
+- Initial creation of package, containing
   * sg3_utils-0.90

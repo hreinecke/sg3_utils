@@ -30,7 +30,7 @@
  
 */
 
-static char * version_str = "0.41 20041106";
+static char * version_str = "0.42 20050426";
 
 #define START_STOP_CMD          0x1b
 #define START_STOP_CMDLEN       6
@@ -76,6 +76,9 @@ static int do_start_stop(int fd, int start, int immed, int loej,
                 perror("start_stop (SG_IO) error");
                 return -1;
         }
+        if (verbose > 2)
+                fprintf(stderr, "      duration=%u ms\n",
+                        io_hdr.duration);
         res = sg_err_category3(&io_hdr);
         if (SG_LIB_CAT_MEDIA_CHANGED == res) {
                 fprintf(stderr, "media change report, try start_stop again\n");
@@ -111,7 +114,7 @@ void usage ()
                "         <scsi_device>\n\n"
                "    Example: 'sg_start 0 /dev/sdb' stops unit\n"
                "             'sg_start -loej /dev/sdb' stops unit and "
-               "ejects\n");
+               "ejects media\n");
         exit (1);
 }
 
@@ -157,6 +160,10 @@ int main(int argc, char * argv[])
                         exit(0);
                 } else if (!strcmp (*argptr, "-v"))
                         ++verbose;
+                else if (!strcmp (*argptr, "-vv"))
+                        verbose += 2;
+                else if (!strcmp (*argptr, "-vvv"))
+                        verbose += 3;
                 else if (!strcmp (*argptr, "0"))
                         startstop = 0;
                 else if (!strcmp (*argptr, "1"))

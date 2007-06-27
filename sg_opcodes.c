@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.17 20050309";
+static char * version_str = "0.18 20050329";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -137,6 +137,8 @@ static int do_rsoc(int sg_fd, int rep_opts, int rq_opcode, int rq_servact,
         perror("SG_IO (rsoc) error");
         return -1;
     }
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -199,6 +201,8 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
         perror("SG_IO (rstmf) error");
         return -1;
     }
+    if (verbose > 2)
+        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
@@ -426,6 +430,10 @@ int main(int argc, char * argv[])
             do_unsorted = 1;
         else if (0 == strcmp("-v", argv[k]))
             ++do_verbose;
+        else if (0 == strcmp("-vv", argv[k]))
+            do_verbose += 2;
+        else if (0 == strcmp("-vvv", argv[k]))
+            do_verbose += 3;
         else if (0 == strcmp("-?", argv[k])) {
             file_name = 0;
             break;

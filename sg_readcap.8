@@ -1,15 +1,37 @@
-.TH SG_READCAP "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.TH SG_READCAP "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_readcap \- calls a READ CAPACITY command on a SCSI device
 .SH SYNOPSIS
 .B sg_readcap 
-[\fI-lba=<block>\fR] [\fI-pmi\fR] [\fI-V\fR]
+[\fI-16\fR] [\fI-h\fR] [\fI-lba=<block>\fR] [\fI-pmi\fR] [\fI-v\fR]
+[\fI-V\fR]
 <\fIdevice\fR>
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 The normal usage is to find the number of blocks (and block size)
 of the given device and output them.
+.PP
+The SCSI READ CAPACITY command (both 10 and 16 byte cdbs) actually yield
+the block address of the last block and the block size. The number of
+blocks is thus one plus the block address of the last block (as blocks
+are counted origin zero (i.e. starting at block zero)). This is the source
+of many "off by one" errors which are often seen as medium or out of range
+errors when the reported last block is read.
+.PP
+Device capacity is the product of the number of blocks and block size.
+This utility outputs this figure in bytes, MiB (1048576 bytes per MiB)
+and GB (1000000000 bytes per GB).
+.TP
+-16
+Use the 16 byte cdb variant of the READ CAPACITY command. The default
+action is to use the 10 byte cdb variant which limits the maximum
+block address to (2**32 - 2). When a 10 byte cdb READ CAPACITY command
+is used on a device whose size is too large then a last block address
+of 0xffffffff is returned (if the device complies with SBC-2).
+.TP
+-h
+output the usage message then exit.
 .TP
 -lba=<block>
 used in conjunction with "-pmi" option. This variant of READ CAPACITY will
@@ -23,17 +45,22 @@ partial medium indicator: for finding the next block address prior to
 some delay (e.g. head movement). In the absence of this switch, the
 total number of blocks and the block size of the device are output.
 .TP
+-v
+verbose: print out cdb of issued commands prior to execution. '-vv'
+and '-vvv' are also accepted yielding greater verbosity.
+.TP
 -V
 outputs version string then exits.
 .PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and SCSI DVDs) can also be specified. For example "sg_readcap /dev/sda"
-will work in the 2.6 series kernels.
+and "sg_readcap /dev/hdd" (if /dev/hdd is a ATAPI CD/DVD device) will
+work in the 2.6 series kernels.
 .SH AUTHORS
 Written by Douglas Gilbert
 .SH COPYRIGHT
-Copyright \(co 1999-2003 Douglas Gilbert
+Copyright \(co 1999-2005 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

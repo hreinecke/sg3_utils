@@ -1,4 +1,4 @@
-.TH SG_OPCODES "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
+.TH SG_OPCODES "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
 .SH NAME
 sg_opcodes \- reports information supported SCSI commands or
 task management functions supported by the given device
@@ -65,7 +65,8 @@ given by the target. When this option is not given the supported commands
 are sorted numerically (first by operation code and then by service action). 
 .TP
 -v
-verbose: print out cdb of issued commands prior to execution
+verbose: print out cdb of issued commands prior to execution. '-vv'
+and '-vvv' are also accepted yielding greater verbosity.
 .TP
 -V
 print out version string

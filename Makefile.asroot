@@ -32,9 +32,9 @@ HEADERS = sg_lib.h sg_cmds.h
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
 # CFLAGS = -O2 -Wall -W $(LARGE_FILE_FLAGS)
-CFLAGS = -g -O2 -Wall -W $(LARGE_FILE_FLAGS)
+# CFLAGS = -g -O2 -Wall -W $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -W -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(LARGE_FILE_FLAGS)
+CFLAGS = -g -O2 -Wall -pedantic -std=c99 $(LARGE_FILE_FLAGS)
 
 CFLAGS_PTHREADS = -D_REENTRANT
 
@@ -67,8 +67,8 @@ libsgutils.la: sg_lib.lo sg_cmds.lo
 	-rpath $(LIBDIR) -version-info $(LIB_VINFO)
 
 # libsgutils.la: sg_lib.lo sg_cmds.lo
-# 	libtool --mode=link $(LD) -o libsgutils.la sg_lib.lo sg_cmds.lo \
-# 	-rpath $(LIBDIR) -release $(RELEASE)
+#	libtool --mode=link $(LD) -o libsgutils.la sg_lib.lo sg_cmds.lo \
+#	-rpath $(LIBDIR) -release $(RELEASE)
 
 sg_inq: sg_inq.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ 
@@ -180,17 +180,17 @@ install: $(EXECS)
 	install -d $(LIBDIR)
 	libtool --mode=install install -c libsgutils.la $(LIBDIR)/libsgutils.la
 	for name in $^; \
-	 do libtool --mode=install install -m 755 \
+	 do libtool --mode=install install -s -o root -g root -m 755 \
 		$$name $(INSTDIR); \
 	done
 	install -d $(MANDIR)/$(MAN_PREF)
 	for mp in $(MAN_PGS); \
-	 do install -m 644 $$mp $(MANDIR)/$(MAN_PREF); \
+	 do install -o root -g root -m 644 $$mp $(MANDIR)/$(MAN_PREF); \
 	 gzip -9f $(MANDIR)/$(MAN_PREF)/$$mp; \
 	done
 	install -d $(INCLUDEDIR)/scsi
 	for hdr in $(HEADERS); \
-	 do install -m 644 $$hdr $(INCLUDEDIR)/scsi ; \
+	 do install -o root -g root -m 644 $$hdr $(INCLUDEDIR)/scsi ; \
 	done
 
 uninstall:
