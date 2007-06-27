@@ -28,7 +28,7 @@
  * -r    list known raw scsi devices on the system
  * -s    display serial number (from INQUIRY VPD page)
  * -t <n[,spn]> access page number <n> [and subpage <spn>], try to decode
- * -u <n[,spn]> access page number <n> [and subpage <spn>] in hex.
+ * -u <n[,spn]> access page number <n> [and subpage <spn>], output in hex
  * -v    show this program's version number
  * -V    access Verify Error Recovery Page.
  * -T    trace commands (for debugging, double for more debug)
@@ -105,12 +105,15 @@
  *
  * Tim Hunt (tim at timhunt dot net)
  *    20050427  increase number of mapped SCSI disks devices
+ *
+ * Dave Johnson (djj at ccv dot brown dot edu)
+ *    20051218  improve disk defect list handling
  */
 
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
-static const char * version_str = "2.20 [20051114]";
+static const char * version_str = "2.22 [20051220]";
 
 #include <stdio.h>
 #include <string.h>
@@ -125,7 +128,7 @@ static const char * version_str = "2.20 [20051114]";
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include "sg_include.h"
+#include "sg_io_linux.h"
 
 #include "sg_lib.h"
 
@@ -409,7 +412,7 @@ static int do_scsi_io(struct scsi_cmnd_io * sio)
     io_hdr.timeout = CMD_TIMEOUT;
 
     if (trace_cmd) {
-        printf("  cbd:");
+        printf("  cdb:");
         dump(sio->cmnd, sio->cmnd_len);
     }
     if ((trace_cmd > 1) && (DXFER_TO_DEVICE == sio->dxfer_dir)) {
@@ -1487,6 +1490,7 @@ static int read_defect_list(int grown_only)
         bp = cbuffer;
         memset(bp, 0, 4);
         trunc = 0;
+        reallen = -1;
 
         cmd[0] = 0x37;          /* READ DEFECT DATA (10) */
         cmd[1] = 0x00; 
@@ -1511,23 +1515,100 @@ static int read_defect_list(int grown_only)
             status |= i;
             continue;
         }
+        if (trace_cmd > 1) {
+            printf("  cdb response:\n");
+            dump(bp, 4);
+        }
+        /*
+         * Check validity of response:
+         * bp[0] reserved, must be zero
+         * bp[1] bits 7-5 reserved, must be zero
+         * bp[1] bits 4-3 should match table requested
+         */
+        if (0 != bp[0] || (table ? 0x08 : 0x10) != (bp[1] & 0xf8)) {
+            fprintf(stdout, ">>> Invalid header for %s defect list.\n",
+                            (table ? "grown" : "manufacturer"));
+            status |= 1;
+            continue;
+        }
         if (header) {
             printf("Defect Lists\n"
                    "------------\n");
             header = 0;
         }
         len = (bp[2] << 8) + bp[3];
-        reallen = len;
-        if (len > 0) {
-            if ((len + 8) >= (int)sizeof(cbuffer)) {
+        if (len < 0xfff8)
+            reallen = len;
+        else {
+            /*
+             * List length is at or over capacity of READ DEFECT DATA (10)
+             * Try to get actual length with READ DEFECT DATA (12)
+             */
+            bp = cbuffer;
+            memset(bp, 0, 8);
+            cmd12[0] = 0xB7;          /* READ DEFECT DATA (12) */
+            cmd12[1] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
+            cmd12[2] = 0x00;          /* (reserved) */
+            cmd12[3] = 0x00;          /* (reserved) */
+            cmd12[4] = 0x00;          /* (reserved) */
+            cmd12[5] = 0x00;          /* (reserved) */
+            cmd12[6] = 0x00;          /* Alloc len */
+            cmd12[7] = 0x00;          /* Alloc len */
+            cmd12[8] = 0x00;          /* Alloc len */
+            cmd12[9] = 0x08;          /* Alloc len (size finder) */
+            cmd12[10] = 0x00;         /* reserved */
+            cmd12[11] = 0x00;         /* control */
 
-                if (len >= 0xfff0)
+            sci.cmnd = cmd12;
+            sci.cmnd_len = sizeof(cmd12);
+            sci.dxfer_dir = DXFER_FROM_DEVICE;
+            sci.dxfer_len = 8;
+            sci.dxferp = bp;
+            i = do_scsi_io(&sci);
+            if (i) {
+                if (trace_cmd) {
+                    fprintf(stdout, ">>> No 12 byte command support, "
+                            "but list is too long for 10 byte version.\n"
+                            "List will be truncated at 8191 elements\n");
+                }
+                goto trytenbyte;
+            }
+            if (trace_cmd > 1) {
+                printf("  cdb response:\n");
+                dump(bp, 8);
+            }
+            /*
+             * Check validity of response:
+             *    bp[0], bp[2] and bp[3] reserved, must be zero
+             *    bp[1] bits 7-5 reserved, must be zero
+             *    bp[1] bits 4-3 should match table we requested
+             */
+            if (0 != bp[0] || 0 != bp[2] || 0 != bp[3] ||
+                    ((table ? 0x08 : 0x10) != (bp[1] & 0xf8))) {
+                if (trace_cmd)
+                    fprintf(stdout,
+                            ">>> Invalid header for %s defect list.\n",
+                            (table ? "grown" : "manufacturer"));
+                goto trytenbyte;
+            }
+            len = (bp[4] << 24) + (bp[5] << 16) + (bp[6] << 8) + bp[7];
+            reallen = len;
+        }
+        
+        if (len > 0) {
+            k = len + 8;              /* length of defect list + header */
+            if (k > (int)sizeof(cbuffer)) {
+                heapp = malloc(k);
+
+                if (len > 0x80000 && NULL == heapp) {
                     len = 0x80000;      /* go large: 512 KB */
-                heapp = malloc(len);
-                if (NULL == heapp)
-                    continue;
-                bp = heapp;
-                k = len;            /* length of defect list */
+                    k = len + 8;
+                    heapp = malloc(k);
+                }
+                if (heapp != NULL)
+                    bp = heapp;
+            }
+            if (len > 0xfff0 && heapp != NULL) {
                 cmd12[0] = 0xB7;          /* READ DEFECT DATA (12) */
                 cmd12[1] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
                 cmd12[2] = 0x00;          /* (reserved) */
@@ -1549,22 +1630,35 @@ static int read_defect_list(int grown_only)
                 i = do_scsi_io(&sci);
                 if (i) 
                     goto trytenbyte;
+                if (trace_cmd > 1) {
+                    printf("  cdb response:\n");
+                    dump(bp, 8);
+                }
                 reallen = (bp[4] << 24) + (bp[5] << 16) + (bp[6] << 8) + 
                           bp[7];
-                len = reallen;
-                if (len > k) { 
-                    len = k; 
+                if (reallen > len) { 
                     trunc = 1;
                 }
                 df = (unsigned char *) (bp + 8);
             }
             else {
 trytenbyte:
-                if ((len + 4) > (int)sizeof(cbuffer)) { 
-                    len = sizeof(cbuffer) - 4; 
+                if (len > 0xfff8) {
+                    len = 0xfff8;
+                    trunc = 1;
+                }
+                k = len + 4;            /* length of defect list + header */
+                if (k > (int)sizeof(cbuffer) && NULL == heapp) { 
+                    heapp = malloc(k);
+                    if (heapp != NULL)
+                        bp = heapp;
+                }
+                if (k > (int)sizeof(cbuffer) && NULL == heapp) {
+                    bp = cbuffer;
+                    k = sizeof(cbuffer);
+                    len = k - 4;
                     trunc = 1; 
                 }
-                k = len;            /* length of defect list */
                 cmd[0] = 0x37;          /* READ DEFECT DATA (10) */
                 cmd[1] = 0x00;
                 cmd[2] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
@@ -1595,6 +1689,10 @@ trytenbyte:
             if (table && !status && !sorthead)
                 printf("\n");
             defect_format = (bp[1] & 0x7);
+            if (-1 == reallen) {
+                printf("at least ");
+                reallen = len;
+            }
             printf("%d entries (%d bytes) in %s table.\n", 
                    reallen / ((0 == defect_format) ? 4 : 8), reallen,
                    table ? "grown" : "manufacturer");
@@ -3497,7 +3595,7 @@ static void usage(char *errtext)
           "\t-s    Display serial number (from INQUIRY VPD page).\n"
           "\t-t<pn[,sp]> Access mode page <pn> [subpage <sp>] and decode.\n"
           "\t-T    Trace commands (for debugging, double for more)\n"
-          "\t-u<pn[,sp]> Access mode page <pn> [subpage <sp>] in hex.\n"
+          "\t-u<pn[,sp]> Access mode page <pn> [subpage <sp>], output in hex\n"
           "\t-v    Show version number\n"
           "\t-V    Access Verify Error Recovery Page.\n"
           "\t-z    single fetch mode pages (rather than double fetch)\n"
@@ -3511,7 +3609,7 @@ static void usage(char *errtext)
     "\t-R    Replace parameters - best used with -X (expert use only)\n"
     "\t      [replacement parameters placed after device on command line]\n\n",
     stdout);
-    printf("\t      sginfo version: %s; See man page for further details.\n", 
+    printf("\t      sginfo version: %s; See man page for more details.\n", 
            version_str);
     exit(2);
 }

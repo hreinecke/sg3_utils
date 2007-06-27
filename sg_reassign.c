@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005 Douglas Gilbert.
+ * Copyright (c) 2005-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,12 +32,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <limits.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -50,20 +48,13 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.03 20051025";
+static char * version_str = "1.04 20060106";
 
 #define ME "sg_reassign: "
-
-#define REASSIGN_BLKS_CMD     0x7
-#define REASSIGN_BLKS_CMDLEN  6
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
 #define MAX_NUM_ADDR 1024
-
-#define EBUFF_SZ 256
 
 
 static struct option long_options[] = {
@@ -115,88 +106,22 @@ static void usage()
           );
 }
 
-/* Invokes a SCSI REASSIGN BLOCKS command.  Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
-int sg_ll_reassign_blocks(int sg_fd, int dummy, int longlba, int longlist,
-                          void * paramp, int param_len, int noisy, int verbose)
-{
-    int res, k;
-    unsigned char reassCmdBlk[REASSIGN_BLKS_CMDLEN] = 
-        {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    reassCmdBlk[1] = (unsigned char)(((longlba << 1) & 0x2) | (longlist & 0x1));
-    if (verbose) {
-        fprintf(stderr, "    reassign blocks cdb: ");
-        for (k = 0; k < REASSIGN_BLKS_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", reassCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    if (verbose > 1) {
-        fprintf(stderr, "    reassign blocks parameter block\n");
-        dStrHex((const char *)paramp, param_len, -1);
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = REASSIGN_BLKS_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = reassCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (dummy) {
-        fprintf(stderr, ">>> dummy: REASSIGN BLOCKS not executed\n");
-        return 0;
-    }
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(stderr, "reassign blocks SG_IO error: %s\n",
-                safe_strerror(errno));
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Reassign blocks, continuing", &io_hdr, verbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Reassign blocks error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-
-            snprintf(ebuff, EBUFF_SZ, "Reassign blocks error, longlba=%d "
-                    "longlist=%d\n     ", longlba, longlist);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
-        }
-        return -1;
-    }
-}
-
 /* Trying to decode multipliers as sg_get_llnum() [in sg_libs does] would
  * only confuse things here, so use this local trimmed version */
 long long get_llnum(const char * buf)
 {
-    int res;
+    int res, len;
     long long num;
     unsigned long long unum;
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1LL;
+    len = strlen(buf);
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%llx", &unum);
+        num = unum;
+    } else if ('H' == toupper(buf[len - 1])) {
+        res = sscanf(buf, "%llx", &unum);
         num = unum;
     } else
         res = sscanf(buf, "%lld", &num);
@@ -208,8 +133,9 @@ long long get_llnum(const char * buf)
 
 /* Read numbers (up to 64 bits in size) from command line (comma separated */
 /* list) or from stdin (one per line, comma separated list or */
-/*  space separated list). Assumed decimal unless prefixed by '0x' (for */
-/* hex). Returns 0 if ok, or 1 if error. */
+/* space separated list). Assumed decimal unless prefixed by '0x', '0X' */
+/* or contains trailing 'h' or 'H' (which indicate hex). */
+/* Returns 0 if ok, or 1 if error. */
 static int build_lba_arr(const char * inp, unsigned long long * lba_arr,
                            int * lba_arr_len, int max_arr_len)
 {
@@ -249,7 +175,7 @@ static int build_lba_arr(const char * inp, unsigned long long * lba_arr,
             in_len -= m;
             if ('#' == *lcp)
                 continue;
-            k = strspn(lcp, "0123456789aAbBcCdDeEfFxX ,\t");
+            k = strspn(lcp, "0123456789aAbBcCdDeEfFhHxX ,\t");
             if ((k < in_len) && ('#' != lcp[k])) {
                 fprintf(stderr, "build_lba_arr: syntax error at "
                         "line %d, pos %d\n", j + 1, m + k + 1);
@@ -285,7 +211,7 @@ static int build_lba_arr(const char * inp, unsigned long long * lba_arr,
         }
         *lba_arr_len = off;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfFxX,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX,");
         if (in_len != k) {
             fprintf(stderr, "build_lba_arr: error at pos %d\n", k + 1);
             return 1;
@@ -458,16 +384,21 @@ int main(int argc, char * argv[])
         param_arr[3] = k & 0xff;
     }
 
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
+        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         perror("");
         return 1;
     } 
 
     if (got_addr) {
-        res = sg_ll_reassign_blocks(sg_fd, dummy, eight, longlist,
-                                    param_arr, param_len, 1, verbose);
+        if (dummy) {
+            fprintf(stderr, ">>> dummy: REASSIGN BLOCKS not executed\n");
+            return 0;
+        }
+        res = sg_ll_reassign_blocks(sg_fd, eight, longlist, param_arr,
+                                    param_len, 1, verbose);
         if (SG_LIB_CAT_INVALID_OP == res) {
             fprintf(stderr, "REASSIGN BLOCKS not supported\n");
             goto err_out;
@@ -535,9 +466,9 @@ int main(int argc, char * argv[])
     }
 
 err_out:
-    res = close(sg_fd);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
         return 1;
     }
     return ret;

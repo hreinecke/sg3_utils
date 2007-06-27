@@ -1,0 +1,140 @@
+SHELL = /bin/sh
+
+PREFIX=/usr/local
+INSTDIR=$(DESTDIR)/$(PREFIX)/bin
+MANDIR=$(DESTDIR)/$(PREFIX)/man
+
+CC = cc
+LD = cc
+
+EXECS = sg_readcap sg_turs sg_inq sg_start sg_modes sg_logs sg_senddiag \
+	sg_persist sg_requests sg_ses sg_luns \
+	sg_sync sg_prevent sg_get_config sg_wr_mode \
+	sg_rtpg sg_reassign sg_format sg_rmsn sg_ident \
+	sg_read_long sg_write_long sg_verify
+
+MAN_PGS = sg_readcap.8 sg_turs.8 sg_inq.8 sg_start.8 sg_modes.8 sg_logs.8 \
+	  sg_senddiag.8 sg_persist.8 sg_requests.8 sg_ses.8 sg_luns.8 \
+	  sg_sync.8 sg_prevent.8 sg_get_config.8 sg_wr_mode.8 \
+	  sg_rtpg.8 sg_reassign.8 sg_format.8 sg_rmsn.8 sg_ident.8 \
+	  sg_read_long.8 sg_write_long.8 sg_verify.8
+
+MAN_PREF = man8
+
+OS_FLAGS = -DSG3_UTILS_OSF1
+LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+S_CFLAGS = $(OS_FLAGS) $(LARGE_FILE_FLAGS)
+
+# CFLAGS = -O2 -Wall -W $(S_CFLAGS)
+CFLAGS = -g -I./getopt_long $(S_CFLAGS)
+# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(S_CFLAGS)
+
+O_FILES = sg_lib.o sg_cmds.o sg_pt_osf1.o
+O_GETOPT_LONG = getopt_long/getopt_long.o
+
+LDFLAGS =
+# LDFLAGS = -v -lm
+
+all: $(EXECS)
+
+depend dep:
+	for i in *.c; do $(CC) $(INCLUDES) $(CFLAGS) -M $$i; \
+	done > .depend
+
+clean:
+	/bin/rm -f *.o $(EXECS) core* .depend *.a *.la *.lo
+	/bin/rm -f $(O_GETOPT_LONG)
+	/bin/rm -rf .libs
+
+.c.o:
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+sg_readcap: sg_readcap.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+sg_turs: sg_turs.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+sg_inq: sg_inq.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+sg_start: sg_start.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+sg_modes: sg_modes.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+sg_logs: sg_logs.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+sg_senddiag: sg_senddiag.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+sg_persist: sg_persist.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_requests: sg_requests.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_ses: sg_ses.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_luns: sg_luns.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_sync: sg_sync.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_prevent: sg_prevent.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_get_config: sg_get_config.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_wr_mode: sg_wr_mode.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_rtpg: sg_rtpg.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_reassign: sg_reassign.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_format: sg_format.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_rmsn: sg_rmsn.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_ident: sg_ident.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_read_long: sg_read_long.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_write_long: sg_write_long.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+sg_verify: sg_verify.o $(O_FILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+
+install: $(EXECS)
+	test -d $(INSTDIR) || mkdir -p $(INSTDIR)
+	for name in $(EXECS); \
+	 do installbsd -c -s -m 755 $$name $(INSTDIR); \
+	done
+	test -d $(MANDIR)/$(MAN_PREF) || mkdir -p $(MANDIR)/$(MAN_PREF)
+	for mp in $(MAN_PGS); \
+	 do installbsd -c -m 644 $$mp $(MANDIR)/$(MAN_PREF); \
+	 gzip -9f $(MANDIR)/$(MAN_PREF)/$$mp; \
+	done
+
+uninstall:
+	dists="$(EXECS)"; \
+	for name in $$dists; do \
+	 rm -f $(INSTDIR)/$$name; \
+	done
+	for mp in $(MAN_PGS); do \
+	 rm -f $(MANDIR)/$(MAN_PREF)/$$mp.gz; \
+	done
+

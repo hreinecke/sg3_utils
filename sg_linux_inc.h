@@ -1,5 +1,5 @@
-#ifndef SG_INCLUDES_H
-#define SG_INCLUDES_H
+#ifndef SG_LINUX_INC_H
+#define SG_LINUX_INC_H
 
 #ifdef SG_KERNEL_INCLUDES
   #define __user

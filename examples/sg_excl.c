@@ -7,8 +7,8 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_io_linux.h"
 
 /* This is a simple program that tests the O_EXCL flag in sg while
    executing a SCSI INQUIRY command and a

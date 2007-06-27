@@ -9,8 +9,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <scsi/scsi_ioctl.h>
-#include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_io_linux.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -38,7 +38,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.05 20050905";
+static char * version_str = "4.06 20051220";
 
 #define ME "sg_scan: "
 

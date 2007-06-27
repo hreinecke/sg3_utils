@@ -6,7 +6,7 @@
 **
 ** Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
 ** Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
-** Copyright (C) 2005  Douglas Gilbert   dgilbert at interlog dot com
+** Copyright (C) 2005-2006  Douglas Gilbert   dgilbert at interlog dot com
 **
 **   This program is free software; you can redistribute it and/or modify
 **   it under the terms of the GNU General Public License as published by
@@ -35,40 +35,25 @@
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
-#include <sys/fcntl.h>
-#include <sys/ioctl.h>
-#include <scsi/scsi.h>
-#include <scsi/scsi_ioctl.h>
-#include <scsi/sg.h>
-#include <sys/errno.h>
 
 #include "sg_lib.h"
 #include "sg_cmds.h"
+
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
 #define CONTROL_MODE_PAGE 0xa     /* alternative page all devices have?? */
 
-#define CDB_SIZE                6       /* SCSI Command Block */
-#define MODE_HDR_SIZE           4       /* Mode Sense Header */
-#define BLOCK_DESCR_SIZE        8       /* Block Descriptor Header */
-
-#define LOGICAL_UNIT_NOT_READY  4 /* ASC */
-#define FORMAT_IN_PROGRESS      4 /* ASCQ */
-
-#define SHORT_TIMEOUT           20000   /* 20 seconds unless immed=0 ... */
-#define FORMAT_TIMEOUT          (4 * 3600 * 1000)       /* 4 hours ! */
+#define SHORT_TIMEOUT           20   /* 20 seconds unless immed=0 ... */
+#define FORMAT_TIMEOUT          (4 * 3600)       /* 4 hours ! */
 
 #define POLL_DURATION_SECS 30
  
 
-#define MAX_SENSE_SZ    32
-static unsigned char sbuff[MAX_SENSE_SZ];
-
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.06 20051025";
+static char * version_str = "1.07 20060106";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -86,117 +71,41 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static const char * scsi_ptype_strs[] = {
-        "disk",                             /* 0x0 */
-        "tape",
-        "printer",
-        "processor",
-        "write once optical disk",
-        "cd/dvd",
-        "scanner",
-        "optical memory device",
-        "medium changer",                   /* 0x8 */
-        "communications",
-        "graphics [0xa]",
-        "graphics [0xb]",
-        "storage array controller",
-        "enclosure services device",
-        "simplified direct access device",
-        "optical card reader/writer device",
-        "bridge controller commands",       /* 0x10 */
-        "object storage device",
-        "automation/drive interface",
-        "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
-        "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
-        "well known logical unit",
-        "no physical device on this lu",
-};
-
-static const char * get_ptype_str(int scsi_ptype)
-{
-        int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
-
-        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
-}
-
-
 /* Return 0 on success, else -1 */
 static int
 scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
 {
-        int k, res;
+        int res;
         const char FORMAT_HEADER_SIZE = 4;
-        unsigned char cdb[CDB_SIZE], fmt_hdr[FORMAT_HEADER_SIZE];
-        sg_io_hdr_t io_hdr;
-
-        cdb[0] = FORMAT_UNIT;
-        cdb[1] = (pinfo ? 0x80 : 0) | (rto_req ? 0x40 : 0) |
-                 (immed ? 0x10 : 0);
-        cdb[2] = 0;             /* vendor specific */
-        cdb[3] = 0;             /* interleave MSB */
-        cdb[4] = 0;             /* interleave LSB */
-        cdb[5] = 0;             /* control */
+        unsigned char fmt_hdr[FORMAT_HEADER_SIZE];
 
         /* fmt_hdr is a short format header, only used when 'immed' is set */
         fmt_hdr[0] = 0;         /* reserved */
-        fmt_hdr[1] = 0x02;      /* use device defaults, IMMED return */
+        fmt_hdr[1] = 0x2;       /* use device defaults, IMMED return */
         fmt_hdr[2] = 0;         /* defect list length MSB */
         fmt_hdr[3] = 0;         /* defect list length LSB */
 
-        memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
-        memset(sbuff, 0, MAX_SENSE_SZ);
-        io_hdr.interface_id = 'S';
-        io_hdr.dxfer_direction = immed ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
-        io_hdr.cmd_len = CDB_SIZE;
-        io_hdr.mx_sb_len = MAX_SENSE_SZ;
-        io_hdr.iovec_count = 0;         /* no scatter gather */
-        if (immed) {
-                io_hdr.dxfer_len = FORMAT_HEADER_SIZE;
-                io_hdr.dxferp = fmt_hdr;
-        }
-        io_hdr.cmdp = cdb;
-        io_hdr.sbp = sbuff;
-        io_hdr.timeout = immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT;
+        res = sg_ll_format_unit(fd, pinfo, rto_req, 0 /* longlist */,
+                                (!! immed) /* fmtdata */, 8 /* cmplist */,
+                                0 /* dlist_format */,
+                                (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
+                                fmt_hdr, (immed ? sizeof(fmt_hdr) : 0),
+                                1, verbose);
 
-        if (verbose) {
-                fprintf(stderr, "    format cdb: ");
-                for (k = 0; k < 6; ++k)
-                        fprintf(stderr, "%02x ", cdb[k]);
-                fprintf(stderr, "\n");
-        }
-        if ((verbose > 1) && immed) {
-                fprintf(stderr, "    format parameter block\n");
-                dStrHex((const char *)fmt_hdr, FORMAT_HEADER_SIZE, -1);
-        }
-
-        if (ioctl(fd, SG_IO, &io_hdr) < 0) {
-                perror("FORMAT UNIT ioctl error");
-                return -1;
-        }
-        if (verbose > 2)
-                fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
-        res = sg_err_category3(&io_hdr);
         switch (res) {
-        case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("Format, continuing", &io_hdr, verbose > 1);
-            /* fall through */
-        case SG_LIB_CAT_CLEAN:
-                break;
+        case 0:
+            break;
         case SG_LIB_CAT_INVALID_OP:
                 fprintf(stderr, "Format command not supported\n");
-                if (verbose > 1)
-                        sg_chk_n_print3("Format", &io_hdr, 1);
                 return -1;
         case SG_LIB_CAT_ILLEGAL_REQ:
                 fprintf(stderr, "Format command illegal parameter\n");
-                if (verbose > 1)
-                        sg_chk_n_print3("Format", &io_hdr, 1);
                 return -1;
         default:
-                if (verbose > 1)
-                        sg_chk_n_print3("Format", &io_hdr, 1);
+                fprintf(stderr, "Format command failed\n");
                 return -1;
         }
+
         if (! immed)
                 return 0;
 
@@ -351,6 +260,7 @@ int main(int argc, char **argv)
         int long_lba = 0;
         int early = 0;
         char device_name[256];
+        char pdt_name[64];
         struct sg_simple_inquiry_resp inq_out;
         int ret = 1;
 
@@ -466,10 +376,9 @@ int main(int argc, char **argv)
         ** o verify SCSI device is a disk (get inquiry data first)
         */
 
-        if ((fd = open(device_name, O_RDWR | O_NONBLOCK)) < 0) {
-                char ebuff[128];
-                sprintf(ebuff, "error opening device file: %s", device_name);
-                perror(ebuff);
+        if ((fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {
+                fprintf(stderr, "error opening device file: %s: %s\n",
+                        device_name, safe_strerror(-fd));
                 return 1;
         }
 
@@ -480,7 +389,8 @@ int main(int argc, char **argv)
         }
         printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
                inq_out.vendor, inq_out.product, inq_out.revision,
-               get_ptype_str(inq_out.peripheral_type),
+               sg_get_pdt_str(inq_out.peripheral_type, sizeof(pdt_name),
+                              pdt_name),
                inq_out.peripheral_type);
         if (verbose)
                 printf("      PROTECT=%d\n", !!(inq_out.byte_5 & 1));
@@ -715,6 +625,6 @@ int main(int argc, char **argv)
         ret = 0;
 
 out:
-        close(fd);
+        sg_cmds_close_device(fd);
         return ret;
 }

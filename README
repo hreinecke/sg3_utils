@@ -2,12 +2,19 @@
                       ====================
 Introduction
 ============
-This package contains utilities for the Linux SCSI subsystem. In the
-Linux 2.6 kernel series almost all of these programs 
-will work on any devices that use the SCSI command set. Apart from SCSI 
-parallel devices, ATAPI devices (CD/DVDs and tapes), USB mass storage 
-devices, Fibre Channel disks and IEEE 1394 storage devices (that use 
-the "SBP" protocol) use the SCSI command set.
+This package contains low level utilities for devices that use
+a SCSI command set. Apart from SCSI parallel devices, the SCSI
+command set is used by ATAPI devices (CD/DVDs and tapes), USB
+mass storage devices, Fibre Channel disks and IEEE 1394 storage
+devices (that use the "SBP" protocol).
+
+This package targets the Linux SCSI subsystem. Recent changes
+allow many utilities within this package to be used on other operating
+systems which have Unix like support. Most operating systems have
+a pass through mechanism for sending SCSI commands and receiving
+the corresponding response. This README mainly concentrates on
+Linux; see the README.freebsd file to information about the FreeBSD
+port.
 
 Most utilities within the sg3_utils package work at the SCSI command
 level. For example the sg_inq utility issues a SCSI INQUIRY command
@@ -44,12 +51,12 @@ kernel in the 2.6 series.
 
 Utilities that wish to use the asynchronous SCSI command interface
 (i.e. via a write() read() sequence) or issue special "commands"
-(e.g. bus and device resets) still need to use the sg driver. Note
+(e.g. bus and device resets) still need to use the linux sg driver. Note
 that various drivers (e.g. cdrom/sr) have different open() flag and
 permissions policies that the user may need to take into account.
 
 If you have problems or questions about them please contact the author.
-Documentation for the sg device driver can be found at:
+Documentation for the linux sg device driver can be found at:
 http://www.torque.net/sg/p/sg_v3_ho.html .
 This is written in DocBook and the original xml can be found in the 
 same directory with the ".xml" extension. Postscript and
@@ -67,15 +74,21 @@ The "sg_lib.[hc]" files contain ASCII text corresponding to most
 of the SCSI commands, errors and warning conditions. The "sg_cmds.[hc]"
 files contains code to invoke common SCSI commands and associated
 response processing. Both are guided by recent drafts at www.t10.org
-which is the home site of SCSI (draft) standards. Since almost all
-of the utilities use these files, a shared library called
-"libsgutils.so" is built. Use of this library cuts down the size of the
-binary distributions of sg3_utils significantly. The "Makefile" provided
-in the main directory builds libsgutils.so and then builds each utility
-to use that shared library. Alternatively there is a script called
-"make_no_lib.sh" that will build utilities without depending on
-libsgutils.so . For example "./make_no_lib.sh sg_dd" builds a version
-of the sg_dd utility that does not depend on libsgutils.so .
+which is the home site of SCSI (draft) standards. Linux specific
+code has been removed from sg_lib.[hc] and sg_cmds.[hc] . The SCSI
+common command implementations in sg_cmds.c access the OS pass through
+mechanism via the function based interface defined in sg_pt.h . The
+linux specific implementation of that pass through is found in the
+sg_pt_linux.c file. Since almost all of the utilities use these files,
+a shared library called "libsgutils.so" is built. Use of this library
+cuts down the size of the binary distributions of sg3_utils
+significantly. The "Makefile" provided in the main directory builds
+libsgutils.so and then builds each utility to use that shared library.
+Alternatively there is a script called "make_no_lib.sh" that will build
+utilities without depending on libsgutils.so . For example
+"./make_no_lib.sh sg_dd" builds a version of the sg_dd utility that
+does not depend on libsgutils.so . See the INSTALL file for more
+information.
 
 All the utilities in the main directory have "man" pages. Additional
 information (including a version number) can be found towards the top
@@ -168,7 +181,7 @@ Some of these utilities have man pages.
 Here is a list in alphabetical order of utilities found in the examples
 subdirectory:
   - scsi_inquiry, sg_simple1, sg_simple2, sg_simple3, sg_simple4,
-    sg_simple16.c
+    sg_simple5 and sg_simple16.c
 
 Also in that subdirectory is a script to test sg_persist, an example
 data file for sg_persist (called "transport_ids.txt") and an example
@@ -215,6 +228,11 @@ sg driver.
 "sg_simple4" shows the INQUIRY command using mmap-ed IO to obtain its
 response buffer.
 
+"sg_simple5" also sends and INQUIRY and TEST UNIT READY commands. It
+uses the generic pass through mechanism based on sg_pt.h . It will
+currently build in linux and FreeBSD (with "make -f Makefile.freebsd").
+It has extensive error checking code.
+
 "sg_simple16" attempts to send a 16 byte SCSI command, READ_16, to the
 scsi device. This is only supported for lk >= 2.4.15 and for adapter
 drivers that indicate that they have 16 byte CDB capability (otherwise
@@ -225,7 +243,7 @@ Command line processing
 These utilities can be divided into 3 groups when their handling of
 command line arguments is considered:
   - ad hoc, typically in a short form only, sometimes longer (e.g.
-    "sg_start -stop /dev/sdc")
+    "sg_logs -pcb /dev/sdc")
   - inspired by the dd Unix command (e.g. sg_dd, sgm_dd, sgp_dd, sg_read)
   - recent utilities use "getopt_long" (see "man getopt_long")
     type command lines. These have short form (starting with "-")
@@ -233,14 +251,14 @@ command line arguments is considered:
 
 The recent utilities that use "getopt_long" are, in alphabetical
 order:
-  - sg_format sg_get_config sg_ident sg_luns sg_persist sg_prevent
-    sg_read_long sg_reassign sg_requests sg_rmsn sg_rtpg sg_ses
-    sg_sync sg_test_rwbuf sg_verify sg_write_long sg_wr_mode
+  - sg_format sg_get_config sg_ident sg_luns sg_map26 sg_persist
+    sg_prevent sg_read_long sg_reassign sg_requests sg_rmsn sg_rtpg
+    sg_ses sg_sync sg_test_rwbuf sg_verify sg_write_long sg_wr_mode
 
 
-Header file problems
-====================
-These utilities include 2 special Linux header files:
+Linux header file problems
+==========================
+In linux some utilities include 2 important header files:
 #include <scsi/sg.h>
 #include <scsi/scsi.h>
 These files are typically found in the directory /usr/include/scsi which
@@ -262,7 +280,7 @@ glibc have removed this symlink. Hence this technique is no longer
 recommended.
 
 The include file path issues are now all addressed in one file called
-"sg_include.h". Please read that file. This fetching of the scsi.h and
+"sg_linux_inc.h". Please read that file. This fetching of the scsi.h and
 sg.h header files has not been a problem in the latter lk 2.4 and lk 2.6
 series.
 
@@ -283,4 +301,4 @@ user). It is available for Linux and other operating systems.
 See http://members.aol.com/plscsi .
 
 Doug Gilbert
-18th November 2005
+27th January 2006

@@ -25,7 +25,8 @@ are listed.
 --byte=<n> | -b <n>
 some control pages need byte 1 (i.e. the second byte) of the cdb set.
 Only required in rare cases when the '--control' option is also set.
-Default is 0; <n> is in decimal unless it is prefixed by 0x.
+Default is 0; <n> is in decimal unless it is prefixed by '0x'
+or '0X' (or has a trailing 'h' or 'H').
 .TP
 --control | -c
 will send control information to the given device via a SCSI SEND

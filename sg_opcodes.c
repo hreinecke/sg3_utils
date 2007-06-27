@@ -8,9 +8,9 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
+#include "sg_io_linux.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
 *  Copyright (C) 2004-2005 D. Gilbert
@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.22 20051025";
+static char * version_str = "0.22 20051220";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */

@@ -1,0 +1,61 @@
+SHELL = /bin/sh
+
+PREFIX=/usr/local
+INSTDIR=$(DESTDIR)/$(PREFIX)/bin
+MANDIR=$(DESTDIR)/$(PREFIX)/man
+
+CC = gcc
+LD = gcc
+
+EXECS = sg_simple5
+
+MAN_PGS =
+MAN_PREF = man8
+
+OS_FLAGS = -DSG3_UTILS_FREEBSD
+EXTRA_FLAGS = $(OS_FLAGS)
+
+# CFLAGS = -O2 -Wall -W $(EXTRA_FLAGS)
+CFLAGS = -g -O2 -Wall -W $(EXTRA_FLAGS)
+# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(EXTRA_FLAGS)
+
+CFLAGS_PTHREADS = -D_REENTRANT
+
+O_FILES = sg_lib.o sg_pt_freebsd.o
+
+LDFLAGS = -lcam
+# LDFLAGS = -v -lm
+
+all: $(EXECS)
+
+depend dep:
+	for i in *.c; do $(CC) $(INCLUDES) $(CFLAGS) -M $$i; \
+	done > .depend
+
+clean:
+	/bin/rm -f *.o $(EXECS) core* .depend *.a *.la *.lo
+	/bin/rm -rf .libs
+
+sg_simple5: sg_simple5.o $(O_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+
+install: $(EXECS)
+	install -d $(INSTDIR)
+	for name in $(EXECS); \
+	 do install -s -m 755 $$name $(INSTDIR); \
+	done
+	install -d $(MANDIR)/$(MAN_PREF)
+	for mp in $(MAN_PGS); \
+	 do install -m 644 $$mp $(MANDIR)/$(MAN_PREF); \
+	 gzip -9f $(MANDIR)/$(MAN_PREF)/$$mp; \
+	done
+
+uninstall:
+	dists="$(EXECS)"; \
+	for name in $$dists; do \
+	 rm -f $(INSTDIR)/$$name; \
+	done
+	for mp in $(MAN_PGS); do \
+	 rm -f $(MANDIR)/$(MAN_PREF)/$$mp.gz; \
+	done
+

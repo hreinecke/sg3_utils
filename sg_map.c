@@ -7,9 +7,9 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
+#include "sg_io_linux.h"
 
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
 *  Copyright (C) 2000-2005 D. Gilbert
@@ -36,7 +36,7 @@
 #error "Need version 2 sg driver (linux kernel >= 2.2.6)"
 #endif
 
-static char * version_str = "1.04 20050810";
+static char * version_str = "1.04 20051220";
 
 static const char * devfs_id = "/dev/.devfsd";
 

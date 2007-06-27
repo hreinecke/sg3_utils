@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "November 2005" "sg3_utils-1.18" SG3_UTILS
+.TH SG_INQ "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sg_inq \- outputs data retrieved from the SCSI INQUIRY or
 ATA IDENTIFY (PACKET) DEVICE command
@@ -58,7 +58,7 @@ Assume given <device> is an ATA or ATAPI device which can receive
 ATA passthrough commands from the host operating system. Skip
 the SCSI INQUIRY command and use either the ATA IDENTIFY DEVICE
 command (for nonpacket devices) or the ATA IDENTIFY PACKET DEVICE
-command.
+command. This option is not available in the FreeBSD port.
 .TP
 -b
 decodes the Block Limits Vital Product Data (VPD) page [0xb0].
@@ -80,9 +80,12 @@ name) by looping through all 256 opcodes. This option uses the CmdDt bit
 which is now obsolete. See the sg_opcodes utility.
 .TP
 -d
-lists version descriptors (if any) after a standard INQUIRY response.
-There are up to 8 version descriptors in the upper bytes of a standard
-INQUIRY, If the code is recognised then the corresponding string is output.
+decodes depending on context. If '-e' option is given, or any option that
+implies '-e' (e.g. '-i' or '-p=80'), then this utility attempts to
+decode the indicated VPD page.  Otherwise the version descriptors (if any)
+are listed following a standard INQUIRY response. There are up to 8 version
+descriptors in the response of a standard INQUIRY, If the version descriptor
+code is recognised then the corresponding string is output.
 Version descriptors are versions of standards and drafts that the device
 claims to comply with (e.g. SAM, SPC, SBC, SPI, FCP, SAS etc).
 .TP

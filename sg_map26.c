@@ -53,7 +53,7 @@
 #include <sys/stat.h>
 #include <linux/major.h>
 
-static char * version_str = "1.01 20051026";
+static char * version_str = "1.01 20051229";
 
 #define ME "sg_map26: "
 
@@ -338,9 +338,9 @@ static int nd_match_scandir_select(const struct dirent * s)
                         return 0;
         }
         return (((-1 == nd_match.majj) ||
-                 (major(st.st_rdev) == (unsigned)nd_match.majj)) &&
+                 ((unsigned)major(st.st_rdev) == (unsigned)nd_match.majj)) &&
                 ((-1 == nd_match.minn) ||
-                 (minor(st.st_rdev) == (unsigned)nd_match.minn)))
+                 ((unsigned)minor(st.st_rdev) == (unsigned)nd_match.minn)))
                ? 1 : 0;
 }
 

@@ -17,15 +17,15 @@
 #include <sys/time.h> 
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
-#include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
+#include "sg_io_linux.h"
 #include "llseek.h"
 
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2005 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2006 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -49,7 +49,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.44 20051118";
+static char * version_str = "5.46 20060103";
 
 #define ME "sg_dd: "
 
@@ -368,128 +368,6 @@ static int read_blkdev_capacity(int sg_fd, long long * num_sect,
 #endif
 }
 
-static int info_offset(unsigned char * sensep, int sb_len)
-{
-    int resp_code;
-
-    if (sb_len < 8)
-        return 0;
-    resp_code = (0x7f & sensep[0]);
-    if (resp_code >= 0x72) { /* descriptor format */
-        unsigned long long ull = 0;
-
-        /* if Information field, fetch it; contains signed number */
-        if (sg_get_sense_info_fld(sensep, sb_len, &ull))
-            return (int)(long long)ull;
-    } else if (sensep[0] & 0x80) { /* fixed, valid set */
-        if ((0 == sensep[3]) && (0 == sensep[4]))
-            return ((sensep[5] << 8) + sensep[6]);
-        else if ((0xff == sensep[3]) && (0xff == sensep[4]))
-            return ((sensep[5] << 8) + sensep[6] - (int)0x10000);
-    }
-    return 0;
-}
-
-static int has_blk_ili(unsigned char * sensep, int sb_len)
-{
-    int resp_code;
-    const unsigned char * cup;
-
-    if (sb_len < 8)
-        return 0;
-    resp_code = (0x7f & sensep[0]);
-    if (resp_code >= 0x72) { /* descriptor format */
-        /* find block command descriptor */
-        if ((cup = sg_scsi_sense_desc_find(sensep, sb_len, 0x5)))
-            return ((cup[3] & 0x20) ? 1 : 0);
-    } else /* fixed */
-        return ((sensep[2] & 0x20) ? 1 : 0);
-    return 0;
-}
-
-/* Invokes a SCSI READ LONG (10) command. Return of 0 -> success,
- * 1 -> ILLEGAL REQUEST with info field written to offsetp,
- * SG_LIB_CAT_INVALID_OP -> Verify(10) not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
-static int sg_ll_read_long10(int sg_fd, int correct, unsigned long lba,
-                             void * data_out, int xfer_len, int * offsetp,
-                             int vverbose)
-{
-    int k, res, offset;
-    unsigned char readLongCmdBlk[READ_LONG_CMD_LEN];
-    struct sg_io_hdr io_hdr;
-    struct sg_scsi_sense_hdr ssh;
-    unsigned char sense_buffer[SENSE_BUFF_LEN];
-
-    memset(readLongCmdBlk, 0, READ_LONG_CMD_LEN);
-    readLongCmdBlk[0] = READ_LONG_OPCODE;
-    if (correct)
-        readLongCmdBlk[1] |= 0x2;
-
-    /*lba*/
-    readLongCmdBlk[2] = (lba & 0xff000000) >> 24;
-    readLongCmdBlk[3] = (lba & 0x00ff0000) >> 16;
-    readLongCmdBlk[4] = (lba & 0x0000ff00) >> 8;
-    readLongCmdBlk[5] = (lba & 0x000000ff);
-    /*size*/
-    readLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
-    readLongCmdBlk[8] = (xfer_len & 0x000000ff);
-
-    if (vverbose) {
-        fprintf(stderr, "    Read Long (10) cmd: ");
-        for (k = 0; k < READ_LONG_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", readLongCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(readLongCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_buffer);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = xfer_len;
-    io_hdr.dxferp = data_out;
-    io_hdr.cmdp = readLongCmdBlk;
-    io_hdr.sbp = sense_buffer;
-    io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror(ME "SG_IO ioctl READ LONG(10) error");
-        return -1;
-    }
-
-    /* now for the error processing */
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr, vverbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-        if (vverbose > 1)
-            sg_chk_n_print3("READ LONG(10) command problem", &io_hdr, 1);
-        return res;
-    default:
-        if (vverbose > 1)
-            sg_chk_n_print3("READ LONG(10) sense", &io_hdr, 1);
-        if ((sg_normalize_sense(&io_hdr, &ssh)) &&
-            (ssh.sense_key == ILLEGAL_REQUEST) &&
-            ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {
-            if (has_blk_ili(io_hdr.sbp, io_hdr.sb_len_wr)) {
-                if (offsetp)
-                        *offsetp = offset;
-                return 1;
-            } else if (vverbose)
-                fprintf(stderr, "  info field [%d], but ILI clear ??\n",
-                        offset);
-        }
-        if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            return res;
-        return -1;
-    }
-}
-
 static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
                              unsigned int blocks, long long start_block,
                              int write_true, int fua, int dpo)
@@ -776,7 +654,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                 return -1;
             }
             res = sg_ll_read_long10(sg_fd, 0 /*corrct */, lba,
-                                    buffp, bs + 8, &offset, verbose);
+                                    buffp, bs + 8, &offset, 1, verbose);
             ok = 0;
             switch (res) {
             case 0:
@@ -791,7 +669,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                     break;
                 }
                 r = sg_ll_read_long10(sg_fd, 0 /*corrct */, lba,
-                                      buffp, nl, &offset, verbose);
+                                      buffp, nl, &offset, 1, verbose);
                 if (0 == r) {
                     ok = 1;
                     ++read_longs;

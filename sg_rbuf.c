@@ -13,8 +13,8 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/time.h>
-#include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_io_linux.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -45,7 +45,7 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.83 20051025";
+static char * version_str = "4.83 20051220";
 
 static void usage()
 {

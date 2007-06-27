@@ -7,7 +7,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "sg_include.h"
+#include "sg_linux_inc.h"
 
 /* This is a program that periodically executes a TEST UNIT READY
    SCSI command using the SCSI generic (sg) driver.

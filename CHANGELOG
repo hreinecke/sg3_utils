@@ -2,6 +2,43 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.19 [20060127]
+  - sg_start: accept '--' options (e.g. 'sg_start --stop')
+    - add '--fl=<n>' option for jump to format layer (mmc5)
+  - sg_logs: background scan log page, resync with sbc3r03
+    - add '-scum' and '-sthr' for setting defaults
+    - add device statistics log page (ssc + adc)
+    - fix "last n" deferred errors/error events incrementing
+    - partial addition of log subpages (spc4r03)
+  - sg_get_config: sync features with mmc5 rev 02b
+  - sg_wr_mode: mask out dpofua bit in mode select header
+  - sg_inq: try harder with '-A' to identify ATA device
+    - broaden meaning of '-d' option to decode ...
+    - decode software interface id VPD page ('-p=84 -d')
+    - decode device capabilities (ssc) VPD page ('-p=b0 -d')
+  - sginfo: correct defect list handling ('-d' and '-G')
+  - sg_verify: improve error processing (e.g. medium errors)
+  - sg_ses: scsi target_initiator port additional element
+     status (06-036r0)
+  - many: arguments that currently accept '0x' or '0X' to
+     indicate a hex number may alternatively take a trailing
+     'h' or 'H' to indicate hex
+  - sg_lib: update asc/ascq strings (spc4r03)
+  - sg_lib+sg_cmds: make independent of linux via
+    sg_pt.h function based interface.
+    - linux pass through code placed in sg_pt_linux.c
+    - rename sg_include.h to sg_linux_inc.h
+    - linux specific code in sg_lib.[hc] moved to
+      sg_io_linux.[hc]
+  - port to FreeBSD: using sg_pt_freebsd.c
+  - port to Tru64: using sg_pt_osf1.c
+  - sg_cmds: add sg_ll_get_config(), sg_ll_format_unit(),
+     sg_ll_reassign_blocks(), sg_ll_persistent_reserve_in+out(),
+     sg_ll_read_long10(), sg_ll_verify10(), sg_ll_write_long10()
+  - sg_persist: add "allow commands" to report capabilities
+  - sg_persist_tst: (examples) takes device node as argument
+  - sg_luns: add "security protocol" wlun
+
 Changelog for sg3_utils-1.18 [20051118]
   - sg_map26: new utility to map sg devices in lk 2.6
   - sg_luns: luns > 16,384 (sam-4 rev 4)

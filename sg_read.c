@@ -16,8 +16,8 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <linux/major.h> 
-#include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_io_linux.h"
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.06 20051025";
+static const char * version_str = "1.06 20051220";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

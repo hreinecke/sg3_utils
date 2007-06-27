@@ -1,0 +1,73 @@
+Introduction
+============
+The FreeBSD port of sg3_utils contains those utilities that are _not_
+specific to Linux. In some cases a utility could be ported but
+requires more work. An example is sg_dd which needs more work
+beyond the SCSI command pass through mechanism.
+
+Supported Utilities
+===================
+Here is a list of utilities that have been ported:
+    sg_format
+    sg_get_config
+    sg_ident
+    sg_inq          [dropped ATA IDENTIFY DEVICE capability]
+    sg_logs
+    sg_luns
+    sg_modes
+    sg_persist
+    sg_prevent
+    sg_read_long
+    sg_readcap
+    sg_reassign
+    sg_requests
+    sg_rmsn
+    sg_rtpg
+    sg_senddiag
+    sg_ses
+    sg_start
+    sg_sync
+    sg_turs
+    sg_verify
+    sg_wr_mode
+    sg_write_long
+
+Most utility names are indicative of the main SCSI command
+that they execute.  Some utilities are slightly higher level, for
+example sg_ses fetches SCSI Enclosure Services (SES) status pages and
+can send control pages. Each utility has a man page (placed in
+section 8). An overview of sg3_utils can be found at:
+http://www.torque.net/sg/u_index.html .
+A copy of the "u_index.html" file is in the "doc" subdirectory.
+
+
+See the INSTALL file (at the end) for instructions on how to build
+sg3_utils on FreeBSD. Some man pages have examples which use linux
+device names which hopefully will not confuse the FreeBSD users.
+
+
+Details
+=======
+The ported utilities listed above, all use SCSI command functions
+declared in sg_cmds.h and implemented in sg_cmds.c . The sg_cmds.c
+file passes SCSI commands to the host operating system via
+an interface declared in sg_pt.h . There are currently three
+implementations of that interface depending on the host operating
+system:
+  - sg_pt_linux.c
+  - sg_pt_freebsd.c
+  - sg_pt_osf1.c  [Tru64]
+
+The sg_pt_freebsd.c file uses the FreeBSD CAM SCSI pass through
+mechanism. Hence only FreeBSD device nodes that support CAM can
+be used. These can be viewed with the "camcontrol devlist"
+command. To access ATAPI devices (e.g. ATAPI DVD drives) the
+kernel may need to be configured with the "atapicam" device.
+
+At the present time these utilities have been lightly tested on a
+FreeBSD version 5.3 system with some SCSI disks, a SCSI tape
+drive and an ATAPI CD drive.
+
+
+Doug Gilbert
+24th January 2006

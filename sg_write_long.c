@@ -5,14 +5,12 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
+#include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2005 D. Gilbert
+   *  Copyright (C) 2004-2006 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -27,13 +25,10 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.08 20051113";
+static char * version_str = "1.09 20060106";
 
-#define WRITE_LONG_OPCODE 0x3F
-#define WRITE_LONG_CMD_LEN 10
 
 #define MAX_XFER_LEN 10000
-#define SENSE_BUFF_LEN 64
 
 /* #define SG_DEBUG */
 
@@ -77,62 +72,19 @@ static void usage()
           );
 }
 
-static int info_offset(unsigned char * sensep, int sb_len)
-{
-    int resp_code;
-
-    if (sb_len < 8)
-        return 0;
-    resp_code = (0x7f & sensep[0]);
-    if (resp_code>= 0x72) { /* descriptor format */
-       unsigned long long ull = 0;
-
-        /* if Information field, fetch it; contains signed number */
-        if (sg_get_sense_info_fld(sensep, sb_len, &ull))
-            return (int)(long long)ull;
-    } else if (sensep[0] & 0x80) { /* fixed, valid set */
-        if ((0 == sensep[3]) && (0 == sensep[4]))
-            return ((sensep[5] << 8) + sensep[6]);
-        else if ((0xff == sensep[3]) && (0xff == sensep[4]))
-            return ((sensep[5] << 8) + sensep[6] - (int)0x10000);
-    }
-    return 0;
-}
-
-static int has_blk_ili(unsigned char * sensep, int sb_len)
-{
-    int resp_code;
-    const unsigned char * cup;
-
-    if (sb_len < 8)
-        return 0;
-    resp_code = (0x7f & sensep[0]);
-    if (resp_code>= 0x72) { /* descriptor format */
-        /* find block command descriptor */
-        if ((cup = sg_scsi_sense_desc_find(sensep, sb_len, 0x5)))
-            return ((cup[3] & 0x20) ? 1 : 0);
-    } else /* fixed */
-        return ((sensep[2] & 0x20) ? 1 : 0);
-    return 0;
-}
-
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, infd, sb_len, offset, k;
-    unsigned char writeLongCmdBlk [WRITE_LONG_CMD_LEN];
+    int sg_fd, res, c, infd, offset;
     unsigned char * writeLongBuff = NULL;
     void * rawp = NULL;
-    unsigned char sense_buffer[SENSE_BUFF_LEN];
     int xfer_len = 520;
     int cor_dis = 0;
-    unsigned int lba = 0;
+    unsigned long lba = 0;
     int verbose = 0;
     int got_stdin;
     char device_name[256];
     char file_name[256];
     char ebuff[EBUFF_SZ];
-    struct sg_io_hdr io_hdr;
-    struct sg_scsi_sense_hdr ssh;
     int ret = 1;
     
     memset(device_name, 0, sizeof device_name);
@@ -158,7 +110,7 @@ int main(int argc, char * argv[])
             break;
         case 'l':
             lba = sg_get_num(optarg);
-            if ((unsigned int)(-1) == lba) {
+            if ((unsigned long)(-1) == lba) {
                 fprintf(stderr, "bad argument to '--lba'\n");
                 return 1;
             }
@@ -208,16 +160,16 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
-        perror("");
+        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
   
     if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
         fprintf(stderr, ME "out of memory (query)\n");
-        close(sg_fd);
+        sg_cmds_close_device(sg_fd);
         return 1;
     }
     writeLongBuff = rawp;
@@ -248,81 +200,42 @@ int main(int argc, char * argv[])
         if (! got_stdin)
             close(infd);
     }
+    if (verbose)
+        fprintf(stderr, ME "issue write long to device %s\n\t\txfer_len= %d "
+                "(0x%x), lba=%lu (0x%lx)\n", device_name, xfer_len, xfer_len,
+                lba, lba);
 
-    memset(writeLongCmdBlk, 0, WRITE_LONG_CMD_LEN);
-    writeLongCmdBlk[0] = WRITE_LONG_OPCODE;
-  
-    /*lba*/
-    writeLongCmdBlk[2] = (lba & 0xff000000) >> 24;
-    writeLongCmdBlk[3] = (lba & 0x00ff0000) >> 16;
-    writeLongCmdBlk[4] = (lba & 0x0000ff00) >> 8;
-    writeLongCmdBlk[5] = (lba & 0x000000ff);
-    /*size*/
-    writeLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
-    writeLongCmdBlk[8] = (xfer_len & 0x000000ff);
-
-    if (cor_dis)
-        writeLongCmdBlk[1] |= 0x80;
-  
-    fprintf(stderr, ME "issue write long to device %s\n\t\txfer_len= %d "
-            "(0x%x), lba=%d (0x%x)\n", device_name, xfer_len, xfer_len,
-            lba, lba);
-  
-    if (verbose) {
-        fprintf(stderr, "    Write Long (10) cmd: ");
-        for (k = 0; k < WRITE_LONG_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", writeLongCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(writeLongCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_buffer);
-    io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-    io_hdr.dxfer_len = xfer_len;
-    io_hdr.dxferp = writeLongBuff;
-    io_hdr.cmdp = writeLongCmdBlk;
-    io_hdr.sbp = sense_buffer;
-    io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
-    /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror(ME "SG_IO ioctl WRITE LONG error");
-        goto err_out;
-    }
-
-    sb_len = io_hdr.sb_len_wr;
-    /* now for the error processing */
-    switch (sg_err_category3(&io_hdr)) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("WRITE LONG, continuing", &io_hdr, verbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
+    res = sg_ll_write_long10(sg_fd, cor_dis, lba, writeLongBuff, xfer_len,
+                             &offset, 1, verbose);
+    switch (res) {
+    case 0:
+        ret = 0;
         break;
-    default: /* won't bother decoding other categories */
-        if ((sg_normalize_sense(&io_hdr, &ssh)) &&
-            (ssh.sense_key == ILLEGAL_REQUEST) &&
-            ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {
-            if (verbose)
-                sg_chk_n_print3("WRITE LONG command problem", &io_hdr, 1);
-            fprintf(stderr, "<<< nothing written to device >>>\n");
-            fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
-                    ">>>\n", xfer_len - offset);
-            if (! has_blk_ili(io_hdr.sbp, io_hdr.sb_len_wr))
-                fprintf(stderr, "    [Invalid Length Indication (ILI) flag "
-                        "expected but not found]\n");
-            goto err_out;
-        }
-        sg_chk_n_print3("WRITE LONG problem error", &io_hdr, verbose > 1);
-        goto err_out;
+    case SG_LIB_CAT_INVALID_OP:
+        fprintf(stderr, "  SCSI WRITE LONG (10) command not supported\n");
+        ret = 1;
+        break;
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        fprintf(stderr, "  SCSI WRITE LONG (10) command, bad field in cdb\n");
+        ret = 1;
+        break;
+    case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
+        fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
+                ">>>\n", xfer_len - offset);
+        ret = 1;
+        break;
+    default:
+        fprintf(stderr, "  SCSI WRITE LONG (10) command error\n");
+        ret = 1;
+        break;
     }
 
-    ret = 0;
 err_out:
-    if (rawp) free(rawp);
-    res = close(sg_fd);
+    if (rawp)
+        free(rawp);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-sg_fd));
         return 1;
     }
     return ret;

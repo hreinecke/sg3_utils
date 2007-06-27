@@ -1,4 +1,4 @@
-.TH SG_WRITE_LONG "8" "October 2005" "sg3_utils-1.18" SG3_UTILS
+.TH SG_WRITE_LONG "8" "Janauary 2006" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sg_write_long \- send the SCSI command write long
 .SH SYNOPSIS
@@ -26,6 +26,19 @@ logical block address. An alternate strategy would be to read the "long"
 contents of the logical block address with
 .B sg_read_long
 utility prior to testing and restore it with this utility after testing.
+.PP
+.B Take care:
+If recoverable errors are being injected (e.g. only one or a few bits
+changed so that the ECC is able to correct the data) then care should
+be taken with the settings in the "read write error recovery" mode page.
+Specifically if the ARRE (for reads) and/or AWRE (for writes) all set
+then recovered errors will cause the lba to be reassigned (and the old
+location to be added to the grown defect list). This is not easily 
+reversed and uses the (finite number) of spare blocks sets aside for
+this purpose. If in doubt it is probably safest to clear the ARRE and
+AWRE bits. These bits can be checked and modified with the sdparm utility.
+For example: "sdparm -c AWRE,ARRE /dev/sda" will clear the bits until
+the disk is rebooted (assuming the "saved" bits are set).
 .TP
 --cor_dis | -c
 sets the correction disabled bit. This inhibits various other
@@ -65,8 +78,8 @@ MB *1,000,000; g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix
 of the form "x<n>" multiplies the leading number by <n>.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
-either "0x" or "0X". When hex numbers are given multipliers cannot be
-used.
+either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
+given multipliers cannot be used.
 .SH "NOTES"
 To read from a defective sector (that, for example, has been filled with
 0xff bytes by this utility) use:
@@ -83,25 +96,14 @@ MEDIUM ERROR since the ECC and associated data will be well formed.
 The 10 byte WRITE LONG SCSI command is implemented (not the 16
 byte variant). This limits the logical block address to a 32 bit
 quantity.
-.PP
-If recoverable errors are being injected (e.g. only one or a few bits
-changed so that the ECC is able to correct the data) then care should
-be taken with the settings in the "read write error recovery" mode page.
-Specifically if the ARRE (for reads) and/or AWRE (for writes) all set
-then recovered errors will cause the lba to be reassigned (and the old
-location to be added to the grown defect list). This is not easily 
-reversed and uses the (finite number) of spare blocks sets aside for
-this purpose. If in doubt it is probably safest to clear the ARRE and
-AWRE bits. These bits can be checked and modified with sginfo, sg_modes
-and sg_wr_mode.
 .SH AUTHORS
-Written by Saeed Bishara.
+Written by Saeed Bishara. Further work by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004-2005 Douglas Gilbert
+Copyright \(co 2004-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_read_long, sg_dd, sginfo, sg_modes, sg_wr_mode(all in sg3_utils)
+.B sg_read_long, sg_dd (both in sg3_utils), sdparm(sdparm)

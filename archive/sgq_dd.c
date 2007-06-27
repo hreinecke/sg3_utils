@@ -17,8 +17,8 @@
 #include <linux/major.h>
 #include <sys/time.h>
 typedef unsigned char u_char;   /* horrible, for scsi.h */
-#include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_io_linux.h"
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.

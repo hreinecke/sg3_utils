@@ -8,8 +8,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libaio.h>
-#include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_linux_inc.h"
 
 /* This is a simple program executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver

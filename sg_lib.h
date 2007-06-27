@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.15 [20051113]
+/* Version 1.18 [20050124]
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
@@ -38,40 +38,48 @@
  */
 
 
-/* This header file contains defines and function declarations that may
- * be useful to Linux applications that communicate with devices that
- * use a SCSI command set. These command sets have names like SPC-3, SBC-2,
- * SSC-2, SES-2 and draft standards defining them can be found at
+/*
+ * This header file contains defines and function declarations that may
+ * be useful to applications that communicate with devices that use a
+ * SCSI command set. These command sets have names like SPC-4, SBC-3,
+ * SSC-3, SES-2 and draft standards defining them can be found at
  * http://www.t10.org . Virtually all devices in the Linux SCSI subsystem
  * utilize SCSI command sets. Many devices in other Linux device subsystems
  * utilize SCSI command sets either natively or via emulation (e.g. a
- * parallel ATA disk in a USB enclosure). Some defines found in the Linux
- * kernel source directory include/scsi (mainly in the scsi.h header)
- * are replicated here.
- * This header is organised into two parts: part 1 is operating system
- * independent (i.e. may be useful to other OSes) and part 2 is Linux
- * specific (or at least closely related).
+ * parallel ATA disk in a USB enclosure).
  */
 
+#include <stdio.h>
 
-/*
- * PART 1: OPERATING SYSTEM INDEPENDENT SECTION
- *         ------------------------------------
- */
-
-#ifndef SCSI_CHECK_CONDITION
-/* Following are the SCSI status codes as found in SAM-3 at www.t10.org . */
-#define SCSI_CHECK_CONDITION 0x2
-#define SCSI_CONDITION_MET 0x4
-#define SCSI_BUSY 0x8
-#define SCSI_IMMEDIATE 0x10
-#define SCSI_IMMEDIATE_CONDITION_MET 0x14
-#define SCSI_RESERVATION_CONFLICT 0x18
-#define SCSI_COMMAND_TERMINATED 0x22    /* obsolete since SAM-2 */
-#define SCSI_TASK_SET_FULL 0x28
-#define SCSI_ACA_ACTIVE 0x30
-#define SCSI_TASK_ABORTED 0x40
+#ifndef SAM_STAT_GOOD
+/* The SCSI status codes as found in SAM-4 at www.t10.org */
+#define SAM_STAT_GOOD 0x0
+#define SAM_STAT_CHECK_CONDITION 0x2
+#define SAM_STAT_CONDITION_MET 0x4
+#define SAM_STAT_BUSY 0x8
+#define SAM_STAT_INTERMEDIATE 0x10
+#define SAM_STAT_INTERMEDIATE_CONDITION_MET 0x14
+#define SAM_STAT_RESERVATION_CONFLICT 0x18
+#define SAM_STAT_COMMAND_TERMINATED 0x22        /* obsolete in SAM-3 */
+#define SAM_STAT_TASK_SET_FULL 0x28
+#define SAM_STAT_ACA_ACTIVE 0x30
+#define SAM_STAT_TASK_ABORTED 0x40
 #endif
+
+/* The SCSI sense key codes as found in SPC-4 at www.t10.org */
+#define SPC_SK_NO_SENSE 0x0
+#define SPC_SK_RECOVERED_ERROR 0x1
+#define SPC_SK_NOT_READY 0x2
+#define SPC_SK_MEDIUM_ERROR 0x3
+#define SPC_SK_HARDWARE_ERROR 0x4
+#define SPC_SK_ILLEGAL_REQUEST 0x5
+#define SPC_SK_UNIT_ATTENTION 0x6
+#define SPC_SK_DATA_PROTECT 0x7
+#define SPC_SK_BLANK_CHECK 0x8
+#define SPC_SK_COPY_ABORTED 0xa
+#define SPC_SK_ABORTED_COMMAND 0xb
+#define SPC_SK_VOLUME_OVERFLOW 0xd
+#define SPC_SK_MISCOMPARE 0xe
 
 
 /* Returns length of SCSI command given the opcode (first byte). 
@@ -94,6 +102,9 @@ extern void sg_get_opcode_name(unsigned char cdb_byte0, int peri_type,
    If no service action give 0, if unknown peripheral type give 0. */
 extern void sg_get_opcode_sa_name(unsigned char cdb_byte0, int service_action,
                                   int peri_type, int buff_len, char * buff);
+
+/* Fetch scsi status string. */
+extern void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff);
 
 /* This is a slightly stretched SCSI sense "descriptor" format header.
    The addition is to allow the 0x70 and 0x71 response codes. The idea
@@ -150,14 +161,52 @@ extern int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
 extern int sg_get_sense_progress_fld(const unsigned char * sensep,
                                      int sb_len, int * progress_outp);
 
+/* Closely related to sg_print_sense(). Puts decode sense data in 'buff'.
+   Usually multiline with multiple '\n' including one trailing. */
+extern void sg_get_sense_str(const char * leadin,
+                             const unsigned char * sense_buffer, int sb_len,
+                             int raw_info, int buff_len, char * buff);
+
 /* Yield string associated with peripheral device type (pdt). Returns
    'buff'. If 'pdt' out of range yields "bad pdt" string. */
 extern char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
 
+extern FILE * sg_warnings_strm;
+
+extern void sg_set_warnings_strm(FILE * warnings_strm);
+
+/* The following "print" functions send ACSII to 'sg_warnings_strm' file
+   descriptor (default value is stderr) */
+extern void sg_print_command(const unsigned char * command);
+extern void sg_print_sense(const char * leadin,
+                           const unsigned char * sense_buffer, int sb_len,
+                           int raw_info);
+extern void sg_print_scsi_status(int scsi_status);
+
+/* The following "category" function returns one of the following */
+#define SG_LIB_CAT_CLEAN 0      /* No errors or other information */
+#define SG_LIB_CAT_MEDIA_CHANGED 1 /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0x6,0x28,*] */
+#define SG_LIB_CAT_RECOVERED 4  /* Successful command after recovered err */
+                                /*       [sk,asc,ascq: 0x1,*,*] */
+#define SG_LIB_CAT_INVALID_OP 5 /* Invalid operation code: */
+                                /*       [sk,asc,ascq: 0x5,0x20,0x0] */
+#define SG_LIB_CAT_MEDIUM_HARD 6 /* medium or hardware error sense key */
+                                /*       [sk,asc,ascq: 0x3/0x4,*,*] */
+#define SG_LIB_CAT_ILLEGAL_REQ 7 /* Illegal request (other than invalid */
+                                /* opcode):   [sk,asc,ascq: 0x5,*,*] */
+#define SG_LIB_CAT_NO_SENSE 8   /* sense data with key of "no sense" */
+                                /*       [sk,asc,ascq: 0x0,*,*] */
+#define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
+
+extern int sg_err_category_sense(const unsigned char * sense_buffer,
+                                 int sb_len);
+
 
 /* <<< General purpose (i.e. not SCSI specific) utility functions >>> */
 
-/* Always returns valid string even if errnum is wild (or library problem) */
+/* Always returns valid string even if errnum is wild (or library problem).
+   If errnum is negative, flip its sign. */
 extern char * safe_strerror(int errnum);
 
 
@@ -194,190 +243,21 @@ extern void dWordHex(const unsigned short* words, int num, int no_ascii,
                      int swapb);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
-   then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix (not both). Recognised multipliers: c C  *1;  w W  *2;
-   b  B *512;  k K KiB  *1,024;  KB  *1,000;  m M MiB  *1,048,576;
-   MB *1,000,000; g G GiB *1,073,741,824;  GB *1,000,000,000 and <n>x<m>
-   which multiplies <n> by <m> . */
+   then -1 is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
+   suffix. Otherwise a decimal multiplier suffix may be given. Recognised
+   multipliers: c C  *1;  w W  *2; b  B *512;  k K KiB  *1,024;
+   KB  *1,000;  m M MiB  *1,048,576; MB *1,000,000; g G GiB *1,073,741,824;
+   GB *1,000,000,000 and <n>x<m> which multiplies <n> by <m> . */
 extern int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
-   then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix (not both). In addition to supporting the multipliers
-   of sg_get_num(), this function supports: t T TiB  *(2**40); TB *(10**12);
-   p P PiB  *(2**50); PB  *(10**15) . */
+   then -1LL is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
+   suffix. Otherwise a decimal multiplier suffix may be given. In addition
+   to supporting the multipliers of sg_get_num(), this function supports:
+   t T TiB  *(2**40); TB *(10**12); p P PiB  *(2**50); PB  *(10**15) . */
 extern long long sg_get_llnum(const char * buf);
 
 extern const char * sg_lib_version();
 
-
-
-/*
- * PART 2: LINUX SPECIFIC SECTION
- *         ----------------------
- */
-
-/* The following are 'host_status' codes */
-#ifndef DID_OK
-#define DID_OK 0x00
-#endif
-#ifndef DID_NO_CONNECT
-#define DID_NO_CONNECT 0x01     /* Unable to connect before timeout */
-#define DID_BUS_BUSY 0x02       /* Bus remain busy until timeout */
-#define DID_TIME_OUT 0x03       /* Timed out for some other reason */
-#define DID_BAD_TARGET 0x04     /* Bad target (id?) */
-#define DID_ABORT 0x05          /* Told to abort for some other reason */
-#define DID_PARITY 0x06         /* Parity error (on SCSI bus) */
-#define DID_ERROR 0x07          /* Internal error */
-#define DID_RESET 0x08          /* Reset by somebody */
-#define DID_BAD_INTR 0x09       /* Received an unexpected interrupt */
-#define DID_PASSTHROUGH 0x0a    /* Force command past mid-level */
-#define DID_SOFT_ERROR 0x0b     /* The low-level driver wants a retry */
-#endif
-#ifndef DID_IMM_RETRY
-#define DID_IMM_RETRY 0x0c      /* Retry without decrementing retry count  */
-#endif
-#ifndef DID_REQUEUE
-#define DID_REQUEUE 0x0d        /* Requeue command (no immediate retry) also
-                                 * without decrementing the retry count    */
-#endif
-
-/* These defines are to isolate applictaions from kernel define changes */
-#define SG_LIB_DID_OK           DID_OK
-#define SG_LIB_DID_NO_CONNECT   DID_NO_CONNECT
-#define SG_LIB_DID_BUS_BUSY     DID_BUS_BUSY
-#define SG_LIB_DID_TIME_OUT     DID_TIME_OUT
-#define SG_LIB_DID_BAD_TARGET   DID_BAD_TARGET
-#define SG_LIB_DID_ABORT        DID_ABORT
-#define SG_LIB_DID_PARITY       DID_PARITY
-#define SG_LIB_DID_ERROR        DID_ERROR
-#define SG_LIB_DID_RESET        DID_RESET
-#define SG_LIB_DID_BAD_INTR     DID_BAD_INTR
-#define SG_LIB_DID_PASSTHROUGH  DID_PASSTHROUGH
-#define SG_LIB_DID_SOFT_ERROR   DID_SOFT_ERROR
-#define SG_LIB_DID_IMM_RETRY    DID_IMM_RETRY
-#define SG_LIB_DID_REQUEUE      DID_REQUEUE
-
-/* The following are 'driver_status' codes */
-#ifndef DRIVER_OK
-#define DRIVER_OK 0x00
-#endif
-#ifndef DRIVER_BUSY
-#define DRIVER_BUSY 0x01
-#define DRIVER_SOFT 0x02
-#define DRIVER_MEDIA 0x03
-#define DRIVER_ERROR 0x04
-#define DRIVER_INVALID 0x05
-#define DRIVER_TIMEOUT 0x06
-#define DRIVER_HARD 0x07
-#define DRIVER_SENSE 0x08       /* Sense_buffer has been set */
-
-/* Following "suggests" are "or-ed" with one of previous 8 entries */
-#define SUGGEST_RETRY 0x10
-#define SUGGEST_ABORT 0x20
-#define SUGGEST_REMAP 0x30
-#define SUGGEST_DIE 0x40
-#define SUGGEST_SENSE 0x80
-#define SUGGEST_IS_OK 0xff
-#endif
-#ifndef DRIVER_MASK
-#define DRIVER_MASK 0x0f
-#endif
-#ifndef SUGGEST_MASK
-#define SUGGEST_MASK 0xf0
-#endif
-
-/* These defines are to isolate applictaions from kernel define changes */
-#define SG_LIB_DRIVER_OK        DRIVER_OK
-#define SG_LIB_DRIVER_BUSY      DRIVER_BUSY
-#define SG_LIB_DRIVER_SOFT      DRIVER_SOFT
-#define SG_LIB_DRIVER_MEDIA     DRIVER_MEDIA
-#define SG_LIB_DRIVER_ERROR     DRIVER_ERROR
-#define SG_LIB_DRIVER_INVALID   DRIVER_INVALID
-#define SG_LIB_DRIVER_TIMEOUT   DRIVER_TIMEOUT
-#define SG_LIB_DRIVER_HARD      DRIVER_HARD
-#define SG_LIB_DRIVER_SENSE     DRIVER_SENSE
-#define SG_LIB_SUGGEST_RETRY    SUGGEST_RETRY
-#define SG_LIB_SUGGEST_ABORT    SUGGEST_ABORT
-#define SG_LIB_SUGGEST_REMAP    SUGGEST_REMAP
-#define SG_LIB_SUGGEST_DIE      SUGGEST_DIE
-#define SG_LIB_SUGGEST_SENSE    SUGGEST_SENSE
-#define SG_LIB_SUGGEST_IS_OK    SUGGEST_IS_OK
-#define SG_LIB_DRIVER_MASK      DRIVER_MASK
-#define SG_LIB_SUGGEST_MASK     SUGGEST_MASK
-
-
-extern FILE * sg_warnings_str;
-
-extern void sg_set_warnings_str(FILE * warnings_str);
-
-/* The following "print" functions send ACSII to 'sg_warnings_fd' file
-   descriptor (default value is stderr) */
-extern void sg_print_command(const unsigned char * command);
-extern void sg_print_sense(const char * leadin,
-                           const unsigned char * sense_buffer, int sb_len,
-                           int raw_info);
-extern void sg_print_status(int masked_status);
-extern void sg_print_scsi_status(int scsi_status);
-extern void sg_print_host_status(int host_status);
-extern void sg_print_driver_status(int driver_status);
-
-/* sg_chk_n_print() returns 1 quietly if there are no errors/warnings
-   else it prints errors/warnings (prefixed by 'leadin') to
-   'sg_warnings_fd' and returns 0. */
-extern int sg_chk_n_print(const char * leadin, int masked_status,
-                          int host_status, int driver_status,
-                          const unsigned char * sense_buffer, int sb_len,
-                          int raw_sinfo);
-
-/* The following function declaration is for the sg version 3 driver. */
-struct sg_io_hdr;
-/* sg_chk_n_print3() returns 1 quietly if there are no errors/warnings;
-   else it prints errors/warnings (prefixed by 'leadin') to
-   'sg_warnings_fd' and returns 0. */
-extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
-                           int raw_sinfo);
-
-/* Calls sg_scsi_normalize_sense() after obtaining the sense buffer and
-   its length from the struct sg_io_hdr pointer. If these cannot be
-   obtained, 0 is returned. */
-extern int sg_normalize_sense(const struct sg_io_hdr * hp, 
-                              struct sg_scsi_sense_hdr * sshp);
-
-
-/* The following "category" function returns one of the following */
-#define SG_LIB_CAT_CLEAN 0      /* No errors or other information */
-#define SG_LIB_CAT_MEDIA_CHANGED 1 /* interpreted from sense buffer */
-                                /*       [sk,asc,ascq: 0x6,0x28,*] */
-#define SG_LIB_CAT_RESET 2      /* interpreted from sense buffer */
-                                /*       [sk,asc,ascq: 0x6,0x29,*] */
-#define SG_LIB_CAT_TIMEOUT 3
-#define SG_LIB_CAT_RECOVERED 4  /* Successful command after recovered err */
-                                /*       [sk,asc,ascq: 0x1,*,*] */
-#define SG_LIB_CAT_INVALID_OP 5 /* Invalid operation code: */
-                                /*       [sk,asc,ascq: 0x5,0x20,0x0] */
-#define SG_LIB_CAT_MEDIUM_HARD 6 /* medium or hardware error sense key */
-                                /*       [sk,asc,ascq: 0x3/0x4,*,*] */
-#define SG_LIB_CAT_ILLEGAL_REQ 7 /* Illegal request (other than invalid */
-                                 /* opcode):   [sk,asc,ascq: 0x5,*,*] */
-#define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
-#define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
-
-extern int sg_err_category(int masked_status, int host_status,
-               int driver_status, const unsigned char * sense_buffer,
-               int sb_len);
-
-extern int sg_err_category_new(int scsi_status, int host_status,
-               int driver_status, const unsigned char * sense_buffer,
-               int sb_len);
-
-/* The following function declaration is for the sg version 3 driver. */
-extern int sg_err_category3(struct sg_io_hdr * hp);
-
-
-/* Note about SCSI status codes found in older versions of Linux.
-   Linux has traditionally used a 1 bit right shifted and masked 
-   version of SCSI standard status codes. Now CHECK_CONDITION
-   and friends (in <scsi/scsi.h>) are deprecated. */
 
 #endif
