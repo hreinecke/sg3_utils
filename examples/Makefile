@@ -9,7 +9,8 @@ LD = gcc
 
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
 	sg_iovec_tst scsi_inquiry sg_excl sg_sense_test sg_simple5 \
-	sg_sat_identify sg_sat_chk_power sg_sat_smart_rd_data
+	sg__sat_identify sg_sat_chk_power sg_sat_smart_rd_data \
+	sg_sat_set_features
 
 # EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
 # 	  sg_simple_aio sg_iovec_tst scsi_inquiry sg_excl
@@ -67,13 +68,16 @@ sg_sense_test: sg_sense_test.o ../sg_lib.o ../sg_io_linux.o
 sg_simple5: sg_simple5.o ../sg_lib.o ../sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_sat_identify: sg_sat_identify.o ../sg_lib.o ../sg_io_linux.o
+sg__sat_identify: sg__sat_identify.o ../sg_lib.o ../sg_io_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_sat_chk_power: sg_sat_chk_power.o ../sg_lib.o ../sg_io_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_sat_smart_rd_data: sg_sat_smart_rd_data.o ../sg_lib.o ../sg_io_linux.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_sat_set_features: sg_sat_set_features.o ../sg_lib.o ../sg_io_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)

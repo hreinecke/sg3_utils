@@ -19,7 +19,7 @@
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
 #include "llseek.h"
 
@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "5.31 20060704";
+static char * version_str = "5.33 20061012";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -80,7 +80,7 @@ static char * version_str = "5.31 20060704";
 #define MAX_NUM_THREADS SG_MAX_QUEUE
 
 #ifndef RAW_MAJOR
-#define RAW_MAJOR 255   /*unlikey value */
+#define RAW_MAJOR 255   /*unlikely value */
 #endif
 
 #define FT_OTHER 1              /* filetype other than one of the following */
@@ -325,26 +325,33 @@ static void usage()
            "               [bpt=<num>] [cdbsz=6|10|12|16] [coe=0|1] "
            "[deb=<n>] [dio=0|1]\n"
            "               [fua=0|1|2|3] [sync=0|1] [thr=<n>] "
-           "[time=0|1]\n\n"
-           "  bpt    is blocks_per_transfer (default is 128)\n"
-           "  bs     must be device block size (default 512)\n"
-           "  cdbsz  size of SCSI READ or WRITE command (default is 10)\n"
-           "  coe    continue on error, 0->exit (def), "
+           "[time=0|1] [verbose=<n>]\n\n"
+           " where:\n"
+           "    bpt      is blocks_per_transfer (default is 128)\n"
+           "    bs       must be device block size (default 512)\n"
+           "    cdbsz    size of SCSI READ or WRITE command (default is 10)\n"
+           "    coe      continue on error, 0->exit (def), "
            "1->zero + continue\n"
-           "  deb    is debug, 0->none (def), > 0->varying degrees of "
+           "    deb      for debug, 0->none (def), > 0->varying degrees of "
            "debug\n");
     fprintf(stderr,
-           "  dio    is direct IO, 1->attempt, 0->indirect IO (def)\n"
-           "  fua    force unit access: 0->don't(def), 1->of, 2->if, "
+           "    dio      is direct IO, 1->attempt, 0->indirect IO (def)\n"
+           "    fua      force unit access: 0->don't(def), 1->of, 2->if, "
            "3->of+if\n"
-           "  iflag  comma separated list from: [coe,direct,dpo,dsync,excl,"
-           "fua]\n"
-           "  oflag  comma separated list from: [append,coe,direct,dpo,"
+           "    iflag    comma separated list from: [coe,direct,dpo,dsync,"
+           "excl,fua]\n"
+           "    oflag    comma separated list from: [append,coe,direct,dpo,"
            "dsync,excl,\n"
-           "          fua]\n"
-           "  sync   0->no sync(def), 1->SYNCHRONIZE CACHE on of after xfer\n"
-           "  thr    is number of threads, must be > 0, default 4, max 16\n"
-           "  time   0->no timing(def), 1->time plus calculate throughput\n");
+           "             fua]\n"
+           "    sync     0->no sync(def), 1->SYNCHRONIZE CACHE on of after "
+           "xfer\n"
+           "    thr      is number of threads, must be > 0, default 4, "
+           "max 16\n"
+           "    time     0->no timing(def), 1->time plus calculate "
+           "throughput\n"
+           "    verbose  same as 'deb=<n>', increase verbosity\n"
+           "    --help   output this usage message then exit\n"
+           "    --version  output version string then exit\n");
 }
 
 static void guarded_stop_in(Rq_coll * clp)
@@ -795,6 +802,7 @@ static void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
 
         res = sg_finish_io(rep->wr, rep, &clp->aux_mutex);
         switch (res) {
+        case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
             /* try again with same addr, count info */
             /* now re-acquire in mutex for balance */
@@ -864,6 +872,7 @@ static void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
 
         res = sg_finish_io(rep->wr, rep, &clp->aux_mutex);
         switch (res) {
+        case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
             /* try again with same addr, count info */
             /* now re-acquire out mutex for balance */
@@ -953,8 +962,9 @@ static int sg_start_io(Rq_elem * rep)
     return 0;
 }
 
-/* 0 -> successful, SG_LIB_CAT_UNIT_ATTENTION -> try again,
-   SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, -1 other errors */
+/* 0 -> successful, SG_LIB_CAT_UNIT_ATTENTION or SG_LIB_CAT_ABORTED_COMMAND
+   -> try again, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD,
+   -1 other errors */
 static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 {
     int res, status;
@@ -990,7 +1000,10 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
             sg_chk_n_print3((rep->wr ? "writing continuing":
                                        "reading continuing"), hp, 0);
             break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
+            if (rep->debug > 8)
+                sg_chk_n_print3((rep->wr ? "writing": "reading"), hp, 0);
             return res;
         case SG_LIB_CAT_NOT_READY:
         default:
@@ -1154,7 +1167,8 @@ int main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'count'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strncmp(key,"deb", 3))
+        } else if ((0 == strncmp(key,"deb", 3)) ||
+                   (0 == strncmp(key,"verb", 4)))
             rcoll.debug = sg_get_num(buf);
         else if (0 == strcmp(key,"dio"))
             rcoll.dio = sg_get_num(buf);

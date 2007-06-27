@@ -22,11 +22,10 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include "sg_lib.h"
-#include "sg_cmds.h"
-#include "sg_io_linux.h"
+#include "sg_cmds_basic.h"
 
 
-static char * version_str = "1.02 20060623";
+static char * version_str = "1.05 20061015";
 
 unsigned char mode6_hdr[] = {
     75, /* Length */
@@ -126,6 +125,9 @@ static int fail_all_paths(int fd)
         case SG_LIB_CAT_UNIT_ATTENTION:
                 fprintf(stderr, "fail paths page failed (unit attention)\n");
                 break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
+                fprintf(stderr, "fail paths page failed (aborted command)\n");
+                break;
         default:
                 if (do_verbose)
                         fprintf(stderr, "fail paths failed\n");
@@ -170,6 +172,9 @@ static int fail_this_path(int fd, int lun)
                 break;
         case SG_LIB_CAT_UNIT_ATTENTION:
                 fprintf(stderr, "fail paths page failed (unit attention)\n");
+                break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
+                fprintf(stderr, "fail paths page failed (aborted command)\n");
                 break;
         case SG_LIB_CAT_ILLEGAL_REQ:
                 fprintf(stderr, "fail lun %d page failed (illegal request)\n",
@@ -289,13 +294,13 @@ static void print_rdac_mode( unsigned char *ptr )
 
 static void usage()
 {
-    printf("Usage:  sg_rdac [-a] [-f=<lun>] [-v] <scsi_device>\n"
+    printf("Usage:  sg_rdac [-a] [-f=<lun>] [-v] [-V] <scsi_device>\n"
            " where -a       transfer all devices to the controller\n"
            "                serving <scsi_device>.\n"
            "       -f=<lun> transfer the device with LUN <lun> to the\n"
            "                controller serving <scsi_device>\n"
            "       -v       verbose\n"
-           "       -V       print version then exit\n"
+           "       -V       print version then exit\n\n"
            " Display/Modify RDAC Redundant Controller Page 0x2c.\n"
            " If [-a] or [-f] is not specified the current settings"
            " are displayed.\n");
@@ -311,8 +316,10 @@ int main(int argc, char * argv[])
         int fail_path = 0;
         int ret = 0;
         
-        if (argc < 2) 
+        if (argc < 2) {
                 usage ();
+                return SG_LIB_SYNTAX_ERROR;
+        }
 
         for (k = 1; k < argc; ++k) {
                 argptr = argv + k;

@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.14 20060702";
+static const char * version_str = "1.14 20061015";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -148,42 +148,46 @@ static int dd_filetype(const char * filename)
 static void usage()
 {
     fprintf(stderr, "Usage: "
-           "sg_read  if=<infile> count=<num> [blk_sgio=0|1] [bpt=<num>] "
-           "[bs=<num>]\n"
-           "                [cdbsz=6|10|12|16] [dio=0|1] [dpo=0|1] "
-           "[fua=0|1] [mmap=0|1]\n"
-           "                [no_dfxer=0|1] [odir=0|1] [skip=<num>] "
-           "[time=<num>]\n"
-           "                [verbose=<n>] [--help] [--version]\n"
-           " blk_sgio 0->normal IO for block devices, 1->SCSI commands via "
-           "SG_IO\n"
-           " bpt      is blocks_per_transfer (default is 128, or 64 KiB for "
-           "def 'bs')\n"
-           "          setting 'bpt=0' will do 'count' zero block SCSI "
+           "sg_read  [blk_sgio=0|1] [bpt=<num>] [bs=<num>] "
+           "[cdbsz=6|10|12|16]\n"
+           "                count=<num> [dio=0|1] [dpo=0|1] [fua=0|1] "
+           "if=<infile>\n"
+           "                [mmap=0|1] [no_dfxer=0|1] [odir=0|1] "
+           "[skip=<num>]\n"
+           "                [time=<num>] [verbose=<n>] [--help] "
+           "[--version]\n"
+           "  where:\n"
+           "    blk_sgio 0->normal IO for block devices, 1->SCSI commands "
+           "via SG_IO\n"
+           "    bpt      is blocks_per_transfer (default is 128, or 64 KiB "
+           "for def 'bs')\n"
+           "             setting 'bpt=0' will do 'count' zero block SCSI "
            "READs\n"
-           " bs       must match sector size if 'if' accessed via SCSI "
-           "commands (def=512)\n"
-           " cdbsz    size of SCSI READ command (default is 10)\n"
-           " count    total bytes read will be 'bs'*'count' (if no error)\n"
-           "          (if negative, do |count| zero block SCSI READs)\n"
-           " dio      1-> attempt direct IO on sg device, 0->indirect IO "
+           "    bs       must match sector size if 'if' accessed via SCSI "
+           "commands\n"
+           "             (def=512)\n"
+           "    cdbsz    size of SCSI READ command (default is 10)\n"
+           "    count    total bytes read will be 'bs'*'count' (if no "
+           "error)\n"
+           "             (if negative, do |count| zero block SCSI READs)\n"
+           "    dio      1-> attempt direct IO on sg device, 0->indirect IO "
            "(def)\n");
     fprintf(stderr,
-           " dpo      1-> set disable page out (DPO) in SCSI READs\n"
-           " fua      1-> set force unit access (FUA) in SCSI READs\n"
-           " if       an sg, block or raw device, or a seekable file (not "
+           "    dpo      1-> set disable page out (DPO) in SCSI READs\n"
+           "    fua      1-> set force unit access (FUA) in SCSI READs\n"
+           "    if       an sg, block or raw device, or a seekable file (not "
            "stdin)\n"
-           " mmap     1->perform mmaped IO on sg device, 0->indirect IO "
+           "    mmap     1->perform mmaped IO on sg device, 0->indirect IO "
            "(def)\n"
-           " no_dxfer 1->DMA to kernel buffers only, not user space, "
+           "    no_dxfer 1->DMA to kernel buffers only, not user space, "
            "0->normal(def)\n"
-           " odir     1->open block device O_DIRECT, 0->don't (def)\n"
-           " skip     each transfer starts at this logical address (def=0)\n"
-           " time     0->do nothing(def), 1->time from 1st cmd, 2->time "
+           "    odir     1->open block device O_DIRECT, 0->don't (def)\n"
+           "    skip     each transfer starts at this logical address (def=0)\n"
+           "    time     0->do nothing(def), 1->time from 1st cmd, 2->time "
            "from 2nd, ...\n"
-           " verbose  increase level of verbosity (def: 0)\n"
-           " --help   print this usage message then exit\n"
-           " --version  print version number then exit\n\n"
+           "    verbose  increase level of verbosity (def: 0)\n"
+           "    --help   print this usage message then exit\n"
+           "    --version  print version number then exit\n\n"
            "Issue SCSI READ commands, each starting from the same logical "
            "block address\n");
 }
@@ -282,7 +286,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
 
 /* -3 medium/hardware error, -2 -> not ready, 0 -> successful,
    1 -> recoverable (ENOMEM), 2 -> try again (e.g. unit attention),
-   -1 -> other unrecoverable error */
+   3 -> try again (e.g. aborted command), -1 -> other unrecoverable error */
 static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
                     long long from_block, int bs, int cdbsz,
                     int fua, int dpo, int * diop, int do_mmap,
@@ -346,6 +350,10 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
         if (verbose)
             sg_chk_n_print3("reading", &io_hdr, verbose - 1);
         return 2;
+    case SG_LIB_CAT_ABORTED_COMMAND:
+        if (verbose)
+            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
+        return 3;
     case SG_LIB_CAT_NOT_READY:
         if (verbose)
             sg_chk_n_print3("reading", &io_hdr, verbose - 1);
@@ -706,6 +714,10 @@ int main(int argc, char * argv[])
                 case 2:
                     ret = SG_LIB_CAT_UNIT_ATTENTION;
                     fprintf(stderr, ME "SCSI READ unit attention\n");
+                    break;
+                case 3:
+                    ret = SG_LIB_CAT_ABORTED_COMMAND;
+                    fprintf(stderr, ME "SCSI READ aborted command\n");
                     break;
                 default:
                     ret = SG_LIB_CAT_OTHER;

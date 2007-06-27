@@ -1,4 +1,4 @@
-.TH SG_PREVENT "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_PREVENT "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_prevent \- invoke SCSI PREVENT ALLOW MEDIUM REMOVAL command on a device
 .SH SYNOPSIS
@@ -8,15 +8,14 @@ sg_prevent \- invoke SCSI PREVENT ALLOW MEDIUM REMOVAL command on a device
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command to the given Linux SCSI
-device. The default action of this utility is to allow the user and the SCSI
-command START STOP UNIT (see sg_start) to remove or eject
-the medium from a drive. Typical examples are a removable disk, a tape
-or a cd/dvd drive. The definition of the "prevent" codes for this command
-differ between disks and tapes (covered by SPC-3) and cd/dvd drives (covered
-by MMC-4). At the time of writing there are moves to remove these differences.
-The "prevent codes" described here are from MMC-4 which seems to be close
-to the proposed merged definition.
+Sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command to the given SCSI
+device. The default action of this utility is to disallow the user and the
+SCSI START STOP UNIT command (see sg_start) removing or ejecting
+the medium from a drive. Drives that hold removable disks, tape
+cartridges or cd/dvd media typically implement this command. The definition
+of the "prevent" codes for this command differ between disks and
+tapes (covered by SBC-3 and SSC-3) and cd/dvd drives (covered by MMC-5).
+The "prevent codes" described here are from MMC-5.
 .TP
 --allow | -a
 allow medium removal. This is equivalent to setting the argument

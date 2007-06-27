@@ -45,6 +45,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_reset - exercises SCSI device/bus/host reset capability
      * sg_rmsn - READ SERIAL SERIAL NUMBER
      * sg_rtpg - REPORT TARGET PORT GROUPS
+     * sg_sat_identify - ATA IDENTIFY (PACKET) DEVICE via SATL
      * sg_scan - displays the SCSI bus on stdout
      * sg_senddiag - runs SCSI self tests
      * sg_ses - fetches status and send control to a SES device

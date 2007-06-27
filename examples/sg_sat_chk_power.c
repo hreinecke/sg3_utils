@@ -39,7 +39,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* This program performs a ATA PASS THROUGH (16) SCSI command in order
+/* This program performs a ATA PASS-THROUGH (16) SCSI command in order
    to perform an ATA CHECK POWER MODE command. See http://www.t10.org
    SAT draft at time of writing: sat-r08.pdf
 
@@ -55,7 +55,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.02 20060629";
+static char * version_str = "1.02 20061014";
 
 int main(int argc, char * argv[])
 {
@@ -109,7 +109,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    /* Prepare ATA PASS THROUGH COMMAND (16) command */
+    /* Prepare ATA PASS-THROUGH COMMAND (16) command */
     aptCmdBlk[14] = ATA_CHECK_POWER_MODE;
     aptCmdBlk[1] = (protocol << 1) | extend;
     aptCmdBlk[2] = (chk_cond << 5) | (t_dir << 3) |

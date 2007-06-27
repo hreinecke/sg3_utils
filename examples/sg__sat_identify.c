@@ -39,13 +39,13 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* This program uses a ATA PASS THROUGH (16) SCSI command to package
+/* This program uses a ATA PASS-THROUGH (16) SCSI command to package
    an ATA IDENTIFY DEVICE (A1h) command. If the '-p' option is given,
    it will package an ATA IDENTIFY PACKET DEVICE (Ech) instead (for
    ATAPI device like cd/dvd drives) See http://www.t10.org
    SAT draft at time of writing: sat-r08a.pdf
 
-   Invocation: sg_sat_identify [-p] [-v] [-V] <device>
+   Invocation: sg__sat_identify [-p] [-v] [-V] <device>
 
    With SAT, the user can find out whether a device is an ATA disk or
    an ATAPI device. The ATA Information VPD page contains a "command
@@ -64,12 +64,12 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.01 20060629";
+static char * version_str = "1.01 20061014";
 
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sat_identify [-p] [-v] [-V] <device>\n"
+          "sg__sat_identify [-p] [-v] [-V] <device>\n"
           "  where: -p    do IDENTIFY PACKET DEVICE (def: IDENTIFY "
           "DEVICE) command\n"
           "         -v    increase verbosity\n"
@@ -132,12 +132,12 @@ int main(int argc, char * argv[])
 
     if ((sg_fd = open(file_name, O_RDWR)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-                 "sg_sat_identify: error opening file: %s", file_name);
+                 "sg__sat_identify: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
 
-    /* Prepare ATA PASS THROUGH COMMAND (16) command */
+    /* Prepare ATA PASS-THROUGH COMMAND (16) command */
     aptCmdBlk[6] = 1;   /* sector count */
     aptCmdBlk[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                  ATA_IDENTIFY_DEVICE);
@@ -167,7 +167,7 @@ int main(int argc, char * argv[])
     /* io_hdr.usr_ptr = NULL; */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("sg_sat_identify: SG_IO ioctl error");
+        perror("sg__sat_identify: SG_IO ioctl error");
         close(sg_fd);
         return 1;
     }

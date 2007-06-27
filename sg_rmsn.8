@@ -1,4 +1,4 @@
-.TH SG_RMSN "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_RMSN "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_rmsn \- read media serial number
 .SH SYNOPSIS
@@ -11,10 +11,10 @@ sg_rmsn \- read media serial number
 Send a READ MEDIA SERIAL NUMBER SCSI command to the given device and
 outputs the response. 
 .PP
-This command is described in SPC-3 found at www.t10.org (the current
-draft is spc3r22a dated 2005/3/25). It was originally added to SPC-3
-in revision 11 (2003/2/12). It is not an mandatory command and the
-author has not seen SCSI devices that support it.
+This command is described in SPC-3 found at www.t10.org . It was
+originally added to SPC-3 in revision 11 (2003/2/12). It is not an
+mandatory command and the author has not seen any SCSI devices
+that support it.
 .TP
 --help | -h
 output the usage message then exit.
@@ -33,7 +33,7 @@ increase the level of verbosity, (i.e. debug output).
 print the version string and then exit.
 .PP
 Device identification information is also found in a standard INQUIRY
-response and its VPD pages (see sg_inq). The relevant VPD pages are
+response and its VPD pages (see sg_vpd). The relevant VPD pages are
 the "device identification page" (VPD page 0x83) and the "unit serial
 number" page (VPD page 0x80).
 .PP
@@ -53,4 +53,4 @@ Copyright \(co 2005-2006 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq(sg3_utils), sg_get_config(sg3_utils)
+.B sg_vpd(sg3_utils), sg_get_config(sg3_utils)

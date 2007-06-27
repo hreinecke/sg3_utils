@@ -7,7 +7,8 @@
 #include <errno.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
    *  Copyright (C) 2004-2006 D. Gilbert
@@ -23,7 +24,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.09 20060623";
+static char * version_str = "1.12 20061012";
 
 #define MAX_XFER_LEN 10000
 
@@ -38,6 +39,7 @@ static struct option long_options[] = {
         {"help", 0, 0, 'h'},
         {"lba", 1, 0, 'l'},
         {"out", 1, 0, 'o'},
+        {"pblock", 0, 0, 'p'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {"xfer_len", 1, 0, 'x'},
@@ -49,64 +51,71 @@ static void usage()
     fprintf(stderr, "Usage: "
           "sg_read_long [--16] [--correct] [--help] [--lba=<num>] "
           "[--out=<name>]\n"
-          "                    [--verbose] [--version] [--xfer_len=<num>]"
-          " <scsi_device>\n"
-          "  where: --16|-S                    do READ LONG(16) (default: "
+          "                    [--pblock] [--verbose] [--version] "
+          "[--xfer_len=<num>]\n"
+          "                    <scsi_device>\n"
+          "  where:\n"
+          "    --16|-S                    do READ LONG(16) (default: "
           "READ LONG(10))\n"
-          "         --correct|-c               use ECC to correct data "
+          "    --correct|-c               use ECC to correct data "
           "(default: don't)\n"
-          "         --help|-h                  print out usage message\n"
-          "         --lba=<num>|-l <num>       logical block address"
+          "    --help|-h                  print out usage message\n"
+          "    --lba=<num>|-l <num>       logical block address"
           " (default: 0)\n"
-          "         --out=<name>|-o <name>     output to file <name>\n"
-          "         --verbose|-v               increase verbosity\n"
-          "         --version|-V               print version string and"
+          "    --out=<name>|-o <name>     output to file <name>\n"
+          "    --verbose|-v               increase verbosity\n"
+          "    --version|-V               print version string and"
           " exit\n"
-          "         --xfer_len=<num>|-x <num>  transfer length (< 10000)"
+          "    --xfer_len=<num>|-x <num>  transfer length (< 10000)"
           " default 520\n\n"
-          "Perform a READ LONG SCSI command\n"
+          "Perform a READ LONG (10 or 16) SCSI command\n"
           );
 }
 
 /* Returns 0 if successful */
-static int process_read_long(int sg_fd, int do_16, int correct,
+static int process_read_long(int sg_fd, int do_16, int pblock, int correct,
                              unsigned long long llba, void * data_out,
                              int xfer_len, int verbose)
 {
     int offset, res;
+    char * ten_or;
 
     if (do_16)
-        res = sg_ll_read_long16(sg_fd, correct, llba, data_out, xfer_len,
-                                &offset, 1, verbose);
+        res = sg_ll_read_long16(sg_fd, pblock, correct, llba, data_out,
+                                xfer_len, &offset, 1, verbose);
     else
-        res = sg_ll_read_long10(sg_fd, correct, (unsigned long)llba,
+        res = sg_ll_read_long10(sg_fd, pblock, correct, (unsigned long)llba,
                                 data_out, xfer_len, &offset, 1, verbose);
+    ten_or = do_16 ? "16" : "10";
     switch (res) {
     case 0:
         break;
     case SG_LIB_CAT_NOT_READY:
         fprintf(stderr, "  SCSI READ LONG (%s) failed, device not ready\n",
-                (do_16 ? "16" : "10"));
+                ten_or);
         break;
     case SG_LIB_CAT_UNIT_ATTENTION:
         fprintf(stderr, "  SCSI READ LONG (%s) failed, unit attention\n",
-                (do_16 ? "16" : "10"));
+                ten_or);
+        break;
+    case SG_LIB_CAT_ABORTED_COMMAND:
+        fprintf(stderr, "  SCSI READ LONG (%s) failed, aborted command\n",
+                ten_or);
         break;
     case SG_LIB_CAT_INVALID_OP:
         fprintf(stderr, "  SCSI READ LONG (%s) command not supported\n",
-                (do_16 ? "16" : "10"));
+                ten_or);
         break;
     case SG_LIB_CAT_ILLEGAL_REQ:
         fprintf(stderr, "  SCSI READ LONG (%s) command, bad field in cdb\n",
-                (do_16 ? "16" : "10"));
+                ten_or);
         break;
     case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
         fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
                 ">>>\n", xfer_len - offset);
         break;
     default:
-        fprintf(stderr, "  SCSI READ LONG (%s) command error\n",
-                (do_16 ? "16" : "10"));
+        fprintf(stderr, "  SCSI READ LONG (%s) command error\n", ten_or);
         break;
     }
     return res;
@@ -121,6 +130,7 @@ int main(int argc, char * argv[])
     int correct = 0;
     int xfer_len = 520;
     int do_16 = 0;
+    int pblock = 0;
     unsigned long long llba = 0;
     int verbose = 0;
     long long ll;
@@ -135,7 +145,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "chl:o:SvVx:", long_options,
+        c = getopt_long(argc, argv, "chl:o:pSvVx:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -158,6 +168,9 @@ int main(int argc, char * argv[])
             break;
         case 'o':
             strncpy(out_fname, optarg, sizeof(out_fname));
+            break;
+        case 'p':
+            pblock = 1;
             break;
         case 'S':
             do_16 = 1;
@@ -226,7 +239,7 @@ int main(int argc, char * argv[])
             "(0x%x), lba=%llu (0x%llx), correct=%d\n", (do_16 ? "16" : "10"),
             device_name, xfer_len, xfer_len, llba, llba, correct);
 
-    if (process_read_long(sg_fd, do_16, correct, llba, readLongBuff,
+    if (process_read_long(sg_fd, do_16, pblock, correct, llba, readLongBuff,
                           xfer_len, verbose))
         goto err_out;
 

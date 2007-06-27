@@ -30,7 +30,8 @@ S_CFLAGS = $(OS_FLAGS) $(LARGE_FILE_FLAGS)
 CFLAGS = -g -I./getopt_long $(S_CFLAGS)
 # CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(S_CFLAGS)
 
-O_FILES = sg_lib.o sg_cmds.o sg_pt_osf1.o
+O_FILES = sg_lib.o sg_cmds_basic.o sg_cmds_extra.o sg_pt_osf1.o
+O_BFILES = sg_lib.o sg_cmds_basic.o sg_pt_osf1.o
 O_GETOPT_LONG = getopt_long/getopt_long.o
 
 LDFLAGS =
@@ -50,23 +51,23 @@ clean:
 .c.o:
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-sg_readcap: sg_readcap.o $(O_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+sg_readcap: sg_readcap.o $(O_BFILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES)
 
-sg_turs: sg_turs.o $(O_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+sg_turs: sg_turs.o $(O_BFILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES)
 
-sg_inq: sg_inq.o $(O_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+sg_inq: sg_inq.o $(O_BFILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES)
 
-sg_start: sg_start.o $(O_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+sg_start: sg_start.o $(O_BFILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES)
 
-sg_modes: sg_modes.o $(O_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+sg_modes: sg_modes.o $(O_BFILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES)
 
-sg_logs: sg_logs.o $(O_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
+sg_logs: sg_logs.o $(O_BFILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES)
 
 sg_senddiag: sg_senddiag.o $(O_FILES)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES)
@@ -74,26 +75,26 @@ sg_senddiag: sg_senddiag.o $(O_FILES)
 sg_persist: sg_persist.o $(O_FILES) $(O_GETOPT_LONG)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
 
-sg_requests: sg_requests.o $(O_FILES) $(O_GETOPT_LONG)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+sg_requests: sg_requests.o $(O_BFILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES) $(O_GETOPT_LONG)
 
 sg_ses: sg_ses.o $(O_FILES) $(O_GETOPT_LONG)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
 
-sg_luns: sg_luns.o $(O_FILES) $(O_GETOPT_LONG)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+sg_luns: sg_luns.o $(O_BFILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES) $(O_GETOPT_LONG)
 
-sg_sync: sg_sync.o $(O_FILES) $(O_GETOPT_LONG)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+sg_sync: sg_sync.o $(O_BFILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES) $(O_GETOPT_LONG)
 
-sg_prevent: sg_prevent.o $(O_FILES) $(O_GETOPT_LONG)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+sg_prevent: sg_prevent.o $(O_BFILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES) $(O_GETOPT_LONG)
 
 sg_get_config: sg_get_config.o $(O_FILES) $(O_GETOPT_LONG)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
 
-sg_wr_mode: sg_wr_mode.o $(O_FILES) $(O_GETOPT_LONG)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+sg_wr_mode: sg_wr_mode.o $(O_BFILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES) $(O_GETOPT_LONG)
 
 sg_rtpg: sg_rtpg.o $(O_FILES) $(O_GETOPT_LONG)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
@@ -119,11 +120,11 @@ sg_write_long: sg_write_long.o $(O_FILES) $(O_GETOPT_LONG)
 sg_verify: sg_verify.o $(O_FILES) $(O_GETOPT_LONG)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
 
-sg_rdac: sg_rdac.o $(O_FILES) $(O_GETOPT_LONG)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+sg_rdac: sg_rdac.o $(O_BFILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(O_BFILES) $(O_GETOPT_LONG)
 
-sg_vpd: sg_vpd.o  sg_vpd_vendor.o $(O_FILES) $(O_GETOPT_LONG)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(O_FILES) $(O_GETOPT_LONG)
+sg_vpd: sg_vpd.o  sg_vpd_vendor.o $(O_BFILES) $(O_GETOPT_LONG)
+	$(LD) -o $@ $(LDFLAGS) $@.o sg_vpd_vendor.o $(O_BFILES) $(O_GETOPT_LONG)
 
 install: $(EXECS)
 	test -d $(INSTDIR) || mkdir -p $(INSTDIR)

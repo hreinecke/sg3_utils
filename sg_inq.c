@@ -13,7 +13,7 @@
 #endif
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
 *  Copyright (C) 2000-2006 D. Gilbert
@@ -59,7 +59,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.61 20050622";    /* spc-4 rev 05 */
+static char * version_str = "0.65 20061007";    /* spc-4 rev 07 */
 
 
 #define SUPPORTED_VPDS_VPD 0x0
@@ -102,45 +102,50 @@ static void usage()
 #ifdef SG3_UTILS_LINUX
     fprintf(stderr,
             "Usage:  sg_inq [-a] [-A] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
-            "[-i] [-m] [-M]\n"
-            "               [-o=<opcode_page>] [-p=<vpd_page>] [-P] [-r] "
-            "[-s] [-v]\n"
-            "               [-V] [-x] [-36] [-?] <device>\n"
-            " where -a   decode ATA information VPD page (0x89)\n"
-            "       -A   treat <device> as (directly attached) ATA device\n");
+            "[-i]\n"
+            "               [-l=<resp_len>] [-m] [-M] [-o=<opcode_page>] "
+            "[-p=<vpd_page>]\n"
+            "               [-P] [-r] [-s] [-v] [-V] [-x] [-36] [-?] "
+            "<device>\n"
+            "  where:\n"
+            "    -a    decode ATA information VPD page (0x89)\n"
+            "    -A    treat <device> as (directly attached) ATA device\n");
 #else
     fprintf(stderr,
             "Usage:  sg_inq [-a] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
-            "[-i] [-m] [-M]\n"
-            "               [-o=<opcode_page>] [-p=<vpd_page>] [-P] [-r] "
-            "[-s] [-v]\n"
-            "               [-V] [-x] [-36] [-?] <device>\n"
-            " where -a   decode ATA information VPD page (0x89)\n");
+            "[-i]\n"
+            "               [-l=<resp_len>] [-m] [-M] [-o=<opcode_page>] "
+            "[-p=<vpd_page>]\n"
+            "               [-P] [-r] [-s] [-v] [-V] [-x] [-36] [-?] "
+            "<device>\n"
+            "  where:\n"
+            "    -a    decode ATA information VPD page (0x89)\n");
 
 #endif
     fprintf(stderr,
-            "       -b   decode Block limits VPD page (0xb0) (SBC)\n"
-            "       -c   set CmdDt mode (use -o for opcode) [obsolete]\n"
-            "       -cl  list supported commands using CmdDt mode [obsolete]\n"
-            "       -d   decode; version descriptors or VPD page\n"
-            "       -e   set VPD mode (use -p for page code)\n"
-            "       -h   output in hex (ASCII to the right)\n"
-            "       -H   output in hex (ASCII to the right) [same as '-h']\n"
-            "       -i   decode device identification VPD page (0x83)\n"
-            "       -m   decode management network addresses VPD page "
+            "    -b    decode Block limits VPD page (0xb0) (SBC)\n"
+            "    -c    set CmdDt mode (use -o for opcode) [obsolete]\n"
+            "    -cl   list supported commands using CmdDt mode [obsolete]\n"
+            "    -d    decode: version descriptors or VPD page\n"
+            "    -e    set VPD mode (use -p for page code)\n"
+            "    -h    output in hex (ASCII to the right)\n"
+            "    -H    output in hex (ASCII to the right) [same as '-h']\n"
+            "    -i    decode device identification VPD page (0x83)\n"
+            "    -l=<resp_len>   requested response length (def: 36)\n"
+            "    -m    decode management network addresses VPD page "
             "(0x85)\n"
-            "       -M   decode mode page policy VPD page (0x87)\n"
-            "       -o=<opcode_page> opcode or page code in hex (def: 0)\n"
-            "       -p=<vpd_page> vpd page code in hex (def: 0)\n"
-            "       -P   decode Unit Path Report VPD page (0xc0) (EMC)\n"
-            "       -r   output raw binary data ('-rr': output for hdparm)\n"
-            "       -s   decode SCSI Ports VPD page (0x88)\n"
-            "       -v   verbose (output cdb and, if non-zero, resid)\n"
-            "       -V   output version string\n"
-            "       -x   decode extended INQUIRY data VPD page (0x86)\n"
-            "       -36  perform standard INQUIRY with a 36 byte response\n"
-            "       -?   output this usage message\n"
-            "   If no options given then does a standard SCSI INQUIRY\n");
+            "    -M    decode mode page policy VPD page (0x87)\n"
+            "    -o=<opcode_page>   opcode or page code in hex (def: 0)\n"
+            "    -p=<vpd_page>   vpd page code in hex (def: 0)\n"
+            "    -P    decode Unit Path Report VPD page (0xc0) (EMC)\n"
+            "    -r    output raw binary data ('-rr': output for hdparm)\n"
+            "    -s    decode SCSI Ports VPD page (0x88)\n"
+            "    -v    verbose (output cdb and, if non-zero, resid)\n"
+            "    -V    output version string\n"
+            "    -x    decode extended INQUIRY data VPD page (0x86)\n"
+            "    -36   perform standard INQUIRY with a 36 byte response\n"
+            "    -?    output this usage message\n\n"
+            "If no options given then does a standard SCSI INQUIRY\n");
 }
 
 
@@ -1142,8 +1147,8 @@ static const char * get_ansi_version_str(int version, char * buff,
 
 /* Returns 0 if successful */
 static int process_std_inq(int sg_fd, const char * file_name, int do_36,
-                           int do_vdescriptors, int do_hex, int do_raw,
-                           int do_verbose)
+                           int resp_len, int do_vdescriptors, int do_hex,
+                           int do_raw, int do_verbose)
 {
     int res, len, act_len, pqual, peri_type, ansi_version, k, j;
     const char * cp;
@@ -1151,8 +1156,12 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
     char buff[48];
 
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
-    res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff,
-                        SAFE_STD_INQ_RESP_LEN, 0, do_verbose);
+    if (resp_len > 0)
+        res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff,
+                            resp_len, 0, do_verbose);
+    else
+        res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff,
+                            SAFE_STD_INQ_RESP_LEN, 0, do_verbose);
     if (0 == res) {
         pqual = (rsp_buff[0] & 0xe0) >> 5;
         if (! do_raw) {
@@ -1171,7 +1180,8 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
         len = rsp_buff[4] + 5;
         ansi_version = rsp_buff[2] & 0x7;
         peri_type = rsp_buff[0] & 0x1f;
-        if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) && (! do_36)) {
+        if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) && (! do_36) &&
+            (0 == resp_len)) {
             if (sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, len, 1, do_verbose)) {
                 fprintf(stderr, "second INQUIRY (%d byte) failed\n", len);
                 return SG_LIB_CAT_OTHER;
@@ -1265,7 +1275,7 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
                 }
             }
         }
-        if (! (do_raw || do_hex || do_36)) {
+        if (! (do_raw || do_hex || do_36 || resp_len)) {
             if (0 == fetch_unit_serial_num(sg_fd, xtra_buff,
                                            sizeof(xtra_buff), do_verbose))
                 printf(" Unit serial number: %s\n", xtra_buff);
@@ -1500,6 +1510,8 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
+            else if (do_hex)
+                dStrHex((const char *)rsp_buff, len, 0);
             else {
                 char obuff[DEF_ALLOC_LEN];
 
@@ -1659,13 +1671,13 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                                   1, verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            if (do_raw) {
-                if (2 == do_raw)
-                    dWordHex((const unsigned short *)(rsp_buff + 60),
-                             256, -2, sg_is_big_endian());
-                else
-                    dStrRaw((const char *)rsp_buff, len);
-            } else
+            /* format output for 'hdparm --Istdin' with '-rr' or '-HHH' */
+            if ((2 == do_raw) || (3 == do_hex))
+                dWordHex((const unsigned short *)(rsp_buff + 60),
+                         256, -2, sg_is_big_endian());
+            else if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else
                 decode_ata_info_vpd(rsp_buff, len, do_hex);
         }
         break;
@@ -1850,6 +1862,7 @@ int main(int argc, char * argv[])
     int do_cmdlst = 0;
     int do_hex = 0;
     int do_raw = 0;
+    int do_resp_len = 0;
     int do_36 = 0;
     int do_vdescriptors = 0;
     int do_verbose = 0;
@@ -1957,10 +1970,23 @@ int main(int argc, char * argv[])
             }
             if (plen <= 0)
                 continue;
-            else if (0 == strncmp("o=", cp, 2)) {
+            else if (0 == strncmp("l=", cp, 2)) {
+                num = sscanf(cp + 2, "%d", &do_resp_len);
+                if ((1 != num) || (do_resp_len < 1)) {
+                    fprintf(stderr, "Inappropriate value after 'l=' "
+                            "option\n");
+                    usage();
+                    return SG_LIB_SYNTAX_ERROR;
+                } else if (do_resp_len > MX_ALLOC_LEN) {
+                    fprintf(stderr, "value after 'l=' "
+                            "option too large\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            } else if (0 == strncmp("o=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", &num_opcode);
                 if ((1 != num) || (num_opcode > 255)) {
-                    fprintf(stderr, "Bad number after 'o=' option\n");
+                    fprintf(stderr, "Inappropriate value after 'o=' "
+                            "option\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -1969,7 +1995,8 @@ int main(int argc, char * argv[])
             } else if (0 == strncmp("p=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", &num_opcode);
                 if ((1 != num) || (num_opcode > 255)) {
-                    fprintf(stderr, "Bad number after '-p' switch\n");
+                    fprintf(stderr, "Inappropriate value after '-p' "
+                            "switch\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -2065,8 +2092,8 @@ int main(int argc, char * argv[])
 
     if ((! do_cmddt) && (! do_evpd)) {
         /* So it's a Standard INQUIRY, try ATA IDENTIFY if that fails */
-        ret = process_std_inq(sg_fd, file_name, do_36, do_vdescriptors,
-                             do_hex, do_raw, do_verbose);
+        ret = process_std_inq(sg_fd, file_name, do_36, do_resp_len,
+                              do_vdescriptors, do_hex, do_raw, do_verbose);
         if (ret)
             goto err_out;
     } else if (do_cmddt) {
@@ -2221,13 +2248,12 @@ static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
     res = ata_command_interface(ata_fd, (char *)&ata_ident, &atapi, verbose);
     if (res)
         return res;
-    if (do_raw) {
-        if (2 == do_raw)
-            dWordHex((const unsigned short *)&ata_ident, 256, -2,
-                     sg_is_big_endian());
-        else
-            dStrRaw((const char *)&ata_ident, 512);
-    } else {
+    if ((2 == do_raw) || (3 == do_hex))
+        dWordHex((const unsigned short *)&ata_ident, 256, -2,
+                 sg_is_big_endian());
+    else if (do_raw)
+        dStrRaw((const char *)&ata_ident, 512);
+    else {
         if (do_hex) {
             if (atapi)
                 printf("ATA IDENTIFY PACKET DEVICE response ");
@@ -2379,6 +2405,8 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x3e0, "SES-2 (no version claimed)"},
     {0x400, "SSC-3 (no version claimed)"},
     {0x420, "MMC-5 (no version claimed)"},
+    {0x42f, "MMC-5 T10/1675-D revision 03"},
+    {0x431, "MMC-5 T10/1675-D revision 03b"},
     {0x440, "OSD-2 (no version claimed)"},
     {0x460, "SPC-4 (no version claimed)"},
     {0x480, "SMC-3 (no version claimed)"},
@@ -2538,7 +2566,8 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0x1729, "Universal Serial Bus Specification, Revision 2.0"},
     {0x1730, "USB Mass Storage Class Bulk-Only Transport, Revision 1.0"},
     {0x1ea0, "SAT (no version claimed)"},
-    {0x1ea7, "SAT T10/1711-d rev 8"},
+    {0x1ea7, "SAT T10/1711-D rev 8"},
+    {0x1eab, "SAT T10/1711-D rev 9"},
     {0x1ec0, "SAT-2 (no version claimed)"},
 };
 

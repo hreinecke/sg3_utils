@@ -36,7 +36,7 @@
 #include <sys/time.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -44,7 +44,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.13 20060623";
+static char * version_str = "1.16 20061012";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 
@@ -54,7 +54,10 @@ static char * version_str = "1.13 20060623";
 static struct option long_options[] = {
         {"desc", 0, 0, 'd'},
         {"help", 0, 0, 'h'},
+        {"hex", 0, 0, 'H'},
         {"num", 1, 0, 'n'},
+        {"raw", 0, 0, 'r'},
+        {"status", 0, 0, 's'},
         {"time", 0, 0, 't'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
@@ -64,21 +67,35 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_requests [--desc] [--help] [--num=<n>] [--time] [--verbose] "
-          "[--version]\n"
-          "                   <scsi_device>\n"
-          "  where: --desc|-d          set flag for descriptor sense "
+          "sg_requests [--desc] [--help] [--hex] [--num=<n>] [--raw]\n"
+          "                   [--status] [--time] [--verbose] [--version] "
+          "<scsi_device>\n"
+          "  where:\n"
+          "     --desc|-d         set flag for descriptor sense "
           "format\n"
-          "         --help|-h          print out usage message\n"
-          "         --num=<n>|-n <n>   number of REQUEST SENSE commands "
+          "     --help|-h         print out usage message\n"
+          "     --hex|-H          output in hexadecimal\n"
+          "     --num=<n>|-n <n>  number of REQUEST SENSE commands "
           "to send (def: 1)\n"
-          "         --time|-t          time the transfer, calculate commands "
+          "     --raw|-r          output in binary (to stdout)\n"
+          "     --status|-s       set exit status from parameter data "
+          "(def: only set\n"
+          "                       exit status from autosense)\n"
+          "     --time|-t         time the transfer, calculate commands "
           "per second\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n\n"
+          "     --verbose|-v      increase verbosity\n"
+          "     --version|-V      print version string and exit\n\n"
           "Perform a REQUEST SENSE SCSI command\n"
           );
 
+}
+
+static void dStrRaw(const char* str, int len)
+{
+    int k;
+
+    for (k = 0 ; k < len; ++k)
+        printf("%c", str[k]);
 }
 
 int main(int argc, char * argv[])
@@ -87,17 +104,20 @@ int main(int argc, char * argv[])
     unsigned char requestSenseBuff[REQUEST_SENSE_BUFF_LEN];
     int desc = 0;
     int num_rs = 1;
+    int do_hex = 0;
+    int do_raw = 0;
+    int do_status = 0;
     int do_time = 0;
     int verbose = 0;
     char device_name[256];
-    int ret = 8;
+    int ret = 0;
     struct timeval start_tm, end_tm;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhn:tvV", long_options,
+        c = getopt_long(argc, argv, "dhHn:rstvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -110,12 +130,21 @@ int main(int argc, char * argv[])
         case '?':
             usage();
             return 0;
+        case 'H':
+            ++do_hex;
+            break;
         case 'n':
            num_rs = sg_get_num(optarg);
            if (num_rs < 1) {
                 fprintf(stderr, "bad argument to '--num'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'r':
+            ++do_raw;
+            break;
+        case 's':
+            do_status = 1;
             break;
         case 't':
             do_time = 1;
@@ -165,14 +194,20 @@ int main(int argc, char * argv[])
         gettimeofday(&start_tm, NULL);
     }
 
+    requestSenseBuff[0] = '\0';
+    requestSenseBuff[7] = '\0';
     for (k = 0; k < num_rs; ++k) {
         memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
         res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
                                   sizeof(requestSenseBuff), 1, verbose);
         ret = res;
         if (0 == res) {
-            if (1 == num_rs) {
-                resp_len = requestSenseBuff[7] + 8;
+            resp_len = requestSenseBuff[7] + 8;
+            if (do_raw)
+                dStrRaw((const char *)requestSenseBuff, resp_len);
+            else if (do_hex)
+                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+            else if (1 == num_rs) {
                 fprintf(stderr, "Decode parameter data as sense data:\n");
                 sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
                 if (verbose) {
@@ -185,6 +220,8 @@ int main(int argc, char * argv[])
             fprintf(stderr, "Request Sense command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in Request Sense cdb\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "Request Sense, aborted command\n");
         else {
             fprintf(stderr, "Request Sense command unexpectedly failed\n");
             if (0 == verbose)
@@ -192,6 +229,18 @@ int main(int argc, char * argv[])
                         "more information\n");
         }
         break;
+    }
+    if ((0 == ret) && do_status) {
+        resp_len = requestSenseBuff[7] + 8;
+        ret = sg_err_category_sense(requestSenseBuff, resp_len);
+        if (SG_LIB_CAT_NO_SENSE == ret) {
+            struct sg_scsi_sense_hdr ssh;
+
+            if (sg_scsi_normalize_sense(requestSenseBuff, resp_len, &ssh)) {
+                if ((0 == ssh.asc) && (0 == ssh.ascq))
+                    ret = 0;
+            }
+        }
     }
     if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;

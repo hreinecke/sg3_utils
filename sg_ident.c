@@ -35,26 +35,29 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
  *
- * This program issues these SCSI commands: REPORT DEVICE IDENTIFIER,
- * SET DEVICE IDENTIFIER and/or INQUIRY (VPD=0x83 [device identifier]).
+ * This program issues these SCSI commands: REPORT IDENTIFYING INFORMATION
+ * and SET IDENTIFYING INFORMATION. These commands were called REPORT
+ * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static char * version_str = "1.02 20060623";
+static char * version_str = "1.04 20061013";
 
 #define ME "sg_ident: "
 
-#define REPORT_DEV_ID_SANITY_LEN 512
+#define REPORT_ID_INFO_SANITY_LEN 512
 
 
 static struct option long_options[] = {
         {"ascii", 0, 0, 'A'},
         {"clear", 0, 0, 'C'},
         {"help", 0, 0, 'h'},
+        {"itype", 1, 0, 'i'},
         {"raw", 0, 0, 'r'},
         {"set", 0, 0, 'S'},
         {"verbose", 0, 0, 'v'},
@@ -62,34 +65,65 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+static void decode_ii(const unsigned char * iip, int ii_len, int itype,
+                      int ascii, int raw, int verbose)
+{
+    int k, n;
+
+    if (raw) {
+        if (ii_len > 0)
+            n = fwrite(iip, 1, ii_len, stdout);
+        return;
+    }
+    if (0x7f == itype) {  /* list of available information types */
+        for (k = 0; k < (ii_len - 3); k += 4)
+            printf("  Information type: %d, Maximum information length: "
+                   "%d bytes\n", iip[k], ((iip[k + 2] << 8) + iip[k + 3]));
+    } else {        /* single element */
+        if (verbose)
+            printf("Information:\n");
+        if (ii_len > 0) {
+            if (ascii)
+                printf("%.*s\n", ii_len, (const char *)iip);
+            else
+                dStrHex((const char *)iip, ii_len, 0); 
+        }
+    }
+}
+
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_ident   [--ascii] [--clear] [--help] [--raw] [--set] "
-          "[--verbose]\n"
-          "                  [--version] <scsi_device>\n"
-          "  where: --ascii|-A      report device identifier as ASCII "
-          "string\n"
-          "         --clear|-C      clear (set to zero length) device "
-          "identifier\n"
+          "sg_ident   [--ascii] [--clear] [--help] [--itype] [--raw] "
+          "[--set]\n"
+          "                  [--verbose] [--version] <scsi_device>\n"
+          "  where: --ascii|-A      report identifying information as ASCII "
+          "(or UTF8)\n"
+          "                         string\n"
+          "         --clear|-C      clear (set to zero length) identifying "
+          "information\n"
           "         --help|-h       print out usage message\n"
-          "         --raw|-r        output device identifier to stdout\n"
+          "         --itype=<n>|-i <n>  specify information type\n"
+          "         --raw|-r        output identifying information to "
+          "stdout or\n"
           "                         fetch from stdin (when '--set')\n"
-          "         --set|-S        invoke set device identifier with data "
-          "from stdin\n"
-          "         --verbose|-v    set device identifier\n"
+          "         --set|-S        invoke set identifying information with "
+          "data from\n"
+          "                         stdin\n"
+          "         --verbose|-v    increase verbosity of output\n"
           "         --version|-V    print version string and exit\n\n"
-          "Performs a REPORT or SET DEVICE IDENTIFIER SCSI command\n"
+          "Performs a REPORT or SET IDENTIFYING INFORMATION SCSI command\n"
           );
 }
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, di_len, n;
-    unsigned char rdi_buff[REPORT_DEV_ID_SANITY_LEN + 4];
+    int sg_fd, res, c, ii_len;
+    unsigned char rdi_buff[REPORT_ID_INFO_SANITY_LEN + 4];
     unsigned char * ucp = NULL;
     int ascii = 0;
     int do_clear = 0;
+    int itype = 0;
     int raw = 0;
     int do_set = 0;
     int verbose = 0;
@@ -100,7 +134,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AChrSvV", long_options,
+        c = getopt_long(argc, argv, "AChi:rSvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -116,6 +150,14 @@ int main(int argc, char * argv[])
         case '?':
             usage();
             return 0;
+        case 'i':
+           itype = sg_get_num(optarg);
+           if ((itype < 0) || (itype > 127)) {
+                fprintf(stderr, "argument to '--itype' should be in range "
+                        "0 to 127\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
         case 'r':
             raw = 1;
             break;
@@ -180,94 +222,100 @@ int main(int argc, char * argv[])
     memset(rdi_buff, 0x0, sizeof(rdi_buff));
     if (do_set || do_clear) {
         if (do_set) {
-            res = fread(rdi_buff, 1, REPORT_DEV_ID_SANITY_LEN + 2, stdin); 
+            res = fread(rdi_buff, 1, REPORT_ID_INFO_SANITY_LEN + 2, stdin); 
             if (res <= 0) {
                 fprintf(stderr, "no data read from stdin; to clear "
-                        "identifier use '--clear' instead\n");
+                        "identifying information use '--clear' instead\n");
+                ret = -1;
                 goto err_out;
-            } else if (res > REPORT_DEV_ID_SANITY_LEN) {
-                fprintf(stderr, "SPC-3 limits identifier length to 512 "
+            } else if (res > REPORT_ID_INFO_SANITY_LEN) {
+                fprintf(stderr, "SPC-4 limits information length to 512 "
                         "bytes\n");
+                ret = -1;
                 goto err_out;
             }
-            di_len = res;
-            res = sg_ll_set_dev_id(sg_fd, rdi_buff, di_len, 1, verbose);
+            ii_len = res;
+            res = sg_ll_set_id_info(sg_fd, itype, rdi_buff, ii_len, 1,
+                                    verbose);
         } else    /* do_clear */
-            res = sg_ll_set_dev_id(sg_fd, rdi_buff, 0, 1, verbose);
+            res = sg_ll_set_id_info(sg_fd, itype, rdi_buff, 0, 1, verbose);
         if (res) {
             ret = res;
             if (SG_LIB_CAT_NOT_READY == res)
-                fprintf(stderr, "Set Device Identifier command, device "
+                fprintf(stderr, "Set identifying information command, device "
                         "not ready\n");
             else if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "Set Device Identifier command not "
+                fprintf(stderr, "Set identifying information command not "
                         "supported\n");
             else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                fprintf(stderr, "Set Device Identifier, unit attention\n");
+                fprintf(stderr, "Set identifying information, unit "
+                        "attention\n");
+            else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                fprintf(stderr, "Set identifying information, aborted "
+                        "command\n");
             else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "bad field in Set Device Identifier "
+                fprintf(stderr, "bad field in Set identifying information "
                         "cdb\n");
             else {
-                fprintf(stderr, "Set Device Identifier command failed\n");
+                fprintf(stderr, "Set identifying information command "
+                        "failed\n");
                 if (0 == verbose)
                     fprintf(stderr, "    try '-v' for more information\n");
             }
         }
-    } else {    /* do report device identifier */
-        res = sg_ll_report_dev_id(sg_fd, rdi_buff, 4, 1, verbose);
+    } else {    /* do report identifying information */
+        res = sg_ll_report_id_info(sg_fd, itype, rdi_buff, 4, 1, verbose);
         if (0 == res) {
-            di_len = (rdi_buff[0] << 24) + (rdi_buff[1] << 16) + 
+            ii_len = (rdi_buff[0] << 24) + (rdi_buff[1] << 16) + 
                          (rdi_buff[2] << 8) + rdi_buff[3];
-            if (! raw)
-                printf("Reported device identifier length = %d\n", di_len);
-            if (0 == di_len) {
-                fprintf(stderr, "    This implies the device has an empty "
-                        "identifier\n");
+            if ((! raw) && (verbose > 0))
+                printf("Reported identifying information length = %d\n",
+                       ii_len);
+            if (0 == ii_len) {
+                if (verbose > 1)
+                    fprintf(stderr, "    This implies the device has an "
+                            "empty information field\n");
                 goto err_out;
             }
-            if (di_len > REPORT_DEV_ID_SANITY_LEN) {
-                fprintf(stderr, "    That length (%d) seems too long for a "
-                        "device identifier\n", di_len);
+            if (ii_len > REPORT_ID_INFO_SANITY_LEN) {
+                fprintf(stderr, "    That length (%d) seems too long for an "
+                        "information\n", ii_len);
+                ret = -1;
                 goto err_out;
             }
             ucp = rdi_buff;
-            res = sg_ll_report_dev_id(sg_fd, ucp, di_len + 4, 1, verbose);
+            res = sg_ll_report_id_info(sg_fd, itype, ucp, ii_len + 4, 1,
+                                       verbose);
             if (0 == res) {
-                di_len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) +
+                ii_len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) +
                          ucp[3];
-                if (raw) {
-                    if (di_len > 0)
-                        n = fwrite(ucp + 4, 1, di_len, stdout);
-                } else {
-                    printf("Device identifier:\n");
-                    if (di_len > 0) {
-                        if (ascii)
-                            printf("%.*s\n", di_len, (const char *)ucp + 4);
-                        else
-                            dStrHex((const char *)ucp + 4, di_len, 0); 
-                    }
-                }
-            } else {
+                decode_ii(ucp + 4, ii_len, itype, ascii, raw, verbose);
+            } else
                 ret = res;
-                if (SG_LIB_CAT_NOT_READY == res)
-                    fprintf(stderr, "Report Device Identifier command, "
-                            "device not ready\n");
-                else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                    fprintf(stderr, "Report Device Identifier, unit "
-                            "attention\n");
-                else if (SG_LIB_CAT_INVALID_OP == res)
-                    fprintf(stderr, "Report Device Identifier command not "
-                            "supported\n");
-                else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                    fprintf(stderr, "bad field in Report Device Identifier "
-                            "cdb\n");
-                else {
-                    fprintf(stderr, "Report Device Identifier command "
-                            "failed\n");
-                    if (0 == verbose)
-                        fprintf(stderr, "    try '-v' for more "
-                                "information\n");
-                }
+        } else
+            ret = res;
+        if (ret) {
+            if (SG_LIB_CAT_NOT_READY == ret)
+                fprintf(stderr, "Report identifying information command, "
+                        "device not ready\n");
+            else if (SG_LIB_CAT_UNIT_ATTENTION == ret)
+                fprintf(stderr, "Report identifying information, unit "
+                        "attention\n");
+            else if (SG_LIB_CAT_ABORTED_COMMAND == ret)
+                fprintf(stderr, "Report identifying information, aborted "
+                        "command\n");
+            else if (SG_LIB_CAT_INVALID_OP == ret)
+                fprintf(stderr, "Report identifying information command "
+                        "not supported\n");
+            else if (SG_LIB_CAT_ILLEGAL_REQ == ret)
+                fprintf(stderr, "bad field in Report identifying "
+                        "information cdb\n");
+            else {
+                fprintf(stderr, "Report identifying information command "
+                        "failed\n");
+                if (0 == verbose)
+                    fprintf(stderr, "    try '-v' for more "
+                            "information\n");
             }
         }
     }

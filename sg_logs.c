@@ -6,7 +6,7 @@
 #include <ctype.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
 *  Copyright (C) 2000-2006 D. Gilbert
@@ -19,11 +19,12 @@
    
 */
 
-static char * version_str = "0.58 20060705";    /* SPC-4 revision 5a */
+static char * version_str = "0.65 20061012";    /* SPC-4 revision 7a */
 
 #define ME "sg_logs: "
 
-#define MX_ALLOC_LEN (1024 * 17)
+#define MX_ALLOC_LEN (0xfffe)
+#define SHORT_RESP_LEN 128
 #define PG_CODE_ALL 0x0
 #define SUBPG_CODE_ALL 0xff
 
@@ -37,7 +38,7 @@ static char * version_str = "0.58 20060705";    /* SPC-4 revision 5a */
    in the future for SAS). Returns 0 if ok, SG_LIB_CAT_INVALID_OP for
    log_sense not supported, SG_LIB_CAT_ILLEGAL_REQ for bad field in log sense
    command, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
-   and -1 for other errors. */
+   SG_LIB_CAT_ABORTED_COMMAND and -1 for other errors. */
 static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code, 
                    int subpg_code, int paramp, unsigned char * resp,
                    int mx_resp_len, int noisy, int verbose)
@@ -53,6 +54,7 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
         case SG_LIB_CAT_INVALID_OP:
         case SG_LIB_CAT_ILLEGAL_REQ:
         case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
             return res;
         default:
             return -1;
@@ -77,6 +79,7 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
         case SG_LIB_CAT_INVALID_OP:
         case SG_LIB_CAT_ILLEGAL_REQ:
         case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
             return res;
         default:
             return -1;
@@ -93,41 +96,45 @@ static void usage()
 {
     printf("Usage:  sg_logs [-a] [-A] [-c=<page_control] [-h] [-H] [-l] "
            "[-L]\n"
-           "                [-p=<page_number>[,<subpage_code>]]\n"
-           "                [-paramp=<parameter_pointer>] [-ppc] [-r] "
-           "[-scum] [-sp]\n"
-           "                [-sthr] [-t] [-T] [-v] [-V] <scsi_device>\n"
-           "  where: -a   output all log pages\n"
-           "         -A   output all log pages and subpages\n"
-           "         -c=<page_control> page control(PC) (default: 1)\n"
-           "                0: current threshhold, 1: current cumulative\n"
-           "                2: default threshhold, 3: default cumulative\n"
-           "         -h   output in hex\n"
-           "         -H   output in hex (same as '-h)\n"
-           "         -l   list supported log page names of given device\n"
-           "         -L   list supported log page and subpages names of "
-           "given device\n"
-           "         -p=<page_code> page code (in hex)\n"
-           "         -p=<page_code>,<subpage_code> both in hex, (defs: 0)\n"
-           "         -paramp=<parameter_pointer> (in hex) (def: 0)\n"
-           "         -pcb show parameter control bytes (ignored if -h "
+           "                [-m=<max_len>] [-p=<page_number>[,"
+           "<subpage_code>]]\n"
+           "                [-paramp=<parameter_pointer>] [-pcb] [-ppc] "
+           "[-r] [-select]\n"
+           "                [-sp] [-t] [-T] [-v] [-V] [-?] <scsi_device>\n"
+           "  where:\n"
+           "    -a     fetch and decode all log pages\n"
+           "    -A     fetch and decode all log pages and subpages\n"
+           "    -c=<page_control> page control(PC) (default: 1)\n"
+           "                  0: current threshhold, 1: current cumulative\n"
+           "                  2: default threshhold, 3: default cumulative\n"
+           "    -h     output in hex (default: decode if known)\n"
+           "    -H     output in hex (same as '-h')\n"
+           "    -l     list supported log page names (equivalent to "
+           "'-p=0')\n"
+           "    -L     list supported log page and subpages names "
+           "(equivalent to\n"
+           "           '-p=0,ff')\n"
+           "    -m=<max_len>   max response length (decimal) (def: 0 "
+           "-> everything)\n"
+           "    -p=<page_code>   page code (in hex)\n"
+           "    -p=<page_code>,<subpage_code>   both in hex, (defs: 0)\n"
+           "    -paramp=<parameter_pointer>   (in hex) (def: 0)\n"
+           "    -pcb   show parameter control bytes (ignored if -h "
            "given)\n");
-    printf("         -ppc set the Parameter Pointer Control (PPC) bit "
+    printf("    -ppc   set the Parameter Pointer Control (PPC) bit "
            "(def: 0)\n"
-           "         -r   reset all implemented parameters to target "
-           "defined defaults\n"
-           "               (uses PCR bit in LOG SELECT)\n"
-           "         -scum  set cumulative parameters to default values\n"
-           "         -sp  set the Saving Parameters (SP) bit (def: 0)\n"
-           "         -sthr  set threshold parameters to default threshold "
-           "values\n"
-           "         -t   outputs temperature log page (0xd)\n"
-           "         -T   outputs transport (protocol specific port) log "
+           "    -r     reset log parameters (takes PC and SP into "
+           "account)\n"
+           "           (uses PCR bit in LOG SELECT)\n"
+           "    -select  perform LOG SELECT using SP and PC values\n"
+           "    -sp    set the Saving Parameters (SP) bit (def: 0)\n"
+           "    -t     outputs temperature log page (0xd)\n"
+           "    -T     outputs transport (protocol specific port) log "
            "page (0x18)\n"
-           "         -v   verbose: output cdbs prior to execution\n"
-           "         -V   output version string\n"
-           "         -?   output this usage message\n\n"
-           "Performs a SCSI LOG SENSE (or SELECT) command\n");
+           "    -v     verbose: output cdbs prior to execution\n"
+           "    -V     output version string\n"
+           "    -?     output this usage message\n\n"
+           "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }
 
 static void show_page_name(int pg_code, int subpg_code,
@@ -212,8 +219,8 @@ static void show_page_name(int pg_code, int subpg_code,
             }
         }
         break;
-    case 1: case 2: case 8:
-        /* tape (streaming) and medium changer type devices */
+    case 1: case 2:
+        /* tape (streaming) and printer (obsolete) devices */
         {
             switch (pg_code) {
             case 0xc:
@@ -227,6 +234,21 @@ static void show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x2e:
                 printf("%sTapeAlert (ssc-2)\n", b);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
+    case 8:
+        /* medium changer type devices */
+        {
+            switch (pg_code) {
+            case 0x14:
+                printf("%sMedia changer statistics (smc-3)\n", b);
+                break;
+            case 0x2e:
+                printf("%sTapeAlert (smc-3)\n", b);
                 break;
             default:
                 done = 0;
@@ -390,7 +412,7 @@ static void show_error_counter_page(unsigned char * resp, int len,
         switch (pc) {
         case 0: printf("  Errors corrected without substantial delay"); break;
         case 1: printf("  Errors corrected with possible delays"); break;
-        case 2: printf("  Total operations"); break;
+        case 2: printf("  Total rewrites or rereads"); break;
         case 3: printf("  Total errors corrected"); break;
         case 4: printf("  Total times correction algorithm processed"); break;
         case 5: printf("  Total bytes processed"); break;
@@ -630,14 +652,14 @@ static void show_Temperature_page(unsigned char * resp, int len,
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
         if (0 == pc) {
-            if (extra > 5) {
+            if ((extra > 5) && (k > 5)) {
                 if (ucp[5] < 0xff)
                     printf("  Current temperature = %d C", ucp[5]);
                 else
                     printf("  Current temperature = <not available>");
             }
         } else if (1 == pc) {
-            if (extra > 5) {
+            if ((extra > 5) && (k > 5)) {
                 if (ucp[5] < 0xff)
                     printf("  Reference temperature = %d C", ucp[5]);
                 else
@@ -821,7 +843,7 @@ static void show_sas_phy_event_info(int peis, unsigned long val,
     case 0x20:
         printf("     Received address frame error count: %lu\n", val);
         break;
-    case 0x21:  /* sas2r02 + 06-134r0 */
+    case 0x21:
         printf("     Transmitted OPEN_REJECT abandon count: %lu\n", val);
         break;
     case 0x22:
@@ -904,7 +926,8 @@ static void show_sas_phy_event_info(int peis, unsigned long val,
     case 0x61:
         printf("     Received SMP frame count: %lu\n", val);
         break;
-    case 0x62:
+    /* case 0x63: */
+    case 0x63:
         printf("     Received SMP frame error count: %lu\n", val);
         break;
     default:
@@ -932,7 +955,7 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
            an 8 bit quantity then only the first 5 phys (of, for example,
            a 8 phy wide link) can be represented */
         if (6 != (0xf & ucp[4]))
-            return 0;   /* only decode SAS log page */
+            return 0;   /* only decode SAS log page [sas2r05a] */
         if (0 == k)
             printf("SAS Protocol Specific page\n");
         printf("relative target port id = %d\n", (ucp[0] << 8) | ucp[1]);
@@ -956,8 +979,8 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "end device"); break;
-            case 2: snprintf(s, sz, "edge expander device"); break;
-            case 3: snprintf(s, sz, "fanout expander device"); break;
+            case 2: snprintf(s, sz, "expander device"); break;
+            case 3: snprintf(s, sz, "expander device (fanout)"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
             printf("    attached device type: %s\n", s);
@@ -971,6 +994,8 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
             case 3: snprintf(s, sz, "phy enabled; SATA spinup hold state");
                          break;
             case 4: snprintf(s, sz, "phy enabled; port selector");
+                         break;
+            case 5: snprintf(s, sz, "phy enabled; reset in progress");
                          break;
             case 8: snprintf(s, sz, "phy enabled; 1.5 Gbps"); break;
             case 9: snprintf(s, sz, "phy enabled; 3 Gbps"); break;
@@ -1167,24 +1192,27 @@ static void show_non_volatile_cache_page(unsigned char * resp, int len,
 }
 
 static const char * bms_status[] = {
-    "no scans active",
-    "background medium scan is active",
-    "pre-scan is active",
-    "scan halted due to fatal error",
-    "scan halted due to a vendor specific pattern of error",
-    "scan halted due to medium formatted without P-List",
-    "scan halted - vendor specific cause",
-    "scan halted due to temperature out of range",
-    "scan suspended until BMS Interval Time expires", /* 8 */
+    "no background scans active",
+    "background scan is active",
+    "background pre-scan is active",
+    "background scan halted due to fatal error",
+    "background scan halted due to a vendor specific pattern of error",
+    "background scan halted due to medium formatted without P-List",
+    "background scan halted - vendor specific cause",
+    "background scan halted due to temperature out of range",
+    "background scan halted until BM interval timer expires", /* 8 */
 };
 
 static const char * reassign_status[] = {
     "No reassignment needed",
     "Reassignment pending receipt of Reassign command or Write command",
-    "LBA successfully reassigned",
+    "Logical block successfully reassigned",
     "Reassign status: Reserved [0x3]",
     "Reassignment failed",
-    "LBA recovered via re-write",       /* 5 */
+    "Logical block recovered via rewrite in-place",
+    "Logical block reassigned by application client, has valid data",
+    "Logical block reassigned by application client, contains no valid data",
+    "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
 static void show_background_scan_results_page(unsigned char * resp, int len,
@@ -1194,7 +1222,7 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
     unsigned char * ucp;
     char str[PCB_STR_LEN];
 
-    printf("Background scan results page (sbc-2) [0x15]\n");
+    printf("Background scan results page (sbc-3) [0x15]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -1203,27 +1231,39 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
         pl = ucp[3] + 4;
         switch (pc) {
         case 0:
-            printf("  Power on minutes: ");
+            printf("  Status parameters:\n");
+            if ((pl < 16) || (num < 16)) {
+                if (num < 16)
+                    fprintf(stderr, "    truncated by response length, "
+                            "expected at least 16 bytes\n");
+                else
+                    fprintf(stderr, "    parameter length >= 16 expected, "
+                            "got %d\n", pl);
+                break;
+            }
+            printf("    Accumulated power on minutes: ");
             j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
-            printf("%d [%d:%d]\n", j, (j / 60), (j % 60));
-            break;
-            printf("    BMS status: ");
+            printf("%d [h:m  %d:%d]\n", j, (j / 60), (j % 60));
+            printf("    Status: ");
             j = ucp[9];
             if (j < (int)(sizeof(bms_status) / sizeof(bms_status[0])))
                 printf("%s\n", bms_status[j]);
             else
-                printf("unknown [0x%x]\n", j);
-            printf("    Number of scans performed: %d\n",
+                printf("unknown [0x%x] background scan status value\n", j);
+            printf("    Number of background scans performed: %d\n",
                    (ucp[10] << 8) + ucp[11]);
-            printf("    Progress of medium scan: %.2f%%\n",
+            printf("    Background medium scan progress: %.2f%%\n",
                    (double)((ucp[12] << 8) + ucp[13]) * 100.0 / 65536.0);
-
             break;
         default:
             printf("  Medium scan parameter # %d\n", pc);
-            if (pl < 24) {
-                fprintf(stderr, "    parameter length >= 24 expected, "
-                        "got %d\n", pl);
+            if ((pl < 24) || (num < 24)) {
+                if (num < 24)
+                    fprintf(stderr, "    truncated by response length, "
+                            "expected at least 24 bytes\n");
+                else
+                    fprintf(stderr, "    parameter length >= 24 expected, "
+                            "got %d\n", pl);
                 break;
             }
             printf("    Power on minutes when error detected: ");
@@ -1235,7 +1275,7 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
                 printf("    %s\n", reassign_status[j]);
             else
                 printf("    Reassign status: reserved [0x%x]\n", j);
-            printf("    sense key: %s   [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
+            printf("    sense key: %s  [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
                    sg_get_sense_key_str(ucp[8] & 0xf, sizeof(str), str),
                    ucp[8] & 0xf, ucp[9], ucp[10]);
             printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
@@ -1246,7 +1286,7 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
                     printf("0x%02x ", ucp[11 + m]);
                 printf("\n");
             }
-            printf("    LBA  (of medium error):  0x");
+            printf("    LBA (associated with medium error): 0x");
             for (m = 0; m < 8; ++m)
                 printf("%02x", ucp[16 + m]);
             printf("\n");
@@ -1774,13 +1814,13 @@ static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }
 
+static unsigned char rsp_buff[MX_ALLOC_LEN];
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, pg_len, res, plen, jmp_out, select_cmds;
+    int sg_fd, k, num, pg_len, res, plen, jmp_out, resp_len;
     const char * file_name = 0;
     const char * cp;
-    unsigned char rsp_buff[MX_ALLOC_LEN];
     unsigned int u, uu;
     int pg_code = 0;
     int subpg_code = 0;
@@ -1790,14 +1830,14 @@ int main(int argc, char * argv[])
     int do_list = 0;
     int do_pcb = 0;
     int do_ppc = 0;
-    int do_scum = 0;
+    int do_select = 0;
     int do_sp = 0;
-    int do_sthr = 0;
     int do_hex = 0;
     int do_all = 0;
     int do_temp = 0;
     int do_pcreset = 0;
     int do_verbose = 0;
+    int max_len = 0;
     int ret = 0;
     struct sg_simple_inquiry_resp inq_out;
 
@@ -1828,6 +1868,7 @@ int main(int argc, char * argv[])
                     break;
                 case 'r':
                     do_pcreset = 1;
+                    do_select = 1;
                     break;
                 case 't':
                     do_temp = 1;
@@ -1860,16 +1901,23 @@ int main(int argc, char * argv[])
             if (0 == strncmp("c=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", &u);
                 if ((1 != num) || (u > 3)) {
-                    printf("Bad page control after 'c=' option [0..3]\n");
+                    printf("Bad page control after '-c=' option [0..3]\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 pc = u;
+            } else if (0 == strncmp("m=", cp, 2)) {
+                num = sscanf(cp + 2, "%d", &max_len);
+                if ((1 != num) || (max_len < 0) || (max_len > MX_ALLOC_LEN)) {
+                    printf("Bad maximum response length after '-m=' option\n");
+                    usage();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
             } else if (0 == strncmp("p=", cp, 2)) {
                 if (NULL == strchr(cp + 2, ',')) {
                     num = sscanf(cp + 2, "%x", &u);
                     if ((1 != num) || (u > 63)) {
-                        fprintf(stderr, "Bad page code value after 'p=' "
+                        fprintf(stderr, "Bad page code value after '-p=' "
                                 "option\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
@@ -1877,7 +1925,7 @@ int main(int argc, char * argv[])
                     pg_code = u;
                 } else if (2 == sscanf(cp + 2, "%x,%x", &u, &uu)) {
                     if (uu > 255) {
-                        fprintf(stderr, "Bad sub page code value after 'p=' "
+                        fprintf(stderr, "Bad sub page code value after '-p=' "
                                 "option\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
@@ -1887,14 +1935,14 @@ int main(int argc, char * argv[])
                     subpg_code_set = 1;
                 } else {
                     fprintf(stderr, "Bad page code, subpage code sequence "
-                            "after 'p=' option\n");
+                            "after '-p=' option\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
             } else if (0 == strncmp("paramp=", cp, 7)) {
                 num = sscanf(cp + 7, "%x", &u);
                 if ((1 != num) || (u > 0xffff)) {
-                    printf("Bad parameter pointer after 'paramp=' option\n");
+                    printf("Bad parameter pointer after '-paramp=' option\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -1903,12 +1951,10 @@ int main(int argc, char * argv[])
                 do_pcb = 1;
             else if (0 == strncmp("ppc", cp, 3))
                 do_ppc = 1;
-            else if (0 == strncmp("scum", cp, 4))
-                do_scum = 1;
+            else if (0 == strncmp("select", cp, 6))
+                do_select = 1;
             else if (0 == strncmp("sp", cp, 2))
                 do_sp = 1;
-            else if (0 == strncmp("sthr", cp, 4))
-                do_sthr = 1;
             else if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
@@ -1924,12 +1970,6 @@ int main(int argc, char * argv[])
         }
     }
     
-    select_cmds = do_pcreset + do_scum + do_sthr;
-    if (select_cmds > 1) {
-        fprintf(stderr, "choose one of '-r', '-scum' or '-sthr'. Try '?' "
-                "for usage.\n");
-        return SG_LIB_SYNTAX_ERROR;
-    }
     if (0 == file_name) {
         fprintf(stderr, "No <scsi_device> argument given. Try '-?' for "
                 "usage.\n");
@@ -1962,19 +2002,11 @@ int main(int argc, char * argv[])
                inq_out.revision);
 
     if (1 == do_temp)
-        return fetchTemperature(sg_fd, rsp_buff, MX_ALLOC_LEN, do_verbose);
+        return fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, do_verbose);
 
-    if (select_cmds) {
-        k = 0;
-        if (do_pcreset)
-            k = sg_ll_log_select(sg_fd, 1, do_sp, pc, pg_code, subpg_code,
-                                 NULL, 0, 1, do_verbose);
-        else if (do_scum)
-            k = sg_ll_log_select(sg_fd, 0, 0, 3 /* pc */, pg_code, subpg_code,
-                                 NULL, 0, 1, do_verbose);
-        else if (do_sthr)
-            k = sg_ll_log_select(sg_fd, 0, 0, 2 /* pc */, pg_code, subpg_code,
-                                 NULL, 0, 1, do_verbose);
+    if (do_select) {
+        k = sg_ll_log_select(sg_fd, !!(do_pcreset), do_sp, pc, pg_code,
+                             subpg_code, NULL, 0, 1, do_verbose);
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
                 fprintf(stderr, "log_select: device not ready\n");
@@ -1982,17 +2014,21 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "log_select: not supported\n");
             else if (SG_LIB_CAT_UNIT_ATTENTION == k)
                 fprintf(stderr, "log_select: unit attention\n");
+            else if (SG_LIB_CAT_ABORTED_COMMAND == k)
+                fprintf(stderr, "log_select: aborted command\n");
         }
         return (k >= 0) ?  k : SG_LIB_CAT_OTHER;
     }
+    resp_len = (max_len > 0) ? max_len : MX_ALLOC_LEN;
     res = do_logs(sg_fd, do_ppc, do_sp, pc, pg_code, subpg_code, paramp,
-                  rsp_buff, MX_ALLOC_LEN, 1, do_verbose);
+                  rsp_buff, resp_len, 1, do_verbose);
     if (0 == res) {
         pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
-        if ((pg_len + 4) > MX_ALLOC_LEN) {
-            printf("Only fetched %d bytes of response, truncate output\n",
-                   MX_ALLOC_LEN);
-            pg_len = MX_ALLOC_LEN - 4;
+        if ((pg_len + 4) > resp_len) {
+            printf("Only fetched %d bytes of response (available: %d "
+                   "bytes)\n    truncate output\n",
+                   resp_len, pg_len + 4);
+            pg_len = resp_len - 4;
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "log_sense: not supported\n");
@@ -2002,6 +2038,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "log_sense: field in cdb illegal\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "log_sense: unit attention\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "log_sense: aborted command\n");
     if ((pg_len > 1) && (0 == do_all)) {
         if (do_hex) {
             if (rsp_buff[0] & 0x40)
@@ -2040,13 +2078,13 @@ int main(int argc, char * argv[])
                 subpg_code = 0;
             
             res = do_logs(sg_fd, do_ppc, do_sp, pc, pg_code, subpg_code,
-                          paramp, rsp_buff, MX_ALLOC_LEN, 1, do_verbose);
+                          paramp, rsp_buff, resp_len, 1, do_verbose);
             if (0 == res) {
                 pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
-                if ((pg_len + 4) > MX_ALLOC_LEN) {
+                if ((pg_len + 4) > resp_len) {
                     printf("Only fetched %d bytes of response, truncate "
-                           "output\n", MX_ALLOC_LEN);
-                    pg_len = MX_ALLOC_LEN - 4;
+                           "output\n", resp_len);
+                    pg_len = resp_len - 4;
                 }
                 if (do_hex) {
                     if (rsp_buff[0] & 0x40)
@@ -2072,6 +2110,8 @@ int main(int argc, char * argv[])
                         "[page=0x%x,0x%x]\n", pg_code, subpg_code);
             else if (SG_LIB_CAT_UNIT_ATTENTION == res)
                 fprintf(stderr, "log_sense: unit attention\n");
+            else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                fprintf(stderr, "log_sense: aborted command\n");
         }
     }
     sg_cmds_close_device(sg_fd);

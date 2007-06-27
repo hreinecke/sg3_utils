@@ -1,5 +1,5 @@
 Unless otherwise noted, these install instructions are for the
-Linux operating system.
+Linux operating system. See below for other operating systems.
 
 By default, the Makefile will build for Linux with a shared library.
 The invocation sequence is:
@@ -54,7 +54,8 @@ utilities found in the main directory. When the sg3_utils binary rpm is
 installed the executables and their associated man pages should be placed in
 appropriate places. The sg3_utils.spec file also builds a libsgutils shared
 object (shared library) and a libsgutils-*-devel shared object with a static
-library and the sg_lib.h, sg_cmds.h and sg_pt.h header files.
+library and the sg_lib.h, sg_cmds.h sg_cmds_basic.h, sg_cmds_extra.h and
+sg_pt.h header files.
 
 Binary rpms (at least in the RedHat distribution) tend to install
 executables in /usr/bin and libraries in /usr/lib .
@@ -73,6 +74,8 @@ a "no_lib" version of the Makefile and the sg3_utils.spec file
 can be found in the "no_lib" subdirectory.
 
 
+FreeBSD
+=======
 In FreeBSD, the utilities can be built with "make -f Makefile.freebsd".
 This will build a shared object (i.e. libsgutils.so and friends) that
 the utilities depend on. To install use "make -f Makefile.freebsd install".
@@ -83,6 +86,8 @@ Utilities that are linux specific (e.g. sg_map) are not built for
 FreeBSD.
 
 
+Tru64 (OSF)
+===========
 In Tru64, the utilities can be built with "make -f Makefile.osf1".
 This will build a shared object (i.e. libsgutils.so and friends) that
 the utilities depend on. To install use "make -f Makefile.osf1 install".
@@ -93,4 +98,23 @@ Utilities that are linux specific (e.g. sg_map) are not built for
 Tru64.
 
 
-29th June 2006
+Windows
+=======
+In Windows only the Windows 2000, 2003 and XP operating systems (and their
+variants) are currently supported. The source tarball can be built in a
+cygwin environment on Windows. See http://www.cygwin.com for more
+information. Various extras such as 'gcc' (the GNU C compiler) and 'make'
+need to be loaded as they are not in the minimal cygwin default distribution.
+The build command is "make -f Makefile.win32" and to install (for a cygwin
+environment) use "make -f Makefile.win32 install". Currently the make
+doesn't build a dll (cf shared libraries are built on Linux and FreeBSD) so
+the executable files are bigger than they need to be. Once built, the
+various ".exe" commands can either be executed in a cygwin shell (typically
+"bash") or a DOS shell. If cygwin has not been installed on the target
+machine then the "cygwin1.dll" (obtained from www.cygwin.com ) is required.
+The various device names that the sg3_utils utilities will accept in Windows
+can be seen by running the sg_scan utility (and perhaps looking at its man
+page (i.e. sg_scan.8 or sg_scan.8w)).
+
+
+5th October 2006

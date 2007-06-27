@@ -35,7 +35,8 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -44,7 +45,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.07 20060623";
+static char * version_str = "1.08 20060907";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -290,6 +291,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "bad field in Report Target Port Groups cdb\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "Report Target Port Groups, unit attention\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "Report Target Port Groups, aborted command\n");
     else {
         fprintf(stderr, "Report Target Port Groups command failed\n");
         if (0 == verbose)

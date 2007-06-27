@@ -16,18 +16,19 @@ EXECS = sg_readcap sg_turs sg_inq sg_start sg_modes sg_logs \
 	sg_senddiag sg_persist sg_requests sg_ses sg_luns \
 	sg_sync sg_prevent sg_get_config sg_wr_mode \
 	sg_rtpg sg_reassign sg_format sg_rmsn sg_ident \
-	sg_read_long sg_write_long sg_verify sg_rdac sg_vpd
+	sg_read_long sg_write_long sg_verify sg_rdac sg_vpd \
+	sg_sat_identify
 
 MAN_PGS = sg_readcap.8 sg_turs.8 sg_inq.8 sg_start.8 sg_modes.8 sg_logs.8 \
 	  sg_senddiag.8 sg_persist.8 sg_requests.8 sg_ses.8 sg_luns.8 \
 	  sg_sync.8 sg_prevent.8 sg_get_config.8 sg_wr_mode.8 \
 	  sg_rtpg.8 sg_reassign.8 sg_format.8 sg_rmsn.8 sg_ident.8 \
 	  sg_read_long.8 sg_write_long.8 sg_verify.8 sg_rdac.8 sg_vpd.8 \
-	  sg3_utils.8
+	  sg3_utils.8 sg_sat_identify.8
 
 MAN_PREF = man8
 
-HEADERS = sg_lib.h sg_cmds.h sg_pt.h
+HEADERS = sg_lib.h sg_cmds.h sg_cmds_basic.h sg_cmds_extra.h sg_pt.h
 
 OS_FLAGS = -DSG3_UTILS_FREEBSD
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -62,20 +63,23 @@ clean:
 sg_lib.lo: sg_lib.o
 	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_lib.c
 
-sg_cmds.lo: sg_cmds.o
-	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds.c
+sg_cmds_basic.lo: sg_cmds_basic.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds_basic.c
+
+sg_cmds_extra.lo: sg_cmds_extra.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds_extra.c
 
 sg_pt_freebsd.lo: sg_pt_freebsd.o
 	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_pt_freebsd.c
 
-libsgutils.la: sg_lib.lo sg_cmds.lo sg_pt_freebsd.lo
+libsgutils.la: sg_lib.lo sg_cmds_basic.lo sg_cmds_extra.lo sg_pt_freebsd.lo
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o libsgutils.la sg_lib.lo \
-	sg_cmds.lo sg_pt_freebsd.lo -rpath $(LIBDIR) \
+	sg_cmds_basic.lo sg_cmds_extra.lo sg_pt_freebsd.lo -rpath $(LIBDIR) \
 	-version-info $(LIB_VINFO)
 
-# libsgutils.la: sg_lib.lo sg_cmds.lo
-#	$(LIBTOOL) --mode=link $(LD) -o libsgutils.la sg_lib.lo sg_cmds.lo \
-#	-rpath $(LIBDIR) -release $(RELEASE)
+# libsgutils.la: sg_lib.lo sg_cmds_basic.lo sg_cmds_extra.lo
+#	$(LIBTOOL) --mode=link $(LD) -o libsgutils.la sg_lib.lo \
+#	sg_cmds_basic.lo sg_cmds_extra.lo -rpath $(LIBDIR) -release $(RELEASE)
 
 sg_readcap: sg_readcap.o libsgutils.la
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
@@ -150,7 +154,10 @@ sg_rdac: sg_rdac.o libsgutils.la
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
 
 sg_vpd: sg_vpd.o sg_vpd_vendor.o libsgutils.la
-	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o sg_vpd_vendor.o libsgutils.la
+
+sg_sat_identify: sg_sat_identify.o libsgutils.la
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o sg_vpd_vendor.o libsgutils.la
 
 install: $(EXECS)
 	install -d $(INSTDIR)

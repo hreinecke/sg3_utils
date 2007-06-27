@@ -60,9 +60,10 @@ targeted the linux kernel 2.2 series with some support for the
 2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>
 for further information about sg_utils.&nbsp; This
 document describes
-<span style="font-weight: bold;">version 1.21</span> of <span
+<span style="font-weight: bold;">version 1.22</span> of <span
  style="font-weight: bold;">sg3_utils</span> .&nbsp; A subset of these
-utilities have been ported to the FreeBSD and Tru64 operating systems.<br>
+utilities have been ported to the FreeBSD, Tru64 and Windows operating
+systems.<br>
 <br>
 In the linux kernel 2.4 series most of these utilities must be
 used with a SCSI generic (sg) driver device name (e.g. <span
@@ -88,7 +89,9 @@ sg3_utils package:<br>
 <br>
 <table style="width: 100%; text-align: left;" border="1" cellpadding="2"
  cellspacing="2">
-  <tbody>
+  <caption align="bottom"><span style="font-weight: bold;">Table 1
+Utilities in sg3_utils</span><br>
+  </caption> <tbody>
     <tr>
       <td style="vertical-align: top;"><span style="font-weight: bold;">Utility</span><br>
       </td>
@@ -117,19 +120,6 @@ to ASCII hex and ASCII, sending its output to stdout (like Unix <span
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">isosize<br>
-      </td>
-      <td style="vertical-align: top;">-<br>
-      </td>
-      <td style="vertical-align: top;">archive<br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;">size of an ISO 9660 file system,
-now in the <span style="font-weight: bold;">util-linux</span> package<br>
-      </td>
-    </tr>
-    <tr>
       <td style="vertical-align: top;">rescan-scsi-bus.sh<br>
       </td>
       <td style="vertical-align: top;">-<br>
@@ -140,20 +130,6 @@ now in the <span style="font-weight: bold;">util-linux</span> package<br>
       </td>
       <td style="vertical-align: top;">copy of Kurt Garloff's useful
 script<br>
-      </td>
-    </tr>
-    <tr>
-      <td style="vertical-align: top;">scsi_devfs_scan<br>
-      </td>
-      <td style="vertical-align: top;">INQUIRY<br>
-      </td>
-      <td style="vertical-align: top;">archive<br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;">more relevant to lk 2.4 (in lk
-2.6 sysfs replaces devfs; see <a href="../scsi/lsscsi.html">lsscsi</a>
-)<br>
       </td>
     </tr>
     <tr>
@@ -240,19 +216,6 @@ threads<br>
       </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">sgq_dd<br>
-      </td>
-      <td style="vertical-align: top;">READ, WRITE<br>
-      </td>
-      <td style="vertical-align: top;">archive<br>
-      </td>
-      <td style="vertical-align: top;"><br>
-      </td>
-      <td style="vertical-align: top;">sg_dd variant that uses
-asynchronous sg IO calls<br>
-      </td>
-    </tr>
-    <tr>
       <td style="vertical-align: top;">sg_dd<br>
       </td>
       <td style="vertical-align: top;">READ, WRITE<br>
@@ -267,7 +230,7 @@ SG_IO ioctl to send SCSI commands to copy data. See the <a
  href="sg_dd.html">sg_dd</a> page. </td>
     </tr>
     <tr>
-      <td style="vertical-align: top;">sg_emc_trepass<br>
+      <td style="vertical-align: top;">sg_emc_trespass<br>
       </td>
       <td style="vertical-align: top;">MODE SELECT<br>
       </td>
@@ -286,7 +249,7 @@ Clariion series<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64<br>
+      <td style="vertical-align: top;">fb,t64,w<br>
       </td>
       <td style="vertical-align: top;">format or resize a SCSI disk<br>
       </td>
@@ -298,7 +261,7 @@ Clariion series<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch features and profiles of a
 cd/dvd drive and/or its current media<br>
       </td>
@@ -310,7 +273,7 @@ cd/dvd drive and/or its current media<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">default is to report (fetch) the
 device identifier. With the '--set' option a new identifier is sent
 to the device.<br>
@@ -323,7 +286,7 @@ to the device.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch standard response, VPD
 pages (including device identification) or version descriptors. Also
 can perform IDENTIFY (PACKET) DEVICE ATA command. VPD page decoding now
@@ -337,7 +300,7 @@ also performed by sg_vpd .<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch log sense pages, decode
 standard pages<br>
       </td>
@@ -349,7 +312,7 @@ standard pages<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch luns reported by a device
 (lun 0 or "well known lu")<br>
       </td>
@@ -389,7 +352,7 @@ out of, sysfs. For the linux 2.6 series.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">dump mode pages (mainly in hex)<br>
       </td>
     </tr>
@@ -413,7 +376,7 @@ supported task management functions<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">control persistent reservations
 and report
 reservation status<br>
@@ -426,7 +389,7 @@ reservation status<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">control media removal, mainly
 for those SCSI devices which have removable media (e.g. CD/DVD and tape
 drives)<br>
@@ -452,7 +415,7 @@ Typically for testing the SCSI transport (for throughput or errors)<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64</td>
+      <td style="vertical-align: top;">fb,t64,w</td>
       <td style="vertical-align: top;">display or modify RDAC redundant
 controller mode page<br>
       </td>
@@ -478,7 +441,7 @@ device cache and transport performance (like sg_rbuf).<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch the number of blocks and
 the individual block size for disks and CD/DVD media<br>
       </td>
@@ -490,7 +453,7 @@ the individual block size for disks and CD/DVD media<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">read data from given lba which
 includes the block and ECC data.<br>
       </td>
@@ -502,7 +465,7 @@ includes the block and ECC data.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">reassign a lba from one sector
 on a disk (typically damaged) to a new (spare) sector. User data copied
 if it is recoverable.<br>
@@ -515,7 +478,7 @@ if it is recoverable.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">fetch sense data from the given
 SCSI device. Useful if no autosense , to get progress indication (e.g.
 during a format) or find the power condition state.<br>
@@ -541,7 +504,7 @@ device (target or lun?) reset.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Relatively new command
 added to SPC-3. Format of response is vendor specific so this utility
 outputs it in hex (default) or binary.<br>
@@ -554,7 +517,7 @@ outputs it in hex (default) or binary.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Specialized for multi-ported
 SCSI devices where one port (or a group of them) is preferred for IO
 over another (or others).<br>
@@ -563,15 +526,28 @@ over another (or others).<br>
     <tr>
       <td style="vertical-align: top;">sg_sat_identify<br>
       </td>
-      <td style="vertical-align: top;">ATA PASS THROUGH<br>
+      <td style="vertical-align: top;">ATA PASS-THROUGH</td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">fb,t64,w<br>
+      </td>
+      <td style="vertical-align: top;">Sends IDENTIFY DEVICE or
+IDENTIFY PACKET DEVICE ATA commands via the SAT ATA PASS-THROUGH (16 or
+12) SCSI command.</td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg__sat_identify<br>
+      </td>
+      <td style="vertical-align: top;">ATA PASS-THROUGH<br>
       </td>
       <td style="vertical-align: top;">examples<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">Sends IDENTIFY (PACKET) DEVICE
-ATA command via the SAT ATA PASS THROUGH SCSI command. Also
-sg_sat_chk_power and sg_sat_smart_rd_data .<br>
+      <td style="vertical-align: top;">Simpler version of
+sg_sat_identify that uses the linux SG_IO ioctl directly. See also
+sg_sat_chk_power, sg_sat_set_features and sg_sat_smart_rd_data in the
+examples subdirectory.<br>
       </td>
     </tr>
     <tr>
@@ -581,12 +557,13 @@ sg_sat_chk_power and sg_sat_smart_rd_data .<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;"><br>
+      <td style="vertical-align: top;">w<br>
       </td>
       <td style="vertical-align: top;">maps each sg device name to
 the corresponding numeric &lt;host, channel, target', lun&gt; tuple. In
 lk 2.6 series the "<a href="scsi/lsscsi.html">lsscsi</a> -g" command is
-similar.<br>
+similar. In Windows shows one device per line, with the device's
+various names and INQUIRY response string on that line.<br>
       </td>
     </tr>
     <tr>
@@ -596,10 +573,11 @@ similar.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Issues either a default self
 test or a short/extended foreground/background self test. With no
-arguments it uses RECEIVE DIAGNOSTIC to list all supported diagnostic
+arguments it uses RECEIVE DIAGNOSTIC RESULTS to list all supported
+diagnostic
 pages.<br>
       </td>
     </tr>
@@ -610,7 +588,7 @@ pages.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Fetches status diagnostic
 pages from, and sends some control pages to, a SCSI Enclosure Services
 (SES) device.<br>
@@ -649,7 +627,7 @@ the scsi generic (sg) driver interface<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Controls the power condition
 state of a SCSI device. Primary use is to spin up and down SCSI disks.<br>
       </td>
@@ -661,7 +639,7 @@ state of a SCSI device. Primary use is to spin up and down SCSI disks.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Causes disk caches to be flushed
 to media<br>
       </td>
@@ -687,7 +665,7 @@ corruption.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">Issue one or more Test Unit
 Ready commands. Can be used to time SCSI command overhead.<br>
       </td>
@@ -697,7 +675,7 @@ Ready commands. Can be used to time SCSI command overhead.<br>
       <td style="vertical-align: top;">VERIFY</td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">reads indicated blocks on a SCSI
 disks, stops on the first error found. Does not yield any data. Useful
 for media scans.</td>
@@ -709,7 +687,7 @@ for media scans.</td>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64<br>
+      <td style="vertical-align: top;">fb,t64,w<br>
       </td>
       <td style="vertical-align: top;">Decodes standard and some vendor
 Vital Product Data (VPD) pages.<br>
@@ -722,7 +700,7 @@ Vital Product Data (VPD) pages.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">writes to a lba, data which
 includes the block and ECC data. Suitable data typically fetched by
 prior
@@ -736,7 +714,7 @@ sg_read_long utility.<br>
       </td>
       <td style="vertical-align: top;"><br>
       </td>
-      <td style="vertical-align: top;">fb,t64 </td>
+      <td style="vertical-align: top;">fb,t64,w </td>
       <td style="vertical-align: top;">writes mode pages supplied in
 ASCII hex (e.g. from "sg_modes -r") to the given SCSI device. See <a
  href="sdparm.html">sdparm</a> for another method of setting mode page
@@ -766,12 +744,13 @@ directory have "man" pages and some in the subdirectories have "man"
 pages. <br>
 <br>
 If the "Ported" column is empty then the utility is only found in
-Linux. At this time the other ports are to FreeBSD, indicated by "fb"
-in the "Ported" column, and to Tru64, indicated by "t64" in the
-"Ported" column. See the README.freebsd and the README.tru64 files
+Linux. Support for other ports is indicated by "fb" for FreeBSD, "t64"
+for Tru64 (OSF) and "w" for Windows. See the README.freebsd,
+README.tru64 and README.win32 files
 for more information.<br>
 <br>
-In the above table all utilities in the main directory except sgp_dd
+This paragraph contains Linux specific information. In the above table
+all utilities in the main directory except sgp_dd
 issue SG_IO ioctls when they want to send SCSI commands to the given
 device. The sgp_dd utility issues SCSI commands using the sg
 driver's asynchronous ( write()/read() ) interface to device nodes that
@@ -785,7 +764,7 @@ changed to the SG_IO ioctl in version 1.15 since the asynchronous
 action is not needed. sgm_dd will only use mmapped IO on sg device
 nodes.]<br>
 <br>
-Irrespective of the Unix device node used to access a device, care
+Irrespective of the device node used to access a device, care
 should be taken not to interfere with a device while it is "active".
 For example invoking a "sg_format -F" utility on a disk with mounted
 file
@@ -824,20 +803,27 @@ attention conditions are usually only reported once by a device.</li>
 reports an illegal request with an additional sense code of "invalid
 operation code" which means that it doesn't support the requested
 command.</li>
-  <li><span style="font-weight: bold;">10</span>&nbsp;&nbsp; the
-&lt;scsi_device&gt; reports it has a check condition but "no sense".
-Some polling commands (e.g. REQUEST SENSE) can react this way. It is
-unlikely that this value will occur as an exit status.</li>
-  <li><span style="font-weight: bold;">11</span>&nbsp;&nbsp; the device
-reports a "recovered error". The requested command was successful. Most
-likely a utility will report a recovered error to stderr and continue,
-probably leaving the utility with an exit status of 0 .</li>
+  <li><span style="font-weight: bold;">11</span>&nbsp; the device (or
+transport) reports an aborted command. In some cases this can be caused
+by congestion on the transport and retrying the command may be
+successful.<br>
+  </li>
   <li><span style="font-weight: bold;">15</span> &nbsp; the utility is
 unable to open, close or use the given device. The given file name
 could be incorrect or there may be permission problems. Adding the '-v'
 option may give more information.</li>
+  <li><span style="font-weight: bold;">20</span>&nbsp;&nbsp; the
+&lt;scsi_device&gt; reports it has a check condition but "no sense".
+Some polling commands (e.g. REQUEST SENSE) can react this way. It is
+unlikely that this value will occur as an exit status.</li>
+  <li><span style="font-weight: bold;">21</span>&nbsp;&nbsp; the device
+reports a "recovered error". The requested command was successful. Most
+likely a utility will report a recovered error to stderr and continue,
+probably leaving the utility with an exit status of 0 .</li>
   <li><span style="font-weight: bold;">33</span>&nbsp;&nbsp; the
-command sent to the device has timed out.</li>
+command sent to the device has timed out. This appears on in Linux, in
+other ports a command timeout will appear as a transport (or OS) error.<br>
+  </li>
   <li><span style="font-weight: bold;">97</span>&nbsp;&nbsp; the
 response to a SCSI command failed sanity checks.</li>
   <li><span style="font-weight: bold;">98</span>&nbsp;&nbsp; the device
@@ -890,7 +876,8 @@ Allows device to be reset to default settings for a specific mode page.
 The user can choose whether changes are also made to the "saved" mode
 page values. The
 numeric addressing allows arbitrary fields to be changed (i.e. sdparm
-doesn't need to know about them in advance).<br>
+doesn't need to know about a mode page or its field structure in
+advance).<br>
   </li>
   <li><span style="font-weight: bold;">sgmode</span> (scsirastools):
 interactive utility for setting mode pages with data held in preset
@@ -1167,14 +1154,92 @@ and a Makefile can be found in the <a
  style="text-decoration: underline;">table 2</span></a> on the <a
  href="index.html">main</a>
 page. There are also source,
-i386 binary rpm and deb packages available. Both sg3_utils and the
+i386 binary rpm and deb packages available. There is no './configure'
+logic so the correct Makefile must be chosen for the OS.<br>
+<br>
+<table style="width: 100%; text-align: left;" border="1" cellpadding="2"
+ cellspacing="2">
+  <caption align="bottom"><span style="font-weight: bold;">Table 2
+Building from source tarball</span><br>
+  </caption><tbody>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">OS</span><br>
+      </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">build
+to use shared library</span><br>
+      </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">build
+without library</span><br>
+      </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">build
+static executables</span><br>
+      </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Notes</span><br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Linux</span><br>
+      </td>
+      <td style="vertical-align: top;">make<br>
+      </td>
+      <td style="vertical-align: top;">./make_no_lib.sh<br>
+      </td>
+      <td style="vertical-align: top;">./make_no_lib_static.sh<br>
+      </td>
+      <td style="vertical-align: top;">rpm spec file and debian
+subdirectory included<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">FreeBSD</span><br>
+      </td>
+      <td style="vertical-align: top;">make -f Makefile.freebsd<br>
+      </td>
+      <td style="vertical-align: top;">./make_no_lib_freebsd.sh<br>
+      </td>
+      <td style="vertical-align: top;">&nbsp;<br>
+      </td>
+      <td style="vertical-align: top;">&nbsp;<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Tru64
+(OSF1)</span><br>
+      </td>
+      <td style="vertical-align: top;">make -f Makefile.osf1<br>
+      </td>
+      <td style="vertical-align: top;">./make_no_lib_osf1.sh<br>
+      </td>
+      <td style="vertical-align: top;">&nbsp;<br>
+      </td>
+      <td style="vertical-align: top;">&nbsp;<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">Windows</span><br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">make -f Makefile.win32<br>
+      </td>
+      <td style="vertical-align: top;">&nbsp;<br>
+      </td>
+      <td style="vertical-align: top;">Windows NT and latter supported
+(uses SPT interface). Builds in a cygwin environment and requires
+cygwin1.dll to run.<br>
+      </td>
+    </tr>
+  </tbody>
+</table>
+<br>
+<br>
+Both sg3_utils and the
 older sg_utils packages can
-be found on http://freshmeat.net .<a
- href="http://oss.metaparadigm.com/safte-monitor"></a><br>
+be found on http://freshmeat.net .<br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 6th July 2006<br>
+<p>Last updated: 14th October 2006<br>
 <br>
 </p>
 </center>

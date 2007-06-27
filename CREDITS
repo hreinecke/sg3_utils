@@ -15,7 +15,7 @@ Dave Johnson <ddj at ccv dot brown dot edu> improved disk defect list
       handling [20051218]
 
 Dave Williams <dave at opensourcesolutions dot co dot uk> help with
-	sgp_dd especially and "> 0x7fffffff" with sg*_dd [20060303]
+        sgp_dd especially and "> 0x7fffffff" with sg*_dd [20060303]
 
 Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
         sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
@@ -45,6 +45,9 @@ Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
         page decoding in sg_inq (vendor specific: EMC) and sg_emc_trespass
         utility
 
+Luben Tuikov <ltuikov at yahoo dot com>
+        help with documentation and other suggestions [20061014]
+
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
 Nate Dailey < Nate dot Dailey at stratus dot com > extended sg_map for sparse
@@ -72,4 +75,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-3rd March 2006
+14th October 2006

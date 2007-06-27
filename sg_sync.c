@@ -35,17 +35,17 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI command SYNCHRONIZE CACHE to the given SCSI
+ * This program issues the SCSI command SYNCHRONIZE CACHE(10) to the given
  * device. This command is defined for SCSI "direct access" devices
- * (e.g. disks)
+ * (e.g. disks).
  */
 
-static char * version_str = "1.05 20060623";
+static char * version_str = "1.06 20061012";
 
 
 #define ME "sg_sync: "
@@ -70,23 +70,24 @@ static void usage()
           " [--lba=<n>]\n"
           "                  [--sync-nv] [--verbose] [--version]"
           " <scsi_device>\n"
-          "  where: --count=<n>|-c <n>  number of blocks to sync (def: 0 "
+          "  where:\n"
+          "    --count=<n>|-c <n>  number of blocks to sync (def: 0 "
           "which implies\n"
-          "                             rest of device)\n"
-          "         --group=<n>|-g <n>  set group number (def: 0)\n"
-          "         --help|-h           print out usage message\n"
-          "         --immed|-i          command returns immediately when set "
+          "                        rest of device)\n"
+          "    --group=<n>|-g <n>  set group number (def: 0)\n"
+          "    --help|-h           print out usage message\n"
+          "    --immed|-i          command returns immediately when set "
           "else wait\n"
-          "                             for 'sync' to complete\n"
-          "         --lba=<n>|-l <n>    logical block address to start sync "
+          "                        for 'sync' to complete\n"
+          "    --lba=<n>|-l <n>    logical block address to start sync "
           "operation\n"
-          "                             from (def: 0)\n"
-          "         --sync-nv|-s        synchronize to non-volatile storage "
+          "                        from (def: 0)\n"
+          "    --sync-nv|-s        synchronize to non-volatile storage "
           "(if distinct\n"
-          "                             from medium)\n"
-          "         --verbose|-v        increase verbosity\n"
-          "         --version|-V        print version string and exit\n\n"
-          "Performs a SYNCHRONIZE CACHE SCSI command\n"
+          "                        from medium)\n"
+          "    --verbose|-v        increase verbosity\n"
+          "    --version|-V        print version string and exit\n\n"
+          "Performs a SYNCHRONIZE CACHE(10) SCSI command\n"
           );
 }
 
@@ -193,6 +194,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Synchronize cache failed, device not ready\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "Synchronize cache, unit attention\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "Synchronize cache, aborted command\n");
     else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Synchronize cache command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)

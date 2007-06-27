@@ -1,15 +1,15 @@
-.TH SG_READ_LONG "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_READ_LONG "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_read_long \- calls a READ LONG command on a SCSI device
 .SH SYNOPSIS
 .B sg_read_long
 [\fI--16\fR] [\fI--correct\fR] [\fI--help\fR] [\fI--lba=<num>\fR]
-[\fI--out=<name>\fR] [\fI--verbose\fR] [\fI--version\fR]
+[\fI--out=<name>\fR] [\fI--pblock\fR] [\fI--verbose\fR] [\fI--version\fR]
 [\fI--xfer_len=<num>\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send READ LONG command to a Linux SCSI device. The read
+Send READ LONG command to a SCSI device. The read
 buffer is output in hex and ASCII to stdout or placed in a file.
 Note that the data returned includes the logical block data (typically
 512 bytes for a disk) plus ECC information (whose format is proprietary)
@@ -31,14 +31,20 @@ output the usage message then exit.
 .TP
 --lba=<num> | -l <num>
 the logical block address of the sector to read. Assumed to be in
-decimal unless prefixed with '0x'. Defaults to lba 0. Only 32 bit
-lbas currently supported.
+decimal unless prefixed with '0x'. Defaults to lba 0. If the lba is
+larger than can fit in 32 bits then the '--16' form should be used.
 .TP
 --out=<name> | -o <name>
 instead of outputting ASCII hex to stdout, try to send it to the file
 called <name>. If '-' is given as the <name> then the (binary) output
 is sent to stdout. Note that all informative and error output is
 sent to stderr.
+.TP
+--pblock | -p
+sets the 'PBLOCK' bit in the READ LONG SCSI command. When set the
+physical block (plus ECC data) containing the requested logical block
+address is read. The default is to leave the 'PBLOCK' bit clear in
+which case the logical block (plus any ECC data) is read.
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output).

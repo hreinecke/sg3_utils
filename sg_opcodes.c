@@ -9,7 +9,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
@@ -24,7 +25,7 @@
 
 */
 
-static char * version_str = "0.24 20060623";
+static char * version_str = "0.26 20061015";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -86,6 +87,7 @@ static unsigned char dummy_1_cmd[] = {
 };
 
 static unsigned char dummy_rsmft_r0 = 0xff;
+static unsigned char dummy_rsmft_r1 = 0x1;
 
 #endif
 /* <<<<<<<<<<<<<<< end of test code */
@@ -228,15 +230,16 @@ static void usage()
             "Usage:  sg_opcodes [-a] [-o=<opcode> [-s=<service_action>] ]"
             " [-t] [-u] [-v]\n"
             "                   [-V] <scsi_device>\n"
-            " where -a   output list of operation codes sorted "
+            " where:\n"
+            "    -a   output list of operation codes sorted "
             "alphabetically\n"
-            "       -o=<opcode>  first byte of command to query (in hex)\n"
-            "       -s=<service_action>  in addition to opcode (in hex)\n"
-            "       -t   output list of supported task management functions\n"
-            "       -u   output list of operation codes as is (unsorted)\n"
-            "       -v   verbose\n"
-            "       -V   output version string\n"
-            "       -?   output this usage message\n\n"
+            "    -o=<opcode>  first byte of command to query (in hex)\n"
+            "    -s=<service_action>  in addition to opcode (in hex)\n"
+            "    -t   output list of supported task management functions\n"
+            "    -u   output list of operation codes as is (unsorted)\n"
+            "    -v   verbose\n"
+            "    -V   output version string\n"
+            "    -?   output this usage message\n\n"
             "Performs a REPORT SUPPORTED OPERATION CODES (or supported task "
             "management\nfunctions) SCSI command\n");
 }
@@ -375,6 +378,7 @@ int main(int argc, char * argv[])
     const char * cp;
     char buff[48];
     struct sg_simple_inquiry_resp inq_resp;
+    const char * op_name;
 
     for (k = 1; k < argc; ++k) {
         cp = argv[k];
@@ -459,6 +463,8 @@ int main(int argc, char * argv[])
                 "so alpha ('-a'),\n          unsorted ('-u') and opcode "
                 "('-o') options ignored\n");
     }
+    op_name = do_taskman ? "Report supported task management functions" :
+              "Report supported operation codes";
 
     if ((sg_fd = open(file_name, O_RDONLY | O_NONBLOCK)) < 0) {
         snprintf(ebuff, EBUFF_SZ, "sg_opcodes: error opening file: %s (ro)",
@@ -482,12 +488,7 @@ int main(int argc, char * argv[])
     close(sg_fd);
 #ifndef TEST_CODE
     if (5 == peri_type) {
-        if (do_taskman)
-            printf("'Report supported task management functions' command not "
-                   "supported\nfor CD/DVD devices\n");
-        else
-            printf("'Report supported operation codes' command not "
-                   "supported for CD/DVD devices\n");
+        printf("'%s' command not supported\nfor CD/DVD devices\n", op_name);
         return SG_LIB_CAT_OTHER;
     }
 #endif
@@ -502,25 +503,40 @@ int main(int argc, char * argv[])
         rep_opts = ((do_servact >= 0) ? 2 : 1);
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
 #ifndef TEST_CODE
-    if (do_taskman) {
+    if (do_taskman)
         res = do_rstmf(sg_fd, rsoc_buff, sizeof(rsoc_buff), 0,
                        do_verbose);
-        if (res) {
-            fprintf(stderr, "Report supported task management functions failed\n");
-            return res;
-        }
-    } else {
+    else
         res = do_rsoc(sg_fd, rep_opts, do_opcode, do_servact, rsoc_buff,
                       sizeof(rsoc_buff), 0, do_verbose);
-        if (res) {
-            fprintf(stderr, "Report supported operation codes failed\n");
-            return res;
-        }
+    switch (res) {
+    case 0:
+    case SG_LIB_CAT_RECOVERED:
+        break;
+    case SG_LIB_CAT_ABORTED_COMMAND:
+        fprintf(stderr, "%s: aborted command\n", op_name);
+        goto err_out;
+    case SG_LIB_CAT_NOT_READY:
+        fprintf(stderr, "%s: device not ready\n", op_name);
+        goto err_out;
+    case SG_LIB_CAT_UNIT_ATTENTION:
+        fprintf(stderr, "%s: unit attention\n", op_name);
+        goto err_out;
+    case SG_LIB_CAT_INVALID_OP:
+        fprintf(stderr, "%s: operation not supported\n", op_name);
+        goto err_out;
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        fprintf(stderr, "%s: bad field in cdb\n", op_name);
+        goto err_out;
+    default:
+        fprintf(stderr, "%s failed\n", op_name);
+        goto err_out;
     }
 #else
-    if (do_taskman)
+    if (do_taskman) {
         rsoc_buff[0] = dummy_rsmft_r0;
-    else
+        rsoc_buff[1] = dummy_rsmft_r1;
+    } else
         memcpy(rsoc_buff, (unsigned char *)&dummy_resp, sizeof(dummy_resp));
 #endif
     if (do_taskman) {
@@ -581,6 +597,9 @@ int main(int argc, char * argv[])
             printf("\n");
         }
     }
+    res = 0;
+
+err_out:
     close(sg_fd);
-    return 0;
+    return res;
 }

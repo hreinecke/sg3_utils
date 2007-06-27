@@ -1,57 +1,68 @@
-.TH SG_IDENT "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_IDENT "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
-sg_ident \- report or set device identifier
+sg_ident \- report or set identifying information
 .SH SYNOPSIS
 .B sg_ident
-[\fI--ascii\fR] [\fI--clear\fR] [\fI--help\fR] [\fI--raw\fR]
-[\fI--set\fR] [\fI--verbose\fR] [\fI--version\fR] \fI<scsi_device>\fR
+[\fI--ascii\fR] [\fI--clear\fR] [\fI--help\fR] [\fI--itype=<n>\fR]
+[\fI--raw\fR] [\fI--set\fR] [\fI--verbose\fR] [\fI--version\fR]
+\fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send a REPORT DEVICE IDENTIFIER or SET DEVICE IDENTIFIER SCSI command
-to the given device. SCSI devices that support these two commands
-allow users to write (set) an identifier and report it back at some
-later time. The identifier is persistent (i.e. stored on some
+Send a REPORT IDENTIFYING INFORMATION or SET IDENTIFYING INFORMATION
+SCSI command to the given device. Prior to SPC-4 (revison 7) these
+commands were called REPORT DEVICE IDENTIFIER and SET DEVICE IDENTIFIER
+respectively. SCSI devices that support these two commands allow users
+to write (set) identifying information and report it back at some
+later time. The information is persistent (i.e. stored on some
 non-volatile medium within the SCSI device that will survive a power
 outage).
 .PP
-Typically the space allocated for the identifier is limited:
-SPC-4 (revision 0) states the maximum length is 512 bytes and
-all devices (that support these commands) shall support lengths
-up to 64 bytes. The author has seen older disks that only support
-16 bytes.
+Typically the space allocated for the information is limited:
+SPC-4 (revision 7) states that for information type 0, the minimum
+length is 64 bytes and the maximum is 512 bytes. For other information
+types (1 to 126 inclusive) the maximum length is 256 bytes. Also
+information types 1 to 126 (inclusive) should contain a null
+terminated UTF-8 string. The author has seen older disks that only
+support 16 bytes.
 .PP
 The default action when no options are given is to invoke the
-Report Device Identifier command. Error reports are sent to
-stderr. If no errors occur then the length of the device identifier
-is output (to stdout). This is followed by an ASCII-HEX rendering of
-each byte of the identifier (up to 16 bytes per line) which an ASCII
-representation to the right with dots replacing non printable characters.
-each 
+Report Identifying Information command with the information type defaulting
+to zero. Error reports are sent to stderr. By default the information is
+shown in ASCII-HEX (up to 16 bytes per line) with an ASCII representation
+to the right with dots replacing non printable characters.
 .TP
 --ascii | -A
-invokes the Report Device Identifier command and if anything is
-found interprets it as ASCII (or UTF-8 depending on the environment)
-and prints the identifier to stdout.
+invokes the Report Identifying Information command and if anything is
+found interprets it as ASCII (or UTF-8 depending on the locale)
+and prints the information to stdout.
 .TP
 --clear | -C
-invokes the Set Device Identifier command with an identifier length
-of zero. This has the effect of clearing the existing device
-identifier.
+invokes the Set Identifying Information command with an information length
+of zero. This has the effect of clearing the existing information.
 .TP
 --help | -h
 output the usage message then exit.
 .TP
+--itype=<n> | -i <n>
+sets the information type. Defaults to zero. The maximum value is
+127 which is special and cannot be used with '--set' or '--clear'.
+The information type of 127 (if supported) causes the REPORT IDENTIFYING
+INFORMATION command to respond with a list of available information
+types and their maximum lengths in bytes. The odd numbered information
+types between 3 and 125 (inclusive) are not to be used (as they clash
+with the SCC-2 standard).
+.TP
 --raw | -r
-invokes the Report Device Identifier command and if anything is found
-sends the identifier (which may be binary) to stdout. Nothing else
-is sent to stdout however error reports are sent to stderr.
+invokes the Report Identifying information command and if anything
+is found sends the information (which may be binary) to stdout. Nothing else
+is sent to stdout however error reports, if any, are sent to stderr.
 .TP
 --set | -S
-first read stdin until an EOF is detected then invokes the Set Device
-Identifier command to set what has been fetched from stdin as the
-device identifier. The amount of data read must be between 1 and
-512 bytes length (inclusive).
+first read stdin until an EOF is detected then invokes the Set Identifying
+Information command to set what has been fetched from stdin as the
+information. The amount of data read must be between 1 and 512 bytes
+length (inclusive).
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output).
@@ -59,25 +70,22 @@ increase the level of verbosity, (i.e. debug output).
 --version | -V
 print the version string and then exit.
 .PP
-This utility facilitates users writing their own identifiers to
-their SCSI devices. There are several other types of identifiers
-that the user cannot change. These include the SCSI INQUIRY command
-with its standard vendor and product identification strings and
-the product revision level; plus the large amount of information
-provided by the "Device Identification" VPD page (see sg_inq).
+This utility facilitates users writing their own information to
+their SCSI devices. There are several other types of descriptors (or
+designators) that the user cannot change. These include the SCSI
+INQUIRY command with its standard vendor and product identification
+strings and the product revision level; plus the large amount of
+information provided by the "Device Identification" VPD page (see
+sg_vpd).
 There is also the READ MEDIA SERIAL NUMBER command (see sg_rmsn).
 The MMC-4 command set for CDs and DVDs has a "media serial number"
 feature (0x109) [and a "logical unit serial number" feature]. These
 can be viewed with sg_get_config.
 .SH EXAMPLES
-First, to see if there is an existing device identifier whose format
-is unknown, use no options:
+First, to see if there is an existing information whose format
+is unknown (for information type 0), use no options:
 .PP
   # sg_ident /dev/sdb
-.br
-  Reported device identifier length = 10
-.br
-  Device identifier:
 .br
    00     31 32 33 34 35 36 37 38  39 30          1234567890
 .PP
@@ -85,13 +93,9 @@ If it is ASCII then it can printed as such:
 .PP
   # sg_ident --ascii /dev/sdb
 .br
-  Reported device identifier length = 10
-.br
-  Device identifier:
-.br
   1234567890
 .PP
-The device identifier can be copied to a file, cleared and then 
+The information can be copied to a file, cleared and then 
 re-asserted with this sequence:
 .PP
   # sg_ident --raw /dev/sdb > t
@@ -112,4 +116,4 @@ Copyright \(co 2005-2006 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq(sg3_utils), sg_rmsn(sg3_utils), sg_get_config(sg3_utils)
+.B sg_vpd(sg3_utils), sg_rmsn(sg3_utils), sg_get_config(sg3_utils)

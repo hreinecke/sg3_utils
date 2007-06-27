@@ -6,7 +6,7 @@
 #include <sys/time.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* This program sends a user specified number of TEST UNIT READY commands
    to the given sg device. Since TUR is a simple command involing no
@@ -21,22 +21,22 @@
 
 */
 
-static char * version_str = "3.20 20060623";
+static char * version_str = "3.22 20061003";
 
 
 static void usage()
 {
-    printf("Usage: 'sg_turs [-n=<num_of_test_unit_readys>] [-p] [-t] "
-           "[-v] [-V]\n"
-           "                <scsi_device>'\n"
-           " where '-n=<num>' number of test_unit_ready commands "
+    printf("Usage: sg_turs [-n=<num>] [-p] [-t] [-v] [-V] "
+           "<device>\n"
+           "  where:\n"
+           "    -n=<num>  number of test_unit_ready commands "
            "(def: 1)\n"
-           "       '-p'   outputs progress indication (percentage) "
+           "    -p        outputs progress indication (percentage) "
            "if available\n"
-           "       '-t'   outputs total duration and commands per "
+           "    -t        outputs total duration and commands per "
            "second\n"
-           "       '-v'   increase verbosity\n"
-           "       '-V'   print version string then exit\n\n"
+           "    -v        increase verbosity\n"
+           "    -V        print version string then exit\n\n"
            "Performs a TEST UNIT READY SCSI command (or many of them)\n");
 }
 

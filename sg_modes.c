@@ -6,7 +6,7 @@
 #include <ctype.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
 *  Copyright (C) 2000-2006 D. Gilbert
@@ -21,7 +21,7 @@
    
 */
 
-static char * version_str = "1.16 20060623";
+static char * version_str = "1.20 20061012";
 
 #define ME "sg_modes: "
 
@@ -119,7 +119,7 @@ static struct page_code_desc pc_desc_smc[] = {
     {0x1d, 0x0, "Element address assignment"},
     {0x1e, 0x0, "Transport geometry parameters"},
     {0x1f, 0x0, "Device capabilities"},
-    {0x1f, 0x1, "Extended device capabilities"},
+    {0x1f, 0x41, "Extended device capabilities"},
 };
 
 static struct page_code_desc pc_desc_scc[] = {
@@ -135,7 +135,7 @@ static struct page_code_desc pc_desc_rbc[] = {
 };
 
 static struct page_code_desc pc_desc_adt[] = {
-    {0xe, 0x0, "ADC device configuration"},
+    /* {0xe, 0x0, "ADC device configuration"}, */
     {0xe, 0x1, "Target device"},
     {0xe, 0x2, "DT device primary port"},
     {0xe, 0x3, "Logical unit"},
@@ -409,6 +409,9 @@ static int examine_pages(int sg_fd, int do_mode6, int inq_pdt, int inq_byte6,
                 fprintf(stderr, ">>>>>> try again without the '-6' "
                         "switch for a 10 byte MODE SENSE command\n");
                 return res;
+            } else if (SG_LIB_CAT_NOT_READY == res) {
+                fprintf(stderr, "MODE SENSE (6) failed, device not ready\n");
+                return res;
             }
         } else {
             res = sg_ll_mode_sense10(sg_fd, 0, 0, 0, k,
@@ -416,6 +419,9 @@ static int examine_pages(int sg_fd, int do_mode6, int inq_pdt, int inq_byte6,
             if (SG_LIB_CAT_INVALID_OP == res) {
                 fprintf(stderr, ">>>>>> try again with a '-6' "
                         "switch for a 6 byte MODE SENSE command\n");
+                return res;
+            } else if (SG_LIB_CAT_NOT_READY == res) {
+                fprintf(stderr, "MODE SENSE (10) failed, device not ready\n");
                 return res;
             }
         }
@@ -429,8 +435,7 @@ static int examine_pages(int sg_fd, int do_mode6, int inq_pdt, int inq_byte6,
                 printf("    %s\n", cp);
             else
                 printf("    [0x%x]\n", k);
-        } else if (SG_LIB_CAT_NOT_READY == res)
-            fprintf(stderr, "MODE SENSE failed, device not ready\n");
+        }
     }
     return res;
 }
@@ -448,31 +453,34 @@ static void usage()
            "[-e] [-h] [-H]\n\t\t"
            " [-l] [-L] [-p=<page_number>[,<sub_page_code>]] [-r]"
            "\n\t\t [-subp=<sub_page_code>] [-v] [-V] [-6] [<scsi_device>]\n"
-           " where -a   get all mode pages supported by device\n"
-           "       -A   get all mode pages and subpages supported by device\n"
-           "       -c=<page_control> page control (def: 0 [current],"
-           " 1 [changeable],\n            2 [default], 3 [saved])\n"
-           "       -d   disable block descriptors (DBD field in cdb)\n"
-           "       -e   examine pages # 0 through to 0x3e, note if found\n"
-           "       -D   disable block descriptor output\n"
-           "       -f   be flexible, cope with MODE SENSE 6/10 response "
+           " where:\n"
+           "   -a    get all mode pages supported by device\n"
+           "   -A    get all mode pages and subpages supported by device\n"
+           "   -c=<page_control>    page control (def: 0 [current],"
+           " 1 [changeable],\n"
+           "                                           2 [default], "
+           "3 [saved])\n"
+           "   -d    disable block descriptors (DBD field in cdb)\n"
+           "   -e    examine pages # 0 through to 0x3e, note if found\n"
+           "   -D    disable block descriptor output\n"
+           "   -f    be flexible, cope with MODE SENSE 6/10 response "
            "mixup\n");
-    printf("       -h   output page number and header in hex\n"
-           "       -H   output page number and header in hex (same as '-h')\n"
-           "       -l   list common page codes for device peripheral type,\n"
-           "            if no device given then assume disk type\n"
-           "       -L   set Long LBA Accepted (LLBAA field in mode sense "
+    printf("   -h    output page number and header in hex\n"
+           "   -H    output page number and header in hex (same as '-h')\n"
+           "   -l    list common page codes for device peripheral type,\n"
+           "         if no device given then assume disk type\n"
+           "   -L    set Long LBA Accepted (LLBAA field in mode sense "
            "10 cdb)\n"
-           "       -p=<page_code> page code in hex (def: 0)\n"
-           "       -p=<page_code>,<sub_page_code> both in hex, (defs: 0)\n"
-           "       -r   mode page output to stdout, a byte per line in "
+           "   -p=<page_code>    page code in hex (def: 0)\n"
+           "   -p=<page_code>,<sub_page_code>    both in hex, (defs: 0)\n"
+           "   -r    mode page output to stdout, a byte per line in "
            "ASCII hex\n"
-           "       -subp=<sub_page_code> (in hex, def: 0)\n"
-           "       -v   verbose\n"
-           "       -V   output version string\n"
-           "       -6   Use MODE SENSE(6), by default uses MODE SENSE(10)\n"
-           "       -?   output this usage message\n\n"
-           "Performs a SCSI MODE SENSE commmand\n");
+           "   -subp=<sub_page_code>    sub page code (in hex, def: 0)\n"
+           "   -v    verbose\n"
+           "   -V    output version string\n"
+           "   -6    Use MODE SENSE(6), by default uses MODE SENSE(10)\n"
+           "   -?    output this usage message\n\n"
+           "Performs a SCSI MODE SENSE (6 or 10) command\n");
 }
 
 
@@ -726,9 +734,6 @@ int main(int argc, char * argv[])
         if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, ">>>>>> try again without the '-6' "
                     "switch for a 10 byte MODE SENSE command\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "invalid field in cdb (perhaps subpages "
-                    "or page control (PC) not supported)\n");
     } else {
         res = sg_ll_mode_sense10(sg_fd, do_llbaa, do_dbd, pc, pg_code,
                                  sub_pg_code, rsp_buff, rsp_buff_size, 1,
@@ -736,17 +741,23 @@ int main(int argc, char * argv[])
         if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, ">>>>>> try again with a '-6' "
                     "switch for a 6 byte MODE SENSE command\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "invalid field in cdb (perhaps subpages "
-                    "or page control (PC) not supported)\n");
     }
-    if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "invalid field in cdb (perhaps subpages "
-                "or page control (PC) not supported)\n");
-    else if (SG_LIB_CAT_NOT_READY == res)
+    if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+        if (sub_pg_code > 0)
+            fprintf(stderr, "invalid field in cdb (perhaps subpages "
+                    "not supported)\n");
+        else if (pc > 0)
+            fprintf(stderr, "invalid field in cdb (perhaps "
+                    "page control (PC) not supported)\n");
+        else
+            fprintf(stderr, "invalid field in cdb (perhaps "
+                "page 0x%x not supported)\n", pg_code);
+    } else if (SG_LIB_CAT_NOT_READY == res)
         fprintf(stderr, "device not ready\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "unit attention\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "aborted command\n");
     ret = res;
     if (0 == res) {
         int medium_type, specific, headerlen;
@@ -827,7 +838,8 @@ int main(int argc, char * argv[])
                 density_code_off = 0;
                 num = bd_len;
                 if (longlba) {
-                    printf("> longlba block descriptors:\n");
+                    printf("> longlba direct access device block "
+                           "descriptors:\n");
                     len = 16;
                     density_code_off = 8;
                 }

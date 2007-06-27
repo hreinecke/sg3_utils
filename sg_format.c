@@ -37,12 +37,15 @@
 #include <unistd.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
 #define CONTROL_MODE_PAGE 0xa     /* alternative page all devices have?? */
+
+#define THIS_MPAGE_EXISTS RW_ERROR_RECOVERY_PAGE
 
 #define SHORT_TIMEOUT           20   /* 20 seconds unless immed=0 ... */
 #define FORMAT_TIMEOUT          (4 * 3600)       /* 4 hours ! */
@@ -53,15 +56,17 @@
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.09 20060623";
+static char * version_str = "1.11 20061012";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
+        {"cmplst", 1, 0, 'C'},
         {"early", 0, 0, 'e'},
         {"format", 0, 0, 'F'},
         {"help", 0, 0, 'h'},
         {"long", 0, 0, 'l'},
         {"pinfo", 0, 0, 'p'},
+        {"pfu", 1, 0, 'P'},
         {"resize", 0, 0, 'r'},
         {"rto_req", 0, 0, 'R'},
         {"six", 0, 0, '6'},
@@ -74,23 +79,24 @@ static struct option long_options[] = {
 
 /* Return 0 on success, else see sg_ll_format_unit() */
 static int
-scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
+scsi_format(int fd, int fmtpinfo, int rto_req, int cmplst, int pf_usage,
+            int immed, int early, int verbose)
 {
-        int res;
+        int res, need_hdr, progress, verb;
         const char FORMAT_HEADER_SIZE = 4;
         unsigned char fmt_hdr[FORMAT_HEADER_SIZE];
 
-        /* fmt_hdr is a short format header, only used when 'immed' is set */
-        fmt_hdr[0] = 0;         /* reserved */
-        fmt_hdr[1] = 0x2;       /* use device defaults, IMMED return */
+        fmt_hdr[0] = pf_usage & 0x7;  /* protection_field_usage (bits 2-0) */
+        fmt_hdr[1] = (immed ? 0x2 : 0); /* fov=0, [dpry,dcrt,stpf,ip=0] */
         fmt_hdr[2] = 0;         /* defect list length MSB */
         fmt_hdr[3] = 0;         /* defect list length LSB */
 
-        res = sg_ll_format_unit(fd, pinfo, rto_req, 0 /* longlist */,
-                                (!! immed) /* fmtdata */, 0 /* cmplist */,
+        need_hdr = (immed || cmplst || (pf_usage > 0));
+        res = sg_ll_format_unit(fd, fmtpinfo, rto_req, 0 /* longlist */,
+                                need_hdr /* fmtdata */, cmplst,
                                 0 /* dlist_format */,
                                 (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
-                                fmt_hdr, (immed ? sizeof(fmt_hdr) : 0),
+                                fmt_hdr, (need_hdr ? sizeof(fmt_hdr) : 0),
                                 1, verbose);
 
         switch (res) {
@@ -108,6 +114,9 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
         case SG_LIB_CAT_UNIT_ATTENTION:
                 fprintf(stderr, "Format command, unit attention\n");
                 break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
+                fprintf(stderr, "Format command, aborted command\n");
+                break;
         default:
                 fprintf(stderr, "Format command failed\n");
                 break;
@@ -121,18 +130,18 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
         printf("\nFormat has started\n");
         if (early) {
                 if (immed)
-                        printf("Format continuing, request sense or test "
-                               "unit ready can be used to monitor progress\n");
+                        printf("Format continuing,\n    request sense or "
+                               "test unit ready can be used to monitor "
+                               "progress\n");
                 return 0;
         }
 
+        verb = (verbose > 1) ? (verbose - 1) : 0;
         for(;;) {
-                int progress;
-
                 sleep(POLL_DURATION_SECS);
                 progress = -1;
                 res = sg_ll_test_unit_ready_progress(fd, 0, &progress, 0,
-                                                      verbose);
+                                                     verb);
                 if (progress >= 0)
                         printf("Format in progress, %d%% done\n",
                                 (progress * 100) / 65536);
@@ -210,14 +219,16 @@ print_read_cap(int fd, int do_16, int verbose)
 
 static void usage()
 {
-        printf("usage: sg_format [--count=<block count>] [--early] [--format]"
-                " [--help]\n"
-                "                 [--long] [--pinfo] [--resize] [--rto_req] "
-                "[--six]\n"
-                "                 [--size=<block size>] [--verbose]"
-                " [--version] [--wait]\n"
-                "                 <scsi_disk>\n"
+        printf("usage: sg_format [--cmplst=<n>] [--count=<block count>] "
+                "[--early] [--format]\n"
+                "                 [--help] [--long] [--pfu=<n>] [--pinfo] "
+                "[--resize]\n"
+                "                 [--rto_req] [--six] [--size=<block size>] "
+                "[--verbose]\n"
+                "                 [--version] [--wait] <scsi_disk>\n"
                 "  where:\n"
+                "    --cmplst=<n> | -C <n>  for CMPLST bit in format cdb "
+                "(default: 1)\n"
                 "    --count=<block count> | -c <block count>\n"
                 "                   best left alone during format (defaults "
                 "to max allowable)\n"
@@ -228,6 +239,8 @@ static void usage()
                 "    --help | -h    prints out this usage message\n"
                 "    --long | -l    allow for 64 bit lbas (default: assume "
                 "32 bit lbas)\n"
+                "    --pfu=<n> | -P <n>  Protection Field Usage value "
+                "(default: 0)\n"
                 "    --pinfo | -p   set the FMTPINFO bit to format with "
                 "protection\n");
         printf( "                   information (defaults to no protection "
@@ -236,7 +249,7 @@ static void usage()
                 "value\n"
                 "    --rto_req | -R  set the RTO_REQ bit in format (only valid "
                 "with '--pinfo')\n"
-                "    --six | -6      use 6 byte MODE SENSE/SELECT\n"
+                "    --six | -6     use 6 byte MODE SENSE/SELECT\n"
                 "    --size=<block size> | -s <block size>\n"
                 "                   only needed to change block size"
                 " (default to\n"
@@ -257,7 +270,7 @@ static void usage()
 
 int main(int argc, char **argv)
 {
-        const int mode_page = RW_ERROR_RECOVERY_PAGE;
+        const int mode_page = THIS_MPAGE_EXISTS;        /* hopefully */
         int fd, res, calc_len, bd_len, dev_specific_param;
         int offset, j, bd_blk_len, prob, len;
         unsigned long long ull;
@@ -269,7 +282,9 @@ int main(int argc, char **argv)
         int fwait = 0;          /* -w */
         int mode6 = 0;
         int pinfo = 0;
+        int pfu = 0;
         int rto_req = 0;
+        int cmplst = 1;
         int do_rcap16 = 0;
         int long_lba = 0;
         int early = 0;
@@ -283,7 +298,7 @@ int main(int argc, char **argv)
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:eFhlprRs:vVw6",
+                c = getopt_long(argc, argv, "c:C:eFhlpP:rRs:vVw6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -299,6 +314,14 @@ int main(int argc, char **argv)
                                                 "'--count'\n");
                                         return SG_LIB_SYNTAX_ERROR;
                                 }
+                        }
+                        break;
+                case 'C':
+                        cmplst = sg_get_num(optarg);
+                        if ((cmplst < 0) || ( cmplst > 1)) {
+                                fprintf(stderr, "bad argument to '--cmplst', "
+                                        "want 0 or 1\n");
+                                return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'e':
@@ -317,6 +340,14 @@ int main(int argc, char **argv)
                 case 'p':
                         pinfo = 1;
                         break;
+                case 'P':
+                        pfu = sg_get_num(optarg);
+                        if ((pfu < 0) || ( pfu > 7)) {
+                                fprintf(stderr, "bad argument to '--pfu', "
+                                        "accepts 0 to 7 inclusive\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
+                        break;
                 case 'r':
                         resize = 1;
                         break;
@@ -327,7 +358,7 @@ int main(int argc, char **argv)
                         blk_size = sg_get_num(optarg);
                         if (blk_size <= 0) {
                                 fprintf(stderr, "bad argument to '--size', "
-                                        "want arg > 0)\n");
+                                        "want arg > 0\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -441,6 +472,9 @@ int main(int argc, char **argv)
                 else if (SG_LIB_CAT_UNIT_ATTENTION == res)
                         fprintf(stderr, "MODE SENSE (%d) command, unit "
                                 "attention\n", (mode6 ? 6 : 10));
+                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                        fprintf(stderr, "MODE SENSE (%d) command, aborted "
+                                "command\n", (mode6 ? 6 : 10));
                 else if (SG_LIB_CAT_INVALID_OP == res) {
                         fprintf(stderr, "MODE SENSE (%d) command is not "
                                 "supported\n", (mode6 ? 6 : 10));
@@ -603,6 +637,9 @@ int main(int argc, char **argv)
                         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
                                 fprintf(stderr, "MODE SELECT command, "
                                         "unit attention\n");
+                        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                                fprintf(stderr, "MODE SELECT command, "
+                                        "aborted command\n");
                         else if (SG_LIB_CAT_INVALID_OP == res)
                                 fprintf(stderr, "MODE SELECT (%d) command is "
                                         "not supported\n", (mode6 ? 6 : 10));
@@ -638,7 +675,7 @@ int main(int argc, char **argv)
                 goto out;
         }
 
-        if(format)
+        if (format)
 #if 1
                 printf("\nA FORMAT will commence in 10 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
@@ -648,8 +685,8 @@ int main(int argc, char **argv)
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
                 sleep(5);
-                res = scsi_format(fd, pinfo, rto_req, ! fwait, early,
-                                  verbose);
+                res = scsi_format(fd, pinfo, rto_req, cmplst, pfu, ! fwait,
+                                  early, verbose);
                 ret = res;
                 if (res) {
                         fprintf(stderr, "FORMAT failed\n");

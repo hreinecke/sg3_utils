@@ -1,24 +1,24 @@
-.TH SG_REASSIGN "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_REASSIGN "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_reassign \- reassign defective blocks on the given (disk) device
 .SH SYNOPSIS
 .B sg_reassign
-\fI--address=<n>,<n>...\fR [\fI--dummy\fR] [\fI--eight=0|1\fR]
-[\fI--grown\fR] [\fI--help\fR] [\fI--longlist=0|1\fR] [\fI--verbose\fR]
-[\fI--version\fR] \fI<scsi_device>\fR
+[\fI--address=<n>,<n>...\fR] [\fI--dummy\fR] [\fI--eight=0|1\fR]
+[\fI--grown\fR] [\fI--help\fR] [\fI--longlist=0|1\fR] [\fI--primary\fR]
+[\fI--verbose\fR] [\fI--version\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Send a REASSIGN BLOCKS SCSI command to the given device. Alternatively
-this utility can find the number of element in a "grown defect list"
-with a READ DEFECT DATA (10) SCSI command. These SCSI commands are
-defined in SBC-2 for direct access devices (e.g. a disk). Reassign
+this utility can find the number of element in a "grown" or "primary"
+defect list with a READ DEFECT DATA (10) SCSI command. These SCSI commands
+are defined in SBC-2 for direct access devices (e.g. a disk). Reassign
 blocks is designed to change the physical location of a logical block
 that is known or suspected to be defective to another area on the
 media. Disks are typically formatted with blocks held in reserve
 for this situation. 
 .PP
-If the '--grown' option is not given then one
+If neither the '--grown' nor '--primary' option is supplied then one
 or more addresses need to be given. If the address (or all of
 the addresses) fit into 4 bytes and '--eight=1' is not given then
 the parameter block passed to the given device is made up of
@@ -61,7 +61,7 @@ elements in the "grown defect list". When this option is given there
 is no reassignment of blocks (i.e. this utility is passive). When this
 option is given then the '--address=' option is not permitted. See
 the discussion below concerning the relationship between reassigned blocks
-and the grown defect list.
+and the grown defect list. This list is sometimes referred to as the GLIST.
 .TP
 --help | -h
 output the usage message then exit.
@@ -72,6 +72,14 @@ Only 1000 addresses are permitted so there should be no need to specify
 a value of 1. The short list variant restricts the parameter block
 length to 2 ** 16 bytes (i.e. about 16000 4 byte addresses or 8000
 8 byte addresses). Added for completeness.
+.TP
+--primary | -p
+use the READ DEFECT DATA (10) SCSI command to determine the number of
+elements in the "primary defect list" which is established during the
+manufacturing process. When this option is given there is no reassignment
+of blocks (i.e. this utility is passive). When this option is given then
+the '--address=' option is not permitted. This list is sometimes referred
+to as the PLIST.
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output).
@@ -131,5 +139,5 @@ Copyright \(co 2005-2006 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_modes(sg3_utils), sg_wr_mode(sg3_utils), sginfo(sg3_utils)
-.B sg_senddiag(sg3_utils), smartmontools(internet, sourceforge)
+.B sg_format(sg3_utils), sdparm(sdparm), sginfo(sg3_utils)
+.B smartmontools(internet, sourceforge)

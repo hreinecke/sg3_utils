@@ -35,7 +35,8 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -43,7 +44,7 @@
  *commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.27 20060623";    /* ses2r15 */
+static char * version_str = "1.29 20061012";    /* ses2r15 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -79,34 +80,36 @@ static void usage()
           "              [--hex] [--inner-hex] [--list] [--page=<n>] [--raw] "
           "[--status]\n"
           "              [--verbose] [--version] <scsi_device>\n"
-          "  where: --byte1=<n>|-b <n> byte 1 (2nd byte) for some control "
+          "  where:\n"
+          "    --byte1=<n>|-b <n>  byte 1 (2nd byte) for some control "
           "pages\n"
-          "         --control|-c       send control information (def: fetch "
+          "    --control|-c        send control information (def: fetch "
           "status)\n"
-          "         --help|-h          print out usage message\n"
-          "         --data=<h>,<h>...|-d <h>...  string of hex for control "
+          "    --data=<h>,<h>...|-d <h>...  string of hex for control "
           "pages\n"
-          "         --filter|-f        filter out enclosure status clear "
+          "    --filter|-f         filter out enclosure status clear "
           "flags\n"
-          "         --hex|-H           print status response in hex\n"
-          "         --inner-hex|-i     print innermost level of a"
+          "    --help|-h           print out usage message\n"
+          "    --hex|-H            print status response in hex\n"
+          "    --inner-hex|-i      print innermost level of a"
           " status page in hex\n"
-          "         --list|-l          list known pages and elements (ignore"
+          "    --list|-l           list known pages and elements (ignore"
           " device)\n"
-          "         --page=<n>|-p <n>  page code <n> (prefix with '0x' "
+          "    --page=<n>|-p <n>   page code <n> (prefix with '0x' "
           "for hex; def: 0)\n"
-          "         --raw|-r           print status page in hex suitable "
+          "    --raw|-r            print status page in hex suitable "
           "for '-d'\n"
-          "         --status|-s        fetch status information\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n\n"
+          "    --status|-s         fetch status information\n"
+          "    --verbose|-v        increase verbosity\n"
+          "    --version|-V        print version string and exit\n\n"
           "Fetches status or sends control data to a SCSI enclosure\n"
           );
 }
 
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
  * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, 
- * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failures */
+ * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, 
+ * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failures */
 static int do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, 
                        int outgoing_len, int noisy, int verbose)
 {
@@ -1539,10 +1542,30 @@ static int ses_process_status(int sg_fd, int page_code, int do_raw,
         }
     } else {
         if (cp)
-            printf("Attempt to fetch %s diagnostic page failed\n", cp);
+            fprintf(stderr, "Attempt to fetch %s diagnostic page failed\n",
+                    cp);
         else
-            printf("Attempt to fetch status diagnostic page [0x%x] "
-                   "failed\n", page_code);
+            fprintf(stderr, "Attempt to fetch status diagnostic page "
+                    "[0x%x] failed\n", page_code);
+        switch (res) {
+        case SG_LIB_CAT_NOT_READY:
+            fprintf(stderr, "    device no ready\n");
+            break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            fprintf(stderr, "    aborted command\n");
+            break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            fprintf(stderr, "    unit attention\n");
+            break;
+        case SG_LIB_CAT_INVALID_OP:
+            fprintf(stderr, "    Receive diagnostic results command not "
+                    "supported\n");
+            break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            fprintf(stderr, "    Receive diagnostic results command, "
+                    "bad field in cdb\n");
+            break;
+        }
     }
     return res;
 }
@@ -1781,6 +1804,26 @@ int main(int argc, char * argv[])
     }
 
 err_out:
+    if (0 == do_status) {
+        switch (ret) {
+        case SG_LIB_CAT_NOT_READY:
+            fprintf(stderr, "    device no ready\n");
+            break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            fprintf(stderr, "    aborted command\n");
+            break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            fprintf(stderr, "    unit attention\n");
+            break;
+        case SG_LIB_CAT_INVALID_OP:
+            fprintf(stderr, "    Send diagnostics command not supported\n");
+            break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            fprintf(stderr, "    Send diagnostics command, bad field in "
+                    "cdb\n");
+            break;
+        }
+    }
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));

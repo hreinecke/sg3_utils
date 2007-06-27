@@ -16,7 +16,7 @@ Upstream Authors: Douglas Gilbert <dgilbert at interlog dot com>,
 
 Copyright:
 
-This software is copyright(c) 1994-2005 by the authors
+This software is copyright(c) 1994-2006 by the authors
 
 You are free to distribute this software under the terms of
 the GNU General Public License.
@@ -25,8 +25,8 @@ License can be found in /usr/share/common-licenses/GPL file.
 
 Some parts of this package are covered by the BSD license.
 These include central error processing code (sg_lib.[hc]),
-common command code (sg_cmds.[hc]) and later utilities. They
-are Copyright: Douglas Gilbert.
+common command code (sg_cmds_basic.[hc] and sg_cmds_extra.[hc])
+and later utilities. They are Copyright: Douglas Gilbert.
 The author's intention is that this code can be used freely
 by others. On Debian systems, the complete text of the BSD
 License can be found in /usr/share/common-licenses/BSD.
