@@ -9,12 +9,12 @@ LD = gcc
 
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_dd sg_debug \
 	sg_scan scsi_inquiry sg_rbuf sginfo sg_readcap \
-	sgp_dd sg_map sg_turs isosize sg_inq sg_test_rwbuf \
-	scsi_devfs_scan sg_start sgm_dd sg_simple4
+	sgp_dd sg_map sg_turs sg_inq sg_test_rwbuf scsi_devfs_scan \
+	sg_start sgm_dd sg_simple4 sg_simple16 sg_read
 
-COMMON = sg_scan scsi_inquiry sginfo sg_readcap isosize sg_start
+COMMON = sg_scan scsi_inquiry sginfo sg_readcap sg_start
 
-MAN_PGS = sg_dd.8 sgp_dd.8 sg_map.8 sg_rbuf.8 isosize.8
+MAN_PGS = sg_dd.8 sgp_dd.8 sg_map.8 sg_rbuf.8 
 MAN_PREF = man8
 
 CFLAGS = -g -O2 -Wall -D_REENTRANT
@@ -44,6 +44,9 @@ sg_simple3: sg_simple3.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_simple4: sg_simple4.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_simple16: sg_simple16.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_dd: sg_dd.o sg_err.o llseek.o
@@ -85,13 +88,13 @@ sg_turs: sg_turs.o
 sg_test_rwbuf: sg_test_rwbuf.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-isosize: isosize.o
-	$(LD) -o $@ $(LDFLAGS) $^
-
 sg_inq: sg_inq.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 scsi_devfs_scan: scsi_devfs_scan.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_read: sg_read.o sg_err.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS) $(COMMON)

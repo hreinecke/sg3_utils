@@ -6,11 +6,11 @@ MANDIR=/usr/local/man
 CC = gcc
 LD = gcc
 
-EXECS = sgq_dd sg_poll sg_reset sg_bus_xfer sg_hold
+EXECS = sgq_dd sg_poll sg_reset sg_bus_xfer sg_hold isosize
 
-COMMON = 
+COMMON = isosize
 
-MAN_PGS = 
+MAN_PGS = isosize.8
 MAN_PREF = man8
 
 CFLAGS = -g -O2 -Wall -D_REENTRANT
@@ -42,6 +42,9 @@ sg_bus_xfer: sg_bus_xfer.o ../sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_hold: sg_hold.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+isosize: isosize.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS) $(COMMON)

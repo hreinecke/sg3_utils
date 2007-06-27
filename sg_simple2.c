@@ -24,7 +24,7 @@
 
    Invocation: sg_simple2 [-x] <sg_device>
 
-   Version 03.55 (991208)
+   Version 03.56 (20011204)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -120,14 +120,12 @@ int main(int argc, char * argv[])
             }
             printf("\n");
         }
-        else if (io_hdr.masked_status)
+        if (io_hdr.masked_status)
             printf("INQUIRY SCSI status=0x%x\n", io_hdr.status);
-        else if (io_hdr.host_status)
+        if (io_hdr.host_status)
             printf("INQUIRY host_status=0x%x\n", io_hdr.host_status);
-        else if (io_hdr.driver_status)
+        if (io_hdr.driver_status)
             printf("INQUIRY driver_status=0x%x\n", io_hdr.driver_status);
-        else
-            printf("INQUIRY unexpected error\n");
     }
     else {  /* output result if it is available */
         char * p = (char *)inqBuff;

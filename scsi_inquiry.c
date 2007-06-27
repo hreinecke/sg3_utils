@@ -26,7 +26,7 @@
    this is a good idea on a disk while it is mounted is debatable.
    No detrimental effects when this was tested ...]
 
-Version 0.13 20010715
+Version 0.14 20011218
 */
         
 
@@ -57,22 +57,35 @@ int main(int argc, char * argv[])
     unsigned char * buffp = inqBuff + OFF;
     My_Scsi_Ioctl_Command * ishp = (My_Scsi_Ioctl_Command *)inqBuff;
     char * file_name = 0;
+    int do_nonblock = 0;
+    int oflags = 0;
 
     for (k = 1; k < argc; ++k) {
-        if (*argv[k] != '-')
+	if (0 == strcmp(argv[k], "-n"))
+	    do_nonblock = 1;
+	else if (*argv[k] != '-')
             file_name = argv[k];
+	else {
+	    printf("Unrecognized argument '%s'\n", argv[k]);
+	    file_name = 0;
+	    break;
+	}
     }
     if (0 == file_name) {
-        printf("Usage: 'scsi_inquiry <scsi_device>'\n");
-        printf("    For example: scsi_inquiry /dev/sda\n");
-        printf("    another example: scsi_inquiry /dev/sg0\n");
+        printf("Usage: 'scsi_inquiry [-n] <scsi_device>'\n");
+        printf("     where: -n   open device in non-blocking mode\n");
+        printf("  Examples: scsi_inquiry /dev/sda\n");
+        printf("            scsi_inquiry /dev/sg0\n");
+        printf("            scsi_inquiry -n /dev/scd0\n");
         return 1;
     }
     
-    s_fd = open(file_name, O_RDWR);
+    if (do_nonblock)
+	oflags = O_NONBLOCK;
+    s_fd = open(file_name, oflags | O_RDWR);
     if (s_fd < 0) {
         if ((EROFS == errno) || (EACCES == errno)) {
-            s_fd = open(file_name, O_RDONLY);
+            s_fd = open(file_name, oflags | O_RDONLY);
             if (s_fd < 0) {
                 perror("scsi_inquiry: open error");
                 return 1;

@@ -8,12 +8,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 #include "sg_include.h"
 #include "sg_err.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999 D. Gilbert
+*  Copyright (C) 1999-2001 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,8 +31,10 @@
    direct io (and is overridden by '-q').
    The '-m' option request mmap-ed IO (and overrides the '-q' and '-d'
    options if they are also given).
+   The ability to time transfers internally (based on gettimeofday()) has
+   been added with the '-t' option.
 
-   Version 4.70 (20011122)
+   Version 4.72 (20011205)
 */
 
 
@@ -61,12 +64,14 @@ int main(int argc, char * argv[])
     int do_quick = 0;
     int do_dio = 0;
     int do_mmap = 0;
+    int do_time = 0;
     int buf_size = 0;
     unsigned int total_size_mb = RB_MB_TO_READ;
     char * file_name = 0;
-    size_t psz = 0;
+    size_t psz = getpagesize();
     int dio_incomplete = 0;
     sg_io_hdr_t io_hdr;
+    struct timeval start_tm, end_tm;
 #ifdef SG_DEBUG
     int clear = 1;
 #endif
@@ -97,6 +102,8 @@ int main(int argc, char * argv[])
             do_dio = 1;
         else if (0 == strcmp("-m", argv[j]))
             do_mmap = 1;
+        else if (0 == strcmp("-t", argv[j]))
+            do_time = 1;
         else if (*argv[j] == '-') {
             printf("Unrecognized switch: %s\n", argv[j]);
             file_name = 0;
@@ -106,11 +113,12 @@ int main(int argc, char * argv[])
             file_name = argv[j];
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_rbuf [[-q] | [-d] | [-m]] [-b=num] [-s=num] "
-	       "<generic_device>'\n");
+        printf("Usage: sg_rbuf [[-q] | [-d] | [-m]] [-t] [-b=num] [-s=num] "
+	       "<generic_device>\n");
         printf("  where: -q       quick, don't xfer to user space\n");
         printf("         -d       requests dio ('-q' overrides it)\n");
         printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
+        printf("         -t       time the data transfer\n");
         printf("         -b=num   num is buff size to use (in KBytes)\n");
         printf("         -s=num   num is total size to read (in MBytes)\n");
         printf("                    default total size is 200 MBytes\n");
@@ -156,7 +164,7 @@ int main(int argc, char * argv[])
     /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("sg_rbuf: SG_IO READ BUFF descriptor error");
+        perror("sg_rbuf: SG_IO READ BUFFER descriptor error");
         if (rawp) free(rawp);
         return 1;
     }
@@ -166,10 +174,10 @@ int main(int argc, char * argv[])
     case SG_ERR_CAT_CLEAN:
         break;
     case SG_ERR_CAT_RECOVERED:
-        printf("Recovered error on READ BUFF descriptor, continuing\n");
+        printf("Recovered error on READ BUFFER descriptor, continuing\n");
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("READ BUFF descriptor error", &io_hdr);
+        sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr);
         if (rawp) free(rawp);
         return 1;
     }
@@ -192,7 +200,10 @@ int main(int argc, char * argv[])
     }
 
     if (! do_dio) {
-        res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &buf_size);
+    	k = buf_size;
+	if (do_mmap && (0 != (k % psz)))
+	    k = ((k / psz) + 1) * psz;  /* round up to page size */
+        res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &k);
         if (res < 0)
             perror("sg_rbuf: SG_SET_RESERVED_SIZE error");
     }
@@ -205,7 +216,6 @@ int main(int argc, char * argv[])
 	}
     }
     else { /* non mmap-ed IO */
-	psz = getpagesize();
 	rawp = malloc(buf_size + (do_dio ? psz : 0));
 	if (NULL == rawp) {
 	    printf("sg_rbuf: out of memory (data)\n");
@@ -219,6 +229,12 @@ int main(int argc, char * argv[])
     }
 
     num = (total_size_mb * 1024U * 1024U) / (unsigned int)buf_size;
+    if (do_time) {
+	start_tm.tv_sec = 0;
+	start_tm.tv_usec = 0;
+	gettimeofday(&start_tm, NULL);
+    }
+    /* main data reading loop */
     for (k = 0; k < num; ++k) {
         memset(rbCmdBlk, 0, RB_CMD_LEN);
         rbCmdBlk[0] = RB_OPCODE;
@@ -250,7 +266,7 @@ int main(int argc, char * argv[])
             io_hdr.flags |= SG_FLAG_NO_DXFER;
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-            perror("sg_rbuf: SG_IO READ BUFF data error");
+            perror("sg_rbuf: SG_IO READ BUFFER data error");
             if (rawp) free(rawp);
             return 1;
         }
@@ -260,10 +276,10 @@ int main(int argc, char * argv[])
         case SG_ERR_CAT_CLEAN:
             break;
         case SG_ERR_CAT_RECOVERED:
-            printf("Recovered error on READ BUFF data, continuing\n");
+            printf("Recovered error on READ BUFFER data, continuing\n");
             break;
         default: /* won't bother decoding other categories */
-            sg_chk_n_print3("READ BUFF data error", &io_hdr);
+            sg_chk_n_print3("READ BUFFER data error", &io_hdr);
             if (rawp) free(rawp);
             return 1;
         }
@@ -281,6 +297,27 @@ int main(int argc, char * argv[])
             }
         }
 #endif
+    }
+    if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+	struct timeval res_tm;
+	double a, b;
+
+        gettimeofday(&end_tm, NULL);
+	res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
+	res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
+	if (res_tm.tv_usec < 0) {
+	    --res_tm.tv_sec;
+	    res_tm.tv_usec += 1000000;
+	}
+	a = res_tm.tv_sec;
+	a += (0.000001 * res_tm.tv_usec);
+	b = (double)buf_size * num;
+	printf("time to read data from buffer was %d.%06d secs", 
+	       (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+	if ((a > 0.00001) && (b > 511))
+	    printf(", %.2f MB/sec\n", b / (a * 1000000.0));
+	else
+	    printf("\n");
     }
     if (dio_incomplete)
         printf(">> direct IO requested but not done\n");

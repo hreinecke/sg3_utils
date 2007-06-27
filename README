@@ -39,6 +39,23 @@ package has essentially the same utilities.
 
 Utilities
 ---------
+Here is a (somewhat arbitrary) categorization of the utilities included
+in this package:
+  1) dd variants: sg_dd, sgp_dd, sgm_dd and sgq_dd
+  2) scanning and mapping: sg_scan, sg_map and scsi_devfs_scan
+  3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start
+     and sg_reset
+  4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
+     and sg_debug
+  5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
+     and sg_simple16
+  6) miscellaneous programs: isosize
+
+There is a brief description of each utility in the following sections.
+
+  
+1) dd variants
+--------------
 The main utility is a variant of the standard Unix command "dd" that
 is called "sg_dd". This program takes a useful subset of the command
 line arguments that "dd" takes. Furthermore "sg_dd" will only work if
@@ -78,7 +95,8 @@ gives a 2 block overestimate for iso9660 file systems on CD-ROMs.
 See the "isosize" command below.]  Disk partition information can
 be found with a command like "fdisk -ul /dev/sda". The 'dio' argument
 requests direct IO (only functions in 2.4 kernels). A warning is issued 
-if direct IO is requested and /proc/scsi/sg/allow_dio == 0 .
+if direct IO is requested and /proc/scsi/sg/allow_dio == 0 . 
+The "sg_dd" command has a "man" page [section 8].
 
 "sgp_dd" uses POSIX threads and attempts to run multiple IO operations
 in parallel. The user can control the amount of parallelism from 
@@ -88,13 +106,20 @@ another can be considerably faster due to this parallelism. There is
 also some speed benefit when raw devices are used. Other enhancements
 compared to "sg_dd" are a "gen=0 | 1" argument that allows general
 copying (i.e. doesn't need to involve sg or raw devices) and that 
-signals are caught.
+signals are caught. This command has a "man" page [section 8].
 
 "sgm_dd" is very similar to sg_dd but it uses mmap-ed IO on one of its
 given sg device names. If both "if" and "of" are sg devices then mmap-ed
 IO is selected on "if" while normal IO is selected on "of". Direct IO
 cannot be selected with this command.
 
+"sgq_dd" is yet another implementation found in the archive directory.
+From the user point of view it is very similar to sgp_dd but uses a
+non-blocking state machine rather then POSIX threads for parallelism.
+
+
+2) Scanning and mapping
+-----------------------
 "sg_scan" does a SCSI bus scan and prints the results to standard output.
 With no arguments only read permissions are needed on the sg devices
 but if "-i" is given (to do a SCSI Inquiry command on the device) then
@@ -102,7 +127,25 @@ write permissions are also needed.
 
 "sg_map" shows the mapping between sg device names and those of the
 sd, sr and st device names. Some devices such as scanners have no
-corresponding sd, sr nor st device names.
+corresponding sd, sr nor st device names. This command has a "man"
+page [section 8].
+
+"scsi_devfs_scan" is a utility for doing a directory scan on a system
+running devfs to identify SCSI (and optionally IDE) devices. Various
+information (including an INQUIRY) can be listed for each found device.
+
+
+3) SCSI support
+---------------
+"sg_inq" is a utility for poking around the INQUIRY command which
+contains much interesting information. It is based on SCSI 3's SPC-1
+document and has additional fields defined in the draft SPC-2 document
+(revision 18 from May 2000). This command is applicable to SCSI 2 (and
+perhaps SCSI 1) devices as well.
+
+The "scsi_inquiry" program shows the use of the SCSI_IOCTL_SEND_COMMAND
+ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the 
+SCSI sub system mid level and so is common to all sd, sr, st and sg devices. 
 
 "sginfo" is a re-porting of the "scsiinfo" program by Eric Youngdale to
 use the sg devices (rather than the sd, sr or st block devices). This
@@ -110,51 +153,51 @@ program outputs "mode sense" information. Amongst other things it outputs
 the full defect list of a disk (which was truncated at 4096 bytes in
 the original).
 
-"isosize" is a utility that gives the number of bytes in an iso9660
-file system. It is a rewrite by Andries Brouwer<Andries.Brouwer@cwi.nl>
-of a utility that first appeared in the cdwrite package but is now
-difficult to obtain. Note that the value given by isosize is usually
-2 or more blocks less than the READ CAPACITY SCSI command yields on
-a CD-ROM (due to run out sectors).
+"sg_readcap" call a READ CAPACITY command on the given device. The file
+descriptor may be any SCSI device (i.e. not just sg devices).
 
-"sg_inq" is a utility for poking around the INQUIRY command which
-contains much interesting information. It is based on SCSI 3's SPC-1
-document and has additional fields defined in the draft SPC-2 document
-(revision 18 from May 2000). This command is applicable to SCSI 2 (and
-perhaps SCSI 1) devices as well.
+"sg_start" has been provided by Kurt Garloff <garloff@suse.de> for spinning
+up (or down) disks. See README.sg_start .
 
-"scsi_devfs_scan" is a utility for doing a directory scan on a system
-running devfs to identify SCSI (and optionally IDE) devices. Various
-information (including an INQUIRY) can be listed for each found device.
+"sg_reset" exercises the SCSI device/bus/host reset capability. It is
+supported by the sg driver in lk 2.2.16 and beyond but associated
+SCSI middle level driver changes have not been accepted into the
+standard kernel at this time. Some distributions contain the patch to
+the mid-level that activates this feature. Due to this uncertainty
+the source is placed in the "archive" directory.
+
+
+4) Timing and testing
+---------------------
+"sg_rbuf" does repeated SCSI READ BUFFER commands which allows SCSI
+bus bandwidth and the SCSI sub-system throughput to be measured.
+This can be done in 4 modes: normal transfer to user space, no
+transfer to user space, direct IO or mmap-ed IO. The latter one wins
+on my hardware. This command has a "man" page [section 8].
 
 "sg_test_rwbuf" is a program by Kurt Garloff <garloff@suse.de> that has
 the following description:  Program to test the SCSI host adapter by 
 issueing write and read operations on a device's buffer and calculating 
 checksums.
 
-"sg_start" has been provided by Kurt Garloff <garloff@suse.de> for spinning
-up (or down) disks. See README.sg_start .
-
-
-Test Programs
--------------
-"sg_debug" is effectively defunct now. The user can instead do:
-$ cat /proc/scsi/sg/debug
-
-"sg_rbuf" does repeated SCSI READ BUFFER commands which allows SCSI
-bus bandwidth and the SCSI sub-system throughput to be measured.
-This can be done in 4 modes: normal transfer for user space, no
-transfer to user space, direct IO or mmap-ed IO. The latter one wins
-on my hardware.
+"sg_read" reads multiple blocks of data starting at the same logical
+address. It can time the transfers (potentially ignoring the first
+issued command) and calculate a MB/sec figure. [In keeping with most
+disk manuafacturers, "MB" is 1,000,000 bytes in this context.] Its 
+command line syntax is modelled on "sg_dd". It allows SCSI device,
+SCSI bus bandwidth and the SCSI sub-system throughput to be measured.
+This can be done in 3 modes: normal transfer to user space, direct
+IO or mmap-ed IO.
 
 "sg_turs" executes a user specified number of TEST UNIT READY commands on
 the given device. This can be used to time SCSI command overhead.
 
-"sg_readcap" call a READ CAPACITY command on the given device. The file
-descriptor may be any SCSI device (i.e. not just sg devices). It should
-also be able to run an almost any sg driver (back to 2.0) although this
-needs some more testing.
+"sg_debug" is effectively defunct now. The user can instead do:
+$ cat /proc/scsi/sg/debug
 
+
+5) Example programs
+-------------------
 "sg_simple1" and "sg_simple2" are simple example programs demonstrating
 calls to the SCSI INQUIRY and TEST UNIT READY commands. They only differ
 in their error processing: sg_simple1 uses sg_err.[hc] for error
@@ -166,17 +209,23 @@ sg driver.
 "sg_simple4" shows the INQUIRY command using mmap-ed IO to obtain its
 response buffer.
 
-An experimental version of a "scsi_inquiry" program is included to
-show the use of the SCSI_IOCTL_SEND_COMMAND ioctl to send a SCSI
-INQUIRY command. That ioctl() is supported by the SCSI sub system
-mid level and so is common to all sd, sr, st and sg devices. 
+"sg_simple16" attempts to send a 16 byte SCSI command, READ_16, to the
+scsi device. This is only supported for lk >= 2.4.15 and for adapter
+drivers that indicate that they have 16 byte CDB capability (otherwise
+DID_ABORT will appear in the host_status).
 
-"sg_reset" exercises the SCSI device/bus/host reset capability. It is
-supported by the sg driver in lk 2.2.16 and beyond but associated
-SCSI middle level driver changes have not been accepted into the
-standard kernel at this time. Some distributions contain the patch to
-the mid-level that activates this feature. Due to this uncertainty
-the source is placed in the "archive" directory.
+
+6) Miscellaneous
+----------------
+"isosize" is a utility that gives the number of bytes in an iso9660
+file system. It is a rewrite by Andries Brouwer<Andries.Brouwer@cwi.nl>
+of a utility that first appeared in the cdwrite package but is now
+difficult to obtain. Note that the value given by isosize is usually
+2 or more blocks less than the READ CAPACITY SCSI command yields on
+a CD-ROM (due to run out sectors). This command has a "man" page
+[section 8]. This utility has been moved to the archive directory
+as isosize is now available in the util-linux-2.10s package (and later).
+
 
 Building
 --------
@@ -190,7 +239,7 @@ giving the executable name to make, for example: 'make sg_dd'.
 There is also a 'make dep' but that shouldn't be needed very often.
 A 'make install' will build if necessary and then install the
 executables into /usr/local/bin by default (controlled by variable
-INSTDIR).
+INSTDIR). The "man" pages are loaded int /usr/local/man/man8 by default.
 
 Header file problems
 --------------------
@@ -220,4 +269,4 @@ The include file path issues are now all addressed in one file called
 
 
 Doug Gilbert
-23rd November 2001
+23rd December 2001

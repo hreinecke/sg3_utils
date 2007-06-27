@@ -50,7 +50,7 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
    This version should compile with Linux sg drivers with version numbers
    >= 30000 .
 
-   Version 1.00 20011123
+   Version 1.01 20011205
 */
 
 #define DEF_BLOCK_SIZE 512
@@ -467,6 +467,8 @@ int main(int argc, char * argv[])
                 return 1;
             }
 	    in_res_sz = bs * bpt;
+	    if (0 != (in_res_sz % psz)) /* round up to next page */
+	    	in_res_sz = ((in_res_sz / psz) + 1) * psz;
             if (ioctl(infd, SG_GET_RESERVED_SIZE, &t) < 0) {
                 perror("sgm_dd: SG_GET_RESERVED_SIZE error");
                 return 1;
