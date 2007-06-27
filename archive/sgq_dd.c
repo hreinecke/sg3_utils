@@ -14,9 +14,9 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/poll.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
 #include <linux/major.h>
 typedef unsigned char u_char;   /* horrible, for scsi.h */
+#include "sg_include.h"
 #include "sg_err.h"
 #include "llseek.h"
 

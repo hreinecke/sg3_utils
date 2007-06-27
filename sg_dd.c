@@ -12,9 +12,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
 #include <linux/major.h> 
 typedef unsigned char u_char;	/* horrible, for scsi.h */
+#include "sg_include.h"
 #include "sg_err.h"
 #include "llseek.h"
 
@@ -44,7 +44,7 @@ typedef unsigned char u_char;	/* horrible, for scsi.h */
    This version should compile with Linux sg drivers with version numbers
    >= 30000 .
 
-   Version 5.12 20010110
+   Version 5.12 20010307
 */
 
 #define DEF_BLOCK_SIZE 512
@@ -552,7 +552,7 @@ int main(int argc, char * argv[])
             res = read_capacity(infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
                 fprintf(stderr, 
-			"Unit attention, media changed(in), try again\n");
+			"Unit attention, media changed(in), continuing\n");
                 res = read_capacity(infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
@@ -576,7 +576,7 @@ int main(int argc, char * argv[])
             res = read_capacity(outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
                 fprintf(stderr, 
-			"Unit attention, media changed(out), try again\n");
+			"Unit attention, media changed(out), continuing\n");
                 res = read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
@@ -650,7 +650,7 @@ int main(int argc, char * argv[])
             }
             else if (2 == res) {
                 fprintf(stderr, 
-			"Unit attention, media changed, try again (r)\n");
+			"Unit attention, media changed, continuing (r)\n");
                 res = sg_read(infd, wrkPos, blocks, skip, bs, &dio_tmp);
             }
             if (0 != res) {
@@ -699,7 +699,7 @@ int main(int argc, char * argv[])
             }
             else if (2 == res) {
                 fprintf(stderr, 
-			"Unit attention, media changed, try again (w)\n");
+			"Unit attention, media changed, continuing (w)\n");
                 res = sg_write(outfd, wrkPos, blocks, seek, bs, &dio_tmp);
             }
             else if (0 != res) {

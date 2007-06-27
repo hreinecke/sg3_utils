@@ -8,8 +8,8 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <linux/../scsi/scsi.h>
-#include <linux/../scsi/scsi_ioctl.h>
+#include <scsi/scsi.h>
+/* #include <scsi/scsi_ioctl.h> */ /* glibc hides this file sometimes */
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -26,7 +26,7 @@
    this is a good idea on a disk while it is mounted is debatable.
    No detrimental effects when this was tested ...]
 
-Version 0.11 991012
+Version 0.12 20010415
 */
         
 
@@ -39,6 +39,9 @@ typedef struct my_scsi_ioctl_command {
 
 #define OFF (2 * sizeof(unsigned int))
 
+#ifndef SCSI_IOCTL_SEND_COMMAND
+#define SCSI_IOCTL_SEND_COMMAND 1
+#endif
 
 #define INQUIRY_CMD     0x12
 #define INQUIRY_CMDLEN  6

@@ -7,8 +7,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
-#include <linux/../scsi/scsi.h>
+#include "sg_include.h"
 #include "sg_err.h"
 
 /* This code is does a SCSI READ CAPACITY command on the given device

@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 500
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -10,25 +12,29 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "sg_include.h"
+#include <sys/sysmacros.h>
+#include <linux/../scsi/sg.h>  /* cope with silly includes */
+#include <linux/major.h>
+typedef unsigned char u_char;   /* horrible, for scsi.h */
 #include "sg_err.h"
+#include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2001 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
    This program is a specialization of the Unix "dd" command in which
-   one or both of the given files is a scsi generic device. A block size
-   ('bs') is assumed to be 512 if not given. This program complains if
-   'ibs' or 'obs' are given with some other value than 'bs'.
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed. The appended multipliers
-   "c, b, k, m" for 1, 512, 1024 and 1048576 respectively are recognized
-   on numeric arguments.
-
+   one or both of the given files is a scsi generic device or a raw
+   device. A block size ('bs') is assumed to be 512 if not given. This
+   program complains if 'ibs' or 'obs' are given with some other value
+   than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
+   'of' is not given or 'of=-' then stdout assumed.  Multipliers:
+      'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
+      'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
+   
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
    For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16KB
@@ -40,7 +46,7 @@
 
 */
 
-static char * version_str = "0.791 20000624";
+static char * version_str = "5.02 20010110";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -48,7 +54,7 @@ static char * version_str = "0.791 20000624";
 /* #define SG_DEBUG */
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 8000        /* 8,000 millisecs == 8 seconds */
+#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 #define S_RW_LEN 10             /* Use SCSI READ(10) and WRITE(10) */
 
 #define SGP_READ10 0x28
@@ -56,12 +62,20 @@ static char * version_str = "0.791 20000624";
 #define DEF_NUM_THREADS 4
 #define MAX_NUM_THREADS SG_MAX_QUEUE
 
+#ifndef RAW_MAJOR
+#define RAW_MAJOR 255   /*unlikey value */
+#endif
+
+#define FT_OTHER 0              /* filetype other than sg or raw device */
+#define FT_SG 1                 /* filetype is sg char device */
+#define FT_RAW 2                /* filetype is raw char device */
+
 
 typedef struct request_collection
 {       /* one instance visible to all threads */
     int infd;
     int skip;
-    int in_is_sg;
+    int in_type;
     int in_scsi_type;
     int in_blk;                 /* -\ next block address to read */
     int in_count;               /*  | blocks remaining for next read */
@@ -71,7 +85,7 @@ typedef struct request_collection
     pthread_mutex_t in_mutex;   /* -/ */
     int outfd;
     int seek;
-    int out_is_sg;
+    int out_type;
     int out_scsi_type;
     int out_blk;                /* -\ next block address to write */
     int out_count;              /*  | blocks remaining for next write */
@@ -87,7 +101,6 @@ typedef struct request_collection
     int sum_of_resids;          /*  | */
     pthread_mutex_t aux_mutex;  /* -/ (also serializes some printf()s */
     int coe;
-    int timeout;
     int debug;
 } Rq_coll;
 
@@ -109,7 +122,6 @@ typedef struct request_element
     int resid;
     int in_scsi_type;
     int out_scsi_type;
-    int timeout;
     int debug;
 } Rq_elem;
 
@@ -137,20 +149,35 @@ int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
     } while (0)
 
 
+int dd_filetype(const char * filename)
+{
+    struct stat st;
+
+    if (stat(filename, &st) < 0)
+        return FT_OTHER;
+    if (S_ISCHR(st.st_mode)) {
+        if (RAW_MAJOR == major(st.st_rdev))
+            return FT_RAW;
+        else if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
+            return FT_SG;
+    }
+    return FT_OTHER;
+}
+
 void usage()
 {
     fprintf(stderr, "Usage: "
-           "xsgp_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
+           "sgp_dd  [if=<infile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
            "               [bs=<num>] [bpt=<num>] [count=<n>]\n"
            "               [dio=<n>] [thr=<n>] [coe=<n>] [gen=<n>]\n"
-           "               [deb=<n>] [tmo=<n>] [--version]\n"
-           "            usually either 'if' or 'of' must be a sg device\n"
+           "               [deb=<n>] [--version]\n"
+           "            usually either 'if' or 'of' is a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
-           " 'thr' is number of threads, must be > 0, default 4, max 16\n"
-           " 'coe' continue on sg error, 0->exit (def), 1->zero + continue\n"
-           " 'gen' 0-> 1 file is sg device(def), 1-> any files allowed\n"
-           " 'tmo' is timeout in millisecs for reads+writes (def 8000 ms)\n"
+           " 'thr' is number of threads, must be > 0, default 4, max 16\n");
+    fprintf(stderr, " 'coe' continue on sg error, 0->exit (def), "
+    	   "1->zero + continue\n"
+           " 'gen' 0-> 1 file is special(def), 1-> any files allowed\n"
            " 'deb' is debug, 0->none (def), > 0->varying degrees of debug\n");
 }
 
@@ -204,7 +231,7 @@ void * sig_listen_thread(void * v_clp)
     while (1) {
         sigwait(&signal_set, &sig_number);
         if (SIGINT == sig_number) {
-            fprintf(stderr, "xsgp_dd interrupted by SIGINT\n");
+            fprintf(stderr, "sgp_dd interrupted by SIGINT\n");
             pthread_mutex_lock(&clp->in_mutex);
             clp->in_stop = 1;
             pthread_mutex_unlock(&clp->in_mutex);
@@ -248,26 +275,23 @@ void * read_write_thread(void * v_clp)
     Rq_coll * clp = (Rq_coll *)v_clp;
     Rq_elem rel;
     Rq_elem * rep = &rel;
-    int off = 0;
+    size_t psz = 0;
     int sz = clp->bpt * clp->bs;
     int stop_after_write = 0;
     int seek_skip =  clp->seek - clp->skip;
     int blocks, status;
 
     memset(rep, 0, sizeof(Rq_elem));
-    if (clp->dio) {     /* this makes dio work better, will disappear */
-        off = getpagesize();
-        sz += off;
-    }
-    if (NULL == (rep->alloc_bp = malloc(sz)))
+    psz = getpagesize();
+    if (NULL == (rep->alloc_bp = malloc(sz + psz)))
         err_exit(ENOMEM, "out of memory creating user buffers\n");
-    rep->buffp = rep->alloc_bp + off;
+    rep->buffp = (unsigned char *)(((unsigned long)rep->alloc_bp + psz - 1) &
+				   (~(psz - 1)));
     /* Follow clp members are constant during lifetime of thread */
     rep->bs = clp->bs;
     rep->dio = clp->dio;
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
-    rep->timeout = clp->timeout;
     rep->debug = clp->debug;
     rep->in_scsi_type = clp->in_scsi_type;
     rep->out_scsi_type = clp->out_scsi_type;
@@ -289,7 +313,7 @@ void * read_write_thread(void * v_clp)
         clp->in_count -= blocks;
 
         pthread_cleanup_push(cleanup_in, (void *)clp);
-        if (clp->in_is_sg)
+        if (FT_SG == clp->in_type)
             sg_in_operation(clp, rep); /* lets go of in_mutex mid operation */
         else
             stop_after_write = normal_in_operation(clp, rep, blocks);
@@ -316,12 +340,12 @@ void * read_write_thread(void * v_clp)
             clp->out_stop = 1;
         rep->wr = 1;
         rep->blk = clp->out_blk;
-        rep->num_blks = blocks;
+        /* rep->num_blks = blocks; */
         clp->out_blk += blocks;
         clp->out_count -= blocks;
 
         pthread_cleanup_push(cleanup_out, (void *)clp);
-        if (clp->out_is_sg)
+        if (FT_SG == clp->out_type)
             sg_out_operation(clp, rep); /* releases out_mutex mid operation */
         else
             normal_out_operation(clp, rep, blocks);
@@ -353,7 +377,7 @@ int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
                         blocks * clp->bs)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
-        sprintf(ebuff, "xsgp_dd: reading, in_blk=%d ", rep->blk);
+        sprintf(ebuff, "sgp_dd: reading, in_blk=%d ", rep->blk);
         errno_exit(ebuff);
     }
     if (res < blocks * clp->bs) {
@@ -387,7 +411,7 @@ void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
                  rep->num_blks * clp->bs)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
-        sprintf(ebuff, "xsgp_dd: output, out_blk=%d ", rep->blk);
+        sprintf(ebuff, "sgp_dd: output, out_blk=%d ", rep->blk);
         errno_exit(ebuff);
     }
     if (res < blocks * clp->bs) {
@@ -414,7 +438,7 @@ void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
-            fprintf(stderr, "xsgp_dd inputting from sg failed, blk=%d\n",
+            fprintf(stderr, "sgp_dd inputting from sg failed, blk=%d\n",
                     rep->blk);
             errno_exit("sg starting in command 2");
         }
@@ -475,7 +499,7 @@ void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
-            fprintf(stderr, "xsgp_dd outputting from sg failed, blk=%d\n",
+            fprintf(stderr, "sgp_dd outputting from sg failed, blk=%d\n",
                     rep->blk);
             errno_exit("sg starting out command 2");
         }
@@ -545,7 +569,7 @@ int sg_start_io(Rq_elem * rep)
     hp->dxferp = rep->buffp;
     hp->mx_sb_len = sizeof(rep->sb);
     hp->sbp = rep->sb;
-    hp->timeout = rep->timeout;
+    hp->timeout = DEF_TIMEOUT;
     hp->usr_ptr = rep;
     hp->pack_id = rep->blk;
     if (rep->dio)
@@ -639,24 +663,24 @@ int sg_prepare(int fd, int bs, int bpt, int * scsi_typep)
 
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 30000)) {
-        fprintf(stderr, "xsgp_dd: sg driver prior to 3.x.y\n");
+        fprintf(stderr, "sgp_dd: sg driver prior to 3.x.y\n");
         return 1;
     }
     res = 0;
     t = bs * bpt;
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
     if (res < 0)
-        perror("xsgp_dd: SG_SET_RESERVED_SIZE error");
+        perror("sgp_dd: SG_SET_RESERVED_SIZE error");
     t = 1;
     res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
     if (res < 0)
-        perror("xsgp_dd: SG_SET_FORCE_PACK_ID error");
+        perror("sgp_dd: SG_SET_FORCE_PACK_ID error");
     if (scsi_typep) {
         struct sg_scsi_id info;
 
         res = ioctl(fd, SG_GET_SCSI_ID, &info);
         if (res < 0)
-            perror("xsgp_dd: SG_SET_SCSI_ID error");
+            perror("sgp_dd: SG_SET_SCSI_ID error");
         *scsi_typep = info.scsi_type;
     }
     return 0;
@@ -665,7 +689,7 @@ int sg_prepare(int fd, int bs, int bpt, int * scsi_typep)
 int get_num(char * buf)
 {
     int res, num;
-    char c, cc;
+    char c;
 
     res = sscanf(buf, "%d%c", &num, &c);
     if (0 == res)
@@ -673,16 +697,26 @@ int get_num(char * buf)
     else if (1 == res)
         return num;
     else {
-        cc = (char)toupper(c);
-        if ('B' == cc)
-            return num * 512;
-        else if ('C' == cc)
+        switch (c) {
+        case 'c':
+        case 'C':
             return num;
-        else if ('K' == cc)
+        case 'b':
+        case 'B':
+            return num * 512;
+        case 'k':
             return num * 1024;
-        else if ('M' == cc)
+        case 'K':
+            return num * 1000;
+        case 'm':
             return num * 1024 * 1024;
-        else {
+        case 'M':
+            return num * 1000000;
+        case 'g':
+            return num * 1024 * 1024 * 1024;
+        case 'G':
+            return num * 1000000000;
+        default:
             fprintf(stderr, "unrecognized multiplier\n");
             return -1;
         }
@@ -708,14 +742,15 @@ int main(int argc, char * argv[])
     int num_threads = DEF_NUM_THREADS;
     pthread_t threads[MAX_NUM_THREADS];
     int gen = 0;
-    int in_sect_sz, out_sect_sz, status;
+    int in_sect_sz, out_sect_sz, status, infull, outfull;
     void * vp;
     char ebuff[256];
     Rq_coll rcoll;
 
     memset(&rcoll, 0, sizeof(Rq_coll));
     rcoll.bpt = DEF_BLOCKS_PER_TRANSFER;
-    rcoll.timeout = DEF_TIMEOUT;
+    rcoll.in_type = FT_OTHER;
+    rcoll.out_type = FT_OTHER;
     inf[0] = '\0';
     outf[0] = '\0';
     if (argc < 2) {
@@ -758,12 +793,11 @@ int main(int argc, char * argv[])
             rcoll.coe = get_num(buf);
         else if (0 == strcmp(key,"gen"))
             gen = get_num(buf);
-        else if (0 == strcmp(key,"tmo"))
-            rcoll.timeout = get_num(buf);
         else if (0 == strncmp(key,"deb", 3))
             rcoll.debug = get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
-            printf("xsgp_dd for sg version 3 driver: %s\n", version_str);
+            fprintf(stderr, "sgp_dd for sg version 3 driver: %s\n", 
+	    	    version_str);
             return 0;
         }
         else {
@@ -792,88 +826,100 @@ int main(int argc, char * argv[])
         return 1;
     }
     if (rcoll.debug)
-        fprintf(stderr, "xsgp_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
+        fprintf(stderr, "sgp_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
                inf, skip, outf, seek, count);
     rcoll.infd = STDIN_FILENO;
     rcoll.outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
-        if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
-            sprintf(ebuff, "xsgp_dd: could not open %s for reading", inf);
-            perror(ebuff);
-            return 1;
-        }
-        if (ioctl(rcoll.infd, SG_GET_TIMEOUT, 0) < 0) {
-            rcoll.in_is_sg = 0;
-            if (skip > 0) {
-                off_t offset = skip;
+    	rcoll.in_type = dd_filetype(inf);
 
-                offset *= rcoll.bs;       /* could overflow here! */
-                if (lseek(rcoll.infd, offset, SEEK_SET) < 0) {
-                    sprintf(ebuff,
-                "xsgp_dd: couldn't skip to required position on %s", inf);
-                    perror(ebuff);
-                    return 1;
-                }
-            }
-        }
-        else { /* looks like sg device so close then re-open it RW */
-            close(rcoll.infd);
+        if (FT_SG == rcoll.in_type) {
             if ((rcoll.infd = open(inf, O_RDWR)) < 0) {
-                fprintf(stderr, "If %s is a sg device, need read+write "
-                        "permissions, even to read from it!\n", inf);
+                sprintf(ebuff, "sgp_dd: could not open %s for sg reading", 
+			inf);
+                perror(ebuff);
                 return 1;
             }
-            rcoll.in_is_sg = 1;
             if (sg_prepare(rcoll.infd, rcoll.bs, rcoll.bpt,
                            &rcoll.in_scsi_type))
                 return 1;
         }
-    }
-    if (outf[0] && ('-' != outf[0])) {
-        if ((rcoll.outfd = open(outf, O_RDWR)) >= 0) {
-            if (ioctl(rcoll.outfd, SG_GET_TIMEOUT, 0) < 0) {
-                /* not a scsi generic device so now try and open RDONLY */
-                close(rcoll.outfd);
-            }
-            else {
-                rcoll.out_is_sg = 1;
-                if (sg_prepare(rcoll.outfd, rcoll.bs, rcoll.bpt,
-                               &rcoll.out_scsi_type))
-                    return 1;
-            }
-        }
-        if (! rcoll.out_is_sg) {
-            if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
-                sprintf(ebuff,
-                        "xsgp_dd: could not open %s for writing", outf);
+        if (FT_SG != rcoll.in_type) {
+            if ((rcoll.infd = open(inf, O_RDONLY)) < 0) {
+                sprintf(ebuff, "sgp_dd: could not open %s for reading", inf);
                 perror(ebuff);
                 return 1;
             }
-            else if (seek > 0) {
-                off_t offset = seek;
+            else if (skip > 0) {
+                llse_loff_t offset = skip;
 
-                offset *= rcoll.bs;       /* could overflow here! */
-                if (lseek(rcoll.outfd, offset, SEEK_SET) < 0) {
+                offset *= rcoll.bs;       /* could exceed 32 here! */
+                if (llse_llseek(rcoll.infd, offset, SEEK_SET) < 0) {
                     sprintf(ebuff,
-                "xsgp_dd: couldn't seek to required position on %s", outf);
+                "sgp_dd: couldn't skip to required position on %s", inf);
                     perror(ebuff);
                     return 1;
                 }
             }
         }
+    }
+    if (outf[0] && ('-' != outf[0])) {
+	rcoll.out_type = dd_filetype(outf);
+
+        if (FT_SG == rcoll.out_type) {
+	    if ((rcoll.outfd = open(outf, O_RDWR)) < 0) {
+                sprintf(ebuff, 
+			"sgp_dd: could not open %s for sg writing", outf);
+                perror(ebuff);
+                return 1;
+            }
+
+	    if (sg_prepare(rcoll.outfd, rcoll.bs, rcoll.bpt,
+			   &rcoll.out_scsi_type))
+		return 1;
+        }
+	else {
+	    if (FT_OTHER == rcoll.out_type) {
+		if ((rcoll.outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
+                    sprintf(ebuff,
+                            "sgp_dd: could not open %s for writing", outf);
+                    perror(ebuff);
+                    return 1;
+                }
+	    }
+	    else {
+		if ((rcoll.outfd = open(outf, O_WRONLY)) < 0) {
+                    sprintf(ebuff,
+                            "sgp_dd: could not open %s for raw writing", outf);
+                    perror(ebuff);
+                    return 1;
+                }
+            }
+            if (seek > 0) {
+                llse_loff_t offset = seek;
+
+                offset *= rcoll.bs;       /* could exceed 32 bits here! */
+		if (llse_llseek(rcoll.outfd, offset, SEEK_SET) < 0) {
+                    sprintf(ebuff,
+                "sgp_dd: couldn't seek to required position on %s", outf);
+                    perror(ebuff);
+                    return 1;
+                }
+            }
+	}
     }
     if ((STDIN_FILENO == rcoll.infd) && (STDOUT_FILENO == rcoll.outfd)) {
         fprintf(stderr, "Disallow both if and of to be stdin and stdout");
         return 1;
     }
-    if (! (rcoll.in_is_sg || rcoll.out_is_sg || gen)) {
-        fprintf(stderr, "Either 'if' or 'of' must be a scsi generic device\n");
+    if ((FT_OTHER == rcoll.in_type) && (FT_OTHER == rcoll.out_type) && !gen) {
+        fprintf(stderr, "Either 'if' or 'of' must be a sg or raw device\n");
         return 1;
     }
     if (0 == count)
         return 0;
     else if (count < 0) {
-        if (rcoll.in_is_sg) {
+        if (FT_SG == rcoll.in_type) {
             res = read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
                 fprintf(stderr, "Unit attention, media changed(in), repeat\n");
@@ -888,7 +934,7 @@ int main(int argc, char * argv[])
                     in_num_sect -= skip;
             }
         }
-        if (rcoll.out_is_sg) {
+        if (FT_SG == rcoll.out_type) {
             res = read_capacity(rcoll.outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
                 fprintf(stderr, "Unit attention, media changed(out), repeat\n");
@@ -916,6 +962,10 @@ int main(int argc, char * argv[])
     if (rcoll.debug > 1)
         fprintf(stderr, "Start of loop, count=%d, in_num_sect=%d, "
                 "out_num_sect=%d\n", count, in_num_sect, out_num_sect);
+    if (count <= 0) {
+        fprintf(stderr, "Couldn't calculate count, please give one\n");
+        return 1;
+    }
 
     rcoll.in_count = count;
     rcoll.in_done_count = count;
@@ -945,14 +995,14 @@ int main(int argc, char * argv[])
 /* vvvvvvvvvvv  Start worker threads  vvvvvvvvvvvvvvvvvvvvvvvv */
     if ((rcoll.out_done_count > 0) && (num_threads > 0)) {
         /* Run 1 work thread to shake down infant retryable stuff */
+        status = pthread_mutex_lock(&rcoll.out_mutex);
+        if (0 != status) err_exit(status, "lock out_mutex");
         status = pthread_create(&threads[0], NULL, read_write_thread,
                                 (void *)&rcoll);
         if (0 != status) err_exit(status, "pthread_create");
         if (rcoll.debug)
             fprintf(stderr, "Starting worker thread k=0\n");
 
-        status = pthread_mutex_lock(&rcoll.out_mutex);
-        if (0 != status) err_exit(status, "lock out_mutex");
         /* wait for any broadcast */
         pthread_cleanup_push(cleanup_out, (void *)&rcoll);
         status = pthread_cond_wait(&rcoll.out_sync_cv, &rcoll.out_mutex);
@@ -985,18 +1035,21 @@ int main(int argc, char * argv[])
         close(rcoll.infd);
     if (STDOUT_FILENO != rcoll.outfd)
         close(rcoll.outfd);
-    if (0 != rcoll.out_count)
+    res = 0;
+    if (0 != rcoll.out_count) {
         fprintf(stderr, ">>>> Some error occurred, remaining blocks=%d\n",
                rcoll.out_count);
-    fprintf(stderr, "%d+%d records in\n", count - rcoll.in_done_count,
-           rcoll.in_partial);
-    fprintf(stderr, "%d+%d records out\n", count - rcoll.out_done_count,
-           rcoll.out_partial);
+	res = 2;
+    }
+    infull = count - rcoll.in_done_count -  rcoll.in_partial;
+    fprintf(stderr, "%d+%d records in\n", infull, rcoll.in_partial);
+    outfull = count - rcoll.out_done_count - rcoll.out_partial;
+    fprintf(stderr, "%d+%d records out\n", outfull, rcoll.out_partial);
     if (rcoll.dio_incomplete)
         fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
                rcoll.dio_incomplete);
     if (rcoll.sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                rcoll.sum_of_resids);
-    return 0;
+    return res;
 }

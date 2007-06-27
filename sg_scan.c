@@ -7,8 +7,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
-#include <linux/../scsi/scsi.h>
+#include "sg_include.h"
 #include "sg_err.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
@@ -32,7 +31,7 @@
    Note: This program is written to work under both the original and
    the new sg driver.
 
-   Version 3.91 20010115
+   Version 3.92 20010119
 
    F. Jansen - minor modification to extend beyond 26 sg devices.
 
@@ -52,6 +51,10 @@
 #define OPEN_FLAG O_RDONLY
 #else
 #define OPEN_FLAG O_RDWR
+#endif
+
+#ifndef SG_MAX_SENSE
+#define SG_MAX_SENSE 16
 #endif
 
 typedef struct my_scsi_idlun {
@@ -310,7 +313,8 @@ int main(int argc, char * argv[])
         if ((isghp->result != 0) || (0 != isghp->sense_buffer[0])) {
             printf("Error from Inquiry: result=%d\n", isghp->result);
             if (0 != isghp->sense_buffer[0])
-                sg_print_sense("Error from Inquiry", isghp->sense_buffer);
+                sg_print_sense("Error from Inquiry", isghp->sense_buffer,
+			       SG_MAX_SENSE);
             continue;
         }
 #endif

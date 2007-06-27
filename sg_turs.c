@@ -8,8 +8,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
-#include <linux/../scsi/scsi.h>
+#include "sg_include.h"
 
 /* This program sends a user specified number of TEST UNIT READY commands
    to the given sg device. Since TUR is a simple command involing no

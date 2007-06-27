@@ -114,6 +114,10 @@ document and has additional fields defined in the draft SPC-2 document
 (revision 18 from May 2000). This command is applicable to SCSI 2 (and
 perhaps SCSI 1) devices as well.
 
+"scsi_devfs_scan" is a utility for doing a directory scan on a system
+running devfs to identify SCSI (and optionally IDE) devices. Various
+information (including an INQUIRY) can be listed for each found device.
+
 "sg_test_rwbuf" is a program by Kurt Garloff <garloff@suse.de> that has
 the following description:  Program to test the SCSI host adapter by 
 issueing write and read operations on a device's buffer and calculating 
@@ -184,14 +188,18 @@ source:
 
 If glibc and the kernel on a machine are of the same vintage then it is
 probably sufficient to use the simple includes listed at the start of this
-section. For more precise control the full absolute path into the kernel
-may be given in the include. The technique used in this package is to
-rely on the fact that /usr/include/linux is (usually) a symbolic link
-to /usr/src/linux/include/linux . That will cause the following:
+section. Another technique is to rely on the fact that
+/usr/include/linux is a symbolic link to /usr/src/linux/include/linux . 
+That will cause the following:
 #include <linux/../scsi/sg.h> 
 #include <linux/../scsi/scsi.h>
-to find the kernel supplied header files.
+to find the kernel supplied header files. However recent versions of
+glibc have removed this symlink! Hence this technique is no longer
+recommended.
+
+The include file path issues are now all addressed in one file called
+"sg_include.h". Please read that file.
 
 
 Doug Gilbert
-15th January 2001
+15th April 2001

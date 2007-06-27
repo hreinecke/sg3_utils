@@ -83,8 +83,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
-#include <linux/../scsi/scsi.h>
+#include "sg_include.h"
 
 #ifdef SG_GET_RESERVED_SIZE
 #include "sg_err.h"
@@ -1664,7 +1663,7 @@ static void usage(char *errtext)
           "\t-n    Display information from Notch and Partition Page.\n"
           "\t-p    Display information from Peripheral Device Page.\n"
           "\t-V    Display information from Verify Error Recovery Page.\n"
-          "\t-uno  Display information from page number no (18 bytes).\n"
+          "\t-u<no> Display information from page number <no> (18 bytes).\n"
           "\t-v    Show version number\n"
           "\t-a    All of the above.\n\n", stdout);
     fputs("\t-l    List known scsi devices on the system\n"
@@ -1821,7 +1820,7 @@ int main(int argc, char *argv[])
             notch = 1;
             /* fall through */
         case 'v':
-            fprintf(stdout, " Sginfo version 1.81\n");
+            fprintf(stdout, " Sginfo version 1.91\n");
             break;
         default:
             fprintf(stdout, "Unknown option '-%c' (ascii %02xh)\n", c, c);
@@ -1883,8 +1882,11 @@ int main(int argc, char *argv[])
         if (-9999 == glob_fd)
             fprintf(stderr, "Couldn't find sg device corresponding to %s\n",
                     device_name);
-        else
+        else {
             perror("sginfo(open)");
+	    fprintf(stderr, "file=%s, or no corresponding sg device found\n",                       device_name);
+	    fprintf(stderr, "Is sg driver loaded?\n");
+	}
         exit(1);
     }
     /* Save the current parameters in NOVRAM on the device */

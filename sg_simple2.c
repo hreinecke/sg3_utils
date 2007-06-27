@@ -7,8 +7,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
-#include <linux/../scsi/scsi.h>  /* cope with silly includes */
+#include "sg_include.h"
 
 /* This is a simple program executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver.
@@ -38,10 +37,6 @@
 #define INQ_REPLY_LEN 96        /* logic assumes >= sizeof(inqCmdBlk) */
 #define INQ_CMD_LEN 6
 #define TUR_CMD_LEN 6
-
-#ifndef DRIVER_SENSE
-#define DRIVER_SENSE 0x08
-#endif
 
 
 int main(int argc, char * argv[])

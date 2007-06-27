@@ -17,9 +17,13 @@ each IO transaction will be made using this number of blocks (or less if
 near the end of count). Default is 128.
 .TP
 bs=BYTES
-this must be the block size of the physical device. Default is 512 which 
-is usually correct for disks but incorrect for cdroms (which are usually
-2048 byte blocks).
+this
+.B must
+be the block size of the physical device. Note that this differs from
+.B dd(1)
+which permits "bs" to be an integral multiple. Default is 512 which
+is usually correct for disks but incorrect for cdroms (which normally
+have 2048 byte blocks).
 .TP
 count=BLOCKS
 copy this number of blocks. Default is minimum number that sg devices

@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <linux/../scsi/sg.h>
-#include <linux/../scsi/scsi.h>  /* cope with silly includes */
+#include "sg_include.h"
 #include "sg_err.h"
 
 
