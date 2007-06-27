@@ -73,12 +73,28 @@
  *      001208   Add Kurt Garloff's "-uno" flag for displaying info
  *               from a page number. <garloff@suse.de> [version 1.90]
  *
+ * Kurt Garloff <garloff@suse.de>
+ *    20000715	allow displaying and modification of vendor specific pages
+ * 			(unformatted - @ hexdatafield)
+ * 		accept vendor lengths for those pages
+ * 		enabled page saving
+ * 		cleaned parameter parsing a bit (it's still a terrible mess!)
+ * 		Use sr (instead of scd) and sg%d (instead of sga,b,...) in -l
+ * 			and support much more devs in -l (incl. nosst)
+ * 		Fix segfault in defect list (len=0xffff) and adapt formatting 
+ *			to large disks. Support up to 256kB defect lists with
+ *			0xB7 (12byte) command if necessary and fallback to 0x37 
+ *			(10byte) in case of failure. Report truncation.
+ * 		sizeof(buffer) (which is sizeof(char*) == 4 or 32 bit archs) 
+ *			was used incorrectly all over the place. Fixed.
+ *                                      [version 1.95]
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -108,8 +124,10 @@ static int sg_get_command_size(unsigned char opcode)
 
 static int glob_fd;
 static char *device_name;
-static unsigned char buff_a[64 * 1024 + 120];
-static unsigned char buff_b[10 * 1024 + 120];
+#define SIZEOF_BUFFER (256*1024)
+#define SIZEOF_BUFFER1 (16*1024)
+static unsigned char buff_a[SIZEOF_BUFFER + SG_HSZ + 12];
+static unsigned char buff_b[SIZEOF_BUFFER1 + SG_HSZ + 12];
 static unsigned char * buffer = buff_a + OFF;
 static unsigned char * buffer1 = buff_b + OFF;
 
@@ -177,11 +195,12 @@ static char *log_names[] =
 #define MAX_LOGNO (sizeof(log_names)/sizeof(char *))
 #endif
 
-static int hexdata_ptr = -1;    /* We allow for one hexdata (@) field.. 
-                                   this is where we parsed it */
+#define MAXPARM 32
+
 static int next_parameter;
 static int n_replacement_values;
-static unsigned long long replacement_values[16];
+static unsigned long long replacement_values[MAXPARM];
+static char is_hex[MAXPARM];
 
 /*  These are the mode pages for direct access devices (i.e. disks). 
  *  Asterisks mark those which this program can currently read and interpret.
@@ -219,15 +238,17 @@ static unsigned long long replacement_values[16];
   bdlen = buffer[11];                           \
   pagestart = buffer + 12 + bdlen;              \
   if(x_interface && replace) {                  \
-    if(n_replacement_values != NPARAM) {        \
-      fprintf(stdout,"Wrong number of replacement values (%i instead of %i)\n", n_replacement_values, NPARAM); \
+     if((NPARAM && n_replacement_values != NPARAM) ||         \
+        (!NPARAM && n_replacement_values != pagestart[1])) {  \
+        fprintf(stdout,"Wrong number of replacement values (%i instead of %i)\n", n_replacement_values, \
+	NPARAM? NPARAM: pagestart[1]);          \
       return 0;                                 \
     };                                          \
     next_parameter = 1;                         \
   };
 
 /* forward declaration */
-static void usage(char *);
+static void usage(char *, char quiet);
 
 
 /* Returns 0 -> ok, 1 -> err, 2 -> recovered error */
@@ -364,10 +385,17 @@ static int putnbyte(unsigned char *pnt, unsigned int value,
 
 static void check_parm_type(int i)
 {
-    if (hexdata_ptr == next_parameter)
-        i = !i;
-    if (i)
-        usage("@ hexdatafield instead of a simple number (or vice-versa)");
+    char reason[128];
+    if (i == 1 && is_hex[next_parameter] != 1) {
+        sprintf (reason, "simple number (pos %i) instead of @ hexdatafield: %llu",
+		 next_parameter, replacement_values[next_parameter]);
+	usage (reason, 1);
+    }
+    if (i != 1 && is_hex[next_parameter]) {
+        sprintf (reason, "@ hexdatafield (pos %i) instead of a simple number: %llu",
+		 next_parameter, replacement_values[next_parameter]);
+	usage (reason, 1);
+    }
 }
 
 static void bitfield(unsigned char *pageaddr, char * text, int mask, int shift)
@@ -477,7 +505,7 @@ static int get_mode_page(int page, int page_code)
     int status, quiet;
     unsigned char *cmd;
 
-    memset(buffer, 0, sizeof(buffer));
+    memset(buffer, 0, SIZEOF_BUFFER);
 
     quiet = page_code & ~3;
     page_code &= 3;
@@ -499,6 +527,7 @@ static int get_mode_page(int page, int page_code)
     if (status && (!quiet))
         fprintf(stdout, ">>> Unable to read %s Page %02xh\n", 
                 get_page_name(page), page);
+    //dump (buffer+2, 46);
     return status;
 }
 
@@ -508,7 +537,7 @@ static int get_mode_page10(int page, int page_code)
     int status, quiet;
     unsigned char *cmd;
 
-    memset(buffer, 0, sizeof(buffer));
+    memset(buffer, 0, SIZEOF_BUFFER);
 
     quiet = page_code & ~3;
     page_code &= 3;
@@ -544,7 +573,7 @@ static int get_log_page(int page, int page_code, char save_values,
     int status, quiet;
     unsigned char *cmd;
 
-    memset(buffer, 0, sizeof(buffer));
+    memset(buffer, 0, SIZEOF_BUFFER);
 
     quiet = page_code & ~3;
     page_code &= 3;
@@ -586,14 +615,14 @@ static int put_mode_page(int page, unsigned char * contents, int page_code)
     int pagelen, pagelen1;
     unsigned char *cmd;
 
-    memset(buffer1, 0, sizeof(buffer1));
+    memset(buffer1, 0, SIZEOF_BUFFER1);
 
     pagelen = contents[3] + 4;  /* How many actual bytes we are sending in
                                    the page */
     pagelen1 = contents[0] + 1;
 
-    *((int *) buffer1) = pagelen1;      /* length of input data */
-    *(((int *) buffer1) + 1) = pagelen1;        /* length of output buffer */
+    *((int *) buffer1) = pagelen1+14;      /* length of input data */
+    *(((int *) buffer1) + 1) = pagelen1+8;        /* length of output buffer */
 
     cmd = (unsigned char *) (((int *) buffer1) + 2);
 
@@ -605,20 +634,20 @@ static int put_mode_page(int page, unsigned char * contents, int page_code)
     cmd[5] = 0x00;              /* (reserved) */
 
     memcpy(cmd + 6, contents, pagelen1);
-
     cmd[6] = 0;                 /* Mask off the mode parameter list length
-                                   - resreved field */
+                                   - reserved field */
+    cmd[8] = 0;
     memset(cmd + 6 + 4, 0, 5);  /* Mask off reserved fields in block
                                    descriptor */
     cmd[6 + pagelen] &= 0x3f;   /* Mask off this reserved field in page
                                    code */
 
-    /* dump (buffer1, 48); */
+    //dump (cmd-8, pagelen1+14);
     status = do_sg_io(glob_fd, buffer1);
     if (status) {
         fprintf(stdout, ">>> Unable to store %s Page %02xh\n",
                 get_page_name(page), page);
-        dump(buffer1, 48);
+        dump(cmd-14, pagelen1+14);
     }
     return status;
 
@@ -811,13 +840,14 @@ static char *formatname(int format) {
 
 static int read_defect_list(int page_code)
 {
-    int status = 0, i, len, table, k;
-    unsigned char *cmd, *df;
+    int status = 0, i, len, reallen, table, k;
+    unsigned char *cmd, *df = 0; int trunc;
 
     printf("Data from Defect Lists\n"
            "----------------------\n");
     for (table = 0; table < 2; table++) {
-        memset(buffer, 0, sizeof(buffer));
+        memset(buffer, 0, SIZEOF_BUFFER);
+	trunc = 0;
 
         *((int *) buffer) = 0;  /* length of input data */
         *(((int *) buffer) + 1) = 4;          /* length of output buffer */
@@ -832,7 +862,7 @@ static int read_defect_list(int page_code)
         cmd[5] = 0x00;          /* (reserved) */
         cmd[6] = 0x00;          /* (reserved) */
         cmd[7] = 0x00;          /* Alloc len */
-        cmd[8] = 0x04;           /* Alloc len */
+        cmd[8] = 0x04;          /* Alloc len */
         cmd[9] = 0x00;          /* control */
 
         i = do_sg_io(glob_fd, buffer);
@@ -846,22 +876,52 @@ static int read_defect_list(int page_code)
             continue;
         }
         len = (buffer[10] << 8) | buffer[11];
+	reallen = len;
         if (len > 0) {
-            k = len + 4;            /* length of defect list */
-            *((int *) buffer) = 0;  /* length of input data */
-            *(((int *) buffer) + 1) = k;        /* length of output buffer */
-            cmd[0] = 0x37;          /* READ DEFECT DATA */
-            cmd[1] = 0x00;          /* lun=0 */
-            cmd[2] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
-            cmd[3] = 0x00;          /* (reserved) */
-            cmd[4] = 0x00;          /* (reserved) */
-            cmd[5] = 0x00;          /* (reserved) */
-            cmd[6] = 0x00;          /* (reserved) */
-            cmd[7] = (k >> 8);      /* Alloc len */
-            cmd[8] = (k & 0xff);    /* Alloc len */
-            cmd[9] = 0x00;          /* control */
-
-            i = do_sg_io(glob_fd, buffer);
+	    if (len >= 0xfff8) {
+		len = SIZEOF_BUFFER - 8;
+		k = len + 8;            /* length of defect list */
+		*((int *) buffer) = 0;  /* length of input data */
+		*(((int *) buffer) + 1) = k;        /* length of output buffer */
+		((struct sg_header*)buffer)->twelve_byte = 1;
+		cmd[0] = 0xB7;          /* READ DEFECT DATA */
+		cmd[1] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
+		cmd[2] = 0x00;          /* (reserved) */
+		cmd[3] = 0x00;          /* (reserved) */
+		cmd[4] = 0x00;          /* (reserved) */
+		cmd[5] = 0x00;          /* (reserved) */
+		cmd[6] = 0x00;          /* Alloc len */
+		cmd[7] = (k >> 16);     /* Alloc len */
+		cmd[8] = (k >> 8);      /* Alloc len */
+		cmd[9] = (k & 0xff);    /* Alloc len */
+		cmd[10] = 0x00;         /* reserved */
+		cmd[11] = 0x00;         /* control */
+		i = do_sg_io(glob_fd, buffer); if (i == 2) i = 0;
+		if (i) goto trytenbyte;
+		reallen = (buffer[12] << 24 | buffer[13] << 16 | buffer[14] << 8 | buffer[15]);
+		len = reallen;
+		if (len > SIZEOF_BUFFER - 8) { len = SIZEOF_BUFFER - 8; trunc = 1; }
+		df = (unsigned char *) (buffer + 16);
+	    }
+	    else {
+trytenbyte:
+		if (len > 0xfff8) { len = 0xfff8; trunc = 1; }
+		k = len + 4;            /* length of defect list */
+		*((int *) buffer) = 0;  /* length of input data */
+		*(((int *) buffer) + 1) = k;        /* length of output buffer */
+		cmd[0] = 0x37;          /* READ DEFECT DATA */
+		cmd[1] = 0x00;          /* lun=0 */
+		cmd[2] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
+		cmd[3] = 0x00;          /* (reserved) */
+		cmd[4] = 0x00;          /* (reserved) */
+		cmd[5] = 0x00;          /* (reserved) */
+		cmd[6] = 0x00;          /* (reserved) */
+		cmd[7] = (k >> 8);      /* Alloc len */
+		cmd[8] = (k & 0xff);    /* Alloc len */
+		cmd[9] = 0x00;          /* control */
+		i = do_sg_io(glob_fd, buffer);
+		df = (unsigned char *) (buffer + 12);
+	    }
         }
         if (2 == i)
             i = 0; /* Recovered error, probably returned a different
@@ -873,42 +933,62 @@ static int read_defect_list(int page_code)
             continue;
         }
         else {
-            df = (unsigned char *) (buffer + 12);
             if (table && !status)
                 printf("\n");
-            printf("%d entries in %s table.\n"
-                   "Format is: %s\n", len / ((buffer[9] & 7) ? 8 : 4),
+            printf("%d entries (%d bytes) in %s table.\n"
+                   "Format (%x) is: %s\n", reallen / ((buffer[9] & 7) ? 8 : 4), reallen,
                    (table ? "grown" : "manufacturer"),
-                   formatname(buffer[9] & 7));
+                   buffer[9] & 7, 
+		   formatname(buffer[9] & 7));
             i = 0;
-            if (len) {
-                while (len) {
-                    sprintf((char *)buffer, "%d:%u:%d", getnbyte(df, 3), 
+            if ((buffer[9] & 7) == 4) {
+                while (len > 0) {
+                    sprintf((char *)buffer, "%6d:%3u:%8d", getnbyte(df, 3),
                             df[3], getnbyte(df + 4, 4));
-                    printf(" %15s", (char *)buffer);
+                    printf("%19s", (char *)buffer);
+                    len -= 8;
+                    df += 8;
+                    i++;
+                    if (i >= 4) {
+                        printf("\n");
+                        i = 0;
+                    }
+		    else printf("|");
+                }
+            } else if ((buffer[9] & 7) == 5) {
+                while (len > 0) {
+                    sprintf((char *)buffer, "%6d:%2u:%5d", getnbyte(df, 3),
+                            df[3], getnbyte(df + 4, 4));
+                    printf("%15s", (char *)buffer);
                     len -= 8;
                     df += 8;
                     i++;
                     if (i >= 5) {
-                        puts("");
+                        printf("\n");
                         i = 0;
                     }
-                }
-            } else {
-                while (len) {
-                    printf(" %8d", getnbyte(df, 4));
+		    else printf("|");
+                }			    
+	    }
+	    else {
+                while (len > 0) {
+                    printf("%10d", getnbyte(df, 4));
                     len -= 4;
                     df += 4;
                     i++;
-                    if (i >= 8) {
-                        puts("");
+                    if (i >= 7) {
+                        printf("\n");
                         i = 0;
                     }
+		    else
+			printf("|");
                 }
             }
             if (i)
-                puts("");
+                printf("\n");
         }
+	if (trunc) 
+		printf("[truncated]\n");
     }
     printf("\n");
     return status;
@@ -1078,43 +1158,31 @@ static int peripheral_device_page(int page_code)
 static int do_user_page(int page_code, int page_no)
 {
     int status;
-    int bdlen;
+    int bdlen; int i;
+    //unsigned ident;
     unsigned char *pagestart;
     char *name;
 
     if (save_mode)
-        printf("/usr/bin/sginfo -pXR %s ", device_name);
+        printf("/usr/bin/sginfo -u %i -XR %s ", page_no, device_name);
 
-    SETUP_MODE_PAGE(page_no, 18);
+    SETUP_MODE_PAGE(page_no, 0);
+    //printf ("Page 0x%02x len: %i\n", page_code, pagestart[1]);
 
 #if 0
-    dump(pagestart, 20);
+    dump(pagestart, page_start[1]+2);
     pagestart[1] += 2;          /*TEST */
     buffer[8] += 2;             /*TEST */
 #endif
     name = "Vendor specific";
+    for (i = 2; i < pagestart[1]+2; i++)
+    {
+       char nm[8]; sprintf (nm, "%02x", i);
+       hexdatafield (pagestart + i, 1, nm);
+    }
 
-    hexdatafield(pagestart +  2, 1, "02");
-    hexdatafield(pagestart +  3, 1, "03");
-    hexdatafield(pagestart +  4, 1, "04");
-    hexdatafield(pagestart +  5, 1, "05");
-    hexdatafield(pagestart +  6, 1, "06");
-    hexdatafield(pagestart +  7, 1, "07");
-    hexdatafield(pagestart +  8, 1, "08");
-    hexdatafield(pagestart +  9, 1, "09");
-    hexdatafield(pagestart + 10, 1, "0A");
-    hexdatafield(pagestart + 11, 1, "0B");
-    hexdatafield(pagestart + 12, 1, "0C");
-    hexdatafield(pagestart + 13, 1, "0D");
-    hexdatafield(pagestart + 14, 1, "0E");
-    hexdatafield(pagestart + 15, 1, "0F");
-    hexdatafield(pagestart + 16, 1, "10");
-    hexdatafield(pagestart + 17, 1, "11");
-    hexdatafield(pagestart + 18, 1, "12");
-    hexdatafield(pagestart + 19, 1, "13");
-
-    if (replace)
-        return put_mode_page(page_no, buffer + 8, 0);
+    if (x_interface && replace)
+               return put_mode_page(page_no, buffer + 8, 0);
     else
         printf("\n");
     if (!save_mode)
@@ -1289,11 +1357,19 @@ static void make_dev_name(char * fname, int k, int do_numeric)
     }
 }
 
-#define MAX_SG_DEVS 20
+#define MAX_SG_DEVS 48
 
 char *devices[] =
 {"/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd", "/dev/sde", "/dev/sdf", 
- "/dev/sdg", "/dev/sdh", "/dev/scd0", "/dev/scd1", "/dev/nst0", "/dev/nst1"};
+ "/dev/sdg", "/dev/sdh", "/dev/sdi", "/dev/sdj", "/dev/sdk", "/dev/sdl",
+ "/dev/sdm", "/dev/sdn", "/dev/sdo", "/dev/sdp", "/dev/sdq", "/dev/sdr",
+ "/dev/sds", "/dev/sdt", "/dev/sdu", "/dev/sdv", "/dev/sdw", "/dev/sdx",
+ "/dev/sdy", "/dev/sdz", "/dev/sdaa", "/dev/sdab", "/dev/sdac", "/dev/sdad",
+ "/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/sr3", "/dev/sr4", "/dev/sr5",
+ "/dev/sr6", "/dev/sr7", "/dev/sr8", "/dev/sr9", "/dev/sr10", "/dev/sr11",
+ "/dev/nst0", "/dev/nst1", "/dev/nst2", "/dev/nst3", "/dev/nst4", "/dev/nst5",
+ "/dev/nosst0", "/dev/nosst1", "/dev/nosst2", "/dev/nosst3", "/dev/nosst4"
+};
 
 static Sg_map sg_map_arr[(sizeof(devices) / sizeof(char *)) + 1];
 
@@ -1304,10 +1380,10 @@ static void show_devices()
     My_scsi_idlun m_idlun;
     char name[64];
     char ebuff[256];
-    int do_numeric = 0;
+    int do_numeric = 1;
 
     for (k = 0, j = 0; k < sizeof(devices) / sizeof(char *); k++) {
-        fd = open(devices[k], O_RDONLY);
+        fd = open(devices[k], O_RDONLY | O_NONBLOCK);
         if (fd < 0)
             continue;
         err = ioctl(fd, SCSI_IOCTL_GET_BUS_NUMBER, &(sg_map_arr[j].bus));
@@ -1458,7 +1534,7 @@ static int show_pages(int page_code)
             return 2;
         offset = 12 + buffer[11];
     } else {                    /* Fake empty notch page */
-        memset(buffer, 0, sizeof(buffer));
+        memset(buffer, 0, SIZEOF_BUFFER);
         offset = 0;
     }
 
@@ -1470,7 +1546,7 @@ static int show_pages(int page_code)
         x_interface = 1;
 
         if (modifiable)
-            usage("do not use -LR with -m");
+            usage("do not use -LR with -m", 1);
 
         /* Just a reminder: */
         puts("#!/bin/sh");
@@ -1642,11 +1718,12 @@ static int open_sg_dev(char * devname)
         return fd;
 }
 
-static void usage(char *errtext)
+static void usage(char *errtext, char quiet)
 {
-    fprintf(stdout, "Error: sginfo - %s\n", errtext);
-    fputs("Usage: sginfo [-options] [device]\n"
-          "\tAllowed options are:\n"
+    fprintf(stderr, "Error: sginfo - %s\n", errtext);
+    fprintf(stderr, "Usage: sginfo [-options] [device]\n");
+    if (!quiet)
+    fputs("\tAllowed options are:\n"
           "\t-c    Display information from Caching Page.\n"
           "\t-C    Display information from Control Mode Page.\n"
           "\t-d    Display defect lists.\n"
@@ -1683,11 +1760,11 @@ static void usage(char *errtext)
   "as a special goodie when using -LXR then a /bin/sh script is written\n"
   "to stdout that will restore the current settings of the target when\n"
   "executed. You can use one of -M, -S with -LXR to save the corresponding\n"
-          "values.\n", stdout);
-    exit(2);
+          "values.\n", stderr);
+    exit(2+quiet);
 }
 
-#if 0
+#if 1
 /* This is a bit of a cheat, but we simply request the info from
    the disconnect/reconnect page, and then send it back again, except
    with the save bit set. In theory, sending a single page with the
@@ -1728,7 +1805,7 @@ int main(int argc, char *argv[])
     long tmp;
 
     if (argc < 2)
-        usage("too few arguments");
+	usage("too few arguments", 0);
     while ((k = getopt(argc, argv, "agdcfisDeCXmMSRvlnLpVu:F:")) != EOF) {
         c = (char)k;
         switch (c) {
@@ -1740,7 +1817,7 @@ int main(int argc, char *argv[])
             else if (!strcasecmp(optarg, "index"))
                 defectformat = 0x4;
             else usage(
-        "Illegal -F parameter, must be one of logical, physical, or index.");
+        "Illegal -F parameter, must be one of logical, physical, or index.", 1);
             break;
         case 'l':
             list = 1;
@@ -1820,25 +1897,26 @@ int main(int argc, char *argv[])
             notch = 1;
             /* fall through */
         case 'v':
-            fprintf(stdout, " Sginfo version 1.91\n");
+            fprintf(stdout, " Sginfo version 1.95\n");
             break;
         default:
             fprintf(stdout, "Unknown option '-%c' (ascii %02xh)\n", c, c);
-            usage("bad option");
+            usage("bad option", 0);
         };
     };
 
     if (saved + modifiable + default_param > 1)
-        usage("only one of -m, -M, or -S allowed");
+        usage("only one of -m, -M, or -S allowed", 1);
     if (x_interface && (inquiry + geometry + cache + format +
                  error + control + disconnect + defect + list_pages) > 1)
-        usage("-X can be used only with exactly one display page option.");
+        usage("-X can be used only with exactly one display page option.", 1);
     if (replace && !x_interface)
-        usage("-R requires -X");
+        usage("-R requires -X", 1);
     if (replace && (modifiable || default_param) && !list_pages)
-        usage("-R not allowed for -m or -M");
+        usage("-R not allowed for -m or -M", 1);
 
     if (replace && !saved) {
+	memset (is_hex, 0, 32);
         for (i = 1; i < argc - optind; i++) {
             if (strncmp(argv[optind + i], "0x", 2) == 0) {
                 char *pnt = argv[optind + i] + 2;
@@ -1859,10 +1937,10 @@ int main(int argc, char *argv[])
 
                 if ((len & 1) || (len != strspn(argv[optind + i] + 1, 
                                                 "0123456789ABCDEFabcdef")))
-    usage("Odd number of chars or non-hex digit in @hexdatafield");
+			    usage("Odd number of chars or non-hex digit in @hexdatafield", 1);
 
                 replacement_values[i] = (unsigned long) argv[optind + i];
-                hexdata_ptr = i;
+		is_hex[i] = 1;
                 continue;
             }
             /* Using a tmp here is silly but the most clean approach */
@@ -1876,7 +1954,7 @@ int main(int argc, char *argv[])
         exit(0);
     }
     if (optind >= argc)
-        usage("no device name given");
+        usage("no device name given", 1);
     glob_fd = open_sg_dev(device_name = argv[optind]);
     if (glob_fd < 0) {
         if (-9999 == glob_fd)
@@ -1890,13 +1968,15 @@ int main(int argc, char *argv[])
         exit(1);
     }
     /* Save the current parameters in NOVRAM on the device */
+#if 1
     if (saved && replace && !list_pages) {
-#if 0
+#if 1
         replace_parameters();
 #endif
         close(glob_fd);
         exit(0);
     };
+#endif
 
     page_code = 0;
     if (modifiable)

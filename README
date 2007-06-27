@@ -123,6 +123,9 @@ the following description:  Program to test the SCSI host adapter by
 issueing write and read operations on a device's buffer and calculating 
 checksums.
 
+"sg_start" has been provided by Kurt Garloff <garloff@suse.de> for spinning
+up (or down) disks. See README.sg_start .
+
 
 Test Programs
 -------------
@@ -202,4 +205,4 @@ The include file path issues are now all addressed in one file called
 
 
 Doug Gilbert
-15th April 2001
+19th April 2001

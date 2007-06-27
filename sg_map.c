@@ -11,7 +11,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 2000 D. Gilbert
+*  Copyright (C) 2000,2001 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,8 @@
 
    Note: This program requires sg version 2 or better.
 
-   Version 0.12 20000415
+   Version 0.13 20010419
+	- additions for osst [Kurt Garloff <garloff@suse.de>]
 */
 
 
@@ -54,7 +55,8 @@ typedef struct my_map_info
 #define MAX_SD_DEVS 128
 #define MAX_SR_DEVS 128
 #define MAX_ST_DEVS 128
-#define MAX_ERRORS 4
+#define MAX_OSST_DEVS 128
+#define MAX_ERRORS 5
 
 static my_map_info_t map_arr[MAX_SG_DEVS];
 
@@ -63,6 +65,7 @@ static my_map_info_t map_arr[MAX_SG_DEVS];
 #define LIN_DEV_TYPE_SR 2
 #define LIN_DEV_TYPE_ST 3
 #define LIN_DEV_TYPE_SCD 4
+#define LIN_DEV_TYPE_OSST 5
 
 
 typedef struct my_scsi_idlun {
@@ -132,6 +135,7 @@ int main(int argc, char * argv[])
     int do_all_s = 1;
     int do_sd = 0;
     int do_st = 0;
+    int do_osst = 0;
     int do_sr = 0;
     int do_scd = 0;
     int do_extra = 0;
@@ -155,6 +159,7 @@ int main(int argc, char * argv[])
         }
         else if (0 == strcmp("-st", argv[k])) {
             do_st = 1;
+	    do_osst = 1;
             do_all_s = 0;
         }
         else if (0 == strcmp("-sr", argv[k])) {
@@ -248,6 +253,8 @@ int main(int argc, char * argv[])
                       last_sg_ind);
     if (do_all_s || do_st)
         scan_dev_type("/dev/st", MAX_ST_DEVS, 1, LIN_DEV_TYPE_ST, last_sg_ind);
+    if (do_all_s || do_osst)
+        scan_dev_type("/dev/osst", MAX_OSST_DEVS, 1, LIN_DEV_TYPE_OSST, last_sg_ind);
 
     for (k = 0; k <= last_sg_ind; ++k) {
         make_dev_name(fname, "/dev/sg", k, do_numeric);
@@ -276,6 +283,10 @@ int main(int argc, char * argv[])
                 break;
             case LIN_DEV_TYPE_ST:
                 make_dev_name(fname, "/dev/st" , map_arr[k].oth_dev_num, 1);
+                printf("  %s", fname);
+                break;
+            case LIN_DEV_TYPE_OSST:
+                make_dev_name(fname, "/dev/osst" , map_arr[k].oth_dev_num, 1);
                 printf("  %s", fname);
                 break;
             case LIN_DEV_TYPE_SR:
@@ -319,7 +330,7 @@ static int find_dev_in_sg_arr(My_scsi_idlun * my_idlun, int host_no,
 static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                           int lin_dev_type, int last_sg_ind)
 {
-    int k, res, ind, sg_fd;
+    int k, res, ind, sg_fd = 0;
     int num_errors = 0;
     int num_silent = 0;
     int host_no = -1;
@@ -331,12 +342,23 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
         if (res < 0) {
             sprintf(ebuff, "Error closing %s ", fname);
             perror("sg_map: close error");
+#ifndef IGN_CLOSE_ERR		
             return;
+#else
+            ++num_errors;
+	    sg_fd = 0;
+#endif
         }
         make_dev_name(fname, leadin, k, do_numeric);
+#ifdef DEBUG
+        printf ("Trying %s: ", fname);
+#endif
 
         sg_fd = open(fname, O_RDONLY | O_NONBLOCK);
         if (sg_fd < 0) {
+#ifdef DEBUG
+	    printf ("ERROR %i\n", errno);
+#endif
             if (EBUSY == errno) {
                 printf("Device %s is busy\n", fname);
                 ++num_errors;
@@ -362,6 +384,9 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                     fname);
             perror(ebuff);
             ++num_errors;
+#ifdef DEBUG
+	    printf ("Couldn't get IDLUN!\n");
+#endif
             continue;
         }
         res = ioctl(sg_fd, SCSI_IOCTL_GET_BUS_NUMBER, &host_no);
@@ -370,8 +395,16 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                     fname);
             perror(ebuff);
             ++num_errors;
+#ifdef DEBUG
+	    printf ("Couldn't get BUS!\n");
+#endif
             continue;
         }
+#ifdef DEBUG	    
+	printf ("%i(%x) %i %i %i %i\n", host_no, my_idlun.host_unique_id, 
+		(my_idlun.dev_id>>24)&0xff, (my_idlun.dev_id>>16)&0xff,
+		(my_idlun.dev_id>>8)&0xff, my_idlun.dev_id&0xff);
+#endif
         ind = find_dev_in_sg_arr(&my_idlun, host_no, last_sg_ind);
         if (ind >= 0) {
             map_arr[ind].oth_dev_num = k;

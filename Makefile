@@ -1,7 +1,8 @@
 SHELL = /bin/sh
 
-INSTDIR=/usr/local/bin
-MANDIR=/usr/local/man
+PREFIX=/usr/local
+INSTDIR=$(DESTDIR)/$(PREFIX)/bin
+MANDIR=$(DESTDIR)/$(PREFIX)/man
 
 CC = gcc
 LD = gcc
@@ -9,9 +10,9 @@ LD = gcc
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_dd sg_debug \
 	sg_scan scsi_inquiry sg_rbuf sginfo sg_readcap \
 	sgp_dd sg_map sg_turs isosize sg_inq sg_test_rwbuf \
-	scsi_devfs_scan
+	scsi_devfs_scan sg_start
 
-COMMON = sg_scan scsi_inquiry sginfo sg_readcap isosize
+COMMON = sg_scan scsi_inquiry sginfo sg_readcap isosize sg_start
 
 MAN_PGS = sg_dd.8 sgp_dd.8 sg_map.8 sg_rbuf.8 isosize.8
 MAN_PREF = man8
@@ -57,8 +58,11 @@ scsi_inquiry: scsi_inquiry.o
 sginfo: sginfo.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_rbuf: sg_rbuf.o sg_err.o
+sg_start: sg_start.o
 	$(LD) -o $@ $(LDFLAGS) $^ 
+
+sg_rbuf: sg_rbuf.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_readcap: sg_readcap.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
