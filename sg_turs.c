@@ -26,7 +26,7 @@
      'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
      'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
 
-   Version 03.04 (20001208)
+   Version 03.05 (20010914)
 
 6 byte TEST UNIT READY command:
 [0x00][   |lu][res   ][res   ][res   ][res   ]
@@ -116,9 +116,9 @@ int main(int argc, char * argv[])
         perror(ebuff);
         return 1;
     }
-    /* Just to be safe, check we have a new sg device by trying an ioctl */
+    /* Just to be safe, check we have a new sg driver by trying an ioctl */
     if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &k) < 0) || (k < 30000)) {
-        printf("sg_turs: %s doesn't seem to be an new sg device\n",
+        printf("sg_turs: %s isn't an sg device (or the sg driver is old)\n",
                file_name);
         close(sg_fd);
         return 1;

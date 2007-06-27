@@ -70,7 +70,7 @@ sg_readcap: sg_readcap.o sg_err.o
 sgp_dd: sgp_dd.o sg_err.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^ -lpthread
 
-sg_map: sg_map.o
+sg_map: sg_map.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_turs: sg_turs.o

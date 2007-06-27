@@ -3,6 +3,13 @@ some description at the top of its ".c" file. "KG" indicates work by
 Kurt Garloff <garloff@suse.de>.
 
 
+Changelog for sg3_utils-0.95 [20010915]
+----------------------------
+  - make sg_dd, sgp_dd and archive/sgq_dd warn if dio selected but
+    /proc/scsi/sg/allow_dio is '0'
+  - sg_map can now do any INQUIRY (when '-i' argument given)
+  - expand example in scsi_inquiry
+
 Changelog for sg3_utils-0.94 [20010419]
 ----------------------------
   - add sg_start, documented in README.sg_start [KG]
