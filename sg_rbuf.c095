@@ -7,7 +7,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
 #include "sg_include.h"
 #include "sg_err.h"
 
@@ -28,10 +27,8 @@
    The '-s=num' option allows the total size of the transfer to be
    set (in megabytes, the default is 200 MB). The '-d' option requests
    direct io (and is overridden by '-q').
-   The '-m' option request mmap-ed IO (and overrides the '-q' and '-d'
-   options if they are also given).
 
-   Version 4.70 (20011122)
+   Version 3.70 (20010321)
 */
 
 
@@ -43,10 +40,6 @@
 #define RB_CMD_LEN 10
 
 /* #define SG_DEBUG */
-
-#ifndef SG_FLAG_MMAP_IO
-#define SG_FLAG_MMAP_IO 4
-#endif
 
 
 int main(int argc, char * argv[])
@@ -60,7 +53,6 @@ int main(int argc, char * argv[])
     int buf_capacity = 0;
     int do_quick = 0;
     int do_dio = 0;
-    int do_mmap = 0;
     int buf_size = 0;
     unsigned int total_size_mb = RB_MB_TO_READ;
     char * file_name = 0;
@@ -95,8 +87,6 @@ int main(int argc, char * argv[])
             do_quick = 1;
         else if (0 == strcmp("-d", argv[j]))
             do_dio = 1;
-        else if (0 == strcmp("-m", argv[j]))
-            do_mmap = 1;
         else if (*argv[j] == '-') {
             printf("Unrecognized switch: %s\n", argv[j]);
             file_name = 0;
@@ -106,11 +96,10 @@ int main(int argc, char * argv[])
             file_name = argv[j];
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_rbuf [[-q] | [-d] | [-m]] [-b=num] [-s=num] "
-	       "<generic_device>'\n");
+        printf(
+        "Usage: 'sg_rbuf [-q] [-d] [-b=num] [-s=num] <generic_device>'\n");
         printf("  where: -q       quick, don't xfer to user space\n");
         printf("         -d       requests dio ('-q' overrides it)\n");
-        printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
         printf("         -b=num   num is buff size to use (in KBytes)\n");
         printf("         -s=num   num is total size to read (in MBytes)\n");
         printf("                    default total size is 200 MBytes\n");
@@ -129,15 +118,10 @@ int main(int argc, char * argv[])
         printf("sg_rbuf: not a sg device, or driver prior to 3.x\n");
         return 1;
     }
-    if (do_mmap) {
-    	do_dio = 0;
-    	do_quick = 0;
+    if (NULL == (rbBuff = malloc(512))) {
+        printf("sg_rbuf: out of memory (query)\n");
+        return 1;
     }
-    if (NULL == (rawp = malloc(512))) {
-	printf("sg_rbuf: out of memory (query)\n");
-	return 1;
-    }
-    rbBuff = rawp;
 
     memset(rbCmdBlk, 0, RB_CMD_LEN);
     rbCmdBlk[0] = RB_OPCODE;
@@ -153,11 +137,10 @@ int main(int argc, char * argv[])
     io_hdr.cmdp = rbCmdBlk;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
-    /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
         perror("sg_rbuf: SG_IO READ BUFF descriptor error");
-        if (rawp) free(rawp);
+        if (rbBuff) free(rbBuff);
         return 1;
     }
 
@@ -170,7 +153,7 @@ int main(int argc, char * argv[])
         break;
     default: /* won't bother decoding other categories */
         sg_chk_n_print3("READ BUFF descriptor error", &io_hdr);
-        if (rawp) free(rawp);
+        if (rbBuff) free(rbBuff);
         return 1;
     }
 
@@ -183,40 +166,27 @@ int main(int argc, char * argv[])
     else if (buf_size > buf_capacity) {
         printf("Requested buffer size=%d exceeds reported capacity=%d\n",
                buf_size, buf_capacity);
-        if (rawp) free(rawp);
+        if (rbBuff) free(rbBuff);
         return 1;
     }
-    if (rawp) {
-	free(rawp);
-	rawp = NULL;
-    }
-
     if (! do_dio) {
         res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &buf_size);
         if (res < 0)
             perror("sg_rbuf: SG_SET_RESERVED_SIZE error");
     }
+    if (rbBuff) free(rbBuff);
 
-    if (do_mmap) {
-	rbBuff = mmap(NULL, buf_size, PROT_READ, MAP_SHARED, sg_fd, 0);
-	if (MAP_FAILED == rbBuff) {
-	    perror("sg_rbuf: error using mmap()");
-	    return 1;
-	}
+    psz = getpagesize();
+    rawp = malloc(buf_size + (do_dio ? psz : 0));
+    if (NULL == rawp) {
+        printf("sg_rbuf: out of memory (data)\n");
+        return 1;
     }
-    else { /* non mmap-ed IO */
-	psz = getpagesize();
-	rawp = malloc(buf_size + (do_dio ? psz : 0));
-	if (NULL == rawp) {
-	    printf("sg_rbuf: out of memory (data)\n");
-	    return 1;
-	}
-	if (do_dio)    /* align to page boundary */
-	    rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
-				      (~(psz - 1)));
-	else
-	    rbBuff = rawp;
-    }
+    if (do_dio)    /* align to page boundary */
+    	rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
+			          (~(psz - 1)));
+    else
+	rbBuff = rawp;
 
     num = (total_size_mb * 1024U * 1024U) / (unsigned int)buf_size;
     for (k = 0; k < num; ++k) {
@@ -226,32 +196,29 @@ int main(int argc, char * argv[])
         rbCmdBlk[6] = 0xff & (buf_size >> 16);
         rbCmdBlk[7] = 0xff & (buf_size >> 8);
         rbCmdBlk[8] = 0xff & buf_size;
+        memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
 #ifdef SG_DEBUG
         memset(rbBuff, 0, buf_size);
 #endif
 
-        memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
         io_hdr.interface_id = 'S';
         io_hdr.cmd_len = sizeof(rbCmdBlk);
         io_hdr.mx_sb_len = sizeof(sense_buffer);
         io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
         io_hdr.dxfer_len = buf_size;
-	if (! do_mmap)
-	    io_hdr.dxferp = rbBuff;
+        io_hdr.dxferp = rbBuff;
         io_hdr.cmdp = rbCmdBlk;
         io_hdr.sbp = sense_buffer;
         io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
         io_hdr.pack_id = k;
-        if (do_mmap)
-            io_hdr.flags |= SG_FLAG_MMAP_IO;
-        else if (do_dio)
+        if (do_dio)
             io_hdr.flags |= SG_FLAG_DIRECT_IO;
-        else if (do_quick)
+        if (do_quick)
             io_hdr.flags |= SG_FLAG_NO_DXFER;
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
             perror("sg_rbuf: SG_IO READ BUFF data error");
-            if (rawp) free(rawp);
+            if (rbBuff) free(rawp);
             return 1;
         }
 
@@ -264,7 +231,7 @@ int main(int argc, char * argv[])
             break;
         default: /* won't bother decoding other categories */
             sg_chk_n_print3("READ BUFF data error", &io_hdr);
-            if (rawp) free(rawp);
+            if (rbBuff) free(rawp);
             return 1;
         }
         if (do_dio &&  
@@ -288,7 +255,7 @@ int main(int argc, char * argv[])
 	   total_size_mb, (num * buf_size) / 1048576, num * buf_size,
 	   buf_size / 1024);
 
-    if (rawp) free(rawp);
+    if (rbBuff) free(rawp);
     res = close(sg_fd);
     if (res < 0) {
         perror("sg_rbuf: close error");

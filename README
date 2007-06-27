@@ -90,6 +90,11 @@ compared to "sg_dd" are a "gen=0 | 1" argument that allows general
 copying (i.e. doesn't need to involve sg or raw devices) and that 
 signals are caught.
 
+"sgm_dd" is very similar to sg_dd but it uses mmap-ed IO on one of its
+given sg device names. If both "if" and "of" are sg devices then mmap-ed
+IO is selected on "if" while normal IO is selected on "of". Direct IO
+cannot be selected with this command.
+
 "sg_scan" does a SCSI bus scan and prints the results to standard output.
 With no arguments only read permissions are needed on the sg devices
 but if "-i" is given (to do a SCSI Inquiry command on the device) then
@@ -138,6 +143,9 @@ $ cat /proc/scsi/sg/debug
 
 "sg_rbuf" does repeated SCSI READ BUFFER commands which allows SCSI
 bus bandwidth and the SCSI sub-system throughput to be measured.
+This can be done in 4 modes: normal transfer for user space, no
+transfer to user space, direct IO or mmap-ed IO. The latter one wins
+on my hardware.
 
 "sg_turs" executes a user specified number of TEST UNIT READY commands on
 the given device. This can be used to time SCSI command overhead.
@@ -154,6 +162,9 @@ processing while sg_simple2 does its own more primitive checks.
 
 "sg_simple3" tests out user space scatter gather added to the version 3
 sg driver.
+
+"sg_simple4" shows the INQUIRY command using mmap-ed IO to obtain its
+response buffer.
 
 An experimental version of a "scsi_inquiry" program is included to
 show the use of the SCSI_IOCTL_SEND_COMMAND ioctl to send a SCSI
@@ -209,4 +220,4 @@ The include file path issues are now all addressed in one file called
 
 
 Doug Gilbert
-15th September 2001
+23rd November 2001

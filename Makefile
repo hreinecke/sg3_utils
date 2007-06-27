@@ -10,7 +10,7 @@ LD = gcc
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_dd sg_debug \
 	sg_scan scsi_inquiry sg_rbuf sginfo sg_readcap \
 	sgp_dd sg_map sg_turs isosize sg_inq sg_test_rwbuf \
-	scsi_devfs_scan sg_start
+	scsi_devfs_scan sg_start sgm_dd sg_simple4
 
 COMMON = sg_scan scsi_inquiry sginfo sg_readcap isosize sg_start
 
@@ -43,6 +43,9 @@ sg_simple2: sg_simple2.o
 sg_simple3: sg_simple3.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
+sg_simple4: sg_simple4.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
 sg_dd: sg_dd.o sg_err.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
@@ -68,6 +71,9 @@ sg_readcap: sg_readcap.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sgp_dd: sgp_dd.o sg_err.o llseek.o
+	$(LD) -o $@ $(LDFLAGS) $^ -lpthread
+
+sgm_dd: sgm_dd.o sg_err.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^ -lpthread
 
 sg_map: sg_map.o sg_err.o
