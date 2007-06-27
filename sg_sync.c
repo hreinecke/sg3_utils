@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,12 +32,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -49,7 +45,7 @@
  * (e.g. disks)
  */
 
-static char * version_str = "1.03 20050808";
+static char * version_str = "1.04 20060125";
 
 
 #define ME "sg_sync: "
@@ -70,7 +66,7 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sync    [--count=<n>] [--group=<n>] [--help] [-immed]"
+          "sg_sync    [--count=<n>] [--group=<n>] [--help] [--immed]"
           " [--lba=<n>]\n"
           "                  [--sync-nv] [--verbose] [--version]"
           " <scsi_device>\n"
@@ -92,7 +88,6 @@ static void usage()
           "         --version|-V        print version string and exit\n\n"
           "Performs a SYNCHRONIZE CACHE SCSI command\n"
           );
-
 }
 
 
@@ -181,10 +176,10 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
-        perror("");
+        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
 
@@ -200,9 +195,9 @@ int main(int argc, char * argv[])
     else
         fprintf(stderr, "Synchronize cache failed\n");
 
-    res = close(sg_fd);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
         return 1;
     }
     return ret;

@@ -3,13 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/time.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -18,7 +13,7 @@
    data transfer (and no REQUEST SENSE command iff the unit is ready)
    then this can be used for timing per SCSI command overheads.
 
-*  Copyright (C) 2000-2005 D. Gilbert
+*  Copyright (C) 2000-2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,9 +21,8 @@
 
 */
 
-static char * version_str = "3.18 20051012";
+static char * version_str = "3.19 20060106";
 
-#define EBUFF_SZ 256
 
 static void usage()
 {
@@ -51,7 +45,6 @@ int main(int argc, char * argv[])
     int sg_fd, k, plen, jmp_out;
     const char * file_name = 0;
     const char * cp;
-    char ebuff[EBUFF_SZ];
     int num_turs = 1;
     int do_progress = 0;
     int progress;
@@ -59,7 +52,6 @@ int main(int argc, char * argv[])
     int do_time = 0;
     int verbose = 0;
     struct timeval start_tm, end_tm;
-
 
     for (k = 1; k < argc; ++k) {
         cp = argv[k];
@@ -120,10 +112,9 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    if ((sg_fd = open(file_name, O_RDONLY | O_NONBLOCK)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, 
-                 "sg_turs: error opening file: %s", file_name);
-        perror(ebuff);
+    if ((sg_fd = sg_cmds_open_device(file_name, 1 /* ro */, verbose)) < 0) {
+        fprintf(stderr, "sg_turs: error opening file: %s: %s\n",
+                file_name, safe_strerror(-sg_fd));
         return 1;
     }
     if (do_progress) {
@@ -135,8 +126,8 @@ int main(int argc, char * argv[])
                                 ((1 == num_turs) ? 1 : 0), verbose);
             if (progress < 0)
                 break;
-	    else
-		printf("Progress indication: %d%% done\n",
+            else
+                printf("Progress indication: %d%% done\n",
                                 (progress * 100) / 65536);
         }
         if (num_turs > 1)
@@ -178,6 +169,6 @@ int main(int argc, char * argv[])
         printf("Completed %d Test Unit Ready commands with %d errors\n",
                 num_turs, num_errs);
     }
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return num_errs ? 1 : 0;
 }

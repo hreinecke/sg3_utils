@@ -11,6 +11,9 @@ Christophe Varoqui <christophe dot varoqui at free dot fr> original sg_rtpg
 
 Clayton Weaver <cgweav at email dot com> contributed safe_strerror().
 
+Dave Johnson <ddj at ccv dot brown dot edu> improved disk defect list
+      handling [20051218]
+
 Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
         sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
         sg_turs and sginfo
@@ -63,4 +66,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-26th April 2005
+20th December 2005

@@ -1,4 +1,4 @@
-.TH SG_SYNC "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_SYNC "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sg_sync \- send the scsi command synchronize cache
 .SH SYNOPSIS
@@ -70,8 +70,8 @@ the form "x<n>" multiplies the leading number by <n>. The "T" and "P"
 suffixes can only be used for --count and --lba.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
-either "0x" or "0X". When hex numbers are given multipliers cannot be
-used.
+either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
+given multipliers cannot be used.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

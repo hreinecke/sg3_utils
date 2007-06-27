@@ -18,9 +18,9 @@
 #include <sys/time.h>
 #include <linux/major.h> 
 #include <linux/fs.h>   /* <sys/mount.h> */
-#include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
+#include "sg_io_linux.h"
 #include "llseek.h"
 
 /* A utility program for copying files. Specialised for "files" that
@@ -54,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.21 20051025";
+static char * version_str = "1.21 20051220";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

@@ -1,5 +1,5 @@
 %define	name	sg3_utils
-%define	version	1.18
+%define	version	1.19
 %define	release	1
 
 %define	major	1
@@ -57,7 +57,7 @@ files.
 %build
 
 make \
-     CFLAGS="%{optflags} -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64" \
+     CFLAGS="%{optflags}" \
      LIBDIR="%{_libdir}"
 
 %install
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Fri Jan 27 2006 - dgilbert at interlog dot com
+- sg_get_config: resync features with mmc5 rev 1
+  * sg3_utils-1.19
+
 * Fri Nov 18 2005 - dgilbert at interlog dot com
 - add sg_map26; sg_inq '-rr' option to play with hdparm
   * sg3_utils-1.18

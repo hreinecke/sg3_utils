@@ -1,11 +1,18 @@
+Unless otherwise noted, these install instructions are for the
+Linux operating system.
+
+By default, the Makefile will build for Linux with a shared library.
+The invocation sequence is:
+
 make
-make install
+make install	[may need root permission]
 
 Unless overridden or edited in the Makefile, INSTDIR places the executables
 in the /usr/local/bin directory, LIBDIR places libraries in the
 /usr/local/lib directory, MANDIR places the man pages in the
-/usr/local/man directory and INCLUDEDIR places header files in the
-/usr/local/include/scsi directory.
+/usr/local/share/man directory and INCLUDEDIR places header files in the
+/usr/local/include/scsi directory. For FreeBSD the default MANDIR is
+/usr/local/man .
 
 Other Makefile targets that might be useful:
 make clean      # remove .o, executables, core and .depend file
@@ -13,10 +20,10 @@ make depend     # generate dependency hierarchy in .depend file
 make dep        # same as 'make depend'
 make sg_inq     # build a specific executable (e.g. 'sg_inq')
 make uninstall  # removes executables, libraries and build remnants
-make -f lib_no_lib/Makefile.no_lib  # build without a library
+make -f no_lib/Makefile.linux  # build without a library
 
 ./make_no_lib.sh sg_inq  # is a simple script; in this case it expands to:
-                         # make -f lib_no_lib/Makefile.no_lib sg_inq
+                         # make -f no_lib/Makefile.linux sg_inq
 
 Note that the main Makefile does _not_ call the Makefiles in the
 subdirectories (i.e. archive, examples and utils directories).
@@ -36,19 +43,18 @@ directory. If an executable cannot find the libsgutils shared library
 to the /etc/ld.so.conf file may be required in some distributions.
 
 A "spec" file is included for building rpm packages. It is called
-sg3_utils.spec and is in the "rpm" subdirectory. To build binary and
-source rpms place a copy of the gzipped tarball in the "SOURCES" directory
-and place a copy of sg3_utils.spec in the "SPEC" directory. These
-directories are found under /usr/src/redhat on redhat distributions. Then
-from the "SPEC" directory execute "rpmbuild -ba sg3_utils.spec". If all
-goes well a source rpm should be found in the SRPMS directory and binary
-rpms in the RPMS/i386 directory (for i386 architecture). Note the spec
-file will only build those utilities in the main directory. When the
-sg3_utils binary rpm is installed the executables and their associated man
-pages should be placed in appropriate places. The sg3_utils.spec file also
-builds a libsgutils shared object (shared library) and a libsgutils-*-devel
-shared object with a static library and the sg_lib.h and sg_cmds.h header
-files.
+sg3_utils.spec . To build binary and source rpms place a copy of the
+gzipped tarball in the "SOURCES" directory and place a copy of
+sg3_utils.spec in the "SPEC" directory. These directories are found under
+/usr/src/redhat on redhat/fedora distributions. Then from the "SPEC"
+directory execute "rpmbuild -ba sg3_utils.spec". If all goes well a source
+rpm should be found in the SRPMS directory and binary rpms in the RPMS/i386
+directory (for i386 architecture). Note the spec file will only build those
+utilities found in the main directory. When the sg3_utils binary rpm is
+installed the executables and their associated man pages should be placed in
+appropriate places. The sg3_utils.spec file also builds a libsgutils shared
+object (shared library) and a libsgutils-*-devel shared object with a static
+library and the sg_lib.h, sg_cmds.h and sg_pt.h header files.
 
 Binary rpms (at least in the RedHat distribution) tend to install
 executables in /usr/bin and libraries in /usr/lib .
@@ -62,7 +68,27 @@ the sg3_utils source directory) if all goes well.
 
 If the shared object (library) is troublesome or unwanted then
 a "no_lib" version of the Makefile and the sg3_utils.spec file
-can be found in the "lib_no_lib" subdirectory.
+can be found in the "no_lib" subdirectory.
 
 
-28th August 2005
+In FreeBSD, the utilities can be built with "make -f Makefile.freebsd".
+This will build a shared object (i.e. libsgutils.so and friends) that
+the utilities depend on. To install use "make -f Makefile.freebsd install".
+These makes depend on libtool. To build without reliance on a shared
+library (and thus libtool) use "make -f no_lib/Makefile.freebsd" (or
+execute the "make_no_lib_freebsd.sh" script which does the same thing).
+Utilities that are linux specific (e.g. sg_map) are not built for
+FreeBSD.
+
+
+In Tru64, the utilities can be built with "make -f Makefile.osf1".
+This will build a shared object (i.e. libsgutils.so and friends) that
+the utilities depend on. To install use "make -f Makefile.osf1 install".
+These makes depend on libtool. To build without reliance on a shared
+library (and thus libtool) use "make -f no_lib/Makefile.osf1" (or
+execute the "make_no_lib_osf1.sh" script which does the same thing).
+Utilities that are linux specific (e.g. sg_map) are not built for
+Tru64.
+
+
+24th January 2006

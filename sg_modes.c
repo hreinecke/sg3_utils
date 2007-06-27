@@ -4,15 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2005 D. Gilbert
+*  Copyright (C) 2000-2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +21,7 @@
    
 */
 
-static char * version_str = "1.11 20051113";
+static char * version_str = "1.13 20060106";
 
 #define ME "sg_modes: "
 
@@ -38,39 +35,6 @@ static char * version_str = "1.11 20051113";
 
 #define EBUFF_SZ 256
 
-
-static const char * scsi_ptype_strs[] = {
-    "disk",                             /* 0x0 */
-    "tape",
-    "printer",
-    "processor",
-    "write once optical disk",
-    "cd/dvd",
-    "scanner",
-    "optical memory device",
-    "medium changer",                   /* 0x8 */
-    "communications",
-    "graphics [0xa]",
-    "graphics [0xb]",
-    "storage array controller",
-    "enclosure services device",
-    "simplified direct access device",
-    "optical card reader/writer device",
-    "bridge controller commands",       /* 0x10 */
-    "object storage device",
-    "automation/drive interface",
-    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
-    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
-    "well known logical unit",
-    "no physical device on this lu",
-};
-
-static const char * get_ptype_str(int scsi_ptype)
-{
-    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
-
-    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
-}
 
 static const char * transport_proto_arr[] =
 {
@@ -94,7 +58,7 @@ struct page_code_desc {
 };
 
 static struct page_code_desc pc_desc_common[] = {
-    {0x0, 0x0, "Unit Attention condition [vendor: page format optional]"},
+    {0x0, 0x0, "Unit Attention condition [vendor specific format]"},
     {0x2, 0x0, "Disconnect-Reconnect"},
     {0x9, 0x0, "Peripheral device (obsolete)"},
     {0xa, 0x0, "Control"},
@@ -127,8 +91,8 @@ static struct page_code_desc pc_desc_disk[] = {
 
 static struct page_code_desc pc_desc_tape[] = {
     {0xf, 0x0, "Data Compression"},
-    {0x10, 0x0, "Device configation"},
-    {0x10, 0x1, "Device configation extension"},
+    {0x10, 0x0, "Device configuration"},
+    {0x10, 0x1, "Device configuration extension"},
     {0x11, 0x0, "Medium Partition [1]"},
     {0x12, 0x0, "Medium Partition [2]"},
     {0x13, 0x0, "Medium Partition [3]"},
@@ -495,12 +459,12 @@ int main(int argc, char * argv[])
     int do_list = 0;
     int do_raw = 0;
     int do_verbose = 0;
-    int oflags = O_RDONLY | O_NONBLOCK;
     int density_code_off, t_proto, inq_pdt, inq_byte6, resp_mode6;
     int num_ua_pages, plen, jmp_out;
     unsigned char * ucp;
     unsigned char uc;
     struct sg_simple_inquiry_resp inq_out;
+    char pdt_name[64];
 
     for (k = 1; k < argc; ++k) {
         cp = argv[k];
@@ -628,7 +592,7 @@ int main(int argc, char * argv[])
                 list_page_codes(0, 0, -1);
             } else {
                 printf("    peripheral device type: %s\n",
-                       get_ptype_str(pg_code));
+                       sg_get_pdt_str(pg_code, sizeof(pdt_name), pdt_name));
                 if (sub_pg_code_set)
                     list_page_codes(pg_code, 0, sub_pg_code);
                 else
@@ -654,16 +618,16 @@ int main(int argc, char * argv[])
     if (! ((pg_code >= 0) || do_all || do_list))
         do_all = 1;
 
-    if ((sg_fd = open(file_name, oflags)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, ME "error opening file: %s", file_name);
-        perror(ebuff);
+    if ((sg_fd = sg_cmds_open_device(file_name, 1 /* ro */, do_verbose)) < 0) {
+        fprintf(stderr, ME "error opening file: %s: %s\n", file_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
 
     if (sg_simple_inquiry(sg_fd, &inq_out, 1, do_verbose)) {
         fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
                 file_name);
-        close(sg_fd);
+        sg_cmds_close_device(sg_fd);
         return 1;
     }
     inq_pdt = inq_out.peripheral_type;
@@ -671,7 +635,7 @@ int main(int argc, char * argv[])
     if (0 == do_raw)
         printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n", 
                inq_out.vendor, inq_out.product, inq_out.revision,
-               get_ptype_str(inq_pdt), inq_pdt);
+               sg_get_pdt_str(inq_pdt, sizeof(pdt_name), pdt_name), inq_pdt);
     if (do_list) {
         if (sub_pg_code_set)
             list_page_codes(inq_pdt, inq_pdt, sub_pg_code);
@@ -771,7 +735,7 @@ int main(int argc, char * argv[])
             len = (len < md_len) ? len : md_len;
             for (k = 0; k < len; ++k)
                 printf("%02x\n", ucp[k]);
-            close(sg_fd);
+            sg_cmds_close_device(sg_fd);
             return 0;
         }
         if (do_hex)
@@ -883,6 +847,6 @@ int main(int argc, char * argv[])
             md_len -= len;
         }
     }
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return 0;
 }

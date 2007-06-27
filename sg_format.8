@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "September 2005" "sg3_utils-1.17" SG3_UTILS
+.TH SG_FORMAT "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
@@ -242,8 +242,8 @@ these multiplicative suffixes: c C *1; w W *2; b B *512; k K KiB *1,024;
 KB *1,000; m M MiB *1,048,576; MB *1,000,000 . This pattern continues
 for "G", "T" and "P". Also a suffix of the form "x<n>" multiplies the
 leading number by <n>. Alternatively numerical values can be given in
-hexadecimal preceded by either "0x" or "0X". When hex numbers are given,
-multipliers cannot be used.
+hexadecimal preceded by either "0x" or "0X" (or with a trailing "h"
+or "H"). When hex numbers are given, multipliers cannot be used.
 .SH EXAMPLES
 First, do not alter anything but print out the existing block count and size
 derived from two sources: a block descriptor in a MODE SELECT command

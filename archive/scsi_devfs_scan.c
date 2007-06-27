@@ -13,8 +13,8 @@
 #include <dirent.h>
 #include <errno.h>
 #include <unistd.h>
-#include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_io_linux.h"
 
 /* Code for scanning for SCSI devices within a Linux device pseudo file
    system.

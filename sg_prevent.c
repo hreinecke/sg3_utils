@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -47,7 +46,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.03 20050808";
+static char * version_str = "1.03 20060125";
 
 #define ME "sg_prevent: "
 
@@ -64,7 +63,7 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_prevent [-allow] [--help] [--prevent=<n>] [--verbose] "
+          "sg_prevent [--allow] [--help] [--prevent=<n>] [--verbose] "
           "[--version]\n"
           "                   <scsi_device>\n"
           "  where: --allow|-a            allow media removal\n"
@@ -155,10 +154,10 @@ int main(int argc, char * argv[])
     else if (prevent < 0)
         prevent = 1;    /* default is to prevent, as utility name suggests */
 
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
-        perror("");
+        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
     res = sg_ll_prevent_allow(sg_fd, prevent, 1, verbose);
@@ -173,9 +172,9 @@ int main(int argc, char * argv[])
     else
         fprintf(stderr, "Prevent allow medium removal command failed\n");
 
-    res = close(sg_fd);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
         return 1;
     }
     return ret;

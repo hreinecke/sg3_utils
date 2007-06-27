@@ -4,10 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -22,12 +19,11 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.27 20050808";
+static char * version_str = "0.27 20060106";
 
 #define ME "sg_senddiag: "
 
 #define MX_ALLOC_LEN (1024 * 4)
-#define EBUFF_SZ 256
 
 
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
@@ -271,7 +267,6 @@ int main(int argc, char * argv[])
 {
     int sg_fd, k, num, rsp_len, plen, jmp_out;
     const char * file_name = 0;
-    char ebuff[EBUFF_SZ];
     unsigned char rsp_buff[MX_ALLOC_LEN];
     int rsp_buff_size = MX_ALLOC_LEN;
     unsigned int u;
@@ -285,7 +280,6 @@ int main(int argc, char * argv[])
     int do_ext_time = 0;
     int do_raw = 0;
     int verbose = 0;
-    int oflags = O_RDWR | O_NONBLOCK;
     int read_in_len = 0;
     const char * cp;
     unsigned char read_in[MX_ALLOC_LEN];
@@ -416,9 +410,9 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    if ((sg_fd = open(file_name, oflags)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, ME "error opening file: %s", file_name);
-        perror(ebuff);
+    if ((sg_fd = sg_cmds_open_device(file_name, 0 /* rw */, verbose)) < 0) {
+        fprintf(stderr, ME "error opening file: %s: %s\n", file_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
     if (do_ext_time) {
@@ -471,7 +465,7 @@ int main(int argc, char * argv[])
             printf("Default self test returned GOOD status\n");
     } else
         goto err_out;
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return 0;
 
 err_out:
@@ -479,6 +473,6 @@ err_out:
 err_out9:
     if (verbose < 2)
         fprintf(stderr, "  try again with '-vv' for more information\n");
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return ret;
 }

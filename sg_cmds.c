@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2005 Douglas Gilbert.
+ * Copyright (c) 1999-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,18 +50,20 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/ioctl.h>
-#include "sg_include.h"
 #include "sg_lib.h"
 #include "sg_cmds.h"
+#include "sg_pt.h"
 
-static char * version_str = "1.21 20051027";
+
+static char * version_str = "1.24 20060125";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-#define START_TIMEOUT 120000    /* 120,000 millisecs == 2 minutes */
-#define LONG_TIMEOUT 7200000    /* 7,200,000 millisecs == 120 minutes */
 #define EBUFF_SZ 256
+
+#define DEF_PT_TIMEOUT 60       /* 60 seconds */
+#define START_PT_TIMEOUT 120    /* 120 seconds == 2 minutes */
+#define LONG_PT_TIMEOUT 7200    /* 7,200 seconds == 120 minutes */
 
 #define INQUIRY_CMD     0x12
 #define INQUIRY_CMDLEN  6
@@ -110,6 +112,22 @@ static char * version_str = "1.21 20051027";
 #define START_STOP_CMDLEN       6
 #define PREVENT_ALLOW_CMD    0x1e
 #define PREVENT_ALLOW_CMDLEN   6
+#define FORMAT_UNIT_CMD 0x4
+#define FORMAT_UNIT_CMDLEN 6
+#define REASSIGN_BLKS_CMD     0x7
+#define REASSIGN_BLKS_CMDLEN  6
+#define GET_CONFIG_CMD 0x46
+#define GET_CONFIG_CMD_LEN 10
+#define PERSISTENT_RESERVE_IN_CMD 0x5e
+#define PERSISTENT_RESERVE_IN_CMDLEN 10
+#define PERSISTENT_RESERVE_OUT_CMD 0x5f
+#define PERSISTENT_RESERVE_OUT_CMDLEN 10
+#define READ_LONG10_CMD 0x3e
+#define READ_LONG10_CMDLEN 10
+#define WRITE_LONG10_CMD 0x3f
+#define WRITE_LONG10_CMDLEN 10
+#define VERIFY10_CMD 0x2f
+#define VERIFY10_CMDLEN 10
 
 #define MODE6_RESP_HDR_LEN 4
 #define MODE10_RESP_HDR_LEN 8
@@ -123,16 +141,140 @@ const char * sg_cmds_version()
     return version_str;
 }
 
+/* Returns file descriptor >= 0 if successful. If error in Unix returns
+   negated errno. */
+int sg_cmds_open_device(const char * device_name, int read_only,
+                        int verbose)
+{
+    return scsi_pt_open_device(device_name, read_only, verbose);
+}
+
+/* Returns 0 if successful. If error in Unix returns negated errno. */
+int sg_cmds_close_device(int device_fd)
+{
+    return scsi_pt_close_device(device_fd);
+}
+
+
+/* Returns -2 for sense data (may not be fatal), -1 for failed or the
+   number of bytes fetched. For data out (to device) or no data, set
+   'mx_resp_len' to 0 or less. If -2 returned then sense category
+   output via 'o_sense_cat' pointer (if not NULL). Outputs to
+   sg_warnings_strm (def: stderr) if problems; depending on 'noisy'
+   and 'verbose' */
+static int process_resp(void * ptvp, const char * leadin, int res,
+                        int mx_resp_len, const unsigned char * sense_b,
+                        int noisy, int verbose, int * o_sense_cat)
+{
+    int got, cat, duration, slen, scat, n, resid;
+    char b[1024];
+
+    if (NULL == leadin)
+        leadin = "";
+    if (res < 0) {
+        if (noisy || verbose)
+            fprintf(sg_warnings_strm, "%s: pass through os error: %s\n",
+                    leadin, safe_strerror(-res));
+        return -1;
+    } else if (SCSI_PT_DO_BAD_PARAMS == res) {
+        fprintf(sg_warnings_strm, "%s: bad pass through setup\n", leadin);
+        return -1;
+    } else if (SCSI_PT_DO_TIMEOUT == res) {
+        fprintf(sg_warnings_strm, "%s: pass through timeout\n", leadin);
+        return -1;
+    }
+    if ((verbose > 2) && ((duration = get_scsi_pt_duration_ms(ptvp)) >= 0))
+        fprintf(sg_warnings_strm, "      duration=%d ms\n", duration);
+    resid = (mx_resp_len > 0) ? get_scsi_pt_resid(ptvp) : 0;
+    switch ((cat = get_scsi_pt_result_category(ptvp))) {
+    case SCSI_PT_RESULT_GOOD:
+        if (mx_resp_len > 0) {
+            got = mx_resp_len - resid;
+            if (verbose && (resid > 0))
+                fprintf(sg_warnings_strm, "    %s: requested %d bytes but "
+                        " got %d bytes\n", leadin, mx_resp_len, got);
+            return got;
+        } else
+            return 0;
+    case SCSI_PT_RESULT_STATUS: /* other than GOOD and CHECK CONDITION */
+        if (verbose || noisy) {
+            sg_get_scsi_status_str(get_scsi_pt_status_response(ptvp),
+                                   sizeof(b), b);
+            fprintf(sg_warnings_strm, "%s: scsi status: %s\n", leadin, b);
+        }
+        return -1;
+    case SCSI_PT_RESULT_SENSE:
+        slen = get_scsi_pt_sense_len(ptvp);
+        scat = sg_err_category_sense(sense_b, slen);
+        switch (scat) {
+        case SG_LIB_CAT_MEDIA_CHANGED:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_NO_SENSE:
+            n = 0;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_MEDIUM_HARD:
+        default:
+            n = noisy;
+            break;
+        }
+        if (verbose || n) {
+            sg_get_sense_str(leadin, sense_b, slen, (verbose > 1),
+                             sizeof(b), b);
+            fprintf(sg_warnings_strm, "%s", b);
+        }
+        if (verbose && (mx_resp_len > 0) && (resid > 0)) {
+            got = mx_resp_len - resid;
+            if ((verbose > 2) || (got > 0))
+                fprintf(sg_warnings_strm, "    requested %d bytes but "
+                        " got %d bytes\n", mx_resp_len, got);
+        }
+        if (o_sense_cat)
+            *o_sense_cat = scat;
+        return -2;
+    case SCSI_PT_RESULT_TRANSPORT_ERR:
+        if (verbose || noisy) {
+            get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
+            fprintf(sg_warnings_strm, "%s: transport: %s", leadin, b);
+        }
+        return -1;
+    case SCSI_PT_RESULT_OS_ERR:
+        if (verbose || noisy) {
+            get_scsi_pt_os_err_str(ptvp, sizeof(b), b);
+            fprintf(sg_warnings_strm, "%s: os: %s", leadin, b);
+        }
+        return -1;
+    default:
+        fprintf(sg_warnings_strm, "%s: unknown pass through result "
+                "category (%d)\n", leadin, cat);
+        return -1;
+    }
+}
+
+static int is_recovered_or_no_sense(void * ptvp, unsigned char * sense_b)
+{
+    struct sg_scsi_sense_hdr ssh;
+    int slen = get_scsi_pt_sense_len(ptvp);
+
+    if (sg_scsi_normalize_sense(sense_b, slen, &ssh)) {
+        if ((SPC_SK_NO_SENSE == ssh.sense_key) ||
+            (SPC_SK_RECOVERED_ERROR == ssh.sense_key))
+            return 1;
+    }
+    return 0;
+}
+
 /* Invokes a SCSI INQUIRY command and yields the response */
-/* Returns 0 when successful, -1 -> SG_IO ioctl failed, -2 -> bad response */
+/* Returns 0 when successful, -1 -> pass through failed, -2 -> bad response */
 int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, 
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
-    int res, k, got;
+    int res, ret, k;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
     unsigned char * up;
+    void * ptvp;
 
     if (cmddt)
         inqCmdBlk[1] |= 2;
@@ -142,13 +284,13 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
     /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
     inqCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     inqCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    inquiry cdb: ");
+        fprintf(sg_warnings_strm, "    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", inqCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", inqCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
     if (resp && (mx_resp_len > 0)) {
         up = resp;
@@ -156,72 +298,43 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
         if (mx_resp_len > 4)
             up[4] = 0;
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(inqCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = inqCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "SG_IO (inquiry) error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "inquiry: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Inquiry", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        got = io_hdr.dxfer_len - io_hdr.resid;
-        if (got < 4) {
-            if (verbose)
-                fprintf(sg_warnings_str, "inquiry: got too few (%d) "
-                        "bytes\n", got);
-            return -2;
-        }
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    inquiry: resid=%d (got %d "
-                    "bytes)\n", io_hdr.resid, got);
-        return 0;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
+    set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
+                       noisy, verbose, NULL);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret)
+        ret = is_recovered_or_no_sense(ptvp, sense_b) ? 0 : -2;
+    else if (ret < 4) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "inquiry: got too few "
+                    "bytes (%d)\n", ret);
+        ret = -2;
+    } else
+        ret = 0;
 
-            if (evpd)
-                snprintf(ebuff, EBUFF_SZ, "Inquiry error, VPD page=0x%x",
-                         pg_op);
-            else if (cmddt)
-                snprintf(ebuff, EBUFF_SZ, "Inquiry error, CmdDt opcode=0x%x",
-                         pg_op);
-            else
-                snprintf(ebuff, EBUFF_SZ, "Inquiry error, [standard]");
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
-        }
-        return -2;
-    }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Yields most of first 36 bytes of a standard INQUIRY (evpd==0) response. */
-/* Returns 0 when successful, -1 -> SG_IO ioctl failed, -2 -> bad response */
+/* Returns 0 when successful, -1 -> pass through failed, -2 -> bad response */
 int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                       int noisy, int verbose)
 {
-    int res, k, got;
+    int res, ret, k;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
     unsigned char inq_resp[INQUIRY_RESP_INITIAL_LEN];
+    void * ptvp;
 
     if (inq_data) {
         memset(inq_data, 0, sizeof(* inq_data));
@@ -229,76 +342,54 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
         inq_data->peripheral_type = 0x1f;
     }
     inqCmdBlk[4] = (unsigned char)sizeof(inq_resp);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    inquiry cdb: ");
+        fprintf(sg_warnings_strm, "    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", inqCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", inqCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
     memset(inq_resp, 0, sizeof(inq_resp));
     inq_resp[0] = 0x7f; /* defensive prefill */
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(inqCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = sizeof(inq_resp);
-    io_hdr.dxferp = inq_resp;
-    io_hdr.cmdp = inqCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "SG_IO (inquiry) error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "inquiry: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Inquiry", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        got = io_hdr.dxfer_len - io_hdr.resid;
-        if (got < 4) {
-            if (verbose)
-                fprintf(sg_warnings_str, "inquiry: got too few (%d) "
-                        "bytes\n", got);
-            return -2;
-        }
-        if (inq_data) {
-            inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
-            inq_data->peripheral_type = inq_resp[0] & 0x1f;
-            inq_data->rmb = (inq_resp[1] & 0x80) ? 1 : 0;
-            inq_data->version = inq_resp[2];
-            inq_data->byte_3 = inq_resp[3];
-            inq_data->byte_5 = inq_resp[5];
-            inq_data->byte_6 = inq_resp[6];
-            inq_data->byte_7 = inq_resp[7];
-            memcpy(inq_data->vendor, inq_resp + 8, 8);
-            memcpy(inq_data->product, inq_resp + 16, 16);
-            memcpy(inq_data->revision, inq_resp + 32, 4);
-        }
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    inquiry: resid=%d (got %d "
-                    "bytes)\n", io_hdr.resid, got);
-        return 0;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
+    set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, inq_resp, sizeof(inq_resp));
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "inquiry", res, sizeof(inq_resp),
+                       sense_b, noisy, verbose, NULL);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret)
+        ret = is_recovered_or_no_sense(ptvp, sense_b) ? 0 : -2;
+    else if (ret < 4) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "inquiry: got too few "
+                    "bytes (%d)\n", ret);
+        ret = -2;
+    } else
+        ret = 0;
 
-            snprintf(ebuff, EBUFF_SZ, "Inquiry error ");
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
-        }
-        return -2;
+    if (0 == ret) {
+        inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
+        inq_data->peripheral_type = inq_resp[0] & 0x1f;
+        inq_data->rmb = (inq_resp[1] & 0x80) ? 1 : 0;
+        inq_data->version = inq_resp[2];
+        inq_data->byte_3 = inq_resp[3];
+        inq_data->byte_5 = inq_resp[5];
+        inq_data->byte_6 = inq_resp[6];
+        inq_data->byte_7 = inq_resp[7];
+        memcpy(inq_data->vendor, inq_resp + 8, 8);
+        memcpy(inq_data->product, inq_resp + 16, 16);
+        memcpy(inq_data->revision, inq_resp + 32, 4);
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI TEST UNIT READY command.
@@ -309,54 +400,46 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
 int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
                                    int noisy, int verbose)
 {
-    int res, k;
-    unsigned char turCmbBlk[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
+    int res, ret, k;
+    unsigned char turCmdBlk[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    test unit ready cdb: ");
+        fprintf(sg_warnings_strm, "    test unit ready cdb: ");
         for (k = 0; k < TUR_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", turCmbBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", turCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(turCmbBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.dxfer_len = 0;
-    io_hdr.dxferp = NULL;
-    io_hdr.cmdp = turCmbBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-    io_hdr.pack_id = pack_id;   /* diagnostic: safe to set to 0 */
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "test_unit_ready (SG_IO) error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "test unit ready: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    default:
+    set_scsi_pt_cdb(ptvp, turCmdBlk, sizeof(turCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_packet_id(ptvp, pack_id);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "test unit ready", res, 0, sense_b,
+                       noisy, verbose, NULL);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
         if (progress) {
-            if (! sg_get_sense_progress_fld(sense_b, sizeof(sense_b),
-                                            progress))
+            int slen = get_scsi_pt_sense_len(ptvp);
+
+            if (! sg_get_sense_progress_fld(sense_b, slen, progress))
                 *progress = -1;
         }
-        if (noisy || verbose)
-            sg_chk_n_print3("test unit ready", &io_hdr, (verbose > 1));
-        return -1;
-    }
+        ret = is_recovered_or_no_sense(ptvp, sense_b) ? 0 : -1;
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI TEST UNIT READY command.
@@ -375,11 +458,11 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
                         unsigned int lba, unsigned int count, int noisy,
                         int verbose)
 {
-    int res, k;
+    int res, ret, k, sense_cat;
     unsigned char scCmdBlk[SYNCHRONIZE_CACHE_CMDLEN] =
                 {SYNCHRONIZE_CACHE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     if (sync_nv)
         scCmdBlk[1] |= 4;
@@ -390,57 +473,53 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
     scCmdBlk[4] = (lba >> 8) & 0xff;
     scCmdBlk[5] = lba & 0xff;
     scCmdBlk[6] = group & 0x1f;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (count > 0xffff) {
-        fprintf(sg_warnings_str, "count too big\n");
+        fprintf(sg_warnings_strm, "count too big\n");
         return -1;
     }
     scCmdBlk[7] = (count >> 8) & 0xff;
     scCmdBlk[8] = count & 0xff;
 
     if (verbose) {
-        fprintf(sg_warnings_str, "    synchronize cache(10) cdb: ");
+        fprintf(sg_warnings_strm, "    synchronize cache(10) cdb: ");
         for (k = 0; k < SYNCHRONIZE_CACHE_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", scCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", scCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(scCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.dxfer_len = 0;
-    io_hdr.dxferp = NULL;
-    io_hdr.cmdp = scCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "synchronize cache(10): out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, scCmdBlk, sizeof(scCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "synchronize cache(10)", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_MEDIA_CHANGED:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "synchronize_cache (SG_IO) error: %s\n",
-                    safe_strerror(errno));
-        return -1;
-    }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_MEDIA_CHANGED:
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("synchronize cache", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("synchronize cache", &io_hdr, (verbose > 1));
-        return -1;
-    }
-    return 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 
@@ -450,12 +529,12 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
 int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba, 
                      void * resp, int mx_resp_len, int noisy, int verbose)
 {
-    int k, res;
+    int k, ret, res, sense_cat;
     unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] = 
                         {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA, 
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     if (pmi) { /* lbs only valid when pmi set */
         rcCmdBlk[14] |= 1;
@@ -473,58 +552,47 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
     rcCmdBlk[11] = (mx_resp_len >> 16) & 0xff;
     rcCmdBlk[12] = (mx_resp_len >> 8) & 0xff;
     rcCmdBlk[13] = mx_resp_len & 0xff;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    read capacity (16) cdb: ");
+        fprintf(sg_warnings_strm, "    read capacity (16) cdb: ");
         for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rcCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rcCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rcCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rcCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "read capacity (16): out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "read capacity (16)", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_MEDIA_CHANGED:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (verbose)
-            fprintf(sg_warnings_str, "read_capacity16 (SG_IO) error: %s\n",
-                    safe_strerror(errno));
-        return -1;
-    }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (verbose)
-            sg_chk_n_print3("Read capacity (16)", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    read_capacity16: resid=%d (got"
-                    " %d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-    case SG_LIB_CAT_MEDIA_CHANGED:
-        if (verbose > 1)
-            sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("READ CAPACITY 16 command error", &io_hdr,
-                            (verbose > 1));
-        return -1;
-    }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI READ CAPACITY (10) command. Return of 0 -> success,
@@ -534,11 +602,11 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
 int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, 
                      void * resp, int mx_resp_len, int noisy, int verbose)
 {
-    int k, res;
+    int k, ret, res, sense_cat;
     unsigned char rcCmdBlk[READ_CAPACITY_10_CMDLEN] =
                          {READ_CAPACITY_10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     if (pmi) { /* lbs only valid when pmi set */
         rcCmdBlk[8] |= 1;
@@ -547,58 +615,47 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
         rcCmdBlk[4] = (lba >> 8) & 0xff;
         rcCmdBlk[5] = lba & 0xff;
     }
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    read capacity (10) cdb: ");
+        fprintf(sg_warnings_strm, "    read capacity (10) cdb: ");
         for (k = 0; k < READ_CAPACITY_10_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rcCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rcCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rcCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;     /* should be 8 */
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rcCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "read capacity (10): out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "read capacity (10)", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_MEDIA_CHANGED:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (verbose)
-            fprintf(sg_warnings_str, "read_capacity (10) (SG_IO) error: %s\n",
-                    safe_strerror(errno));
-        return -1;
-    }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (verbose)
-            sg_chk_n_print3("Read capacity (10)", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    read_capacity10: resid=%d (got"
-                    " %d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-    case SG_LIB_CAT_MEDIA_CHANGED:
-        if (verbose > 1)
-            sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("READ CAPACITY 10 command error", &io_hdr,
-                            (verbose > 1));
-        return -1;
-    }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI MODE SENSE (6) command. Return of 0 -> success,
@@ -607,85 +664,65 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
 int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
                       void * resp, int mx_resp_len, int noisy, int verbose)
 {
-    int res, k;
+    int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] = 
         {MODE_SENSE6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     modesCmdBlk[1] = (unsigned char)(dbd ? 0x8 : 0);
     modesCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
     modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
     modesCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xff) {
-        fprintf(sg_warnings_str, "mx_resp_len too big\n");
+        fprintf(sg_warnings_strm, "mx_resp_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_str, "    mode sense (6) cdb: ");
+        fprintf(sg_warnings_strm, "    mode sense (6) cdb: ");
         for (k = 0; k < MODE_SENSE6_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = MODE_SENSE6_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = modesCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "mode sense (6) SG_IO error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "mode sense (6): out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Mode sense (6)", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    mode sense (6): resid=%d (got "
-                    "%d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        if (verbose > 2) {
-            k = mx_resp_len - io_hdr.resid;
-            if (k > 0) {
-                fprintf(sg_warnings_str, "    mode sense (6): response%s\n",
-                        (k > 256 ? ", first 256 bytes" : ""));
-                dStrHex(resp, (k > 256 ? 256 : k), -1);
-            }
+    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "mode sense (6)", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Mode sense (6) error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-
-            snprintf(ebuff, EBUFF_SZ, "Mode sense (6) error, dbd=%d "
-                    "pc=%d page_code=%x sub_page_code=%x\n     ", dbd,
-                    pc, pg_code, sub_pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    mode sense (6): response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
         }
-        return -1;
+        ret = 0;
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI MODE SENSE (10) command. Return of 0 -> success,
@@ -695,86 +732,66 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                        int sub_pg_code, void * resp, int mx_resp_len,
                        int noisy, int verbose)
 {
-    int res, k;
+    int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] = 
         {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     modesCmdBlk[1] = (unsigned char)((dbd ? 0x8 : 0) | (llbaa ? 0x10 : 0));
     modesCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
     modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
     modesCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     modesCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xffff) {
-        fprintf(sg_warnings_str, "mx_resp_len too big\n");
+        fprintf(sg_warnings_strm, "mx_resp_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_str, "    mode sense (10) cdb: ");
+        fprintf(sg_warnings_strm, "    mode sense (10) cdb: ");
         for (k = 0; k < MODE_SENSE10_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = MODE_SENSE10_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = modesCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "mode sense (10) SG_IO error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "mode sense (10): out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Mode sense (10)", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    mode sense (10): resid=%d (got "
-                    "%d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        if (verbose > 2) {
-            k = mx_resp_len - io_hdr.resid;
-            if (k > 0) {
-                fprintf(sg_warnings_str, "    mode sense (10): response%s\n",
-                        (k > 256 ? ", first 256 bytes" : ""));
-                dStrHex(resp, (k > 256 ? 256 : k), -1);
-            }
+    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "mode sense (10)", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Mode sense (10) error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-
-            snprintf(ebuff, EBUFF_SZ, "Mode sense (10) error, dbd=%d "
-                    "pc=%d page_code=%x sub_page_code=%x\n     ", dbd,
-                    pc, pg_code, sub_pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    mode sense (10): response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
         }
-        return -1;
+        ret = 0;
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI MODE SELECT (6) command.  Return of 0 -> success,
@@ -783,74 +800,63 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
 int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
                        int param_len, int noisy, int verbose)
 {
-    int res, k;
+    int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SELECT6_CMDLEN] = 
         {MODE_SELECT6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     modesCmdBlk[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
     modesCmdBlk[4] = (unsigned char)(param_len & 0xff);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (param_len > 0xff) {
-        fprintf(sg_warnings_str, "mode select (6): param_len too big\n");
+        fprintf(sg_warnings_strm, "mode select (6): param_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_str, "    mode select (6) cdb: ");
+        fprintf(sg_warnings_strm, "    mode select (6) cdb: ");
         for (k = 0; k < MODE_SELECT6_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
     if (verbose > 1) {
-        fprintf(sg_warnings_str, "    mode select (6) parameter block\n");
+        fprintf(sg_warnings_strm, "    mode select (6) parameter block\n");
         dStrHex((const char *)paramp, param_len, -1);
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = MODE_SELECT6_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = modesCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "mode select (6) SG_IO error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "mode select (6): out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Mode select (6)", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Mode select (6) error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-
-            snprintf(ebuff, EBUFF_SZ, "Mode select (6) error, pf=%d "
-                    "sp=%d\n     ", pf, sp);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "mode select (6)", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return -1;
-    }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
@@ -859,75 +865,64 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
 int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
                        int param_len, int noisy, int verbose)
 {
-    int res, k;
+    int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SELECT10_CMDLEN] = 
         {MODE_SELECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     modesCmdBlk[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
     modesCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
     modesCmdBlk[8] = (unsigned char)(param_len & 0xff);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (param_len > 0xffff) {
-        fprintf(sg_warnings_str, "mode select (10): param_len too big\n");
+        fprintf(sg_warnings_strm, "mode select (10): param_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_str, "    mode select (10) cdb: ");
+        fprintf(sg_warnings_strm, "    mode select (10) cdb: ");
         for (k = 0; k < MODE_SELECT10_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
     if (verbose > 1) {
-        fprintf(sg_warnings_str, "    mode select (10) parameter block\n");
+        fprintf(sg_warnings_strm, "    mode select (10) parameter block\n");
         dStrHex((const char *)paramp, param_len, -1);
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = MODE_SELECT10_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = modesCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "mode select (10) SG_IO error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "mode select (10): out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Mode select (10)", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Mode select (10) error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-
-            snprintf(ebuff, EBUFF_SZ, "Mode select (10) error, pf=%d "
-                    "sp=%d\n     ", pf, sp);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "mode select (10)", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return -1;
-    }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* MODE SENSE commands yield a response that has block descriptors followed
@@ -1005,8 +1000,8 @@ int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
         *reported_len = 0;
     if (mx_mpage_len < 4)
         return 0;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     memset(ebuff, 0, sizeof(ebuff));
     /* first try to find length of current page response */
     memset(buff, 0, MODE10_RESP_HDR_LEN);
@@ -1028,7 +1023,7 @@ int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
         if (mode6 && (n < 3)) {
             resp_mode6 = 0;
             if (verbose)
-                fprintf(sg_warnings_str, ">>> msense(6) but resp[0]=%d so "
+                fprintf(sg_warnings_strm, ">>> msense(6) but resp[0]=%d so "
                         "try msense(10) response processing\n", n);
         }
         if ((0 == mode6) && (n > 5)) {
@@ -1037,14 +1032,14 @@ int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
                 buff[1] = n;
                 buff[0] = 0;
                 if (verbose)
-                    fprintf(sg_warnings_str, ">>> msense(10) but resp[0]=%d "
+                    fprintf(sg_warnings_strm, ">>> msense(10) but resp[0]=%d "
                             "and not msense(6) response so fix length\n", n);
             } else
                 resp_mode6 = 1;
         }
     }
     if (verbose && (resp_mode6 != mode6))
-        fprintf(sg_warnings_str, ">>> msense(%d) but resp[0]=%d "
+        fprintf(sg_warnings_strm, ">>> msense(%d) but resp[0]=%d "
                 "so switch response processing\n", (mode6 ? 6 : 10),
                 buff[0]);
     calc_len = resp_mode6 ? (buff[0] + 1) : ((buff[0] << 8) + buff[1] + 2);
@@ -1054,7 +1049,7 @@ int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
                                  ebuff, EBUFF_SZ);
     if (offset < 0) {
         if (('\0' != ebuff[0]) && (verbose > 0))
-            fprintf(sg_warnings_str, "sg_get_mode_page_types: "
+            fprintf(sg_warnings_strm, "sg_get_mode_page_types: "
                     "current values: %s\n", ebuff);
         return offset;
     }
@@ -1092,83 +1087,71 @@ int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
 
 /* Invokes a SCSI REQUEST SENSE command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Request Sense not * supported??,
- * SG_LIB_CAT_ILEGAL_REQ -> bad field in cdb, -1 -> other failure */
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
                         int noisy, int verbose)
 {
-    int k, res;
+    int k, ret, res, sense_cat;
     unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] = 
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     if (desc)
         rsCmdBlk[1] |= 0x1;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xfc) {
-        fprintf(sg_warnings_str, "SPC-3 says request sense allocation "
+        fprintf(sg_warnings_strm, "SPC-3 says request sense allocation "
                 "length should be <= 252\n");
         return -1;
     }
     rsCmdBlk[4] = mx_resp_len & 0xff;
     if (verbose) {
-        fprintf(sg_warnings_str, "    Request Sense cmd: ");
+        fprintf(sg_warnings_strm, "    Request Sense cmd: ");
         for (k = 0; k < REQUEST_SENSE_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rsCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rsCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = REQUEST_SENSE_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rsCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (verbose)
-            fprintf(sg_warnings_str, "request sense SG_IO error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "request sense: out of memory\n");
         return -1;
     }
-
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    /* shouldn't get errors on Request Sense but it is best to be safe */
-    res =  sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (verbose)
-            sg_chk_n_print3("Request sense", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if ((mx_resp_len >= 8) && (io_hdr.resid > (mx_resp_len - 8))) {
+    set_scsi_pt_cdb(ptvp, rsCmdBlk, sizeof(rsCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "request sense", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else {
+        if ((mx_resp_len >= 8) && (ret < 8)) {
             if (verbose)
-                fprintf(sg_warnings_str, "    request sense: resid=%d "
-                        "indicates response too short\n", io_hdr.resid);
-            return -1;
-        } else if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    request sense: resid=%d (got "
-                    "%d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("REQUEST SENSE command problem", &io_hdr,
-                            (verbose > 1));
-        return -1;
+                fprintf(sg_warnings_strm, "    request sense: got %d "
+                        "bytes in response, too short\n", ret);
+            ret = -1;
+        } else
+            ret = 0;
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
@@ -1177,70 +1160,57 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
 int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
                       int mx_resp_len, int noisy, int verbose)
 {
-    int k, res;
+    int k, ret, res, sense_cat;
     unsigned char rlCmdBlk[REPORT_LUNS_CMDLEN] =
                          {REPORT_LUNS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     rlCmdBlk[2] = select_report & 0xff;
     rlCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
     rlCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
     rlCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
     rlCmdBlk[9] = mx_resp_len & 0xff;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    report luns cdb: ");
+        fprintf(sg_warnings_strm, "    report luns cdb: ");
         for (k = 0; k < REPORT_LUNS_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rlCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rlCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rlCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rlCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "report_luns (SG_IO) error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "report luns: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Report luns", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    report luns: resid=%d (got "
-                    "%d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("REPORTS LUNS command error", &io_hdr, 1);
-        return res;
-    case SG_LIB_CAT_MEDIA_CHANGED:
-        return 2;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("REPORT LUNS command error", &io_hdr,
-                            (verbose > 1));
-        return -1;
-    }
+    set_scsi_pt_cdb(ptvp, rlCmdBlk, sizeof(rlCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "report luns", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI LOG SENSE command. Return of 0 -> success,
@@ -1250,16 +1220,16 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                     int paramp, unsigned char * resp, int mx_resp_len, 
                     int noisy, int verbose)
 {
-    int res, k;
+    int res, ret, k, sense_cat;
     unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] = 
         {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xffff) {
-        fprintf(sg_warnings_str, "mx_resp_len too big\n");
+        fprintf(sg_warnings_strm, "mx_resp_len too big\n");
         return -1;
     }
     logsCmdBlk[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
@@ -1269,59 +1239,43 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     logsCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     logsCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
     if (verbose) {
-        fprintf(sg_warnings_str, "    log sense cdb: ");
+        fprintf(sg_warnings_strm, "    log sense cdb: ");
         for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", logsCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", logsCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(logsCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = logsCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "log sense (SG_IO) error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "log sense: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Log sense", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    log sense: resid=%d (got "
-                    "%d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("log_sense error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "log_sense: ppc=%d, sp=%d, "
-                     "pc=%d, page_code=%x, paramp=%x\n    ", ppc, sp, pc, 
-                     pg_code, paramp);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    set_scsi_pt_cdb(ptvp, logsCmdBlk, sizeof(logsCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "log sense", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return -1;
-    }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 
@@ -1332,16 +1286,16 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
                      unsigned char * paramp, int param_len, 
                      int noisy, int verbose)
 {
-    int res, k;
+    int res, ret, k, sense_cat;
     unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] = 
         {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (param_len > 0xffff) {
-        fprintf(sg_warnings_str, "log select: param_len too big\n");
+        fprintf(sg_warnings_strm, "log select: param_len too big\n");
         return -1;
     }
     logsCmdBlk[1] = (unsigned char)((pcr ? 2 : 0) | (sp ? 1 : 0));
@@ -1349,58 +1303,48 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
     logsCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
     logsCmdBlk[8] = (unsigned char)(param_len & 0xff);
     if (verbose) {
-        fprintf(sg_warnings_str, "    log select cdb: ");
+        fprintf(sg_warnings_strm, "    log select cdb: ");
         for (k = 0; k < LOG_SELECT_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", logsCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", logsCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
     if ((verbose > 1) && (param_len > 0)) {
-        fprintf(sg_warnings_str, "    log select parameter block\n");
+        fprintf(sg_warnings_strm, "    log select parameter block\n");
         dStrHex((const char *)paramp, param_len, -1);
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(logsCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = param_len ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = logsCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "log select (SG_IO) error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "log select: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Log select", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("log_select error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "log_select: pcr=%d, sp=%d, "
-                     "pc=%d\n    ", pcr, sp, pc);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    set_scsi_pt_cdb(ptvp, logsCmdBlk, sizeof(logsCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "log select", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return -1;
-    }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI REPORT TARGET PORT GROUPS command. Return of 0 -> success,
@@ -1409,69 +1353,58 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
 int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
                              int mx_resp_len, int noisy, int verbose)
 {
-    int k, res;
+    int k, res, ret, sense_cat;
     unsigned char rtpgCmdBlk[MAINTENANCE_IN_CMDLEN] =
                          {MAINTENANCE_IN_CMD, REPORT_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     rtpgCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
     rtpgCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
     rtpgCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
     rtpgCmdBlk[9] = mx_resp_len & 0xff;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    report target port groups cdb: ");
+        fprintf(sg_warnings_strm, "    report target port groups cdb: ");
         for (k = 0; k < MAINTENANCE_IN_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rtpgCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rtpgCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rtpgCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rtpgCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "report_tgt_prt_grp (SG_IO) error: "
-                    "%s\n", safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "report target port groups: out of "
+                "memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Report target port groups", &io_hdr,
-                            (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    report_tgt_prt_grp: resid=%d (got "
-                    "%d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("REPORT TARGET PORT GROUPS", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("REPORT TARGET PORT GROUPS command error",
-                            &io_hdr, (verbose > 1));
-        return -1;
-    }
+    set_scsi_pt_cdb(ptvp, rtpgCmdBlk, sizeof(rtpgCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "report Target port group", res,
+                       mx_resp_len, sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI SEND DIAGNOSTIC command. Foreground, extended self tests can
@@ -1483,143 +1416,125 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
                     void * paramp, int param_len, int noisy,
                     int verbose)
 {
-    int k, res;
+    int k, res, ret, sense_cat;
     unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] = 
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     senddiagCmdBlk[1] = (unsigned char)((sf_code << 5) | (pf_bit << 4) |
                         (sf_bit << 2) | (devofl_bit << 1) | unitofl_bit);
     senddiagCmdBlk[3] = (unsigned char)((param_len >> 8) & 0xff);
     senddiagCmdBlk[4] = (unsigned char)(param_len & 0xff);
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    Send diagnostic cmd: ");
+        fprintf(sg_warnings_strm, "    Send diagnostic cmd: ");
         for (k = 0; k < SEND_DIAGNOSTIC_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", senddiagCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", senddiagCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
-            fprintf(sg_warnings_str, "    Send diagnostic parameter "
+            fprintf(sg_warnings_strm, "    Send diagnostic parameter "
                     "block:\n");
             dStrHex(paramp, param_len, -1);
         }
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = SEND_DIAGNOSTIC_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = param_len ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = senddiagCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = long_duration ? LONG_TIMEOUT : DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "send diagnostic (SG_IO) error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "send diagnostic: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Send diagnostic, continuing", &io_hdr,
-                            (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("SEND DIAGNOSTIC", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "Send diagnostic error, sf_code=0x%x, "
-                     "pf_bit=%d, sf_bit=%d ", sf_code, pf_bit, sf_bit);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    set_scsi_pt_cdb(ptvp, senddiagCmdBlk, sizeof(senddiagCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, 
+                     (long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT),
+                     verbose);
+    ret = process_resp(ptvp, "send diagnostic", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return -1;
-    }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
-/* Invokes a SCSI RECEIVE DIAGNOSTICS RESULTS command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Receive diagnostics results not supported,
+/* Invokes a SCSI RECEIVE DIAGNOSTIC RESULTS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Receive diagnostic results not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp, 
                        int mx_resp_len, int noisy, int verbose)
 {
-    int k, res;
+    int k, res, ret, sense_cat;
     unsigned char rcvdiagCmdBlk[RECEIVE_DIAGNOSTICS_CMDLEN] = 
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     rcvdiagCmdBlk[1] = (unsigned char)(pcv ? 0x1 : 0);
     rcvdiagCmdBlk[2] = (unsigned char)(pg_code);
     rcvdiagCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     rcvdiagCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    Receive diagnostics results cmd: ");
+        fprintf(sg_warnings_strm, "    Receive diagnostic results cmd: ");
         for (k = 0; k < RECEIVE_DIAGNOSTICS_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rcvdiagCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rcvdiagCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = RECEIVE_DIAGNOSTICS_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rcvdiagCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "receive diagnostics results (SG_IO) "
-                    "error: %s\n", safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "receive diagnostic results: out of "
+                "memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Receive diagnostics results, continuing",
-                            &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("RECEIVE DIAGNOSTICS RESULTS", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "Receive diagnostics results error, "
-                     "pcv=%d, page_code=%x ", pcv, pg_code);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    set_scsi_pt_cdb(ptvp, rcvdiagCmdBlk, sizeof(rcvdiagCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "receive diagnostic results", res,
+                       mx_resp_len, sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return -1;
-    }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI READ DEFECT DATA (10) command (SBC). Return of 0 ->
@@ -1629,85 +1544,66 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
                         int dl_format, void * resp, int mx_resp_len,
                         int noisy, int verbose)
 {
-    int res, k;
+    int res, k, ret, sense_cat;
     unsigned char rdefCmdBlk[READ_DEFECT10_CMDLEN] = 
         {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     rdefCmdBlk[2] = (unsigned char)(((req_plist << 4) & 0x10) |
                          ((req_glist << 3) & 0x8) | (dl_format & 0x7));
     rdefCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     rdefCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xffff) {
-        fprintf(sg_warnings_str, "mx_resp_len too big\n");
+        fprintf(sg_warnings_strm, "mx_resp_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_str, "    read defect (10) cdb: ");
+        fprintf(sg_warnings_strm, "    read defect (10) cdb: ");
         for (k = 0; k < READ_DEFECT10_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rdefCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rdefCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = READ_DEFECT10_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rdefCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "read defect (10) SG_IO error: %s\n",
-                    safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "read defect (10): out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Read defect (10)", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    report defect(10): resid=%d (got "
-                    "%d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        if (verbose > 2) {
-            k = mx_resp_len - io_hdr.resid;
-            if (k > 0) {
-                fprintf(sg_warnings_str, "    read defect (10): response%s\n",
-                        (k > 256 ? ", first 256 bytes" : ""));
-                dStrHex(resp, (k > 256 ? 256 : k), -1);
-            }
+    set_scsi_pt_cdb(ptvp, rdefCmdBlk, sizeof(rdefCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "read defect (10)", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Read defect (10) error", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-
-            snprintf(ebuff, EBUFF_SZ, "Read defect (10) error, req_plist=%d "
-                    "req_glist=%d dl_format=%x\n     ", req_plist, req_glist,
-                    dl_format);
-            sg_chk_n_print3(ebuff, &io_hdr, (verbose > 1));
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read defect (10): response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
         }
-        return -1;
+        ret = 0;
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI READ MEDIA SERIAL NUMBER command. Return of 0 -> success,
@@ -1716,140 +1612,121 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
 int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
                                 int noisy, int verbose)
 {
-    int k, res;
+    int k, res, ret, sense_cat;
     unsigned char rmsnCmdBlk[SERVICE_ACTION_IN_12_CMDLEN] =
                          {SERVICE_ACTION_IN_12_CMD, READ_MEDIA_SERIAL_NUM_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     rmsnCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
     rmsnCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
     rmsnCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
     rmsnCmdBlk[9] = mx_resp_len & 0xff;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    read media serial number cdb: ");
+        fprintf(sg_warnings_strm, "    read media serial number cdb: ");
         for (k = 0; k < SERVICE_ACTION_IN_12_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rmsnCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rmsnCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rmsnCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rmsnCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "read_media_serial_num (SG_IO) error:"
-                    " %s\n", safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "read media serial number: out of "
+                "memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Read media serial number", &io_hdr,
-                            (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    read_media_serial_num: resid=%d ("
-                    "got %d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        if (verbose > 2) {
-            k = mx_resp_len - io_hdr.resid;
-            if (k > 0) {
-                fprintf(sg_warnings_str, "    report media serial number: "
-                        "response%s\n", (k > 256 ? ", first 256 bytes" : ""));
-                dStrHex(resp, (k > 256 ? 256 : k), -1);
-            }
+    set_scsi_pt_cdb(ptvp, rmsnCmdBlk, sizeof(rmsnCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "read media serial number", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("READ MEDIA SERIAL NUMBER", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("READ MEDIA SERIAL NUMBER command error",
-                            &io_hdr, (verbose > 1));
-        return -1;
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read media serial number: respon"
+                    "se%s\n", (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+        }
+        ret = 0;
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI START STOP UNIT command (MMC + SBC).
  * Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Start stop unit not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
-int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
-                          int loej, int start, int noisy, int verbose)
+int sg_ll_start_stop_unit(int sg_fd, int immed, int fl_num, int power_cond,
+                          int fl, int loej, int start, int noisy, int verbose)
 {
     unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-    int k, res;
+    int k, res, ret, sense_cat;
+    void * ptvp;
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     ssuBlk[1] = immed & 1;
-    ssuBlk[4] = ((power_cond & 0xf) << 4) | ((loej & 1) << 1) |
-                (start & 1);
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    ssuBlk[3] = fl_num & 3;
+    ssuBlk[4] = ((power_cond & 0xf) << 4) | (fl ? 0x4 : 0) |
+                 (loej ? 0x2 : 0) | (start ? 0x1 : 0);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    Start stop unit command:");
+        fprintf(sg_warnings_strm, "    Start stop unit command:");
         for (k = 0; k < (int)sizeof(ssuBlk); ++k)
-                fprintf (sg_warnings_str, " %02x", ssuBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+                fprintf (sg_warnings_strm, " %02x", ssuBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(ssuBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.dxfer_len = 0;
-    io_hdr.dxferp = NULL;
-    io_hdr.cmdp = ssuBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = START_TIMEOUT;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (verbose)
-            fprintf(sg_warnings_str, "start_stop_unit (SG_IO) error:"
-                    " %s\n", safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "start stop unit: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (verbose)
-            sg_chk_n_print3("Start stop unit", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("START STOP UNIT", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("START STOP UNIT command error", &io_hdr,
-                            (verbose > 1));
-        return -1;
-    }
+    set_scsi_pt_cdb(ptvp, ssuBlk, sizeof(ssuBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    res = do_scsi_pt(ptvp, sg_fd, START_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "start stop unit", res, 0,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+            ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI PREVENT ALLOW MEDIUM REMOVAL command (SPC-3) 
@@ -1859,144 +1736,123 @@ int sg_ll_start_stop_unit(int sg_fd, int immed, int power_cond,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
 {
-    int k, res;
+    int k, res, ret, sense_cat;
     unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] = 
                 {PREVENT_ALLOW_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if ((prevent < 0) || (prevent > 3)) {
-        fprintf(sg_warnings_str, "prevent argument should be 0, 1, 2 or 3\n");
+        fprintf(sg_warnings_strm, "prevent argument should be 0, 1, 2 or 3\n");
         return -1;
     }
     pCmdBlk[4] |= (prevent & 0x3);
     if (verbose) {
-        fprintf(sg_warnings_str, "    Prevent allow medium removal cdb: ");
+        fprintf(sg_warnings_strm, "    Prevent allow medium removal cdb: ");
         for (k = 0; k < PREVENT_ALLOW_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", pCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", pCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = PREVENT_ALLOW_CMDLEN;
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.dxfer_len = 0;
-    io_hdr.dxferp = NULL;
-    io_hdr.cmdp = pCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(sg_warnings_str, "prevent allow medium removal SG_IO "
-                "error: %s\n", safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "prevent allow medium removal: out of "
+                "memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (verbose)
-            sg_chk_n_print3("Prevent allow medium removal", &io_hdr,
-                            (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("Prevent allow medium removal command problem",
-                            &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("Prevent allow medium removal command problem",
-                            &io_hdr, (verbose > 1));
-        return -1;
-    }
+    set_scsi_pt_cdb(ptvp, pCmdBlk, sizeof(pCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "prevent allow medium removal", res, 0,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+            ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI REPORT DEVICE IDENTIFIER command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
 int sg_ll_report_dev_id(int sg_fd, void * resp, int mx_resp_len,
-                               int noisy, int verbose)
+                        int noisy, int verbose)
 {
-    int k, res;
+    int k, res, ret, sense_cat;
     unsigned char rdiCmdBlk[MAINTENANCE_IN_CMDLEN] =
                          {MAINTENANCE_IN_CMD, REPORT_DEVICE_IDENTIFIER_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     rdiCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
     rdiCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
     rdiCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
     rdiCmdBlk[9] = mx_resp_len & 0xff;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    Report device identifier cdb: ");
+        fprintf(sg_warnings_strm, "    Report device identifier cdb: ");
         for (k = 0; k < MAINTENANCE_IN_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", rdiCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", rdiCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rdiCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rdiCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "report_device_idenifier (SG_IO) error:"
-                    " %s\n", safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "report device identifier: out of "
+                "memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Report device identifier", &io_hdr,
-                            (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(sg_warnings_str, "    report_device_identifier: resid=%d ("
-                    "got %d bytes)\n", io_hdr.resid,
-                    io_hdr.dxfer_len - io_hdr.resid);
-        if (verbose > 2) {
-            k = mx_resp_len - io_hdr.resid;
-            if (k > 0) {
-                fprintf(sg_warnings_str, "    report device identifier: "
-                        "response%s\n", (k > 256 ? ", first 256 bytes" : ""));
-                dStrHex(resp, (k > 256 ? 256 : k), -1);
-            }
+    set_scsi_pt_cdb(ptvp, rdiCmdBlk, sizeof(rdiCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "report device identifier", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
         }
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("REPORT DEVICE IDENTIFIER", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("REPORT DEVICE IDENTIFIER command error",
-                            &io_hdr, (verbose > 1));
-        return -1;
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    report device identifier: respon"
+                    "se%s\n", (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+        }
+        ret = 0;
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Invokes a SCSI SET DEVICE IDENTIFIER command. Return of 0 -> success,
@@ -2005,67 +1861,691 @@ int sg_ll_report_dev_id(int sg_fd, void * resp, int mx_resp_len,
 int sg_ll_set_dev_id(int sg_fd, void * paramp, int param_len,
                      int noisy, int verbose)
 {
-    int k, res;
+    int k, res, ret, sense_cat;
     unsigned char sdiCmdBlk[MAINTENANCE_OUT_CMDLEN] =
                          {MAINTENANCE_OUT_CMD, SET_DEVICE_IDENTIFIER_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
+    void * ptvp;
 
     sdiCmdBlk[6] = (param_len >> 24) & 0xff;
     sdiCmdBlk[7] = (param_len >> 16) & 0xff;
     sdiCmdBlk[8] = (param_len >> 8) & 0xff;
     sdiCmdBlk[9] = param_len & 0xff;
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_str, "    Set device identifier cdb: ");
+        fprintf(sg_warnings_strm, "    Set device identifier cdb: ");
         for (k = 0; k < MAINTENANCE_OUT_CMDLEN; ++k)
-            fprintf(sg_warnings_str, "%02x ", sdiCmdBlk[k]);
-        fprintf(sg_warnings_str, "\n");
+            fprintf(sg_warnings_strm, "%02x ", sdiCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
-            fprintf(sg_warnings_str, "    Set device identifier parameter "
+            fprintf(sg_warnings_strm, "    Set device identifier parameter "
                     "block:\n");
             dStrHex(paramp, param_len, -1);
         }
     }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    memset(sense_b, 0, sizeof(sense_b));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(sdiCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = sdiCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        if (noisy || verbose)
-            fprintf(sg_warnings_str, "set_device_idenifier (SG_IO) error:"
-                    " %s\n", safe_strerror(errno));
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "set device identifier: out of memory\n");
         return -1;
     }
-    if (verbose > 2)
-        fprintf(sg_warnings_str, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        if (noisy || verbose)
-            sg_chk_n_print3("Set device identifier", &io_hdr, (verbose > 1));
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
+    set_scsi_pt_cdb(ptvp, sdiCmdBlk, sizeof(sdiCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "set device identifier", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a FORMAT UNIT (SBC-3) command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Format unit not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
+                      int fmtdata, int cmplist, int dlist_format,
+                      int timeout_secs, void * paramp, int param_len,
+                      int noisy, int verbose)
+{
+    int k, res, ret, sense_cat, tmout;
+    unsigned char fuCmdBlk[FORMAT_UNIT_CMDLEN] = 
+                {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    if (fmtpinfo)
+        fuCmdBlk[1] |= 0x80;
+    if (rto_req)
+        fuCmdBlk[1] |= 0x40;
+    if (longlist)
+        fuCmdBlk[1] |= 0x20;
+    if (fmtdata)
+        fuCmdBlk[1] |= 0x10;
+    if (cmplist)
+        fuCmdBlk[1] |= 0x8;
+    if (dlist_format)
+        fuCmdBlk[1] |= (dlist_format & 0x7);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    format cdb: ");
+        for (k = 0; k < 6; ++k)
+            fprintf(sg_warnings_strm, "%02x ", fuCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+    if ((verbose > 1) && (param_len > 0)) {
+        fprintf(sg_warnings_strm, "    format parameter block:\n");
+        dStrHex((const char *)paramp, param_len, -1);
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "format unit: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, fuCmdBlk, sizeof(fuCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
+    ret = process_resp(ptvp, "format unit", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI REASSIGN BLOCKS command.  Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, -1 -> other failure */
+int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist,
+                          void * paramp, int param_len, int noisy,
+                          int verbose)
+{
+    int res, k, ret, sense_cat;
+    unsigned char reassCmdBlk[REASSIGN_BLKS_CMDLEN] = 
+        {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    reassCmdBlk[1] = (unsigned char)(((longlba << 1) & 0x2) | (longlist & 0x1));
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    reassign blocks cdb: ");
+        for (k = 0; k < REASSIGN_BLKS_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", reassCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+    if (verbose > 1) {
+        fprintf(sg_warnings_strm, "    reassign blocks parameter block\n");
+        dStrHex((const char *)paramp, param_len, -1);
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "reassign blocks: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, reassCmdBlk, sizeof(reassCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "reassign blocks", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI GET CONFIGURATION command (MMC-3,4,5).
+ * Returns 0 when successful, SG_LIB_CAT_INVALID_OP if command not
+ * supported, SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
+ * else -1 */
+int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
+                     int mx_resp_len, int noisy, int verbose)
+{
+    int res, k, ret, sense_cat;
+    unsigned char gcCmdBlk[GET_CONFIG_CMD_LEN] = {GET_CONFIG_CMD, 0, 0, 0, 
+                                                  0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if ((rt < 0) || (rt > 3)) {
+        fprintf(sg_warnings_strm, "Bad rt value: %d\n", rt);
+        return -1;
+    }
+    gcCmdBlk[1] = (rt & 0x3);
+    if ((starting < 0) || (starting > 0xffff)) {
+        fprintf(sg_warnings_strm, "Bad starting field number: 0x%x\n",
+                starting);
+        return -1;
+    }
+    gcCmdBlk[2] = (unsigned char)((starting >> 8) & 0xff);
+    gcCmdBlk[3] = (unsigned char)(starting & 0xff);
+    if ((mx_resp_len < 0) || (mx_resp_len > 0xffff)) {
+        fprintf(sg_warnings_strm, "Bad mx_resp_len: 0x%x\n", starting);
+        return -1;
+    }
+    gcCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    gcCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Get Configuration cdb: ");
+        for (k = 0; k < GET_CONFIG_CMD_LEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", gcCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "get configuration: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, gcCmdBlk, sizeof(gcCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "get configuration", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    get configuration: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+        }
+        ret = 0;
+    }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI PERSISTENT RESERVE IN command (SPC). Returns 0
+ * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported, else -1 */
+int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
+                                int mx_resp_len, int noisy, int verbose)
+{
+    int res, k, ret, sense_cat;
+    unsigned char prinCmdBlk[PERSISTENT_RESERVE_IN_CMDLEN] =
+                 {PERSISTENT_RESERVE_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    if (rq_servact > 0)
+        prinCmdBlk[1] = (unsigned char)(rq_servact & 0x1f);
+    prinCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    prinCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Persistent Reservation In cmd: ");
+        for (k = 0; k < PERSISTENT_RESERVE_IN_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", prinCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "persistent reservation in: out of "
+                "memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, prinCmdBlk, sizeof(prinCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "persistent reservation in", res, mx_resp_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    persistent reserve in: "
+                    "response%s\n", (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex(resp, (ret > 256 ? 256 : ret), -1);
+        }
+        ret = 0;
+    }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI PERSISTENT RESERVE OUT command (SPC). Returns 0
+ * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported, else -1 */
+int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
+                                 unsigned int rq_type, void * paramp,
+                                 int param_len, int noisy, int verbose)
+{
+    int res, k, ret, sense_cat;
+    unsigned char proutCmdBlk[PERSISTENT_RESERVE_OUT_CMDLEN] =
+                 {PERSISTENT_RESERVE_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    if (rq_servact > 0)
+        proutCmdBlk[1] = (unsigned char)(rq_servact & 0x1f);
+    proutCmdBlk[2] = (((rq_scope & 0xf) << 4) | (rq_type & 0xf));
+    proutCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
+    proutCmdBlk[8] = (unsigned char)(param_len & 0xff);
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Persistent Reservation Out cmd: ");
+        for (k = 0; k < PERSISTENT_RESERVE_OUT_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", proutCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+        if (verbose > 1) {
+            fprintf(sg_warnings_strm, "    Persistent Reservation Out parameters:\n");
+            dStrHex(paramp, param_len, 0);
+        }
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "persistent reserve out: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, proutCmdBlk, sizeof(proutCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "persistent reserve out", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+static int has_blk_ili(unsigned char * sensep, int sb_len)
+{
+    int resp_code;
+    const unsigned char * cup;
+
+    if (sb_len < 8)
         return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("SET DEVICE IDENTIFIER", &io_hdr, 1);
-        return res;
-    default:
-        if (noisy || verbose)
-            sg_chk_n_print3("SET DEVICE IDENTIFIER command error",
-                            &io_hdr, (verbose > 1));
+    resp_code = (0x7f & sensep[0]);
+    if (resp_code >= 0x72) { /* descriptor format */
+        /* find block command descriptor */
+        if ((cup = sg_scsi_sense_desc_find(sensep, sb_len, 0x5)))
+            return ((cup[3] & 0x20) ? 1 : 0);
+    } else /* fixed */
+        return ((sensep[2] & 0x20) ? 1 : 0);
+    return 0;
+}
+
+/* Invokes a SCSI READ LONG (10) SBC command. Note that 'xfer_len'
+ * is in bytes. Returns 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> READ LONG(10) not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
+ * SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO -> bad field in cdb, with info
+ * field written to 'offsetp', -1 -> other failure */
+int sg_ll_read_long10(int sg_fd, int correct, unsigned long lba,
+                      void * resp, int xfer_len, int * offsetp,
+                      int noisy, int verbose)
+{
+    int k, res, sense_cat, ret;
+    unsigned char readLongCmdBlk[READ_LONG10_CMDLEN];
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    memset(readLongCmdBlk, 0, READ_LONG10_CMDLEN);
+    readLongCmdBlk[0] = READ_LONG10_CMD;
+    if (correct)
+        readLongCmdBlk[1] |= 0x2;
+
+    /*lba*/
+    readLongCmdBlk[2] = (lba & 0xff000000) >> 24;
+    readLongCmdBlk[3] = (lba & 0x00ff0000) >> 16;
+    readLongCmdBlk[4] = (lba & 0x0000ff00) >> 8;
+    readLongCmdBlk[5] = (lba & 0x000000ff);
+    /*size*/
+    readLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
+    readLongCmdBlk[8] = (xfer_len & 0x000000ff);
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Read Long (10) cmd: ");
+        for (k = 0; k < READ_LONG10_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", readLongCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "read long (10): out of memory\n");
         return -1;
     }
+    set_scsi_pt_cdb(ptvp, readLongCmdBlk, sizeof(readLongCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, xfer_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "read long (10)", res, xfer_len,
+                       sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            {
+                int valid, slen;
+                unsigned long long ull = 0;
+
+                slen = get_scsi_pt_sense_len(ptvp);
+                valid = sg_get_sense_info_fld(sense_b, slen, &ull);
+                if (valid && has_blk_ili(sense_b, slen)) {
+                    if (offsetp)
+                        *offsetp = (int)(long long)ull;
+                    ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
+                } else {
+                    if (verbose || noisy)
+                        fprintf(sg_warnings_strm, "  info field [%d], but "
+                                "ILI clear ??\n", (int)(long long)ull);
+                    ret = SG_LIB_CAT_ILLEGAL_REQ;
+                }
+            }
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI WRITE LONG (10) command (SBC). Note that 'xfer_len'
+ * is in bytes. Returns 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> WRITE LONG(10) not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
+ * SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO -> bad field in cdb, with info
+ * field written to 'offsetp', -1 -> other failure */
+int sg_ll_write_long10(int sg_fd, int cor_dis, unsigned long lba,
+                      void * data_out, int xfer_len, int * offsetp,
+                      int noisy, int verbose)
+{
+    int k, res, sense_cat, ret;
+    unsigned char writeLongCmdBlk[WRITE_LONG10_CMDLEN];
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    memset(writeLongCmdBlk, 0, WRITE_LONG10_CMDLEN);
+    writeLongCmdBlk[0] = WRITE_LONG10_CMD;
+  
+    /*lba*/
+    writeLongCmdBlk[2] = (lba & 0xff000000) >> 24;
+    writeLongCmdBlk[3] = (lba & 0x00ff0000) >> 16;
+    writeLongCmdBlk[4] = (lba & 0x0000ff00) >> 8;
+    writeLongCmdBlk[5] = (lba & 0x000000ff);
+    /*size*/
+    writeLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
+    writeLongCmdBlk[8] = (xfer_len & 0x000000ff);
+
+    if (cor_dis)
+        writeLongCmdBlk[1] |= 0x80;
+  
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Write Long (10) cmd: ");
+        for (k = 0; k < (int)sizeof(writeLongCmdBlk); ++k)
+            fprintf(sg_warnings_strm, "%02x ", writeLongCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "write long(10): out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, writeLongCmdBlk, sizeof(writeLongCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, data_out, xfer_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "write long(10)", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            {
+                int valid, slen;
+                unsigned long long ull = 0;
+
+                slen = get_scsi_pt_sense_len(ptvp);
+                valid = sg_get_sense_info_fld(sense_b, slen, &ull);
+                if (valid && has_blk_ili(sense_b, slen)) {
+                    if (offsetp)
+                        *offsetp = (int)(long long)ull;
+                    ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
+                } else {
+                    if (verbose || noisy)
+                        fprintf(sg_warnings_strm, "  info field [%d], but "
+                                "ILI clear ??\n", (int)(long long)ull);
+                    ret = SG_LIB_CAT_ILLEGAL_REQ;
+                }
+            }
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI VERIFY (10) command (SBC and MMC).
+ * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.
+ * Returns of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Verify(10) not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
+ * SG_LIB_CAT_MEDIUM_HARD -> medium or hardware error, no valid info,
+ * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> as previous, with valid info,
+ * -1 -> other failure */
+int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
+                   int veri_len, void * data_out, int data_out_len,
+                   unsigned long * infop, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char vCmdBlk[VERIFY10_CMDLEN] = 
+                {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    void * ptvp;
+
+    if (dpo)
+        vCmdBlk[1] |= 0x10;
+    if (bytechk)
+        vCmdBlk[1] |= 0x2;
+    vCmdBlk[2] = (unsigned char)((lba >> 24) & 0xff);
+    vCmdBlk[3] = (unsigned char)((lba >> 16) & 0xff);
+    vCmdBlk[4] = (unsigned char)((lba >> 8) & 0xff);
+    vCmdBlk[5] = (unsigned char)(lba & 0xff);
+    vCmdBlk[7] = (unsigned char)((veri_len >> 8) & 0xff);
+    vCmdBlk[8] = (unsigned char)(veri_len & 0xff);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose > 1) {
+        fprintf(sg_warnings_strm, "    Verify(10) cdb: ");
+        for (k = 0; k < VERIFY10_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", vCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "verify (10): out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, vCmdBlk, sizeof(vCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    if (data_out_len > 0)
+        set_scsi_pt_data_out(ptvp, data_out, data_out_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = process_resp(ptvp, "verify (10)", res, 0, sense_b,
+                       noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        case SG_LIB_CAT_MEDIUM_HARD:
+            {
+                int valid, slen;
+                unsigned long long ull = 0;
+
+                slen = get_scsi_pt_sense_len(ptvp);
+                valid = sg_get_sense_info_fld(sense_b, slen, &ull);
+                if (valid) {
+                    if (infop)
+                        *infop = (unsigned long)ull;
+                    ret = SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
+                } else
+                    ret = SG_LIB_CAT_MEDIUM_HARD;
+            }
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }

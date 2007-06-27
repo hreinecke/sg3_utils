@@ -27,12 +27,14 @@ MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sg_map26.8
 MAN_PREF = man8
 
+OS_FLAGS = -DSG3_UTILS_LINUX
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+EXTRA_FLAGS = $(OS_FLAGS) $(LARGE_FILE_FLAGS)
 
-# CFLAGS = -O2 -Wall -W $(LARGE_FILE_FLAGS)
-CFLAGS = -g -O2 -Wall -W $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -W -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(LARGE_FILE_FLAGS)
+# CFLAGS = -O2 -Wall -W $(EXTRA_FLAGS)
+CFLAGS = -g -O2 -Wall -W $(EXTRA_FLAGS)
+# CFLAGS = -g -O2 -W -DSG_KERNEL_INCLUDES $(EXTRA_FLAGS)
+# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(EXTRA_FLAGS)
 
 CFLAGS_PTHREADS = -D_REENTRANT
 
@@ -49,112 +51,112 @@ clean:
 	/bin/rm -f *.o $(EXECS) core* .depend *.a *.la *.lo
 	/bin/rm -rf .libs
 
-sg_dd: sg_dd.o sg_lib.o sg_cmds.o llseek.o
+sg_dd: sg_dd.o sg_lib.o sg_cmds.o sg_pt_linux.o sg_io_linux.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_scan: sg_scan.o sg_lib.o
+sg_scan: sg_scan.o sg_io_linux.o sg_lib.o
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
-sginfo: sginfo.o sg_lib.o
+sginfo: sginfo.o sg_io_linux.o sg_lib.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_start: sg_start.o sg_lib.o sg_cmds.o
+sg_start: sg_start.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
-sg_rbuf: sg_rbuf.o sg_lib.o
+sg_rbuf: sg_rbuf.o sg_lib.o sg_io_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_readcap: sg_readcap.o sg_lib.o sg_cmds.o
+sg_readcap: sg_readcap.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sgp_dd.o: sgp_dd.c
 	$(CC) $(INCLUDES) $(CFLAGS) $(CFLAGS_PTHREADS) -c $<
 
-sgp_dd: sgp_dd.o sg_lib.o sg_cmds.o llseek.o
+sgp_dd: sgp_dd.o sg_lib.o sg_cmds.o sg_pt_linux.o sg_io_linux.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^ -lpthread
 
-sgm_dd: sgm_dd.o sg_lib.o sg_cmds.o llseek.o
+sgm_dd: sgm_dd.o sg_lib.o sg_cmds.o sg_pt_linux.o sg_io_linux.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_map: sg_map.o sg_lib.o sg_cmds.o
+sg_map: sg_map.o sg_lib.o sg_cmds.o sg_pt_linux.o sg_io_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_turs: sg_turs.o sg_lib.o sg_cmds.o
+sg_turs: sg_turs.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_test_rwbuf: sg_test_rwbuf.o sg_lib.o
+sg_test_rwbuf: sg_test_rwbuf.o sg_lib.o sg_io_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_inq: sg_inq.o sg_lib.o sg_cmds.o
+sg_inq: sg_inq.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_read: sg_read.o sg_lib.o llseek.o
+sg_read: sg_read.o sg_lib.o sg_io_linux.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_reset: sg_reset.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_modes: sg_modes.o sg_lib.o sg_cmds.o
+sg_modes: sg_modes.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_logs: sg_logs.o sg_lib.o sg_cmds.o
+sg_logs: sg_logs.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_senddiag: sg_senddiag.o sg_lib.o sg_cmds.o
+sg_senddiag: sg_senddiag.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_opcodes: sg_opcodes.o sg_lib.o sg_cmds.o
+sg_opcodes: sg_opcodes.o sg_lib.o sg_cmds.o sg_pt_linux.o sg_io_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_persist: sg_persist.o sg_lib.o sg_cmds.o
+sg_persist: sg_persist.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_write_long: sg_write_long.o sg_lib.o
+sg_write_long: sg_write_long.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_read_long: sg_read_long.o sg_lib.o
+sg_read_long: sg_read_long.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_requests: sg_requests.o sg_lib.o sg_cmds.o
+sg_requests: sg_requests.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_ses: sg_ses.o sg_lib.o sg_cmds.o
+sg_ses: sg_ses.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_verify: sg_verify.o sg_lib.o
+sg_verify: sg_verify.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_emc_trespass: sg_emc_trespass.o sg_lib.o sg_cmds.o
+sg_emc_trespass: sg_emc_trespass.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_luns: sg_luns.o sg_lib.o sg_cmds.o
+sg_luns: sg_luns.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_sync: sg_sync.o sg_lib.o sg_cmds.o
+sg_sync: sg_sync.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_prevent: sg_prevent.o sg_lib.o sg_cmds.o
+sg_prevent: sg_prevent.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_get_config: sg_get_config.o sg_lib.o sg_cmds.o
+sg_get_config: sg_get_config.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_wr_mode: sg_wr_mode.o sg_lib.o sg_cmds.o
+sg_wr_mode: sg_wr_mode.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_rtpg: sg_rtpg.o sg_lib.o sg_cmds.o
+sg_rtpg: sg_rtpg.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_reassign: sg_reassign.o sg_lib.o sg_cmds.o
+sg_reassign: sg_reassign.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_format: sg_format.o sg_lib.o sg_cmds.o
+sg_format: sg_format.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_rmsn: sg_rmsn.o sg_lib.o sg_cmds.o
+sg_rmsn: sg_rmsn.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_ident: sg_ident.o sg_lib.o sg_cmds.o
+sg_ident: sg_ident.o sg_lib.o sg_cmds.o sg_pt_linux.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_map26: sg_map26.o

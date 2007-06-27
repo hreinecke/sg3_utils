@@ -3,17 +3,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2005 D. Gilbert
+*  Copyright (C) 1999 - 2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -27,14 +24,12 @@
 
 */
 
-static char * version_str = "3.75 20051114";
+static char * version_str = "3.75 20060106";
 
 #define ME "sg_readcap: "
 
 #define RCAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
-
-#define EBUFF_SZ 256
 
 
 void usage ()
@@ -69,7 +64,6 @@ int main(int argc, char * argv[])
     int do16 = 0;
     int verbose = 0;
     unsigned int last_blk_addr, block_size;
-    char ebuff[EBUFF_SZ];
     const char * file_name = 0;
     const char * cp;
     unsigned char resp_buff[RCAP16_REPLY_LEN];
@@ -157,16 +151,16 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    if ((sg_fd = open(file_name, (do16 ? O_RDWR : O_RDONLY) | O_NONBLOCK))
-        < 0) {
-        snprintf(ebuff, EBUFF_SZ, ME "error opening file: %s", file_name);
-        perror(ebuff);
+    if ((sg_fd = sg_cmds_open_device(file_name, 
+                                     (do16 ? 0 /* rw */ : 1), verbose)) < 0) {
+        fprintf(stderr, ME "error opening file: %s: %s\n", file_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
 
     if (! do16) {
         res = sg_ll_readcap_10(sg_fd, pmi, lba, resp_buff, RCAP_REPLY_LEN,
-                               1, verbose);
+                               0, verbose);
         if (0 == res) {
             last_blk_addr = ((resp_buff[0] << 24) | (resp_buff[1] << 16) |
                              (resp_buff[2] << 8) | resp_buff[3]);
@@ -207,11 +201,11 @@ int main(int argc, char * argv[])
             }
         } else if (SG_LIB_CAT_INVALID_OP == res) {
             do16 = 1;
-            close(sg_fd);
-            if ((sg_fd = open(file_name, O_RDWR | O_NONBLOCK)) < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "error re-opening file: %s "
-                         "RDWR", file_name);
-                perror(ebuff);
+            sg_cmds_close_device(sg_fd);
+            if ((sg_fd = sg_cmds_open_device(file_name, 0 /*rw */, verbose))
+                < 0) {
+                fprintf(stderr, ME "error re-opening file: %s (rw): %s\n",
+                        file_name, safe_strerror(-sg_fd));
                 return 1;
             }
             if (verbose)
@@ -225,7 +219,7 @@ int main(int argc, char * argv[])
     }
     if (do16) {
         res = sg_ll_readcap_16(sg_fd, pmi, llba, resp_buff, RCAP16_REPLY_LEN,
-                               1, verbose);
+                               0, verbose);
         if (0 == res) {
             for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
                 llast_blk_addr <<= 8;
@@ -273,10 +267,10 @@ int main(int argc, char * argv[])
     }
     if (brief)
         printf("0x0 0x0\n");
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return 1;
 
 good:
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return 0;
 }

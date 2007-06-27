@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,12 +32,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -47,7 +43,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.04 20051116";
+static char * version_str = "1.05 20060127";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -148,6 +144,10 @@ static void decode_lun(const char * leadin, unsigned char * lunp)
                     break;
                 case 3:
                     printf("%sTARGET LOG PAGES well known logical unit\n",
+                           l_leadin);
+                    break;
+                case 4:
+                    printf("%sSECURITY PROTOCOL well known logical unit\n",
                            l_leadin);
                     break;
                 default:
@@ -261,10 +261,10 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
-        perror("");
+        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
 
@@ -305,16 +305,16 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Report Luns command not supported (support "
                 "mandatory in SPC-3)\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Report Luns command has bad fields in cdb\n");
+        fprintf(stderr, "Report Luns command has bad field in cdb\n");
     else {
         fprintf(stderr, "Report Luns command failed\n");
         if (0 == verbose)
             fprintf(stderr, "    try '-v' option for more information\n");
     }
 
-    res = close(sg_fd);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
         return 1;
     }
     return ret;

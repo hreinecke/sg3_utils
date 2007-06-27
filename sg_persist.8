@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_PERSIST "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sg_persist \- use the Persistent Reservation In and Out SCSI commands
 to manipulate registrations and reservations
@@ -140,11 +140,11 @@ same as 'read-full-status'.
 .TP
 --register | -G
 Register is a sub-command of the PROUT command. It has 3 different
-actions depending on associated parameters. 1) add a new registration 
-with '--param-rk=0' and '--param-sark=<new_rk>'. 2) Change an existing
-registration with '--param-rk=<old_rk>' and '--param-sark=<new_rk>'.
-3) Delete an existing registration with '--param-rk=<old_rk>' 
-and '--param-sark=0'.
+actions depending on associated parameters. a) add a new registration 
+with '--param-rk=0' and '--param-sark=<new_rk>'; b) Change an existing
+registration with '--param-rk=<old_rk>'
+and '--param-sark=<new_rk>'; or  c) Delete an existing registration
+with '--param-rk=<old_rk>' and '--param-sark=0'.
 .TP
 --register-ignore | -I
 Register and Ignore Existing Key is a sub-command of the PROUT command.

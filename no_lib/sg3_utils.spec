@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.18
+Version: 1.19
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -124,6 +124,10 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Fri Jan 27 2006 - dgilbert at interlog dot com
+- sg_get_config: resync features with mmc5 rev 1
+  * sg3_utils-1.19
+
 * Fri Nov 18 2005 - dgilbert at interlog dot com
 - add sg_map26, sg_inq: '-rr' option to play with hdparm
   * sg3_utils-1.18

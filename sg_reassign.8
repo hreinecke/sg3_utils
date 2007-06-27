@@ -29,9 +29,9 @@ then the parameter block passed to the given device is made up of
 .TP
 --address=<n>,<n>... | -a <n>,<n>...
 string of comma separated numbers. Each number is interpreted as decimal
-unless prefixed by '0x' or '0X'. If multiple logical block addresses
-are given they must be separated by a comma. At least one address must
-be given.
+unless prefixed by '0x' or '0X' (or it has a trailing 'h' or 'H'). If
+multiple logical block addresses are given they must be separated by a
+comma. At least one address must be given.
 .TP
 --address=- | -a -
 reads one or more logical block addresses from stdin. These may be comma,

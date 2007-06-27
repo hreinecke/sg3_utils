@@ -1,4 +1,4 @@
-.TH SG_READ "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_READ "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sg_read \- read blocks of data continually from same offset
 .SH SYNOPSIS
@@ -87,8 +87,8 @@ suffixes are compatible with GNU's dd command (since 2002) which claims
 compliance with SI and with IEC 60027-2.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
-either "0x" or "0X". When hex numbers are given multipliers cannot be
-used.
+either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
+given multipliers cannot be used.
 .PP
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies

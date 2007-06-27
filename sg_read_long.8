@@ -1,4 +1,4 @@
-.TH SG_READ_LONG "8" "March 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_READ_LONG "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sg_read_long \- send the scsi command read long
 .SH SYNOPSIS
@@ -55,8 +55,8 @@ MB *1,000,000; g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix
 of the form "x<n>" multiplies the leading number by <n>.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
-either "0x" or "0X". When hex numbers are given multipliers cannot be
-used.
+either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
+given multipliers cannot be used.
 .PP
 As a data point, Fujitsu uses a 54 byte ECC (per block) which is capable
 of correcting up to a single burst error or 216 bits "on the

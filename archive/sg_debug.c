@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
-#include "sg_include.h"
+#include "sg_linux_inc.h"
 
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2005 Douglas Gilbert.
+ * Copyright (c) 1999-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,7 @@
  *    and a GPL notice.
  *
  *    Much of the data in this file is derived from SCSI draft standards
- *    found at http://www.t10.org with the "SCSI Primary Commands-3" (SPC-4)
+ *    found at http://www.t10.org with the "SCSI Primary Commands-4" (SPC-4)
  *    being the central point of reference.
  *
  *    Other contributions:
@@ -65,12 +65,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.15 20051113";    /* spc-4 rev 02 */
 
-FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
+static char * version_str = "1.18 20060124";    /* spc-4 rev 03 */
+
+FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 /* Commands with service actions that change the command name */
 #define SG_MAINTENANCE_IN 0xa3
@@ -81,7 +81,7 @@ FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 #define SG_SERVICE_ACTION_OUT_16 0x9f
 #define SG_VARIABLE_LENGTH_CMD 0x7f
 
-static void dStrHexErr(const char* str, int len);
+static void dStrHexErr(const char* str, int len, int b_len, char * b);
 
 struct value_name_t {
     int value;
@@ -222,7 +222,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0xa0, 0, "Report luns"},
     {0xa1, 0, "ATA command pass through(12)"},
     {0xa1, 5, "Blank"},
-    {0xa2, 0, "Trusted computing in"},
+    {0xa2, 0, "Security protocol in"},
     {0xa3, 0, "Maintenance in"},
     {0xa3, 5, "Send key"},
     {0xa4, 0, "Maintenance out"},
@@ -247,7 +247,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0xb2, 0, "Search data low(12)"},
     {0xb3, 0, "Set limits(12)"},
     {0xb4, 0, "Read element status attached"},
-    {0xb5, 0, "Trusted computing out"},
+    {0xb5, 0, "Security protocol out"},
     {0xb5, 8, "Request volume element address"},
     {0xb6, 0, "Set volume tag"},
     {0xb6, 5, "Set streaming"},
@@ -395,41 +395,34 @@ static const struct value_name_t * get_value_name(
     return NULL;
 }
 
-void sg_set_warnings_str(FILE * warnings_str)
+void sg_set_warnings_strm(FILE * warnings_strm)
 {
-    sg_warnings_str = warnings_str;
+    sg_warnings_strm = warnings_strm;
 }
 
-#define CMD_BUFF_LEN 64
+#define CMD_NAME_LEN 128
 
 void sg_print_command(const unsigned char * command) 
 {
     int k, sz;
-    char buff[CMD_BUFF_LEN];
+    char buff[CMD_NAME_LEN];
 
-    sg_get_command_name(command, 0, CMD_BUFF_LEN, buff);
-    buff[CMD_BUFF_LEN - 1] = '\0';
+    sg_get_command_name(command, 0, CMD_NAME_LEN, buff);
+    buff[CMD_NAME_LEN - 1] = '\0';
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
-    fprintf(sg_warnings_str, "%s [", buff);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    fprintf(sg_warnings_strm, "%s [", buff);
     if (SG_VARIABLE_LENGTH_CMD == command[0]) 
         sz = command[7] + 8;
     else
         sz = sg_get_command_size(command[0]);
     for (k = 0; k < sz; ++k)
-        fprintf(sg_warnings_str, "%02x ", command[k]);
-    fprintf(sg_warnings_str, "]\n");
+        fprintf(sg_warnings_strm, "%02x ", command[k]);
+    fprintf(sg_warnings_strm, "]\n");
 }
 
-void sg_print_status(int masked_status) 
-{
-    int scsi_status = (masked_status << 1) & 0x7e;
-
-    sg_print_scsi_status(scsi_status);
-}
-
-void sg_print_scsi_status(int scsi_status) 
+void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 {
     const char * ccp;
 
@@ -448,10 +441,20 @@ void sg_print_scsi_status(int scsi_status)
         case 0x40: ccp = "Task Aborted"; break;
         default: ccp = "Unknown status"; break;
     }
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
-    fprintf(sg_warnings_str, "%s ", ccp);
+    strncpy(buff, ccp, buff_len);
 }
+
+void sg_print_scsi_status(int scsi_status) 
+{
+    char buff[128];
+
+    sg_get_scsi_status_str(scsi_status, sizeof(buff) - 1, buff);
+    buff[sizeof(buff) - 1] = '\0';
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    fprintf(sg_warnings_strm, "%s ", buff);
+}
+
 
 struct error_info{
     unsigned char code1, code2;
@@ -558,6 +561,7 @@ static struct error_info additional[] =
     {0x0C,0x0B,"Auxiliary memory write error"},
     {0x0C,0x0C,"Write error - unexpected unsolicited data"},
     {0x0C,0x0D,"Write error - not enough unsolicited data"},
+    {0x0C,0x0F,"Defects in error window"},
     {0x0D,0x00,"Error detected by third party temporary initiator"},
     {0x0D,0x01,"Third party device failure"},
     {0x0D,0x02,"Copy target device not reachable"},
@@ -657,6 +661,7 @@ static struct error_info additional[] =
     {0x21,0x00,"Logical block address out of range"},
     {0x21,0x01,"Invalid element address"},
     {0x21,0x02,"Invalid address for write"},
+    {0x21,0x03,"Invalid write crossing layer jump"},
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
     {0x24,0x00,"Invalid field in cdb"},
     {0x24,0x01,"CDB decryption error"},
@@ -690,6 +695,7 @@ static struct error_info additional[] =
     {0x27,0x06,"Conditional write protect"},
     {0x28,0x00,"Not ready to ready change, medium may have changed"},
     {0x28,0x01,"Import or export element accessed"},
+    {0x28,0x02,"Format-layer may have changed"},
     {0x29,0x00,"Power on, reset, or bus device reset occurred"},
     {0x29,0x01,"Power on occurred"},
     {0x29,0x02,"SCSI bus reset occurred"},
@@ -813,6 +819,9 @@ static struct error_info additional[] =
     {0x3F,0x0F,"Echo buffer overwritten"},
     {0x3F,0x10,"Medium loadable"},
     {0x3F,0x11,"Medium auxiliary memory accessible"},
+    {0x3F,0x12,"iSCSI IP address added"},
+    {0x3F,0x13,"iSCSI IP address removed"},
+    {0x3F,0x14,"iSCSI IP address changed"},
 
     /*
      * ASC 0x40, 0x41 and 0x42 overridden by "additional2" array entries
@@ -825,7 +834,7 @@ static struct error_info additional[] =
 
     {0x43,0x00,"Message error"},
     {0x44,0x00,"Internal target failure"},
-    {0x44,0x71,"ATA device failed Set Features"}, /* was 0x44,0xf1 in rev1 */
+    {0x44,0x71,"ATA device failed Set Features"},
     {0x45,0x00,"Select or reselect failure"},
     {0x46,0x00,"Unsuccessful soft reset"},
     {0x47,0x00,"SCSI parity error"},
@@ -863,7 +872,8 @@ static struct error_info additional[] =
     {0x53,0x00,"Media load or eject failed"},
     {0x53,0x01,"Unload tape failure"},
     {0x53,0x02,"Medium removal prevented"},
-    {0x53,0x03,"Data transfer element prevented medium removal"},
+    {0x53,0x03,"Medium removal prevented by data transfer element"},
+    {0x53,0x04,"Medium thread or unthread failure"},
     {0x54,0x00,"SCSI to host system interface failure"},
     {0x55,0x00,"System resource failure"},
     {0x55,0x01,"System buffer full"},
@@ -1023,6 +1033,8 @@ static struct error_info additional[] =
     {0x6F,0x03,"Read of scrambled sector without authentication"},
     {0x6F,0x04,"Media region code is mismatched to logical unit region"},
     {0x6F,0x05,"Drive region must be permanent/region reset count error"},
+    {0x6F,0x06,"Insufficient block count for binding nonce recording"},
+    {0x6F,0x07,"Conflict in binding nonce recording"},
     /*
      * ASC 0x70 overridden by an "additional2" array entry
      * so there is no need to have them here.
@@ -1036,13 +1048,18 @@ static struct error_info additional[] =
     {0x72,0x03,"Session fixation error - incomplete track in session"},
     {0x72,0x04,"Empty or partially written reserved track"},
     {0x72,0x05,"No more track reservations allowed"},
-    {0x73,0x00,"Cd control error"},
+    {0x72,0x06,"RMZ extension is not allowed"},
+    {0x72,0x07,"No more test zone extensions are allowed"},
+    {0x73,0x00,"CD control error"},
     {0x73,0x01,"Power calibration area almost full"},
     {0x73,0x02,"Power calibration area is full"},
     {0x73,0x03,"Power calibration area error"},
     {0x73,0x04,"Program memory area update failure"},
     {0x73,0x05,"Program memory area is full"},
     {0x73,0x06,"RMA/PMA is full"},
+    {0x73,0x10,"Current power calibration area almost full"},
+    {0x73,0x11,"Current power calibration area is full"},
+    {0x73,0x17,"RDZ is full"},
     {0, 0, NULL}
 };
 
@@ -1198,7 +1215,8 @@ int sg_get_sense_progress_fld(const unsigned char * sensep,
     case 0x70:
     case 0x71:
         sk = (sensep[2] & 0xf);
-        if ((sb_len < 18) || ((NO_SENSE != sk) && (NOT_READY != sk)))
+        if ((sb_len < 18) ||
+            ((SPC_SK_NO_SENSE != sk) && (SPC_SK_NOT_READY != sk)))
             return 0;
         if (sensep[15] & 0x80) {
             if (progress_outp)
@@ -1209,7 +1227,7 @@ int sg_get_sense_progress_fld(const unsigned char * sensep,
     case 0x72:
     case 0x73:
         sk = (sensep[1] & 0xf);
-        if ((NO_SENSE != sk) && (NOT_READY != sk))
+        if ((SPC_SK_NO_SENSE != sk) && (SPC_SK_NOT_READY != sk))
             return 0;
         ucp = sg_scsi_sense_desc_find(sensep, sb_len, 2 /* sense key spec. */);
         if (ucp && (0x6 == ucp[1]) && (0x80 & ucp[4])) {
@@ -1260,14 +1278,18 @@ char * sg_get_pdt_str(int pdt, int buff_len, char * buff)
 
 /* Print descriptor format sense descriptors (assumes sense buffer is
    in descriptor format) */
-static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
-                                       int sb_len)
+static void sg_get_sense_descriptors_str(const unsigned char * sense_buffer,
+                                         int sb_len, int buff_len,
+                                         char * buff)
 {
-    int add_sen_len, add_len, desc_len, k, j, sense_key, processed, progress;
+    int add_sen_len, add_len, desc_len, k, j, sense_key, processed;
+    int n, progress;
     const unsigned char * descp;
+    char b[256];
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if ((NULL == buff) || (buff_len <= 0))
+        return;
+    buff[0] = '\0';
     if ((sb_len < 8) || (0 == (add_sen_len = sense_buffer[7])))
         return;
     add_sen_len = (add_sen_len < (sb_len - 8)) ? add_sen_len : (sb_len - 8);
@@ -1277,135 +1299,136 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
         descp += desc_len;
         add_len = (k < (add_sen_len - 1)) ? descp[1]: -1;
         desc_len = add_len + 2;
-        fprintf(sg_warnings_str, "  Descriptor type: ");
+        n = 0;
+        n += sprintf(b + n, "  Descriptor type: ");
         processed = 1;
         switch (descp[0]) {
         case 0:
-            fprintf(sg_warnings_str, "Information\n");
+            n += sprintf(b + n, "Information\n");
             if ((add_len >= 10) && (0x80 & descp[2])) {
-                fprintf(sg_warnings_str, "    0x");
+                n += sprintf(b + n, "    0x");
                 for (j = 0; j < 8; ++j)
-                    fprintf(sg_warnings_str, "%02x", descp[4 + j]);
-                fprintf(sg_warnings_str, "\n");
+                    n += sprintf(b + n, "%02x", descp[4 + j]);
+                n += sprintf(b + n, "\n");
             } else
                 processed = 0;
             break;
         case 1:
-            fprintf(sg_warnings_str, "Command specific\n");
+            n += sprintf(b + n, "Command specific\n");
             if (add_len >= 10) {
-                fprintf(sg_warnings_str, "    0x");
+                n += sprintf(b + n, "    0x");
                 for (j = 0; j < 8; ++j)
-                    fprintf(sg_warnings_str, "%02x", descp[4 + j]);
-                fprintf(sg_warnings_str, "\n");
+                    n += sprintf(b + n, "%02x", descp[4 + j]);
+                n += sprintf(b + n, "\n");
             } else
                 processed = 0;
             break;
         case 2:
-            fprintf(sg_warnings_str, "Sense key specific:");
+            n += sprintf(b + n, "Sense key specific:");
             switch (sense_key) {
-            case ILLEGAL_REQUEST:
-                fprintf(sg_warnings_str, " Field pointer\n");
+            case SPC_SK_ILLEGAL_REQUEST:
+                n += sprintf(b + n, " Field pointer\n");
                 if (add_len < 6) {
                     processed = 0;
                     break;
                 }
-                fprintf(sg_warnings_str, "    Error in %s byte %d",
+                n += sprintf(b + n, "    Error in %s byte %d",
                         (descp[4] & 0x40) ? "Command" : "Data",
                         (descp[5] << 8) | descp[6]);
                 if (descp[4] & 0x08) {
-                    fprintf(sg_warnings_str, " bit %d\n", descp[4] & 0x07);
+                    n += sprintf(b + n, " bit %d\n", descp[4] & 0x07);
                 } else
-                    fprintf(sg_warnings_str, "\n");
+                    n += sprintf(b + n, "\n");
                 break;
-            case HARDWARE_ERROR:
-            case MEDIUM_ERROR:
-            case RECOVERED_ERROR:
-                fprintf(sg_warnings_str, " Actual retry count\n");
+            case SPC_SK_HARDWARE_ERROR:
+            case SPC_SK_MEDIUM_ERROR:
+            case SPC_SK_RECOVERED_ERROR:
+                n += sprintf(b + n, " Actual retry count\n");
                 if (add_len < 6) {
                     processed = 0;
                     break;
                 }
-                fprintf(sg_warnings_str, "    0x%02x%02x\n", descp[5],
+                n += sprintf(b + n, "    0x%02x%02x\n", descp[5],
                         descp[6]);
                 break;
-            case NO_SENSE:
-            case NOT_READY:
-                fprintf(sg_warnings_str, " Progress indication: ");
+            case SPC_SK_NO_SENSE:
+            case SPC_SK_NOT_READY:
+                n += sprintf(b + n, " Progress indication: ");
                 if (add_len < 6) {
                     processed = 0;
-                    fprintf(sg_warnings_str, " field too short\n");
+                    n += sprintf(b + n, " field too short\n");
                     break;
                 }
                 progress = (descp[5] << 8) + descp[6];
-                fprintf(sg_warnings_str, "%d %%\n", 
+                n += sprintf(b + n, "%d %%\n", 
                         (progress * 100) / 0x10000);
                 break;
-            case COPY_ABORTED:
-                fprintf(sg_warnings_str, " Segment pointer\n");
+            case SPC_SK_COPY_ABORTED:
+                n += sprintf(b + n, " Segment pointer\n");
                 if (add_len < 6) {
                     processed = 0;
                     break;
                 }
-                fprintf(sg_warnings_str, "    Relative to start of %s, byte %d",
+                n += sprintf(b + n, "    Relative to start of %s, byte %d",
                         (descp[4] & 0x20) ? "segment descriptor" : 
                                             "parameter list",
                         (descp[5] << 8) | descp[6]);
                 if (descp[4] & 0x08)
-                    fprintf(sg_warnings_str, " bit %d\n", descp[4] & 0x07);
+                    n += sprintf(b + n, " bit %d\n", descp[4] & 0x07);
                 else
-                    fprintf(sg_warnings_str, "\n");
+                    n += sprintf(b + n, "\n");
                 break;
             default:
-                fprintf(sg_warnings_str, " Sense_key: 0x%x unexpected\n",
+                n += sprintf(b + n, " Sense_key: 0x%x unexpected\n",
                         sense_key);
                 processed = 0;
                 break;
             }
             break;
         case 3:
-            fprintf(sg_warnings_str, "Field replaceable unit\n");
+            n += sprintf(b + n, "Field replaceable unit\n");
             if (add_len >= 2)
-                fprintf(sg_warnings_str, "    code=0x%x\n", descp[3]);
+                n += sprintf(b + n, "    code=0x%x\n", descp[3]);
             else
                 processed = 0;
             break;
         case 4:
-            fprintf(sg_warnings_str, "Stream commands\n");
+            n += sprintf(b + n, "Stream commands\n");
             if (add_len >= 2) {
                 if (descp[3] & 0x80)
-                    fprintf(sg_warnings_str, "    FILEMARK");
+                    n += sprintf(b + n, "    FILEMARK");
                 if (descp[3] & 0x40)
-                    fprintf(sg_warnings_str, "    End Of Medium (EOM)");
+                    n += sprintf(b + n, "    End Of Medium (EOM)");
                 if (descp[3] & 0x20)
-                    fprintf(sg_warnings_str, "    Incorrect Length Indicator "
+                    n += sprintf(b + n, "    Incorrect Length Indicator "
                             "(ILI)");
-                fprintf(sg_warnings_str, "\n");
+                n += sprintf(b + n, "\n");
             } else
                 processed = 0;
             break;
         case 5:
-            fprintf(sg_warnings_str, "Block commands\n");
+            n += sprintf(b + n, "Block commands\n");
             if (add_len >= 2)
-                fprintf(sg_warnings_str, "    Incorrect Length Indicator "
+                n += sprintf(b + n, "    Incorrect Length Indicator "
                         "(ILI) %s\n", (descp[3] & 0x20) ? "set" : "clear");
             else
                 processed = 0;
             break;
         case 6:
-            fprintf(sg_warnings_str, "OSD object identification\n");
+            n += sprintf(b + n, "OSD object identification\n");
             processed = 0;
             break;
         case 7:
-            fprintf(sg_warnings_str, "OSD response integrity check value\n");
+            n += sprintf(b + n, "OSD response integrity check value\n");
             processed = 0;
             break;
         case 8:
-            fprintf(sg_warnings_str, "OSD attribute identification\n");
+            n += sprintf(b + n, "OSD attribute identification\n");
             processed = 0;
             break;
         case 9:
-            fprintf(sg_warnings_str, "ATA return\n");
-            if (add_len >= 14) {
+            n += sprintf(b + n, "ATA return\n");
+            if (add_len >= 12) {
                 int extended, sector_count, lba_low, lba_mid, lba_high;
 
                 extended = descp[2] & 1;
@@ -1419,61 +1442,75 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
                     lba_mid += (descp[8] << 8);
                     lba_high += (descp[10] << 8);
                 }
-                fprintf(sg_warnings_str, "    extended=%d  error=0x%x "
+                n += sprintf(b + n, "    extended=%d  error=0x%x "
                         " sector_count=0x%x\n", extended, descp[3],
                         sector_count);
-                fprintf(sg_warnings_str, "    lba_low=0x%x  lba_mid=0x%x "
+                n += sprintf(b + n, "    lba_low=0x%x  lba_mid=0x%x "
                         " lba_high=0x%x\n", lba_low, lba_mid, lba_high);
-                fprintf(sg_warnings_str, "    device=0x%x  status=0x%x\n",
+                n += sprintf(b + n, "    device=0x%x  status=0x%x\n",
                         descp[12], descp[13]);
             } else
                 processed = 0;
             break;
         default:
-            fprintf(sg_warnings_str, "Unknown or vendor specific [0x%x]\n",
+            n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
                     descp[0]);
             processed = 0;
             break;
         }
         if (! processed) {
             if (add_len > 0) {
-                fprintf(sg_warnings_str, "    ");
+                n += sprintf(b + n, "    ");
                 for (j = 0; (j < add_len) && ((k + j + 2) < add_sen_len);
                      ++j) {
                     if ((j > 0) && (0 == (j % 24)))
-                        fprintf(sg_warnings_str, "\n    ");
-                    fprintf(sg_warnings_str, "%02x ", descp[j + 2]);
+                        n += sprintf(b + n, "\n    ");
+                    n += sprintf(b + n, "%02x ", descp[j + 2]);
                 }
-                fprintf(sg_warnings_str, "\n");
+                n += sprintf(b + n, "\n");
             }
         }
-        if (add_len < 0) {
-            fprintf(sg_warnings_str, "    short descriptor\n");
+        if (add_len < 0)
+            n += sprintf(b + n, "    short descriptor\n");
+        j = strlen(buff);
+        if ((n + j) >= buff_len) {
+            strncpy(buff + j, b, buff_len - j);
+            buff[buff_len - 1] = '\0';
             break;
         }
+        strcpy(buff + j, b);
+        if (add_len < 0)
+            break;
     }
 }
 
-/* Print sense information */
-void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
-                    int sb_len, int raw_sinfo)
+/* Fetch sense information */
+void sg_get_sense_str(const char * leadin,
+                      const unsigned char * sense_buffer, int sb_len,
+                      int raw_sinfo, int buff_len, char * buff)
 {
-    int len, valid, progress;
+    int len, valid, progress, n, r;
     unsigned int info;
     int descriptor_format = 0;
     const char * error = NULL;
     char error_buff[64];
-    char add_sense[128];
+    char b[256];
     struct sg_scsi_sense_hdr ssh;
 
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
+    if ((NULL == buff) || (buff_len <= 0))
+        return;
+    buff[buff_len - 1] = '\0';
+    --buff_len;
+    n = 0;
     if (sb_len < 1) {
-            fprintf(sg_warnings_str, "sense buffer empty\n");
+            snprintf(buff, n, "sense buffer empty\n");
             return;
     }
-    if (leadin)
-        fprintf(sg_warnings_str, "%s: ", leadin);
+    if (leadin) {
+        n += snprintf(buff + n, buff_len - n, "%s: ", leadin);
+        if (n >= buff_len)
+            return;
+    }
     len = sb_len;
     if (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh)) {
         switch (ssh.response_code) {
@@ -1505,95 +1542,115 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
             error = error_buff;
             break;
         }
-        fprintf(sg_warnings_str, " %s;  Sense key: %s\n ", error,
-                sense_key_desc[ssh.sense_key]);
+        n += snprintf(buff + n, buff_len - n, " %s;  Sense key: %s\n ",
+                      error, sense_key_desc[ssh.sense_key]);
+        if (n >= buff_len)
+            return;
         if (descriptor_format) {
-            fprintf(sg_warnings_str, "%s\n",
-                    sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
-                                        sizeof(add_sense), add_sense));
-            sg_print_sense_descriptors(sense_buffer, len);
+            n += snprintf(buff + n, buff_len - n, "%s\n",
+                          sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
+                                              sizeof(b), b));
+            if (n >= buff_len)
+                return;
+            sg_get_sense_descriptors_str(sense_buffer, len, buff_len - n,
+                                         buff + n);
+            n = strlen(buff);
+            if (n >= buff_len)
+                return;
         } else if (len > 2) {   /* fixed format */
-            if (len > 12)
-                fprintf(sg_warnings_str, "%s\n",
-                        sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
-                                            sizeof(add_sense), add_sense));
+            if (len > 12) {
+                n += snprintf(buff + n, buff_len - n, "%s\n",
+                              sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
+                                                  sizeof(b), b));
+                if (n >= buff_len)
+                    return;
+            }
+            r = 0;
             valid = sense_buffer[0] & 0x80;
             if (len > 6) {
                 info = (unsigned int)((sense_buffer[3] << 24) |
                         (sense_buffer[4] << 16) | (sense_buffer[5] << 8) |
                         sense_buffer[6]);
                 if (valid)
-                    fprintf(sg_warnings_str, "  Info fld=0x%x [%u] ", info,
-                            info);
+                    r += sprintf(b + r, "  Info fld=0x%x [%u] ", info,
+                                 info);
                 else if (info > 0)
-                    fprintf(sg_warnings_str, "  Valid=0, Info fld=0x%x [%u] ",
-                            info, info);
+                    r += sprintf(b + r, "  Valid=0, Info fld=0x%x [%u] ",
+                                 info, info);
             } else
                 info = 0;
             if (sense_buffer[2] & 0xe0) {
                 if (sense_buffer[2] & 0x80)
-                   fprintf(sg_warnings_str, " FMK");
+                   r += sprintf(b + r, " FMK");
                             /* current command has read a filemark */
                 if (sense_buffer[2] & 0x40)
-                   fprintf(sg_warnings_str, " EOM");
+                   r += sprintf(b + r, " EOM");
                             /* end-of-medium condition exists */
                 if (sense_buffer[2] & 0x20)
-                   fprintf(sg_warnings_str, " ILI");
+                   r += sprintf(b + r, " ILI");
                             /* incorrect block length requested */
-                fprintf(sg_warnings_str, "\n");
+                r += sprintf(b + r, "\n");
             } else if (valid || (info > 0))
-                fprintf(sg_warnings_str, "\n");
+                r += sprintf(b + r, "\n");
             if ((len >= 14) && sense_buffer[14])
-                fprintf(sg_warnings_str, "  Field replaceable unit code: "
-                        "%d\n", sense_buffer[14]);
+                r += sprintf(b + r, "  Field replaceable unit code: "
+                             "%d\n", sense_buffer[14]);
             if ((len >= 18) && (sense_buffer[15] & 0x80)) {
                 /* sense key specific decoding */
                 switch (ssh.sense_key) {
-                case ILLEGAL_REQUEST:
-                    fprintf(sg_warnings_str, "  Sense Key Specific: Error in "
-                            "%s byte %d",
-                            (sense_buffer[15] & 0x40) ? "Command" : "Data",
-                            (sense_buffer[16] << 8) | sense_buffer[17]);
+                case SPC_SK_ILLEGAL_REQUEST:
+                    r += sprintf(b + r, "  Sense Key Specific: Error in "
+                                 "%s byte %d", (sense_buffer[15] & 0x40) ?
+                                                 "Command" : "Data",
+                                 (sense_buffer[16] << 8) | sense_buffer[17]);
                     if (sense_buffer[15] & 0x08)
-                        fprintf(sg_warnings_str, " bit %d\n",
-                                sense_buffer[15] & 0x07);
+                        r += sprintf(b + r, " bit %d\n",
+                                     sense_buffer[15] & 0x07);
                     else
-                        fprintf(sg_warnings_str, "\n");
+                        r += sprintf(b + r, "\n");
                     break;
-                case NO_SENSE:
-                case NOT_READY:
+                case SPC_SK_NO_SENSE:
+                case SPC_SK_NOT_READY:
                     progress = (sense_buffer[16] << 8) + sense_buffer[17];
-                    fprintf(sg_warnings_str, "  Progress indication: %d %%\n",
-                            (progress * 100) / 0x10000);
+                    r += sprintf(b + r, "  Progress indication: %d %%\n",
+                                (progress * 100) / 0x10000);
                     break;
-                case HARDWARE_ERROR:
-                case MEDIUM_ERROR:
-                case RECOVERED_ERROR:
-                    fprintf(sg_warnings_str, "  Actual retry count: "
-                            "0x%02x%02x\n", sense_buffer[16],
-                            sense_buffer[17]);
+                case SPC_SK_HARDWARE_ERROR:
+                case SPC_SK_MEDIUM_ERROR:
+                case SPC_SK_RECOVERED_ERROR:
+                    r += sprintf(b + r, "  Actual retry count: "
+                                 "0x%02x%02x\n", sense_buffer[16],
+                                 sense_buffer[17]);
                     break;
-                case COPY_ABORTED:
-                    fprintf(sg_warnings_str, "  Segment pointer: ");
-                    fprintf(sg_warnings_str, "Relative to start of %s, byte %d",
-                            (sense_buffer[15] & 0x20) ? "segment descriptor" : 
-                                                "parameter list",
-                            (sense_buffer[16] << 8) + sense_buffer[17]);
+                case SPC_SK_COPY_ABORTED:
+                    r += sprintf(b + r, "  Segment pointer: ");
+                    r += sprintf(b + r, "Relative to start of %s, byte %d",
+                                 (sense_buffer[15] & 0x20) ?
+                                     "segment descriptor" : "parameter list",
+                                 (sense_buffer[16] << 8) + sense_buffer[17]);
                     if (sense_buffer[15] & 0x08)
-                        fprintf(sg_warnings_str, " bit %d\n",
-                                sense_buffer[15] & 0x07);
+                        r += sprintf(b + r, " bit %d\n",
+                                     sense_buffer[15] & 0x07);
                     else
-                        fprintf(sg_warnings_str, "\n");
+                        r += sprintf(b + r, "\n");
                     break;
                 default:
-                    fprintf(sg_warnings_str, "  Sense_key: 0x%x unexpected\n",
-                            ssh.sense_key);
+                    r += sprintf(b + r, "  Sense_key: 0x%x unexpected\n",
+                                 ssh.sense_key);
                     break;
                 }
             }
-        } else 
-            fprintf(sg_warnings_str, " fixed descriptor length too short, "
-                    "len=%d\n", len);
+            if (r > 0) {
+                n += snprintf(buff + n, buff_len - n, "%s", b);
+                if (n >= buff_len)
+                    return;
+            }
+        } else { 
+            n += snprintf(buff + n, buff_len - n, " fixed descriptor "
+                          "length too short, len=%d\n", len);
+            if (n >= buff_len)
+                return;
+        }
     } else {    /* non-extended sense data */
 
          /*
@@ -1605,140 +1662,43 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
           */
 
         if (sb_len < 4) {
-            fprintf(sg_warnings_str, "sense buffer too short (4 byte "
-                    "minimum)\n");
+            n += snprintf(buff + n, buff_len - n, "sense buffer too short "
+                          "(4 byte minimum)\n");
             return;
         }
-        if (leadin)
-            fprintf(sg_warnings_str, "%s: ", leadin);
+        r = 0;
         if (sense_buffer[0] < 15)
-            fprintf(sg_warnings_str, "old (SCSI-1) sense: key %s\n",
-                    sense_key_desc[sense_buffer[0] & 0x0f]);
+            r += sprintf(b + r, "old (SCSI-1) sense: key %s\n",
+                         sense_key_desc[sense_buffer[0] & 0x0f]);
         else
-            fprintf(sg_warnings_str, "sns = %2x %2x\n", sense_buffer[0],
-                    sense_buffer[2]);
+            r += sprintf(b + r, "sns = %2x %2x\n", sense_buffer[0],
+                         sense_buffer[2]);
 
-        fprintf(sg_warnings_str, "Non-extended sense class %d code 0x%0x ", 
-                (sense_buffer[0] >> 4) & 0x07, sense_buffer[0] & 0xf);
+        r += sprintf(b + r, "Non-extended sense class %d code 0x%0x ", 
+                     (sense_buffer[0] >> 4) & 0x07, sense_buffer[0] & 0xf);
+        n += snprintf(buff + n, buff_len - n, "%s", b);
+        if (n >= buff_len)
+            return;
         len = 4;
     }
     if (raw_sinfo) {
-        fprintf(sg_warnings_str, " Raw sense data (in hex):\n");
-        dStrHexErr((const char *)sense_buffer, len);
+        n += snprintf(buff + n, buff_len - n, " Raw sense data (in hex):\n");
+        if (n >= buff_len)
+            return;
+        dStrHexErr((const char *)sense_buffer, len, buff_len - n, buff + n);
     }
 }
 
-static const char * linux_host_bytes[] = {
-    "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT",
-    "DID_BAD_TARGET", "DID_ABORT", "DID_PARITY", "DID_ERROR",
-    "DID_RESET", "DID_BAD_INTR", "DID_PASSTHROUGH", "DID_SOFT_ERROR",
-    "DID_IMM_RETRY", "DID_REQUEUE"
-};
-
-#define LINUX_HOST_BYTES_SZ \
-        (int)(sizeof(linux_host_bytes) / sizeof(linux_host_bytes[0]))
-
-void sg_print_host_status(int host_status)
+/* Print sense information */
+void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
+                    int sb_len, int raw_sinfo)
 {
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
-    fprintf(sg_warnings_str, "Host_status=0x%02x ", host_status);
-    if ((host_status < 0) || (host_status >= LINUX_HOST_BYTES_SZ))
-        fprintf(sg_warnings_str, "is invalid ");
-    else
-        fprintf(sg_warnings_str, "[%s] ", linux_host_bytes[host_status]);
-}
+    char b[1024];
 
-static const char * linux_driver_bytes[] = {
-    "DRIVER_OK", "DRIVER_BUSY", "DRIVER_SOFT", "DRIVER_MEDIA",
-    "DRIVER_ERROR", "DRIVER_INVALID", "DRIVER_TIMEOUT", "DRIVER_HARD",
-    "DRIVER_SENSE"
-};
-
-#define LINUX_DRIVER_BYTES_SZ \
-    (int)(sizeof(linux_driver_bytes) / sizeof(linux_driver_bytes[0]))
-
-static const char * linux_driver_suggests[] = {
-    "SUGGEST_OK", "SUGGEST_RETRY", "SUGGEST_ABORT", "SUGGEST_REMAP",
-    "SUGGEST_DIE", "UNKNOWN","UNKNOWN","UNKNOWN",
-    "SUGGEST_SENSE"
-};
-
-#define LINUX_DRIVER_SUGGESTS_SZ \
-    (int)(sizeof(linux_driver_suggests) / sizeof(linux_driver_suggests[0]))
-
-
-void sg_print_driver_status(int driver_status)
-{
-    int driv, sugg;
-    const char * driv_cp = "invalid";
-    const char * sugg_cp = "invalid";
-
-    driv = driver_status & SG_LIB_DRIVER_MASK;
-    if (driv < LINUX_DRIVER_BYTES_SZ)
-        driv_cp = linux_driver_bytes[driv];
-    sugg = (driver_status & SG_LIB_SUGGEST_MASK) >> 4;
-    if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
-        sugg_cp = linux_driver_suggests[sugg];
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
-    fprintf(sg_warnings_str, "Driver_status=0x%02x", driver_status);
-    fprintf(sg_warnings_str, " [%s, %s] ", driv_cp, sugg_cp);
-}
-
-/* Returns 1 if no errors found and thus nothing printed; otherwise
-   prints error/warning (prefix by 'leadin') and returns 0. */
-static int sg_linux_sense_print(const char * leadin, int scsi_status,
-                                int host_status, int driver_status,
-                                const unsigned char * sense_buffer,
-                                int sb_len, int raw_sinfo)
-{
-    int done_leadin = 0;
-    int done_sense = 0;
-
-    if (NULL == sg_warnings_str)
-        sg_warnings_str = stderr;
-    scsi_status &= 0x7e; /*sanity */
-    if ((0 == scsi_status) && (0 == host_status) && (0 == driver_status))
-        return 1;       /* No problems */
-    if (0 != scsi_status) {
-        if (leadin)
-            fprintf(sg_warnings_str, "%s: ", leadin);
-        done_leadin = 1;
-        fprintf(sg_warnings_str, "SCSI status: ");
-        sg_print_scsi_status(scsi_status);
-        fprintf(sg_warnings_str, "\n");
-        if (sense_buffer && ((scsi_status == SCSI_CHECK_CONDITION) ||
-                             (scsi_status == SCSI_COMMAND_TERMINATED))) {
-            /* SCSI_COMMAND_TERMINATED is obsolete */
-            sg_print_sense(0, sense_buffer, sb_len, raw_sinfo);
-            done_sense = 1;
-        }
-    }
-    if (0 != host_status) {
-        if (leadin && (! done_leadin))
-            fprintf(sg_warnings_str, "%s: ", leadin);
-        if (done_leadin)
-            fprintf(sg_warnings_str, "plus...: ");
-        else
-            done_leadin = 1;
-        sg_print_host_status(host_status);
-        fprintf(sg_warnings_str, "\n");
-    }
-    if (0 != driver_status) {
-        if (leadin && (! done_leadin))
-            fprintf(sg_warnings_str, "%s: ", leadin);
-        if (done_leadin)
-            fprintf(sg_warnings_str, "plus...: ");
-        else
-            done_leadin = 1;
-        sg_print_driver_status(driver_status);
-        fprintf(sg_warnings_str, "\n");
-        if (sense_buffer && (! done_sense) &&
-            (SG_LIB_DRIVER_SENSE == (SG_LIB_DRIVER_MASK & driver_status)))
-            sg_print_sense(0, sense_buffer, sb_len, raw_sinfo);
-    }
-    return 0;
+    sg_get_sense_str(leadin, sense_buffer, sb_len, raw_sinfo, sizeof(b), b);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    fprintf(sg_warnings_strm, "%s", b);
 }
 
 int sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
@@ -1775,109 +1735,33 @@ int sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
     return 1;
 }
 
-#ifdef SG_IO
-
-int sg_normalize_sense(const struct sg_io_hdr * hp,
-                       struct sg_scsi_sense_hdr * sshp)
+int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
 {
-    if ((NULL == hp) || (0 == hp->sb_len_wr)) {
-        if (sshp)
-            memset(sshp, 0, sizeof(struct sg_scsi_sense_hdr));
-        return 0;
-    }
-    return sg_scsi_normalize_sense(hp->sbp, hp->sb_len_wr, sshp);
-}
+    struct sg_scsi_sense_hdr ssh;
 
-/* Returns 1 if no errors found and thus nothing printed; otherwise
-   returns 0. */
-int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
-                    int raw_sinfo)
-{
-    return sg_linux_sense_print(leadin, hp->status, hp->host_status,
-                                hp->driver_status, hp->sbp, hp->sb_len_wr,
-                                raw_sinfo);
-}
-#endif
-
-/* Returns 1 if no errors found and thus nothing printed; otherwise
-   returns 0. */
-int sg_chk_n_print(const char * leadin, int masked_status,
-                   int host_status, int driver_status,
-                   const unsigned char * sense_buffer, int sb_len,
-                   int raw_sinfo)
-{
-    int scsi_status = (masked_status << 1) & 0x7e;
-
-    return sg_linux_sense_print(leadin, scsi_status, host_status,
-                                driver_status, sense_buffer, sb_len,
-                                raw_sinfo);
-}
-
-#ifdef SG_IO
-int sg_err_category3(struct sg_io_hdr * hp)
-{
-    return sg_err_category_new(hp->status, hp->host_status,
-                               hp->driver_status, hp->sbp, hp->sb_len_wr);
-}
-#endif
-
-int sg_err_category(int masked_status, int host_status,
-                    int driver_status, const unsigned char * sense_buffer,
-                    int sb_len)
-{
-    int scsi_status = (masked_status << 1) & 0x7e;
-
-    return sg_err_category_new(scsi_status, host_status, driver_status,
-                               sense_buffer, sb_len);
-}
-
-int sg_err_category_new(int scsi_status, int host_status, int driver_status, 
-                        const unsigned char * sense_buffer, int sb_len)
-{
-    int masked_driver_status = (SG_LIB_DRIVER_MASK & driver_status);
-
-    scsi_status &= 0x7e;
-    if ((0 == scsi_status) && (0 == host_status) &&
-        (0 == masked_driver_status))
-        return SG_LIB_CAT_CLEAN;
-    if ((SCSI_CHECK_CONDITION == scsi_status) ||
-        (SCSI_COMMAND_TERMINATED == scsi_status) ||
-        (SG_LIB_DRIVER_SENSE == masked_driver_status)) {
-        struct sg_scsi_sense_hdr ssh;
-
-        if ((sense_buffer && (sb_len > 2)) &&
-            (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh))) {
-            switch (ssh.sense_key) {
-            case RECOVERED_ERROR:
-                return SG_LIB_CAT_RECOVERED;
-            case MEDIUM_ERROR: 
-            case HARDWARE_ERROR: 
-                return SG_LIB_CAT_MEDIUM_HARD;
-            case UNIT_ATTENTION:
-                if (0x28 == ssh.asc)
-                    return SG_LIB_CAT_MEDIA_CHANGED;
-                if (0x29 == ssh.asc)
-                    return SG_LIB_CAT_RESET;
-                break;
-            case ILLEGAL_REQUEST:
-                if ((0x20 == ssh.asc) && (0x0 == ssh.ascq))
-                    return SG_LIB_CAT_INVALID_OP;
-                else
-                    return SG_LIB_CAT_ILLEGAL_REQ;
-                break;
-            }
+    if ((sense_buffer && (sb_len > 2)) &&
+        (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh))) {
+        switch (ssh.sense_key) {
+        case SPC_SK_NO_SENSE:
+            return SG_LIB_CAT_NO_SENSE;
+        case SPC_SK_RECOVERED_ERROR:
+            return SG_LIB_CAT_RECOVERED;
+        case SPC_SK_MEDIUM_ERROR: 
+        case SPC_SK_HARDWARE_ERROR: 
+            return SG_LIB_CAT_MEDIUM_HARD;
+        case SPC_SK_UNIT_ATTENTION:
+            if (0x28 == ssh.asc)
+                return SG_LIB_CAT_MEDIA_CHANGED;
+            break;
+        case SPC_SK_ILLEGAL_REQUEST:
+            if ((0x20 == ssh.asc) && (0x0 == ssh.ascq))
+                return SG_LIB_CAT_INVALID_OP;
+            else
+                return SG_LIB_CAT_ILLEGAL_REQ;
+            break;
         }
-        return SG_LIB_CAT_SENSE;
     }
-    if (0 != host_status) {
-        if ((SG_LIB_DID_NO_CONNECT == host_status) ||
-            (SG_LIB_DID_BUS_BUSY == host_status) ||
-            (SG_LIB_DID_TIME_OUT == host_status))
-            return SG_LIB_CAT_TIMEOUT;
-    }
-    if (SG_LIB_DRIVER_TIMEOUT == masked_driver_status)
-        return SG_LIB_CAT_TIMEOUT;
-    return SG_LIB_CAT_OTHER;
+    return SG_LIB_CAT_SENSE;
 }
 
 /* gives wrong answer for variable length command (opcode=0x7f) */
@@ -2045,6 +1929,8 @@ char * safe_strerror(int errnum)
     size_t len;
     char * errstr;
   
+    if (errnum < 0)
+        errnum = -errnum;
     errstr = strerror(errnum);
     if (NULL == errstr) {
         len = strlen(safe_errbuf);
@@ -2057,7 +1943,7 @@ char * safe_strerror(int errnum)
 
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
-   in this file go to sg_warnings_str (default stderr).] 
+   in this file go to sg_warnings_strm (default stderr).] 
    'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 16 ASCII-hex bytes
        = 0     in addition, the bytes are listed in ASCII to the right
@@ -2128,19 +2014,20 @@ void dStrHex(const char* str, int len, int no_ascii)
         printf("%.76s\n", buff);
 }
 
-/* Output to ASCII-Hex bytes to sg_warnings_str (assumed to be initialized);
+/* Output to ASCII-Hex bytes to 'b' not to exceed 'b_len' characters.
  * 16 bytes per line with an extra space between the 8th and 9th bytes */
-static void dStrHexErr(const char* str, int len)
+static void dStrHexErr(const char* str, int len, int b_len, char * b)
 {
     const char * p = str;
     unsigned char c;
     char buff[82];
     const int bpstart = 5;
     int bpos = bpstart;
-    int k;
+    int k, n;
 
     if (len <= 0)
         return;
+    n = 0;
     memset(buff, ' ', 80);
     buff[80] = '\0';
     for (k = 0; k < len; k++) {
@@ -2151,13 +2038,15 @@ static void dStrHexErr(const char* str, int len)
         sprintf(&buff[bpos], "%.2x", (int)(unsigned char)c);
         buff[bpos + 2] = ' ';
         if ((k > 0) && (0 == ((k + 1) % 16))) {
-            fprintf(sg_warnings_str, "%.60s\n", buff);
+            n += snprintf(b + n, b_len - n, "%.60s\n", buff);
+            if (n >= b_len)
+                return;
             bpos = bpstart;
             memset(buff, ' ', 80);
         }
     }
     if (bpos > bpstart)
-        fprintf(sg_warnings_str, "%.60s\n", buff);
+        n += snprintf(b + n, b_len - n, "%.60s\n", buff);
     return;
 }
 
@@ -2186,7 +2075,7 @@ static unsigned short swapb_ushort(unsigned short u)
 }
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
-   in this file go to sg_warnings_str (default stderr).] 
+   in this file go to sg_warnings_strm (default stderr).] 
    'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 8 ASCII-hex 16 bit words
        = 0     in addition, the ASCI bytes pairs are listed to the right
@@ -2284,7 +2173,7 @@ void dWordHex(const unsigned short* words, int num, int no_ascii,
    Main (SI) multipliers supported: K, M, G. */
 int sg_get_num(const char * buf)
 {
-    int res, num, n;
+    int res, num, n, len;
     unsigned int unum;
     char * cp;
     char c = 'c';
@@ -2292,9 +2181,13 @@ int sg_get_num(const char * buf)
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1;
+    len = strlen(buf);
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%x", &unum);
-        num = (int)unum;
+        num = unum;
+    } else if ('H' == toupper(buf[len - 1])) {
+        res = sscanf(buf, "%x", &unum);
+        num = unum;
     } else
         res = sscanf(buf, "%d%c%c%c", &num, &c, &c2, &c3);
     if (res < 1)
@@ -2348,9 +2241,9 @@ int sg_get_num(const char * buf)
             }
             return -1;
         default:
-            if (NULL == sg_warnings_str)
-                sg_warnings_str = stderr;
-            fprintf(sg_warnings_str, "unrecognized multiplier\n");
+            if (NULL == sg_warnings_strm)
+                sg_warnings_strm = stderr;
+            fprintf(sg_warnings_strm, "unrecognized multiplier\n");
             return -1;
         }
     }
@@ -2362,7 +2255,7 @@ int sg_get_num(const char * buf)
    Main (SI) multipliers supported: K, M, G, T, P. */
 long long sg_get_llnum(const char * buf)
 {
-    int res;
+    int res, len;
     long long num, ll;
     unsigned long long unum;
     char * cp;
@@ -2371,8 +2264,12 @@ long long sg_get_llnum(const char * buf)
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1LL;
+    len = strlen(buf);
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%llx", &unum);
+        num = unum;
+    } else if ('H' == toupper(buf[len - 1])) {
+        res = sscanf(buf, "%llx", &unum);
         num = unum;
     } else
         res = sscanf(buf, "%lld%c%c%c", &num, &c, &c2, &c3);
@@ -2443,9 +2340,9 @@ long long sg_get_llnum(const char * buf)
             }
             return -1LL;
         default:
-            if (NULL == sg_warnings_str)
-                sg_warnings_str = stderr;
-            fprintf(sg_warnings_str, "unrecognized multiplier\n");
+            if (NULL == sg_warnings_strm)
+                sg_warnings_strm = stderr;
+            fprintf(sg_warnings_strm, "unrecognized multiplier\n");
             return -1LL;
         }
     }

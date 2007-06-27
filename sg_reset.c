@@ -7,11 +7,11 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "sg_include.h"
+#include "sg_io_linux.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999-2002 D. Gilbert
+*  Copyright (C) 1999-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
 
 #define ME "sg_reset: "
 
-static char * version_str = "0.54 20050517";
+static char * version_str = "0.54 20051220";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284

@@ -4,16 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2005 D. Gilbert
+*  Copyright (C) 2000-2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -23,13 +19,12 @@
    
 */
 
-static char * version_str = "0.44 20051104";
+static char * version_str = "0.49 20060127";
 
 #define ME "sg_logs: "
 
 #define MX_ALLOC_LEN (1024 * 17)
 #define PG_CODE_ALL 0x0
-#define EBUFF_SZ 256
 
 
 /* Call LOG SENSE twice: the first time ask for 4 byte response to determine
@@ -81,28 +76,36 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
 static void usage()
 {
     printf("Usage:  sg_logs [-a] [-c=<page_control] [-h] [-H] [-l] "
-           "[-p=<page_number>]\n                [-p=<page_number>] "
-           " [-paramp=<parameter_pointer> [-ppc] [-sp]\n"
-           "                [-t] [-v] [-V] <scsi_device>\n"
-           " where -a   output all log pages\n"
-           "       -c=<page_control> page control(PC) (default: 1)\n"
-           "             (0 [current threshhold], 1 [current cumulative]\n"
-           "              2 [default threshhold], 3 [default cumulative])\n"
-           "       -h   output in hex\n"
-           "       -H   output in hex (same as '-h)\n"
-           "       -l   list supported log page names\n"
-           "       -p=<page_code> page code (in hex)\n"
-           "       -paramp=<parameter_pointer> (in hex) (def: 0)\n"
-           "       -pcb show parameter control bytes (ignored if -h given)\n");
-    printf("       -ppc set the Parameter Pointer Control (PPC) bit (def: 0)\n"
-           "       -r   reset all implemented parameters to target defined "
-           "defaults\n"
-           "       -sp  set the Saving Parameters (SP) bit (def: 0)\n"
-           "       -t   outputs temperature log page (0xd)\n"
-           "       -v   verbose: output cdbs prior to execution\n"
-           "       -V   output version string\n"
-           "       -?   output this usage message\n\n"
-           "Performs a SCSI LOG SENSE command\n");
+           "[-p=<page_number>]\n"
+           "                [-p=<page_number>] "
+           "[-paramp=<parameter_pointer>] [-ppc]\n"
+           "                [-scum] [-sp] [-sthr] [-t] [-v] [-V] "
+           "<scsi_device>\n"
+           "  where: -a   output all log pages\n"
+           "         -c=<page_control> page control(PC) (default: 1)\n"
+           "               (0 [current threshhold], 1 [current cumulative]\n"
+           "                2 [default threshhold], 3 [default cumulative])\n"
+           "         -h   output in hex\n"
+           "         -H   output in hex (same as '-h)\n"
+           "         -l   list supported log page names of given device\n"
+           "         -p=<page_code> page code (in hex)\n"
+           "         -paramp=<parameter_pointer> (in hex) (def: 0)\n"
+           "         -pcb show parameter control bytes (ignored if -h "
+           "given)\n");
+    printf("         -ppc set the Parameter Pointer Control (PPC) bit "
+           "(def: 0)\n"
+           "         -r   reset all implemented parameters to target "
+           "defined defaults\n"
+           "               (uses PCR bit in LOG SELECT)\n"
+           "         -scum  set cumulative parameters to default values\n"
+           "         -sp  set the Saving Parameters (SP) bit (def: 0)\n"
+           "         -sthr  set threshold parameters to default threshold "
+           "values\n"
+           "         -t   outputs temperature log page (0xd)\n"
+           "         -v   verbose: output cdbs prior to execution\n"
+           "         -V   output version string\n"
+           "         -?   output this usage message\n\n"
+           "Performs a SCSI LOG SENSE (or SELECT) command\n");
 }
 
 static void show_page_name(int page_no,
@@ -177,7 +180,7 @@ static void show_page_name(int page_no,
                 printf("    0x14    Device statistics (ssc-3)\n");
                 break;
             case 0x2e:
-                printf("    0x2e    Tape alerts (ssc-2)\n");
+                printf("    0x2e    TapeAlert (ssc-2)\n");
                 break;
             default:
                 done = 0;
@@ -200,7 +203,7 @@ static void show_page_name(int page_no,
                 printf("    0x14    Device statistics (adc)\n");
                 break;
             case 0x15:
-                printf("    0x14    DT device log information (adc)\n");
+                printf("    0x15    DT device log information (adc)\n");
                 break;
             default:
                 done = 0;
@@ -221,14 +224,19 @@ static void get_pcb_str(int pcb, char * outp, int maxoutlen)
     char buff[128];
     int n;
 
-    n = sprintf(buff, "du=%d ds=%d tsd=%d etc=%d ", ((pcb & 0x80) ? 1 : 0),
+    n = sprintf(buff, "du=%d [ds=%d] tsd=%d etc=%d ", ((pcb & 0x80) ? 1 : 0),
                 ((pcb & 0x40) ? 1 : 0), ((pcb & 0x20) ? 1 : 0), 
                 ((pcb & 0x10) ? 1 : 0));
     if (pcb & 0x10)
         n += sprintf(buff + n, "tmc=%d ", ((pcb & 0xc) >> 2));
+#if 1
+    n += sprintf(buff + n, "format+linking=%d  [0x%.2x]", pcb & 3,
+                 pcb);
+#else
     if (pcb & 0x1)
         n += sprintf(buff + n, "lbin=%d ", ((pcb & 0x2) >> 1));
     n += sprintf(buff + n, "lp=%d  [0x%.2x]", pcb & 0x1, pcb);
+#endif
     if (outp && (n < maxoutlen)) {
         memcpy(outp, buff, n);
         outp[n] = '\0';
@@ -310,7 +318,7 @@ static void show_error_counter_page(unsigned char * resp, int len,
     unsigned long long ull;
     char pcb_str[64];
 
-    switch(resp[0]) {
+    switch(resp[0] & 0x3f) {
     case 2:
         printf("Write error counter page\n");
         break;
@@ -440,17 +448,21 @@ static void show_last_n_error_page(unsigned char * resp, int len,
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
         printf("  Error event %d:\n", pc);
-        if (pcb & 0x2) {
-            printf("    [binary]:\n");
-            dStrHex((const char *)ucp + 4, pl - 4, 1);
-        } else
-            printf("    %.*s\n", pl - 4, (const char *)(ucp + 4));
+        if (pl > 4) {
+            if ((pcb & 0x1) && (pcb & 0x2)) {
+                printf("    [binary]:\n");
+                dStrHex((const char *)ucp + 4, pl - 4, 1);
+            } else if (pcb & 0x1)
+                printf("    %.*s\n", pl - 4, (const char *)(ucp + 4));
+            else {
+                printf("    [data counter?? (LP bit should be set)]:\n");
+                dStrHex((const char *)ucp + 4, pl - 4, 1);
+            }
+        }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("      <%s>\n", pcb_str);
         }
-        num -= pl;
-        ucp += pl;
     }
 }
 
@@ -482,8 +494,6 @@ static void show_last_n_deferred_error_page(unsigned char * resp,
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("      <%s>\n", pcb_str);
         }
-        num -= pl;
-        ucp += pl;
     }
 }
 
@@ -644,7 +654,10 @@ static void show_Start_Stop_page(unsigned char * resp, int len, int show_pcb)
         case 4:
             if (extra > 7) {
                 n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
-                printf("  Accumulated start-stop cycles = %u", n);
+                if (0xffffffff == n)
+                    printf("  Accumulated start-stop cycles = -1");
+                else
+                    printf("  Accumulated start-stop cycles = %u", n);
             }
             break;
         default:
@@ -945,7 +958,7 @@ static const char * bms_status[] = {
     "background medium scan is active",
     "pre-scan is active",
     "scan halted due to fatal error",
-    "scan halted due to unusual pattern of error",
+    "scan halted due to a vendor specific pattern of error",
     "scan halted due to medium formatted without P-List",
     "scan halted - vendor specific cause",
     "scan halted due to temperature out of range",
@@ -953,12 +966,12 @@ static const char * bms_status[] = {
 };
 
 static const char * reassign_status[] = {
-    "No assignment needed",
+    "No reassignment needed",
     "Reassignment pending receipt of Reassign command or Write command",
-    "LBA successfully reassigned by drive",
+    "LBA successfully reassigned",
     "Reassign status: Reserved [0x3]",
     "Reassignment failed",
-    "LBA recovered via re-write",
+    "LBA recovered via re-write",       /* 5 */
 };
 
 static void show_background_scan_results_page(unsigned char * resp, int len,
@@ -977,9 +990,9 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
         pl = ucp[3] + 4;
         switch (pc) {
         case 0:
-            printf("  Power on time: ");
+            printf("  Power on minutes: ");
             j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
-            printf("%d minutes [%d:%d]\n", j, (j / 60), (j % 60));
+            printf("%d [%d:%d]\n", j, (j / 60), (j % 60));
             break;
             printf("    BMS status: ");
             j = ucp[9];
@@ -1000,16 +1013,16 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
                         "got %d\n", pl);
                 break;
             }
-            printf("    Power on time when error detected: ");
+            printf("    Power on minutes when error detected: ");
             j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
-            printf("%d minutes [%d:%d]\n", j, (j / 60), (j % 60));
+            printf("%d [%d:%d]\n", j, (j / 60), (j % 60));
             j = (ucp[8] >> 4) & 0xf;
             if (j < 
                 (int)(sizeof(reassign_status) / sizeof(reassign_status[0])))
                 printf("    %s\n", reassign_status[j]);
             else
                 printf("    Reassign status: reserved [0x%x]\n", j);
-            printf("    sense key: %s   sk,asc,ascq: 0x%x,0x%x,0x%x\n",
+            printf("    sense key: %s   [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
                    sg_get_sense_key_str(ucp[8] & 0xf, sizeof(str), str),
                    ucp[8] & 0xf, ucp[9], ucp[10]);
             printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
@@ -1139,6 +1152,108 @@ static void show_sequential_access_page(unsigned char * resp, int len,
     }
 }
 
+static void show_device_stats_page(unsigned char * resp, int len, 
+                                   int show_pcb)
+{
+    int k, j, num, pl, pc, pcb;
+    unsigned char * ucp;
+    unsigned char * xp;
+    unsigned long long ull;
+    char pcb_str[64];
+
+    printf("Device statistics page (ssc-3 and adc)\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (pc < 0x1000) {
+            k = pl - 4;
+            xp = ucp + 4;
+            if (k > (int)sizeof(ull)) {
+                xp += (k - sizeof(ull));
+                k = sizeof(ull);
+            }
+            ull = 0;
+            for (j = 0; j < k; ++j) {
+                if (j > 0)
+                    ull <<= 8;
+                ull |= xp[j];
+            }
+            switch (pc) {
+            case 0: 
+                printf("  Lifetime media loads: %llu\n", ull);
+                break;
+            case 1: 
+                printf("  Lifetime cleaning operations: %llu\n", ull);
+                break;
+            case 2: 
+                printf("  Lifetime power on hours: %llu\n", ull);
+                break;
+            case 3: 
+                printf("  Lifetime media motion (head) hours: %llu\n", ull);
+                break;
+            case 4: 
+                printf("  Lifetime metres of tape processed: %llu\n", ull);
+                break;
+            case 5: 
+                printf("  Lifetime media motion (head) hours when "
+                       "incompatible media last loaded: %llu\n", ull);
+                break;
+            case 6: 
+                printf("  Lifetime power on hours when "
+                       "last temperature condition occurred: %llu\n", ull);
+                break;
+            case 7: 
+                printf("  Lifetime power on hours when last power "
+                       "consumption condition occurred: %llu\n", ull);
+                break;
+            case 8: 
+                printf("  Media motion (head) hours since last successful "
+                       "cleaning operation: %llu\n", ull);
+                break;
+            case 9: 
+                printf("  Media motion (head) hours since 2nd to last "
+                       "successful cleaning: %llu\n", ull);
+                break;
+            case 0xa: 
+                printf("  Media motion (head) hours since 3rd to last "
+                       "successful cleaning: %llu\n", ull);
+                break;
+            case 0xb: 
+                printf("  Lifetime power on hours when last operator "
+                       "initiated forced reset\n    and/or emergency "
+                       "eject occurred: %llu\n", ull);
+                break;
+            default:
+                printf("  Reserved parameter [0x%x] value: %llu\n",
+                       pc, ull);
+                break;
+            }
+        } else {
+            switch (pc) {
+            case 0x1000: 
+                printf("  Media motion (head) hours for each medium type:\n");
+                printf("      <<to be decoded, dump in hex for now>>:\n");
+                dStrHex((const char *)ucp, pl, 0);
+                break;
+            default:
+                printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
+                dStrHex((const char *)ucp, pl, 0);
+                break;
+            }
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("  <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        num -= pl;
+        ucp += pl;
+    }
+}
+
 static void show_seagate_cache_page(unsigned char * resp, int len, 
                                     int show_pcb)
 {
@@ -1191,7 +1306,7 @@ static void show_seagate_cache_page(unsigned char * resp, int len,
 static void show_seagate_factory_page(unsigned char * resp, int len,
                                       int show_pcb)
 {
-    int k, j, num, pl, pc, pcb;
+    int k, j, num, pl, pc, pcb, valid;
     unsigned char * ucp;
     unsigned char * xp;
     unsigned long long ull;
@@ -1204,30 +1319,34 @@ static void show_seagate_factory_page(unsigned char * resp, int len,
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        valid = 1;
         switch (pc) {
         case 0: printf("  number of hours powered up"); break;
         case 8: printf("  number of minutes until next internal SMART test");
             break;
         default:
+            valid = 0;
             printf("  Unknown Seagate/Hitachi parameter code = 0x%x", pc);
             break;
         }
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
+        if (valid) {
+            k = pl - 4;
+            xp = ucp + 4;
+            if (k > (int)sizeof(ull)) {
+                xp += (k - sizeof(ull));
+                k = sizeof(ull);
+            }
+            ull = 0;
+            for (j = 0; j < k; ++j) {
+                if (j > 0)
+                    ull <<= 8;
+                ull |= xp[j];
+            }
+            if (0 == pc)
+                printf(" = %.2f", ((double)ull) / 60.0 );
+            else
+                printf(" = %llu", ull);
         }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
-        if (0 == pc)
-            printf(" = %.2f", ((double)ull) / 60.0 );
-        else
-            printf(" = %llu", ull);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("  <%s>\n", pcb_str);
@@ -1242,7 +1361,7 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
                             struct sg_simple_inquiry_resp * inq_dat,
                             int verbose)
 {
-    int k, num, done;
+    int k, num, done, page_code, spage_code;
 
     if (len < 0) {
         printf("response has bad length\n");
@@ -1250,7 +1369,10 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
     }
     num = len - 4;
     done = 1;
-    switch (resp[0]) {
+    page_code = resp[0] & 0x3f;
+    spage_code = (resp[0] & 0x40) ? resp[1] : 0;
+
+    switch (page_code) {
     case 0:
         printf("Supported pages:\n");
         for (k = 0; k < num; ++k)
@@ -1308,6 +1430,19 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
         break;
     case 0x10:
         show_self_test_page(resp, len, show_pcb);
+        break;
+    case 0x14:
+        {
+            switch (inq_dat->peripheral_type) {
+            case 1: case 8: case 0x12:
+                /* tape, medium changer and adc type devices */
+                show_device_stats_page(resp, len, show_pcb);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
         break;
     case 0x15:
         {
@@ -1378,7 +1513,7 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
     }
     if (! done) {
         printf("No ascii information for page = 0x%x, here is hex:\n", 
-               resp[0]);
+               resp[0] & 0x3f);
         if (len > 128) {
             dStrHex((const char *)resp, 64, 1);
             printf(" .....  [truncated after 64 of %d bytes (use '-h' to "
@@ -1403,17 +1538,16 @@ static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
                "or IE)\n");
         res = 1;
     }
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return res;
 }
 
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, pg_len, res, plen, jmp_out;
+    int sg_fd, k, num, pg_len, res, plen, jmp_out, select_cmds;
     const char * file_name = 0;
     const char * cp;
-    char ebuff[EBUFF_SZ];
     unsigned char rsp_buff[MX_ALLOC_LEN];
     unsigned int u;
     int pg_code = 0;
@@ -1422,14 +1556,14 @@ int main(int argc, char * argv[])
     int do_list = 0;
     int do_pcb = 0;
     int do_ppc = 0;
+    int do_scum = 0;
     int do_sp = 0;
+    int do_sthr = 0;
     int do_hex = 0;
     int do_all = 0;
     int do_temp = 0;
     int do_pcreset = 0;
     int do_verbose = 0;
-    int oflags = O_RDWR | O_NONBLOCK;
-    int oroflags = O_RDONLY | O_NONBLOCK;
     struct sg_simple_inquiry_resp inq_out;
 
     memset(rsp_buff, 0, sizeof(rsp_buff));
@@ -1451,28 +1585,8 @@ int main(int argc, char * argv[])
                 case 'l':
                     do_list = 1;
                     break;
-                case 'p':
-                    if (0 == strncmp("pcb", cp, 3)) {
-                        do_pcb = 1;
-                        cp +=2;
-                        plen -=2;
-                    } else if (0 == strncmp("ppc", cp, 3)) {
-                        do_ppc = 1;
-                        cp +=2;
-                        plen -=2;
-                    } else
-                        jmp_out = 1;
-                    break;
                 case 'r':
                     do_pcreset = 1;
-                    break;
-                case 's':
-                    if ('p' == *(cp + 1)) {
-                        do_sp = 1;
-                        ++cp;
-                        --plen;
-                    } else
-                        jmp_out = 1;
                     break;
                 case 't':
                     do_temp = 1;
@@ -1486,6 +1600,10 @@ int main(int argc, char * argv[])
                 case '?':
                     usage();
                     return 1;
+                case '-':
+                    ++cp;
+                    jmp_out = 1;
+                    break;
                 default:
                     jmp_out = 1;
                     break;
@@ -1519,7 +1637,17 @@ int main(int argc, char * argv[])
                     return 1;
                 }
                 paramp = u;
-            } else if (jmp_out) {
+            } else if (0 == strncmp("pcb", cp, 3))
+                do_pcb = 1;
+            else if (0 == strncmp("ppc", cp, 3))
+                do_ppc = 1;
+            else if (0 == strncmp("scum", cp, 4))
+                do_scum = 1;
+            else if (0 == strncmp("sp", cp, 2))
+                do_sp = 1;
+            else if (0 == strncmp("sthr", cp, 4))
+                do_sthr = 1;
+            else if (jmp_out) {
                 fprintf(stderr, "Unrecognized option: %s\n", cp);
                 usage();
                 return 1;
@@ -1534,16 +1662,24 @@ int main(int argc, char * argv[])
         }
     }
     
+    select_cmds = do_pcreset + do_scum + do_sthr;
+    if (select_cmds > 1) {
+        fprintf(stderr, "choose one of '-r', '-scum' or '-sthr'. Try '?' "
+                "for usage.\n");
+        return 1;
+    }
     if (0 == file_name) {
-        fprintf(stderr, "No <scsi_device> argument given\n");
-        usage();
+        fprintf(stderr, "No <scsi_device> argument given. Try '-?' for "
+                "usage.\n");
         return 1;
     }
 
-    if ((sg_fd = open(file_name, oflags)) < 0) {
-        if ((sg_fd = open(file_name, oroflags)) < 0) {
-            snprintf(ebuff, EBUFF_SZ, ME "error opening file: %s", file_name);
-            perror(ebuff);
+    if ((sg_fd = sg_cmds_open_device(file_name, 0 /* rw */,
+                                     do_verbose)) < 0) {
+        if ((sg_fd = sg_cmds_open_device(file_name, 1 /* r0 */,
+                                         do_verbose)) < 0) {
+            fprintf(stderr, ME "error opening file: %s: %s \n", file_name,
+                    safe_strerror(-sg_fd));
             return 1;
         }
     }
@@ -1552,8 +1688,9 @@ int main(int argc, char * argv[])
     pg_len = 0;
 
     if (sg_simple_inquiry(sg_fd, &inq_out, 1, do_verbose)) {
-        printf(ME "%s doesn't respond to a SCSI INQUIRY\n", file_name);
-        close(sg_fd);
+        fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
+                file_name);
+        sg_cmds_close_device(sg_fd);
         return 1;
     } else
         printf("    %.8s  %.16s  %.4s\n", inq_out.vendor, inq_out.product,
@@ -1561,12 +1698,23 @@ int main(int argc, char * argv[])
 
     if (1 == do_temp)
         return fetchTemperature(sg_fd, rsp_buff, MX_ALLOC_LEN, do_verbose);
-
-    if (1 == do_pcreset) {
-        k = sg_ll_log_select(sg_fd, 1, do_sp, pc, NULL, 0, 1, do_verbose);
-        if (SG_LIB_CAT_INVALID_OP == k)
-            fprintf(stderr, "log_select: not supported\n");
-        return k ?  1 : 0;
+    if (select_cmds) {
+        if (do_pcreset) {
+            k = sg_ll_log_select(sg_fd, 1, do_sp, pc, NULL, 0, 1, do_verbose);
+            if (SG_LIB_CAT_INVALID_OP == k)
+                fprintf(stderr, "log_select: not supported\n");
+            return k ?  1 : 0;
+        } else if (do_scum) {
+            k = sg_ll_log_select(sg_fd, 0, 0, 3 /* pc */, NULL, 0, 1, do_verbose);
+            if (SG_LIB_CAT_INVALID_OP == k)
+                fprintf(stderr, "log_select: not supported\n");
+            return k ?  1 : 0;
+        } else if (do_sthr) {
+            k = sg_ll_log_select(sg_fd, 0, 0, 2 /* pc */, NULL, 0, 1, do_verbose);
+            if (SG_LIB_CAT_INVALID_OP == k)
+                fprintf(stderr, "log_select: not supported\n");
+            return k ?  1 : 0;
+        }
     }
     res = do_logs(sg_fd, do_ppc, do_sp, pc, pg_code, paramp, rsp_buff,
                   MX_ALLOC_LEN, 1, do_verbose);
@@ -1578,8 +1726,13 @@ int main(int argc, char * argv[])
             pg_len = MX_ALLOC_LEN - 4;
         }
         if (do_hex) {
-            printf("Returned log page code=0x%x,  page len=0x%x\n", 
-                   rsp_buff[0], pg_len);
+            if (rsp_buff[0] & 0x40)
+                printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, "
+                       "page_len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
+                       !!(rsp_buff[0] & 0x80), pg_len);
+            else
+                printf("Log page code=0x%x, DS=%d, SPF=0, page_len=0x%x\n",
+                       rsp_buff[0] & 0x3f, !!(rsp_buff[0] & 0x80), pg_len);
             dStrHex((const char *)rsp_buff, pg_len + 4, 1);
         }
         else
@@ -1608,8 +1761,14 @@ int main(int argc, char * argv[])
                     pg_len = MX_ALLOC_LEN - 4;
                 }
                 if (do_hex) {
-                    printf("Returned log page code=0x%x,  page len=0x%x\n", 
-                           rsp_buff[0], pg_len);
+                    if (rsp_buff[0] & 0x40)
+                        printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"
+                               "len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
+                               !!(rsp_buff[0] & 0x80), pg_len);
+                    else
+                        printf("Log page code=0x%x, DS=%d, SPF=0, page_len="
+                               "0x%x\n", rsp_buff[0] & 0x3f,
+                               !!(rsp_buff[0] & 0x80), pg_len);
                     dStrHex((const char *)rsp_buff, pg_len + 4, 1);
                 }
                 else
@@ -1618,6 +1777,6 @@ int main(int argc, char * argv[])
             }
         }
     }
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return 0;
 }

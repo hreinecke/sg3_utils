@@ -3,15 +3,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
 /*
- *  Copyright (C) 1999-2005 D. Gilbert
+ *  Copyright (C) 1999-2006 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,36 +26,38 @@
  
 */
 
-static char * version_str = "0.45 20050810";
+static char * version_str = "0.48 20060125";
 
 
 void usage ()
 {
-        fprintf(stderr, "Usage:  sg_start [0|-stop|1|-start] [-eject] "
-                "[-imm=0|1] [-load]\n"
-                "                 [-loej] [-pc=<n>] [-v] [-V] "
-                "<scsi_device>\n"
-                " where: 0        stop unit (e.g. spin down a disk or a "
+        fprintf(stderr, "Usage:  sg_start [0|--stop|1|--start] [--eject] "
+                "[--fl=<n>] [--imm=0|1]\n"
+                "                 [--load] [--loej] [--pc=<n>] [-v] [-V] "
+                "<device>\n"
+                " where: 0         stop unit (e.g. spin down a disk or a "
                 "cd/dvd)\n"
-                "        1        start unit (e.g. spin up a disk or a "
+                "        1         start unit (e.g. spin up a disk or a "
                 "cd/dvd)\n"
-                "        -eject   stop then eject the medium\n"
-                "        -imm=0|1   0->await completion(def), 1->return "
+                "        --eject   stop then eject the medium\n"
+                "        --fl=<n>  format layer number (mmc5)\n"
+                "        --imm=0|1   0->await completion(def), 1->return "
                 "immediately\n"
-                "        -load    load then start the medium\n"
-                "        -loej    load the medium if '-start' option is "
+                "        --load    load then start the medium\n"
+                "        --loej    load the medium if '-start' option is "
                 "also given\n"
-                "                 or stop unit and eject\n"
-                "        -pc=<n>  power conditions (in hex, default 0 -> no "
+                "                  or stop unit and eject\n"
+                "        --pc=<n>  power conditions (in hex, default 0 -> no "
                 "power condition)\n"
-                "                 1 -> active, 2 -> idle, 3 -> standby, "
+                "                  1 -> active, 2 -> idle, 3 -> standby, "
                 "5 -> sleep (MMC)\n"
-                "        -start   start unit (same as '1')\n"
-                "        -stop    stop unit (same as '0')\n"
-                "        -v       verbose (print out SCSI commands)\n"
-                "        -V       print version string then exit\n\n"
-                "    Example: 'sg_start -stop /dev/sdb'    stops unit\n"
-                "             'sg_start -eject /dev/scd0'  stops unit and "
+                "        --start   start unit (same as '1'), default "
+                "action\n"
+                "        --stop    stop unit (same as '0')\n"
+                "        -v        verbose (print out SCSI commands)\n"
+                "        -V        print version string then exit\n\n"
+                "    Example: 'sg_start --stop /dev/sdb'    stops unit\n"
+                "             'sg_start --eject /dev/scd0'  stops unit and "
                 "ejects medium\n\n"
                 "Performs a START STOP UNIT SCSI command\n"
                 );
@@ -72,8 +71,10 @@ int main(int argc, char * argv[])
         const char * cp;
         int k, fd, num, res, plen, jmp_out;
         unsigned int u;
+        int ambigu = 0;
         int immed = 0;
         int loej = 0;
+        int fl_num = -1;
         int power_conds = 0;
         int verbose = 0;
         
@@ -86,48 +87,6 @@ int main(int argc, char * argv[])
                         for (--plen, ++cp, jmp_out = 0; plen > 0;
                              --plen, ++cp) {
                                 switch (*cp) {
-                                case 'e':
-                                        if (0 == strncmp(cp, "eject", 5)) {
-                                                loej = 1;
-                                                startstop = 0;
-                                                cp += 4;
-                                                plen -= 4;
-                                        } else
-                                                jmp_out = 1;
-                                        break;
-                                case 'l':
-                                        if (0 == strncmp(cp, "loej", 4)) {
-                                                loej = 1;
-                                                cp += 3;
-                                                plen -= 3;
-                                        } else if (0 == 
-                                                   strncmp(cp, "load", 4)) {
-                                                loej = 1;
-                                                startstop = 1;
-                                                cp += 3;
-                                                plen -= 3;
-                                        } else
-                                                jmp_out = 1;
-                                        break;
-                                case 's':
-                                        if (startstop >= 0) {
-                                                fprintf(stderr,
-                        "please, only one of 0, 1, -start or -stop\n");
-                                                usage();
-                                                return 1;
-                                        }
-                                        if (0 == strncmp(cp, "start", 5)) {
-                                                startstop = 1;
-                                                cp += 4;
-                                                plen -= 4;
-                                        } else if (0 == strncmp(cp, "stop",
-                                                                4)) {
-                                                startstop = 0;
-                                                cp += 3;
-                                                plen -= 3;
-                                        } else
-                                                jmp_out = 1;
-                                        break;
                                 case 'v':
                                         ++verbose;
                                         break;
@@ -138,6 +97,11 @@ int main(int argc, char * argv[])
                                 case '?':
                                         usage();
                                         return 1;
+                                case '-':
+                                        ++cp;
+                                        --plen;
+                                        jmp_out = 1;
+                                        break;
                                 default:
                                         jmp_out = 1;
                                         break;
@@ -147,7 +111,23 @@ int main(int argc, char * argv[])
                         }
                         if (plen <= 0)
                                 continue;
-                        if (0 == strncmp("imm=", cp, 4)) {
+
+                        if (0 == strncmp(cp, "eject", 5)) {
+                                loej = 1;
+                                if (startstop == 1)
+                                        ambigu = 1;
+                                else
+                                        startstop = 0;
+                        } else if (0 == strncmp("fl=", cp, 3)) {
+                                num = sscanf(cp + 3, "%x", &u);
+                                if (1 != num) {
+                                        fprintf(stderr, "Bad value after "
+                                                "'fl=' option\n");
+                                        usage();
+                                        return 1;
+                                }
+                                fl_num = u;
+                        } else if (0 == strncmp("imm=", cp, 4)) {
                                 num = sscanf(cp + 4, "%x", &u);
                                 if ((1 != num) || (u > 1)) {
                                         fprintf(stderr, "Bad value after "
@@ -156,7 +136,15 @@ int main(int argc, char * argv[])
                                         return 1;
                                 }
                                 immed = u;
-                        } else if (0 == strncmp("pc=", cp, 3)) {
+                        } else if (0 == strncmp(cp, "load", 4)) {
+                                loej = 1;
+                                if (startstop == 0)
+                                        ambigu = 1;
+                                else
+                                        startstop = 1;
+                        } else if (0 == strncmp(cp, "loej", 4))
+                                loej = 1;
+                        else if (0 == strncmp("pc=", cp, 3)) {
                                 num = sscanf(cp + 3, "%x", &u);
                                 if ((1 != num) || (u > 15)) {
                                         fprintf(stderr, "Bad value after "
@@ -165,6 +153,16 @@ int main(int argc, char * argv[])
                                         return 1;
                                 }
                                 power_conds = u;
+                        } else if (0 == strncmp(cp, "start", 5)) {
+                                if (startstop == 0)
+                                        ambigu = 1;
+                                else
+                                        startstop = 1;
+                        } else if (0 == strncmp(cp, "stop", 4)) {
+                                if (startstop == 1)
+                                        ambigu = 1;
+                                else
+                                        startstop = 0;
                         } else if (jmp_out) {
                                 fprintf(stderr, "Unrecognized option: %s\n",
                                         cp);
@@ -172,26 +170,26 @@ int main(int argc, char * argv[])
                                 return 1;
                         }
                 } else if (0 == strcmp("0", cp)) {
-                        if (startstop >= 0) {
-                                fprintf(stderr, "please, only one of 0, 1, "
-                                        "-start or -stop\n");
-                                usage();
-                                return 1;
-                        } else
+                        if (startstop >= 0)
+                                ambigu = 1;
+                        else
                                 startstop = 0;
                 } else if (0 == strcmp("1", cp)) {
-                        if (startstop >= 0) {
-                                fprintf(stderr, "please, only one of 0, 1, "
-                                        "-start or -stop\n");
-                                usage();
-                                return 1;
-                        } else
+                        if (startstop >= 0)
+                                ambigu = 1;
+                        else
                                 startstop = 1;
                 } else if (0 == file_name)
                         file_name = cp;
                 else {
                         fprintf(stderr, "too many arguments, got: %s, not "
                                 "expecting: %s\n", file_name, cp);
+                        usage();
+                        return 1;
+                }
+                if (ambigu) {
+                        fprintf(stderr, "please, only one of 0, 1, --eject, "
+                                "--load, --start or --stop\n");
                         usage();
                         return 1;
                 }
@@ -203,25 +201,45 @@ int main(int argc, char * argv[])
                 return 1;
         }
 
-        if ((startstop == -1) && loej)
-                startstop = 0;
-        if ((startstop == -1) && (0 == power_conds))
-                startstop = 1;
+        if (fl_num >= 0) {
+                if (startstop == 0) {
+                        fprintf(stderr, "Giving '--fl=<n>' and '--stop' (or "
+                                "'--eject') is invalid\n");
+                        usage();
+                        return 1;
+                }
+                if (power_conds > 0) {
+                        fprintf(stderr, "Giving '--fl=<n>' and '--pc=<n>' "
+                                "when <n> is non-zero is invalid\n");
+                        usage();
+                        return 1;
+                }
+        } else {
+                if ((startstop == -1) && loej)
+                        startstop = 0;
+                if ((startstop == -1) && (0 == power_conds))
+                        startstop = 1;
+        }
                 
-        fd = open(file_name, O_RDWR | O_NONBLOCK);
+        fd = sg_cmds_open_device(file_name, 0 /* rw */, verbose);
         if (fd < 0) {
-                fprintf(stderr, "Error trying to open %s\n", file_name);
-                perror("");
+                fprintf(stderr, "Error trying to open %s: %s\n",
+                        file_name, safe_strerror(-fd));
                 return 2;
         }
-        
+
         res = 0;
-        if (power_conds > 0)
-                res = sg_ll_start_stop_unit(fd, immed, power_conds, 0, 0,
-                                            1, verbose);
+        if (fl_num >= 0)
+                res = sg_ll_start_stop_unit(fd, immed, fl_num, power_conds,
+                                            1 /* fl */, 1 /* loej */,
+                                            1 /*start */, 1 /* noisy */,
+                                            verbose);
+        else if (power_conds > 0)
+                res = sg_ll_start_stop_unit(fd, immed, 0, power_conds, 0, 0,
+                                            0, 1, verbose);
         else if (startstop != -1)
-                res = sg_ll_start_stop_unit(fd, immed, 0, loej, startstop,
-                                            1, verbose);
+                res = sg_ll_start_stop_unit(fd, immed, 0, 0, 0, loej,
+                                            startstop, 1, verbose);
         if (res) {
                 if (verbose < 2) {
                         if (SG_LIB_CAT_INVALID_OP == res)
@@ -231,6 +249,6 @@ int main(int argc, char * argv[])
                 }
                 fprintf(stderr, "START STOP UNIT command failed\n");
         }
-        close (fd);
+        sg_cmds_close_device(fd);
         return res ? 1 : 0;
 }

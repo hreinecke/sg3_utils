@@ -5,16 +5,12 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004-2005 D. Gilbert
+*  Copyright (C) 2004-2006 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,19 +20,13 @@
 
 */
 
-static char * version_str = "0.23 20051025";
+static char * version_str = "0.25 20060117";
 
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-
-#define SG_PERSISTENT_IN 0x5e
-#define SG_PERSISTENT_OUT 0x5f
 #define PRIN_RKEY_SA     0x0
 #define PRIN_RRES_SA     0x1
 #define PRIN_RCAP_SA     0x2
 #define PRIN_RFSTAT_SA   0x3
-#define PRINOUT_CMD_LEN 10
 #define PROUT_REG_SA     0x0
 #define PROUT_RES_SA     0x1
 #define PROUT_REL_SA     0x2
@@ -46,8 +36,6 @@ static char * version_str = "0.23 20051025";
 #define PROUT_REG_IGN_SA 0x6
 #define PROUT_REG_MOVE_SA 0x7
 #define MX_ALLOC_LEN 8192
-
-#define EBUFF_SZ 256
 
 
 static struct option long_options[] = {
@@ -111,126 +99,6 @@ static const char * prout_sa_strs[] = {
 static const int num_prout_sa_strs = sizeof(prout_sa_strs) / 
                                      sizeof(prout_sa_strs[0]);
 
-
-/* Returns 0 when successful, else -1 */
-static int do_prin(int sg_fd, int rq_servact, void * resp, int mx_resp_len,
-                   int noisy, int verbose)
-{
-    int res, k;
-    unsigned char prinCmdBlk[PRINOUT_CMD_LEN] = {SG_PERSISTENT_IN, 0, 0, 0,
-                                                 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    if (rq_servact > 0) {
-        prinCmdBlk[1] = (unsigned char)(rq_servact & 0x1f);
-
-    }
-    prinCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    prinCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
-
-    if (verbose) {
-        fprintf(stderr, "    Persistent Reservation In cmd: ");
-        for (k = 0; k < PRINOUT_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", prinCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(prinCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = prinCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (PR In) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("PRIN, continuing", &io_hdr, verbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    default:
-        if (noisy || verbose) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "PRIN error, service_action: %s",
-                     ((rq_servact < num_prin_sa_strs) ? 
-                        prin_sa_strs[rq_servact] : "??"));
-            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
-        }
-        return -1;
-    }
-}
-
-/* Returns 0 when successful, else -1 */
-static int do_prout(int sg_fd, int rq_servact, int rq_scope, 
-                    unsigned int rq_type, void * paramp, int param_len,
-                    int noisy, int verbose)
-{
-    int res, k;
-    unsigned char proutCmdBlk[PRINOUT_CMD_LEN] = {SG_PERSISTENT_OUT, 0, 0, 0,
-                                                  0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    if (rq_servact > 0) {
-        proutCmdBlk[1] = (unsigned char)(rq_servact & 0x1f);
-
-    }
-    proutCmdBlk[2] = (((rq_scope & 0xf) << 4) | (rq_type & 0xf));
-    proutCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
-    proutCmdBlk[8] = (unsigned char)(param_len & 0xff);
-
-    if (verbose) {
-        fprintf(stderr, "    Persistent Reservation Out cmd: ");
-        for (k = 0; k < PRINOUT_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", proutCmdBlk[k]);
-        fprintf(stderr, "\n");
-        if (verbose > 1) {
-            fprintf(stderr, "    Persistent Reservation Out parameters:\n");
-            dStrHex(paramp, param_len, 0);
-        }
-    }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(proutCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-    io_hdr.dxfer_len = param_len;
-    io_hdr.dxferp = paramp;
-    io_hdr.cmdp = proutCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (PR Out) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("PROUT, continuing", &io_hdr, verbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    default:
-        if (noisy) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "PROUT error, service_action: %s",
-                     ((rq_servact < num_prout_sa_strs) ? 
-                        prout_sa_strs[rq_servact] : "??"));
-            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
-        }
-        return -1;
-    }
-}
 
 static void usage()
 {
@@ -400,15 +268,22 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
 
 static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
 {
-    int k, j, num, add_len, add_desc_len, rel_pt_addr;
+    int k, j, num, res, add_len, add_desc_len, rel_pt_addr;
     unsigned int pr_gen;
     unsigned long long ull;
     unsigned char * ucp;
     unsigned char pr_buff[MX_ALLOC_LEN];
 
     memset(pr_buff, 0, sizeof(pr_buff));
-    if (0 != do_prin(sg_fd, prin_sa, pr_buff, 
-                     sizeof(pr_buff), 1, do_verbose)) {
+    res = sg_ll_persistent_reserve_in(sg_fd, prin_sa, pr_buff,
+                                      sizeof(pr_buff), 1, do_verbose);
+    if (res) {
+       if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "Persistent reserve in command not supported\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in Persistent reserve in cdb\n");
+        else
+            fprintf(stderr, "Persistent reserve in command failed\n");
         return 1;
     }
     if (PRIN_RCAP_SA == prin_sa) {
@@ -431,6 +306,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                    !!(pr_buff[2] & 0x1));
             printf("  Type Mask Valid(TMV): %d\n",
                    !!(pr_buff[3] & 0x80));
+            printf("  Allow commands: %d\n", (pr_buff[3] >> 4) & 0x7);
             printf("  Persist Through Power Loss active(PTPL_A): %d\n",
                    !!(pr_buff[3] & 0x1));
             if (pr_buff[3] & 0x80) {
@@ -555,7 +431,7 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
                       int param_aptpl, unsigned char * transportidp,
                       int transportid_len, int do_verbose)
 {
-    int j, len;
+    int j, len, res;
     unsigned char pr_buff[MX_ALLOC_LEN];
 
     memset(pr_buff, 0, sizeof(pr_buff));
@@ -581,8 +457,15 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
         pr_buff[26] = (unsigned char)((transportid_len >> 8) & 0xff);
         pr_buff[27] = (unsigned char)(transportid_len & 0xff);
     }
-    if (0 != do_prout(sg_fd, prout_sa, 0, prout_type, pr_buff,
-                      len, 1, do_verbose)) {
+    res = sg_ll_persistent_reserve_out(sg_fd, prout_sa, 0, prout_type,
+                                       pr_buff, len, 1, do_verbose);
+    if (res) {
+       if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "Persistent reserve out command not supported\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in Persistent reserve out cdb\n");
+        else
+            fprintf(stderr, "Persistent reserve out command failed\n");
         return 1;
     } else if (do_verbose) {
         char buff[64];
@@ -604,7 +487,7 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
                       unsigned char * transportidp, int transportid_len,
                       int do_verbose)
 {
-    int j, len;
+    int j, len, res;
     unsigned char pr_buff[MX_ALLOC_LEN];
 
     memset(pr_buff, 0, sizeof(pr_buff));
@@ -631,8 +514,16 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
         pr_buff[22] = (unsigned char)((transportid_len >> 8) & 0xff);
         pr_buff[23] = (unsigned char)(transportid_len & 0xff);
     }
-    if (0 != do_prout(sg_fd, PROUT_REG_MOVE_SA, 0, prout_type, pr_buff,
-                      len, 1, do_verbose)) {
+    res = sg_ll_persistent_reserve_out(sg_fd, PROUT_REG_MOVE_SA, 0,
+                                       prout_type, pr_buff, len, 1,
+                                       do_verbose);
+    if (res) {
+       if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "Persistent reserve out command not supported\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in Persistent reserve out cdb\n");
+        else
+            fprintf(stderr, "Persistent reserve out command failed\n");
         return 1;
     } else if (do_verbose)
         fprintf(stderr, "Persistent Reservation Out 'register and move' "
@@ -780,7 +671,6 @@ int main(int argc, char * argv[])
     unsigned long long param_sark = 0;
     unsigned int param_rtp = 0;
     char device_name[256];
-    char ebuff[EBUFF_SZ];
     char buff[48];
     int num_prin_sa = 0;
     int num_prout_sa = 0;
@@ -1032,10 +922,10 @@ int main(int argc, char * argv[])
     }
 
     if (do_inquiry) {
-        if ((sg_fd = open(device_name, O_RDONLY | O_NONBLOCK)) < 0) {
-            snprintf(ebuff, EBUFF_SZ, "sg_persist: error opening file: %s "
-                     " (ro)", device_name);
-            perror(ebuff);
+        if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */,
+                                         do_verbose)) < 0) {
+            fprintf(stderr, "sg_persist: error opening file (ro): %s: %s\n",
+                     device_name, safe_strerror(-sg_fd));
             return 1;
         }
         if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, do_verbose)) {
@@ -1052,13 +942,13 @@ int main(int argc, char * argv[])
                    device_name);
             return 1;
         }
-        close(sg_fd);
+        sg_cmds_close_device(sg_fd);
     }
 
-    if ((sg_fd = open(device_name, O_RDWR | O_NONBLOCK)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, "sg_persist: error opening file: %s (rw)",
-                 device_name);
-        perror(ebuff);
+    if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,
+                                     do_verbose)) < 0) {
+        fprintf(stderr, "sg_persist: error opening file (rw): %s: %s\n",
+                device_name, safe_strerror(-sg_fd));
         return 1;
     }
 
@@ -1075,6 +965,6 @@ int main(int argc, char * argv[])
                          param_sark, param_alltgpt, param_aptpl,
                          transportid_arr, transportid_arr_len, do_verbose);
 
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
     return ret;
 }

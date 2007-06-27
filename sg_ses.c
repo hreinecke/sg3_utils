@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,12 +32,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -47,7 +43,7 @@
  *commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.21 20051113";    /* ses2r13 */
+static char * version_str = "1.23 20060115";    /* ses2r13 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -288,9 +284,9 @@ static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
             fprintf(stderr, "      enc descriptor len=%d ??\n", el);
             continue;
         }
-        printf("      logical id (hex): ");
+        printf("      logical identifier (hex): ");
         for (j = 0; j < 8; ++j)
-            printf("%02x ", ucp[4 + j]);
+            printf("%02x", ucp[4 + j]);
         printf("\n      vendor: %.8s  product: %.16s  rev: %.4s\n",
                ucp + 12, ucp + 20, ucp + 36);
         if (el > 40) {
@@ -995,8 +991,8 @@ static char * sas_device_type[] = {
     "reserved [4]", "reserved [5]", "reserved [6]", "reserved [7]"
 };
 
-static void ses_transport_proto(const unsigned char * ucp, int len,
-                                int elem_num)
+static void ses_additional_elem_each(const unsigned char * ucp, int len,
+                                     int elem_num, int elem_type)
 {
     int ports, phys, j, m, desc_type, eip_offset;
     const unsigned char * per_ucp;
@@ -1045,33 +1041,57 @@ static void ses_transport_proto(const unsigned char * ucp, int len,
                        ((per_ucp[3] & 4) ? "STP" : ""),
                        ((per_ucp[3] & 2) ? "SMP" : ""),
                        ((per_ucp[3] & 1) ? "SATA_device" : ""));
-                printf("      attached SAS address: ");
+                printf("      attached SAS address: 0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", per_ucp[4 + m]);
-                printf("\n      SAS address: ");
+                printf("\n      SAS address: 0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", per_ucp[12 + m]);
                 printf("\n      phy identifier: 0x%x\n", per_ucp[20]);
             }
         } else if (1 == desc_type) {
             phys = ucp[2 + eip_offset];
-            printf("expander descriptor type [%d]\n", desc_type);
-            printf("    number of phys: %d\n", phys);
-            printf("    SAS address: ");
-            for (m = 0; m < 8; ++m)
-                printf("%02x", ucp[6 + eip_offset + m]);
-            printf("\n");
-            per_ucp = ucp + 14 + eip_offset;
-            for (j = 0; j < phys; ++j, per_ucp += 2) {
-                printf("    [%d] ", phys + 1);
-                if (0xff == per_ucp[0])
-                    printf("no attached connector");
-                else
-                    printf("connector element index: %d", per_ucp[0]);
-                if (0xff != per_ucp[1])
-                    printf(", other element index: %d", per_ucp[1]);
+            if (0x18 == elem_type) {
+                printf("expander descriptor type\n");
+                printf("    number of phys: %d\n", phys);
+                printf("    SAS address: 0x");
+                for (m = 0; m < 8; ++m)
+                    printf("%02x", ucp[6 + eip_offset + m]);
                 printf("\n");
-            }
+                per_ucp = ucp + 14 + eip_offset;
+                for (j = 0; j < phys; ++j, per_ucp += 2) {
+                    printf("      [%d] ", j + 1);
+                    if (0xff == per_ucp[0])
+                        printf("no attached connector");
+                    else
+                        printf("connector element index: %d", per_ucp[0]);
+                    if (0xff != per_ucp[1])
+                        printf(", other element index: %d", per_ucp[1]);
+                    printf("\n");
+                }
+            } else if ((0x14 == elem_type) || (0x15 == elem_type)) {
+                printf("SCSI %s port descriptor type\n", 
+                       ((0x14 == elem_type) ? "target" : "initiator"));
+                printf("    number of phys: %d\n", phys);
+                per_ucp = ucp + 6 + eip_offset;
+                for (j = 0; j < phys; ++j, per_ucp += 12) {
+                    printf("    phy identifier: 0x%x\n", per_ucp[0]);
+                    if (0xff == per_ucp[2])
+                        printf("      no attached connector");
+                    else
+                        printf("      connector element index: %d",
+                               per_ucp[2]);
+                    if (0xff != per_ucp[3])
+                        printf(", other element index: %d", per_ucp[3]);
+                    printf("\n");
+                    printf("      SAS address: 0x");
+                    for (m = 0; m < 8; ++m)
+                        printf("%02x", per_ucp[4 + m]);
+                    printf("\n");
+                }
+            } else
+                printf("    unrecognised element type [%d] for desc_type 1\n",
+                       elem_type);
         } else
             printf("    unrecognised descriptor type [%d]\n", desc_type);
         break;
@@ -1084,7 +1104,7 @@ static void ses_transport_proto(const unsigned char * ucp, int len,
 }
 
 /* Previously called "Device element status descriptor". Changed "device"
-   to "additional" to allow for SAS descriptors and SATA devices */
+   to "additional" to allow for SAS expander and SATA devices */
 static void ses_additional_elem_sdg(const struct element_hdr * ehp,
                          int num_telems, unsigned int ref_gen_code,
                          const unsigned char * resp, int resp_len)
@@ -1112,9 +1132,12 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
         if ((ucp + 1) > last_ucp)
             goto truncated;
         elem_type = ehp[k].etype;
-        if (! ((1 == elem_type) || (0x17 == elem_type) || (0x18 != elem_type)))
-            continue;
-        /* only interested in device, array and SAS expander elements */
+        if (! ((1 == elem_type) ||      /* device */
+               (0x14 == elem_type) ||   /* scsi target */
+               (0x15 == elem_type) ||   /* scsi initiator */
+               (0x17 == elem_type) ||   /* array */
+               (0x18 == elem_type)))    /* SAS expander */
+            continue;   /* skip if not one of above element types */
         cp = find_element_desc(elem_type);
         if (cp)
             printf("  Element type: %s, subenclosure id: %d\n",
@@ -1129,10 +1152,10 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
             if (0x6 == proto) {  /* SAS */
                 desc_type = ((eip ? ucp[5] : ucp[3]) >> 6) & 0x3;
                 if (eip) {
-                    if (0 == desc_type) /* non expander */
+                    if (0 == desc_type) /* device or array element */
                         printf("    element index: %d [0x%x], bay number: %d"
                                " [0x%x]\n", ucp[3], ucp[3], ucp[7], ucp[7]);
-                    else
+                    else  /* target, initiator or SAS expander element */
                         printf("    element index: %d [0x%x]\n", ucp[3],
                                ucp[3]);
                 }
@@ -1144,7 +1167,7 @@ static void ses_additional_elem_sdg(const struct element_hdr * ehp,
             if (invalid)
                 printf("      flagged as invalid (no further information)\n");
             else
-                ses_transport_proto(ucp, desc_len, j);
+                ses_additional_elem_each(ucp, desc_len, j, elem_type);
         }
     }
     return;
@@ -1655,10 +1678,10 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
-        perror("");
+        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
     if (! do_raw) {
@@ -1738,9 +1761,9 @@ int main(int argc, char * argv[])
 
     ret = 0;
 err_out:
-    res = close(sg_fd);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
         return 2;
     }
     return ret;

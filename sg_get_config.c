@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,12 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -49,25 +45,15 @@
 
 */
 
-static char * version_str = "0.20 20051025";
+static char * version_str = "0.23 20060125";
 
-
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
-
-#define GET_CONFIG_CMD 0x46
-#define GET_CONFIG_CMD_LEN 10
 #define MX_ALLOC_LEN 8192
-
 #define NAME_BUFF_SZ 64
-
-#define EBUFF_SZ 256
 
 #define ME "sg_get_config: "
 
 
 static unsigned char resp_buffer[MX_ALLOC_LEN];
-static char ebuff[EBUFF_SZ];
 
 static struct option long_options[] = {
         {"brief", 0, 0, '1'},
@@ -82,81 +68,6 @@ static struct option long_options[] = {
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
 };
-
-/* Returns 0 when successful, SG_LIB_CAT_INVALID_OP if command not
-   supported, SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
-   else -1 */
-static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
-                            int mx_resp_len, int noisy, int verbose)
-{
-    int res, k;
-    unsigned char gcCmdBlk[GET_CONFIG_CMD_LEN] = {GET_CONFIG_CMD, 0, 0, 0, 
-                                                  0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    if ((rt < 0) || (rt > 3)) {
-        fprintf(stderr, "Bad rt value: %d\n", rt);
-        return -1;
-    }
-    gcCmdBlk[1] = (rt & 0x3);
-    if ((starting < 0) || (starting > 0xffff)) {
-        fprintf(stderr, "Bad starting field number: 0x%x\n", starting);
-        return -1;
-    }
-    gcCmdBlk[2] = (unsigned char)((starting >> 8) & 0xff);
-    gcCmdBlk[3] = (unsigned char)(starting & 0xff);
-    if ((mx_resp_len < 0) || (mx_resp_len > 0xffff)) {
-        fprintf(stderr, "Bad mx_resp_len: 0x%x\n", starting);
-        return -1;
-    }
-    gcCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    gcCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
-
-    if (verbose) {
-        fprintf(stderr, "    Get Configuration cdb: ");
-        for (k = 0; k < GET_CONFIG_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", gcCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(gcCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = gcCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (get config) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Get config, continuing", &io_hdr, verbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        if (verbose && io_hdr.resid)
-            fprintf(stderr, "      get config: resid=%d\n", io_hdr.resid);
-        return 0;
-    case SG_LIB_CAT_INVALID_OP:
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        if (verbose > 1)
-            sg_chk_n_print3("get config error", &io_hdr, 1);
-        return res;
-    default:
-        if (verbose | noisy) {
-            snprintf(ebuff, EBUFF_SZ, "get config error, rt=%d, "
-                     "starting=0x%x ", rt, starting);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
-        }
-        return -1;
-    }
-}
 
 static void usage()
 {
@@ -209,19 +120,22 @@ static struct code_desc profile_desc_arr[] = {
         {0x12, "DVD-RAM"},
         {0x13, "DVD-RW restricted overwrite"},
         {0x14, "DVD-RW restricted recording"},
-        {0x15, "DVD-R dual layer sequental recording"},
-        {0x16, "DVD-R dual layer layer jump recording"},
+        {0x15, "DVD-R dual layer - sequental recording"},
+        {0x16, "DVD-R dual layer - recording"},
         {0x1a, "DVD+RW"},
         {0x1b, "DVD+R"},
         {0x20, "DDCD-ROM"},
         {0x21, "DDCD-R"},
         {0x22, "DDCD-RW"},
-        {0x2a, "DVD+RW double layer"},
+        {0x2a, "DVD+RW dual layer"},
         {0x2b, "DVD+R double layer"},
         {0x40, "BD-ROM"},
         {0x41, "BD-R sequential recording (SRM)"},
         {0x42, "BD-R random recording (RRM)"},
         {0x43, "BD-RE"},
+        {0x50, "HD DVD-ROM"},
+        {0x51, "HD DVD-R"},
+        {0x52, "HD DVD-Rewritable"},
         {0xffff, "Non-conforming profile"},
 };
 
@@ -258,7 +172,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x25, "Write once"},
         {0x26, "Restricted overwrite"},
         {0x27, "CD-RW CAV write"},
-        {0x28, "MRW"},
+        {0x28, "MRW"},          /* Mount Rainier reWritable */
         {0x29, "Enhanced defect reporting"},
         {0x2a, "DVD+RW"},
         {0x2b, "DVD+R"},
@@ -276,9 +190,10 @@ static struct code_desc feature_desc_arr[] = {
         {0x3b, "DVD+R double layer"},
         {0x40, "BD read"},
         {0x41, "BD write"},
-        {0x42, "TSR"},
+        {0x42, "TSR (timely safe recording)"},
         {0x50, "HD DVD read"},
         {0x51, "HD DVD write"},
+        {0x80, "Hybrid disc"},
         {0x100, "Power management"},
         {0x101, "SMART"},
         {0x102, "Embedded changer"},
@@ -287,7 +202,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x105, "Timeout"},
         {0x106, "DVD CSS"},
         {0x107, "Real time streaming"},
-        {0x108, "Logical unit serial number"},
+        {0x108, "Drive serial number"},
         {0x109, "Media serial number"},
         {0x10a, "Disc control blocks"},
         {0x10b, "DVD CPRM"},
@@ -324,8 +239,8 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
                feature);
-        printf("    available profiles [ordered from most advanced to "
-               "least]:\n");
+        printf("    available profiles [ordered from most to least "
+               "advanced]:\n");
         for (k = 4; k < len; k += 4) {
             profile = (ucp[k] << 8) + ucp[k + 1];
             printf("      profile: %s , currentP=%d\n",
@@ -359,7 +274,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      Physical interface standard: %s", cp);
         if (len > 8)
-            printf(", DBE=%d\n", !!(ucp[8] & 1));
+            printf(", INQ2=%d, DBE=%d\n", !!(ucp[8] & 2), !!(ucp[8] & 1));
         else
             printf("\n");
         break;
@@ -423,13 +338,12 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
                num, ((ucp[8] << 8) + ucp[9]), !!(ucp[10] & 0x1));
         break;
     case 0x1d:     /* Multi-read */
-    case 0x1f:     /* DVD read */
     case 0x22:     /* Sector erasable */
     case 0x26:     /* Restricted overwrite */
     case 0x27:     /* CDRW CAV write */
     case 0x38:     /* BD-R pseudo-overwrite (POW) */
+    case 0x42:     /* TSR (timely safe recording) */
     case 0x100:    /* Power management */
-    case 0x104:    /* Firmware upgrade */
     case 0x109:    /* Media serial number */
     case 0x110:    /* VCPS */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -446,6 +360,17 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      DAP=%d, C2 flags=%d, CD-Text=%d\n", !!(ucp[4] & 0x80),
                !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+        break;
+    case 0x1f:     /* DVD read */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      MULTI110=%d, Dual-R=%d\n", !!(ucp[4] & 0x1),
+               !!(ucp[6] & 0x1));
         break;
     case 0x20:     /* Random writable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -469,8 +394,9 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      Data block types supported=0x%x, ARSV=%d, BUF=%d\n",
-               ((ucp[4] << 8) + ucp[5]), !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
+        printf("      Data block types supported=0x%x, TRIO=%d, ARSV=%d, "
+               "BUF=%d\n", ((ucp[4] << 8) + ucp[5]), !!(ucp[6] & 0x4),
+               !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
         num = ucp[7];
         printf("      Number of link sizes=%d\n", num);
         for (k = 0; k < num; ++k)
@@ -506,12 +432,13 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
                num, ((ucp[8] << 8) + ucp[9]), !!(ucp[10] & 0x1));
         break;
-    case 0x28:     /* MRW */
+    case 0x28:     /* MRW  (Mount Rainier reWriteable) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 4)
-            printf("      Write=%d\n", !!(ucp[4] & 0x1));
+            printf("      DVD+Write=%d, DVD+Read=%d, Write=%d\n",
+                   !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
     case 0x29:     /* Enhanced defect reporting */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -569,8 +496,8 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      BUF=%d, R-W raw=%d, R-W pack=%d, Test write=%d\n",
                !!(ucp[4] & 0x40), !!(ucp[4] & 0x10), !!(ucp[4] & 0x8),
                !!(ucp[4] & 0x4));
-        printf("      CD-RW=%d, R-W sub-code=%d\n",
-               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+        printf("      CD-RW=%d, R-W sub-code=%d, Data type supported=%d\n",
+               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1), (ucp[6] << 8) + ucp[7]);
         break;
     case 0x2e:     /* CD mastering (session at once) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -596,9 +523,22 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      BUF=%d, Dual-R=%d, Test write=%d, DVD-RW=%d\n",
+        printf("      BUF=%d, RDL=%d, Test write=%d, DVD-RW=%d\n",
                !!(ucp[4] & 0x40), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
                !!(ucp[4] & 0x2));
+        break;
+    case 0x33:     /* Layer jump recording */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        num = ucp[7];
+        printf("      Number of link sizes=%d\n", num);
+        for (k = 0; k < num; ++k)
+            printf("        %d\n", ucp[8 + k]);
         break;
     case 0x37:     /* CD-RW media write support */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -685,6 +625,38 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
                (ucp[28] << 8) + ucp[29],
                (ucp[30] << 8) + ucp[31]);
         break;
+    case 0x50:     /* HD DVD Read */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      HD DVD-R=%d, HD DVD-RW=%d\n", !!(ucp[4] & 0x1),
+               !!(ucp[6] & 0x1));
+        break;
+    case 0x51:     /* HD DVD Write */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      HD DVD-R=%d, HD DVD-RW=%d\n", !!(ucp[4] & 0x1),
+               !!(ucp[6] & 0x1));
+        break;
+    case 0x80:     /* Hybrid disc */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      RI=%d\n", !!(ucp[4] & 0x1));
+        break;
     case 0x101:    /* SMART */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -718,6 +690,16 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1),
                (ucp[6] << 8) + ucp[7]);
         break;
+    case 0x104:    /* Firmware upgrade */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      M5=%d\n", !!(ucp[4] & 0x1));
+        break;
     case 0x105:    /* Timeout */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -749,7 +731,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x10), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
                !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
-    case 0x108:    /* Logical unit serial number */
+    case 0x108:    /* Drive serial number */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
@@ -758,7 +740,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         n = ((num < n) ? num : n);
         strncpy(buff, (const char *)(ucp + 4), n);
         buff[n] = '\0';
-        printf("      Logical unit serial number: %s\n", buff);
+        printf("      Drive serial number: %s\n", buff);
         break;
     case 0x10a:    /* Disc control blocks */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -790,6 +772,19 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      %.2s%.2s/%.2s/%.2s %.2s:%.2s:%.2s\n", ucp + 4,
                ucp + 6, ucp + 8, ucp + 10, ucp + 12, ucp + 14, ucp + 16);
+        break;
+    case 0x10d:    /* AACS */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      BNG=%d, Block count for binding nonce=%d\n",
+               !!(ucp[4] & 0x1), ucp[5]);
+        printf("      Number of AGIDs=%d, AACS version=%d\n",
+               (ucp[6] & 0xf), ucp[7]);
         break;
     case 0x120:    /* BD CPS */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -969,10 +964,9 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    if ((sg_fd = open(device_name, O_RDONLY | O_NONBLOCK)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, ME "error opening file: %s (ro)",
-                 device_name);
-        perror(ebuff);
+    if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */, verbose)) < 0) {
+        fprintf(stderr, ME "error opening file: %s (ro): %s\n",
+                 device_name, safe_strerror(-sg_fd));
         return 1;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
@@ -985,14 +979,15 @@ int main(int argc, char * argv[])
         else
             printf("  Peripheral device type: 0x%x\n", peri_type);
     } else {
-        printf(ME "%s doesn't respond to a SCSI INQUIRY\n", device_name);
+        fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
+                device_name);
         return 1;
     }
-    close(sg_fd);
+    sg_cmds_close_device(sg_fd);
 
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        perror(ME "open error (rw)");
+        fprintf(stderr, ME "open error (rw): %s\n", safe_strerror(-sg_fd));
         return 1;
     }
 
@@ -1019,9 +1014,9 @@ int main(int argc, char * argv[])
             fprintf(stderr, "    try '-v' option for more information\n");
     }
 
-    res = close(sg_fd);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
         return 1;
     }
     return ret;

@@ -27,15 +27,16 @@ MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sg_map26.8
 MAN_PREF = man8
 
-HEADERS = sg_lib.h sg_cmds.h
+HEADERS = sg_lib.h sg_cmds.h sg_pt.h
 
-
+OS_FLAGS = -DSG3_UTILS_LINUX
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+# S_CFLAGS = $(OS_FLAGS) $(LARGE_FILE_FLAGS) -DSG_KERNEL_INCLUDES
+S_CFLAGS = $(OS_FLAGS) $(LARGE_FILE_FLAGS)
 
-# CFLAGS = -O2 -Wall -W $(LARGE_FILE_FLAGS)
-CFLAGS = -g -O2 -Wall -W $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -W -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(LARGE_FILE_FLAGS)
+# CFLAGS = -O2 -Wall -W
+CFLAGS = -g -O2 -Wall -W
+# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99
 
 CFLAGS_PTHREADS = -D_REENTRANT
 
@@ -49,7 +50,7 @@ LIB_VINFO = 1:0:0
 all: $(EXECS)
 
 depend dep:
-	for i in *.c; do $(CC) $(INCLUDES) $(CFLAGS) -M $$i; \
+	for i in *.c; do $(CC) $(INCLUDES) $(CFLAGS) $(S_CFLAGS) -M $$i; \
 	done > .depend
 
 clean:
@@ -57,15 +58,21 @@ clean:
 	/bin/rm -rf .libs
 
 
+.c.o:
+	$(CC) $(INCLUDES) $(CFLAGS) $(S_CFLAGS) -c -o $@ $<
+
 sg_lib.lo: sg_lib.o
 	libtool --mode=compile $(CC) -c sg_lib.c
 
 sg_cmds.lo: sg_cmds.o
 	libtool --mode=compile $(CC) -c sg_cmds.c
 
-libsgutils.la: sg_lib.lo sg_cmds.lo
+sg_pt_linux.lo: sg_pt_linux.o
+	libtool --mode=compile $(CC) -c sg_pt_linux.c
+
+libsgutils.la: sg_lib.lo sg_cmds.lo sg_pt_linux.lo
 	libtool --mode=link $(LD) -o libsgutils.la sg_lib.lo sg_cmds.lo \
-	-rpath $(LIBDIR) -version-info $(LIB_VINFO)
+	sg_pt_linux.lo -rpath $(LIBDIR) -version-info $(LIB_VINFO)
 
 # libsgutils.la: sg_lib.lo sg_cmds.lo
 #	libtool --mode=link $(LD) -o libsgutils.la sg_lib.lo sg_cmds.lo \
@@ -74,43 +81,44 @@ libsgutils.la: sg_lib.lo sg_cmds.lo
 sg_inq: sg_inq.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ 
 
-sg_dd: sg_dd.o llseek.o libsgutils.la
+sg_dd: sg_dd.o llseek.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_scan: sg_scan.o libsgutils.la
+sg_scan: sg_scan.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ 
 
-sginfo: sginfo.o libsgutils.la
+sginfo: sginfo.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_start: sg_start.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ 
 
-sg_rbuf: sg_rbuf.o libsgutils.la
+sg_rbuf: sg_rbuf.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_readcap: sg_readcap.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sgp_dd.o: sgp_dd.c
-	$(CC) $(INCLUDES) $(CFLAGS) $(CFLAGS_PTHREADS) -c $<
+	$(CC) $(INCLUDES) $(CFLAGS) $(S_CFLAGS) $(CFLAGS_PTHREADS) \
+	-c -o sgp_dd.o $<
 
-sgp_dd: sgp_dd.o llseek.o libsgutils.la
+sgp_dd: sgp_dd.o llseek.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^ -lpthread
 
-sgm_dd: sgm_dd.o llseek.o libsgutils.la
+sgm_dd: sgm_dd.o llseek.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_map: sg_map.o libsgutils.la
+sg_map: sg_map.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_turs: sg_turs.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_test_rwbuf: sg_test_rwbuf.o libsgutils.la
+sg_test_rwbuf: sg_test_rwbuf.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_read: sg_read.o llseek.o libsgutils.la
+sg_read: sg_read.o llseek.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_reset: sg_reset.o
@@ -125,7 +133,7 @@ sg_logs: sg_logs.o libsgutils.la
 sg_senddiag: sg_senddiag.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
-sg_opcodes: sg_opcodes.o libsgutils.la
+sg_opcodes: sg_opcodes.o sg_io_linux.o libsgutils.la
 	libtool --mode=link $(LD) -o $@ $(LDFLAGS) $^
 
 sg_persist: sg_persist.o libsgutils.la

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,11 +32,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include "sg_include.h"
+
 #include "sg_lib.h"
 #include "sg_cmds.h"
 
@@ -46,7 +43,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.04 20050722";
+static char * version_str = "1.05 20060106";
 
 #define ME "sg_wr_mode: "
 
@@ -280,7 +277,7 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, num, alloc_len, off;
+    int sg_fd, res, c, num, alloc_len, off, pdt;
     int k, md_len, hdr_len, bd_len, mask_in_len;
     unsigned u, uu;
     int dbd = 0;
@@ -298,6 +295,7 @@ int main(int argc, char * argv[])
     unsigned char mask_in[MX_ALLOC_LEN];
     unsigned char ref_md[MX_ALLOC_LEN];
     char ebuff[EBUFF_SZ];
+    struct sg_simple_inquiry_resp inq_data;
     int ret = 1;
 
     memset(device_name, 0, sizeof device_name);
@@ -415,12 +413,16 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
+    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
-        perror("");
+        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return 1;
     }
+    if (0 == sg_simple_inquiry(sg_fd, &inq_data, 0, verbose))
+        pdt = inq_data.peripheral_type;
+    else
+        pdt = 0x1f;
 
     /* do MODE SENSE to fetch current values */
     memset(ref_md, 0, MX_ALLOC_LEN);
@@ -466,6 +468,8 @@ int main(int argc, char * argv[])
         ref_md[0] = 0;  /* mode data length reserved for mode select */
         if (! mode_6)
             ref_md[1] = 0;    /* mode data length reserved for mode select */
+        if (0 == pdt)   /* for disks mask out DPOFUA bit */
+            ref_md[mode_6 ? 2 : 3] &= 0xef;
         if (md_len > alloc_len) {
             fprintf(stderr, "mode data length=%d exceeds allocation "
                     "length=%d\n", md_len, alloc_len);
@@ -545,9 +549,9 @@ int main(int argc, char * argv[])
     }
     ret = 0;
 err_out:
-    res = close(sg_fd);
+    res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        perror(ME "close error");
+        fprintf(stderr, ME "close error: %s\n", safe_strerror(-res));
         return 1;
     }
     return ret;

@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "September 2005" "sg3_utils-1.17" SG3_UTILS
+.TH SGM_DD "8" "December 2005" "sg3_utils-1.19" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from files and devices. Specialized for
 devices that understand the SCSI command set and does memory mapped
@@ -132,8 +132,8 @@ suffixes are compatible with GNU's dd command (since 2002) which claims
 compliance with SI and with IEC 60027-2.
 .PP
 Alternatively numerical values can be given in hexadecimal preceded by
-either "0x" or "0X". When hex numbers are given multipliers cannot be
-used.
+either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
+given multipliers cannot be used.
 .PP
 The count, skip and seek parameters can take 64 bit values (i.e. very
 big numbers). Other values are limited to what can fit in a signed
