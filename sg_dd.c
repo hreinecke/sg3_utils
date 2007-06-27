@@ -51,7 +51,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.62 20070606";
+static char * version_str = "5.63 20070626";
 
 #define ME "sg_dd: "
 
@@ -1841,6 +1841,8 @@ int main(int argc, char * argv[])
         }
     }
     free(wrkBuff);
+    if (zeros_buff)
+        free(zeros_buff);
     if (STDIN_FILENO != infd)
         close(infd);
     if (! ((STDOUT_FILENO == outfd) || (FT_DEV_NULL & out_type)))
