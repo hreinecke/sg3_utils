@@ -2,6 +2,16 @@ Each utility has its own version number, date of last changes and
 some description at the top of its ".c" file.
 
 
+Changelog for sg3_utils-0.93 [20010415]
+----------------------------
+  - more include file fine tuning
+  - some "dio" work sg_rbuf
+  - extend sgp_dd so "continue on error" works on normal files
+  - introduce sg_include.h to encapsulate sg include problems
+  - add scsi_devfs_scan
+  - add sg_bus_xfer to archive directory
+  - more error info in sginfo
+
 Changelog for sg3_utils-0.92 [20010116]
 ----------------------------
   - change sg_err.c output from stdout to stderr

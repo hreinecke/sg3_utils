@@ -7,7 +7,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
+#include "sg_include.h"
 #include "sg_err.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
@@ -28,7 +28,7 @@
    set (in megabytes, the default is 200 MB). The '-d' option requests
    direct io (and is overridden by '-q').
 
-   Version 3.69 (20001220)
+   Version 3.70 (20010321)
 */
 
 
@@ -47,7 +47,8 @@ int main(int argc, char * argv[])
     int sg_fd, res, j, m;
     unsigned int k, num;
     unsigned char rbCmdBlk [RB_CMD_LEN];
-    unsigned char * rbBuff = malloc(512);
+    unsigned char * rbBuff = NULL;
+    void * rawp = NULL;
     unsigned char sense_buffer[32];
     int buf_capacity = 0;
     int do_quick = 0;
@@ -55,6 +56,7 @@ int main(int argc, char * argv[])
     int buf_size = 0;
     unsigned int total_size_mb = RB_MB_TO_READ;
     char * file_name = 0;
+    size_t psz = 0;
     int dio_incomplete = 0;
     sg_io_hdr_t io_hdr;
 #ifdef SG_DEBUG
@@ -102,21 +104,22 @@ int main(int argc, char * argv[])
         printf("         -s=num   num is total size to read (in MBytes)\n");
         printf("                    default total size is 200 MBytes\n");
         printf("                    max total size is 4000 MBytes\n");
-        if (rbBuff) free(rbBuff);
         return 1;
     }
 
     sg_fd = open(file_name, O_RDONLY);
     if (sg_fd < 0) {
         perror("sg_rbuf: open error");
-        if (rbBuff) free(rbBuff);
         return 1;
     }
     /* Don't worry, being very careful not to write to a none-sg file ... */
     res = ioctl(sg_fd, SG_GET_VERSION_NUM, &k);
     if ((res < 0) || (k < 30000)) {
         printf("sg_rbuf: not a sg device, or driver prior to 3.x\n");
-        if (rbBuff) free(rbBuff);
+        return 1;
+    }
+    if (NULL == (rbBuff = malloc(512))) {
+        printf("sg_rbuf: out of memory (query)\n");
         return 1;
     }
 
@@ -157,11 +160,6 @@ int main(int argc, char * argv[])
     buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
     printf("READ BUFFER reports: buffer capacity=%d, offset boundary=%d\n",
            buf_capacity, (int)rbBuff[0]);
-    if (! do_dio) {
-        res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &buf_capacity);
-        if (res < 0)
-            perror("sg_rbuf: SG_SET_RESERVED_SIZE error");
-    }
 
     if (0 == buf_size)
         buf_size = buf_capacity;
@@ -171,9 +169,24 @@ int main(int argc, char * argv[])
         if (rbBuff) free(rbBuff);
         return 1;
     }
-
+    if (! do_dio) {
+        res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &buf_size);
+        if (res < 0)
+            perror("sg_rbuf: SG_SET_RESERVED_SIZE error");
+    }
     if (rbBuff) free(rbBuff);
-    rbBuff = malloc(buf_size);
+
+    psz = getpagesize();
+    rawp = malloc(buf_size + (do_dio ? psz : 0));
+    if (NULL == rawp) {
+        printf("sg_rbuf: out of memory (data)\n");
+        return 1;
+    }
+    if (do_dio)    /* align to page boundary */
+    	rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
+			          (~(psz - 1)));
+    else
+	rbBuff = rawp;
 
     num = (total_size_mb * 1024U * 1024U) / (unsigned int)buf_size;
     for (k = 0; k < num; ++k) {
@@ -205,7 +218,7 @@ int main(int argc, char * argv[])
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
             perror("sg_rbuf: SG_IO READ BUFF data error");
-            if (rbBuff) free(rbBuff);
+            if (rbBuff) free(rawp);
             return 1;
         }
 
@@ -218,7 +231,7 @@ int main(int argc, char * argv[])
             break;
         default: /* won't bother decoding other categories */
             sg_chk_n_print3("READ BUFF data error", &io_hdr);
-            if (rbBuff) free(rbBuff);
+            if (rbBuff) free(rawp);
             return 1;
         }
         if (do_dio &&  
@@ -242,7 +255,7 @@ int main(int argc, char * argv[])
 	   total_size_mb, (num * buf_size) / 1048576, num * buf_size,
 	   buf_size / 1024);
 
-    if (rbBuff) free(rbBuff);
+    if (rbBuff) free(rawp);
     res = close(sg_fd);
     if (res < 0) {
         perror("sg_rbuf: close error");

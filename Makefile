@@ -8,7 +8,8 @@ LD = gcc
 
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_dd sg_debug \
 	sg_scan scsi_inquiry sg_rbuf sginfo sg_readcap \
-	sgp_dd sg_map sg_turs isosize sg_inq sg_test_rwbuf
+	sgp_dd sg_map sg_turs isosize sg_inq sg_test_rwbuf \
+	scsi_devfs_scan
 
 COMMON = sg_scan scsi_inquiry sginfo sg_readcap isosize
 
@@ -16,6 +17,7 @@ MAN_PGS = sg_dd.8 sgp_dd.8 sg_map.8 sg_rbuf.8 isosize.8
 MAN_PREF = man8
 
 CFLAGS = -g -O2 -Wall -D_REENTRANT
+# CFLAGS = -g -O2 -Wall -D_REENTRANT -DSG_KERNEL_INCLUDES
 # CFLAGS = -g -O2 -Wall -pedantic -D_REENTRANT
 
 LDFLAGS =
@@ -77,6 +79,9 @@ isosize: isosize.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_inq: sg_inq.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+scsi_devfs_scan: scsi_devfs_scan.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS) $(COMMON)

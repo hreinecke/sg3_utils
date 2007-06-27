@@ -13,7 +13,7 @@
 #include <sys/poll.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
+#include "sg_include.h"
 #include "sg_err.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")

@@ -29,8 +29,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <linux/../scsi/sg.h>		/* cope with silly includes */
-#include <linux/../scsi/scsi.h>		/* SCSI commands */
+#include "sg_include.h"
 #include "sg_err.h"
 
 #define BPI (signed)(sizeof(int))

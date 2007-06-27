@@ -13,9 +13,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <linux/../scsi/sg.h>  /* cope with silly includes */
 #include <linux/major.h>
 typedef unsigned char u_char;   /* horrible, for scsi.h */
+#include "sg_include.h"
 #include "sg_err.h"
 #include "llseek.h"
 
@@ -46,7 +46,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "5.02 20010110";
+static char * version_str = "5.03 20010307";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -142,11 +142,13 @@ int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
         text, __FILE__, __LINE__, strerror(code)); \
     exit(1); \
     } while (0)
+#if 0   /* unsued now */
 #define errno_exit(text) do { \
     fprintf(stderr, "%s at \"%s\":%d: %s\n", \
         text, __FILE__, __LINE__, strerror(errno)); \
     exit(1); \
     } while (0)
+#endif
 
 
 int dd_filetype(const char * filename)
@@ -175,10 +177,30 @@ void usage()
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
            " 'thr' is number of threads, must be > 0, default 4, max 16\n");
-    fprintf(stderr, " 'coe' continue on sg error, 0->exit (def), "
+    fprintf(stderr, " 'coe' continue on error, 0->exit (def), "
     	   "1->zero + continue\n"
            " 'gen' 0-> 1 file is special(def), 1-> any files allowed\n"
            " 'deb' is debug, 0->none (def), > 0->varying degrees of debug\n");
+}
+
+static void guarded_stop_in(Rq_coll * clp)
+{
+    pthread_mutex_lock(&clp->in_mutex);
+    clp->in_stop = 1;
+    pthread_mutex_unlock(&clp->in_mutex);
+}
+
+static void guarded_stop_out(Rq_coll * clp)
+{
+    pthread_mutex_lock(&clp->out_mutex);
+    clp->out_stop = 1;
+    pthread_mutex_unlock(&clp->out_mutex);
+}
+
+static void guarded_stop_both(Rq_coll * clp)
+{
+    guarded_stop_in(clp);
+    guarded_stop_out(clp);
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
@@ -232,12 +254,7 @@ void * sig_listen_thread(void * v_clp)
         sigwait(&signal_set, &sig_number);
         if (SIGINT == sig_number) {
             fprintf(stderr, "sgp_dd interrupted by SIGINT\n");
-            pthread_mutex_lock(&clp->in_mutex);
-            clp->in_stop = 1;
-            pthread_mutex_unlock(&clp->in_mutex);
-            pthread_mutex_lock(&clp->out_mutex);
-            clp->out_stop = 1;
-            pthread_mutex_unlock(&clp->out_mutex);
+	    guarded_stop_both(clp);
             pthread_cond_broadcast(&clp->out_sync_cv);
         }
     }
@@ -251,9 +268,7 @@ void cleanup_in(void * v_clp)
     fprintf(stderr, "thread cancelled while in mutex held\n");
     clp->in_stop = 1;
     pthread_mutex_unlock(&clp->in_mutex);
-    pthread_mutex_lock(&clp->out_mutex);
-    clp->out_stop = 1;
-    pthread_mutex_unlock(&clp->out_mutex);
+    guarded_stop_out(clp);
     pthread_cond_broadcast(&clp->out_sync_cv);
 }
 
@@ -264,9 +279,7 @@ void cleanup_out(void * v_clp)
     fprintf(stderr, "thread cancelled while out mutex held\n");
     clp->out_stop = 1;
     pthread_mutex_unlock(&clp->out_mutex);
-    pthread_mutex_lock(&clp->in_mutex);
-    clp->in_stop = 1;
-    pthread_mutex_unlock(&clp->in_mutex);
+    guarded_stop_in(clp);
     pthread_cond_broadcast(&clp->out_sync_cv);
 }
 
@@ -315,8 +328,11 @@ void * read_write_thread(void * v_clp)
         pthread_cleanup_push(cleanup_in, (void *)clp);
         if (FT_SG == clp->in_type)
             sg_in_operation(clp, rep); /* lets go of in_mutex mid operation */
-        else
+        else {
             stop_after_write = normal_in_operation(clp, rep, blocks);
+	    status = pthread_mutex_unlock(&clp->in_mutex);
+	    if (0 != status) err_exit(status, "unlock in_mutex");
+	}
         pthread_cleanup_pop(0);
 
         status = pthread_mutex_lock(&clp->out_mutex);
@@ -347,8 +363,11 @@ void * read_write_thread(void * v_clp)
         pthread_cleanup_push(cleanup_out, (void *)clp);
         if (FT_SG == clp->out_type)
             sg_out_operation(clp, rep); /* releases out_mutex mid operation */
-        else
+        else {
             normal_out_operation(clp, rep, blocks);
+	    status = pthread_mutex_unlock(&clp->out_mutex);
+	    if (0 != status) err_exit(status, "unlock out_mutex");
+	}
         pthread_cleanup_pop(0);
 
         if (stop_after_write)
@@ -368,17 +387,27 @@ void * read_write_thread(void * v_clp)
 
 int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 {
-    int res, status;
+    int res;
     int stop_after_write = 0;
-    char ebuff[80];
 
     /* enters holding in_mutex */
     while (((res = read(clp->infd, rep->buffp,
                         blocks * clp->bs)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
-        sprintf(ebuff, "sgp_dd: reading, in_blk=%d ", rep->blk);
-        errno_exit(ebuff);
+	if (clp->coe) {
+	    memset(rep->buffp, 0, rep->num_blks * rep->bs);
+	    fprintf(stderr, ">> substituted zeros for in blk=%d for "
+		    "%d bytes, %s\n", rep->blk, 
+		    rep->num_blks * rep->bs, strerror(errno));
+	    res = rep->num_blks * clp->bs;
+	}
+	else {
+	    fprintf(stderr, "error in normal read, %s\n", strerror(errno));
+	    clp->in_stop = 1;
+	    guarded_stop_out(clp);
+	    return 1;
+	}
     }
     if (res < blocks * clp->bs) {
         int o_blocks = blocks;
@@ -396,23 +425,30 @@ int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
         clp->in_count -= blocks;
     }
     clp->in_done_count -= blocks;
-    status = pthread_mutex_unlock(&clp->in_mutex);
-    if (0 != status) err_exit(status, "unlock in_mutex");
     return stop_after_write;
 }
 
 void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 {
-    int res, status;
-    char ebuff[80];
+    int res;
 
     /* enters holding out_mutex */
     while (((res = write(clp->outfd, rep->buffp,
                  rep->num_blks * clp->bs)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
-        sprintf(ebuff, "sgp_dd: output, out_blk=%d ", rep->blk);
-        errno_exit(ebuff);
+	if (clp->coe) {
+	    fprintf(stderr, ">> ignored error for out blk=%d for "
+		    "%d bytes, %s\n", rep->blk, 
+		    rep->num_blks * rep->bs, strerror(errno));
+	    res = rep->num_blks * clp->bs;
+	}
+	else {
+	    fprintf(stderr, "error normal write, %s\n", strerror(errno));
+	    guarded_stop_in(clp);
+	    clp->out_stop = 1;
+	    return;
+	}
     }
     if (res < blocks * clp->bs) {
         blocks = res / clp->bs;
@@ -423,8 +459,6 @@ void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
         rep->num_blks = blocks;
     }
     clp->out_done_count -= blocks;
-    status = pthread_mutex_unlock(&clp->out_mutex);
-    if (0 != status) err_exit(status, "unlock out_mutex");
 }
 
 void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
@@ -438,9 +472,12 @@ void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
-            fprintf(stderr, "sgp_dd inputting from sg failed, blk=%d\n",
-                    rep->blk);
-            errno_exit("sg starting in command 2");
+            fprintf(stderr, "sgp_dd inputting to sg failed, blk=%d\n",
+		    rep->blk);
+	    status = pthread_mutex_unlock(&clp->in_mutex);
+	    if (0 != status) err_exit(status, "unlock in_mutex");
+	    guarded_stop_both(clp);
+	    return;
         }
         /* Now release in mutex to let other reads run in parallel */
         status = pthread_mutex_unlock(&clp->in_mutex);
@@ -455,12 +492,7 @@ void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
             }
             else {
                 fprintf(stderr, "error finishing sg in command\n");
-                pthread_mutex_lock(&clp->in_mutex);
-                clp->in_stop = 1;
-                pthread_mutex_unlock(&clp->in_mutex);
-                pthread_mutex_lock(&clp->out_mutex);
-                clp->out_stop = 1;
-                pthread_mutex_unlock(&clp->out_mutex);
+		guarded_stop_both(clp);
                 return;
             }
         }
@@ -501,7 +533,10 @@ void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
         else if (res < 0) {
             fprintf(stderr, "sgp_dd outputting from sg failed, blk=%d\n",
                     rep->blk);
-            errno_exit("sg starting out command 2");
+	    status = pthread_mutex_unlock(&clp->out_mutex);
+	    if (0 != status) err_exit(status, "unlock out_mutex");
+	    guarded_stop_both(clp);
+	    return;
         }
         /* Now release in mutex to let other reads run in parallel */
         status = pthread_mutex_unlock(&clp->out_mutex);
@@ -514,12 +549,7 @@ void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
                         "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
             else {
                 fprintf(stderr, "error finishing sg out command\n");
-                pthread_mutex_lock(&clp->in_mutex);
-                clp->in_stop = 1;
-                pthread_mutex_unlock(&clp->in_mutex);
-                pthread_mutex_lock(&clp->out_mutex);
-                clp->out_stop = 1;
-                pthread_mutex_unlock(&clp->out_mutex);
+		guarded_stop_both(clp);
                 return;
             }
         }
@@ -588,7 +618,8 @@ int sg_start_io(Rq_elem * rep)
     if (res < 0) {
         if (ENOMEM == errno)
             return 1;
-        return res;
+        perror("starting io on sg device, error");
+        return -1;
     }
     return 0;
 }
@@ -922,7 +953,8 @@ int main(int argc, char * argv[])
         if (FT_SG == rcoll.in_type) {
             res = read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
-                fprintf(stderr, "Unit attention, media changed(in), repeat\n");
+                fprintf(stderr, 
+			"Unit attention, media changed(in), continuing\n");
                 res = read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
@@ -937,7 +969,8 @@ int main(int argc, char * argv[])
         if (FT_SG == rcoll.out_type) {
             res = read_capacity(rcoll.outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
-                fprintf(stderr, "Unit attention, media changed(out), repeat\n");
+                fprintf(stderr, 	
+			"Unit attention, media changed(out), continuing\n");
                 res = read_capacity(rcoll.outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {

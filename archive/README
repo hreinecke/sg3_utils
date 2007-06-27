@@ -16,10 +16,18 @@ been set up which builds:
                 POSIX threads (as does sgp_dd)]
     - sg_reset [does SCSI bus/device/host resets if mid level SCSI patch
                 in place]
+    - sg_hold  holds a sg device open and periodically sends a TEST
+		UNIT READY command to the device
     - sg_poll  [internal testing]
 
 The sg_err.h and llseek.h headers have simply been copied from the parent
 directory.
 
+A test program called sg_bus_xfer.c exercises a patch that adds a
+SG_FLAG_BUS_ADDR capability. This allows a bus address (e.g. PCI
+video card's frame buffer) to be passed through to a SCSI adapter
+to side step various buffer copies. See:
+http://www.torque.net/sg/mem2disk.html
+
 Doug Gilbert
-13th January 2001
+22nd March 2001
