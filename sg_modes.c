@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "0.28 20041012";
+static char * version_str = "0.28 20041111";
 
 #define ME "sg_modes: "
 
@@ -56,11 +56,16 @@ const char * scsi_ptype_strs[] = {
     "optical card reader/writer device",
 };
 
-const char * get_ptype_str(int scsi_ptype)
+static const char * get_ptype_str(int scsi_ptype)
 {
     int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
 
-    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+    if (0x1f == scsi_ptype)
+        return "no physical device on this lu";
+    else if (0x1e == scsi_ptype)
+        return "well known logical unit";
+    else
+        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 struct page_code_desc {
@@ -388,16 +393,16 @@ int main(int argc, char * argv[])
 
     if (do_mode6) {
         res = sg_ll_mode_sense6(sg_fd, do_dbd, pc, pg_code, sub_pg_code,
-				rsp_buff, rsp_buff_size, 1, do_verbose);
-	if (SG_LIB_CAT_INVALID_OP == res)
-	    fprintf(stderr, ">>>>>> try again without the '-6' "
-		    "switch for a 10 byte MODE SENSE command\n");
+                                rsp_buff, rsp_buff_size, 1, do_verbose);
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, ">>>>>> try again without the '-6' "
+                    "switch for a 10 byte MODE SENSE command\n");
     } else {
         res = sg_ll_mode_sense10(sg_fd, do_dbd, pc, pg_code, sub_pg_code,
-				 rsp_buff, rsp_buff_size, 1, do_verbose);
-	if (SG_LIB_CAT_INVALID_OP == res)
-	    fprintf(stderr, ">>>>>> try again with a '-6' "
-		    "switch for a 6 byte MODE SENSE command\n");
+                                 rsp_buff, rsp_buff_size, 1, do_verbose);
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, ">>>>>> try again with a '-6' "
+                    "switch for a 6 byte MODE SENSE command\n");
     }
     if (0 == res) {
         int medium_type, specific, headerlen;

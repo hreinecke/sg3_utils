@@ -6,12 +6,12 @@
 
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.10
+Version: 1.11
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
 Group: Utilities/System
-Source: ftp://www.torque.net/sg/p/sg3_utils-1.10.tgz
+Source: ftp://www.torque.net/sg/p/sg3_utils-1.11.tgz
 Url: http://www.torque.net/sg/u_index.html
 Provides: sg_utils
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
@@ -20,11 +20,12 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
 Collection of Linux utilities for devices that use the SCSI command set.
 Includes utilities to copy data based on "dd" syntax and semantics (called
 sg_dd, sgp_dd and sgm_dd); check INQUIRY data and VPD pages (sg_inq); check
-mode and log pages (sg_modes and sg_logs); spin up and down disks (sg_start);
-do self tests (sg_senddiag); and various other functions. See the README and
-CHANGELOG files. Requires the linux kernel 2.4 series or later. In the 2.4
-series SCSI generic device names (e.g. /dev/sg0) must be used. In the 2.6
-series other device names may be used as well (e.g. /dev/sda).
+mode and log pages (sginfo, sg_modes and sg_logs); spin up and down
+disks (sg_start); do self tests (sg_senddiag); and various other functions.
+See the README and CHANGELOG files. Requires the linux kernel 2.4 series
+or later. In the 2.4 series SCSI generic device names (e.g. /dev/sg0) must
+be used. In the 2.6 series other device names may be used as
+well (e.g. /dev/sda).
 
 Warning: Some of these tools access the internals of your system and their
 incorrect usage may render your system inoperable.
@@ -90,6 +91,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_verify
 %attr(755,root,root) %{_bindir}/sg_emc_trespass
 %attr(755,root,root) %{_bindir}/sg_luns
+%attr(755,root,root) %{_bindir}/sg_sync
+%attr(755,root,root) %{_bindir}/sg_prevent
+%attr(755,root,root) %{_bindir}/sg_get_config
 %attr(755,root,root) %{_libdir}/libsgutils.so
 %attr(755,root,root) %{_libdir}/libsgutils.so.1
 %attr(755,root,root) %{_libdir}/libsgutils.so.1.0.0
@@ -120,6 +124,9 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_verify.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_emc_trespass.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_luns.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_sync.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_prevent.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_get_config.8*
 
 %files devel
 %defattr(-,root,root)
@@ -130,6 +137,9 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Fri Nov 26 2004 - dgilbert at interlog dot com
+- add sg_sync, sg_prevent and sg_get_config; fix sg_requests
+  * sg3_utils-1.11
 * Sat Oct 30 2004 - dgilbert at interlog dot com
 - fix read capacity (10+16), add sg_luns
   * sg3_utils-1.10

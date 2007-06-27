@@ -50,7 +50,7 @@
  * tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.08 20041026";
+static char * version_str = "1.09 20041111";
 
 #define SEND_DIAGNOSTIC_CMD     0x1d
 #define SEND_DIAGNOSTIC_CMDLEN  6
@@ -243,6 +243,17 @@ static const char * scsi_ptype_strs[] = {
     "automation/driver interface",
 };
 
+static const char * get_ptype_str(int scsi_ptype)
+{
+    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
+
+    if (0x1f == scsi_ptype)
+        return "no physical device on this lu";
+    else if (0x1e == scsi_ptype)
+        return "well known logical unit";
+    else
+        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+}
 
 struct page_code_desc {
         int page_code;
@@ -312,6 +323,7 @@ static struct element_desc element_desc_arr[] = {
         {0x15, "SCSI initiator port"},
         {0x16, "Simple subenclosure"},
         {0x17, "Array device"},
+        {0x18, "SAS expander"},
 };
 
 static const char * find_element_desc(int type_code)
@@ -742,6 +754,9 @@ static void print_over_elem_status(const char * pad,
                    pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
+    case 0x18:   /* SAS expander */
+        printf("%sIdent=%d\n", pad, !!(statp[1] & 0x80));
+        break;
     default:
         printf("%sUnknown element type, status in hex: %02x %02x %02x %02x\n",
                pad, statp[0], statp[1], statp[2], statp[3]);
@@ -1088,9 +1103,10 @@ static void ses_device_elem_sdg(const struct element_hdr * ehp,
     for (k = 0; k < num_telems; ++k) {
         if ((ucp + 2) > last_ucp)
             goto truncated;
-        if ((1 != ehp[k].etype) && (0x17 != ehp[k].etype))
+        if ((1 != ehp[k].etype) && (0x17 != ehp[k].etype) &&
+            (0x18 != ehp[k].etype))
             continue;
-        /* only interested in device and array elements */
+        /* only interested in device, array and SAS expander elements */
         cp = find_element_desc(ehp[k].etype);
         if (cp)
             printf("  Element type: %s, subenclosure id: %d\n",
@@ -1439,6 +1455,7 @@ int main(int argc, char * argv[])
     int pd_type = 0;
     int ret = 1;
     struct sg_simple_inquiry_resp inq_resp;
+    const char * cp;
 
     memset(device_name, 0, sizeof device_name);
     while (1) {
@@ -1561,7 +1578,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    sg_fd = open(device_name, O_RDWR);
+    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
         perror(ME "open error");
         return 1;
@@ -1575,14 +1592,13 @@ int main(int argc, char * argv[])
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
                    inq_resp.product, inq_resp.revision);
             pd_type = inq_resp.peripheral_type;
+            cp = get_ptype_str(pd_type);
             if (0xd == pd_type)
                 printf("    enclosure services device\n");
             else if (0x40 & inq_resp.byte_6)
-                printf("    %s device has EncServ bit set\n",
-                       scsi_ptype_strs[pd_type]);
+                printf("    %s device has EncServ bit set\n", cp);
             else
-                printf("    %s device (not an enclosure)\n",
-                       scsi_ptype_strs[pd_type]);
+                printf("    %s device (not an enclosure)\n", cp);
         }
     }
     if (do_status)

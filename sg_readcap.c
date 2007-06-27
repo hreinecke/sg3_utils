@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "3.68 20041024";
+static char * version_str = "3.68 20041106";
 
 #define ME "sg_readcap: "
 
@@ -120,7 +120,8 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    if ((sg_fd = open(file_name, do16 ? O_RDWR : O_RDONLY)) < 0) {
+    if ((sg_fd = open(file_name, (do16 ? O_RDWR : O_RDONLY) | O_NONBLOCK))
+        < 0) {
         snprintf(ebuff, EBUFF_SZ, ME "error opening file: %s", file_name);
         perror(ebuff);
         return 1;
@@ -162,7 +163,7 @@ int main(int argc, char * argv[])
         else if (SG_LIB_CAT_INVALID_OP == res) {
             do16 = 1;
             close(sg_fd);
-            if ((sg_fd = open(file_name, O_RDWR)) < 0) {
+            if ((sg_fd = open(file_name, O_RDWR | O_NONBLOCK)) < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "error re-opening file: %s "
                          "RDWR", file_name);
                 perror(ebuff);

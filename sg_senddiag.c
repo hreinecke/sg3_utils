@@ -22,7 +22,7 @@
    command.
 */
 
-static char * version_str = "0.20 20041012";
+static char * version_str = "0.20 20041106";
 
 #define ME "sg_senddiag: "
 
@@ -252,7 +252,7 @@ int main(int argc, char * argv[])
     int do_uoff = 0;
     int do_ext_time = 0;
     int verbose = 0;
-    int oflags = O_RDWR;
+    int oflags = O_RDWR | O_NONBLOCK;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {

@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "0.34 20041028";
+static char * version_str = "0.36 20041117";
 
 #define ME "sg_logs: "
 
@@ -107,16 +107,15 @@ static void show_page_name(int page_no,
     case 0x5 : printf("    0x05    Error counters (verify)\n"); break;
     case 0x6 : printf("    0x06    Non-medium errors\n"); break;
     case 0x7 : printf("    0x07    Last n error events\n"); break;
-    case 0x8 : printf("    0x08    Format status (SBC-2)\n"); break;
     case 0xb : printf("    0x0b    Last n deferred errors or "
                 "asynchronous events\n"); break;
     case 0xd : printf("    0x0d    Temperature\n"); break;
     case 0xe : printf("    0x0e    Start-stop cycle counter\n"); break;
     case 0xf : printf("    0x0f    Application client\n"); break;
     case 0x10 : printf("    0x10    Self-test results\n"); break;
-    case 0x17 : printf("    0x17    Non-volatile cache (SBC-2)\n"); break;
     case 0x18 : printf("    0x18    Protocol specific port\n"); break;
-    case 0x2f : printf("    0x2f    Informational exceptions (SMART)\n"); break;
+    case 0x2f : printf("    0x2f    Informational exceptions (SMART)\n");
+        break;
     default : done = 0; break;
     }
     if (done)
@@ -128,10 +127,17 @@ static void show_page_name(int page_no,
         /* disk (direct access) type devices */
         {
             switch (page_no) {
-            case 0x8 : printf("    0x08    Format status (sbc2)\n"); break;
-            case 0x17 : printf("    0x18    Non-volatile cache (sbc2)\n"); break;
-            case 0x37 : printf("    0x37    Cache (Seagate)\n"); break;
-            case 0x3e : printf("    0x3e    Factory (Seagate/Hitachi)\n"); break;
+            case 0x8 : printf("    0x08    Format status (sbc-2)\n"); break;
+            case 0x17 : printf("    0x17    Non-volatile cache (sbc-2)\n");
+                break;
+            case 0x30 : printf("    0x30    Performance counters (Hitachi)"
+                               "\n");
+                break;
+            case 0x37 : printf("    0x37    Cache (Seagate), Miscellaneous"
+                               " (Hitachi)\n");
+                break;
+            case 0x3e : printf("    0x3e    Factory (Seagate/Hitachi)\n");
+                break;
             default: done = 0; break;
             }
         }
@@ -743,6 +749,145 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
     return 1;
 }
 
+static void show_format_status_page(unsigned char * resp, int len, 
+                                    int show_pcb)
+{
+    int k, j, num, pl, pc, pcb, all_ff, counter;
+    unsigned char * ucp;
+    unsigned char * xp;
+    unsigned long long ull;
+    char pcb_str[64];
+
+    printf("Format status page (sbc-2) [0x8]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        counter = 1;
+        switch (pc) {
+        case 0: printf("  Format data out:\n");
+            counter = 0;
+            dStrHex((const char *)ucp, pl, 0);
+            break;
+        case 1: printf("  Grown defects during certification"); break;
+        case 2: printf("  Total blocks relocated during format"); break;
+        case 3: printf("  Total new blocks relocated"); break;
+        case 4: printf("  Power on minutes since format"); break;
+        default:
+            printf("  Unknown Format status code = 0x%x\n", pc);
+            counter = 0;
+            dStrHex((const char *)ucp, pl, 0);
+            break;
+        }
+        if (counter) {
+            k = pl - 4;
+            xp = ucp + 4;
+            if (k > (int)sizeof(ull)) {
+                xp += (k - sizeof(ull));
+                k = sizeof(ull);
+            }
+            ull = 0;
+            for (all_ff = 0, j = 0; j < k; ++j) {
+                if (j > 0)
+                    ull <<= 8;
+                else
+                    all_ff = 1;
+                ull |= xp[j];
+                if (0xff != xp[j])
+                    all_ff = 0;
+            }
+            if (all_ff)
+                printf(" <not available>");
+            else
+                printf(" = %llu", ull);
+            if (show_pcb) {
+                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+                printf("  <%s>\n", pcb_str);
+            } else
+                printf("\n");
+        } else {
+            if (show_pcb) {
+                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+                printf("  <%s>\n", pcb_str);
+            }
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static void show_non_volatile_cache_page(unsigned char * resp, int len,
+                                         int show_pcb)
+{
+    int j, num, pl, pc, pcb;
+    unsigned char * ucp;
+    char pcb_str[64];
+
+    printf("Non-volatile cache page (sbc-2) [0x17]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        switch (pc) {
+        case 0:
+            printf("  Remaining non-volatile time: ");
+            if (3 == ucp[4]) {
+                j = (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+                switch (j) {
+                case 0:
+                    printf("0 (i.e. it is now volatile)\n");
+                    break;
+                case 1:
+                    printf("<unknown>\n");
+                    break;
+                case 0xffffff:
+                    printf("<indefinite>\n");
+                    break;
+                default:
+                    printf("%d minutes [%d:%d]\n", j, (j / 60), (j % 60));
+                    break;
+                }
+            } else
+                printf("<unexpected parameter length=%d>\n", ucp[4]);
+            break;
+        case 1: printf("  Maximum non-volatile time: ");
+            if (3 == ucp[4]) {
+                j = (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+                switch (j) {
+                case 0:
+                    printf("0 (i.e. it is now volatile)\n");
+                    break;
+                case 1:
+                    printf("<reserved>\n");
+                    break;
+                case 0xffffff:
+                    printf("<indefinite>\n");
+                    break;
+                default:
+                    printf("%d minutes [%d:%d]\n", j, (j / 60), (j % 60));
+                    break;
+                }
+            } else
+                printf("<unexpected parameter length=%d>\n", ucp[4]);
+            break;
+        default:
+            printf("  Unknown Format status code = 0x%x\n", pc);
+            dStrHex((const char *)ucp, pl, 0);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("    <%s>\n", pcb_str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
 static void show_seagate_cache_page(unsigned char * resp, int len, 
                                     int show_pcb)
 {
@@ -874,6 +1019,18 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
     case 0x7:
         show_last_n_error_page(resp, len, show_pcb);
         break;
+    case 0x8:
+        {
+            switch (inq_dat->peripheral_type) {
+            case 0: case 4: case 7: case 0xe:
+                /* disk (direct access) type devices */
+                show_format_status_page(resp, len, show_pcb);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
     case 0xb:
         show_last_n_deferred_error_page(resp, len, show_pcb);
         break;
@@ -885,6 +1042,19 @@ static void show_ascii_page(unsigned char * resp, int len, int show_pcb,
         break;
     case 0x10:
         show_self_test_page(resp, len, show_pcb);
+        break;
+    case 0x17:
+        {
+            switch (inq_dat->peripheral_type) {
+            case 0: case 4: case 7: case 0xe:
+                /* disk (direct access) type devices */
+                show_non_volatile_cache_page(resp, len, show_pcb);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
         break;
     case 0x18:
         done = show_protocol_specific_page(resp, len, show_pcb);

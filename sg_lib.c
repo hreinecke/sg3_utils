@@ -67,7 +67,7 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.01 20041024";
+static char * version_str = "1.03 20041114";
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -79,6 +79,8 @@ FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 #define SG_SERVICE_ACTION_IN_16 0x9e
 #define SG_SERVICE_ACTION_OUT_16 0x9f
 #define SG_VARIABLE_LENGTH_CMD 0x7f
+
+static void dStrHexErr(const char* str, int len);
 
 struct value_name_t {
     int value;
@@ -196,6 +198,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0x82, 0, "Regenerate(16)"},
     {0x83, 0, "Extended copy"},
     {0x84, 0, "Receive copy results"},
+    {0x85, 0, "ATA command pass through(16)"},
     {0x86, 0, "Access control in"},
     {0x87, 0, "Access control out"},
     {0x88, 0, "Read(16)"},
@@ -214,7 +217,7 @@ static const struct value_name_t normal_opcodes[] = {
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
     {0xa0, 0, "Report luns"},
-    {0xa1, 0, "Blank"},
+    {0xa1, 0, "ATA command pass through(12)"},
     {0xa2, 0, "Trusted computing in"},
     {0xa3, 0, "Maintenance in"},
     {0xa3, 5, "Send key"},
@@ -1232,6 +1235,9 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
         case 8:
             fprintf(sg_warnings_str, "OSD attribute identification\n");
             break;
+        case 9:
+            fprintf(sg_warnings_str, "ATA return\n");
+            break;
         default:
             fprintf(sg_warnings_str, "Unknown or vendor specific [0x%x]\n",
                     descp[0]);
@@ -1258,7 +1264,7 @@ static void sg_print_sense_descriptors(const unsigned char * sense_buffer,
 void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     int sb_len)
 {
-    int k, len, valid;
+    int len, valid;
     unsigned int info;
     int descriptor_format = 0;
     const char * error = NULL;
@@ -1374,7 +1380,7 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
         if (leadin)
             fprintf(sg_warnings_str, "%s: ", leadin);
         if (sense_buffer[0] < 15)
-            fprintf(sg_warnings_str, "old sense: key %s\n",
+            fprintf(sg_warnings_str, "old (SCSI-1) sense: key %s\n",
                     sense_key_desc[sense_buffer[0] & 0x0f]);
         else
             fprintf(sg_warnings_str, "sns = %2x %2x\n", sense_buffer[0],
@@ -1385,13 +1391,8 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
         len = 4;
     }
 
-    fprintf(sg_warnings_str, " Raw sense data (in hex):\n  ");
-    for (k = 0; k < len; ++k) {
-        if ((k > 0) && (0 == (k % 24)))
-            fprintf(sg_warnings_str, "\n  ");
-        fprintf(sg_warnings_str, "%02x ", sense_buffer[k]);
-    }
-    fprintf(sg_warnings_str, "\n");
+    fprintf(sg_warnings_str, " Raw sense data (in hex):\n");
+    dStrHexErr((const char *)sense_buffer, len);
 }
 
 static const char * linux_host_bytes[] = {
@@ -1823,22 +1824,24 @@ void dStrHex(const char* str, int len, int no_ascii)
 
     if (len <= 0)
         return;
-    memset(buff,' ',80);
-    buff[80]='\0';
+    memset(buff, ' ', 80);
+    buff[80] = '\0';
     if (no_ascii < 0) {
-        for (bpos = 0, k = 0; k < len; k++) {
+        for (k = 0; k < len; k++) {
             c = *p++;
+            bpos += 3;
+            if (bpos == (bpstart + (9 * 3)))
+                bpos++;
             sprintf(&buff[bpos], "%.2x", (int)(unsigned char)c);
             buff[bpos + 2] = ' ';
-            bpos += 3;
             if ((k > 0) && (0 == ((k + 1) % 16))) {
-                printf("%.50s\n", buff);
-                bpos = 0;
-                memset(buff,' ',80);
+                printf("%.60s\n", buff);
+                bpos = bpstart;
+                memset(buff, ' ', 80);
             }
         }
-        if (bpos > 0)
-            printf("%.50s\n", buff);
+        if (bpos > bpstart)
+            printf("%.60s\n", buff);
         return;
     }
     /* no_ascii>=0, start each line with address (offset) */
@@ -1862,17 +1865,50 @@ void dStrHex(const char* str, int len, int no_ascii)
             buff[cpos++] = c;
         }
         if (cpos > (cpstart+15)) {
-            printf("%s\n", buff);
+            printf("%.76s\n", buff);
             bpos = bpstart;
             cpos = cpstart;
             a += 16;
-            memset(buff,' ',80);
+            memset(buff, ' ', 80);
             k = sprintf(buff + 1, "%.2x", a);
             buff[k + 1] = ' ';
         }
     }
     if (cpos > cpstart)
-        printf("%s\n", buff);
+        printf("%.76s\n", buff);
+}
+
+/* Output to ASCII-Hex bytes to sg_warnings_str (assumed to be initialized);
+ * 16 bytes per line with an extra space between the 8th and 9th bytes */
+static void dStrHexErr(const char* str, int len)
+{
+    const char * p = str;
+    unsigned char c;
+    char buff[82];
+    const int bpstart = 5;
+    int bpos = bpstart;
+    int k;
+
+    if (len <= 0)
+        return;
+    memset(buff, ' ', 80);
+    buff[80] = '\0';
+    for (k = 0; k < len; k++) {
+        c = *p++;
+        bpos += 3;
+        if (bpos == (bpstart + (9 * 3)))
+            bpos++;
+        sprintf(&buff[bpos], "%.2x", (int)(unsigned char)c);
+        buff[bpos + 2] = ' ';
+        if ((k > 0) && (0 == ((k + 1) % 16))) {
+            fprintf(sg_warnings_str, "%.60s\n", buff);
+            bpos = bpstart;
+            memset(buff, ' ', 80);
+        }
+    }
+    if (bpos > bpstart)
+        fprintf(sg_warnings_str, "%.60s\n", buff);
+    return;
 }
 
 /* If the number in 'buf' can be decoded or the multiplier is unknown

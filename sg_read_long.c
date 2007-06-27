@@ -28,7 +28,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.02 20041011";
+static char * version_str = "1.02 20041106";
 
 #define READ_LONG_OPCODE 0x3E
 #define READ_LONG_CMD_LEN 10
@@ -206,7 +206,7 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    sg_fd = open(device_name, O_RDWR);
+    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
         perror(ME "open error");
         return 1;
@@ -233,7 +233,7 @@ int main(int argc, char * argv[])
     readLongCmdBlk[7] = (xfer_len & 0x0000ff00) >> 8;
     readLongCmdBlk[8] = (xfer_len & 0x000000ff);
 
-    fprintf(stderr, ME "issue read long to device %s\n\t\txfer_len= %d "
+    fprintf(stderr, ME "issue read long to device %s\n\t\txfer_len=%d "
             "(0x%x), lba=%d (0x%x), correct=%d\n", device_name, xfer_len,
             xfer_len, lba, lba, correct);
 

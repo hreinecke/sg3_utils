@@ -54,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.34 20041029";
+static char * version_str = "5.36 20041125";
 
 
 #define DEF_BLOCK_SIZE 512
@@ -85,6 +85,11 @@ static char * version_str = "5.34 20041029";
 #define FT_BLOCK 32             /* filetype is block device */
 
 #define DEV_NULL_MINOR_NUM 3
+
+/* If platform does not support O_DIRECT then define it harmlessly */
+#ifndef O_DIRECT
+#define O_DIRECT 0
+#endif
 
 static int sum_of_resids = 0;
 
@@ -1021,11 +1026,11 @@ int main(int argc, char * argv[])
     if (do_sync) {
         if (FT_SG & out_type) {
             fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
-            res = sg_ll_sync_cache(outfd, 0, 0, 0, 0);
+            res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, 0, 0);
             if (2 == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed(in), continuing\n");
-                res = sg_ll_sync_cache(outfd, 0, 0, 0, 0);
+                res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, 0, 0);
             }
             if (0 != res)
                 fprintf(stderr, "Unable to synchronize cache\n");

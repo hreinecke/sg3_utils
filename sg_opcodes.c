@@ -245,6 +245,18 @@ static const char * scsi_ptype_strs[] = {
     "automation/driver interface",
 };
 
+static const char * get_ptype_str(int scsi_ptype)
+{
+    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
+
+    if (0x1f == scsi_ptype)
+        return "no physical device on this lu";
+    else if (0x1e == scsi_ptype)
+        return "well known logical unit";
+    else
+        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+}
+
 /* returns -1 when left < right, 0 when left == right, else returns 1 */
 int opcode_num_compare(const void * left, const void * right)
 {
@@ -377,6 +389,7 @@ int main(int argc, char * argv[])
     int do_taskman = 0;
     int rep_opts = 0;
     int ret = 0;
+    const char * cp;
     struct sg_simple_inquiry_resp inq_resp;
 
     for (k = 1; k < argc; ++k) {
@@ -454,12 +467,11 @@ int main(int argc, char * argv[])
         printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                inq_resp.revision);
         peri_type = inq_resp.peripheral_type;
-        if (peri_type >= 
-                (int)(sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0])))
-            printf("  Peripheral device type: 0x%x\n", peri_type);
+        cp = get_ptype_str(peri_type);
+        if (strlen(cp) > 0)
+            printf("  Peripheral device type: %s\n", cp);
         else
-            printf("  Peripheral device type: %s\n", 
-                   scsi_ptype_strs[peri_type]);
+            printf("  Peripheral device type: 0x%x\n", peri_type);
     } else {
         printf("sg_opcodes: %s doesn't respond to a SCSI INQUIRY\n", file_name);
         return 1;

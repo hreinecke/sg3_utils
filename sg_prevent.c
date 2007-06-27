@@ -42,29 +42,29 @@
 #include <sys/time.h>
 #include "sg_include.h"
 #include "sg_lib.h"
+#include "sg_cmds.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
- * This program issues the SCSI VERIFY command to the given SCSI block device.
+ * This program issues the SCSI PREVENT ALLOW MEDIUM REMOVAL command to the
+ * given SCSI device.
  */
 
-static char * version_str = "1.00 20041106";
+static char * version_str = "1.00 20041107";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
-#define VERIFY10_CMD      0x2f
-#define VERIFY10_CMDLEN   10
+#define PREVENT_REMOVAL_CMD    0x1e
+#define PREVENT_REMOVAL_CMDLEN   6
 
-#define ME "sg_verify: "
+#define ME "sg_prevent: "
 
 
 static struct option long_options[] = {
-        {"bpc", 1, 0, 'b'},
-        {"count", 1, 0, 'c'},
-        {"dpo", 0, 0, 'd'},
+        {"allow", 0, 0, 'a'},
         {"help", 0, 0, 'h'},
-        {"lba", 1, 0, 'l'},
+        {"prevent", 1, 0, 'p'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -73,103 +73,80 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_verify [--bpc=<n>] [--count=<n>] [--dpo] [--help] [--lba=<n>]\n"
-          "                   [--verbose] [--version] <scsi_device>\n"
-          "  where: --bpc=<n>|-b <n>   max blocks per verify command "
-          "(def 128)\n"
-          "         --count=<n>|-c <n> count of blocks to verify (def 1)\n"
-          "         --dpo|-d           disable page out (cache retension "
-          "priority)\n"
-          "         --help|-h          print out usage message\n"
-          "         --lba=<n>|-l <n>   logical block address to start "
-          "verify (def 0)\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n"
+          "sg_prevent [-allow] [--help] [--prevent=<n>] [--verbose] "
+          "[--version]\n"
+          "                   <scsi_device>\n"
+          "  where: --allow|-a            allow media removal\n"
+          "         --help|-h             print out usage message\n"
+          "         --prevent=<n>|-p <n>  prevention level (def: 1 -> "
+          "prevent)\n"
+          "                               0 -> allow, 1 -> prevent\n"
+          "                               2 -> persistent allow, 3 -> "
+          "persistent prevent\n"
+          "         --verbose|-v          increase verbosity\n"
+          "         --version|-V          print version string and exit\n\n"
+          "    performs a PREVENT ALLOW MEDIUM REMOVAL SCSI command\n"
           );
 
 }
 
-/* Invokes a SCSI VERIFY (10) command */
+/* Invokes a SCSI PREVENT ALLOW MEDIUM REMOVAL command */
 /* Return of 0 -> success, -1 -> failure, SG_LIB_CAT_INVALID_OP -> 
-   Verify(10) not supported */
-int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
-                   int veri_len, void * data_out, int data_out_len,
-                   int verbose)
+   command not supported */
+int sg_ll_prevent(int sg_fd, int prevent, int verbose)
 {
     int k;
-    unsigned char vCmdBlk[VERIFY10_CMDLEN] = 
-                {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char pCmdBlk[PREVENT_REMOVAL_CMDLEN] = 
+                {PREVENT_REMOVAL_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
-    if ((0 == bytechk) && (data_out && (data_out_len > 0))) {
-        fprintf(stderr, "Verify(10): data_out buffer given but "
-                "'bytechk'==0??\n");
+    if ((prevent < 0) || (prevent > 3)) {
+        fprintf(stderr, "prevent argument should be 0, 1, 2 or 3\n");
         return -1;
     }
-    if (bytechk && (! (data_out && (data_out_len > 0)))) {
-        fprintf(stderr, "Verify(10): invalid data_out buffer given but "
-                "'bytechk'==1??\n");
-        return -1;
-    }
-    if (dpo)
-        vCmdBlk[1] |= 0x10;
-    if (bytechk)
-        vCmdBlk[1] |= 0x2;
-    vCmdBlk[2] = (unsigned char)((lba >> 24) & 0xff);
-    vCmdBlk[3] = (unsigned char)((lba >> 16) & 0xff);
-    vCmdBlk[4] = (unsigned char)((lba >> 8) & 0xff);
-    vCmdBlk[5] = (unsigned char)(lba & 0xff);
-    vCmdBlk[7] = (unsigned char)((veri_len >> 8) & 0xff);
-    vCmdBlk[8] = (unsigned char)(veri_len & 0xff);
+    pCmdBlk[4] |= (prevent & 0x3);
     if (verbose) {
-        fprintf(stderr, "    Verify(10) cdb: ");
-        for (k = 0; k < VERIFY10_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", vCmdBlk[k]);
+        fprintf(stderr, "    Prevent allow medium removal cdb: ");
+        for (k = 0; k < PREVENT_REMOVAL_CMDLEN; ++k)
+            fprintf(stderr, "%02x ", pCmdBlk[k]);
         fprintf(stderr, "\n");
     }
 
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = VERIFY10_CMDLEN;
+    io_hdr.cmd_len = PREVENT_REMOVAL_CMDLEN;
     io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = bytechk ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
-    io_hdr.dxfer_len = bytechk ? data_out_len : 0;
-    io_hdr.dxferp = bytechk ? data_out : NULL;
-    io_hdr.cmdp = vCmdBlk;
+    io_hdr.dxfer_direction = SG_DXFER_NONE;
+    io_hdr.dxfer_len = 0;
+    io_hdr.dxferp = NULL;
+    io_hdr.cmdp = pCmdBlk;
     io_hdr.sbp = sense_b;
-    io_hdr.pack_id = (int)lba;  /* aid debugging with progress indication */
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        fprintf(stderr, "verify(10) SG_IO error: %s\n",
+        fprintf(stderr, "prevent allow medium removal SG_IO error: %s\n",
                 safe_strerror(errno));
         return -1;
     }
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
-        return 0;
     case SG_LIB_CAT_RECOVERED:
-        fprintf(sg_warnings_str, "Recovered error on VERIFY(10) command, "
-                "continuing\n");
         return 0;
     case SG_LIB_CAT_INVALID_OP:
         return SG_LIB_CAT_INVALID_OP;
     default:
-        sg_chk_n_print3("VERIFY(10) command problem", &io_hdr);
+        sg_chk_n_print3("Prevent allow medium removal command problem",
+                        &io_hdr);
         return -1;
     }
 }
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, num;
-    long long ll;
-    int dpo = 0;
-    int bytechk = 0;
-    long long count = 1;
-    int bpc = 128;
-    unsigned long long lba = 0;
+    int sg_fd, res, c;
+    int allow = 0;
+    int prevent = -1;
     int verbose = 0;
     char device_name[256];
     int ret = 1;
@@ -178,40 +155,25 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:c:dhl:vV", long_options,
+        c = getopt_long(argc, argv, "ahp:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
-        case 'b':
-           bpc = sg_get_num(optarg);
-           if (bpc < 1) {
-                fprintf(stderr, "bad argument to '--bpc'\n");
-                return 1;
-            }
-            break;
-        case 'c':
-           count = sg_get_llnum(optarg);
-           if (count < 0) {
-                fprintf(stderr, "bad argument to '--count'\n");
-                return 1;
-            }
-            break;
-        case 'd':
-            dpo = 1;
+        case 'a':
+            allow = 1;
             break;
         case 'h':
         case '?':
             usage();
             return 0;
-        case 'l':
-           ll = sg_get_llnum(optarg);
-           if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--lba'\n");
+        case 'p':
+           prevent = sg_get_num(optarg);
+           if ((prevent < 0) || (prevent > 3)) {
+                fprintf(stderr, "bad argument to '--prevent'\n");
                 return 1;
             }
-            lba = (unsigned long long)ll;
             break;
         case 'v':
             ++verbose;
@@ -239,43 +201,34 @@ int main(int argc, char * argv[])
             return 1;
         }
     }
-    if (bpc > 0xffff) {
-        fprintf(stderr, "'bpc' cannot exceed 65535\n");
-        usage();
-        return 1;
-    }
-    if (lba > 0xffffffffLLU) {
-        fprintf(stderr, "'lba' cannot exceed 32 bits\n");
-        usage();
-        return 1;
-    }
-
     if (0 == device_name[0]) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return 1;
     }
+    if (allow && (prevent >= 0)) {
+        fprintf(stderr, "can't give both '--allow' and '--prevent='\n");
+        usage();
+        return 1;
+    }
+    if (allow)
+        prevent = 0;
+    else if (prevent < 0)
+        prevent = 1;    /* default is to prevent, as utility name suggests */
+
     sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
         perror(ME "open error");
         return 1;
     }
-
-    for (; count > 0; count -= bpc, lba +=bpc) {
-        num = (count > bpc) ? bpc : count;
-        res = sg_ll_verify10(sg_fd, dpo, bytechk, (unsigned long)lba, num,
-                             NULL, 0, verbose);
-        if (0 != res) {
-            if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "Verify(10) command not supported\n");
-            else
-                fprintf(stderr, "Verify(10) failed near lba=%llu [0x%llx]\n",
-                        lba, lba);
-            break;
-        }
-    }
-    if (count <= 0)
+    res = sg_ll_prevent(sg_fd, prevent, verbose);
+    if (0 == res)
         ret = 0;
+    else if (SG_LIB_CAT_INVALID_OP == res)
+        fprintf(stderr, "Prevent allow medium removal command not "
+                "supported\n");
+    else
+        fprintf(stderr, "Prevent allow medium removal failed\n");
 
     res = close(sg_fd);
     if (res < 0) {

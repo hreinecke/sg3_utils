@@ -6,6 +6,7 @@ on the right. The second table lists supported ATA commands.
 
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        ----------------------------------------------
+GET CONFIGURATION   sg_get_config
 INQUIRY             sg_inq, sginfo, sg_logs, sg_map('-i'), sg_modes,
                     sg_opcodes, sg_persist, sg_scan, sg_ses
 LOG SELECT          sg_logs
@@ -16,6 +17,7 @@ MODE SENSE(6)       sginfo, sg_modes, sg_senddiag('-e')
 MODE SENSE(10)      sginfo, sg_modes, sg_senddiag('-e')
 PERSISTENT IN       sg_persist
 PERSISTENT OUT      sg_persist
+PREVENT ALLOW MEDIUM REMOVAL            sg_prevent
 READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
@@ -33,9 +35,9 @@ REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REQUEST SENSE       sg_requests
 SEND DIAGNOSTIC     sg_senddiag, sg_ses
 START STOP          sg_start
-SYNCHRONIZE CACHE   sg_dd, sgm_dd, sgp_dd, sg_start
+SYNCHRONIZE CACHE   sg_sync, sg_dd, sgm_dd, sgp_dd
 TEST UNIT READY     sg_turs
-VERIFY(10)	    sg_verify
+VERIFY(10)          sg_verify
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
@@ -50,4 +52,4 @@ IDENTITY            sg_inq, sg_scan
 
 
 Doug Gilbert
-26th October 2004
+14th November 2004

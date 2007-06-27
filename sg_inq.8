@@ -1,11 +1,11 @@
-.TH SG_INQ "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
+.TH SG_INQ "8" "November 2004" "sg3_utils-1.11" SG3_UTILS
 .SH NAME
 sg_inq \- outputs data retrieved from the SCSI INQUIRY command
 .SH SYNOPSIS
 .B sg_inq
 [\fI-c\fR] [\fI-cl\fR] [\fI-d\fR] [\fI-e\fR] [\fI-h\fR] [\fI-i\fR]
 [\fI-o=<opcode_page>\fR] [\fI-p=<vpd_page>\fR] [\fI-P\fR]
-[\fI-r\fR] [\fI-v\fR] [\fI-V\fR] [\fI-x\fR] [\fI-36\fR] [\fI-?\fR]
+[\fI-r\fR] [\fI-s\fR] [\fI-v\fR] [\fI-V\fR] [\fI-x\fR] [\fI-36\fR] [\fI-?\fR]
 \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -27,8 +27,8 @@ device identification strings are output. If the "-r" option is given
 then the 256 byte IDENTITY block is output in binary.
 .PP
 The reference document used for interpreting an INQUIRY is T10/1416-D Revision 
-21 (22nd September 2004) found at http://www.t10.org . Obsolete items in the
-INQUIRY response are displayed in brackets.
+21a (9th November 2004) found at http://www.t10.org . Obsolete items in the
+standard INQUIRY response are displayed in brackets.
 .TP
 -c
 set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used
@@ -36,7 +36,7 @@ in conjunction with the '-o=<opcode>' option to specify the SCSI command
 opcode to supply the support data for. The command support data is a mask of
 the same length as the command with bits set in positions that are
 modifiable. For example, '12 03 ff 00 ff 01' shows the device 
-supports the EVPD and CmdDt bits [byte 1 bits 0 and 1] in an INQUIRY command.
+supports the EVPD and CmdDt bits [byte 1, bits 0 and 1] in an INQUIRY command.
 The CmdDt bit is now obsolete. It has been replaced by the REPORT SUPPORTED
 OPERATION CODES command which is accessed via the sg_opcodes utility.
 .TP
@@ -65,7 +65,7 @@ used with '-i' outputs partially decoded device identification descriptors
 with the identifier itself output in hex.
 .TP
 -i
-outputs the Device Identification Vital Product Data (VPD) [0x83] page.
+outputs the Device Identification Vital Product Data (VPD) page [0x83].
 If '-r' is not given then attempts to decode the response which can be made
 up of several "identification descriptors". If '-h' is given then each
 descriptor header is decoded and the identifier itself is output in hex.
@@ -93,7 +93,7 @@ hexadecimal and is expected to be in the range 0 to ff inclusive.
 Defaults to 0 so if '-e' is given without '-p=' then VPD page 0 is output.
 .TP
 -P
-outputs the Unit Path Report Vital Product Data (VPD) [0xc0] page,
+outputs the Unit Path Report Vital Product Data (VPD) page [0xc0],
 which is specific to selected EMC devices. To see the whole VPD 0xc0
 page response in hex use '-o=c0 -h'.
 .TP
@@ -102,6 +102,15 @@ outputs the INQUIRY response in binary. If the SCSI INQUIRY has failed
 and an ATA IDENTITY succeeds then the 256 byte IDENTITY response is
 output in hex. Standard output should be redirected
 to a file or some other program that can process binary data.
+.TP
+-s
+outputs the SCSI Ports Vital Product Data (VPD) page [0x88].
+If '-r' is not given then attempts to decode the response. The response
+contains information about the target (or rarely the initiator) ports
+associated with the addressed device server (i.e. the target). In practice
+this is a way to find all target port addresses of a dual ported disk.
+If '-h' is given then each target (and/or initiator) descriptor is output
+in hex. To see the whole VPD 0x88 page response in hex use '-p=88 -h'.
 .TP
 -v
 verbose: print out cdb of issued commands prior to execution

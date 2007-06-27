@@ -50,7 +50,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.01 20041028";
+static char * version_str = "1.01 20041110";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -75,6 +75,11 @@ static void usage()
           "  where: --decode|-d        decode all luns into parts\n"
           "         --help|-h          print out usage message\n"
           "         --select=<n>|-s <n>  select report <n> (def: 0)\n"
+          "                               0 -> luns apart from 'well "
+          "known' lus\n"
+          "                               1 -> only 'well known' "
+          "logical unit numbers\n"
+          "                               2 -> all luns\n"
           "         --verbose|-v       increase verbosity\n"
           "         --version|-V       print version string and exit\n"
           );
@@ -251,7 +256,7 @@ int main(int argc, char * argv[])
         usage();
         return 1;
     }
-    sg_fd = open(device_name, O_RDWR);
+    sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
         perror(ME "open error");
         return 1;

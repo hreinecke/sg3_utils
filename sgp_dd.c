@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "5.19 20041029";
+static char * version_str = "5.20 20041102";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1325,11 +1325,11 @@ int main(int argc, char * argv[])
     if (do_sync) {
         if (FT_SG == rcoll.out_type) {
             fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
-            res = sg_ll_sync_cache(rcoll.outfd, 0, 0, 0, 0);
+            res = sg_ll_sync_cache_10(rcoll.outfd, 0, 0, 0, 0, 0, 0, 0);
             if (2 == res) {
                 fprintf(stderr,
                         "Unit attention, media changed(in), continuing\n");
-                res = sg_ll_sync_cache(rcoll.outfd, 0, 0, 0, 0);
+                res = sg_ll_sync_cache_10(rcoll.outfd, 0, 0, 0, 0, 0, 0, 0);
             }
             if (0 != res)
                 fprintf(stderr, "Unable to synchronize cache\n");

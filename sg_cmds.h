@@ -11,8 +11,9 @@ extern int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
 extern int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy,
                                  int verbose);
 
-extern int sg_ll_sync_cache(int sg_fd, int sync_nv, int immed, int noisy,
-                            int verbose);
+int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
+                        unsigned int lba, unsigned int count, int noisy,
+                        int verbose);
 
 extern int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
                             void * resp, int mx_resp_len, int verbose);

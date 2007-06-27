@@ -15,6 +15,9 @@ make sg_inq   	# build a specific executable (e.g. 'sg_inq')
 make uninstall  # removes executables, libraries and build remnants
 make -f lib_no_lib/Makefile.no_lib  # build without a library
 
+./make_no_lib.sh sg_inq  # is a simple script; in this case it expands to:
+                         # make -f lib_no_lib/Makefile.no_lib sg_inq
+
 Note that the main Makefile does _not_ call the Makefiles in the
 subdirectories (i.e. archive, examples and utils directories).
 
@@ -52,4 +55,4 @@ If the libsgutils.so shared library is troublesome or unwanted
 then "no_lib" versions of the Makefile and the sg3_utils.spec file
 can be found in the "lib_no_lib" subdirectory.
 
-28th October 2004
+26th November 2004

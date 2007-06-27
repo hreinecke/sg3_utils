@@ -24,7 +24,7 @@
 
 */
 
-static char * version_str = "0.18 20041012";
+static char * version_str = "0.19 20041124";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -297,6 +297,18 @@ static const char * scsi_ptype_strs[] = {
     "automation/driver interface",
 };
 
+static const char * get_ptype_str(int scsi_ptype)
+{
+    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
+
+    if (0x1f == scsi_ptype)
+        return "no physical device on this lu";
+    else if (0x1e == scsi_ptype)
+        return "well known logical unit";
+    else
+        return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
+}
+
 static const char * pr_type_strs[] = {
     "obsolete [0]",
     "Write Exclusive",
@@ -311,7 +323,8 @@ static const char * pr_type_strs[] = {
     "obsolete [0xd]", "obsolete [0xe]", "obsolete [0xf]",
 };
 
-static void decode_transport_id(unsigned char * ucp, int len)
+static void decode_transport_id(const char * leadin, unsigned char * ucp,
+                                int len)
 {
     int format_code, proto_id, num, j, k;
     unsigned long long ull;
@@ -319,58 +332,62 @@ static void decode_transport_id(unsigned char * ucp, int len)
 
     for (k = 0, bump; k < len; k += bump, ucp += bump) {
         if ((len < 24) || (0 != (len % 4)))
-            printf("      Transport Id short or not multiple of 4 "
-                   "[length=%d]:\n", len);
+            printf("%sTransport Id short or not multiple of 4 "
+                   "[length=%d]:\n", leadin, len);
         else
-            printf("      Transport Id of initiator:\n");
+            printf("%sTransport Id of initiator:\n", leadin);
         format_code = ((ucp[0] >> 6) & 0x3);
         proto_id = (ucp[0] & 0xf);
         switch (proto_id) {
         case 0: /* Fibre channel */
-            printf("        FCP-2 World Wide Name:\n");
+            printf("%s  FCP-2 World Wide Name:\n", leadin);
             if (0 != format_code) 
-                printf("        [Unexpected format code: %d]\n", format_code);
+                printf("%s  [Unexpected format code: %d]\n", leadin,
+                       format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
             bump = 24;
             break;
         case 1: /* Parallel SCSI */
-            printf("        Parallel SCSI initiator SCSI address: 0x%x\n",
-                   ((ucp[2] << 8) | ucp[3]));
+            printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
+                   leadin, ((ucp[2] << 8) | ucp[3]));
             if (0 != format_code) 
-                printf("        [Unexpected format code: %d]\n", format_code);
-            printf("        relative port number (of target): 0x%x\n",
-                   ((ucp[6] << 8) | ucp[7]));
+                printf("%s  [Unexpected format code: %d]\n", leadin,
+                       format_code);
+            printf("%s  relative port number (of corresponding target): "
+                   "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
             bump = 24;
             break;
         case 2: /* SSA */
-            printf("        SSA (transport id not defined):\n");
-            printf("        format code: %d\n", format_code);
+            printf("%s  SSA (transport id not defined):\n", leadin);
+            printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
         case 3: /* IEEE 1394 */
-            printf("        IEEE 1394 EUI-64 name:\n");
+            printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
             if (0 != format_code) 
-                printf("        [Unexpected format code: %d]\n", format_code);
+                printf("%s  [Unexpected format code: %d]\n", leadin,
+                       format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
             bump = 24;
             break;
         case 4: /* Remote Direct Memory Access (RDMA) */
-            printf("        RDMA initiator port identifier:\n");
+            printf("%s  RDMA initiator port identifier:\n", leadin);
             if (0 != format_code) 
-                printf("        [Unexpected format code: %d]\n", format_code);
+                printf("%s  [Unexpected format code: %d]\n", leadin,
+                       format_code);
             dStrHex((const char *)&ucp[8], 16, 0);
             bump = 24;
             break;
         case 5: /* iSCSI */
-            printf("        iSCSI ");
+            printf("%s  iSCSI ", leadin);
             num = ((ucp[2] << 8) | ucp[3]);
             if (0 == format_code)
                 printf("name: %.*s\n", num, &ucp[4]);
             else if (1 == format_code)
                 printf("world wide unique port id: %.*s\n", num, &ucp[4]);
             else {
-                printf("        [Unexpected format code: %d]\n", format_code);
+                printf("  [Unexpected format code: %d]\n", format_code);
                 dStrHex((const char *)ucp, num + 4, 0);
             }
             bump = (((num + 4) < 24) ? 24 : num + 4);
@@ -382,26 +399,27 @@ static void decode_transport_id(unsigned char * ucp, int len)
                     ull <<= 8;
                 ull |= ucp[4 + j];
             }
-            printf("        SAS address: 0x%llx\n", ull);
+            printf("%s  SAS address: 0x%llx\n", leadin, ull);
             if (0 != format_code) 
-                printf("        [Unexpected format code: %d]\n", format_code);
+                printf("%s  [Unexpected format code: %d]\n", leadin,
+                       format_code);
             bump = 24;
             break;
         case 7: /* Automation/Drive Interface Transport Protocol */
-            printf("        ADT:\n");
-            printf("        format code: %d\n", format_code);
+            printf("%s  ADT:\n", leadin);
+            printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
         case 8: /* ATAPI */
-            printf("        ATAPI:\n");
-            printf("        format code: %d\n", format_code);
+            printf("%s  ATAPI:\n", leadin);
+            printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
         default:
-            fprintf(stderr, "        unknown protocol id=0x%x  "
-                    "format_code=%d\n", proto_id, format_code);
+            fprintf(stderr, "%s  unknown protocol id=0x%x  "
+                    "format_code=%d\n", leadin, proto_id, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
@@ -553,7 +571,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                 } else
                     printf("      not reservation holder\n");
                 if (add_desc_len > 0)
-                    decode_transport_id(&ucp[24], add_desc_len);
+                    decode_transport_id("      ", &ucp[24], add_desc_len);
             }
         }
     }
@@ -798,6 +816,7 @@ int main(int argc, char * argv[])
     int transportid_arr_len = 0;
     int num_transportids = 0;
     struct sg_simple_inquiry_resp inq_resp;
+    const char * cp;
 
     device_name[0] = '\0';
     while (1) {
@@ -1022,7 +1041,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "number of tranport-ids decoded from "
                 "command line (or stdin): %d\n", num_transportids);
         fprintf(stderr, "  Decode given transport-ids:\n");
-        decode_transport_id(transportid_arr, transportid_arr_len);
+        decode_transport_id("      ", transportid_arr, transportid_arr_len);
     }
 
     if (do_inquiry) {
@@ -1036,12 +1055,11 @@ int main(int argc, char * argv[])
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                    inq_resp.revision);
             peri_type = inq_resp.peripheral_type;
-            if (peri_type >= 
-                   (int)(sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0])))
-                printf("  Peripheral device type: 0x%x\n", peri_type);
+            cp = get_ptype_str(peri_type);
+            if (strlen(cp) > 0)
+                printf("  Peripheral device type: %s\n", cp);
             else
-                printf("  Peripheral device type: %s\n", 
-                       scsi_ptype_strs[peri_type]);
+                printf("  Peripheral device type: 0x%x\n", peri_type);
         } else {
             printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n", 
                    device_name);
