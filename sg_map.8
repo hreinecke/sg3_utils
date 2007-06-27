@@ -1,10 +1,10 @@
-.TH SG_MAP "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_MAP "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_map \- displays mapping between sg and other SCSI devices
 .SH SYNOPSIS
 .B sg_map
-[\fI-a\fR] [\fI-i\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR] [\fI-sr\fR]
-[\fI-st\fR] [\fI-V\fR] [\fI-x\fR]
+[\fI-a\fR] [\fI-h\fR] [\fI-i\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR]
+[\fI-sr\fR] [\fI-st\fR] [\fI-V\fR] [\fI-x\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -18,6 +18,9 @@ name.
 -a
 assume the sg devices have alphabetical device names and loop
 through /dev/sga, /dev/sgb, etc. Default is numeric scan
+.TP
+-h
+print usage message then exit.
 .TP
 -i
 in addition do a standard INQUIRY and output vendor, product and revision
@@ -65,6 +68,17 @@ Quite often the mapping information can be derived by
 observing the output of the command: "cat /proc/scsi/scsi".
 However if devices have been added since boot this can
 be deceptive.
+.PP
+In the linux kernel 2.6 series something close to the mapping
+shown by this utility can be found by analysing sysfs. The
+main difference is that sysfs analysis will show the mapping
+between sg nodes and other SCSI device nodes in terms of
+major and minor numbers. While major 8, minor 16 will usually
+be /dev/sdb this is not necessarily so. Facilities associated
+with udev may assign major 8, minor 16 some other device node
+name. This version of sg_map has been extended to cope with
+sparse disk device node names of the form "/dev/sd<str>"
+where <str> can be one of [a-z,aa-zz,aaa-zzz].
 .SH EXAMPLES
 .PP
 My system has a SCSI disk, a cd writer and a dvd player:

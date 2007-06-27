@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "3.71 20050426";
+static char * version_str = "3.72 20050601";
 
 #define ME "sg_readcap: "
 
@@ -50,17 +50,15 @@ void usage ()
             "valid with -pmi]\n"
             "          -pmi: partial medium indicator (without this switch "
             "shows total\n"
-            "                disk capacity\n"
+            "                disk capacity)\n"
             "          -v: increase verbosity\n"
             "          -V: output version string and exit\n"
-            "          <device>: sg device (or block device in lk 2.6)\n"
-            "                    with no other arguments reads device "
-            "capacity\n");
+            "          <device>: sg device (or block device in lk 2.6)\n");
 }
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, res, num;
+    int sg_fd, k, res, num, plen, jmp_out;
     unsigned int lba = 0;
     unsigned long long llba = 0;
     unsigned long long u, llast_blk_addr;
@@ -70,52 +68,81 @@ int main(int argc, char * argv[])
     unsigned int last_blk_addr, block_size;
     char ebuff[EBUFF_SZ];
     const char * file_name = 0;
+    const char * cp;
     unsigned char resp_buff[RCAP16_REPLY_LEN];
 
+
     for (k = 1; k < argc; ++k) {
-        if (0 == strcmp("-pmi", argv[k]))
-            pmi = 1;
-        else if (0 == strcmp("-16", argv[k]))
-            do16 = 1;
-        else if (0 == strncmp("-lba=", argv[k], 5)) {
-            num = sscanf(argv[k] + 5, "%llx", &u);
-            if (1 != num) {
-                printf("Bad value after '-lba' switch\n");
-                file_name = 0;
-                break;
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case '1':
+                    if ('6' == *(cp + 1)) {
+                        do16 = 1;
+                        ++cp;
+                        --plen;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 'p':
+                    if (0 == strncmp("pmi", cp, 3)) {
+                        pmi = 1;
+                        cp += 2;
+                        plen -= 2;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 'v':
+                    ++verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case '?':
+                case 'h':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-            llba = u;
-            if (llba > 0xfffffffeULL)
-                do16 = 1;       /* force READ_CAPACITY16 for large lbas */
-            lba = (unsigned int)llba;
-        }
-        else if (0 == strcmp("-v", argv[k]))
-            ++verbose;
-        else if (0 == strcmp("-vv", argv[k]))
-            verbose += 2;
-        else if (0 == strcmp("-vvv", argv[k]))
-            verbose += 3;
-        else if (0 == strcmp("-V", argv[k])) {
-            printf("Version string: %s\n", version_str);
-            exit(0);
-        }
-        else if (0 == strcmp("-h", argv[k])) {
+            if (plen <= 0)
+                continue;
+            if (0 == strncmp("lba=", cp, 4)) {
+                num = sscanf(cp + 4, "%llx", &u);
+                if (1 != num) {
+                    printf("Bad value after 'lba=' option\n");
+                    usage();
+                    return 1;
+                }
+                llba = u;
+                if (llba > 0xfffffffeULL)
+                    do16 = 1;       /* force READ_CAPACITY16 for large lbas */
+                lba = (unsigned int)llba;
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
+            }
+        } else if (0 == file_name)
+            file_name = cp;
+        else {
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
             usage();
-            exit(0);
+            return 1;
         }
-        else if (0 == strcmp("-?", argv[k])) {
-            usage();
-            exit(0);
-        }
-        else if (*argv[k] == '-') {
-            printf("Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
-        }
-        else
-            file_name = argv[k];
     }
+    
     if (0 == file_name) {
+        fprintf(stderr, "No <device> argument given\n");
         usage();
         return 1;
     }

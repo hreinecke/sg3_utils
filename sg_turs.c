@@ -18,7 +18,7 @@
    data transfer (and no REQUEST SENSE command iff the unit is ready)
    then this can be used for timing per SCSI command overheads.
 
-*  Copyright (C) 2000-2008 D. Gilbert
+*  Copyright (C) 2000-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,15 +26,28 @@
 
 */
 
-static char * version_str = "3.14 20050328";
+static char * version_str = "3.16 20050603";
 
 #define EBUFF_SZ 256
 
+static void usage()
+{
+    printf("Usage: 'sg_turs [-n=<num_of_test_unit_readys>] [-t] "
+           "[-v] [-V] <scsi_device>'\n"
+           " where '-n=<num>' number of test_unit_ready commands "
+           "(def: 1)\n"
+           "       '-t'   outputs total duration and commands per "
+           "second\n"
+           "       '-v'   increase verbosity\n"
+           "       '-V'   print version string then exit\n"
+           "Send Test Unit Ready SCSI command(s)\n");
+}
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k;
-    char * file_name = 0;
+    int sg_fd, k, plen, jmp_out;
+    const char * file_name = 0;
+    const char * cp;
     char ebuff[EBUFF_SZ];
     int num_turs = 1;
     int num_errs = 0;
@@ -42,53 +55,64 @@ int main(int argc, char * argv[])
     int verbose = 0;
     struct timeval start_tm, end_tm;
 
+
     for (k = 1; k < argc; ++k) {
-        if (0 == strncmp("-n=", argv[k], 3)) {
-            num_turs = sg_get_num(argv[k] + 3);
-            if (num_turs < 0) {
-                printf("Couldn't decode number after '-n' switch\n");
-                file_name = 0;
-                break;
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case 't':
+                    do_time = 1;
+                    break;
+                case 'v':
+                    ++verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case '?':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-        }
-        else if (0 == strcmp("-t", argv[k]))
-            do_time = 1;
-        else if (0 == strcmp("-v", argv[k]))
-            ++verbose;
-        else if (0 == strcmp("-vv", argv[k]))
-            verbose += 2;
-        else if (0 == strcmp("-vvv", argv[k]))
-            verbose += 3;
-        else if (0 == strcmp("-V", argv[k])) {
-            fprintf(stderr, "Version string: %s\n", version_str);
-            exit(0);
-        } else if (*argv[k] == '-') {
-            printf("Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
-        }
-        else if (0 == file_name)
-            file_name = argv[k];
+            if (plen <= 0)
+                continue;
+            if (0 == strncmp("n=", cp, 2)) {
+                num_turs = sg_get_num(cp + 2);
+                if (num_turs <= 0) {
+                    printf("Couldn't decode number after 'n=' option\n");
+                    usage();
+                    return 1;
+                }
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
+            }
+        } else if (0 == file_name)
+            file_name = cp;
         else {
-            printf("too many arguments\n");
-            file_name = 0;
-            break;
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
+            usage();
+            return 1;
         }
     }
-    if ((0 == file_name) || (num_turs <= 0)) {
-        printf("Usage: 'sg_turs [-n=<num_of_test_unit_readys>] [-t] "
-               "[-v] [-V] <scsi_device>'\n"
-               " where '-n=<num>' number of test_unit_ready commands "
-               "(def: 1)\n"
-               "       '-t'   outputs total duration and commands per "
-               "second\n"
-               "       '-v'   increase verbosity\n"
-               "       '-V'   print version string then exit\n"
-               "Send Test Unit Ready SCSI command(s)\n");
+    if (0 == file_name) {
+        fprintf(stderr, "No <scsi_device> argument given\n");
+        usage();
         return 1;
     }
 
-    if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
+    if ((sg_fd = open(file_name, O_RDONLY | O_NONBLOCK)) < 0) {
         snprintf(ebuff, EBUFF_SZ, 
                  "sg_turs: error opening file: %s", file_name);
         perror(ebuff);

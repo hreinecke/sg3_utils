@@ -35,7 +35,7 @@ in the future.
    
 */
 
-static char * version_str = "0.49 20050426";
+static char * version_str = "0.51 20050602";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -69,11 +69,11 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
 static void usage()
 {
     fprintf(stderr,
-            "Usage: 'sg_inq [-c] [-cl] [-d] [-e] [-h] [-H] [-i] "
+            "Usage:  sg_inq [-c] [-cl] [-d] [-e] [-h] [-H] [-i] "
             "[-o=<opcode_page>]\n"
             "               [-p=<vpd_page>] [-P] [-r] [-s] [-v] [-V] [-x] "
             "[-36] [-?]\n"
-            "               <scsi_device>'\n"
+            "               <scsi_device>\n"
             " where -c   set CmdDt mode (use -o for opcode) [obsolete]\n"
             "       -cl  list supported commands using CmdDt mode [obsolete]\n"
             "       -d   list version descriptors\n"
@@ -295,7 +295,7 @@ static const char * assoc_arr[] =
 static const char * id_type_arr[] =
 {
     "vendor specific [0x0]",
-    "T10 vendor identication",
+    "T10 vendor identification",
     "EUI-64 based",
     "NAA",
     "Relative target port",
@@ -352,7 +352,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
         case 0: /* vendor specific */
             dStrHex((const char *)ip, i_len, 0);
             break;
-        case 1: /* T10 vendor identication */
+        case 1: /* T10 vendor identification */
             printf("      vendor id: %.8s\n", ip);
             if (i_len > 8)
                 printf("      vendor specific: %.*s\n", i_len - 8, ip + 8);
@@ -395,6 +395,10 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
                         ip[11]);
                 printf("      Directory ID: 0x%x\n", d_id);
             }
+            printf("      [0x");
+            for (m = 0; m < i_len; ++m)
+                printf("%02x", (unsigned int)ip[m]);
+            printf("]\n");
             break;
         case 3: /* NAA */
             if (1 != c_set) {
@@ -1161,8 +1165,9 @@ static int process_evpd(int sg_fd, int num_opcode, int do_hex,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, len;
-    char * file_name = 0;
+    int sg_fd, k, num, len, plen, jmp_out;
+    const char * file_name = 0;
+    const char * cp;
     char ebuff[EBUFF_SZ];
     unsigned int num_opcode = 0; /* SUPPORTED_VPDS_VPD == 0 */
     int num_opcode_given = 0;
@@ -1183,92 +1188,124 @@ int main(int argc, char * argv[])
     int oflags = O_RDONLY | O_NONBLOCK;
     int ret = 0;
 
+
     for (k = 1; k < argc; ++k) {
-        if (0 == strcmp("-36", argv[k]))
-            do_36 = 1;
-        else if (0 == strcmp("-c", argv[k]))
-            do_cmddt = 1;
-        else if (0 == strcmp("-cl", argv[k])) {
-            do_cmdlst = 1;
-            do_cmddt = 1;
-        } else if (0 == strcmp("-d", argv[k]))
-            do_vdescriptors = 1;
-        else if (0 == strcmp("-e", argv[k]))
-            do_evpd = 1;
-        else if (0 == strcmp("-h", argv[k]))
-            do_hex = 1;
-        else if (0 == strcmp("-H", argv[k]))
-            do_hex = 1;
-        else if (0 == strcmp("-i", argv[k]))
-            do_di_vpd = 1;
-        else if (0 == strncmp("-o=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", &num_opcode);
-            if ((1 != num) || (num_opcode > 255)) {
-                fprintf(stderr, "Bad number after '-p' or '-o' switch\n");
-                file_name = 0;
-                break;
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case '3':
+                    if ('6' == *(cp + 1)) {
+                        do_36 = 1;
+                        --plen;
+                        ++cp;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 'c':
+                    do_cmddt = 1;
+                    if ('l' == *(cp + 1)) {
+                        do_cmdlst = 1;
+                        --plen;
+                        ++cp;
+                    }
+                    break;
+                case 'd':
+                    do_vdescriptors = 1;
+                    break;
+                case 'e':
+                    do_evpd = 1;
+                    break;
+                case 'h':
+                case 'H':
+                    do_hex = 1;
+                    break;
+                case 'i':
+                    do_di_vpd = 1;
+                    break;
+                case 'P':
+                    do_upr_c0_emc = 1;
+                    break;
+                case 'r':
+                    do_raw = 1;
+                    break;
+                case 's':
+                    do_scsi_ports_vpd = 1;
+                    break;
+                case 'v':
+                    ++do_verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case 'x':
+                    do_xtended = 1;
+                    break;
+                case '?':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-            num_opcode_given = 1;
-        }
-        else if (0 == strncmp("-p=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", &num_opcode);
-            if ((1 != num) || (num_opcode > 255)) {
-                fprintf(stderr, "Bad number after '-p' switch\n");
-                file_name = 0;
-                break;
+            if (plen <= 0)
+                continue;
+            else if (0 == strncmp("o=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", &num_opcode);
+                if ((1 != num) || (num_opcode > 255)) {
+                    fprintf(stderr, "Bad number after 'o=' option\n");
+                    usage();
+                    return 1;
+                }
+                num_opcode_given = 1;
+            } else if (0 == strncmp("p=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", &num_opcode);
+                if ((1 != num) || (num_opcode > 255)) {
+                    fprintf(stderr, "Bad number after '-p' switch\n");
+                    usage();
+                    return 1;
+                }
+                num_opcode_given = 1;
+                p_switch_given = 1;
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
             }
-            num_opcode_given = 1;
-            p_switch_given = 1;
-        } else if (0 == strcmp("-P", argv[k]))
-            do_upr_c0_emc = 1;
-        else if (0 == strcmp("-r", argv[k]))
-            do_raw = 1;
-        else if (0 == strcmp("-s", argv[k]))
-            do_scsi_ports_vpd = 1;
-        else if (0 == strcmp("-v", argv[k]))
-            ++do_verbose;
-        else if (0 == strcmp("-vv", argv[k]))
-            do_verbose += 2;
-        else if (0 == strcmp("-vvv", argv[k]))
-            do_verbose += 3;
-        else if (0 == strcmp("-x", argv[k]))
-            do_xtended = 1;
-        else if (0 == strcmp("-?", argv[k])) {
-            file_name = 0;
-            break;
-        }
-        else if (0 == strcmp("-V", argv[k])) {
-            fprintf(stderr, "Version string: %s\n", version_str);
-            exit(0);
-        }
-        else if (*argv[k] == '-') {
-            fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
-        }
-        else if (0 == file_name)
-            file_name = argv[k];
+        } else if (0 == file_name)
+            file_name = cp;
         else {
-            fprintf(stderr, "too many arguments\n");
-            file_name = 0;
-            break;
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
+            usage();
+            return 1;
         }
     }
     
     decode = do_di_vpd + do_xtended + do_upr_c0_emc + do_scsi_ports_vpd;
     if (do_raw && do_hex) {
         fprintf(stderr, "Can't do hex and raw at the same time\n");
-        file_name = 0;
+        usage();
+        return 1;
     }
     if (decode > 1) {
         fprintf(stderr, "Can only have one of '-i', '-P', '-s' or '-x'\n");
-        file_name = 0;
+        usage();
+        return 1;
     } else if (decode && (do_cmddt || do_evpd || num_opcode_given)) {
         fprintf(stderr, "Can't use '-i', '-P', '-s' or '-x' with other VPD "
                 "or CmdDt flags\n");
-        file_name = 0;
+        usage();
+        return 1;
     }
     if (0 == file_name) {
+        fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
         return 1;
     }

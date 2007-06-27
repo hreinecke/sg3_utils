@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "0.39 20050427";
+static char * version_str = "0.41 20050601";
 
 #define ME "sg_logs: "
 
@@ -70,15 +70,16 @@ static int do_logs(int sg_fd, int ppc, int sp, int pc, int pg_code,
 
 static void usage()
 {
-    printf("Usage: 'sg_logs [-a] [-c=<page_control] [-h] [-l] "
+    printf("Usage:  sg_logs [-a] [-c=<page_control] [-h] [-H] [-l] "
            "[-p=<page_number>]\n                [-p=<page_number>] "
            " [-paramp=<parameter_pointer> [-ppc] [-sp]\n"
-           "                [-t] [-v] [-V] <sg_device>'\n"
+           "                [-t] [-v] [-V] <scsi_device>\n"
            " where -a   output all log pages\n"
            "       -c=<page_control> page control(PC) (default: 1)\n"
            "             (0 [current threshhold], 1 [current cumulative]\n"
            "              2 [default threshhold], 3 [default cumulative])\n"
            "       -h   output in hex\n"
+           "       -H   output in hex (same as '-h)\n"
            "       -l   list supported log page names\n"
            "       -p=<page_code> page code (in hex)\n"
            "       -paramp=<parameter_pointer> (in hex) (def: 0)\n"
@@ -1394,8 +1395,9 @@ static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, pg_len, res;
-    char * file_name = 0;
+    int sg_fd, k, num, pg_len, res, plen, jmp_out;
+    const char * file_name = 0;
+    const char * cp;
     char ebuff[EBUFF_SZ];
     unsigned char rsp_buff[MX_ALLOC_LEN];
     unsigned int u;
@@ -1416,71 +1418,108 @@ int main(int argc, char * argv[])
     struct sg_simple_inquiry_resp inq_out;
 
     for (k = 1; k < argc; ++k) {
-        if (0 == strcmp("-a", argv[k]))
-            do_all = 1;
-        else if (0 == strncmp("-c=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", &u);
-            if ((1 != num) || (u > 3)) {
-                printf("Bad page control after '-c' switch [0..3]\n");
-                file_name = 0;
-                break;
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case 'a':
+                    do_all = 1;
+                    break;
+                case 'h':
+                case 'H':
+                    do_hex = 1;
+                    break;
+                case 'l':
+                    do_list = 1;
+                    break;
+                case 'p':
+                    if (0 == strncmp("pcb", cp, 3)) {
+                        do_pcb = 1;
+                        cp +=2;
+                        plen -=2;
+                    } else if (0 == strncmp("ppc", cp, 3)) {
+                        do_ppc = 1;
+                        cp +=2;
+                        plen -=2;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 'r':
+                    do_pcreset = 1;
+                    break;
+                case 's':
+                    if ('p' == *(cp + 1)) {
+                        do_sp = 1;
+                        ++cp;
+                        --plen;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 't':
+                    do_temp = 1;
+                    break;
+                case 'v':
+                    ++do_verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case '?':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-            pc = u;
-        } else if (0 == strcmp("-h", argv[k]))
-            do_hex = 1;
-        else if (0 == strcmp("-l", argv[k]))
-            do_list = 1;
-        else if (0 == strncmp("-p=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", &u);
-            if ((1 != num) || (u > 63)) {
-                printf("Bad page code after '-p' switch [0..63]\n");
-                file_name = 0;
-                break;
+            if (plen <= 0)
+                continue;
+            if (0 == strncmp("c=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", &u);
+                if ((1 != num) || (u > 3)) {
+                    printf("Bad page control after 'c=' option [0..3]\n");
+                    usage();
+                    return 1;
+                }
+                pc = u;
+            } else if (0 == strncmp("p=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", &u);
+                if ((1 != num) || (u > 63)) {
+                    printf("Bad page code after 'p=' option [0..63]\n");
+                    usage();
+                    return 1;
+                }
+                pg_code = u;
+            } else if (0 == strncmp("paramp=", cp, 7)) {
+                num = sscanf(cp + 7, "%x", &u);
+                if ((1 != num) || (u > 0xffff)) {
+                    printf("Bad parameter pointer after 'paramp=' option\n");
+                    usage();
+                    return 1;
+                }
+                paramp = u;
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
             }
-            pg_code = u;
-        } else if (0 == strncmp("-paramp=", argv[k], 8)) {
-            num = sscanf(argv[k] + 8, "%x", &u);
-            if ((1 != num) || (u > 0xffff)) {
-                printf("Bad parameter pointer after '-paramp' switch\n");
-                file_name = 0;
-                break;
-            }
-            paramp = u;
-        } else if (0 == strcmp("-pcb", argv[k]))
-            do_pcb = 1;
-        else if (0 == strcmp("-ppc", argv[k]))
-            do_ppc = 1;
-        else if (0 == strcmp("-r", argv[k]))
-            do_pcreset = 1;
-        else if (0 == strcmp("-sp", argv[k]))
-            do_sp = 1;
-        else if (0 == strcmp("-t", argv[k]))
-            do_temp = 1;
-        else if (0 == strcmp("-v", argv[k]))
-            ++do_verbose;
-        else if (0 == strcmp("-vv", argv[k]))
-            do_verbose += 2;
-        else if (0 == strcmp("-vvv", argv[k]))
-            do_verbose += 3;
-        else if (0 == strcmp("-V", argv[k])) {
-            printf("Version string: %s\n", version_str);
-            exit(0);
-        } else if (0 == strcmp("-?", argv[k])) {
-            file_name = 0;
-            break;
-        } else if (*argv[k] == '-') {
-            printf("Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
         } else if (0 == file_name)
-            file_name = argv[k];
+            file_name = cp;
         else {
-            printf("too many arguments\n");
-            file_name = 0;
-            break;
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
+            usage();
+            return 1;
         }
     }
+    
     if (0 == file_name) {
+        fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
         return 1;
     }

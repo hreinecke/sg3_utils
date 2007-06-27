@@ -149,13 +149,13 @@ Default value is zero which yields the minimum amount of debug output.
 A value of 1 reports extra information that is not repetitive. A value
 2 reports cdbs and responses for SCSI commands that are not repetitive
 (i.e. other that READ and WRITE). Error processing is not considered
-repetitive. Values of 3 and 4 yield ouput for all SCSI commands (and
+repetitive. Values of 3 and 4 yield output for all SCSI commands (and
 Unix read() and write() calls).
 .TP
 --version
 outputs version number information and exits
 .PP
-The exit status of the sg_dd utilty is 0 when successful, 1 for
+The exit status of the sg_dd utility is 0 when successful, 1 for
 total failure (i.e. failed before copying data) and 2 when some
 data has been copied (prior to some problem).
 .PP
@@ -212,13 +212,13 @@ equivalent to:
    dd if=/dev/sda of=t bs=512 count=1000000
 .PP
 although dd's speed may improve if bs was larger and count was suitably
-reduced. Using a raw device to do something similar on a IDE disk:
+reduced. Using a raw device to do something similar on a ATA disk:
 .PP
    raw /dev/raw/raw1 /dev/hda
 .br
    sg_dd if=/dev/raw/raw1 of=t bs=512 count=1MB
 .PP
-To copy a SCSI disk partition to an IDE disk partition:
+To copy a SCSI disk partition to an ATA disk partition:
 .PP
    raw /dev/raw/raw2 /dev/hda3
 .br
@@ -228,7 +228,7 @@ This assumes a valid partition is found on the SCSI disk at the given
 skip block address (past the 5 GB point of that disk) and that
 the partition goes to the end of the SCSI disk. An explicit count
 is probably a safer option. The partition is copied to /dev/hda3 which
-is an offset into the IDE disk /dev/hda . The exact number of blocks
+is an offset into the ATA disk /dev/hda . The exact number of blocks
 read from /dev/sg0 are written to /dev/hda (i.e. no padding).
 .PP
 To time a streaming read of the first 1 GB (2 ** 30 bytes) on a disk

@@ -9,28 +9,26 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-/* This program is modeled on the example code in the SCSI Programming
-   HOWTO V1.5 by Heiko Eissfeldt dated 7 May 1996.
-*
-*  Copyright (C) 1999-2004 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
+/*
+ *  Copyright (C) 1999-2005 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
 
-   Since this code has been used in the past to form the backbone of
-   some Linux apps based on the "sg" device driver, it has been
-   strengthened.
+    Since this code has been used in the past to form the backbone of
+    some Linux apps based on the "sg" device driver, it has been
+    strengthened.
 
-   Start/Stop parameter by Kurt Garloff <garloff at suse dot de>, 6/2000
-   Sync cache parameter by Kurt Garloff <garloff at suse dot de>, 1/2001
-   Guard block device answering sg's ioctls. 
-                    <dgilbert at interlog dot com> 12/2002
-   Convert to SG_IO ioctl so can use sg or block devices in 2.6.* 3/2003
+    Start/Stop parameter by Kurt Garloff <garloff at suse dot de>, 6/2000
+    Sync cache parameter by Kurt Garloff <garloff at suse dot de>, 1/2001
+    Guard block device answering sg's ioctls. 
+                     <dgilbert at interlog dot com> 12/2002
+    Convert to SG_IO ioctl so can use sg or block devices in 2.6.* 3/2003
  
 */
 
-static char * version_str = "0.42 20050426";
+static char * version_str = "0.43 20050603";
 
 #define START_STOP_CMD          0x1b
 #define START_STOP_CMDLEN       6
@@ -97,33 +95,37 @@ static int do_start_stop(int fd, int start, int immed, int loej,
 
 void usage ()
 {
-        fprintf(stderr, "Usage:  sg_start [0|1] [-imm=0|1] [-loej] "
-                        "[-pc=<n>] [-v] [-V] <scsi_device>\n"
-               " where: 0: stop unit (e.g. spin down a disk or a cd/dvd)\n"
-               "        1: start unit (e.g. spin up a disk or a cd/dvd)\n"
-               "        -imm=0|1: 0->await completion, 1->return "
-               "immediately(def)\n"
-               "        -loej: load the medium if start option '1' is also "
-               "given\n"
-               "                or stop unit and eject\n"
-               "        -pc=<n>: power conditions (in hex, default 0 -> no "
-               "power condition)\n"
-               "                 1 -> active, 2 -> idle, 3 -> standby\n"
-               "        -v: verbose (print out SCSI commands)\n"
-               "        -V: print version string then exit\n"
-               "         <scsi_device>\n\n"
-               "    Example: 'sg_start 0 /dev/sdb' stops unit\n"
-               "             'sg_start -loej /dev/sdb' stops unit and "
-               "ejects media\n");
+        fprintf(stderr, "Usage:  sg_start [0|-stop|1|-start] [-imm=0|1] "
+                "[-loej] [-pc=<n>] [-v] [-V]\n"
+                "                 <scsi_device>\n"
+                " where: 0        stop unit (e.g. spin down a disk or a "
+                "cd/dvd)\n"
+                "        1        start unit (e.g. spin up a disk or a "
+                "cd/dvd)\n"
+                "        -imm=0|1   0->await completion, 1->return "
+                "immediately(def)\n"
+                "        -loej    load the medium if '-start' option is "
+                "also given\n"
+                "                 or stop unit and eject\n"
+                "        -pc=<n>  power conditions (in hex, default 0 -> no "
+                "power condition)\n"
+                "                 1 -> active, 2 -> idle, 3 -> standby\n"
+                "        -start   start unit (same as '1')\n"
+                "        -stop    stop unit (same as '0')\n"
+                "        -v       verbose (print out SCSI commands)\n"
+                "        -V       print version string then exit\n\n"
+                "    Example: 'sg_start -stop /dev/sdb'   stops unit\n"
+                "             'sg_start -loej /dev/scd0'  stops unit and "
+                "ejects media\n");
         exit (1);
 }
 
 int main(int argc, char * argv[])
 {
-        char **argptr;
         int startstop = -1;
-        char * file_name = 0;
-        int k, fd, num, res;
+        const char * file_name = 0;
+        const char * cp;
+        int k, fd, num, res, plen, jmp_out;
         unsigned int u;
         int immed = 1;
         int loej = 0;
@@ -134,61 +136,120 @@ int main(int argc, char * argv[])
                 usage ();
 
         for (k = 1; k < argc; ++k) {
-                argptr = argv + k;
-                if (!strcmp (*argptr, "-loej"))
-                        loej = 1;
-                else if (0 == strncmp("-imm=", argv[k], 5)) {
-                        num = sscanf(argv[k] + 5, "%x", &u);
-                        if ((1 != num) || (u > 1)) {
-                                printf("Bad value after '-imm' switch\n");
-                                file_name = 0;
-                                break;
+                cp = argv[k];
+                plen = strlen(cp);
+                if (plen <= 0)
+                        continue;
+                if ('-' == *cp) {
+                        for (--plen, ++cp, jmp_out = 0; plen > 0;
+                             --plen, ++cp) {
+                                switch (*cp) {
+                                case 'l':
+                                        if (0 == strncmp(cp, "loej", 4)) {
+                                                loej = 1;
+                                                cp += 3;
+                                                plen -= 3;
+                                        } else
+                                                jmp_out = 1;
+                                        break;
+                                case 's':
+                                        if (startstop >= 0) {
+                                                fprintf(stderr,
+                        "please, only one of 0, 1, -start or -stop\n");
+                                                usage();
+                                                return 1;
+                                        }
+                                        if (0 == strncmp(cp, "start", 5)) {
+                                                startstop = 1;
+                                                cp += 4;
+                                                plen -= 4;
+                                        } else if (0 == strncmp(cp, "stop",
+                                                                4)) {
+                                                startstop = 0;
+                                                cp += 3;
+                                                plen -= 3;
+                                        } else
+                                                jmp_out = 1;
+                                        break;
+                                case 'v':
+                                        ++verbose;
+                                        break;
+                                case 'V':
+                                        fprintf(stderr, "Version string: "
+                                                "%s\n", version_str);
+                                        exit(0);
+                                case '?':
+                                        usage();
+                                        return 1;
+                                default:
+                                        jmp_out = 1;
+                                        break;
+                                }
+                                if (jmp_out)
+                                        break;
                         }
-                        immed = u;
-                }
-                else if (0 == strncmp("-pc=", argv[k], 4)) {
-                        num = sscanf(argv[k] + 4, "%x", &u);
-                        if ((1 != num) || (u > 15)) {
-                                printf("Bad value after '-pc' switch\n");
-                                file_name = 0;
-                                break;
+                        if (plen <= 0)
+                                continue;
+                        if (0 == strncmp("imm=", cp, 4)) {
+                                num = sscanf(cp + 4, "%x", &u);
+                                if ((1 != num) || (u > 1)) {
+                                        fprintf(stderr, "Bad value after "
+                                                "'imm=' option\n");
+                                        usage();
+                                        return 1;
+                                }
+                                immed = u;
+                        } else if (0 == strncmp("pc=", cp, 3)) {
+                                num = sscanf(cp + 3, "%x", &u);
+                                if ((1 != num) || (u > 15)) {
+                                        fprintf(stderr, "Bad value after "
+                                                "after 'pc=' option\n");
+                                        usage();
+                                        return 1;
+                                }
+                                power_conds = u;
+                        } else if (jmp_out) {
+                                fprintf(stderr, "Unrecognized option: %s\n",
+                                        cp);
+                                usage();
+                                return 1;
                         }
-                        power_conds = u;
-                }
-                else if (!strcmp (*argptr, "-V")) {
-                        printf("Version string: %s\n", version_str);
-                        exit(0);
-                } else if (!strcmp (*argptr, "-v"))
-                        ++verbose;
-                else if (!strcmp (*argptr, "-vv"))
-                        verbose += 2;
-                else if (!strcmp (*argptr, "-vvv"))
-                        verbose += 3;
-                else if (!strcmp (*argptr, "0"))
-                        startstop = 0;
-                else if (!strcmp (*argptr, "1"))
-                        startstop = 1;
-                else if (*argv[k] == '-') {
-                        fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
-                        file_name = 0;
-                        break;
-                }
-                else if (0 == file_name)
-                        file_name = argv[k];
+                } else if (0 == strcmp("0", cp)) {
+                        if (startstop >= 0) {
+                                fprintf(stderr, "please, only one of 0, 1, "
+                                        "-start or -stop\n");
+                                usage();
+                                return 1;
+                        } else
+                                startstop = 0;
+                } else if (0 == strcmp("1", cp)) {
+                        if (startstop >= 0) {
+                                fprintf(stderr, "please, only one of 0, 1, "
+                                        "-start or -stop\n");
+                                usage();
+                                return 1;
+                        } else
+                                startstop = 1;
+                } else if (0 == file_name)
+                        file_name = cp;
                 else {
-                        fprintf(stderr, "too many arguments\n");
-                        file_name = 0;
-                        break;
+                        fprintf(stderr, "too many arguments, got: %s, not "
+                                "expecting: %s\n", file_name, cp);
+                        usage();
+                        return 1;
                 }
         }
+    
         if (0 == file_name) {
+                fprintf(stderr, "No <scsi_device> argument given\n");
                 usage();
                 return 1;
         }
+
         if ((startstop == -1) && loej)
                 startstop = 0;
         if ((startstop == -1) && (0 == power_conds)) {
-                fprintf(stderr, "need either start/stop indication (0|1) or"
+                fprintf(stderr, "need either -start|-stop indication or"
                         " non-zero power condition\n");
                 usage ();
                 return 1;

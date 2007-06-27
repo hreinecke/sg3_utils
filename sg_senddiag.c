@@ -22,7 +22,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.24 20050323";
+static char * version_str = "0.26 20050604";
 
 #define ME "sg_senddiag: "
 
@@ -238,7 +238,7 @@ static void list_page_codes()
 
 static void usage()
 {
-    printf("Usage: 'sg_senddiag [-doff] [-e] [-h] [-l] [-pf]"
+    printf("Usage: 'sg_senddiag [-doff] [-e] [-h] [-H] [-l] [-pf]"
            " [-raw=<h>,<h>...]\n"
            "                    [-s=<self_test_code>] [-t] [-uoff] [-v] "
            "[-V]\n"
@@ -246,6 +246,7 @@ static void usage()
            " where -doff device online (def: 0, only with '-t')\n"
            "       -e   duration of an extended test (from mode page 0xa)\n"
            "       -h   output in hex\n"
+           "       -H   output in hex (same as '-h')\n"
            "       -l   list supported page codes\n"
            "       -pf  set PF bit (def: 0)\n"
            "       -raw=<h>,<h>...  sequence of bytes to form diag page to "
@@ -265,8 +266,8 @@ static void usage()
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, read_in_len;
-    char * file_name = 0;
+    int sg_fd, k, num, rsp_len, read_in_len, plen, jmp_out;
+    const char * file_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char rsp_buff[MX_ALLOC_LEN];
     int rsp_buff_size = MX_ALLOC_LEN;
@@ -287,56 +288,99 @@ int main(int argc, char * argv[])
     int ret = 1;
 
     for (k = 1; k < argc; ++k) {
-        if (0 == strncmp("-s=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", &u);
-            if ((1 != num) || (u > 7)) {
-                printf("Bad page code after '-s' switch\n");
-                file_name = 0;
-                break;
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case 'd':
+                    if (0 == strncmp("doff", cp, 4)) {
+                        do_doff = 1;
+                        cp += 3;
+                        plen -= 3;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 'e':
+                    do_ext_time = 1;
+                    break;
+                case 'h':
+                case 'H':
+                    do_hex = 1;
+                    break;
+                case 'l':
+                    do_list = 1;
+                    break;
+                case 'p':
+                    if (0 == strncmp("pf", cp, 2)) {
+                        do_pf = 1;
+                        ++cp;
+                        --plen;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 't':
+                    do_def_test = 1;
+                    break;
+                case 'u':
+                    if (0 == strncmp("uoff", cp, 4)) {
+                        do_uoff = 1;
+                        cp += 3;
+                        plen -= 3;
+                    } else
+                        jmp_out = 1;
+                    break;
+                case 'v':
+                    ++verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case '?':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-            self_test_code = u;
-        }
-        else if (0 == strncmp("-raw=", argv[k], 5)) {
-            if (build_diag_page(argv[k] + 5, read_in, &read_in_len, sizeof(read_in))) {
-                printf("Bad sequence after '-raw'\n");
-                file_name = 0;
-                break;
+            if (plen <= 0)
+                continue;
+            if (0 == strncmp("raw=", cp, 4)) {
+                if (build_diag_page(cp + 4, read_in, &read_in_len,
+                                    sizeof(read_in))) {
+                    printf("Bad sequence after 'raw=' option\n");
+                    usage();
+                    return 1;
+                }
+                do_raw = 1;
+            } else if (0 == strncmp("s=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", &u);
+                if ((1 != num) || (u > 7)) {
+                    printf("Bad page code after 's=' option\n");
+                    usage();
+                    return 1;
+                }
+                self_test_code = u;
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
             }
-            do_raw = 1;
-        } else if (0 == strcmp("-pf", argv[k]))
-            do_pf = 1;
-        else if (0 == strcmp("-doff", argv[k]))
-            do_doff = 1;
-        else if (0 == strcmp("-h", argv[k]))
-            do_hex = 1;
-        else if (0 == strcmp("-l", argv[k]))
-            do_list = 1;
-        else if (0 == strcmp("-t", argv[k]))
-            do_def_test = 1;
-        else if (0 == strcmp("-uoff", argv[k]))
-            do_uoff = 1;
-        else if (0 == strcmp("-e", argv[k]))
-            do_ext_time = 1;
-        else if (0 == strcmp("-?", argv[k])) {
-            usage();
-            return 0;
-        } else if (0 == strcmp("-v", argv[k])) 
-            ++verbose;
-        else if (0 == strcmp("-V", argv[k])) {
-            printf("Version string: %s\n", version_str);
-            exit(0);
-        } else if (*argv[k] == '-') {
-            printf("Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
         } else if (0 == file_name)
-            file_name = argv[k];
+            file_name = cp;
         else {
-            printf("too many arguments\n");
-            file_name = 0;
-            break;
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
+            usage();
+            return 1;
         }
     }
+    
     if ((do_doff || do_uoff) && (! do_def_test)) {
         printf("setting -doff or -uoff only useful when -t is set\n");
         usage();
@@ -363,6 +407,7 @@ int main(int argc, char * argv[])
             list_page_codes();
             return 0;
         }
+        fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
         return 1;
     }
@@ -386,11 +431,11 @@ int main(int argc, char * argv[])
                 printf("Extended self-test duration not available\n");
         } else {
             printf("Extended self-test duration (mode page 0xa) failed\n");
-            goto err_out;
+            goto err_out9;
         }
     } else if (do_list) {
         memset(rsp_buff, 0, sizeof(rsp_buff));
-        if (0 == do_senddiag(sg_fd, 0, do_pf, 0, 0, 0, rsp_buff, 4, 1,
+        if (0 == do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4, 1,
                              verbose)) {
             if (0 == sg_ll_receive_diag(sg_fd, 0, 0, rsp_buff,
                                         rsp_buff_size, 1, verbose)) {
@@ -404,8 +449,12 @@ int main(int argc, char * argv[])
                         printf("  %s\n", (cp ? cp : "<unknown>"));
                     }
                 }
+            } else {
+                fprintf(stderr, "RECEIVE DIAGNOSTIC command failed\n");
+                goto err_out9;
             }
-        }
+        } else
+            goto err_out;
     } else if (do_raw) {
         if (do_senddiag(sg_fd, 0, do_pf, 0, 0, 0, read_in, read_in_len, 1,
                         verbose))
@@ -418,9 +467,14 @@ int main(int argc, char * argv[])
             printf("Default self test returned GOOD status\n");
     } else
         goto err_out;
-    ret = 0;
+    close(sg_fd);
+    return 0;
 
 err_out:
+    fprintf(stderr, "SEND DIAGNOSTIC command failed\n");
+err_out9:
+    if (verbose < 2)
+        fprintf(stderr, "  try again with '-vv' for more information\n");
     close(sg_fd);
     return ret;
 }

@@ -12,7 +12,7 @@
 #include "sg_cmds.h"
 
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2004 D. Gilbert
+*  Copyright (C) 2000-2005 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -20,18 +20,15 @@
 
    This shows the mapping from "sg" devices to other scsi devices
    (i.e. sd, scd or st) if any.
-   Options: -n   numeric scan: scan /dev/sg0,1,2, .... [default]
-            -a   alphabetical scan: scan /dev/sga,b,c, ....
-            -x   also show bus,chan,id,lun and type
-            -i   also show device INQUIRY information
-            -sd  only scan for sd devices [disks]
-            -st  only scan for st (and osst) devices [tapes]
-            -scd (or -sr)  only scan for scd devices [cdroms]
 
    Note: This program requires sg version 2 or better.
 
    Version 0.19 20041203
-        - additions for osst [Kurt Garloff <garloff at suse dot de>]
+
+   Version 1.02 20050511
+        - allow for sparse disk name with up to 3 letter SCSI
+          disk device node names (e.g. /dev/sdaaa)
+          [Nate Dailey < Nate dot Dailey at stratus dot com >]
 */
 
 
@@ -39,7 +36,7 @@
 #error "Need version 2 sg driver (linux kernel >= 2.2.6)"
 #endif
 
-static char * version_str = "1.01 20050424";
+static char * version_str = "1.02 20050511";
 
 static const char * devfs_id = "/dev/.devfsd";
 
@@ -59,7 +56,7 @@ typedef struct my_map_info
 
 
 #define MAX_SG_DEVS 256
-#define MAX_SD_DEVS 128
+#define MAX_SD_DEVS 26 + 26*26 + 26*26*26 /* sdX, sdXX, sdXXX */
 #define MAX_SR_DEVS 128
 #define MAX_ST_DEVS 128
 #define MAX_OSST_DEVS 128
@@ -90,11 +87,11 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 
 static void usage()
 {
-    printf("Usage: 'sg_map [-a] [i] [-h] [-n] [-sd] [-scd or -sr] [-st] "
+    printf("Usage: 'sg_map [-a] [-h] [i] [-n] [-sd] [-scd or -sr] [-st] "
            "[-V] [-x]'\n");
     printf("    where: -a   do alphabetic scan (ie sga, sgb, sgc)\n");
-    printf("           -i   also show device INQUIRY strings\n");
     printf("           -h or -?  show this usage message then exit\n");
+    printf("           -i   also show device INQUIRY strings\n");
     printf("           -n   do numeric scan (i.e. sg0, sg1, sg2) "
            "(default)\n");
     printf("           -sd  show mapping to disks\n");
@@ -111,31 +108,34 @@ static void make_dev_name(char * fname, const char * leadin, int k,
                           int do_numeric)
 {
     char buff[64];
-    int  big,little;
+    int  ones,tens,hundreds; /* for lack of a better name */
+    int  buff_idx;
 
     strcpy(fname, leadin ? leadin : "/dev/sg");
     if (do_numeric) {
         sprintf(buff, "%d", k);
         strcat(fname, buff);
     }
+    else if (k >= (26 + 26*26 + 26*26*26)) {
+        strcat(fname, "xxxx");
+    }
     else {
-        if (k < 26) {
-            buff[0] = 'a' + (char)k;
-            buff[1] = '\0';
-            strcat(fname, buff);
-        }
-        else if (k <= 255) { /* assumes sequence goes x,y,z,aa,ab,ac etc */
-            big    = k/26;
-            little = k - (26 * big);
-            big    = big - 1;
+        ones = k % 26;
 
-            buff[0] = 'a' + (char)big;
-            buff[1] = 'a' + (char)little;
-            buff[2] = '\0';
-            strcat(fname, buff);
-        }
-        else
-            strcat(fname, "xxxx");
+        if ((k - 26) >= 0)
+            tens = ((k-26)/26) % 26;
+        else tens = -1;
+
+        if ((k - (26 + 26*26)) >= 0)
+             hundreds = ((k - (26 + 26*26))/(26*26)) % 26;
+        else hundreds = -1;
+
+        buff_idx = 0;
+        if (hundreds >= 0) buff[buff_idx++] = 'a' + (char)hundreds;
+        if (tens >= 0) buff[buff_idx++] = 'a' + (char)tens;
+        buff[buff_idx++] = 'a' + (char)ones;
+        buff[buff_idx] = '\0';
+        strcat(fname, buff);
     }
 }
 
@@ -394,20 +394,17 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
             if (EBUSY == errno) {
                 printf("Device %s is busy\n", fname);
                 ++num_errors;
-                continue;
             }
-            else if ((ENODEV == errno) || (ENOENT == errno) ||
-                     (ENXIO == errno)) {
+            else if ((ENODEV == errno) || (ENXIO == errno)) {
                 ++num_errors;
                 ++num_silent;
-                continue;
             }
-            else {
+            else if (ENOENT != errno) { /* ignore ENOENT for sparse names */
                 snprintf(ebuff, EBUFF_SZ, "Error opening %s ", fname);
                 perror(ebuff);
                 ++num_errors;
-                continue;
             }
+            continue;
         }
 
         res = ioctl(sg_fd, SCSI_IOCTL_GET_IDLUN, &my_idlun);

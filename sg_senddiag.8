@@ -1,9 +1,9 @@
-.TH SG_SENDDIAG "8" "March 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_SENDDIAG "8" "June 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
 .B sg_senddiag
-[\fI-doff\fR] [\fI-e\fR] [\fI-h\fR] [\fI-l\fR] [\fI-pf\fR] 
+[\fI-doff\fR] [\fI-e\fR] [\fI-h\fR] [\fI-H\fR] [\fI-l\fR] [\fI-pf\fR]
 [\fI-raw=<h>,<h>... | -raw=-\fR]
 [\fI-s=<self_test_code>\fR] [\fI-t\fR] [\fI-uoff\fR] [\fI-v\fR]
 [\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
@@ -11,10 +11,16 @@ sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .\" Add any additional description here
 .PP
 This utility sends a SEND DIAGNOSTIC SCSI command to the given device.
-In the case of '-l' option it then sends a RECEIVE DIAGNOSTIC SCSI
-command to fetch the response (i.e. the page numbers of supported
-diagnostic pages). This utility can issue self tests, find supported
-diagnostic pages or send arbitrary diagnostic pages.
+It can issue self tests, find supported diagnostic pages or
+send arbitrary diagnostic pages.
+.PP
+When the '-l' option and a <scsi_device> are given then the utility
+sends a RECEIVE DIAGNOSTIC SCSI command to fetch the response (i.e.
+the page numbers of supported diagnostic pages).
+.PP
+When the '-l' option is given without a <scsi_device> then a
+list of diagnostic page names and their numbers, known by this
+utility, are listed.
 .TP
 -doff
 set the Device Offline (DevOffL) bit (default is clear). Only significant 
@@ -30,13 +36,21 @@ from mode page 0xa (control page).
 -h
 outputs response from RECEIVE DIAGNOSTIC in hex rather than decode it.
 .TP
+-H
+outputs response from RECEIVE DIAGNOSTIC in hex rather than decode it.
+.TP
 -l
-lists the names of all diagnostic pages supported by this device.
-The request is sent via a SEND DIAGNOSTIC command and the response
-is fetched by a RECEIVE DIAGNOSTIC command.
+when a <scsi_device> is also given lists the names of all diagnostic
+pages supported by this device. The request is sent via a SEND DIAGNOSTIC
+command (with the "pf" bit set) and the response is fetched by a RECEIVE DIAGNOSTIC command.
+When used in the absence of a <scsi_device> argument then a
+list of diagnostic page names and their numbers, known by this
+utility, are listed.
 .TP
 -pf
-set Page Format (PF) bit. By default it is clear (i.e. 0).
+set Page Format (PF) bit. By default it is clear (i.e. 0) unless
+the list ('-l') option is given in which case the Page Format
+bit is set (as required by SPC-3).
 .TP
 -raw=<h>,<h>...
 string of comma separated hex numbers each of which should resolve to
@@ -107,6 +121,12 @@ diagnostic pages could also be sent.
 .PP
 Arbitrary diagnostic pages can be read (in hex) with the sg_ses
 utility (not only those defined in SES-2).
+.PP
+If the utility is used with no options (e.g. "sg_senddiag /dev/sg1")
+Then a degenerate SEND DIAGNOSTICS SCSI command is sent with zero
+in all its fields apart from the opcode. Some devices report this
+as an error while others ignore it. It is not entirely clear from
+SPC-3 if it is invalid to send such a command.
 .PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks

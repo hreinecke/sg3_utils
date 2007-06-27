@@ -38,6 +38,9 @@ Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
 
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
+Nate Dailey < Nate dot Dailey at stratus dot com > extended sg_map for sparse
+        disk node names (e.g. /dev/sdaaa) [20050511]
+
 Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
         values in sg_dd (and friends); also problems when reading /dev/null
 

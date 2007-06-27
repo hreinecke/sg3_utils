@@ -17,7 +17,7 @@ and higher). An INQUIRY is termed as "standard" when both the EVPD and
 CmdDt bits are clear. 
 .PP
 An important "non-standard" INQUIRY page is the Device Identification
-Vital Prodoct Data (VPD) page (page number: 0x83). In recent SPC-3
+Vital Product Data (VPD) page (page number: 0x83). In recent SPC-3
 drafts support for this page has been flagged as mandatory. The '-i'
 option decodes this page.
 .PP
@@ -137,13 +137,13 @@ second (longer) INQUIRY is not performed.
 -?
 output usage message and exit. Ignore all other parameters.
 .PP
-Some device with weak SCSI command set implementations lock up when
+Some devices with weak SCSI command set implementations lock up when
 they receive commands they don't understand (or even response lengths
-that they don't expect). Such devices need to be treated carefully
+that they don't expect). Such devices need to be treated carefully,
 hence the '-36' option. Without this option this utility will issue
-a standard INQUIRY requesting 36 bytes of response data. If the device
-indicates it could have supplied more data then a second INQUIRY is
-issued to fetch the longer response.
+an initial standard INQUIRY requesting 36 bytes of response data. If
+the device indicates it could have supplied more data then a second
+INQUIRY is issued to fetch the longer response.
 .PP
 In the INQUIRY standard response there is a 'MultiP' flag which is set
 when the device has 2 or more ports. Some vendors use the preceding

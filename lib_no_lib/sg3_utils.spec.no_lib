@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.14
+Version: 1.15
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -120,6 +120,10 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Sun Jun 05 2005 - dgilbert at interlog dot com
+- use O_NONBLOCK on all fds that use SG_IO iotcl
+  * sg3_utils-1.15
+
 * Fri May 06 2005 - dgilbert at interlog dot com
 - add sg_rmsn; sg_ses update to SES-2 rev 11
   * sg3_utils-1.14

@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "1.04 20050505";
+static char * version_str = "1.08 20050601";
 
 #define ME "sg_modes: "
 
@@ -437,19 +437,24 @@ static const char * pg_control_str_arr[] = {
 
 static void usage()
 {
-    printf("Usage: 'sg_modes [-a] [-A] [-c=<page_control] [-d] [-D] [-h] "
-           "[-l]\n\t\t"
-           " [-p=<page_number>[,<sub_page_code>]] [-r]"
-           "\n\t\t [-subp=<sub_page_code>] [-v] [-V] [-6] [<scsi_device>]'\n"
+    printf("Usage:  sg_modes [-a] [-A] [-c=<page_control] [-d] [-D] [-f] [-h] "
+           "[-H] [-l]\n\t\t"
+           " [-L] [-p=<page_number>[,<sub_page_code>]] [-r]"
+           "\n\t\t [-subp=<sub_page_code>] [-v] [-V] [-6] [<scsi_device>]\n"
            " where -a   get all mode pages supported by device\n"
            "       -A   get all mode pages and subpages supported by device\n"
            "       -c=<page_control> page control (def: 0 [current],"
            " 1 [changeable],\n            2 [default], 3 [saved])\n"
-           "       -d   disable block descriptors (field in cdb)\n"
+           "       -d   disable block descriptors (DBD field in cdb)\n"
            "       -D   disable block descriptor output\n"
-           "       -h   output in hex\n"
+           "       -f   be flexible, cope with MODE SENSE 6/10 response "
+           "mixup\n");
+    printf("       -h   output page number and header in hex\n"
+           "       -H   output page number and header in hex (same as '-h')\n"
            "       -l   list common page codes for device peripheral type,\n"
            "            if no device given then assume disk type\n"
+           "       -L   set Long LBA Accepted (LLBAA field in mode sense "
+           "10 cdb)\n"
            "       -p=<page_code> page code in hex (def: 0)\n"
            "       -p=<page_code>,<sub_page_code> both in hex, (defs: 0)\n"
            "       -r   mode page output to stdout, a byte per line in "
@@ -457,7 +462,7 @@ static void usage()
            "       -subp=<sub_page_code> (in hex, def: 0)\n"
            "       -v   verbose\n"
            "       -V   output version string\n"
-           "       -6   Use MODE SENSE(6) instead of MODE SENSE(10)\n"
+           "       -6   Use MODE SENSE(6), by default uses MODE SENSE(10)\n"
            "       -?   output this usage message\n");
 }
 
@@ -465,9 +470,10 @@ static void usage()
 int main(int argc, char * argv[])
 {
     int sg_fd, k, num, len, res, md_len, bd_len, longlba, page_num, spf;
-    char * file_name = 0;
+    const char * file_name = 0;
     char ebuff[EBUFF_SZ];
     const char * descp;
+    const char * cp;
     unsigned char rsp_buff[MX_ALLOC_LEN];
     int rsp_buff_size = MX_ALLOC_LEN;
     unsigned int u, uu;
@@ -479,103 +485,139 @@ int main(int argc, char * argv[])
     int do_all_sub = 0;
     int do_dbd = 0;
     int no_desc_out = 0;
+    int flexible = 0;
     int do_hex = 0;
+    int do_llbaa = 0;
     int do_mode6 = 0;  /* Use MODE SENSE(6) instead of MODE SENSE(10) */
     int do_list = 0;
     int do_raw = 0;
     int do_verbose = 0;
     int oflags = O_RDONLY | O_NONBLOCK;
-    int density_code_off, t_proto, inq_pdt, inq_byte6;
+    int density_code_off, t_proto, inq_pdt, inq_byte6, resp_mode6;
+    int num_ua_pages, plen, jmp_out;
     unsigned char * ucp;
     unsigned char uc;
     struct sg_simple_inquiry_resp inq_out;
 
     for (k = 1; k < argc; ++k) {
-        if (0 == strcmp("-a", argv[k]))
-            do_all = 1;
-        else if (0 == strcmp("-A", argv[k])) {
-            do_all = 1;
-            do_all_sub = 1;
-        } else if (0 == strncmp("-c=", argv[k], 3)) {
-            num = sscanf(argv[k] + 3, "%x", &u);
-            if ((1 != num) || (u > 3)) {
-                fprintf(stderr, "Bad page control after '-c' switch\n");
-                file_name = 0;
-                break;
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case '6':
+                    do_mode6 = 1;
+                    break;
+                case 'a':
+                    do_all = 1;
+                    break;
+                case 'A':
+                    do_all = 1;
+                    do_all_sub = 1;
+                    break;
+                case 'd':
+                    do_dbd = 1;
+                    break;
+                case 'D':
+                    no_desc_out = 1;
+                    break;
+                case 'f':
+                    flexible = 1;
+                    break;
+                case 'h':
+                case 'H':
+                    do_hex = 1;
+                    break;
+                case 'l':
+                    do_list = 1;
+                    break;
+                case 'L':
+                    do_llbaa = 1;
+                    break;
+                case 'r':
+                    do_raw = 1;
+                    break;
+                case 'v':
+                    ++do_verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case '?':
+                    usage();
+                    return 1;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
             }
-            pc = u;
-        } else if (0 == strcmp("-d", argv[k]))
-            do_dbd = 1;
-        else if (0 == strcmp("-D", argv[k]))
-            no_desc_out = 1;
-        else if (0 == strcmp("-h", argv[k]))
-            do_hex = 1;
-        else if (0 == strcmp("-l", argv[k]))
-            do_list = 1;
-        else if (0 == strncmp("-p=", argv[k], 3)) {
-            if (NULL == strchr(argv[k] + 3, ',')) {
-                num = sscanf(argv[k] + 3, "%x", &u);
-                if ((1 != num) || (u > 63)) {
-                    fprintf(stderr, "Bad page code value after '-p' switch\n");
-                    file_name = 0;
-                    break;
+            if (plen <= 0)
+                continue;
+            if (0 == strncmp("c=", cp, 2)) {
+                num = sscanf(cp + 2, "%x", &u);
+                if ((1 != num) || (u > 3)) {
+                    fprintf(stderr, "Bad page control after 'c=' option\n");
+                    usage();
+                    return 1;
                 }
-                pg_code = u;
-            } else if (2 == sscanf(argv[k] + 3, "%x,%x", &u, &uu)) {
-                if (uu > 255) {
-                    fprintf(stderr, "Bad sub page code value after '-p' "
-                            "switch\n");
-                    file_name = 0;
-                    break;
+                pc = u;
+            } else if (0 == strncmp("p=", cp, 2)) {
+                if (NULL == strchr(cp + 2, ',')) {
+                    num = sscanf(cp + 2, "%x", &u);
+                    if ((1 != num) || (u > 63)) {
+                        fprintf(stderr, "Bad page code value after 'p=' "
+                                "option\n");
+                        usage();
+                        return 1;
+                    }
+                    pg_code = u;
+                } else if (2 == sscanf(cp + 2, "%x,%x", &u, &uu)) {
+                    if (uu > 255) {
+                        fprintf(stderr, "Bad sub page code value after 'p=' "
+                                "option\n");
+                        usage();
+                        return 1;
+                    }
+                    pg_code = u;
+                    sub_pg_code = uu;
+                    sub_pg_code_set = 1;
+                } else {
+                    fprintf(stderr, "Bad page code, subpage code sequence "
+                            "after 'p=' option\n");
+                    usage();
+                    return 1;
                 }
-                pg_code = u;
-                sub_pg_code = uu;
+            } else if (0 == strncmp("subp=", cp, 5)) {
+                num = sscanf(cp + 5, "%x", &u);
+                if ((1 != num) || (u > 255)) {
+                    fprintf(stderr, "Bad sub page code after 'subp=' "
+                            "option\n");
+                    usage();
+                    return 1;
+                }
+                sub_pg_code = u;
                 sub_pg_code_set = 1;
-            } else {
-                fprintf(stderr, "Bad page code, subpage code sequence after "
-                        "'-p' switch\n");
-                file_name = 0;
-                break;
+                if (-1 == pg_code)
+                    pg_code = 0;
+            } else if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
             }
-        } else if (0 == strcmp("-r", argv[k]))
-            do_raw = 1;
-        else if (0 == strncmp("-subp=", argv[k], 6)) {
-            num = sscanf(argv[k] + 6, "%x", &u);
-            if ((1 != num) || (u > 255)) {
-                fprintf(stderr, "Bad sub page code after '-subp' switch\n");
-                file_name = 0;
-                break;
-            }
-            sub_pg_code = u;
-            sub_pg_code_set = 1;
-            if (-1 == pg_code)
-                pg_code = 0;
-        } else if (0 == strcmp("-v", argv[k]))
-            ++do_verbose;
-        else if (0 == strcmp("-vv", argv[k]))
-            do_verbose += 2;
-        else if (0 == strcmp("-vvv", argv[k]))
-            do_verbose += 3;
-        else if (0 == strcmp("-V", argv[k])) {
-            printf("Version string: %s\n", version_str);
-            exit(0);
-        } else if (0 == strcmp("-6", argv[k]))
-            do_mode6 = 1;
-        else if (0 == strcmp("-?", argv[k])) {
-            usage();
-            return 0;
-        } else if (*argv[k] == '-') {
-            fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
-            file_name = 0;
-            break;
         } else if (0 == file_name)
-            file_name = argv[k];
+            file_name = cp;
         else {
-            fprintf(stderr, "too many arguments\n");
-            file_name = 0;
-            break;
+            fprintf(stderr, "too many arguments, got: %s, not expecting: "
+                    "%s\n", file_name, cp);
+            usage();
+            return 1;
         }
     }
+    
     if (0 == file_name) {
         if (do_list) {
             if ((pg_code < 0) || (pg_code > 0x1f)) {
@@ -591,13 +633,20 @@ int main(int argc, char * argv[])
             }
             return 0;
         }
+        fprintf(stderr, "No <scsi_device> argument given\n");
         usage();
         return 1;
     }
 
     /* The 6 bytes command only allows up to 252 bytes of response data */
-    if (do_mode6) 
+    if (do_mode6) { 
+        if (do_llbaa) {
+            fprintf(stderr, "LLBAA not defined for MODE SENSE 6, try "
+                    "without '-L'\n");
+            return 1;
+        }
         rsp_buff_size = 252;
+    }
     /* If no pages or list selected than treat as 'a' */
     if (! ((pg_code >= 0) || do_all || do_list))
         do_all = 1;
@@ -647,6 +696,7 @@ int main(int argc, char * argv[])
         }
     }
 
+    memset(rsp_buff, 0, sizeof(rsp_buff));
     if (do_mode6) {
         res = sg_ll_mode_sense6(sg_fd, do_dbd, pc, pg_code, sub_pg_code,
                                 rsp_buff, rsp_buff_size, 1, do_verbose);
@@ -655,24 +705,47 @@ int main(int argc, char * argv[])
                     "switch for a 10 byte MODE SENSE command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in cdb (perhaps subpages "
-                    "not supported)\n");
+                    "or page control (PC) not supported)\n");
     } else {
-        res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, do_dbd, pc, pg_code,
-                         sub_pg_code, rsp_buff, rsp_buff_size, 1, do_verbose);
+        res = sg_ll_mode_sense10(sg_fd, do_llbaa, do_dbd, pc, pg_code,
+                                 sub_pg_code, rsp_buff, rsp_buff_size, 1,
+                                 do_verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, ">>>>>> try again with a '-6' "
                     "switch for a 6 byte MODE SENSE command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in cdb (perhaps subpages "
-                    "not supported\n");
+                    "or page control (PC) not supported)\n");
     }
     if (0 == res) {
         int medium_type, specific, headerlen;
 
-        if (! do_raw)
-            printf("Mode parameter header from %s byte MODE SENSE:\n",
-                   (do_mode6 ? "6" : "10"));
-        if (do_mode6) {
+        resp_mode6 = do_mode6;
+        if (flexible) {
+            num = rsp_buff[0];
+            if (do_mode6 && (num < 3))
+                resp_mode6 = 0;
+            if ((0 == do_mode6) && (num > 5)) {
+                if ((num > 11) && (0 == (num % 2)) && (0 == rsp_buff[4]) &&
+                    (0 == rsp_buff[5]) && (0 == rsp_buff[6])) {
+                    rsp_buff[1] = num;
+                    rsp_buff[0] = 0;
+                    fprintf(stderr, ">>> msense(10) but resp[0]=%d and "
+                            "not msense(6) response so fix length\n", num);
+                } else
+                    resp_mode6 = 1;
+            }
+        }
+        if (! do_raw) {
+            if (resp_mode6 == do_mode6)
+                printf("Mode parameter header from %s byte MODE SENSE:\n",
+                       (do_mode6 ? "6" : "10"));
+            else
+                printf(" >>> Mode parameter header from %s byte MODE "
+                       "SENSE,\n     decoded as %s byte response:\n",
+                       (do_mode6 ? "6" : "10"), (resp_mode6 ? "6" : "10"));
+        }
+        if (resp_mode6) {
             headerlen = 4;
             md_len = rsp_buff[0] + 1;
             bd_len = rsp_buff[3];
@@ -745,6 +818,7 @@ int main(int argc, char * argv[])
         }
         ucp = rsp_buff + bd_len + headerlen;    /* start of mode page(s) */
         md_len -= bd_len + headerlen;           /* length of mode page(s) */
+        num_ua_pages = 0;
         for (k = 0; md_len > 0; ++k) { /* got mode page(s) */
             if ((k > 0) && (! do_all) && (SPG_CODE_ALL != sub_pg_code)) {
                 fprintf(stderr, "Unexpectedly received extra mode page "
@@ -755,6 +829,16 @@ int main(int argc, char * argv[])
             spf = ((uc & 0x40) ? 1 : 0);
             len = (spf ? ((ucp[2] << 8) + ucp[3] + 4) : (ucp[1] + 2));
             page_num = ucp[0] & PG_CODE_MASK;
+            if (0x0 == page_num) {
+                ++num_ua_pages;
+                if((num_ua_pages > 3) && (md_len > 0xa00)) {
+                    fprintf(stderr, ">>> Seen 3 unit attention pages "
+                            "(only one should be at end)\n     and mpage "
+                            "length=%d, looks malformed, try '-f' option\n",
+                            md_len);
+                    break;
+                }
+            }
             if (do_hex) {
                 if (spf)
                     printf(">> page_code=0x%x, subpage_code=0x%x, "
@@ -785,7 +869,13 @@ int main(int argc, char * argv[])
                     printf(">> page_code: %s, page_control: %s\n", ebuff,
                            pg_control_str_arr[pc]);
             }
-            dStrHex((const char *)ucp, ((len > md_len) ? md_len : len) , 1);
+            num = (len > md_len) ? md_len : len;
+            if ((k > 0) && (num > 256)) {
+                num = 256;
+                fprintf(stderr, ">>> page length (%d) > 256 bytes, unlikely "
+                                "trim\n    Try '-f' option\n", len);
+            }
+            dStrHex((const char *)ucp, num , 1);
             ucp += len;
             md_len -= len;
         }

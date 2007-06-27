@@ -68,7 +68,7 @@
 #include "sg_include.h"
 #include "sg_lib.h"
 
-static char * version_str = "1.09 20050504";    /* spc-3 rev 22a */
+static char * version_str = "1.10 20050521";    /* spc-3 rev 23+ */
 
 FILE * sg_warnings_str = NULL;        /* would like to default to stderr */
 
@@ -731,7 +731,9 @@ static struct error_info additional[] =
     {0x30,0x08,"Cannot write - application code mismatch"},
     {0x30,0x09,"Current session not fixated for append"},
     {0x30,0x0A,"Cleaning request rejected"},
+    {0x30,0x0B,"Cleaning tape expired"},
     {0x30,0x0C,"WORM medium, overwrite attempted"},
+    {0x30,0x0D,"Cleaning completed"},
     {0x30,0x10,"Medium not formatted"},
     {0x31,0x00,"Medium format corrupted"},
     {0x31,0x01,"Format command failed"},

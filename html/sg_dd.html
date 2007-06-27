@@ -57,10 +57,9 @@ transport is ATAPI (i.e. the ATA packet interface) is irrelevant, to
 the
 sg_dd utility they are SCSI devices.<br>
 <br>
-This page outlines the features of the sg_dd utility version 5.38 found
-in the <a href="u_index.html">sg3_utils</a> version 1.13 package. This
-was released on the 13th
-March 2005.<br>
+This page outlines the features of the sg_dd utility version 5.41 found
+in the <a href="u_index.html">sg3_utils</a> version 1.15 package. This
+was released on the 5th June 2005.<br>
 <h2><a name="dd_like_features"></a> dd like features</h2>
 The basic syntax of the sg_dd utility is the same as the dd command in
 Unix. That said, the syntax of the dd command in Unix is different from
@@ -271,7 +270,7 @@ than overwrite)<br>
       <td style="vertical-align: top;">0<br>
       </td>
       <td style="vertical-align: top;">when set access devices via SCSI
-commands (SG_IO)<br>
+commands (SG_IO ioctl)<br>
       </td>
     </tr>
     <tr>
@@ -280,7 +279,7 @@ commands (SG_IO)<br>
       <td style="vertical-align: top;">128<br>
       </td>
       <td style="vertical-align: top;">blocks_per_transfer (granularity
-of each IO)<br>
+of each IO). Default may be too large for cd/dvd drives<br>
       </td>
     </tr>
     <tr>
@@ -521,7 +520,12 @@ sg_dd utility expects direct access devices (whereas tapes are
 sequential access) so sg_dd generates an error if a st device is
 detected. When the input or output file is a sg device then the
 'blk_sgio' option is ignored as IO with that file is always via SCSI
-commands.<br>
+commands. When 'blk_sgio=1' is used on an ATAPI dvd/cd drive the
+combination of 2048 byte block size and the default 'bpt' value of 128
+may cause read errors. The solution is to reduce the 'bpt' value (try
+64 first) so the number of bytes transferred per SCSI command is below
+a limit imposed of the native device node (e.g. /dev/hdd). [When 'bpt'
+is to high the first read will report an EIO (input/output) error.]<br>
 <br>
 If a partition of block device is accessed (e.g. /dev/sda2) when
 'blk_sgio=0' (or is not given) then logical block address 0 for the
@@ -801,7 +805,7 @@ are encountered.<br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 14th March 2005<br>
+<p>Last updated: 5th June 2005<br>
 <br>
 </p>
 </center>

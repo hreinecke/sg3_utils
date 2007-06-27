@@ -1,4 +1,4 @@
-.TH SGINFO "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SGINFO "8" "June 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -251,14 +251,14 @@ Now check that the change took effect:
 When a mode page is "replaced" the default action is to change both the 
 current page and the saved page. [For some reason versions of sginfo and
 scsiinfo prior to 2.0 did not change the "saved" page.] To change only
-the cuurent mode page but not the coresponding saved page use the "-N" 
+the current mode page but not the corresponding saved page use the "-N" 
 option.
 .PP
 .SH GENERATING SCRIPT FILES AND HEX PAGES
 The "-aX" or "-AX" option generates output suitable for a script file.
 Mode pages are output in list format (after the INQUIRY and serial
 number) one page per line. To facilitate running the output as (part
-of) a script file to assert chosen modpe page values, each line is 
+of) a script file to assert chosen mode page values, each line is 
 prefixed by "sginfo -t <pn>[,<spn>] -XR ". When such a script
 file is run, it will have the effect of re-asserting the mode
 page values to what they were when the "-aX" generated the output.
@@ -298,7 +298,7 @@ scsiinfo version 1.0 was released by Eric Youngdale on 1st November 1993.
 The most recent version of scsiinfo is version 1.7 with the last patches
 by Michael Weller. sginfo is derived from scsiinfo and uses the sg
 interface to get around the 4 KB buffer limit in scsiinfo that cramped
-the diplay of defect lists especially. sginfo was written by Douglas 
+the display of defect lists especially. sginfo was written by Douglas 
 Gilbert with patches from Kurt Garloff. This manpage corresponds with
 version 2.01 of sginfo. It may be backported (or just copied) soon to
 become scsiinfo 2.01 .
@@ -307,9 +307,11 @@ This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B plscsi(internet), scsiinfo(internet), sg_modes(sg3_utils),
-.B sg_inq(sg3_utils)
+.B sg_inq(sg3_utils), sdparm(sdparm)
 .PP
 plscsi can sent arbitrary (user supplied) SCSI commands; scsiinfo is the
 predecessor of this utility; sg_modes is a low level MODE SENSE based
 utility and sg_inq is specialised for the mandatory SCSI INQUIRY
 command which contains a lot of information about advanced devices.
+Users may find sdparm more convenient for getting and setting mode
+page parameters.

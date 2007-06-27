@@ -38,7 +38,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.02 20050312";
+static char * version_str = "4.03 20050603";
 
 #define ME "sg_scan: "
 
@@ -79,10 +79,12 @@ static unsigned char inqCmdBlk[INQ_CMD_LEN] =
 
 void usage()
 {
-    printf("Usage: 'sg_scan [-a] [-i] [-n] [-V] [-w] [-x] [<sam_dev>]*'\n");
+    printf("Usage: 'sg_scan [-a] [-i] [-n] [-v] [-V] [-w] [-x] "
+           "[<sam_dev>]*'\n");
     printf("    where: -a   do alpha scan (ie sga, sgb, sgc)\n");
     printf("           -i   do SCSI INQUIRY, output results\n");
     printf("           -n   do numeric scan (ie sg0, sg1...) [default]\n");
+    printf("           -v   increase verbosity\n");
     printf("           -V   output version string then exit\n");
     printf("           -w   force open with read/write flag\n");
     printf("           -x   extra information output about queuing\n");
@@ -124,11 +126,12 @@ void make_dev_name(char * fname, int k, int do_numeric)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, k, j, f;
+    int sg_fd, res, k, j, f, plen, jmp_out;
     unsigned char inqBuff[INQ_REPLY_LEN];
     int do_numeric = NUMERIC_SCAN_DEF;
     int do_inquiry = 0;
     int do_extra = 0;
+    int verbose = 0;
     int writeable = 0;
     int num_errors = 0;
     int num_silent = 0;
@@ -144,6 +147,7 @@ int main(int argc, char * argv[])
     int has_file_args = 0;
     const int max_file_args = 2048;
     int * argv_index_arr;
+    const char * cp;
 
     if ((argv_index_arr = malloc(max_file_args * sizeof(int))))
         memset(argv_index_arr, 0, max_file_args * sizeof(int));
@@ -153,31 +157,55 @@ int main(int argc, char * argv[])
     }
 
     for (k = 1, j = 0; k < argc; ++k) {
-        if (0 == strcmp("-a", argv[k]))
-            do_numeric = 0;
-        else if (0 == strcmp("-i", argv[k]))
-            do_inquiry = 1;
-        else if (0 == strcmp("-n", argv[k]))
-            do_numeric = 1;
-        else if (0 == strcmp("-V", argv[k])) {
-            printf("Version string: %s\n", version_str);
-            exit(0);
-        } else if (0 == strcmp("-w", argv[k]))
-            writeable = 1;
-        else if (0 == strcmp("-x", argv[k]))
-            do_extra = 1;
-        else if ((0 == strcmp("-?", argv[k])) ||
-                 (0 == strncmp("-h", argv[k], 2))) {
-            printf("Scan sg device names and optionally do an INQUIRY\n\n");
-            usage();
-            return 1;
-        }
-        else if (*argv[k] == '-') {
-            printf("Unknown switch: %s\n", argv[k]);
-            usage();
-            return 1;
-        }
-        else if (*argv[k] != '-') {
+        cp = argv[k];
+        plen = strlen(cp);
+        if (plen <= 0)
+            continue;
+        if ('-' == *cp) {
+            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+                switch (*cp) {
+                case 'a':
+                    do_numeric = 0;
+                    break;
+                case 'h':
+                case '?':
+                    printf("Scan sg device names and optionally do an "
+                           "INQUIRY\n\n");
+                    usage();
+                    return 1;
+                case 'i':
+                    do_inquiry = 1;
+                    break;
+                case 'n':
+                    do_numeric = 1;
+                    break;
+                case 'v':
+                    ++verbose;
+                    break;
+                case 'V':
+                    fprintf(stderr, "Version string: %s\n", version_str);
+                    exit(0);
+                case 'w':
+                    writeable = 1;
+                    break;
+                case 'x':
+                    do_extra = 1;
+                    break;
+                default:
+                    jmp_out = 1;
+                    break;
+                }
+                if (jmp_out)
+                    break;
+            }
+            if (plen <= 0)
+                continue;
+            if (jmp_out) {
+                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                usage();
+                return 1;
+            }
+        } else {
             if (j < max_file_args) {
                 has_file_args = 1;
                 argv_index_arr[j++] = k;
@@ -187,7 +215,7 @@ int main(int argc, char * argv[])
             }
         }
     }
-
+    
     flags = writeable ? O_RDWR : O_RDONLY;
 
     for (k = 0, res = 0, j = 0; 
@@ -216,6 +244,9 @@ int main(int argc, char * argv[])
             }
             else if ((ENODEV == errno) || (ENOENT == errno) ||
                      (ENXIO == errno)) {
+                if (verbose)
+                    fprintf(stderr, "Unable to open: %s, errno=%d\n",
+                            file_namep, errno);
                 ++num_errors;
                 ++num_silent;
                 continue;
@@ -234,8 +265,8 @@ int main(int argc, char * argv[])
             res = try_ata_identity(file_namep, sg_fd, do_inquiry);
             if (res == 0)
                 continue;
-            snprintf(ebuff, EBUFF_SZ,
-                     ME "device %s failed on scsi ioctl, skip", file_namep);
+            snprintf(ebuff, EBUFF_SZ, ME "device %s failed on scsi+ata "
+                     "ioctl, skip", file_namep);
             perror(ebuff);
             ++num_errors;
             continue;
@@ -264,8 +295,8 @@ int main(int argc, char * argv[])
 
             res = ioctl(sg_fd, SG_GET_SCSI_ID, &m_id);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "device %s ioctls(4), skip",
-                         file_namep);
+                snprintf(ebuff, EBUFF_SZ, ME "device %s failed "
+                         "SG_GET_SCSI_IDioctl(4), skip", file_namep);
                 perror(ebuff);
                 ++num_errors;
                 continue;

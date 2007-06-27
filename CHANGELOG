@@ -2,6 +2,31 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.15 [20050605]
+  - sg_cmds: sg_get_mode_page_controls(): improve error processing,
+     add double fetch
+  - sg_turs, sg_rbuf, sg_requests, sg_test_rwbuf, sg_format,
+    sg_dd and sgm_dd: add O_NONBLOCK to open()
+  - sgm_dd: switch to use SG_IO ioctl (that leaves only
+     sgp_dd using the asynchronous sg write()/read() sequence)
+  - sg_ses: sync with rev 12 changes
+  - sg_map: extend to cope with sparse disk device names with
+     up to 3 letters (e.g. /dev/sdaaa) [Nate Dailey]
+  - sg_modes: add '-f' option to flexibly decode broken mode
+     sense responses.
+     - zero prefill response; stop decoding response after 3
+       unit attention mode pages seen (i.e. malformed)
+     - add '-L' option for LLBAA bit in msense 10 cdb
+  - sg_reset: update man page
+  - sg_inq: VPD page 0x83: output eui addresses in hex as well
+  - Makefile: fix bug in rules for sgp_dd (when 'make dep' used)
+  - sg_format: expand explanations in its man page
+  - sg_inq, sg_logs, sg_modes, sg_opcodes, sg_rbuf, sg_readcap,
+    sg_scan, sg_senddiag, sg_start and sg_turs: allow command
+    line to take concaternated options
+  - sg_start: add -start and -stop to parallel "1" and "0"
+  - sg_senddiag: set pf bit with '-l' option
+
 Changelog for sg3_utils-1.14 [20050506]
   - sg_rmsn: new utility to read media serial number
   - sg_rtpg: add T_SUP bit report

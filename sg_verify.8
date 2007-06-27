@@ -1,4 +1,4 @@
-.TH SG_VERIFY "8" "February 2005" "sg3_utils-1.13" SG3_UTILS
+.TH SG_VERIFY "8" "May 2005" "sg3_utils-1.15" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ at http://www.t10.org). Verify starts at the logical block address
 given by the '--lba=<n>' option and continues for '--count=<n>'
 blocks. No more than '--bpc=<n>' blocks are verified by each VERIFY
 command so if necessary multiple VERIFY commands are sent.
-No news is good news (i.e. if there are no verfy errors detected
+No news is good news (i.e. if there are no verify errors detected
 no messages are sent to stderr and the Unix return status is 0).
 .TP
 --bpc=<n> | -b <n>
@@ -28,7 +28,7 @@ this value may be constrained by the maximum transfer length field
 in the block limits VPD page.
 .TP
 --dpo | -d
-disable page out changes the cache retension policy of blocks read on
+disable page out changes the cache retention policy of blocks read on
 the device's cache to the lowest priority. This means that blocks read by
 other commands are more likely to remain in the device's cache.
 .TP
@@ -46,7 +46,8 @@ output the usage message then exit.
 .TP
 --lba=<n> | -l <n>
 specifies the logical block address on the device to start the verify
-operation. The default value is 0 (i.e. the start of the device).
+operation. <n> is assumed to be decimal unless prefixed by '0x' (see
+below). The default value is 0 (i.e. the start of the device).
 .TP
 --verbose | -v
 increase the level of verbosity, (i.e. debug output).

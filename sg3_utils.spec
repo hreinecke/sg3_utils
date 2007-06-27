@@ -1,5 +1,5 @@
 %define	name	sg3_utils
-%define	version	1.14
+%define	version	1.15
 %define	release	1
 
 %define	major	1
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Sun Jun 05 2005 - dgilbert at interlog dot com
+- use O_NONBLOCK on all fds that use SG_IO ioctl
+  * sg3_utils-1.15
+
 * Fri May 06 2005 - dgilbert at interlog dot com
 - produce libsgutils (+ -devel variant) as well as sg3_utils binary rpm
   * sg3_utils-1.14
