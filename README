@@ -1,0 +1,184 @@
+                      README for sg3_utils
+                      ====================
+Introduction
+------------
+In this directory are some utilities and test programs for the Linux
+sg (version 3) device driver. This driver is found in latter lk 2.3
+series and in lk 2.4 series kernels. If you have problems or questions
+ about them please contact me at dgilbert@interlog.com .
+The home site for the Linux sg device drivers is: 
+http://www.torque.net/sg .
+Documentation for the driver can be found at:
+http://www.torque.net/sg/p/scsi_generic_v3.txt .
+
+All programs are "GPL"-ed so you can incorporate all or part of them
+in your applications as you please. The "sg_err.[hc]" files contain
+ASCII text corresponding to most of the error and warning conditions
+defined by the SCSI 2 standard. They are used by most other programs.
+
+Additional information (including a version number) can be found
+towards the top of each ".c" file corresponding to each utility and
+test program.
+
+
+Scope
+-----
+The sg driver in Linux can be seen as having 3 distinct versions:
+
+   v1   lk < 2.2.6     sg_header based relatively unchanged since 1992
+   v2   lk >= 2.2.6    enhanced sg_header interface structure
+   v3   lk >= 2.4      additional sg_io_hdr interface structure.
+
+This package is targeted as "v3" only. Another package called "sg_utils"
+is targeted at "v2" and to a lesser extent "v1". The "sg_utils"
+package has essentially the same utilities.
+
+
+Utilities
+---------
+The main utility is a variant of the standard Unix command "dd" that
+is called "sg_dd". This program takes a useful subset of the command
+line arguments that "dd" takes. Furthermore "sg_dd" will only work if
+one or both of the given files (ie "if" or "of") is an "sg" or a raw
+device. If "bs" (block size) is not given it is assumed to be 512 bytes.
+Available dd options:
+   bs=<n>        typically 512 or 2048
+   ibs=<n>       if given must be the same as "bs"
+   obs=<n>       if given must be the same as "bs"
+   if=<name>     like dd plus sg device or "-" (read from stdin)
+   of=<name>     like dd plus sg device or "-" (write to stdout)
+   skip=<n>      block offset to start reading "if"
+   seek=<n>      block offset to start writing "of"
+Extra options:
+   bpt=<n>       blocks per transfer (default 128)
+   dio=<n>       0 or 1, request direct IO (default 0)
+
+All numeric arguments can take multiplier suffixes:
+  "c", "C"        * 1
+  "b", "B"        * 512
+  "k"             * 1024           [2 ^ 10]
+  "K"             * 1000           [10 ^ 3]
+  "m"             * 1048576        [2 ^ 20]
+  "M"             * 1000000        [10 ^ 6]
+  "g"             * 1073741824     [2 ^ 30]
+  "G"             * 1000000000     [10 ^ 9]
+The 'skip' and 'seek' options lead to the use of the system command
+lseek() to a byte offset when used on raw devices and normal files.
+[For sg devices 32 bit block addresses are used thus limiting accesses
+on disks with 512 byte blocks to 1 TB.] On 32 bit architectures the
+normal lseek() is limited to a signed 32 bit byte offset (i.e. 2 GB).
+"sg_dd" bypasses this limit by using Linux's _llseek() [while modern
+"dd" commands use read loops to "walk" around the limit].
+If 'count' is not given then the SCSI READ CAPACITY command will be
+used (on sg devices) if appropriate. [Note that READ CAPACITY often
+gives a 2 block overestimate for iso9660 file systems on CD-ROMs. 
+See the "isosize" command below.]  Disk partition information can
+be found with a command like "fdisk -ul /dev/sda". The 'dio' argument
+requests direct IO (only functions in 2.3/2.4 kernels with some patches).
+
+"sgp_dd" uses POSIX threads and attempts to run multiple IO operations
+in parallel. The user can control the amount of parallelism from 
+1 worker (i.e. single threaded) through to 16 worker threads. This is
+done via the "thr=<n>" option (default 4). Copies from one sg device to
+another can be considerably faster due to this parallelism. There is
+also some speed benefit when raw devices are used. Other enhancements
+compared to "sg_dd" are a "gen=0 | 1" argument that allows general
+copying (i.e. doesn't need to involve sg or raw devices) and that 
+signals are caught.
+
+"sg_scan" does a SCSI bus scan and prints the results to standard output.
+With no arguments only read permissions are needed on the sg devices
+but if "-i" is given (to do a SCSI Inquiry command on the device) then
+write permissions are also needed.
+
+"sg_map" shows the mapping between sg device names and those of the
+sd, sr and st device names. Some devices such as scanners have no
+corresponding sd, sr nor st device names.
+
+"sginfo" is a re-porting of the "scsiinfo" program by Eric Youngdale to
+use the sg devices (rather than the sd, sr or st block devices). This
+program outputs "mode sense" information. Amongst other things it outputs
+the full defect list of a disk (which was truncated at 4096 bytes in
+the original).
+
+"isosize" is a utility that gives the number of bytes in an iso9660
+file system. It is a rewrite by Andries Brouwer<Andries.Brouwer@cwi.nl>
+of a utility that first appeared in the cdwrite package but is now
+difficult to obtain. Note that the value given by isosize is usually
+2 or more blocks less than the READ CAPACITY SCSI command yields on
+a CD-ROM (due to run out sectors).
+
+"sg_inq" is a utility for poking around the INQUIRY command which
+contains much interesting information. It is based on SCSI 3's SPC-1
+document and has additional fields defined in the draft SPC-2 document
+(revision 18 from May 2000). This command is applicable to SCSI 2 (and
+perhaps SCSI 1) devices as well.
+
+"sg_test_rwbuf" is a program by Kurt Garloff <garloff@suse.de> that has
+the following description:  Program to test the SCSI host adapter by 
+issueing write and read operations on a device's buffer and calculating 
+checksums.
+
+
+Test Programs
+-------------
+"sg_debug" is effectively defunct now. The user can instead do:
+$ cat /proc/scsi/sg/debug
+
+"sg_rbuf" does repeated SCSI READ BUFFER commands which allows SCSI
+bus bandwidth and the SCSI sub-system throughput to be measured.
+
+"sg_turs" executes a user specified number of TEST UNIT READY commands on
+the given device. This can be used to time SCSI command overhead.
+
+"sg_readcap" call a READ CAPACITY command on the given device. The file
+descriptor may be any SCSI device (i.e. not just sg devices). It should
+also be able to run an almost any sg driver (back to 2.0) although this
+needs some more testing.
+
+"sg_simple1" and "sg_simple2" are simple example programs demonstrating
+calls to the SCSI INQUIRY and TEST UNIT READY commands. They only differ
+in their error processing: sg_simple1 uses sg_err.[hc] for error
+processing while sg_simple2 does its own more primitive checks.
+
+"sg_simple3" tests out user space scatter gather added to the version 3
+sg driver.
+
+An experimental version of a "scsi_inquiry" program is included to
+show the use of the SCSI_IOCTL_SEND_COMMAND ioctl to send a SCSI
+INQUIRY command. That ioctl() is supported by the SCSI sub system
+mid level and so is common to all sd, sr, st and sg devices. 
+
+"sg_reset" exercises the SCSI device/bus/host reset capability. It is
+supported by the sg driver in lk 2.2.16 and beyond but associated
+SCSI middle level driver changes have not been accepted into the
+standard kernel at this time. Some distributions contain the patch to
+the mid-level that activates this feature. Due to this uncertainty
+the source is placed in the "archive" directory.
+
+Building
+--------
+A Makefile is provided that builds the above utilities and test programs
+'make' and 'make all' will cause everything (that is stale) to be built.
+
+A complete rebuild can be forced by executing 'make clean' prior to
+any of the above make commands. Individual commands can be built be
+giving the executable name to make, for example: 'make sg_dd'.
+
+There is also a 'make dep' but that shouldn't be needed very often.
+A 'make install' will build if necessary and then install the
+executables into /usr/local/bin by default (controlled by variable
+INSTDIR).
+
+Warning: some distributions hide the real "sg.h" file by having an
+old copy of /usr/src/linux/include/scsi/*.h in /usr/include/scsi when
+the latter could be a symbolic link to the kernel include directory.
+Redhat 6.0 seems to have this problem (but 5.2 and 5.1 didn't).
+The solution used by these utilities is to this is to rely on 
+/usr/include/linux being a symbolic link and get "sg.h" this way:
+#include <linux/../scsi/sg.h>
+Ugly, elegant and effective (thanks to Monty author of cdparanoia).
+
+
+Doug Gilbert
+10th December 2000
