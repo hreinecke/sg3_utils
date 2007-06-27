@@ -8,12 +8,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/../scsi/sg.h>  /* cope with silly includes */
-#include "sg_err.h"  /* alternatively include <linux/../scsi/scsi.h> */
+#include <linux/../scsi/scsi.h>
+#include "sg_err.h"
 
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999,2000 D. Gilbert
+*  Copyright (C) 1999 - 2001 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -23,7 +24,7 @@
    of Linux kernels no matter which of those environments it was
    compiled and built under.
 
-   Version 3.55 (20000827)
+   Version 3.56 (20010115)
 
 10 byte READ CAPACITY command:
 [0x25][  |lu][    ][    ][    ][    ][    ][    ][cntrl] {ignore PMI mode}

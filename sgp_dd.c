@@ -20,7 +20,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 #include "llseek.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999, 2000 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2001 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -46,7 +46,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "5.01 20001211";
+static char * version_str = "5.02 20010110";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -340,7 +340,7 @@ void * read_write_thread(void * v_clp)
             clp->out_stop = 1;
         rep->wr = 1;
         rep->blk = clp->out_blk;
-        rep->num_blks = blocks;
+        /* rep->num_blks = blocks; */
         clp->out_blk += blocks;
         clp->out_count -= blocks;
 
@@ -742,7 +742,7 @@ int main(int argc, char * argv[])
     int num_threads = DEF_NUM_THREADS;
     pthread_t threads[MAX_NUM_THREADS];
     int gen = 0;
-    int in_sect_sz, out_sect_sz, status;
+    int in_sect_sz, out_sect_sz, status, infull, outfull;
     void * vp;
     char ebuff[256];
     Rq_coll rcoll;
@@ -995,14 +995,14 @@ int main(int argc, char * argv[])
 /* vvvvvvvvvvv  Start worker threads  vvvvvvvvvvvvvvvvvvvvvvvv */
     if ((rcoll.out_done_count > 0) && (num_threads > 0)) {
         /* Run 1 work thread to shake down infant retryable stuff */
+        status = pthread_mutex_lock(&rcoll.out_mutex);
+        if (0 != status) err_exit(status, "lock out_mutex");
         status = pthread_create(&threads[0], NULL, read_write_thread,
                                 (void *)&rcoll);
         if (0 != status) err_exit(status, "pthread_create");
         if (rcoll.debug)
             fprintf(stderr, "Starting worker thread k=0\n");
 
-        status = pthread_mutex_lock(&rcoll.out_mutex);
-        if (0 != status) err_exit(status, "lock out_mutex");
         /* wait for any broadcast */
         pthread_cleanup_push(cleanup_out, (void *)&rcoll);
         status = pthread_cond_wait(&rcoll.out_sync_cv, &rcoll.out_mutex);
@@ -1041,10 +1041,10 @@ int main(int argc, char * argv[])
                rcoll.out_count);
 	res = 2;
     }
-    fprintf(stderr, "%d+%d records in\n", count - rcoll.in_done_count,
-           rcoll.in_partial);
-    fprintf(stderr, "%d+%d records out\n", count - rcoll.out_done_count,
-           rcoll.out_partial);
+    infull = count - rcoll.in_done_count -  rcoll.in_partial;
+    fprintf(stderr, "%d+%d records in\n", infull, rcoll.in_partial);
+    outfull = count - rcoll.out_done_count - rcoll.out_partial;
+    fprintf(stderr, "%d+%d records out\n", outfull, rcoll.out_partial);
     if (rcoll.dio_incomplete)
         fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
                rcoll.dio_incomplete);

@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/../scsi/sg.h>  /* cope with silly includes */
-#include "sg_err.h"  /* alternatively include <linux/../scsi/scsi.h> */
+#include "sg_err.h"
 
 /* This is a simple program executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver.

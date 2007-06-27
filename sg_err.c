@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <linux/../scsi/sg.h>
+#include <linux/../scsi/scsi.h>  /* cope with silly includes */
 #include "sg_err.h"
+
 
 /* This file is a huge cut, paste and hack from linux/drivers/scsi/constant.c
 *  which I guess was written by:
 *         Copyright (C) 1993, 1994, 1995 Eric Youngdale
 
 * The rest of this is:
-*  Copyright (C) 1999 D. Gilbert
+*  Copyright (C) 1999 - 2001 D. Gilbert
 *
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
@@ -18,9 +21,11 @@
 *
 *  Some of the tables have been updated for SCSI 2.
 *
-*  Version 0.83 (991208)
+*  Version 0.84 (20010115)
+*      Change output from stdout to stderr
 */
 
+#define OUTP stderr
 
 static const unsigned char scsi_command_size[8] = { 6, 10, 10, 12,
                                                    12, 12, 10, 10 };
@@ -104,16 +109,16 @@ static void print_opcode(int opcode) {
     const char **table = commands[ group(opcode) ];
     switch ((unsigned long) table) {
     case RESERVED_GROUP:
-        printf("%s(0x%02x) ", reserved, opcode);
+        fprintf(OUTP, "%s(0x%02x) ", reserved, opcode);
         break;
     case VENDOR_GROUP:
-        printf("%s(0x%02x) ", vendor, opcode);
+        fprintf(OUTP, "%s(0x%02x) ", vendor, opcode);
         break;
     default:
         if (table[opcode & 0x1f] != unknown)
-            printf("%s ",table[opcode & 0x1f]);
+            fprintf(OUTP, "%s ",table[opcode & 0x1f]);
         else
-            printf("%s(0x%02x) ", unknown, opcode);
+            fprintf(OUTP, "%s(0x%02x) ", unknown, opcode);
         break;
     }
 }
@@ -122,8 +127,8 @@ void sg_print_command (const unsigned char * command) {
     int i,s;
     print_opcode(command[0]);
     for ( i = 1, s = COMMAND_SIZE(command[0]); i < s; ++i)
-        printf("%02x ", command[i]);
-    printf("\n");
+        fprintf(OUTP, "%02x ", command[i]);
+    fprintf(OUTP, "\n");
 }
 
 static const char * statuses[] = {
@@ -138,7 +143,7 @@ static const char * statuses[] = {
 
 void sg_print_status (int masked_status) {
     /* status = (status >> 1) & 0xf; */ /* already done */
-    printf("%s ",statuses[masked_status]);
+    fprintf(OUTP, "%s ",statuses[masked_status]);
 }
 
 #define D 0x001  /* DIRECT ACCESS DEVICE (disk) */
@@ -407,17 +412,17 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
            s = sb_len;
 
         if (!valid)
-            printf("[valid=0] ");
-        printf("Info fld=0x%x, ", (int)((sense_buffer[3] << 24) |
-               (sense_buffer[4] << 16) | (sense_buffer[5] << 8) |
-               sense_buffer[6]));
+            fprintf(OUTP, "[valid=0] ");
+        fprintf(OUTP, "Info fld=0x%x, ", (int)((sense_buffer[3] << 24) |
+                (sense_buffer[4] << 16) | (sense_buffer[5] << 8) |
+                sense_buffer[6]));
 
         if (sense_buffer[2] & 0x80)
-           printf( "FMK ");     /* current command has read a filemark */
+           fprintf(OUTP, "FMK ");     /* current command has read a filemark */
         if (sense_buffer[2] & 0x40)
-           printf( "EOM ");     /* end-of-medium condition exists */
+           fprintf(OUTP, "EOM ");     /* end-of-medium condition exists */
         if (sense_buffer[2] & 0x20)
-           printf( "ILI ");     /* incorrect block length requested */
+           fprintf(OUTP, "ILI ");     /* incorrect block length requested */
 
         switch (code) {
         case 0x0:
@@ -432,11 +437,11 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
             error = "Invalid";
         }
 
-        printf("%s ", error);
+        fprintf(OUTP, "%s ", error);
 
         if (leadin)
-            printf("%s: ", leadin);
-        printf("sense key: %s\n", snstext[sense_buffer[2] & 0x0f]);
+            fprintf(OUTP, "%s: ", leadin);
+        fprintf(OUTP, "sense key: %s\n", snstext[sense_buffer[2] & 0x0f]);
 
         /* Check to see if additional sense information is available */
         if(sense_buffer[7] + 7 < 13 ||
@@ -445,16 +450,16 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
         for(i=0; additional[i].text; i++)
             if(additional[i].code1 == sense_buffer[12] &&
                additional[i].code2 == sense_buffer[13])
-                printf("Additional sense indicates: %s\n",
-                       additional[i].text);
+                fprintf(OUTP, "Additional sense indicates: %s\n",
+                        additional[i].text);
 
         for(i=0; additional2[i].text; i++)
             if(additional2[i].code1 == sense_buffer[12] &&
                additional2[i].code2_min >= sense_buffer[13]  &&
                additional2[i].code2_max <= sense_buffer[13]) {
-                printf("Additional sense indicates: ");
-                printf(additional2[i].text, sense_buffer[13]);
-                printf("\n");
+                fprintf(OUTP, "Additional sense indicates: ");
+                fprintf(OUTP, additional2[i].text, sense_buffer[13]);
+                fprintf(OUTP, "\n");
             };
     } else {    /* non-extended sense data */
 
@@ -467,24 +472,26 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
           */
 
         if (leadin)
-            printf("%s: ", leadin);
+            fprintf(OUTP, "%s: ", leadin);
         if (sense_buffer[0] < 15)
-            printf("old sense: key %s\n", snstext[sense_buffer[0] & 0x0f]);
+            fprintf(OUTP, 
+	    	    "old sense: key %s\n", snstext[sense_buffer[0] & 0x0f]);
         else
-            printf("sns = %2x %2x\n", sense_buffer[0], sense_buffer[2]);
+            fprintf(OUTP, "sns = %2x %2x\n", sense_buffer[0], sense_buffer[2]);
 
-        printf("Non-extended sense class %d code 0x%0x ", sense_class, code);
+        fprintf(OUTP, "Non-extended sense class %d code 0x%0x ", 
+		sense_class, code);
         s = 4;
     }
 
  done:
-    printf("Raw sense data (in hex):\n  ");
+    fprintf(OUTP, "Raw sense data (in hex):\n  ");
     for (i = 0; i < s; ++i) {
         if ((i > 0) && (0 == (i % 24)))
-            printf("\n  ");
-        printf("%02x ", sense_buffer[i]);
+            fprintf(OUTP, "\n  ");
+        fprintf(OUTP, "%02x ", sense_buffer[i]);
     }
-    printf("\n");
+    fprintf(OUTP, "\n");
     return;
 }
 
@@ -501,12 +508,12 @@ void sg_print_host_status(int host_status)
         for(i = 0; hostbyte_table[i]; i++) ;
         maxcode = i-1;
     }
-    printf("Host_status=0x%02x", host_status);
+    fprintf(OUTP, "Host_status=0x%02x", host_status);
     if(host_status > maxcode) {
-        printf("is invalid ");
+        fprintf(OUTP, "is invalid ");
         return;
     }
-    printf("(%s) ",hostbyte_table[host_status]);
+    fprintf(OUTP, "(%s) ",hostbyte_table[host_status]);
 }
 
 static const char * driverbyte_table[]={
@@ -531,14 +538,14 @@ void sg_print_driver_status(int driver_status)
         for(i = 0; driversuggest_table[i]; i++) ;
         suggest_max = i;
     }
-    printf("Driver_status=0x%02x",driver_status);
-    printf(" (%s,%s) ",
-        dr < driver_max  ? driverbyte_table[dr]:"invalid",
-        su < suggest_max ? driversuggest_table[su]:"invalid");
+    fprintf(OUTP, "Driver_status=0x%02x",driver_status);
+    fprintf(OUTP, " (%s,%s) ",
+            dr < driver_max  ? driverbyte_table[dr]:"invalid",
+            su < suggest_max ? driversuggest_table[su]:"invalid");
 }
 
 #ifdef SG_IO
-int sg_chk_n_print3(const char * leadin, sg_io_hdr_t * hp)
+int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp)
 {
     return sg_chk_n_print(leadin, hp->masked_status, hp->host_status,
                           hp->driver_status, hp->sbp, hp->sb_len_wr);
@@ -557,10 +564,10 @@ int sg_chk_n_print(const char * leadin, int masked_status,
         return 1;       /* No problems */
     if (0 != masked_status) {
         if (leadin)
-            printf("%s: ", leadin);
+            fprintf(OUTP, "%s: ", leadin);
         done_leadin = 1;
         sg_print_status(masked_status);
-        printf("\n");
+        fprintf(OUTP, "\n");
         if (sense_buffer && ((masked_status == CHECK_CONDITION) ||
                              (masked_status == COMMAND_TERMINATED))) {
             sg_print_sense(0, sense_buffer, sb_len);
@@ -569,23 +576,23 @@ int sg_chk_n_print(const char * leadin, int masked_status,
     }
     if (0 != host_status) {
         if (leadin && (! done_leadin))
-            printf("%s: ", leadin);
+            fprintf(OUTP, "%s: ", leadin);
         if (done_leadin)
-            printf("plus...: ");
+            fprintf(OUTP, "plus...: ");
         else
             done_leadin = 1;
         sg_print_host_status(host_status);
-        printf("\n");
+        fprintf(OUTP, "\n");
     }
     if (0 != driver_status) {
         if (leadin && (! done_leadin))
-            printf("%s: ", leadin);
+            fprintf(OUTP, "%s: ", leadin);
         if (done_leadin)
-            printf("plus...: ");
+            fprintf(OUTP, "plus...: ");
         else
             done_leadin = 1;
         sg_print_driver_status(driver_status);
-        printf("\n");
+        fprintf(OUTP, "\n");
         if (sense_buffer && (! done_sense) &&
             (SG_ERR_DRIVER_SENSE & driver_status))
             sg_print_sense(0, sense_buffer, sb_len);
@@ -594,7 +601,7 @@ int sg_chk_n_print(const char * leadin, int masked_status,
 }
 
 #ifdef SG_IO
-int sg_err_category3(sg_io_hdr_t * hp)
+int sg_err_category3(struct sg_io_hdr * hp)
 {
     return sg_err_category(hp->masked_status, hp->host_status,
                            hp->driver_status, hp->sbp, hp->sb_len_wr);

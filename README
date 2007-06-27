@@ -170,15 +170,28 @@ A 'make install' will build if necessary and then install the
 executables into /usr/local/bin by default (controlled by variable
 INSTDIR).
 
-Warning: some distributions hide the real "sg.h" file by having an
-old copy of /usr/src/linux/include/scsi/*.h in /usr/include/scsi when
-the latter could be a symbolic link to the kernel include directory.
-Redhat 6.0 seems to have this problem (but 5.2 and 5.1 didn't).
-The solution used by these utilities is to this is to rely on 
-/usr/include/linux being a symbolic link and get "sg.h" this way:
-#include <linux/../scsi/sg.h>
-Ugly, elegant and effective (thanks to Monty author of cdparanoia).
+Header file problems
+--------------------
+These utilities include 2 special Linux header files:
+#include <scsi/sg.h>
+#include <scsi/scsi.h>
+These files are typically found in the directory /usr/include/scsi which
+is maintained by the GNU glibc team. Unfortunately these GNU supplied
+headers may not be (functionally) the same as those found in the kernel
+source:
+/usr/src/linux/include/scsi/sg.h   and
+/usr/src/linux/include/scsi/scsi.h
+
+If glibc and the kernel on a machine are of the same vintage then it is
+probably sufficient to use the simple includes listed at the start of this
+section. For more precise control the full absolute path into the kernel
+may be given in the include. The technique used in this package is to
+rely on the fact that /usr/include/linux is (usually) a symbolic link
+to /usr/src/linux/include/linux . That will cause the following:
+#include <linux/../scsi/sg.h> 
+#include <linux/../scsi/scsi.h>
+to find the kernel supplied header files.
 
 
 Doug Gilbert
-10th December 2000
+15th January 2001
