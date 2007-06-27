@@ -1,0 +1,36 @@
+.TH SG_RESET "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sg_reset \- exercises SCSI device/bus/host reset capability
+.SH SYNOPSIS
+.B sg_reset
+[\fI-d\fR] 
+[\fI-b\fR] 
+[\fI-h\fR] 
+<\fIgeneric device\fR>
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg_reset exercises the SCSI device/bus/host reset capability. It is
+supported by the sg driver in lk 2.2.16 and beyond but associated
+SCSI middle level driver changes were not been accepted into the
+official kernel for some time. Many distributions contain the patch to
+the mid-level that activates this feature. The required patch first
+officially appeared in the kernel in lk 2.4.19 .
+.TP
+-d
+attempt a SCSI device reset
+.TP
+-b
+attempt a SCSI bus reset
+.TP
+-h
+attempt a host adapter reset
+.PP
+If no switch is given, then sg_reset checks if a reset is underway.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH COPYRIGHT
+Copyright \(co 1999-2002 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

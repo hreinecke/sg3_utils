@@ -1,0 +1,27 @@
+.TH SG_TEST_RWBUF "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sg_test_rwbuf \- Tests the SCSI host adapter by issueing write and read operations on a device's buffer and calculating checksums.
+.SH SYNOPSIS
+.B sg_test_rwbuf
+<\fIgeneric device\fR>
+<\fIsz\fR> 
+[\fIaddwr\fR]
+[\fIaddrd\fR] 
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg_test_rwbuf writes and reads back sz bytes to the internal buffer of
+device /dev/sgX. For testing purposes, you can ask it to write
+(addwr) or read (addrd) some more bytes.
+.PP
+\fBWARNING\fR: If you access the device at the same time, e.g. because it's a
+mounted hard disk, the device's buffer may be used by the device
+itself for other data at the same time, and overwriting it may or may
+not cause data corruption!  
+.SH AUTHORS
+Written by D. Gilbert and K. Garloff
+.SH COPYRIGHT
+Copyright \(co 2000 Douglas Gilbert, Kurt Garloff
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

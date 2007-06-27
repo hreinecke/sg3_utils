@@ -1,0 +1,41 @@
+.TH SG_SCAN "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sg_scan \- does a SCSI bus scan and prints the results to standard output
+.SH SYNOPSIS
+.B sg_scan
+[\fI-a\fR] 
+[\fI-n\fR] 
+[\fI-w\fR] 
+[\fI-i\fR] 
+[\fI-x\fR] 
+<\fIgeneric device\fR>
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg_reset exercises the SCSI device/bus/host reset capability. It is
+supported by the sg driver in lk 2.2.16 and beyond but associated
+SCSI middle level driver changes have not been accepted into the
+standard kernel at this time. Many distributions contain the patch to
+the mid-level that activates this feature.
+.TP
+-a
+do alpha scan (ie sga, sgb, sgc)
+.TP
+-n
+do numeric scan (ie sg0, sg1...) [default]
+.TP
+-w
+force open with read/write flag
+.TP
+-i
+do SCSI INQUIRY, output results
+.TP
+-x
+extra information output about queuing
+.SH AUTHORS
+Written by D. Gilbert and F. Jansen
+.SH COPYRIGHT
+Copyright \(co 1999-2002 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

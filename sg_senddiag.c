@@ -21,7 +21,7 @@
    command.
 */
 
-static char * version_str = "0.13 20030331";
+static char * version_str = "0.15 20030422";
 
 #define ME "sg_senddiag: "
 
@@ -243,13 +243,14 @@ static void list_page_codes()
 
 static void usage()
 {
-    printf("Usage: 'sg_senddiag [-cpf] [-doff] [-h] [-l]"
-	   " [-s=<self_test_code>]\n\t\t [-t] [-uoff] [-V] [<sg_device>]'\n"
-	   " where -cpf clear PF bit (def: 1)\n"
-	   "       -doff device online (def: 0, only with '-t')\n"
+    printf("Usage: 'sg_senddiag [-doff] [-e] [-h] [-l] [-pf]"
+	   " [-s=<self_test_code>]\n"
+	   "                    [-t] [-uoff] [-V] [<sg_device>]'\n"
+	   " where -doff device online (def: 0, only with '-t')\n"
 	   "       -e   duration of last extended test (from mode page 0xa)\n"
 	   "       -h   output in hex\n"
 	   "       -l   list supported page codes\n"
+	   "       -pf  set PF bit (def: 0)\n"
 	   "       -s=<self_test_code> (def: 0)\n"
 	   "          1->background short, 2->background extended,"
 	   " 4->abort test\n"
@@ -259,7 +260,6 @@ static void usage()
 	   "       -V   output version string\n"
 	   "       -?   output this usage message\n");
 }
-
 
 static void dStrHex(const char* str, int len, int no_ascii)
 {
@@ -324,7 +324,7 @@ int main(int argc, char * argv[])
     int rsp_buff_size = MX_ALLOC_LEN;
     unsigned int u;
     int self_test_code = 0;
-    int do_pf = 1;
+    int do_pf = 0;
     int do_doff = 0;
     int do_hex = 0;
     int do_list = 0;
@@ -343,8 +343,8 @@ int main(int argc, char * argv[])
             }
 	    self_test_code = u;
         }
-        else if (0 == strcmp("-cpf", argv[k]))
-	    do_pf = 0;
+        else if (0 == strcmp("-pf", argv[k]))
+	    do_pf = 1;
         else if (0 == strcmp("-doff", argv[k]))
 	    do_doff = 1;
         else if (0 == strcmp("-h", argv[k]))
@@ -426,7 +426,7 @@ int main(int argc, char * argv[])
 	return 0;
     }
     if (do_list) {
-	memset(rsp_buff, 0, 4);
+	memset(rsp_buff, 0, sizeof(rsp_buff));
 	if (0 == do_senddiag(sg_fd, 0, do_pf, 0, 0, 0, rsp_buff, 4, 1)) {
 	    if (0 == do_rcvdiag(sg_fd, 0, 0, rsp_buff, rsp_buff_size, 1)) {
 		printf("Supported diagnostic pages response:\n");
@@ -435,7 +435,7 @@ int main(int argc, char * argv[])
 		    dStrHex((const char *)rsp_buff, rsp_len, 1);
 		else {
 		    for (k = 0; k < (rsp_len - 4); ++k)
-			printf("  %s\n", find_page_code_desc(rsp_buff[k + 4]));
+		        printf("  %s\n", find_page_code_desc(rsp_buff[k + 4]));
 		}
 	    }
 	}

@@ -8,8 +8,8 @@ If you have problems or questions about them please contact me.
 The home site for the Linux sg device drivers is: http://www.torque.net/sg .
 Documentation for the driver can be found at:
 http://www.torque.net/sg/p/sg_v3_ho.html .
-This is written in DocBook and the original sgml (soon to become xml) can
-be found in the same directory with the ".sgml" extension. Postscript and
+This is written in DocBook and the original xml can be found in the 
+same directory with the ".xml" extension. Postscript and
 pdf renderings are also in that directory.
 Older documentation for the sg version 3 driver can be found at:
 http://www.torque.net/sg/p/scsi_generic_v3.txt .
@@ -36,6 +36,13 @@ This package is targeted as "v3" only. Another package called "sg_utils"
 is targeted at "v2" and to a lesser extent "v1". The "sg_utils"
 package has essentially the same utilities.
 
+Some sg ioctls (noteably SG_IO) are defined for all block devices
+from lk 2.5.48 . This version of sg3_utils (1.02 and later) allows
+some utilities that use SG_IO to just work for block devices
+(e.g. sg_inq). It guards some others that formerly assumed that any
+device that answers one of sg's ioctls was automatically an sg device
+(e.g. sginfo).
+
 
 Utilities
 ---------
@@ -44,7 +51,7 @@ in this package:
   1) dd variants: sg_dd, sgp_dd, sgm_dd and sgq_dd
   2) scanning and mapping: sg_scan, sg_map and scsi_devfs_scan
   3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
-     sg_modes, sg_logs, and sg_reset
+     sg_modes, sg_logs, sg_senddiag and sg_reset
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
@@ -74,12 +81,13 @@ Extra options:
    dio=<n>       0 or 1, request direct IO (default 0)
    cdbsz=6|10|12|16   allow the command size of SCSI READ and WRITE commands
                       to be specified (default is 10)
-   gen=0|1       either "if" or "of" must be a sg or raw device when "gen=0"
-                 (default). Set to 1 to remove this restriction
    sync=0|1      when 1, do a SYNCHRONIZE CACHE on "of" after the transfer
    		 is complete
    fua=0|1|2|3   when 0, do not set 'force unit access' bit; when 1, set it
    		 on "of"; when 2, set it on "if"; when 3, set it on "if"+"of"
+   time=0|1      times the transfer and calculates a throughput figure when
+   		 1, output sent to stderr. Default is 0
+   coe=0|1       continue on error (only on sg devices) when 1. Default is 0.
 
 All numeric arguments can take multiplier suffixes:
   "c", "C"        * 1
@@ -104,6 +112,8 @@ See the "isosize" command below.]  Disk partition information can
 be found with a command like "fdisk -ul /dev/sda". The 'dio' argument
 requests direct IO (only functions in 2.4 kernels). A warning is issued 
 if direct IO is requested and /proc/scsi/sg/allow_dio == 0 . 
+"of=/dev/null" causes writes to be skipped, and "of=." is accepted as
+an alias for "of=/dev/null" (convenient shorthand).
 The "sg_dd" command has a "man" page [section 8].
 
 "sgp_dd" uses POSIX threads and attempts to run multiple IO operations
@@ -111,10 +121,8 @@ in parallel. The user can control the amount of parallelism from
 1 worker (i.e. single threaded) through to 16 worker threads. This is
 done via the "thr=<n>" option (default 4). Copies from one sg device to
 another can be considerably faster due to this parallelism. There is
-also some speed benefit when raw devices are used. Other enhancements
-compared to "sg_dd" are a "gen=0 | 1" argument that allows general
-copying (i.e. doesn't need to involve sg or raw devices) and that 
-signals are caught. This command has a "man" page [section 8].
+also some speed benefit when raw devices are used. This command has a 
+"man" page [section 8].
 
 "sgm_dd" is very similar to sg_dd but it uses mmap-ed IO on one of its
 given sg device names. If both "if" and "of" are sg devices then mmap-ed
@@ -132,7 +140,8 @@ non-blocking state machine rather then POSIX threads for parallelism.
 "sg_scan" does a SCSI bus scan and prints the results to standard output.
 With no arguments only read permissions are needed on the sg devices
 but if "-i" is given (to do a SCSI Inquiry command on the device) then
-write permissions are also needed.
+write permissions are also needed. This command has a "man" page
+[section 8].
 
 "sg_map" shows the mapping between sg device names and those of the
 sd, sr and st device names. Some devices such as scanners have no
@@ -142,40 +151,52 @@ page [section 8].
 "scsi_devfs_scan" is a utility for doing a directory scan on a system
 running devfs to identify SCSI (and optionally IDE) devices. Various
 information (including an INQUIRY) can be listed for each found device.
+ This command has a "man" page [section 8].
 
 
 3) SCSI support
 ---------------
 "sg_inq" is a utility for poking around the INQUIRY command which
-contains much interesting information. It is based on SCSI 3's SPC-1
-document and has additional fields defined in the draft SPC-2 document
-(revision 18 from May 2000). This command is applicable to SCSI 2 (and
-perhaps SCSI 1) devices as well.
+contains much interesting information. It is based on SCSI 3's SPC-2
+document. Has switches to output "command support" and "vital product
+data" pages. It can output in formatted ASCII, hex or binary. This 
+command is applicable to SCSI 2 (and perhaps SCSI 1) devices as well.
+The "sg_inq" command has a "man" page [section 8].
 
 The "scsi_inquiry" program shows the use of the SCSI_IOCTL_SEND_COMMAND
 ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the 
 SCSI sub system mid level and so is common to all sd, sr, st and sg devices. 
+This program has been placed in the "examples" subdirectory.
 
 "sginfo" is a re-porting of the "scsiinfo" program by Eric Youngdale to
 use the sg devices (rather than the sd, sr or st block devices). This
 program outputs "mode sense" information. Amongst other things it outputs
 the full defect list of a disk (which was truncated at 4096 bytes in
-the original).
+the original). The "sginfo" command has a "man" page [section 8].
 
-"sg_readcap" call a READ CAPACITY command on the given device. The file
-descriptor may be any SCSI device (i.e. not just sg devices).
+"sg_readcap" call a READ CAPACITY command on the given device. Now also
+supports "partial medium indicator" (PMI) flag that indicates where the
+next significant delay will be on the media (after a given address).
+The "sg_readcap" command has a "man" page [section 8].
 
 "sg_start" has been provided by Kurt Garloff <garloff@suse.de> for spinning
-up (or down) disks. See README.sg_start .
+up (or down) disks. The "sg_start" command has a "man" page [section 8] and
+see the README.sg_start file.
 
 "sg_modes" and "sg_logs" print out mode sense pages and log sense pages 
-respectively.
+respectively.  The "sg_modes" and "sg_logs" commands have a "man" pages 
+[section 8].
+
+"sg_senddiag" permits various device self tests to be run. It can also
+list the diagnostic pages support by a device. The "sg_senddiag" command 
+has a "man" page [section 8].
 
 "sg_reset" exercises the SCSI device/bus/host reset capability. It is
 supported by the sg driver in lk 2.2.16 and beyond but associated
 SCSI middle level driver changes have not been accepted into the
 standard kernel at this time. Many distributions contain the patch to
-the mid-level that activates this feature.
+the mid-level that activates this feature. The "sg_reset" command has 
+a "man" page [section 8].
 
 
 4) Timing and testing
@@ -189,7 +210,7 @@ on my hardware. This command has a "man" page [section 8].
 "sg_test_rwbuf" is a program by Kurt Garloff <garloff@suse.de> that has
 the following description:  Program to test the SCSI host adapter by 
 issueing write and read operations on a device's buffer and calculating 
-checksums.
+checksums. The "sg_test_rwbuf" command has a "man" page [section 8].
 
 "sg_read" reads multiple blocks of data starting at the same logical
 address. It can time the transfers (potentially ignoring the first
@@ -202,9 +223,11 @@ IO or mmap-ed IO.  The "sg_read" command has a "man" page [section 8].
 
 "sg_turs" executes a user specified number of TEST UNIT READY commands on
 the given device. This can be used to time SCSI command overhead.
+The "sg_turs" command has a "man" page [section 8].
 
 "sg_debug" is effectively defunct now. The user can instead do:
-$ cat /proc/scsi/sg/debug
+$ cat /proc/scsi/sg/debug . This command has been placed in the
+archive directory.
 
 
 5) Example programs
@@ -224,6 +247,9 @@ response buffer.
 scsi device. This is only supported for lk >= 2.4.15 and for adapter
 drivers that indicate that they have 16 byte CDB capability (otherwise
 DID_ABORT will appear in the host_status).
+
+All these example programs (plus scsi_inquiry) have been placed in the
+"examples" subdirectory with their own Makefile.
 
 
 6) Miscellaneous
@@ -278,6 +304,15 @@ recommended.
 The include file path issues are now all addressed in one file called
 "sg_include.h". Please read that file.
 
+scsirastools
+------------
+This package found at http://scsirastools.sourceforge.net contains utilities
+which overlap with the functionality offered in sg3_utils. Utilities of note
+in scsirastools are:
+  - sgdskfl: for loading firmware into SCSI disks
+  - sgmode: get and set mode pages
+  - sgdefects: list primary and grown defect lists
+  - sgdiag to perform format and other test functions
 
 Doug Gilbert
-17th March 2002
+13th May 2003

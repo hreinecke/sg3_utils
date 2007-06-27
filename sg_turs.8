@@ -1,0 +1,31 @@
+.TH SG_TURS "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sg_turs \- executes a user specified number of TEST UNIT READY commands on
+the given device
+.SH SYNOPSIS
+.B sg_turs
+[\fI-n=<number of commands to send>\fR] [\fI-t]
+<\fIgeneric device\fR>
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg_turs sends a number of TEST UNIT READY commands to a given SCSI
+generic device. Useful for timing the per command overhead. Note that
+TEST UNIT READY has no associated data, just a 6 byte command and a
+returned SCSI status value.
+.TP
+-n=<num>
+performs TEST UNIT READY "<num>" times. If not given defaults to 1.
+Postfix multipliers "k" (1024), "K" (1000), "m" (1048576) or "M" (1000000)
+may be applied to "<num>".
+.TP
+-t
+after completing the requested number of TEST UNIT READY commands, outputs
+the total duration and the average number of commands executed per second.
+.SH AUTHORS
+Written by D. Gilbert
+.SH COPYRIGHT
+Copyright \(co 2000-2003 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

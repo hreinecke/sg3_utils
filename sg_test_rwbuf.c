@@ -326,16 +326,24 @@ void parseargs (int argc, char *argv[])
 int main (int argc, char * argv[])
 {
 	int sg_fd; int res;
+	struct stat a_st;
+	int block_dev = 0;
    
 	parseargs (argc, argv);
 	sg_fd = open(file_name, O_RDWR);
 	if (sg_fd < 0) {
 		perror("sg_test_rwbuf: open error");
-        return 1;
+		return 1;
 	}
+        if (fstat(sg_fd, &a_st) < 0) {
+                fprintf(stderr, "could do fstat() on fd ??\n");
+                close(sg_fd);
+                return 1;
+        }
+        if (S_ISBLK(a_st.st_mode))
+                block_dev = 1;
 	/* Don't worry, being very careful not to write to a none-sg file ... */
-	res = ioctl(sg_fd, SG_GET_TIMEOUT, 0);
-	if (res < 0) {
+        if (block_dev || (ioctl(sg_fd, SG_GET_TIMEOUT, 0) < 0)) {
 		/* perror("ioctl on generic device, error"); */
 		printf("sg_test_rwbuf: not a sg device, or wrong driver\n");
 		return 1;

@@ -1,0 +1,101 @@
+.TH SGINFO "8" "April 2003" "sg3_utils-1.03" SG3_UTILS
+.SH NAME
+sginfo \- outputs mode sense information for a SCSI generic device
+the given device
+.SH SYNOPSIS
+.B sginfo
+[\fI-options\fR]
+[\fIdevice\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sginfo is a re-porting of the scsiinfo program by Eric Youngdale to
+use the sg devices (rather than the sd, sr or st block devices). This
+program outputs "mode sense" information. Amongst other things it outputs
+the full defect list of a disk (which was truncated at 4096 bytes in
+the original). With the '-R' option mode page data can be changed
+(using the SCSI mode select command).
+.TP
+-c
+Display information from Caching Page.
+.TP
+-C
+Display information from Control Mode Page.
+.TP
+-d
+Display defect lists.
+.TP
+-Farg
+Format of the defect list:
+                -Flogical  - logical blocks
+                -Fphysical - physical blocks
+                -Findex    - defect bytes from index
+.TP
+-e
+Display information from Error Recovery page.
+.TP
+-f
+Display information from Format Device Page.
+.TP
+-g
+Display information from Rigid Disk Drive Geometry Page.
+.TP
+-i
+Display all information from Inquiry command.
+.TP
+-s
+Display all information from unit serial number page.
+.TP
+-D
+Display information from Disconnect-Reconnect Page.
+.TP
+-n
+Display information from Notch and Partition Page.
+.TP
+-p
+Display information from Peripheral Device Page.
+.TP
+-V
+Display information from Verify Error Recovery Page.
+.TP
+-u <no>
+Display information from page number <no> (18 bytes).
+.TP
+-v
+Show version number
+.TP
+-a
+All of the above.
+
+.TP
+-l
+List known scsi devices on the system
+.TP
+-L
+List pages supported notched by program and target
+(notched and active notch are also returned)
+.PP
+Only one of the following three options can be specified.
+None of these three implies the current values are returned.
+.TP
+-m
+Display modifiable fields instead of current values
+.TP
+-M
+Display manufacturer defaults instead of current values
+.TP
+-S
+Display saved defaults instead of current values
+.PP
+The following are advanced options, not generally suited for most users:
+.TP
+-X
+Display output suitable for the X-based interface.
+.TP
+-R
+Replace parameters - best used with -X (expert use only)
+.SH AUTHORS
+Written by Eric Youngdale, Michael Weller, Douglas Gilbert, Kurt Garloff
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

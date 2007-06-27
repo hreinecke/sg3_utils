@@ -2,6 +2,69 @@ Each utility has its own version number, date of last changes and
 some description at the top of its ".c" file. "KG" indicates work by
 Kurt Garloff <garloff@suse.de>.
 
+Changelog for sg3_utils-1.04 [20030513]
+  - all remaining utilities in the main directory have man pages [thanks
+    to Eric Schwartz <emschwar@debian.org> for 7 man pages]
+  - add CREDITS file
+  - sg_simple1, sg_simple2, sg_simple3, sg_simple4, sg_simple16 and
+    scsi_inquiry: moved to the examples directory
+  - sg_debug: moved to the archive directory
+  - sg_modes: add '-subp=<n>' for sub page code, suggests 6/10 byte
+    alternative if bad opcode sense received, flip -cpf flag to -pf,
+    add page names for most peripheral types
+  - sg_turs: default '-n=' argument to 1, only when '-n=1' print error
+    message in full
+  - sg_logs: print temperature "<not available>" for 255, '-t' switch
+    for temperature (from either temperature or IE log page)
+  - sg_dd: add '-odir=0|1' switch for O_DIRECT on block devices
+  - sg_start: add '-imm', '-loej' and 'pc=<n>' switches plus man page
+  - sg_readcap: add '-pmi' and 'lba=<n>' switches
+  - open files O_NONBLOCK in sg_inq, sg_modes and sg_logs so they
+    can be used on cd/dvd drivers when there is no disk present
+
+Changelog for sg3_utils-1.03 [20030402]
+  - sg_senddiag: added, allows self tests and listing of diag pages
+  - sg_start: changed to use SG_IO so works on block devices
+  - sg_err: print out some "sense key specific" data [Trent Piepho]
+  - sg_modes: add "-6" switch for force 6 byte MODE SENSE [Trent Piepho]
+  - sg_modes: more information on page codes and controls
+  - sg_inq, sg_modes, sg_logs, sg_senddiag: add man pages
+  - sg_dd: add "append=0|1" switch for glueing together large files
+  - note in README about utilities offered by scsirastools package
+
+Changelog for sg3_utils-1.02 [20030101]
+  - sg_inq: check if cmddt or evpd bits ignored
+  - sg_inq: warn -o=<n> not used for standard INQUIRY
+  - sg_turs: add -t option to time Test Unit Ready commands
+  - sg_errs: (used by most utilities) warn if sense buffer empty
+  - sg_modes: make safe with block SG_IO (bypass SG_GET_SCSI_ID ioctl)
+  - sg_logs: make safe with block SG_IO, self-test page work
+  - sg_dd: add "blksg_io=" switch to experiment with block SG_IO
+  - sg_read: now use SG_IO ioctl rather than sg write/read
+  - sginfo: fix writing parameters, check for block devices that answer
+    sg's ioctls, recognize "scd<n>" device names
+  - sg_map: stop close error report on tape devices
+  - sg_readcap: make safe with block SG_IO
+  - sg_start: make safe with block SG_IO
+  - sg_test_rwbuf: make safe with block SG_IO
+
+Changelog for sg3_utils-1.01 [20020814]
+----------------------------
+  - add raw switch ("-r") to sg_inq [Martin Schwenke]
+
+Changelog for sg3_utils-1.00 [20020728]
+----------------------------
+  - update sg_err [to SPC-3 T10/1416-D Rev 07 3 May 2002]
+  - "sg_inq -cl" now outputs opcode names
+  - add "continue on error" option to sg_dd
+  - add _LARGEFILE64_SOURCE _FILE_OFFSET_BITS=64 defines to Makefile
+  - drop 'gen' argument from sg_dd and friends, allow any file types
+    except scsi tape device file names
+  - treat of=/dev/null as special (skip write). Accept of=. as alias
+    for of=/dev/null
+  - decode various log pages in sg_logs
+  - add 'dio' argument to sgm_dd for testing "zero copy" copies
+
 Changelog for sg3_utils-0.99 [20020317]
 ----------------------------
   - add 'fua' and 'sync' arguments to sg_dd, sgp_dd and sgm_dd

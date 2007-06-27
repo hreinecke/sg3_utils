@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "March 2002" "sg3_utils-0.99" SG3_UTILS
+.TH SGM_DD "8" "May 2002" "sg3_utils-1.00" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from sg and raw devices
 .SH SYNOPSIS
@@ -29,6 +29,13 @@ count=BLOCKS
 copy this number of blocks. Default is minimum number that sg devices
 return from READ CAPACITY (if that works) or 0
 .TP
+dio=0 | 1
+permits direct IO to be selected on the write-side (i.e. "of"). Only
+allowed when the read-side (i.e. "if") is a sg device. When 1 there
+may be a "zero copy" copy (i.e. mmap-ed IO on the read into the user
+space and direct IO from there on the write, potentially two DMAs and
+no data copying from the CPU). Default is 0
+.TP
 fua=0 | 1 | 2 | 3
 force unit access bit. When 3, fua is set on both "if" and "of", when 2, fua
 is set on "if", when 1, fua is set on "of", when 0, fua is cleared on both.
@@ -45,7 +52,10 @@ obs=BYTES
 if given must be the same as bs
 .TP
 of=FILE
-write to FILE instead of stdout. A file name of - is taken to be stdout
+write to FILE instead of stdout. A file name of - is taken to be stdout.
+If FILE is /dev/null then no actual writes are performed. If FILE is .
+(period) then it is treated the same way as /dev/null (this is a
+shorthand notation)
 .TP
 seek=BLOCKS
 skip BLOCKS bs-sized blocks at start of output
@@ -64,7 +74,6 @@ results (to stderr) at completion. When 0 (default) doesn't perform timing
 --version
 outputs version number information and exits
 .PP
-Either the input file or the output file must be a sg or raw device.
 A raw device must be bound to a block device prior to using sgm_dd.
 See
 .B raw(8)

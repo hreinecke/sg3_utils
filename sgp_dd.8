@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "March 2002" "sg3_utils-0.99" SG3_UTILS
+.TH SGP_DD "8" "May 2002" "sg3_utils-1.00" SG3_UTILS
 .SH NAME
 sgp_dd \- copies data to and from sg and raw devices
 .SH SYNOPSIS
@@ -54,10 +54,6 @@ is set on "if", when 1, fua is set on "of", when 0, fua is cleared on both.
 6 byte SCSI READ and WRITE commands (cdbsz=6) do not support the fua bit.
 Only active for sg device file names
 .TP
-gen=0 | 1
-when 0 (default) either input or output must be a sg or raw device.
-When it is 1 then this condition is relaxed.
-.TP
 ibs=BYTES
 if given must be the same as bs
 .TP
@@ -68,7 +64,10 @@ obs=BYTES
 if given must be the same as bs
 .TP
 of=FILE
-write to FILE instead of stdout. A file name of - is taken to be stdout
+write to FILE instead of stdout. A file name of - is taken to be stdout.
+If FILE is /dev/null then no actual writes are performed. If FILE is .
+(period) then it is treated the same way as /dev/null (this is a
+shorthand notation)
 .TP
 seek=BLOCKS
 skip BLOCKS bs-sized blocks at start of output
@@ -91,8 +90,6 @@ results (to stderr) at completion. When 0 (default) doesn't perform timing
 --version
 outputs version number information and exits
 .PP
-Either the input file or the output file should be a sg or raw device
-(unless gen=1).
 A raw device must be bound to a block device prior to using sgp_dd.
 See
 .B raw(8)
@@ -166,7 +163,7 @@ Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert@interlog.com>.
 .SH COPYRIGHT
-Copyright \(co 2000, 2001 Douglas Gilbert
+Copyright \(co 2000-2002 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

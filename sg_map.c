@@ -11,7 +11,7 @@
 #include "sg_err.h"  /* needed for INQUIRY, if problematic then remove */
 
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000,2001 D. Gilbert
+*  Copyright (C) 2000-2002 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 
    Note: This program requires sg version 2 or better.
 
-   Version 0.15 20010819
+   Version 0.16 20021211
 	- additions for osst [Kurt Garloff <garloff@suse.de>]
 */
 
@@ -363,6 +363,9 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 
     for (k = 0, res = 0; (k < max_dev)  && (num_errors < MAX_ERRORS);
          ++k, res = (sg_fd >= 0) ? close(sg_fd) : 0) {
+
+/* ignore close() errors */
+#if 0
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
             perror("sg_map: close error");
@@ -373,6 +376,7 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 	    sg_fd = 0;
 #endif
         }
+#endif
         make_dev_name(fname, leadin, k, do_numeric);
 #ifdef DEBUG
         printf ("Trying %s: ", fname);

@@ -27,3 +27,11 @@ fi
 
 Enjoy!
 					Kurt Garloff <garloff@suse.de>
+
+
+Postscript
+==========
+sg_start has been reworked to allow a block device (e.g. /dev/sda) in
+addition to the sg device name (e.g. /dev/sg0) from lk 2.5.50 onwards.
+sg_start now has more command line options, see its man page.
+	Doug Gilbert <dgilbert@interlog.com> 2003/4/30

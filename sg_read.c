@@ -48,7 +48,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static const char * version_str = "0.94 20020204";
+static const char * version_str = "0.95 20021207";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -246,7 +246,6 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     sg_io_hdr_t io_hdr;
-    int res;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block)) {
         fprintf(stderr, ME "bad cdb build, from_block=%d, blocks=%d\n",
@@ -270,23 +269,13 @@ int sg_bread(int sg_fd, unsigned char * buff, int blocks, int from_block,
     else if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
 
-    while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
-        ;
-    if (res < 0) {
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
         if (ENOMEM == errno)
             return 1;
-        perror("reading (wr) on sg device, error");
+        perror("reading (SG_IO) on sg device, error");
         return -1;
     }
 
-    while (((res = read(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
-        ;
-    if (res < 0) {
-        perror("reading (rd) on sg device, error");
-        return -1;
-    }
     switch (sg_err_category3(&io_hdr)) {
     case SG_ERR_CAT_CLEAN:
         break;

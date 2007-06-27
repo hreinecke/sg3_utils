@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -14,7 +15,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 1999-2001 D. Gilbert
+*  Copyright (C) 1999-2002 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -34,7 +35,7 @@
    The ability to time transfers internally (based on gettimeofday()) has
    been added with the '-t' option.
 
-   Version 4.72 (20011205)
+   Version 4.73 (20020520)
 */
 
 
@@ -50,6 +51,8 @@
 #ifndef SG_FLAG_MMAP_IO
 #define SG_FLAG_MMAP_IO 4
 #endif
+
+#define ME "sg_rbuf: "
 
 
 int main(int argc, char * argv[])
@@ -119,7 +122,7 @@ int main(int argc, char * argv[])
         printf("         -d       requests dio ('-q' overrides it)\n");
         printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
         printf("         -t       time the data transfer\n");
-        printf("         -b=num   num is buff size to use (in KBytes)\n");
+        printf("         -b=num   num is buffer size to use (in KBytes)\n");
         printf("         -s=num   num is total size to read (in MBytes)\n");
         printf("                    default total size is 200 MBytes\n");
         printf("                    max total size is 4000 MBytes\n");
@@ -128,13 +131,13 @@ int main(int argc, char * argv[])
 
     sg_fd = open(file_name, O_RDONLY);
     if (sg_fd < 0) {
-        perror("sg_rbuf: open error");
+        perror(ME "open error");
         return 1;
     }
     /* Don't worry, being very careful not to write to a none-sg file ... */
     res = ioctl(sg_fd, SG_GET_VERSION_NUM, &k);
     if ((res < 0) || (k < 30000)) {
-        printf("sg_rbuf: not a sg device, or driver prior to 3.x\n");
+        printf(ME "not a sg device, or driver prior to 3.x\n");
         return 1;
     }
     if (do_mmap) {
@@ -142,7 +145,7 @@ int main(int argc, char * argv[])
     	do_quick = 0;
     }
     if (NULL == (rawp = malloc(512))) {
-	printf("sg_rbuf: out of memory (query)\n");
+	printf(ME "out of memory (query)\n");
 	return 1;
     }
     rbBuff = rawp;
@@ -164,7 +167,7 @@ int main(int argc, char * argv[])
     /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("sg_rbuf: SG_IO READ BUFFER descriptor error");
+        perror(ME "SG_IO READ BUFFER descriptor error");
         if (rawp) free(rawp);
         return 1;
     }
@@ -205,20 +208,24 @@ int main(int argc, char * argv[])
 	    k = ((k / psz) + 1) * psz;  /* round up to page size */
         res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &k);
         if (res < 0)
-            perror("sg_rbuf: SG_SET_RESERVED_SIZE error");
+            perror(ME "SG_SET_RESERVED_SIZE error");
     }
 
     if (do_mmap) {
 	rbBuff = mmap(NULL, buf_size, PROT_READ, MAP_SHARED, sg_fd, 0);
 	if (MAP_FAILED == rbBuff) {
-	    perror("sg_rbuf: error using mmap()");
+	    if (ENOMEM == errno)
+	    	printf(ME "mmap() out of memory, try a smaller "
+		       "buffer size than %d KB\n", buf_size / 1024);
+	    else
+		perror(ME "error using mmap()");
 	    return 1;
 	}
     }
     else { /* non mmap-ed IO */
 	rawp = malloc(buf_size + (do_dio ? psz : 0));
 	if (NULL == rawp) {
-	    printf("sg_rbuf: out of memory (data)\n");
+	    printf(ME "out of memory (data)\n");
 	    return 1;
 	}
 	if (do_dio)    /* align to page boundary */
@@ -266,7 +273,11 @@ int main(int argc, char * argv[])
             io_hdr.flags |= SG_FLAG_NO_DXFER;
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-            perror("sg_rbuf: SG_IO READ BUFFER data error");
+	    if (ENOMEM == errno)
+	    	printf(ME "SG_IO data; out of memory, try a smaller "
+		       "buffer size than %d KB\n", buf_size / 1024);
+            else
+	    	perror(ME "SG_IO READ BUFFER data error");
             if (rawp) free(rawp);
             return 1;
         }
@@ -328,7 +339,7 @@ int main(int argc, char * argv[])
     if (rawp) free(rawp);
     res = close(sg_fd);
     if (res < 0) {
-        perror("sg_rbuf: close error");
+        perror(ME "close error");
         return 1;
     }
 #ifdef SG_DEBUG

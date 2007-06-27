@@ -6,20 +6,25 @@
 
 Summary: Utils for Linux's SCSI generic driver devices + raw devices
 Name: sg3_utils
-Version: 1.03
+Version: 1.04
 Release: 1
 Packager: dgilbert@interlog.com
 License: GPL
 Group: Utilities/System
-Source: ftp://www.torque.net/sg/p/sg3_utils-1.03.tgz
+Source: ftp://www.torque.net/sg/p/sg3_utils-1.04.tgz
 Url: http://www.torque.net/sg/u_index.html
 Provides: sg_utils
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
 
 %description
-Collection of small useful tools, that are based on the Linux SCSI generic
-(sg) interface and give info on the SCSI bus, copy data,... The utilities
-to copy data are based on the Unix dd command and are called sg_dd, sgp_dd
-and sgm_dd. These 3 commands can also act on raw devices (e.g. /dev/raw/raw1).
+Collection of tools for SCSI devices that use the Linux SCSI generic (sg)
+interface. Includes utilities to copy data based on "dd" syntax
+and semantics (called sg_dd, sgp_dd and sgm_dd); check INQUIRY data and
+associated pages (sg_inq); check mode and log pages (sg_modes and sg_logs);
+spin up and down disks (sg_start); do self tests (sg_senddiag); and various
+other functions. See the README and CHANGELOG files. Requires the lk 2.4
+series or better. [In the lk 2.5 development series many of these utilities
+can be used on the primary block device name (e.g. /dev/sda).]
 
 Warning: Some of these tools access the internals of your system and the
 incorrect usage of them may render your system inoperable.
@@ -38,27 +43,23 @@ Authors:
 make
 
 %install
-make install INSTDIR=%{_bindir} MANDIR=%{_mandir}
+if [ "$RPM_BUILD_ROOT" != "/" ]; then
+        rm -rf $RPM_BUILD_ROOT
+fi
+make install INSTDIR=$RPM_BUILD_ROOT/usr/bin MANDIR=$RPM_BUILD_ROOT/usr/share/man
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%attr(-,root,root) %doc README README.sg_start CHANGELOG INSTALL
+%attr(-,root,root) %doc CREDITS README README.sg_start CHANGELOG INSTALL
 %attr(755,root,root) %{_bindir}/sg_dd
-%attr(755,root,root) %{_bindir}/sg_debug
 %attr(755,root,root) %{_bindir}/sg_inq
 %attr(755,root,root) %{_bindir}/sg_scan
 %attr(755,root,root) %{_bindir}/sg_rbuf
 %attr(755,root,root) %{_bindir}/sginfo
-%attr(755,root,root) %{_bindir}/sg_simple1
-%attr(755,root,root) %{_bindir}/sg_simple2
-%attr(755,root,root) %{_bindir}/sg_simple3
-%attr(755,root,root) %{_bindir}/sg_simple4
-%attr(755,root,root) %{_bindir}/sg_simple16
 %attr(755,root,root) %{_bindir}/sg_readcap
-%attr(755,root,root) %{_bindir}/scsi_inquiry
 %attr(755,root,root) %{_bindir}/sgp_dd
 %attr(755,root,root) %{_bindir}/sg_map
 %attr(755,root,root) %{_bindir}/sg_turs
@@ -76,14 +77,25 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sgm_dd.8.gz
 %attr(-,root,root) %doc %{_mandir}/man8/sg_read.8.gz
 %attr(-,root,root) %doc %{_mandir}/man8/sg_map.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/sg_scan.8.gz
 %attr(-,root,root) %doc %{_mandir}/man8/sg_rbuf.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/sginfo.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/sg_readcap.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/sg_turs.8.gz
 %attr(-,root,root) %doc %{_mandir}/man8/sg_inq.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/sg_test_rwbuf.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/scsi_devfs_scan.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/sg_start.8.gz
+%attr(-,root,root) %doc %{_mandir}/man8/sg_reset.8.gz
 %attr(-,root,root) %doc %{_mandir}/man8/sg_modes.8.gz
 %attr(-,root,root) %doc %{_mandir}/man8/sg_logs.8.gz
 %attr(-,root,root) %doc %{_mandir}/man8/sg_senddiag.8.gz
  
 
 %changelog
+* Tue May 13 2003 - dgilbert@interlog.com
+- default sg_turs '-n=' to 1, sg_logs gets '-t' for temperature, CREDITS
+  * sg3_utils-1.04
 * Wed Apr 02 2003 - dgilbert@interlog.com
 - 6 byte CDBs for sg_modes, sg_start on block devs, sg_senddiag, man pages
   * sg3_utils-1.03
