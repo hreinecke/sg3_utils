@@ -10,19 +10,19 @@ LD = gcc
 EXECS = sg_dd sgp_dd sgm_dd sg_read sg_map sg_scan sg_rbuf \
 	sginfo sg_readcap sg_turs sg_inq sg_test_rwbuf \
 	sg_start sg_reset sg_modes sg_logs sg_senddiag sg_opcodes \
-	sg_persist
+	sg_persist sg_write_long sg_read_long
 
 MAN_PGS = sg_dd.8 sgp_dd.8 sgm_dd.8 sg_read.8 sg_map.8 sg_scan.8 sg_rbuf.8 \
 	sginfo.8 sg_readcap.8 sg_turs.8 sg_inq.8 sg_test_rwbuf.8 \
 	sg_start.8 sg_reset.8 sg_modes.8 sg_logs.8 sg_senddiag.8 \
-	sg_opcodes.8 sg_persist.8
+	sg_opcodes.8 sg_persist.8 sg_write_long.8 sg_read_long.8
 MAN_PREF = man8
 
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
 CFLAGS = -g -O2 -Wall -W -D_REENTRANT $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -pedantic -D_REENTRANT $(LARGE_FILE_FLAGS)
+# CFLAGS = -g -O2 -W -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
+# CFLAGS = -g -O2 -Wall -pedantic -std=c99 -D_REENTRANT $(LARGE_FILE_FLAGS)
 
 LDFLAGS =
 
@@ -57,7 +57,7 @@ sgp_dd: sgp_dd.o sg_err.o llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^ -lpthread
 
 sgm_dd: sgm_dd.o sg_err.o llseek.o
-	$(LD) -o $@ $(LDFLAGS) $^ -lpthread
+	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_map: sg_map.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
@@ -90,6 +90,12 @@ sg_opcodes: sg_opcodes.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_persist: sg_persist.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_write_long: sg_write_long.o sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_read_long: sg_read_long.o sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)

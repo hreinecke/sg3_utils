@@ -1,13 +1,20 @@
                       README for sg3_utils
                       ====================
 Introduction
-------------
+============
 This package contains utilities and test programs for the Linux SCSI
 subsystem. In the Linux 2.6 kernel series almost all of these programs 
 will work on any devices that use the SCSI command set. Apart from SCSI 
 parallel devices, ATAPI devices (CD/DVDs and tapes), USB mass storage 
 devices, Fibre Channel disks and IEEE 1394 storage devices (that use 
 the "SBP" protocol) use the SCSI command set.
+
+A web site supporting the sg3_utils package, its predecessor sg_utils,
+and the Linux SCSI generic driver (and the scsi_debug driver) can be
+found at http://www.torque.net/sg . The most recent release version
+of sg3_utils and the most recent beta is on that page. There is also
+a page describing the utilities in the sg3_utils and sg_utils packages:
+http://www.torque.net/sg/u_index.html .
 
 In the Linux 2.4 kernel series these programs need to use the SCSI generic
 (sg) driver to access SCSI devices. The name of this package (i.e.
@@ -17,7 +24,7 @@ this added a new SCSI command interface structure (i.e. struct sg_io_hdr)
 that is more flexible than the older "sg_header" structure found in the
 sg driver in the 2.2 and earlier linux kernel series. The sg_io_hdr structure
 is also more flexible than the awkward (and limiting) interface to the
-SCSI_IOCTL_SEND_COMMAND ioctl supportd by the linux SCSI mid level.
+SCSI_IOCTL_SEND_COMMAND ioctl supported by the linux SCSI mid level.
 Also added in the version 3 sg driver was the SG_IO ioctl that is synchronous
 (i.e. it issues the requested SCSI command and waits for the response
 (or a timeout) before the ioctl returns to the user space program that
@@ -30,9 +37,8 @@ Utilities that wish to use the asynchronous SCSI command interface
 that various drivers (e.g. cdrom/sr) have different open() flag and
 permissions policies that the user may need to take into account.
 
-If you have problems or questions about them please contact me.
-The home site for the Linux sg device drivers is: http://www.torque.net/sg .
-Documentation for the driver can be found at:
+If you have problems or questions about them please contact the author.
+Documentation for the sg device driver can be found at:
 http://www.torque.net/sg/p/sg_v3_ho.html .
 This is written in DocBook and the original xml can be found in the 
 same directory with the ".xml" extension. Postscript and
@@ -43,8 +49,8 @@ http://www.torque.net/sg/p/scsi_generic_v3.txt .
 All programs are "GPL"-ed so you can incorporate all or part of them
 in your applications as you please. The "sg_err.[hc]" files contain
 ASCII text corresponding to most of the error and warning conditions
-defined in recent drafts at www.t10.org (SCSI standards home site). 
-They are used by most other programs.
+defined in recent drafts at www.t10.org which is the home site of
+SCSI (draft) standards. 
 
 Additional information (including a version number) can be found
 towards the top of each ".c" file corresponding to each utility and
@@ -52,19 +58,19 @@ test program.
 
 
 Scope
------
+=====
 The sg driver in Linux can be seen as having 3 distinct versions:
 
    v1   lk < 2.2.6     sg_header based relatively unchanged since 1992
-   v2   lk >= 2.2.6    enhanced sg_header interface structure
-   v3   lk >= 2.4      additional sg_io_hdr interface structure.
-   v3   lk >= 2.6      same interface as found in lk 2.4
+   v2   lk >= 2.2.6    enhanced sg_header interface structure [1999/4/16]
+   v3   lk >= 2.4      additional sg_io_hdr interface structure [2001/1/4]
+   v3   lk >= 2.6      same interface as found in lk 2.4 [2004/1/??]
 
 This package is targeted as "v3" only. Another package called "sg_utils"
 is targeted at "v2" and to a lesser extent "v1". The "sg_utils"
 package has a subset of the utilities found in this package.
 
-Some sg ioctls (noteably SG_IO) are defined for many block devices
+Some sg ioctls (notably SG_IO) are defined for many block devices
 in lk 2.6 . In practice this means all SCSI block devices, ATAPI block devices
 (mainly CD and DVD players) but _not_ ATA disks (currently). Support for
 the SG_IO as been added to the scsi tape driver (st) in lk 2.6.6 (and
@@ -85,13 +91,14 @@ metadata (i.e. disk corruption).
 
 
 Utilities
----------
+=========
 Here is a (somewhat arbitrary) categorization of the utilities included
 in this package:
   1) dd variants: sg_dd, sgp_dd, sgm_dd and sgq_dd
   2) scanning and mapping: sg_scan, sg_map and scsi_devfs_scan
   3) SCSI support: sg_inq, scsi_inquiry, sginfo, sg_readcap, sg_start,
-     sg_modes, sg_logs, sg_senddiag, sg_reset, sg_opcodes and sg_persist
+     sg_modes, sg_logs, sg_senddiag, sg_reset, sg_opcodes, sg_persist,
+     sg_write_long and sg_read_long
   4) timing and testing: sg_rbuf, sg_test_rwbuf, sg_read, sg_turs,
      and sg_debug
   5) example programs: sg_simple1, sg_simple2, sg_simple3, sg_simple4
@@ -125,11 +132,11 @@ Extra options:
    cdbsz=6|10|12|16   allow the command size of SCSI READ and WRITE commands
                       to be specified (default is 10)
    sync=0|1      when 1, do a SYNCHRONIZE CACHE on "of" after the transfer
-   		 is complete
+                 is complete
    fua=0|1|2|3   when 0, do not set 'force unit access' bit; when 1, set it
-   		 on "of"; when 2, set it on "if"; when 3, set it on "if"+"of"
+                 on "of"; when 2, set it on "if"; when 3, set it on "if"+"of"
    time=0|1      times the transfer and calculates a throughput figure when
-   		 1, output sent to stderr. Default is 0
+                 1, output sent to stderr. Default is 0
    coe=0|1       continue on error (only on sg devices) when 1. Default is 0.
 
 Numeric arguments can be given in decimal or hexadecimal. Hex arguments should
@@ -152,7 +159,7 @@ normal lseek() is limited to a signed 32 bit byte offset (i.e. 2 GB).
 "sg_dd" bypasses this limit by using Linux's _llseek() [while modern
 "dd" commands use read loops to "walk" around the limit].
 If 'count' is not given then the SCSI READ CAPACITY command will be
-used (on sg devices) if appropriate. Block devices are querie for their
+used (on sg devices) if appropriate. Block devices are queried for their
 length if 'count' is not given. [Note that READ CAPACITY often
 gives a 2 block overestimate for iso9660 file systems on CD-ROMs. 
 See the "isosize" command below.]  Disk partition information can
@@ -239,15 +246,20 @@ list the diagnostic pages support by a device.
 supported by the sg driver in lk 2.2.16 and beyond but associated
 SCSI middle level driver changes have not been accepted into the
 standard kernel at this time. Many distributions contain the patch to
-the mid-level that activates this feature. Thi patch is in later
-lk 2.4 vesrions and in the lk 2.6 series. This utility will only
+the mid-level that activates this feature. This patch is in later
+lk 2.4 versions and in the lk 2.6 series. This utility will only
 work on sg device names.
 
 "sg_opcodes" lists available opcode names. It uses the REPORT SUPPORTED
 OPERATION CODES SCSI command which was introduced in February 2002
 (and replaced the Cmd modes (CmdDt bit) in the INQUIRY command). Opcode
 names include various SCSI commands with service actions (e.g.
-the Maintenance In command) and variable length commands.
+the Maintenance In command) and variable length commands. The command
+list is either unsorted (as returned by the device), numerically sorted
+(default) or alphabetically sorted. An individual opcode (and optionally
+a service action) can be given in which case the "changeable" bits of
+that command are output. With the '-t' command line option this utility
+will list supported task management functions.
 
 "sg_persist" accesses the Persistent Reservation In and Out commands.
 These are relatively complex commands and potential users are referred
@@ -255,6 +267,13 @@ to the SPC-3 document at http://www.t10.org . That said, it is
 relatively safe to query the state of existing registrations and
 reservations with the PR In command (use the switch "--in" with
 sg_persist to enforce this).
+
+"sg_write_long" can be used to write a "long" block to the given device
+(typically a disk). A "long" block includes data, ECC information and
+and other vendor specific information.
+
+"sg_read_long" can be used to read a "long" block from the given device
+(typically a disk).
 
 
 4) Timing and testing
@@ -267,13 +286,13 @@ on my hardware.
 
 "sg_test_rwbuf" is a program by Kurt Garloff <garloff at suse dot de> that
 has the following description:  Program to test the SCSI host adapter by 
-issueing write and read operations on a device's buffer and calculating 
+issuing write and read operations on a device's buffer and calculating 
 checksums. 
 
 "sg_read" reads multiple blocks of data starting at the same logical
 address. It can time the transfers (potentially ignoring the first
 issued command) and calculate a MB/sec figure. [In keeping with most
-disk manuafacturers, "MB" is 1,000,000 bytes in this context.] Its 
+disk manufacturers, "MB" is 1,000,000 bytes in this context.] Its 
 command line syntax is modelled on "sg_dd". It allows SCSI device,
 SCSI bus bandwidth and the SCSI sub-system throughput to be measured.
 This can be done in 3 modes: normal transfer to user space, direct
@@ -320,9 +339,8 @@ a CD-ROM (due to run out sectors). This command has a "man" page
 [section 8]. This utility has been moved to the archive directory
 as isosize is now available in the util-linux-2.10s package (and later).
 
-
 Building
---------
+========
 A Makefile is provided that builds the above utilities and test programs
 'make' and 'make all' will cause everything (that is stale) to be built.
 
@@ -336,7 +354,7 @@ executables into /usr/local/bin by default (controlled by variable
 INSTDIR). The "man" pages are loaded int /usr/local/man/man8 by default.
 
 Header file problems
---------------------
+====================
 These utilities include 2 special Linux header files:
 #include <scsi/sg.h>
 #include <scsi/scsi.h>
@@ -362,7 +380,7 @@ The include file path issues are now all addressed in one file called
 "sg_include.h". Please read that file.
 
 scsirastools
-------------
+============
 This package found at http://scsirastools.sourceforge.net contains utilities
 which overlap with the functionality offered in sg3_utils. Utilities of note
 in scsirastools are:
@@ -372,4 +390,4 @@ in scsirastools are:
   - sgdiag to perform format and other test functions
 
 Doug Gilbert
-8th July 2004
+31st August 2004

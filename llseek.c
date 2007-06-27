@@ -8,6 +8,8 @@
  * of fdisk. It allows seeks to 64 bit offsets, if supported.
  * Changed "ext2_" prefix to "llse".
  */
+#define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
 
 #include <sys/types.h>
 
@@ -116,5 +118,4 @@ llse_loff_t llse_llseek (unsigned int fd, llse_loff_t offset,
 }
 
 #endif  /* linux */
-
 

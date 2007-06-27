@@ -3,7 +3,7 @@
 
 /* Feel free to copy and modify this GPL-ed code into your applications. */
 
-/* Version 0.93 (20040708) 
+/* Version 0.97 (20040830) 
 */
 
 
@@ -126,20 +126,50 @@ extern int sg_chk_n_print(const char * leadin, int masked_status,
                           int host_status, int driver_status,
                           const unsigned char * sense_buffer, int sb_len);
 
+/* This is a slightly stretched SCSI sense "descriptor" format header.
+   The addition is to allow the 0x70 and 0x71 response codes. The idea
+   is to place the salient data of both "fixed" and "descriptor" sense
+   format into one structure to ease application processing.
+   The original sense buffer should be kept around for those cases
+   in which more information is required (e.g. the LBA of a MEDIUM ERROR). */
+struct sg_scsi_sense_hdr {
+    unsigned char response_code; /* permit: 0x0, 0x70, 0x71, 0x72, 0x73 */
+    unsigned char sense_key;
+    unsigned char asc;
+    unsigned char ascq;
+    unsigned char byte4;
+    unsigned char byte5;
+    unsigned char byte6;
+    unsigned char additional_length;
+};
+
+/* Maps the salient data from a sense buffer which is in either fixed or
+   descriptor format into a structure mimicking a descriptor format
+   header (i.e. the first 8 bytes).
+   If zero response code returns 0. Otherwise returns 1 and if 'sshp' is
+   non-NULL then zero all fields and then set the appropriate fields in
+   that structure. sshp::additional_length is always 0 for response
+   codes 0x70 and 0x71 (fixed format). */
+extern int sg_scsi_normalize_sense(const unsigned char * sensep, 
+                                   int sense_len,
+                                   struct sg_scsi_sense_hdr * sshp);
+
+/* Attempt to find the first SCSI sense data descriptor that matches the
+   given 'desc_type'. If found return pointer to start of sense data
+   descriptor; otherwise (including fixed format sense data) returns NULL. */
+extern const unsigned char * sg_scsi_sense_desc_find(
+                const unsigned char * sensep, int sense_len, int desc_type);
+
 /* The following function declaration is for the sg version 3 driver. 
    Only version 3 sg_err.c defines it. */
 struct sg_io_hdr;
 extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp);
 
-/* If no sense data returns 0 and places 0 in *response_code (if non-NULL)
-   and *sense_key (if non-NULL). If sense data found returns 1 and outputs
-   to *response_code, *sense_key, *asc and *ascq (those that are non-NULL).
-   Understands both descriptor and fixed sense data format. */
-extern int sg_decode_sense(const struct sg_io_hdr * hp, 
-                           unsigned char * response_code,
-                           unsigned char * sense_key,
-                           unsigned char * asc,
-                           unsigned char * ascq);
+/* Calls sg_scsi_normalize_sense() after obtaining the sense buffer and
+   its length from the struct sg_io_hdr pointer. If these cannot be
+   obtained, 0 is returned. */
+extern int sg_normalize_sense(const struct sg_io_hdr * hp, 
+                              struct sg_scsi_sense_hdr * sshp);
 
 
 /* The following "category" function returns one of the following */
@@ -180,4 +210,18 @@ extern void sg_get_opcode_name(unsigned char cmd_byte0, int peri_type,
 /* Command name given opcode (byte 0) and service action of a command */
 extern void sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                                   int peri_type, int buff_len, char * buff);
+
+
+/* <<< General purpose (i.e. not SCSI specific) utility functions >>> */
+
+/* Always returns valid string even if errnum is wild (or library problem) */
+extern char * safe_strerror(int errnum);
+
+
+/* Print (to stdout) 'str' of bytes in hex, 16 bytes per line optionally
+   followed at the right hand side of the line with an ASCII interpretation.
+   Each line is prefixed with an address, starting at 0 for str[0]..str[15].
+   All output numbers are in hex. */
+extern void dStrHex(const char* str, int len, int no_ascii);
+
 #endif

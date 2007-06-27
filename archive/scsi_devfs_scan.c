@@ -1,9 +1,13 @@
+#define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <dirent.h>
@@ -55,7 +59,7 @@ static int do_extra = 0;
 static int do_quiet = 0;
 static int checked_sg = 0;
 
-static void dStrHex(const char* str, int len)
+static void ddStrHex(const char* str, int len)
 {
     const char* p = str;
     unsigned char c;
@@ -229,7 +233,7 @@ void leaf_dir(const char * lf, unsigned int * larr)
         if (0 != do_inquiry(sg_fd, buff, 64))
             return;
         close(sg_fd);
-        dStrHex(buff, 64);
+        ddStrHex(buff, 64);
     }
 }
 

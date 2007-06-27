@@ -8,7 +8,7 @@ CC = gcc
 LD = gcc
 
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
-	sg_iovec_tst scsi_inquiry sg_excl
+	sg_iovec_tst scsi_inquiry sg_excl sg_sense_test
 
 # EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
 # 	  sg_simple_aio sg_iovec_tst scsi_inquiry sg_excl
@@ -58,6 +58,9 @@ scsi_inquiry: scsi_inquiry.o
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 sg_excl: sg_excl.o ../sg_err.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_sense_test: sg_sense_test.o ../sg_err.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)
