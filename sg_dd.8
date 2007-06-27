@@ -1,4 +1,4 @@
-.TH SG_DD "8" "August 2004" "sg3_utils-1.08" SG3_UTILS
+.TH SG_DD "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -43,7 +43,7 @@ Default is 0.
 bpt=BLOCKS
 each IO transaction will be made using this number of blocks (or less if 
 near the end of count). Default is 128. So for bs=512 the reads and writes
-will each convey 64KB of data by default (less if near the end of the
+will each convey 64 KiB of data by default (less if near the end of the
 transfer or memory restrictions).
 .TP
 bs=BYTES
@@ -151,7 +151,7 @@ Raw disk partition information can often be found with
 .B fdisk(8)
 [the "-ul" argument is useful in this respect].
 .PP
-BYTES and BLOCKS may be followed by the following multiplicative suffixes:
+BYTES and BLOCKS may be followed by one of these multiplicative suffixes:
 c C *1; b B *512; k *1,024; K *1,000; m *1,048,576; M *1,000,000;
 g *1,073,741,824; G *1,000,000,000; t *1,099,511,627,776 and
 T *1,000,000,000,000 (the latter two can only be used for count, skip

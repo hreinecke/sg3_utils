@@ -1,10 +1,10 @@
-.TH SG_START "8" "May 2003" "sg3_utils-1.04" SG3_UTILS
+.TH SG_START "8" "July 2004" "sg3_utils-1.08" SG3_UTILS
 .SH NAME
 sg_start \- starts (spins-up) or stops (spins down) SCSI devices
 .SH SYNOPSIS
 .B sg_start
-[\fI-d\fR] [\fI-imm=0|1\fR] [\fI-loej\fR] [\fI-pc=<n>\fR]
-[\fI-s\fR] [\fI-V\fR] [\fI0|1\fR] \fI<sg_device>\fR
+[\fI-imm=0|1\fR] [\fI-loej\fR] [\fI-pc=<n>\fR] [\fI-s\fR]
+[\fI-v\fR] [\fI-V\fR] \fI0|1\fR \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -12,9 +12,6 @@ sg_start sends a START STOP UNIT SCSI command to the given device with
 the selected options. The most used options are "0" to spin down a disk
 and "1" to spin up a disk. Using "sg_start 1 /dev/sg0" on a disk that
 is already spinning is harmless. 
-.TP
--d
-outputs some extra debug information associated with executing this command
 .TP
 -imm=0|1
 when the immediate bit is 1 (default) then this command (and hence this
@@ -30,12 +27,20 @@ removable media.
 .TP
 -pc=<n>
 set the 'power conditions' value (in hex); 0 to f (inclusive) are valid.
+Default value is 0.
 When '-pc=0' then the start value (i.e. 0 or 1) and '-loej' are active.
-See recent SBC-2 or SAS drafts at www.t10.org for meaning.
+Some common values are 1 for the active power condition; 2 for the idle
+power condition; 3 for the standby power condition, 7 for LU_CONTROL,
+a (hex == decimal 10) for FORCE_IDLE_0 and b (hex) for
+FORCE_STANDBY_0.
+See recent SBC-2 or SAS drafts at www.t10.org for more information.
 .TP
 -s
 send the SYNCHRONIZE CACHE SCSI command to the device prior to sending the
 START STOP UNIT command.
+.TP
+-v
+verbose: outputs SCSI command in hex to console before with executing it.
 .TP
 -V
 print out version string then exit.
@@ -55,7 +60,7 @@ Written by K. Garloff and D. Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002-2003 Kurt Garloff, Douglas Gilbert
+Copyright \(co 2002-2004 Kurt Garloff, Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

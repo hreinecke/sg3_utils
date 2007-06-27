@@ -14,7 +14,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* Code for scanning for SCSI devices within a Linux device pseudo file
    system.
@@ -131,8 +131,8 @@ static int do_inquiry(int sg_fd, void * resp, int mx_resp_len)
     }
     res = sg_err_category3(&io_hdr);
     switch (res) {
-    case SG_ERR_CAT_CLEAN:
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_RECOVERED:
         return 0;
     default:
         sg_chk_n_print3("Failed INQUIRY", &io_hdr);

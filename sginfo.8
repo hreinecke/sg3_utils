@@ -1,4 +1,4 @@
-.TH SGINFO "8" "December 2003" "sg3_utils-1.06" SG3_UTILS
+.TH SGINFO "8" "October 2004" "sg3_utils-1.09" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -73,6 +73,9 @@ Access information in the Disconnect-Reconnect mode page.
 .TP
 -e
 Access information in the Error Recovery mode page.
+.TP
+-E
+Access information in the Control Extension mode page.
 .TP
 -f
 Access information in the Format Device mode page.
@@ -275,8 +278,9 @@ back when the mode page is written (i.e. via a MODE SELECT command).
 .PP
 .SH REFERENCES
 SCSI (draft) standards can be found at http://www.t10.org . The relevant
-documents are SPC-3 (primary mode pages), SBC-2 (direct access
-devices [e.g. disks]), MMC-4 (CDs and DVDs) and SSC-2 (tapes).
+documents are SPC-3 (mode pages common to all device types),
+SBC-2 (direct access devices [e.g. disks]), MMC-4 (CDs and DVDs) and
+SSC-2 (tapes).
 .PP
 .SH AUTHORS
 Written by Eric Youngdale, Michael Weller, Douglas Gilbert, Kurt Garloff,
@@ -294,3 +298,11 @@ become scsiinfo 2.01 .
 .PP
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B plscsi(internet), scsiinfo(internet), sg_modes(sg3_utils),
+.B sg_inq(sg3_utils)
+.PP
+plscsi can sent arbitrary (user supplied) SCSI commands; scsiinfo is the
+predecessor of this utility; sg_modes is a low level MODE SENSE based
+utility and sg_inq is specialised for the mandatory SCSI INQUIRY
+command which contains a lot of information about advanced devices.

@@ -14,7 +14,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.

@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -85,13 +85,13 @@ int sg_read(int sg_fd, unsigned char * buff, int num_blocks, int from_block,
         return -1;
     }
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         fprintf(stderr, "Recovered error while reading block=%d, num=%d\n",
                from_block, num_blocks);
         break;
-    case SG_ERR_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_MEDIA_CHANGED:
         fprintf(stderr, "Media changed\n");
         return -1;
     default:

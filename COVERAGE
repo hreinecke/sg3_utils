@@ -7,9 +7,11 @@ on the right. The second table lists supported ATA commands.
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        ----------------------------------------------
 INQUIRY             sg_inq, sginfo, sg_logs, sg_map('-i'), sg_modes,
-                    sg_opcodes, sg_persist, sg_scan
-MODE SELECT(6)      sginfo
-MODE SELECT(10)     sginfo
+                    sg_opcodes, sg_persist, sg_scan, sg_ses
+LOG SELECT          sg_logs
+LOG SENSE           sg_logs
+MODE SELECT(6)      sginfo, sg_emc_trespass
+MODE SELECT(10)     sginfo, sg_emc_trespass
 MODE SENSE(6)       sginfo, sg_modes, sg_senddiag('-e')
 MODE SENSE(10)      sginfo, sg_modes, sg_senddiag('-e')
 PERSISTENT IN       sg_persist
@@ -19,19 +21,20 @@ READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ BUFFER         sg_rbuf, sg_test_rwbuf
-READ DEFECT(10)     sginfo
-READ DEFECT(12)     sginfo
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd
+READ DEFECT(10)     sginfo
+READ DEFECT(12)     sginfo
 READ LONG           sg_read_long
-RECEIVE DIAGNOSTIC  sg_senddiag
+RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses
 REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
-REQUEST SENSE
-SEND DIAGNOSTIC     sg_senddiag
+REQUEST SENSE       sg_requests
+SEND DIAGNOSTIC     sg_senddiag, sg_ses
 START STOP          sg_start
 SYNCHRONIZE CACHE   sg_dd, sgm_dd, sgp_dd, sg_start
 TEST UNIT READY     sg_turs
+VERIFY(10)	    sg_verify
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
@@ -46,4 +49,4 @@ IDENTITY            sg_inq, sg_scan
 
 
 Doug Gilbert
-31st August 2004
+20th October 2004

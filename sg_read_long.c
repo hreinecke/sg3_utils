@@ -12,7 +12,7 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
    *  Copyright (C) 2004 D. Gilbert
@@ -28,7 +28,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.02 20040831";
+static char * version_str = "1.02 20041011";
 
 #define READ_LONG_OPCODE 0x3E
 #define READ_LONG_CMD_LEN 10
@@ -49,50 +49,6 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static int get_num(char * buf)
-{
-    int res, num;
-    unsigned int unum;
-    char c = 'c';
-
-    if ('\0' == buf[0])
-        return -1;
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%x", &unum);
-        num = (int)unum;
-    } else
-        res = sscanf(buf, "%d%c", &num, &c);
-    if (1 == res)
-        return num;
-    else if (2 != res)
-        return -1;
-    else {
-        switch (c) {
-        case 'c':
-        case 'C':
-            return num;
-        case 'b':
-        case 'B':
-            return num * 512;
-        case 'k':
-            return num * 1024;
-        case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
-        case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
-        case 'G':
-            return num * 1000000000;
-        default:
-            fprintf(stderr, "unrecognized multiplier\n");
-            return -1;
-        }
-    }
-}
-
 static void usage()
 {
     fprintf(stderr, "Usage: "
@@ -111,7 +67,6 @@ static void usage()
           "         --xfer_len=<num>|-x <num>  transfer length (<1000)"
           " default 520\n"
           );
-
 }
 
 static int info_offset(unsigned char * sensep, int sb_len)
@@ -161,7 +116,7 @@ static int has_ili(unsigned char * sensep, int sb_len)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, outfd, res, c, offset;
+    int sg_fd, outfd, res, c, k, offset;
     unsigned char readLongCmdBlk [READ_LONG_CMD_LEN];
     unsigned char * readLongBuff = NULL;
     void * rawp = NULL;
@@ -197,7 +152,7 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         case 'l':
-            lba = get_num(optarg);
+            lba = sg_get_num(optarg);
             if ((unsigned int)(-1) == lba) {
                 fprintf(stderr, "bad argument to '--lba'\n");
                 return 1;
@@ -213,7 +168,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         case 'x':
-            xfer_len = get_num(optarg);
+            xfer_len = sg_get_num(optarg);
            if (-1 == xfer_len) {
                 fprintf(stderr, "bad argument to '--xfer_len'\n");
                 return 1;
@@ -282,6 +237,13 @@ int main(int argc, char * argv[])
             "(0x%x), lba=%d (0x%x), correct=%d\n", device_name, xfer_len,
             xfer_len, lba, lba, correct);
 
+    if (verbose) {
+        fprintf(stderr, "    Read Long (10) cmd: ");
+        for (k = 0; k < READ_LONG_CMD_LEN; ++k)
+            fprintf(stderr, "%02x ", readLongCmdBlk[k]);
+        fprintf(stderr, "\n");
+    }
+
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = sizeof(readLongCmdBlk);
@@ -295,16 +257,16 @@ int main(int argc, char * argv[])
     /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror(ME "SG_IO READ LONG descriptor error");
+        perror(ME "SG_IO ioctl READ LONG error");
         goto err_out;
     }
 
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
-        fprintf(stderr, "Recovered error on READ LONG descriptor, "
+    case SG_LIB_CAT_RECOVERED:
+        fprintf(stderr, "Recovered error on READ LONG command, "
                 "continuing\n");
         break;
     default: /* won't bother decoding other categories */
@@ -312,7 +274,7 @@ int main(int argc, char * argv[])
             (ssh.sense_key == ILLEGAL_REQUEST) &&
             ((offset = info_offset(io_hdr.sbp, io_hdr.sb_len_wr)))) {
             if (verbose)
-                sg_chk_n_print3("READ LONG descriptor error", &io_hdr);
+                sg_chk_n_print3("READ LONG command problem", &io_hdr);
             fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
                     ">>>\n", xfer_len - offset);
             if (! has_ili(io_hdr.sbp, io_hdr.sb_len_wr))
@@ -320,7 +282,7 @@ int main(int argc, char * argv[])
                         "expected but not found]\n");
             goto err_out;
         }
-        sg_chk_n_print3("READ LONG descriptor error", &io_hdr);
+        sg_chk_n_print3("READ LONG command problem", &io_hdr);
         goto err_out;
     }
     if ('\0' == file_name[0])

@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -54,43 +54,6 @@
 /* #define SG_DEBUG */
 
 
-int get_num(char * buf)
-{
-    int res, num;
-    char c;
-
-    res = sscanf(buf, "%d%c", &num, &c);
-    if (0 == res)
-        return -1;
-    else if (1 == res)
-        return num;
-    else {
-        switch (c) {
-        case 'c':
-        case 'C':
-            return num;
-        case 'b':
-        case 'B':
-            return num * 512;
-        case 'k':
-            return num * 1024;
-        case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
-        case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
-        case 'G':
-            return num * 1000000000;
-        default:
-            fprintf(stderr, "unrecognized multiplier\n");
-            return -1;
-        }
-    }
-}
-
 int main(int argc, char * argv[])
 {
     int sg_fd, res, j, m;
@@ -117,7 +80,7 @@ int main(int argc, char * argv[])
         }
         else if (0 == strncmp("-bs=", argv[j], 4)) {
             m = 4;
-            bs = get_num(argv[j] + m);
+            bs = sg_get_num(argv[j] + m);
             if (-1 == bs) {
                 printf("Couldn't decode number after '-bs=' switch\n");
                 file_name = 0;
@@ -126,7 +89,7 @@ int main(int argc, char * argv[])
         }
         else if (0 == strncmp("-skip=", argv[j], 6)) {
             m = 6;
-            skip = get_num(argv[j] + m);
+            skip = sg_get_num(argv[j] + m);
             if (-1 == skip) {
                 printf("Couldn't decode number after '-skip=' switch\n");
                 file_name = 0;
@@ -135,7 +98,7 @@ int main(int argc, char * argv[])
         }
         else if (0 == strncmp("-count=", argv[j], 7)) {
             m = 7;
-            count = get_num(argv[j] + m);
+            count = sg_get_num(argv[j] + m);
             if (-1 == count) {
                 printf("Couldn't decode number after '-count=' switch\n");
                 file_name = 0;
@@ -218,9 +181,9 @@ int main(int argc, char * argv[])
 
     /* now for the error processing */
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error, continuing\n");
         break;
     default: /* won't bother decoding other categories */

@@ -19,7 +19,7 @@ been set up which builds:
     - sg_poll  [internal testing]
     - isosize  available in util-linux-2.10s and later
 
-The sg_err.h and llseek.h headers have simply been copied from the parent
+The sg_lib.h and llseek.h headers have simply been copied from the parent
 directory.
 
 The very useful rescan-scsi-bus.sh script from Kurt Garloff
@@ -32,4 +32,4 @@ to side step various buffer copies. See:
 http://www.torque.net/sg/mem2disk.html
 
 Doug Gilbert
-27th February 2002
+3rd September 2004

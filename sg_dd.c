@@ -1,5 +1,5 @@
 #define _XOPEN_SOURCE 500
-#define _GNU_SOURCE
+#define _GNU_SOURCE     /* resolves u_char typedef in scsi/scsi.h [lk 2.4] */
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -18,7 +18,8 @@
 #include <linux/major.h>
 #include <linux/fs.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
+#include "sg_cmds.h"
 #include "llseek.h"
 
 /* A utility program for copying files. Specialised for "files" that
@@ -45,7 +46,7 @@
 
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16KB
+   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
    in this case) is transferred to or from the sg device in a single SCSI
    command. The actual size of the SCSI READ or WRITE command block can be
    selected with the "cdbsz" argument.
@@ -53,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.33 20040708";
+static char * version_str = "5.33 20041011";
 
 
 #define DEF_BLOCK_SIZE 512
@@ -67,14 +68,7 @@ static char * version_str = "5.33 20040708";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
-#define RCAP16_REPLY_LEN 12
-
-#ifndef SERVICE_ACTION_IN
-#define SERVICE_ACTION_IN     0x9e
-#endif
-#ifndef SAI_READ_CAPACITY_16
-#define SAI_READ_CAPACITY_16  0x10
-#endif
+#define RCAP16_REPLY_LEN 32
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
@@ -193,72 +187,29 @@ void usage()
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
-int read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
+int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 {
-    int res;
-    unsigned char rcCmdBlk[10] = {READ_CAPACITY, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char rcBuff[READ_CAP_REPLY_LEN];
-    unsigned char sense_b[64];
-    struct sg_io_hdr io_hdr;
+    int k, res;
+    unsigned char rcBuff[RCAP16_REPLY_LEN];
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rcCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = sizeof(rcBuff);
-    io_hdr.dxferp = rcBuff;
-    io_hdr.cmdp = rcCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0);
+    if (0 != res)
+        return res;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("read_capacity (SG_IO) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    if (SG_ERR_CAT_MEDIA_CHANGED == res)
-        return 2; /* probably have another go ... */
-    else if (SG_ERR_CAT_CLEAN != res) {
-        sg_chk_n_print3("read capacity", &io_hdr);
-        return -1;
-    }
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
-        unsigned char rcCmdBlk16[16] = {SERVICE_ACTION_IN, 
-                            SAI_READ_CAPACITY_16,
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        unsigned char rcBuff16[RCAP16_REPLY_LEN];
-        int k;
         long long ls;
 
-        memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-        io_hdr.interface_id = 'S';
-        io_hdr.cmd_len = sizeof(rcCmdBlk16);
-        io_hdr.mx_sb_len = sizeof(sense_b);
-        io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-        io_hdr.dxfer_len = sizeof(rcBuff16);
-        io_hdr.dxferp = rcBuff16;
-        io_hdr.cmdp = rcCmdBlk16;
-        io_hdr.sbp = sense_b;
-        io_hdr.timeout = DEF_TIMEOUT;
-
-        if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-            perror("read_capacity_16 (SG_IO) error");
-            return -1;
-        }
-        res = sg_err_category3(&io_hdr);
-        if (SG_ERR_CAT_CLEAN != res) {
-            sg_chk_n_print3("read capacity_16", &io_hdr);
-            return -1;
-        }
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0);
+        if (0 != res)
+            return res;
         for (k = 0, ls = 0; k < 8; ++k) {
             ls <<= 8;
-            ls |= rcBuff16[k];
+            ls |= rcBuff[k];
         }
         *num_sect = ls + 1;
-        *sect_sz = (rcBuff16[8] << 24) | (rcBuff16[9] << 16) |
-                   (rcBuff16[10] << 8) | rcBuff16[11];
+        *sect_sz = (rcBuff[8] << 24) | (rcBuff[9] << 16) |
+                   (rcBuff[10] << 8) | rcBuff[11];
     } else {
         *num_sect = 1 + ((rcBuff[0] << 24) | (rcBuff[1] << 16) |
                     (rcBuff[2] << 8) | rcBuff[3]);
@@ -297,40 +248,6 @@ int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         return -1;
     }
 #endif
-    return 0;
-}
-
-/* Return of 0 -> success, -1 -> failure, 2 -> try again */
-int sync_cache(int sg_fd)
-{
-    int res;
-    unsigned char scCmdBlk [10] = {SYNCHRONIZE_CACHE, 0, 0, 0, 0, 0, 0, 
-                                   0, 0, 0};
-    unsigned char sense_b[64];
-    struct sg_io_hdr io_hdr;
-
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(scCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.dxfer_len = 0;
-    io_hdr.dxferp = NULL;
-    io_hdr.cmdp = scCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("synchronize_cache (SG_IO) error");
-        return -1;
-    }
-    res = sg_err_category3(&io_hdr);
-    if (SG_ERR_CAT_MEDIA_CHANGED == res)
-        return 2; /* probably have another go ... */
-    else if (SG_ERR_CAT_CLEAN != res) {
-        sg_chk_n_print3("synchronize cache", &io_hdr);
-        return -1;
-    }
     return 0;
 }
 
@@ -465,13 +382,13 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
         return -1;
     }
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         fprintf(stderr, "Recovered error while reading block=%lld, num=%d\n",
                from_block, blocks);
         break;
-    case SG_ERR_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
         sg_chk_n_print3("reading", &io_hdr);
@@ -533,13 +450,13 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
         return -1;
     }
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         fprintf(stderr, "Recovered error while writing block=%lld, num=%d\n",
                to_block, blocks);
         break;
-    case SG_ERR_CAT_MEDIA_CHANGED:
+    case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
         sg_chk_n_print3("writing", &io_hdr);
@@ -555,95 +472,6 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     return 0;
-}
-
-int get_num(char * buf)
-{
-    int res, num;
-    char c = 'c';
-
-    if ('\0' == buf[0])
-        return -1;
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1])))
-        res = sscanf(buf + 2, "%x", &num);
-    else
-        res = sscanf(buf, "%d%c", &num, &c);
-    if (1 == res)
-        return num;
-    else if (2 != res)
-        return -1;
-    else {
-        switch (c) {
-        case 'c':
-        case 'C':
-            return num;
-        case 'b':
-        case 'B':
-            return num * 512;
-        case 'k':
-            return num * 1024;
-        case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
-        case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
-        case 'G':
-            return num * 1000000000;
-        default:
-            fprintf(stderr, "unrecognized multiplier\n");
-            return -1;
-        }
-    }
-}
-
-long long get_llnum(char * buf)
-{
-    int res;
-    long long num;
-    char c = 'c';
-
-    if ('\0' == buf[0])
-        return -1;
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1])))
-        res = sscanf(buf + 2, "%llx", &num);
-    else
-        res = sscanf(buf, "%lld%c", &num, &c);
-    if (1 == res)
-        return num;
-    else if (2 != res)
-        return -1;
-    else {
-        switch (c) {
-        case 'c':
-        case 'C':
-            return num;
-        case 'b':
-        case 'B':
-            return num * 512;
-        case 'k':
-            return num * 1024;
-        case 'K':
-            return num * 1000;
-        case 'm':
-            return num * 1024 * 1024;
-        case 'M':
-            return num * 1000000;
-        case 'g':
-            return num * 1024 * 1024 * 1024;
-        case 'G':
-            return num * 1000000000;
-        case 't':
-            return num * 1024LL * 1024LL * 1024LL * 1024LL;
-        case 'T':
-            return num * 1000000000000LL;
-        default:
-            fprintf(stderr, "unrecognized multiplier\n");
-            return -1;
-        }
-    }
 }
 
 #define STR_SZ 1024
@@ -719,38 +547,38 @@ int main(int argc, char * argv[])
             } else 
                 strncpy(outf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key,"ibs"))
-            ibs = get_num(buf);
+            ibs = sg_get_num(buf);
         else if (0 == strcmp(key,"obs"))
-            obs = get_num(buf);
+            obs = sg_get_num(buf);
         else if (0 == strcmp(key,"bs"))
-            bs = get_num(buf);
+            bs = sg_get_num(buf);
         else if (0 == strcmp(key,"bpt"))
-            bpt = get_num(buf);
+            bpt = sg_get_num(buf);
         else if (0 == strcmp(key,"skip"))
-            skip = get_llnum(buf);
+            skip = sg_get_llnum(buf);
         else if (0 == strcmp(key,"seek"))
-            seek = get_llnum(buf);
+            seek = sg_get_llnum(buf);
         else if (0 == strcmp(key,"count"))
-            dd_count = get_llnum(buf);
+            dd_count = sg_get_llnum(buf);
         else if (0 == strcmp(key,"dio"))
-            dio = get_num(buf);
+            dio = sg_get_num(buf);
         else if (0 == strcmp(key,"coe"))
-            do_coe = get_num(buf);
+            do_coe = sg_get_num(buf);
         else if (0 == strcmp(key,"time"))
-            do_time = get_num(buf);
+            do_time = sg_get_num(buf);
         else if (0 == strcmp(key,"cdbsz")) {
-            scsi_cdbsz_in = get_num(buf);
+            scsi_cdbsz_in = sg_get_num(buf);
             scsi_cdbsz_out = scsi_cdbsz_in;
         } else if (0 == strcmp(key,"fua"))
-            fua_mode = get_num(buf);
+            fua_mode = sg_get_num(buf);
         else if (0 == strcmp(key,"sync"))
-            do_sync = get_num(buf);
+            do_sync = sg_get_num(buf);
         else if (0 == strcmp(key,"odir"))
-            do_odir = get_num(buf);
+            do_odir = sg_get_num(buf);
         else if (0 == strcmp(key,"blk_sgio"))
-            do_blk_sgio = get_num(buf);
+            do_blk_sgio = sg_get_num(buf);
         else if (0 == strncmp(key,"app", 3))
-            do_append = get_num(buf);
+            do_append = sg_get_num(buf);
         else if (0 == strncmp(key, "--vers", 6)) {
             fprintf(stderr, ME "for Linux sg version 3 driver: %s\n",
                     version_str);
@@ -926,11 +754,11 @@ int main(int argc, char * argv[])
     if (dd_count < 0) {
         in_num_sect = -1;
         if (FT_SG & in_type) {
-            res = read_capacity(infd, &in_num_sect, &in_sect_sz);
+            res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed(in), continuing\n");
-                res = read_capacity(infd, &in_num_sect, &in_sect_sz);
+                res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
                 fprintf(stderr, "Unable to read capacity on %s\n", inf);
@@ -952,11 +780,11 @@ int main(int argc, char * argv[])
 
         out_num_sect = -1;
         if (FT_SG & out_type) {
-            res = read_capacity(outfd, &out_num_sect, &out_sect_sz);
+            res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed(out), continuing\n");
-                res = read_capacity(outfd, &out_num_sect, &out_sect_sz);
+                res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
                 fprintf(stderr, "Unable to read capacity on %s\n", outf);
@@ -1193,11 +1021,11 @@ int main(int argc, char * argv[])
     if (do_sync) {
         if (FT_SG & out_type) {
             fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
-            res = sync_cache(outfd);
+            res = sg_ll_sync_cache(outfd, 0, 0, 0);
             if (2 == res) {
                 fprintf(stderr, 
                         "Unit attention, media changed(in), continuing\n");
-                res = sync_cache(outfd);
+                res = sg_ll_sync_cache(outfd, 0, 0, 0);
             }
             if (0 != res)
                 fprintf(stderr, "Unable to synchronize cache\n");

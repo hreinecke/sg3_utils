@@ -5,7 +5,7 @@ sg_modes \- reads SCSI MODE SENSE pages
 .B sg_modes
 [\fI-a\fR] [\fI-c=<page_control>\fR] [\fI-d\fR] [\fI-h\fR] [\fI-l\fR]
 [\fI-p=<page_code>\fR] [\fI-subp=<sub_page_code>\fR] [\fI-v\fR] [\fI-V\fR] 
-[\fI-6\fR] [\fI-?\fR] [\fI<sg_device>\fR]
+[\fI-6\fR] [\fI-?\fR] [\fI<scsi_device>\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -46,7 +46,7 @@ sub page code to fetch. Should be a hexadecimal number between 0 and
 0xff inclusive. The default value is 0.
 .TP
 -v
-verbose: output cdb in hex before executing them.
+verbose: output cdbs in hex before executing them.
 .TP
 -V
 print out version string

@@ -29,13 +29,13 @@ depend dep:
 clean:
 	/bin/rm -f *.o $(EXECS) core .depend
 
-sg_poll: sg_poll.o ../sg_err.o
+sg_poll: sg_poll.o ../sg_lib.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sgq_dd: sgq_dd.o ../sg_err.o ../llseek.o
+sgq_dd: sgq_dd.o ../sg_lib.o ../llseek.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_bus_xfer: sg_bus_xfer.o ../sg_err.o
+sg_bus_xfer: sg_bus_xfer.o ../sg_lib.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_hold: sg_hold.o
@@ -44,7 +44,7 @@ sg_hold: sg_hold.o
 isosize: isosize.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-scsi_devfs_scan: scsi_devfs_scan.o ../sg_err.o
+scsi_devfs_scan: scsi_devfs_scan.o ../sg_lib.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_debug: sg_debug.o

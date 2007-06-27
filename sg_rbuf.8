@@ -1,10 +1,10 @@
-.TH SG_RBUF "8" "December 2001" "sg3_utils-0.96" SG_UTILS
+.TH SG_RBUF "8" "September 2004" "sg3_utils-1.09" SG3_UTILS
 .SH NAME
 sg_rbuf \- reads data using SCSI READ BUFFER command
 .SH SYNOPSIS
 .B sg_rbuf
-[[\fI-q\fR] | [\fI-d\fR] | [\fI-m\fR]] [\fI-t\fR] [\fI-s=<num_MB>\fR]
-[\fI-b=<num_KB>\fR] \fI<sg_device>\fR
+[\fI-b=<num_KiB>\fR] [[\fI-q\fR] | [\fI-d\fR] | [\fI-m\fR]]
+[\fI-s=<num_MiB>\fR] [\fI-t\fR] [\fI-v\fR] [\fI-V\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -15,9 +15,12 @@ is sourced quickly (although this is not guaranteed by the SCSI
 standards). This command is designed for timing transfer speeds
 across a SCSI bus.
 .TP
--q
-only transfer the data into kernel buffers (typically by DMA from
-the SCSI adapter card) and do not move it into the user space.
+-b=<num_KiB>
+size of each transfer (in Kilobytes == 1024). The default is
+the actual available buffer size returned by the READ BUFFER
+command. The maximum is the same as the default, hence this
+argument can only be used to reduce the size of each transfer
+to less than the device's actual available buffer size.
 .TP
 -d
 use direct IO if available. In this case the sg driver will attempt
@@ -31,24 +34,28 @@ use memory mapped IO if available. In this case the sg driver will attempt
 to configure the DMA from the SCSI adapter to transfer directly
 into user memory. This will eliminate the copy via kernel buffers.
 .TP
+-q
+only transfer the data into kernel buffers (typically by DMA from
+the SCSI adapter card) and do not move it into the user space.
+.TP
+-s=<num_MiB>
+size of total transfer (in Megabytes == 1024^2). The default is
+200 MiB, the maximum is 4095 MiB. The actual number of bytes
+transferred may be slightly less since all transfers are the
+same size (and an integer division is involved rounding towards zero).
+.TP
 -t
 times the bulk data transfer component of this command. The elapsed time
 is printed out plus a MB/sec calculation. In this case "MB" is 1,000,000
 bytes. The gettimeofday() system call is used internally for the time
 calculation.
 .TP
--s=<num_MB>
-size of total transfer (in Megabytes == 1024^2). The default is
-200 MB, the maximum is 4095 MB. The actual number of bytes
-transferred may be slightly less since all transfers are the
-same size (and an integer division is involved rounding towards zero).
+-v
+increase level of verbosity (print out SCSI command bytes before
+executing it).
 .TP
--b=<num_KB>
-size of each transfer (in Kilobytes == 1024). The default is
-the actual available buffer size returned by the READ BUFFER
-command. The maximum is the same as the default, hence this
-argument can only be used to reduce the size of each transfer
-to less than the device's actual available buffer size.
+-V
+print out version string then exit.
 .PP
 This command is typically used on modern SCSI disks which have
 a RAM cache on their drive electronics. If no IO to the magnetic
@@ -73,9 +80,9 @@ READ BUFFER reports: buffer capacity=3434944,
 .br
     offset boundary=6
 .br
-Read 200 MBytes (actual 199 MB, 209531584 bytes),
+Read 200 MiB (actual 199 MiB, 209531584 bytes),
 .br
-    buffer size=3354 KBytes
+    buffer size=3354 KiB
 .br
 real 0m5.072s, user 0m0.000s, sys 0m2.280s
 .PP
@@ -89,9 +96,9 @@ READ BUFFER reports: buffer capacity=3434944,
 .br
     offset boundary=6
 .br
-Read 200 MBytes (actual 199 MB, 209531584 bytes),
+Read 200 MiB (actual 199 MiB, 209531584 bytes),
 .br
-    buffer size=3354 KBytes
+    buffer size=3354 KiB
 .br
 real 0m2.784s, user 0m0.000s, sys 0m0.000s
 .SH AUTHOR

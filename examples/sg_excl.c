@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_include.h"
-#include "sg_err.h"
+#include "sg_lib.h"
 
 /* This is a simple program that tests the O_EXCL flag in sg while
    executing a SCSI INQUIRY command and a
@@ -125,10 +125,10 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     ok = 0;
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         ok = 1;
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error on INQUIRY, continuing\n");
         ok = 1;
         break;
@@ -170,10 +170,10 @@ int main(int argc, char * argv[])
     /* now for the error processing */
     ok = 0;
     switch (sg_err_category3(&io_hdr)) {
-    case SG_ERR_CAT_CLEAN:
+    case SG_LIB_CAT_CLEAN:
         ok = 1;
         break;
-    case SG_ERR_CAT_RECOVERED:
+    case SG_LIB_CAT_RECOVERED:
         printf("Recovered error on Test Unit Ready, continuing\n");
         ok = 1;
         break;

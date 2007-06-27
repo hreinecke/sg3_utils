@@ -6,12 +6,12 @@
 
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.08
+Version: 1.09
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
-License: GPL
+License: GPL/FreeBSD
 Group: Utilities/System
-Source: ftp://www.torque.net/sg/p/sg3_utils-1.08.tgz
+Source: ftp://www.torque.net/sg/p/sg3_utils-1.09.tgz
 Url: http://www.torque.net/sg/u_index.html
 Provides: sg_utils
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root/
@@ -36,17 +36,26 @@ Authors:
     Peter Allworth  [contribution to sg_dd and sgp_dd]
     Martin Schwenke <martin at meltin dot net> [contribution to sg_inq]
 
+%package devel
+Summary: Files needed for developing applications using the SCSI command set
+Group: Development/Libraries
+Requires: %{name} = %{version}-%{release}
+
+%description devel
+sg3_utils-devel contains a static library (libsgutils.a) and header files
+to support using the SCSI command set on devices in Linux.
+
 %prep
 %setup
 
 %build
-make
+make LIBDIR=/usr/lib
 
 %install
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
         rm -rf $RPM_BUILD_ROOT
 fi
-make install INSTDIR=$RPM_BUILD_ROOT/usr/bin MANDIR=$RPM_BUILD_ROOT/usr/share/man
+make install INSTDIR=$RPM_BUILD_ROOT/usr/bin MANDIR=$RPM_BUILD_ROOT/usr/share/man LIBDIR=$RPM_BUILD_ROOT/usr/lib INCLUDEDIR=$RPM_BUILD_ROOT/usr/include
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -76,6 +85,13 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/sg_persist
 %attr(755,root,root) %{_bindir}/sg_write_long
 %attr(755,root,root) %{_bindir}/sg_read_long
+%attr(755,root,root) %{_bindir}/sg_requests
+%attr(755,root,root) %{_bindir}/sg_ses
+%attr(755,root,root) %{_bindir}/sg_verify
+%attr(755,root,root) %{_bindir}/sg_emc_trespass
+%attr(755,root,root) %{_libdir}/libsgutils.so
+%attr(755,root,root) %{_libdir}/libsgutils.so.1
+%attr(755,root,root) %{_libdir}/libsgutils.so.1.0.0
 # Mandrake compresses man pages with bzip2, RedHat with gzip
 %attr(-,root,root) %doc %{_mandir}/man8/sg_dd.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sgp_dd.8*
@@ -98,9 +114,23 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) %doc %{_mandir}/man8/sg_persist.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_write_long.8*
 %attr(-,root,root) %doc %{_mandir}/man8/sg_read_long.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_requests.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_ses.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_verify.8*
+%attr(-,root,root) %doc %{_mandir}/man8/sg_emc_trespass.8*
+
+%files devel
+%defattr(-,root,root)
+%attr(644,root,root) %{_includedir}/scsi/sg_lib.h
+%attr(644,root,root) %{_includedir}/scsi/sg_cmds.h
+%attr(755,root,root) %{_libdir}/libsgutils.la
+%attr(644,root,root) %{_libdir}/libsgutils.a
  
 
 %changelog
+* Thu Oct 21 2004 - dgilbert at interlog dot com
+- sg_requests, sg_ses, sg_verify, libsgutils(sg_lib.c+sg_cmds.c), devel rpm
+  * sg3_utils-1.09
 * Tue Aug 31 2004 - dgilbert at interlog dot com
 - 'register+move' in sg_persist, sg_opcodes sorts, sg_write_long
   * sg3_utils-1.08
