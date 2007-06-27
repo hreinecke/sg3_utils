@@ -2,6 +2,61 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.22 [20061016]
+  - sgp_dd: accept verbose=<n> as well as deb=<n> to ease
+    interworking with sg_dd and sgm_dd
+  - sg_sat_set_features: added to examples directory
+  - sg_lib: sync asc/ascq text with spc4r06
+    - move SG_LIB_CAT_NO_SENSE and SG_LIB_CAT_RECOVERED to
+      20 and 21 respectively; add SG_LIB_CAT_ABORTED_COMMAND
+      at 11 (its sense key value) 
+  - sg_vpd: tweak '--page=sp --quiet' output
+    - change '-HHH' so same as '-rr' (prepares ATA Information
+      (ai) response for hdparm)
+  - sg_requests: add '-s' option to set exit status from
+    parameter data
+  - sg_modes: exit quickly from '-e' if device not ready
+  - sg_logs: sync sas log pages with sas2r05a
+    - expand background scan results log page
+    - add '-m=<max_len>' to limit response length
+    - drop '-scum' and '-sthr' options and add '-select'
+  - sg_write_long: add '--16' option to send 16 byte cdb
+    - add '--wr_uncor' and '--pblock' options
+  - sg_senddiag: cleanup and add sdiag_sas_p1_stop.txt
+    to examples directory
+  - sg_format: add '--cmplst=<n>' option (default: 1)
+    - add '--pfu=<n>' option
+    - expand man page to discuss P/D/C/GLISTs
+  - sg_reassign: add '--primary' option to fetch primary
+    defect list (PLIST) length
+  - sg_readcap: add '-H' option to output response in hex
+    and '-r' to output response in binary to stdout
+    - add logical blocks per physical block (sbc3r07)
+  - sginfo: add PLIST and GLIST designation to defect lists
+  - sg_cmds: split this support file into sg_cmds_basic.[hc]
+    and sg_cmds_extra.[hc]
+    - add sg_ll_ata_pt() (SATL ATA pass) to sg_cmds_extra.[hc]
+  - sg_rdac: fix includes for FreeBSD
+  - sg_dd: add 'coe_limit=' option to exit after <n>
+    consecutive 'coe' type read errors
+  - sgm_dd: print out throughput information when signal arrives
+    if time=1 (like sg_dd does already)
+  - sg_inq: change '-HHH' so same as '-rr'. Now sg_inq, sg_vpd
+    and sdparm output for hdparm with '-HHH'
+    -add '-l=<resp_len>' option
+  - sg_read_long: add '--pblock' option for physical blocks
+  - sg_luns: add '--hex' and '--raw' options
+  - sg_requests: add '--hex' and '--raw' options
+  - sg_scan: windows version added (was previously linux only)
+    - 2 man pages: sg_scan.8l and sg_scan.8w that are installed
+      as sg_scan.8
+  - archive directory: removed all but rescan-scsi-bus.sh
+      - README points to previous version in that directory
+  - sg_sat_identify: add to main directory
+      - rename earlier version to examples/sg__sat_identify.c
+  - sg_ident: rework as spc4r07 changed command names and
+    expanded functionality
+
 Changelog for sg3_utils-1.21 [20060706]
   - sg_vpd: new utility for decoding VPD pages. sg_inq's cli is
     cluttered; also borrows from sdparm's VPD handling
@@ -30,7 +85,7 @@ Changelog for sg3_utils-1.21 [20060706]
   - sg_dd: expand medium/hardware error "coe' processing to include
     the "blank check" sense key (for optical devices)
   - sg_ses: expand display element (per 05-011r2)
-  - sg_format: clear 'cmplist' bit (for MO disks)
+  - sg_format: clear 'cmplst' bit (for MO disks)
     - add '--six' ('-6') option for mode sense/select(6)
   - sg_format + sg_test_rwbuf: fix for when char is unsigned
   - sg_inq: VPD page 0x89: output ATA IDENTIFY DEVICE strings

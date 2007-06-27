@@ -1,5 +1,5 @@
 %define name    sg3_utils
-%define version 1.21
+%define version 1.22
 %define release 1
 
 %define major   1
@@ -96,6 +96,10 @@ make install \
 %{_libdir}/*.la
 
 %changelog
+* Mon Oct 16 2006 - dgilbert at interlog dot com
+- add sg_sat_identify, expand sg_format and sg_requests
+  * sg3_utils-1.22
+
 * Thu Jul 06 2006 - dgilbert at interlog dot com
 - add sg_vpd and sg_rdac, uniform exit statuses
   * sg3_utils-1.21

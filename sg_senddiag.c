@@ -6,7 +6,8 @@
 #include <ctype.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
 *  Copyright (C) 2003-2006 D. Gilbert
@@ -19,7 +20,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.29 20060623";
+static char * version_str = "0.31 20061012";
 
 #define ME "sg_senddiag: "
 
@@ -63,6 +64,9 @@ static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
                 (mode6 ? "6" : "10"));
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "Mode sense (%s) failed, unit attention\n",
+                (mode6 ? "6" : "10"));
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "Mode sense (%s) failed, aborted command\n",
                 (mode6 ? "6" : "10"));
     return res;
 }
@@ -238,29 +242,30 @@ static void list_page_codes()
 
 static void usage()
 {
-    printf("Usage: 'sg_senddiag [-doff] [-e] [-h] [-H] [-l] [-pf]"
+    printf("Usage: sg_senddiag [-doff] [-e] [-h] [-H] [-l] [-pf]"
            " [-raw=<h>,<h>...]\n"
-           "                    [-s=<self_test_code>] [-t] [-uoff] [-v] "
+           "                   [-s=<self_test_code>] [-t] [-uoff] [-v] "
            "[-V]\n"
-           "                    [<scsi_device>]'\n"
-           " where -doff device online (def: 0, only with '-t')\n"
-           "       -e   duration of an extended test (from mode page 0xa)\n"
-           "       -h   output in hex\n"
-           "       -H   output in hex (same as '-h')\n"
-           "       -l   list supported page codes\n"
-           "       -pf  set PF bit (def: 0)\n"
-           "       -raw=<h>,<h>...  sequence of bytes to form diag page to "
+           "                   [<scsi_device>]\n"
+           "  where:\n"
+           "    -doff   device online (def: 0, only with '-t')\n"
+           "    -e      duration of an extended test (from mode page 0xa)\n"
+           "    -h      output in hex\n"
+           "    -H      output in hex (same as '-h')\n"
+           "    -l      list supported page codes\n"
+           "    -pf     set PF bit (def: 0)\n"
+           "    -raw=<h>,<h>...  sequence of bytes to form diag page to "
            "send\n"
-           "       -raw=-           read stdin for sequence of bytes to send\n"
-           "       -s=<self_test_code> (def: 0)\n"
-           "          1->background short, 2->background extended,"
+           "    -raw=-  read stdin for sequence of bytes to send\n"
+           "    -s=<self_test_code> (def: 0)\n"
+           "            1->background short, 2->background extended,"
            " 4->abort test\n"
-           "          5->foreground short, 6->foreground extended\n"
-           "       -t   default self test\n"
-           "       -uoff unit online (def: 0, only with '-t')\n"
-           "       -v   increase verbosity (print issued SCSI cmds)\n"
-           "       -V   output version string\n"
-           "       -?   output this usage message\n\n"
+           "            5->foreground short, 6->foreground extended\n"
+           "    -t      default self test\n"
+           "    -uoff   unit online (def: 0, only with '-t')\n"
+           "    -v      increase verbosity (print issued SCSI cmds)\n"
+           "    -V      output version string\n"
+           "    -?      output this usage message\n\n"
            "Performs a SEND DIAGNOSTIC (and/or a RECEIVE DIAGNOSTIC RESULTS)"
            " SCSI command\n"
         );
@@ -457,7 +462,8 @@ int main(int argc, char * argv[])
                 }
             } else {
                 ret = res;
-                fprintf(stderr, "RECEIVE DIAGNOSTIC command failed\n");
+                fprintf(stderr, "RECEIVE DIAGNOSTIC RESULTS command "
+                        "failed\n");
                 goto err_out9;
             }
         } else {
@@ -490,14 +496,15 @@ int main(int argc, char * argv[])
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 
 err_out:
-    fprintf(stderr, "SEND DIAGNOSTIC command failed\n");
     if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "SEND DIAGNOSTIC RESULTS, unit attention\n");
+        fprintf(stderr, "SEND DIAGNOSTIC, unit attention\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "SEND DIAGNOSTIC, aborted command\n");
     else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "SEND DIAGNOSTIC RESULTS, device not "
+        fprintf(stderr, "SEND DIAGNOSTIC, device not "
                 "ready\n");
     else
-        fprintf(stderr, "SEND DIAGNOSTIC RESULTS, failed\n");
+        fprintf(stderr, "SEND DIAGNOSTIC command, failed\n");
 err_out9:
     if (verbose < 2)
         fprintf(stderr, "  try again with '-vv' for more information\n");

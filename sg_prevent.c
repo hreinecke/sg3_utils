@@ -38,7 +38,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -46,7 +46,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.04 20060623";
+static char * version_str = "1.05 20061012";
 
 #define ME "sg_prevent: "
 
@@ -66,15 +66,16 @@ static void usage()
           "sg_prevent [--allow] [--help] [--prevent=<n>] [--verbose] "
           "[--version]\n"
           "                   <scsi_device>\n"
-          "  where: --allow|-a            allow media removal\n"
-          "         --help|-h             print out usage message\n"
-          "         --prevent=<n>|-p <n>  prevention level (def: 1 -> "
+          "  where:\n"
+          "    --allow|-a            allow media removal\n"
+          "    --help|-h             print out usage message\n"
+          "    --prevent=<n>|-p <n>  prevention level (def: 1 -> "
           "prevent)\n"
-          "                               0 -> allow, 1 -> prevent\n"
-          "                               2 -> persistent allow, 3 -> "
+          "                            0 -> allow, 1 -> prevent\n"
+          "                            2 -> persistent allow, 3 -> "
           "persistent prevent\n"
-          "         --verbose|-v          increase verbosity\n"
-          "         --version|-V          print version string and exit\n\n"
+          "    --verbose|-v          increase verbosity\n"
+          "    --version|-V          print version string and exit\n\n"
           "Performs a PREVENT ALLOW MEDIUM REMOVAL SCSI command\n"
           );
 
@@ -168,6 +169,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Device not ready\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "Unit attention\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "Aborted command\n");
     else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Prevent allow medium removal command not "
                 "supported\n");

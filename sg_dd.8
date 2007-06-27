@@ -1,4 +1,4 @@
-.TH SG_DD "8" "July 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_DD "8" "September 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -72,10 +72,10 @@ that a 4 byte block number may be exceeded or 'bpt' is greater than
 16 bits (65535), in which case it defaults to 16 byte SCSI commands).
 .TP
 coe=0 | 1 | 2 | 3
-set to 1 for continue on error. Only applies to errors on sg devices or
-block devices with the 'sgio' flag set. Thus errors on other files will
-stop sg_dd. Default is 0 which implies stop on any error. See the 'coe'
-flag for more information.
+set to 1 or more for continue on error. Only applies to errors on sg
+devices or block devices with the 'sgio' flag set. Thus errors on other
+files will stop sg_dd. Default is 0 which implies stop on any error. See
+the 'coe' flag for more information.
 .TP
 count=BLOCKS
 copy this number of blocks from 'if' to 'of'. Default is the 
@@ -182,19 +182,21 @@ block <n>.
 .TP
 coe
 continue on error. Only active for sg devices and block devices that
-have the 'sgio' flag set. To have the same action as 'coe=2', use
-twice (e.g. 'iflag=coe,coe'). A medium or hardware error while reading
-will re-read blocks prior to the bad block, then try to recover the bad
-block, supplying zeroes if that fails, and finally reread
-the blocks after the bad block. A medium error while writing is
-noted and ignored. The recovery of the bad block when reading uses
-the READ LONG SCSI command if 'coe' given twice or more. Further,
-the READ LONG will set its CORRCT bit if 'coe' given thrice.
-SCSI disks may automatically try and remap faulty sectors (see the
-AWRE and ARRE in the read write error recovery mode page (perhaps
-with the sdparm utility)). Errors occurring on other files types will
-stop sg_dd. Error messages are sent to stderr.
-This flag is similar to 'conv=noerror' in the
+have the 'sgio' flag set. 'iflag=coe oflag=coe' and 'coe=1' are
+equivalent. Use this flag twice (e.g. 'iflag=coe,coe') to have the
+same action as the 'coe=2'. A medium, hardware or blank check error
+while reading will re-read blocks prior to the bad block, then try to
+recover the bad block, supplying zeroes if that fails, and finally reread
+the blocks after the bad block. A medium, hardware or blank check error
+while writing is noted and ignored. The recovery of the bad block when
+reading uses the READ LONG SCSI command if 'coe' given twice or
+more (also with the command line option 'coe=2'). Further, the READ LONG
+will set its CORRCT bit if 'coe' given thrice. SCSI disks may automatically
+try and remap faulty sectors (see the AWRE and ARRE in the read write
+error recovery mode page (the sdparm utility to access and possibly change
+these attributes)). Errors occurring on other files types will stop sg_dd.
+Error messages are sent to stderr. This flag is similar to 'conv=noerror'
+in the
 .B dd(1) 
 utility. See note about READ LONG below.
 .TP
@@ -266,11 +268,11 @@ big numbers). Other values are limited to what can fit in a signed
 Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
 this data into user memory (write operations reverse this sequence).
-This is called "indirect IO" and there is a 'dio' option to select
-"direct IO" which will DMA directly into user memory. Due to some
+This is called "indirect IO" and there is a 'dio' option to
+select "direct IO" which will DMA directly into user memory. Due to some
 issues "direct IO" is disabled in the sg driver and needs a 
-configuration change to activate it. This is typically done with
-'echo 1 > /proc/scsi/sg/allow_dio'.
+configuration change to activate it. This is typically done
+with 'echo 1 > /proc/scsi/sg/allow_dio'.
 .PP
 All informative, warning and error output is sent to stderr so that
 dd's output file can be stdout and remain unpolluted. If no options

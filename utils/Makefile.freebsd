@@ -7,7 +7,7 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 CC = gcc
 LD = gcc
 
-EXECS = hxascdmp
+EXECS = hxascdmp sg_chk_asc
 
 MAN_PGS = 
 MAN_PREF = man8
@@ -28,6 +28,9 @@ clean:
 
 hxascdmp: hxascdmp.o
 	$(LD) -o $@ $(LDFLAGS) $@.o
+
+sg_chk_asc: sg_chk_asc.o ../sg_lib.o
+	$(LD) -o $@ $(LDFLAGS) $@.o sg_lib.o
 
 
 install: $(EXECS)

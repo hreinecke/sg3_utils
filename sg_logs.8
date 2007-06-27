@@ -1,21 +1,21 @@
-.TH SG_LOGS "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_LOGS "8" "September 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
-sg_logs \- read SCSI device log pages
+sg_logs \- access SCSI device log pages
 .SH SYNOPSIS
 .B sg_logs
 [\fI-a\fR] [\fI-A\fR] [\fI-c=<page_control>\fR] [\fI-h\fR] [\fI-H\fR]
-[\fI-l\fR] [\fI-L\fR] [\fI-p=<page_code>[,<subpage_code]\fR]
-[\fI-paramp=<parameter_pointer>\fR] [\fI-pcb\fR] [\fI-ppc\fR] [\fI-r\fR]
-[\fI-scum\fR] [\fI-sp\fR] [\fI-sthr\fR] [\fI-t\fR] [\fI-T\fR] [\fI-v\fR]
-[\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
+[\fI-l\fR] [\fI-L\fR] [\fI-m=<max_len>\fR]
+[\fI-p=<page_code>[,<subpage_code]\fR] [\fI-paramp=<parameter_pointer>\fR]
+[\fI-pcb\fR] [\fI-ppc\fR] [\fI-r\fR] [\fI-select\fR] [\fI-sp\fR] [\fI-t\fR]
+[\fI-T\fR] [\fI-v\fR] [\fI-V\fR] [\fI-?\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 This utility sends a LOG SENSE SCSI command to the given device and then
-outputs the response. This is used in most cases to fetch log pages
-stored on the given device and known log pages are decoded and output
-in ASCII. In some cases a LOG SELECT SCSI command is issued to reset
-parameters back to the device manufacturer's default values.
+outputs the response. The LOG SENSE command is used to fetch log pages.
+Known log pages are decoded and output in ASCII, or output in hex. When
+the '-r' and/or '-select' option is given then a LOG SELECT SCSI command
+is issued to reset parameters.
 .PP
 In SPC-4 revision 5 a subpage code was introduced to both the LOG
 SENSE and LOG SELECT command. At the same time a page code field was
@@ -53,11 +53,18 @@ same action as '-h'.
 .TP
 -l
 lists the names of all logs sense pages supported by this device.
-See the list of common log page codes below.
+This is done bt reading the "supported log pages" log page. See the
+list of common log page codes below.
 .TP
 -L
 lists the names of all logs sense pages and subpages supported by this
-device.  See the list of common log page codes below.
+device. See the list of common log page codes below.
+.TP
+-m=<max_len>
+request only <max_len> bytes of response data. Default is 0 which is
+interpreted as all that is available. <max_len> is decimal unless it
+has a lleading '0x' or trailing 'h'. Useful for seeing earlier
+parameters in large logs.
 .TP
 -p=<page_code>
 log page code to access. Should be a hexadecimal number between 0 and 3f
@@ -81,20 +88,26 @@ being output in ASCII).
 sets the Parameter Pointer Control (PPC) bit. Default is 0 (i.e. cleared).
 .TP
 -r
-use LOG SELECT SCSI command (PCR bit) to reset the given page or all pages
-to the implemented parameter values to be the device defined (i.e.
-manufacturer's) default values. In most cases the default values are zeroes.
+use LOG SELECT SCSI command (PCR bit set) to reset the all log pages (or
+the given page). [SPC-4 (rev 6) doesn't say that a given log (sub)page can
+be reset yet.] Exactly what is reset depends on the accompanying SP
+bit (i.e. '-sp' option which defaults to 0) and the PC ("page control")
+value (i.e. argument to '-c=' which defaults to 1). Supplying this option
+implies the '-select' option as well.
 This option seems to clear error counter log pages but leaves pages like
 self-test results, start-stop cycle counter and temperature log pages
 unaffected. This option may be required to clear log pages if a counter
 reaches its maximum value since the log page in which the counter is found
-will remain "stuck" until something is done. Most other options are ignored.
-Prior to SPC-4 revision 5 the LOG SELECT command did not take a page
-code (or a subpage code).
+will remain "stuck" until something is done.
 .TP
--scum
-sets all (or specified log page) cumulative parameters to their default
-values. Uses LOG SELECT SCSI command with pc=3 .
+-select
+use a LOG SELECT command. The default action (i.e. when neither this option
+not '-r' is given) is to do a LOG SENSE command. When this option is given,
+the SP bit (i.e. '-sp' option which defaults to 0), the PC ("page control")
+value (i.e. argument to '-c=' which defaults to 1) and the PCR
+bit (i.e. '-r' option which defaults to 0) are placed in the command
+block ("cdb") sent to the device. At some stage the log page and subpage
+option may also be active [but SPC-4 (rev 6) doesn't say that].
 .TP
 -sp
 sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared). When
@@ -105,10 +118,6 @@ across power cycles. This option is typically not needed, especially
 if the GLTSD flag is clear in the control mode page as this instructs
 the device to periodically save all saveable log parameters to
 non-volatile locations.
-.TP
--sthr
-sets all (or specified log page) current threshold parameters to the default
-threshold values.  Uses LOG SELECT SCSI command with pc=2 .
 .TP
 -t
 outputs the temperature. First looks in the temperature log page and if
@@ -136,48 +145,50 @@ The smartmontools package provides much of the information found with
 sg_logs in a form suitable for monitoring the health of SCSI disks and
 tape drives.
 .PP
-Here is a list of log pages that are decoded by this utility. [Drop
-the "0x" prefix when using them as an argument to the '-p=' option]:
+Here is a list of log pages that are decoded by this utility. [The "0x"
+prefix amy be dropped when using them as an argument to the '-p=' option]:
 .PP
-0x0     Supported log pages
+0x0       Supported log pages
 .br
-0x1     Buffer overrun/underrun
+0x0,0xff  Supported log pages and subpages
 .br
-0x2     Write error counter
+0x1       Buffer overrun/underrun
 .br
-0x3     Read error counter
+0x2       Write error counter
 .br
-0x4     Read reverse error counter
+0x3       Read error counter
 .br
-0x5     Verify error counter
+0x4       Read reverse error counter
 .br
-0x6     Non-medium error
+0x5       Verify error counter
 .br
-0x7     Last n error events
+0x6       Non-medium error
 .br
-0x8     Format status (sbc-2)
+0x7       Last n error events
 .br
-0xb     Last n deferred errors or asynchronous events
+0x8       Format status (sbc-2)
 .br
-0xc     Sequential access device (ssc-2)
+0xb       Last n deferred errors or asynchronous events
 .br
-0xd     Temperature
+0xc       Sequential access device (ssc-2)
 .br
-0xe     Start-stop cycle counter
+0xd       Temperature
 .br
-0x10    Self-test results
+0xe       Start-stop cycle counter
 .br
-0x15    Background scan results (sbc-3)
+0x10      Self-test results
 .br
-0x17    Non-volatile cache (sbc-3)
+0x15      Background scan results (sbc-3)
 .br
-0x18    Protocol specific port (SAS transport)
+0x17      Non-volatile cache (sbc-3)
 .br
-0x2f    Informational exceptions
+0x18      Protocol specific port (SAS transport)
 .br
-0x37    Seagate cache (vendor, disk)
+0x2f      Informational exceptions
 .br
-0x3e    Seagate factory (vendor, disk)
+0x37      Seagate cache (vendor, disk)
+.br
+0x3e      Seagate factory (vendor, disk)
 .PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks

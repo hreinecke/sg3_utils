@@ -30,7 +30,7 @@
  *
  */
 
-/* Version 1.24 [20050630]
+/* Version 1.26 [20051015]
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
@@ -205,9 +205,11 @@ extern void sg_print_scsi_status(int scsi_status);
         /* was SG_LIB_CAT_MEDIA_CHANGED earlier [sk,asc,ascq: 0x6,0x28,*] */
 #define SG_LIB_CAT_INVALID_OP 9 /* (Illegal request,) Invalid opcode: */
                                 /*       [sk,asc,ascq: 0x5,0x20,0x0] */
-#define SG_LIB_CAT_NO_SENSE 10  /* sense data with key of "no sense" */
+#define SG_LIB_CAT_ABORTED_COMMAND 11 /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0xb,*,*] */
+#define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense" */
                                 /*       [sk,asc,ascq: 0x0,*,*] */
-#define SG_LIB_CAT_RECOVERED 11 /* Successful command after recovered err */
+#define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err */
                                 /*       [sk,asc,ascq: 0x1,*,*] */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */

@@ -1,11 +1,10 @@
-.TH SG_READCAP "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_READCAP "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_readcap \- calls a READ CAPACITY command on a SCSI device
 .SH SYNOPSIS
 .B sg_readcap 
-[\fI-16\fR] [\fI-h\fR] [\fI-lba=<block>\fR] [\fI-pmi\fR] [\fI-v\fR]
-[\fI-V\fR]
-<\fIdevice\fR>
+[\fI-16\fR] [\fI-h\fR] [\fI-H\fR] [\fI-lba=<block>\fR] [\fI-pmi\fR]
+[\fI-r\fR] [\fI-v\fR] [\fI-V\fR] <\fIdevice\fR>
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -38,7 +37,12 @@ second number is the size of each block. If the operation fails
 then "0x0 0x0" is written to stdout.
 .TP
 -h
-output the usage message then exit.
+output the usage message then exit. Giving the '-?' option also outputs
+the usage message then exits.
+.TP
+-H
+output the response to the READ CAPACITY command (either the 10 or 16
+byte cdb variant) in ASCII hexadecimal on stdout.
 .TP
 -lba=<block>
 used in conjunction with "-pmi" option. This variant of READ CAPACITY will
@@ -52,12 +56,27 @@ partial medium indicator: for finding the next block address prior to
 some delay (e.g. head movement). In the absence of this switch, the
 total number of blocks and the block size of the device are output.
 .TP
+--raw | -r
+output response in binary (to stdout).
+.TP
 -v
 verbose: print out cdb of issued commands prior to execution. '-vv'
 and '-vvv' are also accepted yielding greater verbosity.
 .TP
 -V
 outputs version string then exits.
+.PP
+If sg_readcap is called without the '-16' option then the 10 byte cdb
+version: READ CAPACITY (10) is sent to the <device>. If the number
+of blocks in the response is reported as 0xffffffff (i.e. (2**32 - 1) )
+and the '-H' option has not been given, then READ CAPACITY (16) is
+called and its response is output. 
+.PP
+The read capacity(16) response shows additional information not found
+in the read capacity(10) response. This includes protection information
+and the number of logical blocks per physical block. So even though
+the media size may not exceed what read capacity(10) can show, it may
+still be useful to examine the response to read capacity(16). 
 .PP
 In the 2.4 series of Linux kernels the given device must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks

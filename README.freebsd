@@ -24,6 +24,7 @@ Here is a list of utilities that have been ported:
     sg_requests
     sg_rmsn
     sg_rtpg
+    sg_sat_identify
     sg_senddiag
     sg_ses
     sg_start
@@ -51,14 +52,16 @@ device names which hopefully will not confuse the FreeBSD users.
 Details
 =======
 The ported utilities listed above, all use SCSI command functions
-declared in sg_cmds.h and implemented in sg_cmds.c . The sg_cmds.c
-file passes SCSI commands to the host operating system via
-an interface declared in sg_pt.h . There are currently three
+declared in sg_cmds_basic.h and sg_cmds_extra.h . Those SCSI command
+functions are implemented in the corresponding ".c" files. The ".c"
+files pass SCSI commands to the host operating system via
+an interface declared in sg_pt.h . There are currently four
 implementations of that interface depending on the host operating
 system:
   - sg_pt_linux.c
   - sg_pt_freebsd.c
   - sg_pt_osf1.c  [Tru64]
+  - sg_pt_win32.c
 
 The sg_pt_freebsd.c file uses the FreeBSD CAM SCSI pass through
 mechanism. Hence only FreeBSD device nodes that support CAM can
@@ -72,4 +75,4 @@ drive and an ATAPI CD drive.
 
 
 Doug Gilbert
-29th May 2006
+11th October 2006

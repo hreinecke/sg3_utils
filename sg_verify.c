@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2006 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,14 +35,15 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.07 20060623";
+static char * version_str = "1.08 20061012";
 
 #define ME "sg_verify: "
 
@@ -62,18 +63,19 @@ static void usage()
 {
     fprintf(stderr, "Usage: "
           "sg_verify [--bpc=<n>] [--count=<n>] [--dpo] [--help] [--lba=<n>]\n"
-          "                   [--verbose] [--version] <scsi_device>\n"
-          "  where: --bpc=<n>|-b <n>   max blocks per verify command "
+          "                 [--verbose] [--version] <scsi_device>\n"
+          "  where:\n"
+          "    --bpc=<n>|-b <n>   max blocks per verify command "
           "(def 128)\n"
-          "         --count=<n>|-c <n> count of blocks to verify (def 1)\n"
-          "         --dpo|-d           disable page out (cache retention "
+          "    --count=<n>|-c <n> count of blocks to verify (def 1)\n"
+          "    --dpo|-d           disable page out (cache retention "
           "priority)\n"
-          "         --help|-h          print out usage message\n"
-          "         --lba=<n>|-l <n>   logical block address to start "
+          "    --help|-h          print out usage message\n"
+          "    --lba=<n>|-l <n>   logical block address to start "
           "verify (def 0)\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n\n"
-          "Performs a VERIFY SCSI command\n"
+          "    --verbose|-v       increase verbosity\n"
+          "    --version|-V       print version string and exit\n\n"
+          "Performs a VERIFY(10) SCSI command\n"
           );
 
 }
@@ -196,6 +198,9 @@ int main(int argc, char * argv[])
                 break;
             case SG_LIB_CAT_UNIT_ATTENTION:
                 fprintf(stderr, "Verify(10), unit attention\n");
+                break;
+            case SG_LIB_CAT_ABORTED_COMMAND:
+                fprintf(stderr, "Verify(10), aborted command\n");
                 break;
             case SG_LIB_CAT_INVALID_OP:
                 fprintf(stderr, "Verify(10) command not supported\n");

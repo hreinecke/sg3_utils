@@ -1,14 +1,15 @@
-.TH SG_REQUESTS "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_REQUESTS "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_requests \- send one or more SCSI REQUEST SENSE commands
 .SH SYNOPSIS
 .B sg_requests
-[\fI--desc\fR] [\fI--help\fR] [\fI--num=<n>\fR] [\fI--time\fR]
-[\fI--verbose\fR] [\fI--version\fR] \fI<scsi_device>\fR
+[\fI--desc\fR] [\fI--help\fR] [\fI--hex\fR] [\fI--num=<n>\fR]
+[\fI--raw\fR] [\fI--status\fR] [\fI--time\fR] [\fI--verbose\fR]
+[\fI--version\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send REQUEST SENSE command to a Linux SCSI device and output the response
+Send REQUEST SENSE command to a SCSI device and output the response
 which is expected to be in sense data format. Both fixed and descriptor
 format are supported.
 .TP
@@ -22,9 +23,28 @@ field may cause a check condition status with an illegal request sense key.
 --help | -h
 output the usage message then exit.
 .TP
+--hex | -H
+output response in ASCII hexadecimal.
+.TP
 --num=<n> | -n <n>
 perform <n> SCSI REQUEST SENSE commands, stopping whe either <n> is
 reached or an error occurs. The default value for <n> is 1 .
+.TP
+--raw | -r
+output response in binary (to stdout).
+.TP
+--status | -s
+if the last REQUEST SENSE finished without error (from SCSI status or
+autosense) then the contents of the parameter data is analysed as
+sense data and the exit status is set accordingly. The default
+action (when this option is not given) is to ignore the contents
+of the parameter data for the purposes of setting the exit status.
+Some types of error set a sense key of "NO SENSE" with non-zero
+information in the additional sense code (e.g. the FAILURE PREDICTION
+THRESHOLD EXCEEDED group of codes); this results in an exit status
+value of 10. If the sense key is "NO SENSE" and both asc and ascq are
+zero then the exit status is set to 0 . See the sg3_utils(8) man page
+for exit status values.
 .TP
 --time | -t
 time the SCSI REQUEST SENSE command(s) and calculate the average number
@@ -42,7 +62,7 @@ In SCSI 1 and 2 the REQUEST SENSE command was very important for error
 and warning processing in SCSI. The autosense capability rendered this
 command almost superfluous.
 .PP
-However recent SCSI drafts (e.g. SPC rev 23 and SBC-2 rev 16) increase
+However recent SCSI drafts (e.g. SPC-3 rev 23 and SBC-2 rev 16) increase
 the utility of the REQUEST SENSE command. Idle and standby power
 conditions can now be detected with this command; a progress indication
 is given during FORMAT (when that command was started with with IMMED=1
@@ -67,4 +87,4 @@ Copyright \(co 2004-2006 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq
+.B sg_format(sg3_utils)

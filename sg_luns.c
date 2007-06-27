@@ -35,7 +35,7 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -43,7 +43,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.06 20060623";
+static char * version_str = "1.08 20061015";
 
 #define REPORT_LUNS_BUFF_LEN 1024
 
@@ -53,6 +53,8 @@ static char * version_str = "1.06 20060623";
 static struct option long_options[] = {
         {"decode", 0, 0, 'd'},
         {"help", 0, 0, 'h'},
+        {"hex", 0, 0, 'H'},
+        {"raw", 0, 0, 'r'},
         {"select", 1, 0, 's'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
@@ -62,19 +64,21 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_luns    [--decode] [--help] [--select=<n>] [--verbose] "
-          "[--version]\n"
-          "                   <scsi_device>\n"
-          "  where: --decode|-d        decode all luns into parts\n"
-          "         --help|-h          print out usage message\n"
-          "         --select=<n>|-s <n>  select report <n> (def: 0)\n"
-          "                               0 -> luns apart from 'well "
+          "sg_luns    [--decode] [--help] [--hex] [--raw] [--select=<n>]\n"
+          "                  [--verbose] [--version] <scsi_device>\n"
+          "  where:\n"
+          "    --decode|-d        decode all luns into parts\n"
+          "    --help|-h          print out usage message\n"
+          "    --hex|-H           output in hexadecimal\n"
+          "    --raw|-r           output in binary\n"
+          "    --select=<n>|-s <n>  select report <n> (def: 0)\n"
+          "                          0 -> luns apart from 'well "
           "known' lus\n"
-          "                               1 -> only 'well known' "
+          "                          1 -> only 'well known' "
           "logical unit numbers\n"
-          "                               2 -> all luns\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n\n"
+          "                          2 -> all luns\n"
+          "    --verbose|-v       increase verbosity\n"
+          "    --version|-V       print version string and exit\n\n"
           "Performs a REPORT LUNS SCSI command\n"
           );
 
@@ -195,11 +199,21 @@ static void decode_lun(const char * leadin, unsigned char * lunp)
     }
 }
 
+static void dStrRaw(const char* str, int len)
+{
+    int k;
+
+    for (k = 0 ; k < len; ++k)
+        printf("%c", str[k]);
+}
+
 int main(int argc, char * argv[])
 {
     int sg_fd, k, m, off, res, c, list_len, luns, trunc;
     unsigned char reportLunsBuff[REPORT_LUNS_BUFF_LEN];
     int decode = 0;
+    int do_hex = 0;
+    int do_raw = 0;
     int select_rep = 0;
     int verbose = 0;
     char device_name[256];
@@ -209,7 +223,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhs:vV", long_options,
+        c = getopt_long(argc, argv, "dhHrs:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -222,6 +236,12 @@ int main(int argc, char * argv[])
         case '?':
             usage();
             return 0;
+        case 'H':
+            ++do_hex;
+            break;
+        case 'r':
+            ++do_raw;
+            break;
         case 's':
            if ((1 != sscanf(optarg, "%d", &select_rep)) ||
                (select_rep < 0) || (select_rep > 255)) {
@@ -277,6 +297,14 @@ int main(int argc, char * argv[])
     if (0 == res) {
         list_len = (reportLunsBuff[0] << 24) + (reportLunsBuff[1] << 16) +
                    (reportLunsBuff[2] << 8) + reportLunsBuff[3];
+        if (do_raw) {
+            dStrRaw((const char *)reportLunsBuff, list_len + 4);
+            goto the_end;
+        }
+        if (do_hex) {
+            dStrHex((const char *)reportLunsBuff, list_len + 4, 1);
+            goto the_end;
+        }
         luns = (list_len / 8);
         printf("Lun list length = %d which imples %d lun entr%s\n",
                list_len, luns, ((1 == luns) ? "y" : "ies"));
@@ -304,6 +332,8 @@ int main(int argc, char * argv[])
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Luns command not supported (support "
                 "mandatory in SPC-3)\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "Report Luns, aborted command\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "Report Luns command has bad field in cdb\n");
     else {
@@ -312,6 +342,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "    try '-v' option for more information\n");
     }
 
+the_end:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));

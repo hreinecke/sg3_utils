@@ -7,7 +7,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
 
 /* The program allows the user to send a trespass command to change the
@@ -25,7 +25,7 @@
  *  any later version.
  */
 
-static char * version_str = "0.13 20060623";
+static char * version_str = "0.14 20060907";
 
 static int debug = 0;
 

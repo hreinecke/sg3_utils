@@ -35,7 +35,8 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -44,7 +45,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.02 20060623";
+static char * version_str = "1.04 20061012";
 
 #define ME "sg_rmsn: "
 
@@ -188,6 +189,9 @@ int main(int argc, char * argv[])
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
             fprintf(stderr, "Read Media Serial Number failed, unit "
                     "attention\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "Read Media Serial Number failed, aborted "
+                    "command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in Read Media Serial Number cdb\n");
         else {

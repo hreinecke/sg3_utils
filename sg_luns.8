@@ -1,24 +1,30 @@
-.TH SG_LUNS "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_LUNS "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_luns \- send the scsi command report luns
 .SH SYNOPSIS
 .B sg_luns
-[\fI--decode\fR] [\fI--help\fR] [\fI--select=<n>\fR] [\fI--verbose\fR]
-[\fI--version\fR] \fI<scsi_device>\fR
+[\fI--decode\fR] [\fI--help\fR] [\fI--hex\fR] [\fI--raw\fR]
+[\fI--select=<n>\fR] [\fI--verbose\fR] [\fI--version\fR]
+\fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send REPORT LUNS command to a Linux SCSI device and output the response.
-In the recent SCSI draft standard SPC-3 device support for this command
-is mandatory.
+Send REPORT LUNS command to a SCSI device and output the response.
+In the SPC-3 SCSI standard support for this command is mandatory.
 .TP
 --decode | -d
 decode logical unit numbers into their hierarchical parts. Interprets
-luns as described in SAM-3 (rev 14) when the HiSup bit is set in a
+luns as described in SAM-3 when the HiSup bit is set in a
 standard INQUIRY's response.
 .TP
 --help | -h
 output the usage message then exit.
+.TP
+--hex | -H
+output response to this command in ASCII hex.
+.TP
+--raw | -r
+output response in binary (to stdout).
 .TP
 --select=<n> | -s <n>
 this option sets the 'select report' field in the SCSI REPORT LUNS command.

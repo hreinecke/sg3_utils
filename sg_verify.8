@@ -1,4 +1,4 @@
-.TH SG_VERIFY "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_VERIFY "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
@@ -9,7 +9,7 @@ sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends one or more SCSI VERIFY commands to the given Linux SCSI device.
+Sends one or more SCSI VERIFY commands to the given SCSI device.
 It is a 10 byte VERIFY command defined for block devices (see SBC-2
 at http://www.t10.org). Verify starts at the logical block address
 given by the '--lba=<n>' option and continues for '--count=<n>'

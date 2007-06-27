@@ -45,22 +45,23 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.85 20060623";
+static char * version_str = "4.85 20061003";
 
 static void usage()
 {
-    printf("Usage: sg_rbuf [-b=num] [[-q] | [-d] | [-m]] [-s=num] [-t] "
+    printf("Usage: sg_rbuf [-b=num] [-d] [-m] [-q] [-s=num] [-t] "
            "[-v] [-V]\n               <scsi_device>\n");
-    printf("  where  -b=num   num is buffer size to use (in KiB)\n");
-    printf("         -d       requests dio ('-q' overrides it)\n");
-    printf("         -m       requests mmap-ed IO (overrides -q, -d)\n");
-    printf("         -q       quick, don't xfer to user space\n");
-    printf("         -s=num   num is total size to read (in MiB)\n");
-    printf("                    default total size is 200 MiB\n");
-    printf("                    max total size is 4000 MiB\n");
-    printf("         -t       time the data transfer\n");
-    printf("         -v       increase verbosity (more debug)\n");
-    printf("         -V       print version string then exit\n\n");
+    printf("  where:\n");
+    printf("    -b=num   num is buffer size to use (in KiB)\n");
+    printf("    -d       requests dio ('-q' overrides it)\n");
+    printf("    -m       requests mmap-ed IO (overrides -q, -d)\n");
+    printf("    -q       quick, don't xfer to user space\n");
+    printf("    -s=num   num is total size to read (in MiB) (default: "
+           "200 MiB)\n");
+    printf("             maximum total size is 4000 MiB\n");
+    printf("    -t       time the data transfer\n");
+    printf("    -v       increase verbosity (more debug)\n");
+    printf("    -V       print version string then exit\n\n");
     printf("Use SCSI READ BUFFER command (data mode, buffer id 0) "
            "repeatedly\n");
 }

@@ -1,6 +1,6 @@
 Summary: Utilities for SCSI devices in Linux
 Name: sg3_utils
-Version: 1.21
+Version: 1.22
 Release: 1
 Packager: Douglas Gilbert <dgilbert at interlog dot com>
 License: GPL/FreeBSD
@@ -129,6 +129,10 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
+* Mon Oct 16 2006 - dgilbert at interlog dot com
+- add sg_sat_identify, expand sg_format and sg_requests
+  * sg3_utils-1.22
+
 * Thu Jul 06 2006 - dgilbert at interlog dot com
 - add sg_vpd and sg_rdac, uniform exit statuses
   * sg3_utils-1.21

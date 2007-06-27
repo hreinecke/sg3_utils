@@ -24,11 +24,13 @@ sg_dd utility </a>
       <li><a href="#mozTocId370866">Introduction</a></li>
       <li><a href="#mozTocId352668">&nbsp;dd like features</a></li>
       <li><a href="#mozTocId703997">sg_dd extras</a></li>
+      <li><a href="#mozTocId657084">Retries</a></li>
       <li><a href="#mozTocId437677">Continue on error
 (coe)</a></li>
       <li><a href="#mozTocId566094">Recovered errors</a></li>
       <li><a href="#mozTocId899152">Verbose</a></li>
-      <li><a href="#mozTocId443896">sgp_dd, sgm_dd and sg_read</a></li>
+      <li><a href="#mozTocId443896">sgp_dd, sgm_dd and
+sg_read</a></li>
       <li><a href="#mozTocId157981">Conclusion</a></li>
     </ol>
   </li>
@@ -41,7 +43,7 @@ copies files. The sg_dd utility is specialized for devices that use the
 SCSI command set in the Linux operating system. The sg_dd utility is
 found in the <a href="sg3_utils.html">sg3_utils</a> package which
 targets the linux kernel 2.4 and
-2.6 series.<br>
+2.6 series and has ports to various other operating systems.<br>
 <br>
 Not all SCSI device types are supported by the sg_dd utility. Obviously
 those device types that deal with enclosures and medium changers don't
@@ -69,8 +71,8 @@ irrelevant to
 the
 sg_dd utility; they use SCSI command sets.<br>
 <br>
-This page outlines the features of the sg_dd utility version 5.48 found
-in the <a href="sg3_utils.html">sg3_utils</a> version 1.20 package.<br>
+This page outlines the features of the sg_dd utility version 5.56 found
+in the <a href="sg3_utils.html">sg3_utils</a> version 1.22 package.<br>
 <h2><a class="mozTocH2" name="mozTocId352668"></a>&nbsp;dd like features</h2>
 The basic syntax of the sg_dd utility is the same as the dd command in
 Unix. That said, the syntax of the dd command in Unix is different from
@@ -521,6 +523,9 @@ options in sg_dd</span><br>
       </td>
       <td style="vertical-align: top;"><span style="font-weight: bold;">default</span><br>
       </td>
+      <td style="vertical-align: top;"><span style="font-weight: bold;">sgm_dd
+      </span>and<span style="font-weight: bold;"> sgp_dd</span><br>
+      </td>
       <td style="vertical-align: top;"><span style="font-weight: bold;">Brief
 description</span><br>
       </td>
@@ -529,6 +534,8 @@ description</span><br>
       <td style="vertical-align: top;">append=0|1<br>
       </td>
       <td style="vertical-align: top;">0<br>
+      </td>
+      <td style="vertical-align: top;">both<br>
       </td>
       <td style="vertical-align: top;">append to output file (rather
 than overwrite). Better to use 'iflag=append' and/or 'oflag=append'.<br>
@@ -539,6 +546,8 @@ than overwrite). Better to use 'iflag=append' and/or 'oflag=append'.<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
+      <td style="vertical-align: top;"><br>
+      </td>
       <td style="vertical-align: top;">when set access devices via SCSI
 commands (SG_IO ioctl). May use 'iflag=sgio' and/or 'oflag=sgio'
 instead.<br>
@@ -548,6 +557,8 @@ instead.<br>
       <td style="vertical-align: top;">bpt<br>
       </td>
       <td style="vertical-align: top;">128 or 32<br>
+      </td>
+      <td style="vertical-align: top;">both<br>
       </td>
       <td style="vertical-align: top;">blocks_per_transfer (granularity
 of each IO). Default is 128 when bs &lt; 2048 (bytes) else the default
@@ -561,6 +572,8 @@ is 32. For block devices (bpt * bs) is constrained by <span
       </td>
       <td style="vertical-align: top;">10 or 16<br>
       </td>
+      <td style="vertical-align: top;">both<br>
+      </td>
       <td style="vertical-align: top;">cdb size of SCSI READ and/or
 WRITE commands. Only applicable to sg devices or when the SG_IO ioctl
 is being used (e.g. when blk_sgio=1). Defaults to 10 byte cdb unless
@@ -573,6 +586,8 @@ case a 16 cdb is used.<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
+      <td style="vertical-align: top;">sgp_dd<br>
+      </td>
       <td style="vertical-align: top;">when non-zero, continue_on_error
 for
 sg devices and block devices using the SG_IO ioctl. May use 'iflag=coe'
@@ -581,9 +596,23 @@ instead. An equivalent of 'coe=2' is 'iflag=coe,coe'<br>
       </td>
     </tr>
     <tr>
+      <td style="vertical-align: top;">coe_limit=&lt;n&gt;<br>
+      </td>
+      <td style="vertical-align: top;">0<br>
+      </td>
+      <td style="vertical-align: top;">&nbsp;<br>
+      </td>
+      <td style="vertical-align: top;">number of consecutive "bad"
+block errors allowed when reading and 'coe &gt; 0'. Default of 0 is
+interpreted as no limit.<br>
+      </td>
+    </tr>
+    <tr>
       <td style="vertical-align: top;">dio=0|1<br>
       </td>
       <td style="vertical-align: top;">0<br>
+      </td>
+      <td style="vertical-align: top;">both<br>
       </td>
       <td style="vertical-align: top;">direct IO (only via sg device
 nodes)<br>
@@ -594,6 +623,8 @@ nodes)<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
+      <td style="vertical-align: top;">both<br>
+      </td>
       <td style="vertical-align: top;">force_unit_access, 1-&gt;of,
 2-&gt;if, 3-&gt;of+if . Better to use 'iflag=fua' and/or 'oflag=fua'. </td>
     </tr>
@@ -602,13 +633,28 @@ nodes)<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
+      <td style="vertical-align: top;"><br>
+      </td>
       <td style="vertical-align: top;">O_DIRECT flag on open() when
 set. Better to use 'iflag=direct' and/or 'oflag=direct'. </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">retries=&lt;n&gt;<br>
+      </td>
+      <td style="vertical-align: top;">0<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">number of times to retry an
+error on a sg device READ or WRITE command<br>
+      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">sync=0|1<br>
       </td>
       <td style="vertical-align: top;">0<br>
+      </td>
+      <td style="vertical-align: top;">both<br>
       </td>
       <td style="vertical-align: top;">when set, sends SYNCHRONIZE
 CACHE SCSI command to &lt;ofile&gt; if it is a sg device or accessed
@@ -620,6 +666,8 @@ via the SG_IO ioctl.<br>
       </td>
       <td style="vertical-align: top;">0<br>
       </td>
+      <td style="vertical-align: top;">both<br>
+      </td>
       <td style="vertical-align: top;">when set print elapsed time and
 throughput calculation at the completion of the copy<br>
       </td>
@@ -628,6 +676,8 @@ throughput calculation at the completion of the copy<br>
       <td style="vertical-align: top;">verbose=&lt;n&gt;<br>
       </td>
       <td style="vertical-align: top;">0<br>
+      </td>
+      <td style="vertical-align: top;">sgm_dd<br>
       </td>
       <td style="vertical-align: top;">larger &lt;n&gt; is the greater
 the debug output. 1 and 2 print the cdbs for setup commands; 3 and 4
@@ -822,6 +872,28 @@ output when the copy is complete (or an error stops the copy). If a
 SIGUSR1 signal is sent to the process identifier (pid) of a running
 sg_dd utility which has the 'time' option set the elapsed time and the
 throughput of the copy to that point is output and the copy continues.<br>
+<h2><a class="mozTocH2" name="mozTocId657084"></a>Retries</h2>
+Often retries are of little use, especially on medium errors, since the
+device has probably already done multiple retries (probably
+interspersed with moving the heads to the extreme ends of the media)
+before the medium error is reported. However a transport error (e.g.
+causing a CRC error in returned data) is not necessarily seen by the
+device and a retry may quickly solve the problem. In SAS a transport
+layer retries (TLR) state machine is optional and requires both the
+initiator and target to implement the capability. Most first generation
+SAS disks do not implement TLR. So transport errors in the form of
+"aborted commands" can be reported due to corruption (marginal cables)
+or congestion.<br>
+<br>
+When the 'retries=&lt;n&gt;' option is given and &lt;n&gt; is greater
+than 0 then most errors on a READ or WRITE SCSI command are retried up
+to &lt;n&gt; times. Device not ready errors are not retried and "unit
+attention" conditions are automatically retried (without looking at or
+decrementing &lt;n&gt;). Once the number of retries is exhausted on the
+same operation without success then sg_dd will refer to the 'coe'
+option as to what to do next. Each new operation,<br>
+READ or WRITE, or to a different logical block address has its own
+retry count initialized to &lt;n&gt;.<br>
 <h2><a class="mozTocH2" name="mozTocId437677"></a>Continue on error
 (coe)</h2>
 Recent additions to the sg_dd utility allow it to be used as a copy "of
@@ -884,6 +956,13 @@ encountered. Any number greater than zero flags an imperfect copy. The
 second counter (always less than or equal to the first) is the number
 of "successful" READ LONG SCSI commands performed. If the source media
 is a CD or DVD then this number will be zero.<br>
+<br>
+The 'coe_limit=&lt;n&gt;' option is meant to stop sg_dd continuing ad
+nausum if errors are being detected during reading. The input media may
+be blank (unrecorded) or beyond its logical block address limit. The
+'coe_limit=&lt;n&gt;' option is only active on read operations when
+'coe &gt; 0' which itself is only active on sg device nodes (or block
+devices when 'blk_sgio=1' (or 'iflag=sgio') is given).<br>
 <br>
 <h2><a class="mozTocH2" name="mozTocId566094"></a>Recovered errors</h2>
 Often errors are recovered using ECC data or by the device retrying
@@ -1008,7 +1087,9 @@ have their own man pages.<br>
 <span style="font-weight: bold;">sgp_dd</span> uses POSIX threads
 (default: 4 threads) to potentially speed the copy. The syntax and
 semantics of sgp_dd are very similar to sg_dd. The "continue on error"
-processing in sgp_dd is simpler than what is described above for sg_dd.<br>
+processing in sgp_dd is simpler than what is described above for sg_dd.
+Instead of the 'verbose=&lt;n&gt;' option used by sg_dd, sgp_dd uses
+'deb=&lt;n&gt;' which does a similar thing.<br>
 <br>
 <span style="font-weight: bold;">sgm_dd</span> uses memory mapped IO to
 speed copies from or to sg device nodes. Memory mapped IO will bypass
@@ -1023,7 +1104,7 @@ processing) that complicate the picture.<br>
 to sg_dd but has no 'of=&lt;ofile&gt;'. It is designed to measure the
 performance of device (e.g. disk) caches, the throughput of the
 transport and command overhead. It perform a read (either a SCSI READ
-command or a Unix read()) from the given skip block address (default
+command or a Unix read()) from the given skip block address (default is
 logical block address 0) and continues doing reads until
 'count=&lt;blocks&gt;' is exhausted. If multiple reads are&nbsp;
 performed (i.e. when "count &gt; bpt") then they are all from the same
@@ -1041,7 +1122,7 @@ MEDIUM errors, while recovering as much data as possible.<br>
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 29th May 2006<br>
+<p>Last updated: 15th October 2006<br>
 <br>
 </p>
 </center>

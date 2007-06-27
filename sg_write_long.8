@@ -1,25 +1,26 @@
-.TH SG_WRITE_LONG "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_WRITE_LONG "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
-sg_write_long \- send the SCSI command write long
+sg_write_long \- send the WRITE LONG SCSI command
 .SH SYNOPSIS
 .B sg_write_long
-[\fI--cor_dis\fR] [\fI--help\fR] [\fI--in=<name>\fR] [\fI--lba=<num>\fR]
-[\fI--verbose\fR] [\fI--version\fR] [\fI--xfer_len=<num>\fR]
-\fI<scsi_device>\fR
+[\fI--16\fR] [\fI--cor_dis\fR] [\fI--help\fR] [\fI--in=<name>\fR]
+[\fI--lba=<num>\fR] [\fI--pblock\fR] [\fI--verbose\fR] [\fI--version\fR]
+[\fI--wr_uncor\fR] [\fI--xfer_len=<num>\fR] \fI<scsi_device>\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send WRITE LONG (10) command to a Linux SCSI device. The
-buffer to be written to the device is filled with
+Send the WRITE LONG (10 or 16 byte) SCSI command to the given device.
+The buffer to be written to the device is filled with
 .B 0xff
 bytes or read from the given file. This buffer includes the sector data
 and the ECC bytes.
 .PP
 This utility can be used to generate a MEDIUM ERROR at a specific logical
-block address. This can be useful for testing. Prior to testing, the
+block address. This can be useful for testing error handling. Prior to
+such a test, the
 .B sg_dd
 utility could be used to copy the original contents of the logical
-block address to some safe location. After testing the
+block address to some safe location. After the test the
 .B sg_dd
 utility could be used to write back the original contents of the
 logical block address. An alternate strategy would be to read the "long"
@@ -31,19 +32,25 @@ utility prior to testing and restore it with this utility after testing.
 If recoverable errors are being injected (e.g. only one or a few bits
 changed so that the ECC is able to correct the data) then care should
 be taken with the settings in the "read write error recovery" mode page.
-Specifically if the ARRE (for reads) and/or AWRE (for writes) all set
+Specifically if the ARRE (for reads) and/or AWRE (for writes) are set
 then recovered errors will cause the lba to be reassigned (and the old
-location to be added to the grown defect list). This is not easily 
+location to be added to the grown defect list (PLIST)). This is not easily 
 reversed and uses the (finite number) of spare blocks sets aside for
 this purpose. If in doubt it is probably safest to clear the ARRE and
 AWRE bits. These bits can be checked and modified with the sdparm utility.
 For example: "sdparm -c AWRE,ARRE /dev/sda" will clear the bits until
-the disk is rebooted (assuming the "saved" bits are set).
+the disk is rebooted (assuming the "saved" bits are not set).
+.TP
+--16 | -S
+send a WRITE LONG (16) SCSI command to the given device. The default
+action (in the absence of this option) is to send a WRITE LONG (10)
+SCSI command.
 .TP
 --cor_dis | -c
-sets the correction disabled bit. This inhibits various other
-mechanisms such as automatic block reallocation, error recovery
+sets the correction disabled (i.e 'COR_DIS') bit. This inhibits various
+other mechanisms such as automatic block reallocation, error recovery
 and various informational exception conditions being triggered.
+This bit is new in SBC-3 .
 .TP
 --help | -h
 output the usage message then exit.
@@ -56,14 +63,30 @@ not given then a buffer of 0xff bytes is written.
 --lba=<num> | -l <num>
 the logical block address of the sector to corrupt. Defaults to lba 0
 which is a dangerous block to overwrite on a disk that is in use.
-Assumed to be in decimal unless prefixed with '0x'. Only 32 bit
-lbas currently supported.
+Assumed to be in decimal unless prefixed with '0x'. If the lba is
+larger than can fit in 32 bits then the '--16' form should be used.
+.TP
+--pblock | -p
+sets the physical block (i.e 'PBLOCK') bit. This instructs the device
+to use the given data (unless '--wr_uncor' is also given) to write
+to the physical block containing the given lba. The default action
+is to write to the logical block corresponding to the given lba.
+This bit is new in SBC-3 .
 .TP
 --verbose | -v
 increase the degree of verbosity (debug messages).
 .TP
 --version | -V
 output version string then exit.
+.TP
+--wr_uncor | -w
+sets the "write uncorrected" (i.e 'WR_UNCOR') bit. This instructs the
+device to flag the given lba (or the physical block that contains it
+if '--pblock' is also given) as having an unrecoverable error
+associated with it. Note: no data is transferred to the device,
+other that the command (i.e. the cdb). The default action is to
+use the provided data (--xfer_len= bytes in length) and write it to
+the device.  This bit is new in SBC-3 .
 .TP
 --xfer_len=<num>|-x <num>
 the transfer length in bytes (default to 520). If the given value (or the
@@ -93,9 +116,9 @@ To overwrite to a defective sector use:
 This will result in a sector (block) with 512 bytes of 0x0 without a
 MEDIUM ERROR since the ECC and associated data will be well formed.
 .PP
-The 10 byte WRITE LONG SCSI command is implemented (not the 16
-byte variant). This limits the logical block address to a 32 bit
-quantity.
+The 10 byte WRITE LONG SCSI command limits the logical block address
+to a 32 bit quantity. For larger lbas use the '--16' option for the
+WRITE LONG (16) SCSI command.
 .SH EXIT STATUS
 The exit status of sg_write_long is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

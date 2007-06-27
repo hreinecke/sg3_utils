@@ -36,7 +36,8 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -45,7 +46,7 @@
 
 */
 
-static char * version_str = "0.26 20060623";
+static char * version_str = "0.28 20061015";
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -79,9 +80,9 @@ static void usage()
             "                      [--version] <device>'\n"
             " where --brief | -b     only give feature names of <device> "
             "(don't decode)\n"
-            "       --help | -h      output usage message\n"
             "       --current | -c   equivalent to '--rt=1' (show "
             "current)\n"
+            "       --help | -h      output usage message\n"
             "       --hex | -H       output response in hex\n"
             "       --inner-hex | -i  decode to feature name, then output "
             "features in hex\n"
@@ -1011,6 +1012,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "field in Get Configuration command illegal\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         fprintf(stderr, "Get Configuration received unit attention\n");
+    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+        fprintf(stderr, "Get Configuration: aborted command\n");
     else {
         fprintf(stderr, "Get Configuration command failed\n");
         if (0 == verbose)

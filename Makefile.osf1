@@ -26,7 +26,7 @@ MAN_PGS = sg_readcap.8 sg_turs.8 sg_inq.8 sg_start.8 sg_modes.8 sg_logs.8 \
 
 MAN_PREF = man8
 
-HEADERS = sg_lib.h sg_cmds.h sg_pt.h
+HEADERS = sg_lib.h sg_cmds.h sg_cmds_basic.h sg_cmds_extra.h sg_pt.h
 
 OS_FLAGS = -DSG3_UTILS_OSF1
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -62,20 +62,23 @@ clean:
 sg_lib.lo: sg_lib.o
 	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_lib.c
 
-sg_cmds.lo: sg_cmds.o
-	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds.c
+sg_cmds_basic.lo: sg_cmds_basic.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds_basic.c
+
+sg_cmds_extra.lo: sg_cmds_extra.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_cmds_extra.c
 
 sg_pt_osf1.lo: sg_pt_osf1.o
 	$(LIBTOOL) $(LT_EXTRA) --mode=compile $(CC) -c sg_pt_osf1.c
 
-libsgutils.la: sg_lib.lo sg_cmds.lo sg_pt_osf1.lo
+libsgutils.la: sg_lib.lo sg_cmds_basic.lo sg_cmds_extra.lo sg_pt_osf1.lo
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o libsgutils.la sg_lib.lo \
-	sg_cmds.lo sg_pt_osf1.lo -rpath $(LIBDIR) \
+	sg_cmds_basic.lo sg_cmds_extra.lo sg_pt_osf1.lo -rpath $(LIBDIR) \
 	-version-info $(LIB_VINFO)
 
-# libsgutils.la: sg_lib.lo sg_cmds.lo
-#	$(LIBTOOL) --mode=link $(LD) -o libsgutils.la sg_lib.lo sg_cmds.lo \
-#	-rpath $(LIBDIR) -release $(RELEASE)
+# libsgutils.la: sg_lib.lo sg_cmds_basic.lo sg_cmds_extra.lo
+#	$(LIBTOOL) --mode=link $(LD) -o libsgutils.la sg_lib.lo
+#	 sg_cmds_basic.lo sg_cmds_extra.lo -rpath $(LIBDIR) -release $(RELEASE)
 
 sg_readcap: sg_readcap.o libsgutils.la
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la
@@ -150,7 +153,7 @@ sg_rdac: sg_rdac.o libsgutils.la
 	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la getopt_long/getopt_long.o
 
 sg_vpd: sg_vpd.o sg_vpd_vendor.o libsgutils.la getopt_long/getopt_long.o
-	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o libsgutils.la getopt_long/getopt_long.o
+	$(LIBTOOL) $(LT_EXTRA) --mode=link $(LD) -o $@ $(LDFLAGS) $@.o sg_vpd_vendor.o libsgutils.la getopt_long/getopt_long.o
 
 install: $(EXECS)
 	test -d $(INSTDIR) || mkdir -p $(INSTDIR)

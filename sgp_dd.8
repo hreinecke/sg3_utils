@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SGP_DD "8" "July 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sgp_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -10,7 +10,7 @@ devices that understand the SCSI command set.
 [\fI--help\fR] [\fI--version\fR]
 .PP
 [\fIbpt=<n>\fR] [\fIcdbsz=6|10|12|16\fR] [\fIdeb=<n>\fR] [\fIdio=0|1\fR]
-[\fIsync=0|1\fR] [\fIthr=<n>\fR] [\fItime=0|1\fR]
+[\fIsync=0|1\fR] [\fIthr=<n>\fR] [\fItime=0|1\fR] [\fIverbose=<n>\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -119,6 +119,10 @@ time=0 | 1
 when 1, the transfer is timed and throughput calculation is
 performed, outputting the results (to stderr) at completion. When
 0 (default) no timing is performed.
+.TP
+verbose=NUM
+increase verbosity. Same as 'deb=NUM'. Added for compatibility with
+sg_dd and sgm_dd.
 .TP
 --help
 outputs usage message and exits

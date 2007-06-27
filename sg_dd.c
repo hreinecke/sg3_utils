@@ -18,7 +18,8 @@
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 #include "llseek.h"
 
@@ -49,7 +50,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.53 20060704";
+static char * version_str = "5.56 20061012";
 
 #define ME "sg_dd: "
 
@@ -119,9 +120,11 @@ static int num_retries = 0;
 static int do_time = 0;
 static int verbose = 0;
 static int start_tm_valid = 0;
-struct timeval start_tm;
+static struct timeval start_tm;
 static int blk_sz = 0;
 static int max_uas = MAX_UNIT_ATTENTIONS;
+static int coe_limit = 0;
+static int coe_count = 0;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -255,11 +258,11 @@ static void usage()
            "              [obs=<n>] [of=<ofile>] [oflag=<flags>]"
            "[seek=<n>] [skip=<n>]\n"
            "              [--help] [--version]\n\n"
-           "              [append=0|1] [bpt=<n>] [blk_sgio=0|1]"
+           "              [append=0|1] [blk_sgio=0|1] [bpt=<n>]"
            " [cdbsz=6|10|12|16]\n"
-           "              [coe=0|1|2|3] [dio=0|1] [fua=0|1|2|3] [odir=0|1]"
-           " [sync=0|1]\n"
-           "              [time=0|1] [verbose=<n>]\n"
+           "              [coe=0|1|2|3] [coe_limit=<n>] [dio=0|1] "
+           "[fua=0|1|2|3]\n"
+           "              [odir=0|1] [sync=0|1] [time=0|1] [verbose=<n>]\n"
            " where:\n"
            "  append  1->append output to normal <ofile>, (default is 0)\n"
            "  blk_sgio  0->block device use normal I/O(def), 1->use SG_IO\n"
@@ -271,6 +274,9 @@ static void usage()
            "  coe     0->exit on error (def), 1->continue on sg error (zero\n"
            "          fill), 2->also try read_long on unrecovered reads,\n"
            "          3->and set the CORRCT bit on the read long\n"
+           "  coe_limit   limit when reading of consecutive 'bad' blocks "
+           "allowed\n"
+           "              when 'coe > 0' (default: 0 which is no limit)\n"
            "  dio     for direct IO, 1->attempt, 0->indirect IO (def)\n"
            "  fua     force unit access: 0->don't(def), 1->of, 2->if, "
            "3->of+if\n"
@@ -481,7 +487,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
    SG_LIB_CAT_UNIT_ATTENTION -> try again,
    SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> 'io_addrp' written to,
    SG_LIB_CAT_MEDIUM_HARD -> no info field,
-   SG_LIB_CAT_NOT_READY,
+   SG_LIB_CAT_NOT_READY, SG_LIB_CAT_ABORTED_COMMAND,
    -2 -> ENOMEM
    -1 other errors */
 static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
@@ -550,6 +556,7 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
             sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         }
         break;
+    case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
         sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         return res;
@@ -563,8 +570,8 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         if ((info_valid) || ((5 == ifp->pdt) && (*io_addrp > 0)))
             return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
         else {
-            fprintf(stderr, "Medium or hardware error but no lba of failure"
-                    " given\n");
+            fprintf(stderr, "Medium, hardware or blank check error but "
+                    "no lba of failure given\n");
             return res;
         }
         break;
@@ -587,7 +594,8 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
 
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_UNIT_ATTENTION -> try again, SG_LIB_CAT_NOT_READY,
-   SG_LIB_CAT_MEDIUM_HARD, -2 -> ENOMEM, -1 other errors */
+   SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ABORTED_COMMAND,
+   -2 -> ENOMEM, -1 other errors */
 static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                    long long from_block, int bs, struct flags_t * ifp,
                    int * diop, int * blks_readp)
@@ -609,18 +617,23 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         case 0:
             if (blks_readp)
                 *blks_readp = xferred + blks;
+            if (coe_limit > 0)
+                coe_count = 0;  /* good read clears coe_count */
             return 0;
         case -2:        /* ENOMEM */
             return res;
         case SG_LIB_CAT_NOT_READY:
             fprintf(stderr, "Device (r) not ready\n");
             return res;
+        case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
             if (--max_uas > 0) {
-                fprintf(stderr, "Unit attention, continuing (r)\n");
+                fprintf(stderr, "Unit attention or aborted command, "
+                        "continuing (r)\n");
                 repeat = 1;
             } else {
-                fprintf(stderr, "Unit attention, too many (r)\n");
+                fprintf(stderr, "Unit attention or aborted command, "
+                        "too many (r)\n");
                 return res;
             }
             break;
@@ -688,8 +701,10 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                 fprintf(stderr, "device (r) not ready\n");
                 return res;
             case SG_LIB_CAT_UNIT_ATTENTION:
-                fprintf(stderr, 
-                        "Unit attention, unexpected (r)\n");
+                fprintf(stderr, "Unit attention, unexpected (r)\n");
+                return res;
+            case SG_LIB_CAT_ABORTED_COMMAND:
+                fprintf(stderr, "Aborted command, unexpected (r)\n");
                 return res;
             case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
             case SG_LIB_CAT_MEDIUM_HARD:
@@ -707,7 +722,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         if (0 == ifp->coe) {
             /* give up at block before problem unless 'coe' */
             if (blks_readp)
-                *blks_readp = xferred + blks;
+                *blks_readp = xferred;
             return ret;
         }
         if (bs < 32) {
@@ -730,8 +745,8 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                 return -1;
             }
             corrct = (ifp->coe > 2) ? 1 : 0;
-            res = sg_ll_read_long10(sg_fd, corrct, lba, buffp, bs + 8,
-                                    &offset, 1, verbose);
+            res = sg_ll_read_long10(sg_fd, /* pblock */0, corrct, lba, buffp,
+                                    bs + 8, &offset, 1, verbose);
             ok = 0;
             switch (res) {
             case 0:
@@ -747,7 +762,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                 }
                 if (verbose)
                     fprintf(stderr, "read_long(10): adjusted len=%d\n", nl);
-                r = sg_ll_read_long10(sg_fd, corrct, lba, buffp, nl,
+                r = sg_ll_read_long10(sg_fd, 0, corrct, lba, buffp, nl,
                                       &offset, 1, verbose);
                 if (0 == r) {
                     ok = 1;
@@ -769,6 +784,9 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             case SG_LIB_CAT_UNIT_ATTENTION:
                 fprintf(stderr, ">> read_long(10): unit attention\n");
                 break;
+            case SG_LIB_CAT_ABORTED_COMMAND:
+                fprintf(stderr, ">> read_long(10): aborted command\n");
+                break;
             default:
                 fprintf(stderr, ">> read_long(10): problem (%d)\n", res);
                 break;
@@ -784,9 +802,14 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             memset(bp, 0, bs);
         }
         ++xferred;
-        ++blks;
         bp += bs;
         ++lba;
+        if ((coe_limit > 0) && (++coe_count > coe_limit)) {
+            if (blks_readp)
+                *blks_readp = xferred + blks;
+            fprintf(stderr, ">> coe_limit on consecutive reads exceeded\n");
+            return SG_LIB_CAT_MEDIUM_HARD;
+        }
     }
     if (blks_readp)
         *blks_readp = xferred;
@@ -807,7 +830,8 @@ err_out:
 
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_MEDIUM_HARD,
-   -2 -> recoverable (ENOMEM), -1 -> unrecoverable error + others */
+   SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
+   -1 -> unrecoverable error + others */
 static int sg_write(int sg_fd, unsigned char * buff, int blocks,
                     long long to_block, int bs, const struct flags_t * ofp,
                     int * diop)
@@ -875,6 +899,7 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
             sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         }
         break;
+    case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
         sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         return res;
@@ -1049,6 +1074,12 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key, "coe")) {
             iflag.coe = sg_get_num(buf);
             oflag.coe = iflag.coe;
+        } else if (0 == strcmp(key, "coe_limit")) {
+            coe_limit = sg_get_num(buf);
+            if (-1 == coe_limit) {
+                fprintf(stderr, ME "bad argument to 'coe_limit'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else if (0 == strcmp(key, "count")) {
             dd_count = sg_get_llnum(buf);
             if (-1LL == dd_count) {
@@ -1380,8 +1411,10 @@ int main(int argc, char * argv[])
         if (FT_SG & in_type) {
             res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-                fprintf(stderr, 
-                        "Unit attention (readcap in), continuing\n");
+                fprintf(stderr, "Unit attention (readcap in), continuing\n");
+                res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
+            } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
+                fprintf(stderr, "Aborted command (readcap in), continuing\n");
                 res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
@@ -1418,6 +1451,10 @@ int main(int argc, char * argv[])
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 fprintf(stderr, 
                         "Unit attention (readcap out), continuing\n");
+                res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
+            } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
+                fprintf(stderr, 
+                        "Aborted command (readcap out), continuing\n");
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
@@ -1616,6 +1653,13 @@ int main(int argc, char * argv[])
                         fprintf(stderr, "Unit attention, continuing (w)\n");
                     else {
                         fprintf(stderr, "Unit attention, too many (w)\n");
+                        break;
+                    }
+                } else if ((SG_LIB_CAT_ABORTED_COMMAND == ret) && first) {
+                    if (--max_uas > 0)
+                        fprintf(stderr, "Aborted command, continuing (w)\n");
+                    else {
+                        fprintf(stderr, "Aborted command, too many (w)\n");
                         break;
                     }
                 } else if (ret < 0)

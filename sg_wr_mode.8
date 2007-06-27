@@ -43,6 +43,10 @@ mode page without any prior checks on the existing mode page. This should
 only be required for vendor specific mode pages. The existing mode data
 is ignored apart from the block descriptors which can be suppressed with
 the '--dbd' option if need be.
+.PP
+Changing individual fields in a mode page is probably more easily done
+with the sdparm utility. Fields can be identified by acronym or by a
+numerical descriptor.
 .TP
 --contents=<h>,<h>... | -c <h>,<h>...
 string of comma separated hex numbers each of which should resolve to

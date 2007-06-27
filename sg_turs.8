@@ -1,4 +1,4 @@
-.TH SG_TURS "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_TURS "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
 sg_turs \- executes a user specified number of TEST UNIT READY commands on
 the given device
@@ -12,7 +12,9 @@ the given device
 sg_turs sends a number of TEST UNIT READY commands to a given SCSI
 device. Useful for timing the per command overhead. Note that
 TEST UNIT READY has no associated data, just a 6 byte command and a
-returned SCSI status value.
+returned SCSI status value. If the SCSI status value is CHECK CONDITION
+then most modern initiators fetch sense data from the device (i.e.
+autosense).
 .TP
 -n=<num>
 performs TEST UNIT READY "<num>" times. If not given defaults to 1.
@@ -45,7 +47,7 @@ the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000-2005 Douglas Gilbert
+Copyright \(co 2000-2006 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
 
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
@@ -36,7 +36,7 @@
 */
 
 
-static char * version_str = "1.06 20060623";
+static char * version_str = "1.07 20060907";
 
 static const char * devfs_id = "/dev/.devfsd";
 

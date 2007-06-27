@@ -39,7 +39,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* This program performs a ATA PASS THROUGH (16) SCSI command in order
+/* This program performs a ATA PASS-THROUGH (16) SCSI command in order
    to perform an ATA SMART/READ DATA command. See http://www.t10.org
    SAT draft at time of writing: sat-r08.pdf
 
@@ -57,7 +57,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.01 20060629";
+static char * version_str = "1.01 20061014";
 
 int main(int argc, char * argv[])
 {
@@ -112,7 +112,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    /* Prepare ATA PASS THROUGH COMMAND (16) command */
+    /* Prepare ATA PASS-THROUGH COMMAND (16) command */
     aptCmdBlk[4] = ATA_SMART_READ_DATA;   /* feature (7:0) */
     aptCmdBlk[6] = 1;   /* number of block (sector count) */
     aptCmdBlk[10] = 0x4f;    /* lba_mid (7:0) */

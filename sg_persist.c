@@ -7,7 +7,8 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
+#include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
 *  Copyright (C) 2004-2006 D. Gilbert
@@ -20,7 +21,7 @@
 
 */
 
-static char * version_str = "0.26 20060623";
+static char * version_str = "0.27 20061015";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -103,48 +104,49 @@ static const int num_prout_sa_strs = sizeof(prout_sa_strs) /
 static void usage()
 {
     fprintf(stderr,
-            "Usage: 'sg_persist [<options>] [<scsi_device>]\n"
+            "Usage: 'sg_persist [<options>] [<scsi_device>]\n\n"
             " where Persistent Reserve (PR) <options> include:\n"
-            "       --clear|-C             PR Out: Clear\n"
-            "       --device=<scsi_device> device to query or change\n"
-            "       -d <scsi_device>       device to query or change "
+            "   --clear|-C                 PR Out: Clear\n"
+            "   --device=<scsi_device>     device to query or change\n"
+            "   -d <scsi_device>           device to query or change "
             "('-d' optional)\n"
-            "       --help|-h    output this usage message (no <scsi_device> "
-            "required)\n"
-            "       --hex|-H     output response in hex (default ACSII)\n"
-            "       --in|-i                request PR In command (default)\n"
-            "       --out|-o               request PR Out command\n"
-            "       --no-inquiry|-n        skip INQUIRY (default: do "
+            "   --help|-h                  output this usage message\n"
+            "   --hex|-H                   output response in hex\n"
+            "   --in|-i                    request PR In command (default)\n"
+            "   --out|-o                   request PR Out command\n"
+            "   --no-inquiry|-n            skip INQUIRY (default: do "
             "INQUIRY)\n"
-            "       --param-alltgpt|-Y     PR Out parameter 'ALL_TG_PT'\n"
-            "       --param-aptpl|-Z       PR Out parameter 'APTPL'\n"
-            "       --param-rk=<h>|-K <h>  PR Out parameter reservation key\n"
-            "                 (argument in hex)\n"
-            "       --param-sark=<h>|-S <h>  PR Out parameter service action\n"
-            "                 reservation key (argument in hex)\n"
-            "       --preempt|-P           PR Out: Preempt\n"
-            "       --preempt-abort|-A     PR Out: Preempt and Abort\n"
-            "       --prout-type=<h>|-T <n>  PR Out command type\n"
-            "       --read-keys|-k         PR In: Read Keys\n"
-            "       --read-reservation|-r  PR In: Read Reservation\n"
-            "       --read-status|-s       PR In: Read Full Status\n"
-            "       --read-full-status|-s  PR In: Read Full Status\n"
-            "       --register|-G          PR Out: Register\n"
-            "       --register-ignore|-I   PR Out: Register and Ignore\n"
-            "       --register-move|-M     PR Out: Register and Move\n"
-            "       --relative-target-port=<h>|-Q <h>  PR Out parameter for "
+            "   --param-alltgpt|-Y         PR Out parameter 'ALL_TG_PT'\n"
+            "   --param-aptpl|-Z           PR Out parameter 'APTPL'\n"
+            "   --param-rk=<h>|-K <h>      PR Out parameter reservation key\n"
+            "                              (argument in hex)\n"
+            "   --param-sark=<h>|-S <h>    PR Out parameter service action\n"
+            "                              reservation key (argument in hex)\n"
+            "   --preempt|-P               PR Out: Preempt\n"
+            "   --preempt-abort|-A         PR Out: Preempt and Abort\n"
+            "   --prout-type=<h>|-T <n>    PR Out command type\n"
+            "   --read-full-status|-s      PR In: Read Full Status\n"
+            "   --read-keys|-k             PR In: Read Keys\n"
+            "   --read-reservation|-r      PR In: Read Reservation\n"
+            "   --read-status|-s           PR In: Read Full Status\n"
+            "   --register|-G              PR Out: Register\n"
+            "   --register-ignore|-I       PR Out: Register and Ignore\n"
+            "   --register-move|-M         PR Out: Register and Move\n"
+            "   --relative-target-port=<h>|-Q <h>  PR Out parameter for "
             "'-M'\n"
-            "       --release|-L           PR Out: Release\n"
-            "       --report-capabilities|-c   PR In: Report Capabilities\n"
-            "       --reserve|-R           PR Out: Reserve\n"
-            "       --transport-id=<h>,<h>...|-X <h>,<h>...  TransportID "
-            "hex number\n"
-            "                 comma separated list\n"
-            "       --transport-id=-|-X -  read TransportID from stdin\n"
-            "       --unreg|-U     optional with PR Out Register and Move\n"
-            "       --verbose|-v   output additional debug information\n"
-            "       --version|-V   output version string\n"
-            "       -?   output this usage message\n\n"
+            "   --release|-L               PR Out: Release\n"
+            "   --report-capabilities|-c   PR In: Report Capabilities\n"
+            "   --reserve|-R               PR Out: Reserve\n"
+            "   --transport-id=<h>,<h>...|-X <h>,<h>...  TransportID "
+            "hex number(s),\n"
+            "                              comma separated list\n"
+            "   --transport-id=-|-X -      read TransportID from stdin\n"
+            "   --unreg|-U                 optional with PR Out Register "
+            "and Move\n"
+            "   --verbose|-v               output additional debug "
+            "information\n"
+            "   --version|-V               output version string\n"
+            "   -?                         output this usage message\n\n"
             "Performs a PERSISTENT RESERVE (IN or OUT) SCSI command\n");
 }
 
@@ -285,6 +287,8 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
             fprintf(stderr, "Persistent reserve in: bad field in cdb\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
             fprintf(stderr, "Persistent reserve in: unit attention\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "Persistent reserve in: aborted command\n");
         else
             fprintf(stderr, "Persistent reserve in, command failed\n");
         return 1;
@@ -469,6 +473,8 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
             fprintf(stderr, "Persistent reserve out, bad field in cdb\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
             fprintf(stderr, "Persistent reserve out, unit attention\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "Persistent reserve out, aborted command\n");
         else
             fprintf(stderr, "Persistent reserve out, command failed\n");
         return 1;
@@ -529,6 +535,8 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
             fprintf(stderr, "Persistent reserve out, bad field in cdb\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
             fprintf(stderr, "Persistent reserve out, unit attention\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "Persistent reserve out, aborted command\n");
         else
             fprintf(stderr, "Persistent reserve out command failed\n");
         return 1;

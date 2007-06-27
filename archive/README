@@ -1,35 +1,7 @@
-This archive directory contains programs the use the Linux SCSI
-subsystem and typically use the SCSI generic interface (sg) as
-well.
+In order to save source code space, the files is this directory have
+been removed (apart from the rescan-scsi-bus.sh script). See the
+sg3_utils-1.22 source tarball for the most recent version that
+included this source.
 
-The programs in this directory are fully functional but have been
-"retired" from the main sg3_utils directory most likely because
-their functionality is done in another (perhaps better) way.
-
-The last time I checked these programs compiled and built and
-didn't depend on too many other things (see the Makefile in the
-parent directory for ideas).
-
-Since I actively use some of these programs for testing, a Makefile has
-been set up which builds:
-    - sgq_dd   [a dd variant the uses a dispatch loop rather than
-                POSIX threads (as does sgp_dd)]
-    - sg_hold  holds a sg device open and periodically sends a TEST
-		UNIT READY command to the device
-    - sg_poll  [internal testing]
-    - isosize  available in util-linux-2.10s and later
-
-The sg_lib.h and llseek.h headers have simply been copied from the parent
-directory.
-
-The very useful rescan-scsi-bus.sh script from Kurt Garloff
-<kurt at garloff dot de> is included in this directory.
-
-A test program called sg_bus_xfer.c exercises a patch that adds a
-SG_FLAG_BUS_ADDR capability. This allows a bus address (e.g. PCI
-video card's frame buffer) to be passed through to a SCSI adapter
-to side step various buffer copies. See:
-http://www.torque.net/sg/mem2disk.html
-
-Doug Gilbert
-3rd September 2004
+Douglas Gilbert
+10th October 2006

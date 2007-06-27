@@ -35,7 +35,7 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -43,7 +43,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.06 20060623";
+static char * version_str = "1.07 20061012";
 
 #define ME "sg_wr_mode: "
 
@@ -74,34 +74,35 @@ static void usage()
           "                  [--len=<10|6>] [--mask=<h>,<h>...]\n"
           "                  [--page=<page_code>[,<subpage_code]] [--save]\n"
           "                  [--verbose] [--version] <scsi_device>\n"
-          "  where: --contents=<h>,<h>... | -c <h>,<h>...  comma separated "
+          "  where:\n"
+          "    --contents=<h>,<h>... | -c <h>,<h>...  comma separated "
           "string of hex\n"
-          "                               numbers that is mode page contents"
+          "                          numbers that is mode page contents"
           " to write\n"
-          "         --contents=- | -c -   read stdin for mode page contents"
+          "    --contents=- | -c -   read stdin for mode page contents"
           " to write\n"
-          "         --dbd | -d            disable block descriptors (DBD bit"
+          "    --dbd | -d            disable block descriptors (DBD bit"
           " in cdb)\n"
-          "         --force | -f          force the contents to be written\n"
-          "         --help | -h           print out usage message\n"
-          "         --len=<10|6> | -l <10|6>   use 10 byte (def) or 6 byte "
+          "    --force | -f          force the contents to be written\n"
+          "    --help | -h           print out usage message\n"
+          "    --len=<10|6> | -l <10|6>   use 10 byte (def) or 6 byte "
           "variants of\n"
-          "                               MODE SENSE/SELECT\n"
-          "         --mask=<h>,<h>... | -m <h>,<h>...   comma separated "
+          "                          MODE SENSE/SELECT\n"
+          "    --mask=<h>,<h>... | -m <h>,<h>...   comma separated "
           "string of hex\n"
-          "                               numbers that mask contents"
+          "                          numbers that mask contents"
           " to write\n"
-          "         --page=<page_code> | -p <page_code>  page_code to be "
+          "    --page=<page_code> | -p <page_code>  page_code to be "
           "written (in hex)\n"
-          "         --page=<page_code>,<subpage_code | -p <pc>,<spc>  page "
+          "    --page=<page_code>,<subpage_code | -p <pc>,<spc>  page "
           "and subpage\n"
-          "                               code to be written (in hex)\n"
-          "         --save | -s           set 'save page' (SP) bit; default "
+          "                          code to be written (in hex)\n"
+          "    --save | -s           set 'save page' (SP) bit; default "
           "don't so\n"
-          "                               only 'current' values changed\n"
-          "         --verbose | -v        increase verbosity\n"
-          "         --version | -V        print version string and exit\n\n"
-          "    writes given mode page to device\n"
+          "                          only 'current' values changed\n"
+          "    --verbose | -v        increase verbosity\n"
+          "    --version | -V        print version string and exit\n\n"
+          "writes given mode page to device with MODE SELECT (6 or 10)\n"
           );
 }
 
@@ -447,6 +448,10 @@ int main(int argc, char * argv[])
         fprintf(stderr, "MODE SENSE (%d) failed, unit attention\n",
                 (mode_6 ? 6 : 10));
         goto err_out;
+    } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
+        fprintf(stderr, "MODE SENSE (%d) failed, aborted command\n",
+                (mode_6 ? 6 : 10));
+        goto err_out;
     } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
         fprintf(stderr, "bad field in MODE SENSE (%d) command\n",
                 (mode_6 ? 6 : 10));
@@ -543,6 +548,10 @@ int main(int argc, char * argv[])
             goto err_out;
         } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
             fprintf(stderr, "MODE SELECT (%d) failed, unit attention\n",
+                    (mode_6 ? 6 : 10));
+            goto err_out;
+        } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
+            fprintf(stderr, "MODE SELECT (%d) failed, aborted command\n",
                     (mode_6 ? 6 : 10));
             goto err_out;
         } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {

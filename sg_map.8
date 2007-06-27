@@ -1,6 +1,6 @@
-.TH SG_MAP "8" "June 2006" "sg3_utils-1.21" SG3_UTILS
+.TH SG_MAP "8" "October 2006" "sg3_utils-1.22" SG3_UTILS
 .SH NAME
-sg_map \- displays mapping between sg and other SCSI devices
+sg_map \- displays mapping between linux sg and other SCSI devices
 .SH SYNOPSIS
 .B sg_map
 [\fI-a\fR] [\fI-h\fR] [\fI-i\fR] [\fI-n\fR] [\fI-scd\fR] [\fI-sd\fR]
@@ -32,12 +32,12 @@ strings for devices that are found.
 assume the sg devices have numeric device names and loop
 through /dev/sg0, /dev/sg1, etc. Default is numeric scan
 .TP
--sd
-display mappings to SCSI disk device names
-.TP
 -scd
 display mappings to SCSI cdrom device names of the form
 /dev/scd0, /dev/scd1 etc
+.TP
+-sd
+display mappings to SCSI disk device names
 .TP
 -sr
 display mappings to SCSI cdrom device names of the form

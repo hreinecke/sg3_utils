@@ -36,7 +36,7 @@
 #include <getopt.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /* This is a companion file to sg_vpd.c . It contains logic to output and
    decode vendor specific VPD pages

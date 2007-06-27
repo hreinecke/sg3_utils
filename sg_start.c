@@ -5,7 +5,7 @@
 #include <fcntl.h>
 
 #include "sg_lib.h"
-#include "sg_cmds.h"
+#include "sg_cmds_basic.h"
 
 /*
  *  Copyright (C) 1999-2006 D. Gilbert
@@ -26,37 +26,39 @@
  
 */
 
-static char * version_str = "0.50 20060623";
+static char * version_str = "0.51 20061016";
 
 
 void usage ()
 {
-        fprintf(stderr, "Usage:  sg_start [0|--stop|1|--start] [--eject] "
-                "[--fl=<n>] [-i] [--imm=0|1]\n"
-                "                 [--load] [--loej] [--pc=<n>] [-v] [-V] "
-                "<device>\n"
-                " where: 0         stop unit (e.g. spin down a disk or a "
+        fprintf(stderr, "Usage:  sg_start [0] [1] [--eject] [--fl=<n>] "
+                "[-i] [--imm=0|1]\n"
+                "                 [--load] [--loej] [--pc=<n>] [--start] "
+                "[--stop] [-v] [-V]\n"
+                "<                device>\n"
+                "  where:\n"
+                "    0          stop unit (e.g. spin down a disk or a "
                 "cd/dvd)\n"
-                "        1         start unit (e.g. spin up a disk or a "
+                "    1          start unit (e.g. spin up a disk or a "
                 "cd/dvd)\n"
-                "        --eject   stop then eject the medium\n"
-                "        --fl=<n>  format layer number (mmc5)\n"
-                "        -i        return immediately (same as '--imm=1')\n"
-                "        --imm=0|1   0->await completion(def), 1->return "
+                "    --eject    stop then eject the medium\n"
+                "    --fl=<n>   format layer number (mmc5)\n"
+                "    -i         return immediately (same as '--imm=1')\n"
+                "    --imm=0|1  0->await completion(def), 1->return "
                 "immediately\n"
-                "        --load    load then start the medium\n"
-                "        --loej    load the medium if '-start' option is "
+                "    --load     load then start the medium\n"
+                "    --loej     load the medium if '-start' option is "
                 "also given\n"
-                "                  or stop unit and eject\n"
-                "        --pc=<n>  power conditions (in hex, default 0 -> no "
+                "               or stop unit and eject\n"
+                "    --pc=<n>   power conditions (in hex, default 0 -> no "
                 "power condition)\n"
-                "                  1 -> active, 2 -> idle, 3 -> standby, "
+                "               1 -> active, 2 -> idle, 3 -> standby, "
                 "5 -> sleep (MMC)\n"
-                "        --start   start unit (same as '1'), default "
+                "    --start    start unit (same as '1'), default "
                 "action\n"
-                "        --stop    stop unit (same as '0')\n"
-                "        -v        verbose (print out SCSI commands)\n"
-                "        -V        print version string then exit\n\n"
+                "    --stop     stop unit (same as '0')\n"
+                "    -v         verbose (print out SCSI commands)\n"
+                "    -V         print version string then exit\n\n"
                 "    Example: 'sg_start --stop /dev/sdb'    stops unit\n"
                 "             'sg_start --eject /dev/scd0'  stops unit and "
                 "ejects medium\n\n"
@@ -257,8 +259,10 @@ int main(int argc, char * argv[])
                                 fprintf(stderr, "device not ready\n");
                         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
                                 fprintf(stderr, "unit attention\n");
+                        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                                fprintf(stderr, "aborted command\n");
                         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                                fprintf(stderr, "command malformed\n");
+                                fprintf(stderr, "invalid field in cdb\n");
                 }
                 fprintf(stderr, "START STOP UNIT command failed\n");
         }

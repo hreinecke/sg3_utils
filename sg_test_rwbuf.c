@@ -9,7 +9,7 @@
  * somebody else in the meantime.
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Doug Gilbert's sg_rbuf program.
- * (c) 1999-2005 Doug Gilbert
+ * (c) 1999-2006 Doug Gilbert
  * 
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@
 #include "sg_io_linux.h"
 
 
-static char * version_str = "1.03 20060623";
+static char * version_str = "1.03 20060811";
 
 #define BPI (signed)(sizeof(int))
 
@@ -349,7 +349,7 @@ void usage ()
         printf (" for other data at the same time, and overwriting it may or "
                 "may not\n");
         printf (" cause data corruption!\n");
-        printf ("(c) Douglas Gilbert, Kurt Garloff, 2000-2005, GNU GPL\n");
+        printf ("(c) Douglas Gilbert, Kurt Garloff, 2000-2006, GNU GPL\n");
 }
 
 

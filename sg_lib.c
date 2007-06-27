@@ -68,7 +68,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.24 20060630";    /* spc-4 rev 5a */
+static char * version_str = "1.26 20061015";    /* spc-4 rev 7a */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -273,7 +273,8 @@ static const struct value_name_t normal_opcodes[] = {
 
 
 static const struct value_name_t maint_in_arr[] = {
-    {0x5, 0, "Report device identifier"},
+    {0x5, 0, "Report identifying information"},
+                /* was "Report device identifier" prior to spc4r07 */
     {0xa, 0, "Report target port groups"},
     {0xb, 0, "Report aliases"},
     {0xc, 0, "Report supported operation codes"},
@@ -286,7 +287,8 @@ static const struct value_name_t maint_in_arr[] = {
         (int)(sizeof(maint_in_arr) / sizeof(maint_in_arr[0]))
 
 static const struct value_name_t maint_out_arr[] = {
-    {0x6, 0, "Set device identifier"},
+    {0x6, 0, "Set identifying information"},
+                /* was "Set device identifier" prior to spc4r07 */
     {0xa, 0, "Set target port groups"},
     {0xb, 0, "Change aliases"},
     {0xe, 0, "Set priority"},
@@ -741,6 +743,7 @@ static struct error_info additional[] =
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2F,0x00,"Commands cleared by another initiator"},
     {0x2F,0x01,"Commands cleared by power loss notification"},
+    {0x2F,0x02,"Commands cleared by device server"},
     {0x30,0x00,"Incompatible medium installed"},
     {0x30,0x01,"Cannot read medium - unknown format"},
     {0x30,0x02,"Cannot read medium - incompatible format"},
@@ -1445,7 +1448,7 @@ static void sg_get_sense_descriptors_str(const unsigned char * sense_buffer,
             processed = 0;
             break;
         case 9:
-            n += sprintf(b + n, "ATA Status Return\n");
+            n += sprintf(b + n, "ATA Return\n");
             if (add_len >= 12) {
                 int extended, sector_count;
 
@@ -1665,35 +1668,29 @@ void sg_get_sense_str(const char * leadin,
             if (n >= buff_len)
                 return;
         }
-    } else {    /* non-extended sense data */
-
-         /*
-          * A (very old) Standard says:
-          *    sense_buffer[0] & 0200 : address valid
-          *    sense_buffer[0] & 0177 : vendor-specific error code
-          *    sense_buffer[1] & 0340 : vendor-specific
-          *    sense_buffer[1..3] : 21-bit logical block address
-          */
-
+    } else {    /* non-extended SCSI-1 sense data ?? */
         if (sb_len < 4) {
             n += snprintf(buff + n, buff_len - n, "sense buffer too short "
                           "(4 byte minimum)\n");
             return;
         }
         r = 0;
-        if (sense_buffer[0] < 15)
-            r += sprintf(b + r, "old (SCSI-1) sense: key %s\n",
-                         sense_key_desc[sense_buffer[0] & 0x0f]);
-        else
-            r += sprintf(b + r, "sns = %2x %2x\n", sense_buffer[0],
-                         sense_buffer[2]);
-
-        r += sprintf(b + r, "Non-extended sense class %d code 0x%0x ", 
-                     (sense_buffer[0] >> 4) & 0x07, sense_buffer[0] & 0xf);
+        r += sprintf(b + r, "Probably uninitialized data.\n  Try to view "
+                     "as SCSI-1 non-extended sense:\n");
+        r += sprintf(b + r, "  AdValid=%d  Error class=%d  Error code=%d\n",
+                     !!(sense_buffer[0] & 0x80),
+                     ((sense_buffer[0] >> 4) & 0x7),
+                     (sense_buffer[0] & 0xf));
+        if (sense_buffer[0] & 0x80)
+            r += sprintf(b + r, "  lba=0x%x\n",
+                         ((sense_buffer[1] & 0x1f) << 16) +
+                         (sense_buffer[2] << 8) + sense_buffer[3]);
         n += snprintf(buff + n, buff_len - n, "%s\n", b);
         if (n >= buff_len)
             return;
-        len = 4;
+        len = sb_len;
+        if (len > 32)
+            len = 32;   /* trim in case there is a lot of rubbish */
     }
     if (raw_sinfo) {
         n += snprintf(buff + n, buff_len - n, " Raw sense data (in hex):\n");
@@ -1775,6 +1772,8 @@ int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             else
                 return SG_LIB_CAT_ILLEGAL_REQ;
             break;
+        case SPC_SK_ABORTED_COMMAND:
+            return SG_LIB_CAT_ABORTED_COMMAND;
         }
     }
     return SG_LIB_CAT_SENSE;
