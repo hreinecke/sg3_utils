@@ -52,6 +52,9 @@ Luben Tuikov <ltuikov at yahoo dot com>
         help with documentation and other suggestions [20061014]
         contribution sg_read_buffer and sg_write_buffer [20061103]
 
+Mark Knibbs <markk at clara dot co dot uk>
+        suggested and tested oflag=sparse for sg_dd
+
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
 Nate Dailey < Nate dot Dailey at stratus dot com > extended sg_map for sparse
@@ -76,4 +79,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-31st March 2007
+27th June 2007
