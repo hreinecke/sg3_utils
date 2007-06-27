@@ -1,4 +1,4 @@
-.TH SG_START "8" "August 2005" "sg3_utils-1.16" SG3_UTILS
+.TH SG_START "8" "October 2005" "sg3_utils-1.18" SG3_UTILS
 .SH NAME
 sg_start \- starts (spins-up) or stops (spins down) SCSI device, load or
 eject medium
@@ -38,7 +38,7 @@ already started (or is in the process of starting).
 .TP
 -eject
 stop the medium and eject it from the drive. Only appropriate for a
-removable medium.
+device with removable medium. Might be ignored (prevented), see below.
 .TP
 -imm=0|1
 when the immediate bit is 1 then this utility returns immediately after

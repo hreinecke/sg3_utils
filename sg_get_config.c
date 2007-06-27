@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.19 20050806";
+static char * version_str = "0.20 20051025";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -137,7 +137,7 @@ static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Get config, continuing", &io_hdr, verbose);
+        sg_chk_n_print3("Get config, continuing", &io_hdr, verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         if (verbose && io_hdr.resid)
@@ -152,7 +152,7 @@ static int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
         if (verbose | noisy) {
             snprintf(ebuff, EBUFF_SZ, "get config error, rt=%d, "
                      "starting=0x%x ", rt, starting);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose);
+            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
         }
         return -1;
     }
@@ -187,39 +187,6 @@ static void usage()
             "       --verbose | -v   verbose\n"
             "       --version | -V   output version string\n\n"
             "Get configuration information for MMC drive and/or media\n");
-}
-
-static const char * scsi_ptype_strs[] = {
-    /* 0 */ "disk",
-    "tape",
-    "printer",
-    "processor",
-    "write once optical disk",
-    /* 5 */ "cd/dvd",
-    "scanner",
-    "optical memory device",
-    "medium changer",
-    "communications",
-    /* 0xa */ "graphics [0xa]",
-    "graphics [0xb]",
-    "storage array controller",
-    "enclosure services device",
-    "simplified direct access device",
-    "optical card reader/writer device",
-    /* 0x10 */ "bridge controller commands",
-    "object based storage",
-    "automation/driver interface",
-    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
-    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
-    "well known logical unit",
-    "no physical device on this lu",
-};
-
-static const char * get_ptype_str(int scsi_ptype)
-{
-    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
-
-    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 struct code_desc {
@@ -309,6 +276,9 @@ static struct code_desc feature_desc_arr[] = {
         {0x3b, "DVD+R double layer"},
         {0x40, "BD read"},
         {0x41, "BD write"},
+        {0x42, "TSR"},
+        {0x50, "HD DVD read"},
+        {0x51, "HD DVD write"},
         {0x100, "Power management"},
         {0x101, "SMART"},
         {0x102, "Embedded changer"},
@@ -322,6 +292,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x10a, "Disc control blocks"},
         {0x10b, "DVD CPRM"},
         {0x10c, "Firmware information"},
+        {0x10d, "AACS"},
         {0x110, "VCPS"},
         {0x120, "BD CPS"},
 };
@@ -914,6 +885,7 @@ int main(int argc, char * argv[])
     int starting = 0;
     int verbose = 0;
     char device_name[256];
+    char buff[64];
     const char * cp;
     struct sg_simple_inquiry_resp inq_resp;
     int ret = 1;
@@ -1007,7 +979,7 @@ int main(int argc, char * argv[])
         printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                inq_resp.revision);
         peri_type = inq_resp.peripheral_type;
-        cp = get_ptype_str(peri_type);
+        cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
         if (strlen(cp) > 0)
             printf("  Peripheral device type: %s\n", cp);
         else

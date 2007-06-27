@@ -1,11 +1,11 @@
-.TH SG_TURS "8" "April 2005" "sg3_utils-1.14" SG3_UTILS
+.TH SG_TURS "8" "October 2005" "sg3_utils-1.18" SG3_UTILS
 .SH NAME
 sg_turs \- executes a user specified number of TEST UNIT READY commands on
 the given device
 .SH SYNOPSIS
 .B sg_turs
-[\fI-n=<number of commands to send>\fR] [\fI-t] [\fI-v] [\fI-V]
-<\fIscsi_device\fR>
+[\fI-n=<number of commands to send>\fR] [\fI-p\fR]  [\fI-t\fR] [\fI-v\fR]
+[\fI-V\fR] <\fIscsi_device\fR>
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -21,6 +21,11 @@ k K KiB *1,024; KB *1,000; m M MiB *1,048,576; MB *1,000,000;
 g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix of the
 form "x<n>" multiplies the leading number by <n>. Alternatively a hex
 number may be given, prefixed by either 0x or 0X.
+.TP
+-p
+show progress indication (a percentage) if available. If <num> greater
+than one waits 30 seconds before subsequent checks. Exits when <num>
+is reached or there is no more progress indication. Ignores '-t' option.
 .TP
 -t
 after completing the requested number of TEST UNIT READY commands, outputs

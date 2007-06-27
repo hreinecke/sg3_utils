@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "3.74 20050808";
+static char * version_str = "3.75 20051114";
 
 #define ME "sg_readcap: "
 
@@ -238,8 +238,8 @@ int main(int argc, char * argv[])
                 goto good;
             }
             printf("Read Capacity results:\n");
-            printf("   Protection: prot_en=%d, rto_en=%d\n",
-                   !!(resp_buff[12] & 0x1), !!(resp_buff[12] & 0x2));
+            printf("   Protection: prot_en=%d, p_type=%d\n",
+                   !!(resp_buff[12] & 0x1), ((resp_buff[12] >> 1) & 0x7));
             if (pmi)
                 printf("   PMI mode: given lba=0x%llx, last block before "
                        "delay=0x%llx\n", llba, llast_blk_addr);

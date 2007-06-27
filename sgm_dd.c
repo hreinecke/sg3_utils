@@ -54,7 +54,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.21 20050909";
+static char * version_str = "1.21 20051025";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -469,12 +469,12 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Reading, continuing", &io_hdr, verbose);
+        sg_chk_n_print3("Reading, continuing", &io_hdr, verbose > 1);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("reading", &io_hdr, verbose);
+        sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         return -1;
     }
     sum_of_resids += io_hdr.resid;
@@ -553,12 +553,12 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Writing, continuing", &io_hdr, verbose);
+        sg_chk_n_print3("Writing, continuing", &io_hdr, verbose > 1);
         break;
     case SG_LIB_CAT_MEDIA_CHANGED:
         return 2;
     default:
-        sg_chk_n_print3("writing", &io_hdr, verbose);
+        sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         return -1;
     }
     if (diop && *diop &&

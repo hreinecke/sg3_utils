@@ -25,7 +25,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.06 20050808";
+static char * version_str = "1.06 20051025";
 
 #define READ_LONG_OPCODE 0x3E
 #define READ_LONG_CMD_LEN 10
@@ -163,7 +163,7 @@ static int sg_ll_read_long10(int sg_fd, int correct, unsigned long lba,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr, verbose);
+        sg_chk_n_print3("READ LONG(10), continuing", &io_hdr, verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;

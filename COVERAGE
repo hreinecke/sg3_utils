@@ -4,55 +4,57 @@ The following table lists SCSI commands in alphabetical order on the
 left and the sg3_utils utilities that implement invocations of them
 on the right. The second table lists supported ATA commands.
 
-SCSI command        sg3_utils ** utilities that use this SCSI command
+SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
 GET CONFIGURATION   sg_get_config
-INQUIRY             sdparm, sg_dd, sg_format, sg_inq, sginfo, sg_logs,
-                    sg_map('-i'), sg_modes, sg_opcodes, sg_persist,
-                    sg_scan, sg_ses
+INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
+		    sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
+		    sg_persist, sg_scan, sg_ses, ++
 FORMAT UNIT         sg_format
-LOG SELECT          sg_logs('-r')
-LOG SENSE           sg_logs
-MODE SELECT(6)      sdparm, sg_wr_mode, sginfo, sg_format, sg_emc_trespass
-MODE SELECT(10)     sdparm, sg_wr_mode, sginfo, sg_format, sg_emc_trespass
-MODE SENSE(6)       sdparm, sg_modes, sg_wr_mode, sginfo, sg_format, sg_dd,
-                    sg_senddiag('-e')
-MODE SENSE(10)      sdparm, sg_modes, sg_wr_mode, sginfo, sg_format, sg_dd,
-                    sg_senddiag('-e')
+LOG SELECT          sg_logs('-r'), ++
+LOG SENSE           sg_logs, ++
+MODE SELECT(6)      sg_wr_mode, sginfo, sg_format,
+		    sg_emc_trespass, ++
+MODE SELECT(10)     sg_wr_mode, sginfo, sg_format,
+		    sg_emc_trespass, ++
+MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_format,
+		    sg_senddiag('-e'), ++
+MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_format,
+		    sg_senddiag('-e'), ++
 PERSISTENT IN       sg_persist
 PERSISTENT OUT      sg_persist
-PREVENT ALLOW MEDIUM REMOVAL            sg_prevent
+PREVENT ALLOW MEDIUM REMOVAL            sg_prevent, ++
 READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ BUFFER         sg_rbuf, sg_test_rwbuf
-READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format
-READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format
-READ DEFECT(10)     sginfo, sg_reassign
+READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
+READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
+READ DEFECT(10)     sginfo, sg_reassign, ++
 READ DEFECT(12)     sginfo
-READ LONG           sg_read_long, sg_dd
-READ MEDIA SERIAL NUMBER        sg_rmsn
+READ LONG (10)      sg_read_long, sg_dd
+READ MEDIA SERIAL NUMBER        sg_rmsn, ++
 REASSIGN BLOCKS     sg_reassign
-RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses
-REPORT DEVICE IDENTIFIER     sg_ident
-REPORT LUNS         sg_luns
+RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses, ++
+REPORT DEVICE IDENTIFIER     sg_ident, ++
+REPORT LUNS         sg_luns, ++
 REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
-REPORT TARGET PORT GROUPS       sg_rtpg
-REQUEST SENSE       sg_requests
-SEND DIAGNOSTIC     sg_senddiag, sg_ses
-SET DEVICE IDENTIFIER        sg_ident
-START STOP          sg_start
-SYNCHRONIZE CACHE   sg_sync, sg_dd, sgm_dd, sgp_dd
-TEST UNIT READY     sg_turs, sg_format
+REPORT TARGET PORT GROUPS       sg_rtpg, ++
+REQUEST SENSE       sg_requests, ++
+SEND DIAGNOSTIC     sg_senddiag, sg_ses, ++
+SET DEVICE IDENTIFIER        sg_ident, ++
+START STOP          sg_start, ++
+SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
+TEST UNIT READY     sg_turs, sg_format, ++
 VERIFY(10)          sg_verify
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
 WRITE(16)           sg_dd, sgm_dd, sgp_dd
 WRITE BUFFER        sg_test_rwbuf
-WRITE LONG          sg_write_long
+WRITE LONG (10)     sg_write_long
 
 
 ATA command         sg3_utils utilities that use this SCSI command
@@ -61,7 +63,7 @@ IDENTIFY DEVICE     sg_inq, sg_scan
 IDENTIFY PACKET DEVICE     sg_inq
 
 
-** sdparm is now in its own package called sdparm (rather than sg3_utils)
+++  command wrapper found in sg_cmds.c for this command
 
 Doug Gilbert
-19th September 2005
+14th November 2005

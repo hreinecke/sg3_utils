@@ -58,7 +58,7 @@
  * added in the future.
  */
 
-static char * version_str = "0.55 20050922";    /* spc-4 rev02 */
+static char * version_str = "0.55 20051113";    /* spc-4 rev02 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -138,39 +138,6 @@ static void dStrRaw(const char* str, int len)
     
     for (k = 0 ; k < len; ++k)
         printf("%c", str[k]);
-}
-
-static const char * scsi_ptype_strs[] = {
-    /* 0 */ "disk",
-    "tape",
-    "printer",
-    "processor",        /* often SAF-TE (seldom scanner) device */
-    "write once optical disk",
-    /* 5 */ "cd/dvd",
-    "scanner",
-    "optical memory device",
-    "medium changer",
-    "communications",
-    /* 0xa */ "graphics",
-    "graphics",
-    "storage array controller",
-    "enclosure services device",
-    "simplified direct access device",
-    "optical card reader/writer device",
-    /* 0x10 */ "bridge controller commands",
-    "object based storage",
-    "automation/driver interface",
-    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
-    "0x19", "0x1a", "0x1b", "0x1c", "0x1d", 
-    "well known logical unit",
-    "no physical device on this lu",
-};
-
-static const char * get_ptype_str(int scsi_ptype)
-{
-    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
-
-    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
 }
 
 struct vpd_name {
@@ -786,12 +753,14 @@ static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
         dStrHex((const char *)buff, len, 0);
         return;
     }
-    printf("  RTO=%d GRD_CHK=%d APP_CHK=%d REF_CHK=%d\n", !!(buff[4] & 0x8),
-           !!(buff[4] & 0x4), !!(buff[4] & 0x2), !!(buff[4] & 0x1));
+    printf("  SPT=%d GRD_CHK=%d APP_CHK=%d REF_CHK=%d\n",
+	   ((buff[4] >> 3) & 0x7), !!(buff[4] & 0x4), !!(buff[4] & 0x2),
+	   !!(buff[4] & 0x1));
     printf("  GRP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d SIMPSUP=%d\n",
            !!(buff[5] & 0x10), !!(buff[5] & 0x8), !!(buff[5] & 0x4),
            !!(buff[5] & 0x2), !!(buff[5] & 0x1));
-    printf("  NV_SUP=%d V_SUP=%d\n", !!(buff[6] & 0x2), !!(buff[6] & 0x1));
+    printf("  CORR_D_SUP=%d NV_SUP=%d V_SUP=%d\n", !!(buff[6] & 0x80),
+           !!(buff[6] & 0x2), !!(buff[6] & 0x1));
 }
 
 static void decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
@@ -1028,7 +997,7 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
     int res, len, act_len, pqual, peri_type, ansi_version, ret, k, j;
     const char * cp;
     int vdesc_arr[8];
-    char buff[32];
+    char buff[48];
 
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
     res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, 36, 0, do_verbose);
@@ -1092,7 +1061,7 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
                 printf("MultiP=1 (VS=%d)  ", !!(rsp_buff[6] & 0x20));
             else
                 printf("MultiP=0  "); 
-            printf("MChngr=%d  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
+            printf("[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
                    !!(rsp_buff[6] & 0x08), !!(rsp_buff[6] & 0x04),
                    !!(rsp_buff[6] & 0x01), !!(rsp_buff[7] & 0x80));
             printf("WBus16=%d  Sync=%d  Linked=%d  [TranDis=%d]  ",
@@ -1110,7 +1079,7 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
                        len, len);
             if ((ansi_version >= 2) && (len < 36))
                 printf("  [for SCSI>=2, len>=36 is expected]");
-            cp = get_ptype_str(peri_type);
+            cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
             if (strlen(cp) > 0)
                 printf("   Peripheral device type: %s\n", cp);
 
@@ -1145,7 +1114,7 @@ static int process_std_inq(int sg_fd, const char * file_name, int do_36,
                 }
             }
         }
-        if (! (do_raw || do_hex)) {
+        if (! (do_raw || do_hex || do_36)) {
             if (0 == fetch_unit_serial_num(sg_fd, xtra_buff,
                                            sizeof(xtra_buff), do_verbose))
                 printf(" Unit serial number: %s\n", xtra_buff);
@@ -1301,6 +1270,7 @@ static int process_evpd(int sg_fd, int num_opcode, int do_hex,
 {
     int ret, len, num, k, peri_type, vpd;
     const char * cp;
+    char buff[48];
 
     if (!do_raw)
         printf("VPD INQUIRY, page code=0x%.2x:\n", num_opcode);
@@ -1332,7 +1302,7 @@ static int process_evpd(int sg_fd, int num_opcode, int do_hex,
                 peri_type = rsp_buff[0] & 0x1f;
                 printf("   [PQual=%d  Peripheral device type: %s]\n",
                        (rsp_buff[0] & 0xe0) >> 5, 
-                       get_ptype_str(peri_type));
+                       sg_get_pdt_str(peri_type, sizeof(buff), buff));
                 printf("   Supported VPD pages:\n");
                 num = rsp_buff[3];
                 for (k = 0; k < num; ++k) {
@@ -1492,9 +1462,13 @@ static int decode_vpd(int sg_fd, int num_opcode, int do_hex,
                                   1, do_verbose))
                     return 1;
             }
-            if (do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
+            if (do_raw) {
+                if (2 == do_raw)
+                    dWordHex((const unsigned short *)(rsp_buff + 60),
+                             256, -2, sg_is_big_endian());
+                else
+                    dStrRaw((const char *)rsp_buff, len);
+            } else
                 decode_ata_info_vpd(rsp_buff, len, do_hex);
             return 0;
         }
@@ -1674,7 +1648,7 @@ int main(int argc, char * argv[])
                     ++do_vpd_decode;
                     break;
                 case 'r':
-                    do_raw = 1;
+                    ++do_raw;
                     break;
                 case 's':
                     num_opcode = SCSI_PORTS_VPD;
@@ -1973,9 +1947,13 @@ static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
 #endif
     if (res)
         return res;
-    if (do_raw)
-        dStrRaw((const char *)&ata_ident, 512);
-    else {
+    if (do_raw) {
+        if (2 == do_raw)
+            dWordHex((const unsigned short *)&ata_ident, 256, -2,
+                     sg_is_big_endian());
+        else
+            dStrRaw((const char *)&ata_ident, 512);
+    } else {
         if (do_hex) {
             if (atapi)
                 printf("ATA IDENTIFY PACKET DEVICE response ");

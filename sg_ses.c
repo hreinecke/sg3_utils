@@ -47,7 +47,7 @@
  *commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.18 20050808";
+static char * version_str = "1.21 20051113";    /* ses2r13 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 512
@@ -120,39 +120,6 @@ static int do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg,
                            noisy, verbose);
 }
 
-static const char * scsi_ptype_strs[] = {
-    /* 0 */ "disk",
-    "tape",
-    "printer",
-    "processor",
-    "write once optical disk",
-    /* 5 */ "cd/dvd",
-    "scanner",
-    "optical memory device",
-    "medium changer",
-    "communications",
-    /* 0xa */ "graphics",
-    "graphics",
-    "storage array controller",
-    "enclosure services device",
-    "simplified direct access device",
-    "optical card reader/writer device",
-    /* 0x10 */ "bridge controller commands",
-    "object based storage",
-    "automation/driver interface",
-    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
-    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
-    "well known logical unit",
-    "no physical device on this lu",
-};
-
-static const char * get_ptype_str(int scsi_ptype)
-{
-    int num = sizeof(scsi_ptype_strs) / sizeof(scsi_ptype_strs[0]);
-
-    return (scsi_ptype < num) ? scsi_ptype_strs[scsi_ptype] : "";
-}
-
 struct page_code_desc {
         int page_code;
         const char * desc;
@@ -178,12 +145,48 @@ static struct page_code_desc pc_desc_arr[] = {
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
 };
+static struct page_code_desc in_pc_desc_arr[] = {
+        {0x0, "Supported diagnostic pages"},
+        {0x1, "Configuration (SES)"},
+        {0x2, "Enclosure status (SES)"},
+        {0x3, "Help text (SES)"},
+        {0x4, "String In (SES)"},
+        {0x5, "Threshold In (SES)"},
+        {0x6, "Array Status (SES, obsolete)"},
+        {0x7, "Element descriptor (SES)"},
+        {0x8, "Short enclosure status (SES)"},
+        {0x9, "Enclosure busy (SES-2)"},
+        {0xa, "Additional (device) element status (SES-2)"},
+        {0xb, "Subenclosure help text (SES-2)"},
+        {0xc, "Subenclosure string In (SES-2)"},
+        {0xd, "Supported SES diagnostic pages (SES-2)"},
+        {0xe, "Download microcode (SES-2)"},
+        {0xf, "Subenclosure nickname (SES-2)"},
+        {0x3f, "Protocol specific SAS (SAS-1)"},
+        {0x40, "Translate address (SBC)"},
+        {0x41, "Device status (SBC)"},
+};
 
 static const char * find_page_code_desc(int page_num)
 {
     int k;
     int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
     const struct page_code_desc * pcdp = &pc_desc_arr[0];
+
+    for (k = 0; k < num; ++k, ++pcdp) {
+        if (page_num == pcdp->page_code)
+            return pcdp->desc;
+        else if (page_num < pcdp->page_code)
+            return NULL;
+    }
+    return NULL;
+}
+
+static const char * find_in_page_code_desc(int page_num)
+{
+    int k;
+    int num = sizeof(in_pc_desc_arr) / sizeof(in_pc_desc_arr[0]);
+    const struct page_code_desc * pcdp = &in_pc_desc_arr[0];
 
     for (k = 0; k < num; ++k, ++pcdp) {
         if (page_num == pcdp->page_code)
@@ -400,30 +403,29 @@ static char * find_sas_connector_type(int conn_type, char * buff,
         snprintf(buff, buff_len, "No information");
         break;
     case 0x1:
-        snprintf(buff, buff_len, "SAS external receptacle (SFF-8470) "
+        snprintf(buff, buff_len, "SAS 4x receptacle (SFF-8470) "
                  "[max 4 phys]");
         break;
     case 0x2:
-        snprintf(buff, buff_len, "SAS external compact receptacle "
-                 "(SFF-8088) [max 4 phys]");
-        break;
-    case 0x10:
-        snprintf(buff, buff_len, "SAS internal wide plug (SFF-8484) "
+        snprintf(buff, buff_len, "Mini SAS 4x receptacle (SFF-8088) "
                  "[max 4 phys]");
         break;
+    case 0x10:
+        snprintf(buff, buff_len, "SAS 4i plug (SFF-8484) [max 4 phys]");
+        break;
     case 0x11:
-        snprintf(buff, buff_len, "SAS internal compact wide plug "
-                 "(SFF-8087) [max 4 phys]");
+        snprintf(buff, buff_len, "Mini SAS 4i receptacle (SFF-8087) "
+                 "[max 4 phys]");
         break;
     case 0x20:
-        snprintf(buff, buff_len, "SAS backplane receptacle (SFF-8482) "
+        snprintf(buff, buff_len, "SAS Drive backplane receptacle (SFF-8482) "
                  "[max 2 phys]");
         break;
     case 0x21:
-        snprintf(buff, buff_len, "SATA style host plug [max 1 phy]");
+        snprintf(buff, buff_len, "SATA host plug [max 1 phy]");
         break;
     case 0x22:
-        snprintf(buff, buff_len, "SAS plug (SFF-8482) [max 2 phys]");
+        snprintf(buff, buff_len, "SAS Drive plug (SFF-8482) [max 2 phys]");
         break;
     case 0x23:
         snprintf(buff, buff_len, "SATA device plug [max 1 phy]");
@@ -444,7 +446,7 @@ static char * find_sas_connector_type(int conn_type, char * buff,
         else if (conn_type < 0x80)
             snprintf(buff, buff_len, "vendor specific connector type: 0x%x",
                      conn_type);
-        else    /* conn_type comes from a 7 bit field, so this is imposs */
+        else    /* conn_type is a 7 bit field, so this is impossible */
             snprintf(buff, buff_len, "unexpected connector type: 0x%x",
                      conn_type);
         break;
@@ -531,7 +533,7 @@ static void print_element_status(const char * pad,
                    !!(statp[1] & 0x80), !!(statp[3] & 0x40),
                    !!(statp[3] & 0x20), !!(statp[3] & 0x10));
         printf("%sActual speed=%d rpm, Fan %s\n", pad,
-               (((3 & statp[1]) << 8) + statp[2]) * 10,
+               (((0x7 & statp[1]) << 8) + statp[2]) * 10,    /* 05-372r0 */
                actual_speed_desc[7 & statp[3]]);
         break;
     case 4:     /* temperature sensor */
@@ -996,20 +998,20 @@ static char * sas_device_type[] = {
 static void ses_transport_proto(const unsigned char * ucp, int len,
                                 int elem_num)
 {
-    int ports, phys, j, m, desc_type, eip_off;
+    int ports, phys, j, m, desc_type, eip_offset;
     const unsigned char * per_ucp;
 
-    eip_off = (0x10 & ucp[0]) ? 2 : 0;
+    eip_offset = (0x10 & ucp[0]) ? 2 : 0;
     switch (0xf & ucp[0]) {
     case 0:     /* FCP */
-        ports = ucp[2 + eip_off];
+        ports = ucp[2 + eip_offset];
         printf("   [%d] Transport protocol: FCP, number of ports: %d\n",
                elem_num + 1, ports);
         printf("    node_name: ");
         for (m = 0; m < 8; ++m)
-            printf("%02x", ucp[6 + eip_off + m]);
+            printf("%02x", ucp[6 + eip_offset + m]);
         printf("\n");
-        per_ucp = ucp + 14 + eip_off;
+        per_ucp = ucp + 14 + eip_offset;
         for (j = 0; j < ports; ++j, per_ucp += 16) {
             printf("    [%d] port loop position: %d, port requested hard "
                    "address: %d\n", j + 1, per_ucp[0], per_ucp[4]);
@@ -1022,14 +1024,14 @@ static void ses_transport_proto(const unsigned char * ucp, int len,
         }
         break;
     case 6:     /* SAS */
-        desc_type = (ucp[3 + eip_off] >> 6) & 0x3;
+        desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
         printf("   [%d] Transport protocol: SAS, ", elem_num + 1);
         if (0 == desc_type) {
-            phys = ucp[2 + eip_off];
+            phys = ucp[2 + eip_offset];
             printf("SAS and SATA device descriptor type [%d]\n", desc_type);
             printf("    number of phys: %d, not all phys: %d\n", phys,
-                   ucp[3 + eip_off] & 1);
-            per_ucp = ucp + 4 + eip_off + eip_off;
+                   ucp[3 + eip_offset] & 1);
+            per_ucp = ucp + 4 + eip_offset + eip_offset;
             for (j = 0; j < phys; ++j, per_ucp += 28) {
                 printf("    [%d] device type: %s\n", phys + 1,
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
@@ -1052,14 +1054,14 @@ static void ses_transport_proto(const unsigned char * ucp, int len,
                 printf("\n      phy identifier: 0x%x\n", per_ucp[20]);
             }
         } else if (1 == desc_type) {
-            phys = ucp[2 + eip_off];
+            phys = ucp[2 + eip_offset];
             printf("expander descriptor type [%d]\n", desc_type);
             printf("    number of phys: %d\n", phys);
             printf("    SAS address: ");
             for (m = 0; m < 8; ++m)
-                printf("%02x", ucp[6 + eip_off + m]);
+                printf("%02x", ucp[6 + eip_offset + m]);
             printf("\n");
-            per_ucp = ucp + 14 + eip_off;
+            per_ucp = ucp + 14 + eip_offset;
             for (j = 0; j < phys; ++j, per_ucp += 2) {
                 printf("    [%d] ", phys + 1);
                 if (0xff == per_ucp[0])
@@ -1380,7 +1382,7 @@ static void ses_process_status(int sg_fd, int page_code, int do_raw,
     const char * cp;
 
     memset(rsp_buff, 0, rsp_buff_size);
-    cp = find_page_code_desc(page_code);
+    cp = find_in_page_code_desc(page_code);
     if (0 == sg_ll_receive_diag(sg_fd, 1, page_code, rsp_buff,
                                 rsp_buff_size, 1, verbose)) {
         rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
@@ -1524,6 +1526,7 @@ int main(int argc, char * argv[])
     int inner_hex = 0;
     int byte1 = 0;
     char device_name[256];
+    char buff[48];
     unsigned char data_arr[1024];
     int arr_len = 0;
     int pd_type = 0;
@@ -1667,7 +1670,7 @@ int main(int argc, char * argv[])
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
                    inq_resp.product, inq_resp.revision);
             pd_type = inq_resp.peripheral_type;
-            cp = get_ptype_str(pd_type);
+            cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
             if (0xd == pd_type)
                 printf("    enclosure services device\n");
             else if (0x40 & inq_resp.byte_6)

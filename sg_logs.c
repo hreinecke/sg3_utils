@@ -23,7 +23,7 @@
    
 */
 
-static char * version_str = "0.44 20050916";
+static char * version_str = "0.44 20051104";
 
 #define ME "sg_logs: "
 
@@ -764,8 +764,9 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
                          break;
             case 3: snprintf(s, sz, "phy enabled; SATA spinup hold state");
                          break;
-            case 8: snprintf(s, sz, "phy enabled; 1.5Gbps"); break;
-            case 9: snprintf(s, sz, "phy enabled; 3.0Gbps"); break;
+            case 8: snprintf(s, sz, "phy enabled; 1.5 Gbps"); break;
+            case 9: snprintf(s, sz, "phy enabled; 3 Gbps"); break;
+            case 0xa: snprintf(s, sz, "phy enabled; 6 Gbps"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
             printf("    negotiated physical link rate: %s\n", s);

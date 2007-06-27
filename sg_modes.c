@@ -24,7 +24,7 @@
    
 */
 
-static char * version_str = "1.10 20050904";
+static char * version_str = "1.11 20051113";
 
 #define ME "sg_modes: "
 
@@ -236,6 +236,7 @@ static struct page_code_desc pc_desc_t_sas[] = {
     {0x18, 0x0, "LU SSP, short format"},
     {0x19, 0x0, "Port SSP, short format"},
     {0x19, 0x1, "Port SSP, phy control and discover"},
+    {0x19, 0x2, "Port SSP, shared"},
 };
 
 static struct page_code_desc pc_desc_t_adt[] = {
@@ -706,7 +707,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ">>>>>> try again without the '-6' "
                     "switch for a 10 byte MODE SENSE command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in cdb (perhaps subpages "
+            fprintf(stderr, "invalid field in cdb (perhaps subpages "
                     "or page control (PC) not supported)\n");
     } else {
         res = sg_ll_mode_sense10(sg_fd, do_llbaa, do_dbd, pc, pg_code,
@@ -716,7 +717,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ">>>>>> try again with a '-6' "
                     "switch for a 6 byte MODE SENSE command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in cdb (perhaps subpages "
+            fprintf(stderr, "invalid field in cdb (perhaps subpages "
                     "or page control (PC) not supported)\n");
     }
     if (0 == res) {

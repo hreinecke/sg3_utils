@@ -1,26 +1,53 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
+  <title>Linux sg3_utils package</title>
   <meta http-equiv="Content-Type"
  content="text/html; charset=iso-8859-1">
+  <meta name="keywords" content="sg3_utils, SCSI utilities, linux">
   <meta name="GENERATOR"
  content="Mozilla/4.79 [en] (X11; U; Linux 2.5.31 i686) [Netscape]">
-  <title>Linux sg3_utils package</title>
 </head>
 <body alink="#ff0000" background="paper.jpg" bgcolor="#ffffff"
  link="#0000ff" text="#000000" vlink="#000080">
 <center>
-<h1> The&nbsp; Linux sg3_utils package</h1>
+<h1><a class="mozTocH1" name="mozTocId697451"></a> The&nbsp; Linux
+sg3_utils package</h1>
 </center>
-<a href="#intro">Introduction</a> <br>
-<a href="#contents">Contents</a><br>
-<a href="#Changing_mode_page_settings">Changing mode page settings</a><br>
-<a href="#Examples"><span style="text-decoration: underline;">Examples</span></a><br>
-<a href="#notes">Notes</a> <br>
-<a href="#download">Download</a> <br>
-<a href="#others">Programs from other sources</a> <br>
-&nbsp;
-<h2> <a name="intro"></a>Introduction</h2>
+<a href="#intro"></a>
+<ol id="mozToc">
+<!--mozToc h1 1 h2 2 h3 3 h4 4 h5 5 h6 6--><li><a href="#mozTocId697451">
+The&nbsp; Linux sg3_utils package</a>
+    <ol>
+      <li><a href="#mozTocId746876"> Introduction</a></li>
+      <li><a href="#mozTocId764860"> Contents of sg3_utils</a></li>
+      <li><a href="#mozTocId143590">Changing mode page
+settings</a></li>
+      <li><a href="#mozTocId301018">Examples</a></li>
+      <li><a href="#mozTocId585558"> Notes</a></li>
+      <li><a href="#mozTocId479511"> Download</a></li>
+      <li><a href="#mozTocId185822"> Programs from other sources</a>
+        <ol>
+          <li><a href="#mozTocId348388"> scu</a></li>
+          <li><a href="#mozTocId668788"> dt</a></li>
+          <li><a href="#mozTocId673853">scsiinfo</a></li>
+          <li><a href="#mozTocId550034"> scsidev</a></li>
+          <li><a href="#mozTocId212850"> ddrescue</a></li>
+          <li><a href="#mozTocId380766"> mapscsi</a></li>
+          <li><a href="#mozTocId108175"> scsimap</a></li>
+          <li><a href="#mozTocId143073"> smartsuite</a></li>
+          <li><a href="#mozTocId535090">smartmontools</a></li>
+          <li><a href="#mozTocId974127">scsirastools</a></li>
+          <li><a href="#mozTocId783871">SeaTools</a></li>
+          <li><a href="#mozTocId264328"> devlabel</a></li>
+          <li><a href="#mozTocId295637">plscsi</a></li>
+          <li><a href="#mozTocId325127">safte-monitor</a></li>
+        </ol>
+      </li>
+    </ol>
+  </li>
+</ol>
+<h2><a class="mozTocH2" name="mozTocId746876"></a> Introduction</h2>
 The <span style="font-weight: bold;">sg3_utils</span> package contains
 utilities
 that send SCSI commands to Linux devices. As well as devices on SCSI
@@ -41,7 +68,7 @@ targeted the&nbsp; linux kernel 2.2 series with some support for the
 2.0 series. See an earlier version of this web <a href="uu_index.html">page</a>&nbsp;
 for further information about sg_utils.&nbsp; This
 document describes
-<span style="font-weight: bold;">version 1.16</span> of <span
+<span style="font-weight: bold;">version 1.18</span> of <span
  style="font-weight: bold;">sg3_utils</span> . <br>
 <br>
 In the linux kernel 2.4 series most these utilities must be
@@ -61,7 +88,7 @@ state machines.<br>
 <p>SCSI utility programs for Linux from other sources are listed and
 briefly described in
 the final section. </p>
-<h2> <a name="contents"></a>Contents of sg3_utils</h2>
+<h2><a class="mozTocH2" name="mozTocId764860"></a> Contents of sg3_utils</h2>
 Here is a listing in alphabetical order of the utilities in the
 sg3_utils package:<br>
 <br>
@@ -246,7 +273,7 @@ cd/dvd drive and/or its current media<br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">default is to report (fetch) the
-device identifier. With the '--set' option a new identifier can be sent
+device identifier. With the '--set' option a new identifier is sent
 to the device.<br>
       </td>
     </tr>
@@ -258,7 +285,8 @@ to the device.<br>
       <td style="vertical-align: top;"><br>
       </td>
       <td style="vertical-align: top;">fetch standard response, VPD
-pages (including device identification) or version descriptors<br>
+pages (including device identification) or version descriptors. Also
+can perform IDENTIFY (PACKET) DEVICE ATA command.<br>
       </td>
     </tr>
     <tr>
@@ -293,6 +321,18 @@ standard pages<br>
       <td style="vertical-align: top;">shows mapping between sg devices
 and primary device node (if any). In lk 2.6 see <a
  href="../scsi/lsscsi.html">lsscsi</a> .<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">sg_map26<br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;"><br>
+      </td>
+      <td style="vertical-align: top;">maps between single sg device
+and primary device node (and vice versa). Also does mapping in to and
+out of sysfs. For the linux 2.6 series.<br>
       </td>
     </tr>
     <tr>
@@ -621,7 +661,7 @@ should be taken not to interfere with a device while it is "active".
 For example invoking a "sg_format -F" utility on a disk with mounted
 file
 systems on it is going to cause damage.<br>
-<h2><a name="Changing_mode_page_settings"></a>Changing mode page
+<h2><a class="mozTocH2" name="mozTocId143590"></a>Changing mode page
 settings</h2>
 SCSI devices store settings (metadata) that could possibly be changed
 by the user (called the "application client" in SCSI jargon) in mode
@@ -680,7 +720,7 @@ this particular feature)).<br>
 The author's recommendation is to use <a href="sdparm.html">sdparm</a>
 unless the features of
 another utility better suit your needs.<br>
-<h2><a name="Examples"></a>Examples</h2>
+<h2><a class="mozTocH2" name="mozTocId301018"></a>Examples</h2>
 The fundamental SCSI command whose support is mandatory for all SCSI
 devices is INQUIRY. All devices should respond to a "standard" (i.e.
 when no Vital Product Pages are requested) INQUIRY.<br>
@@ -856,7 +896,7 @@ utilities in the sg3_utils package can be issued directly against the
 primary device node (e.g. /dev/sda).&nbsp; However the sg driver is
 still needed to "talk" to devices such as enclosures which have no
 specialized driver in linux.<br>
-<h2> <a name="notes"></a>Notes</h2>
+<h2><a class="mozTocH2" name="mozTocId585558"></a> Notes</h2>
 Starting with sg3_utils-1.09 a library called libsgutils is built and
 is required by most utilities. The library is made up of two source
 files: sg_lib.c and sg_cmds.c; and their associated header files . The
@@ -883,7 +923,7 @@ Note that SCSI tape devices (both st and osst device drivers) are char
 devices and support the SG_IO ioctl from lk 2.6.6 onwards.<br>
 <p>See the notes about header file problems in the README file inside
 each package. </p>
-<h2> <a name="download"></a>Download</h2>
+<h2><a class="mozTocH2" name="mozTocId479511"></a> Download</h2>
 Various tarballs that include the source, a README, CHANGELOG, INSTALL
 and a Makefile can be found in the <span
  style="text-decoration: underline;">table 2</span> on the main
@@ -891,8 +931,9 @@ page (link at the bottom of this page). There are also source,
 i386 binary rpm and deb packages available. Both sg3_utils and the
 older sg_utils packages can
 be found on http://freshmeat.net .
-<h2> <a name="others"></a>Programs from other sources</h2>
-<h3> scu</h3>
+<h2><a class="mozTocH2" name="mozTocId185822"></a> Programs from other
+sources</h2>
+<h3><a class="mozTocH3" name="mozTocId348388"></a> scu</h3>
 The SCSI Command Utility (SCU) implements various SCSI commands
 necessary for normal maintenance and diagnostics of SCSI
 peripherals. Some of its features include: formatting, scanning for
@@ -904,7 +945,7 @@ in binary form. See&nbsp;<a class="moz-txt-link-freetext"
  style="font-family: monospace;"> </span>www.scsifaq.org/RMiller_Tools/index.html</a>
 or&nbsp; <a href="http://www.scsifaq.org/RMiller_Tools/index.html">http://www.scsifaq.org/RMiller_Tools/index.html</a>
 for more details.
-<h3> dt</h3>
+<h3><a class="mozTocH3" name="mozTocId668788"></a> dt</h3>
 The Data Test (DT) program is modelled on dd's syntax but <b>dt </b>can
 do a lot more than sequential copies. It is a comprehensive data test
 program for SCSI devices such as disks, tapes and cdrom/dvds. It is
@@ -915,7 +956,7 @@ See&nbsp;<a class="moz-txt-link-freetext"
  style="font-family: monospace;"></span>www.scsifaq.org/RMiller_Tools/index.html</a>&nbsp;for
 more details. Both <b>scu</b> and <b>dt </b>are written by Robin
 T. Miller &lt;Robin.Miller at hp dot com&gt;<br>
-<h3>scsiinfo</h3>
+<h3><a class="mozTocH3" name="mozTocId673853"></a>scsiinfo</h3>
 Older package that includes the <span style="font-weight: bold;">scsiinfo</span>
 and <span style="font-weight: bold;">scsiformat</span> utilities plus
 tcl/tk GUI interfaces for those utilities. The last update of the <span
@@ -929,7 +970,7 @@ standards (e.g. extra and extended mode pages) are reflected in <span
  style="font-weight: bold;">sg_format</span> utility can be thought of
 as a modern replacement for the <span style="font-weight: bold;">scsiformat</span>
 utility.<br>
-<h3> scsidev</h3>
+<h3><a class="mozTocH3" name="mozTocId550034"></a> scsidev</h3>
 Kurt Garloff &lt;garloff@suse.de&gt; describes this utility thus: "This
 program scans the SCSI bus and creates device nodes in /dev/scsi/,
 which have a naming corresponding to their SCSI IDs and LUNs, just
@@ -943,13 +984,13 @@ more information see: <a
  href="http://www.garloff.de/kurt/linux/scsidev">www.garloff.de/kurt/linux/scsidev</a>
 . He also has the useful <b>rescan-scsi-bus.sh</b> script at the same
 location.
-<h3> ddrescue</h3>
+<h3><a class="mozTocH3" name="mozTocId212850"></a> ddrescue</h3>
 This is another utility from&nbsp; Kurt Garloff &lt;garloff@suse.de&gt;
 for rescuing damaged media. It is a variant of dd that will continue
 passed errors on the input file. It is applicable to any device that
 can be read by dd (e.g. IDE and SCSI disks, cds and tapes). For more
 information see: <a href="http://www.garloff.de/kurt/linux/ddrescue">www.garloff.de/kurt/linux/ddrescue</a>
-<h3> mapscsi</h3>
+<h3><a class="mozTocH3" name="mozTocId380766"></a> mapscsi</h3>
 Michael Clark &lt;michael@metaparadigm.com&gt; describes his utility
 thus: "mapscsi is a small utility that creates a consistent mapping
 to Linux scsi devices. mapscsi achieves this by creating symbolic
@@ -961,7 +1002,7 @@ using this information plus a mapping rules file containing device
 templates to dynamically create link names". For more information see: <a
  href="http://gort.metaparadigm.com/mapscsi">http://gort.metaparadigm.com/mapscsi</a>
 .
-<h3> scsimap</h3>
+<h3><a class="mozTocH3" name="mozTocId108175"></a> scsimap</h3>
 Steve Cameron &lt;smcameron@yahoo.com&gt; has the following description
 at his site:
 <p>This is a utility to create and maintain symbolic links mapping a
@@ -979,7 +1020,7 @@ handles later generation Compaq array controllers (those which use
 the cciss driver.) </p>
 <p>See: <a href="http://www.geocities.com/smcameron">www.geocities.com/smcameron</a>
 . </p>
-<h3> smartsuite</h3>
+<h3><a class="mozTocH3" name="mozTocId143073"></a> smartsuite</h3>
 This is a package that supports S.M.A.R.T. capabilities built into
 modern IDE and SCSI-3 disks. Self-Monitoring, Analysis and Reporting
 Technology (S.M.A.R.T.) is described at <a
@@ -987,14 +1028,14 @@ Technology (S.M.A.R.T.) is described at <a
 For smartsuite see <a href="http://sourceforge.net/projects/smartsuite">sourceforge.net/projects/smartsuite</a>
 . <br>
 <br>
-<h3>smartmontools</h3>
+<h3><a class="mozTocH3" name="mozTocId535090"></a>smartmontools</h3>
 This project has taken over from the aforementioned
 smartsuite which is currently not actively maintained. See <a
  href="http://smartmontools.sourceforge.net">http://smartmontools.sourceforge.net</a>
 . The author is a maintainer of the SCSI component of this project.
 [The lead maintainer is Bruce Allen.]<br>
 <br>
-<h3>scsirastools</h3>
+<h3><a class="mozTocH3" name="mozTocId974127"></a>scsirastools</h3>
 "This project includes changes that enhance the Reliability,
 Availability and Serviceability (RAS) of the drivers that are
 commonly used in a Linux software RAID-1 configuration. Other
@@ -1006,7 +1047,7 @@ to load disk firmware, <b>sgmode</b> to get and set mode pages, <b>sgdefects</b>
 to read primary and grown defect lists and <b>sgdiag</b> to perform
 format and other test functions.<br>
 &nbsp;<br>
-<h3>SeaTools</h3>
+<h3><a class="mozTocH3" name="mozTocId783871"></a>SeaTools</h3>
 SeaTools is a freely available (binary, not source) utility for disk
 diagnostics from Seagate which is a disk manufacturer. It can be found
 at <a href="http://www.seagate.com">http://www.seagate.com</a> under
@@ -1014,7 +1055,7 @@ the support tab. They have both a command line and a graphical utility.
 &nbsp;Some of the facilities will work on any SCSI disks while others
 are Seagate specific. Self tests, mode page settings and formats (to
 different block sizes) are amongst the facilities available.<br>
-<h3> devlabel</h3>
+<h3><a class="mozTocH3" name="mozTocId264328"></a> devlabel</h3>
 Devlabel is "a small userspace app which maps symlinks to underlying
 disk names. It uses [INQUIRY VPD] Page83/Page80 data to track the
 true locations of disks even if their hd/sd name changes and simply
@@ -1023,11 +1064,11 @@ lk 2.6 series and support for multi-path configurations is on the
 author's "to do" list. See <a href="http://www.lerhaupt.com/linux.html">http://www.lerhaupt.com/linux.html</a>
 .<br>
 <br>
-<h3>plscsi</h3>
+<h3><a class="mozTocH3" name="mozTocId295637"></a>plscsi</h3>
 This utility allows arbitrary SCSI commands to be sent to a device. See
 <a href="http://members.aol.com/plscsi">http://members.aol.com/plscsi</a>
 . It is similar to FreeBSD's camcontrol command.<br>
-<h3>safte-monitor</h3>
+<h3><a class="mozTocH3" name="mozTocId325127"></a>safte-monitor</h3>
 SAF-TE (SCSI Attached Fault-Tolerant Enclosure) is a SCSI command set
 for monitoring and controlling enclosures and RAIDs. SAF-TE devices
 report "processor" peripheral device type (0x3) in their INQUIRY
@@ -1038,7 +1079,7 @@ monitoring tool for linux see: <a
 <br>
 <p>Return to <a href="index.html">main</a> page. </p>
 <center>
-<p>Last updated: 5th August 2005<br>
+<p>Last updated: 15th November 2005<br>
 <br>
 </p>
 </center>

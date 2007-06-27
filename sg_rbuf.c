@@ -45,7 +45,7 @@
 
 #define ME "sg_rbuf: "
 
-static char * version_str = "4.83 20050808";
+static char * version_str = "4.83 20051025";
 
 static void usage()
 {
@@ -217,12 +217,12 @@ int main(int argc, char * argv[])
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_RECOVERED:
         sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr,
-                        verbose);
+                        verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, verbose);
+        sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, verbose > 1);
         if (rawp) free(rawp);
         return 1;
     }
@@ -338,10 +338,11 @@ int main(int argc, char * argv[])
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr, verbose);
+            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr,
+                            verbose > 1);
             break;
         default: /* won't bother decoding other categories */
-            sg_chk_n_print3("READ BUFFER data error", &io_hdr, verbose);
+            sg_chk_n_print3("READ BUFFER data error", &io_hdr, verbose > 1);
             if (rawp) free(rawp);
             return 1;
         }

@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "September 2005" "sg3_utils-1.17" SG3_UTILS
+.TH SG_INQ "8" "November 2005" "sg3_utils-1.18" SG3_UTILS
 .SH NAME
 sg_inq \- outputs data retrieved from the SCSI INQUIRY or
 ATA IDENTIFY (PACKET) DEVICE command
@@ -153,7 +153,10 @@ outputs the INQUIRY response in binary. If the SCSI INQUIRY has failed
 and an ATA IDENTIFY succeeds then the 512 bytes of the IDENTIFY response
 is output in binary. Overrides the various VPD decoding options. Standard
 output should be redirected to a file or some other program that can
-process binary data.
+process binary data. Can be used twice and if used with the '-A'
+or '-a' option yields output with the same format
+as "cat /proc/ide/hd<x>/identify" so that it can then be piped
+to "hdparm --Istdin".
 .TP
 -s
 decodes the SCSI Ports Vital Product Data (VPD) page [0x88]. The response
@@ -234,6 +237,11 @@ this utility exits. To see the response for an ATA IDENTIFY PACKET
 DEVICE command add the '-A' option (e.g. "sg_inq -A /dev/hdc) and to
 see the response in hex add the "-H" option as
 well (e.g. "sg_inq -A -H /dev/hdc").
+.PP
+This utility doesn't decode the response to an ATA IDENTIFY (PACKET)
+DEVICE command, hdparm does a good job at that. The '-rr' option has
+been added to use with either the '-A' or '-a' option to produce a
+format acceptable to "hdparm --Istdin". See hdparm.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
@@ -245,4 +253,4 @@ This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sgdiag(scsirastools), sg_opcodes(sg3_utils), sg_modes(sg3_utils),
-.B sg_logs(sg3_utils)
+.B sg_logs(sg3_utils), hdparm(hdparm)

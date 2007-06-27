@@ -45,7 +45,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.04 20050808";
+static char * version_str = "1.04 20051025";
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -149,7 +149,7 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("VERIFY(10), continuing", &io_hdr, verbose);
+        sg_chk_n_print3("VERIFY(10), continuing", &io_hdr, verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         return 0;
@@ -159,7 +159,7 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
             sg_chk_n_print3("VERIFY(10) command problem", &io_hdr, 1);
         return res;
     default:
-        sg_chk_n_print3("VERIFY(10) command problem", &io_hdr, verbose);
+        sg_chk_n_print3("VERIFY(10) command problem", &io_hdr, verbose > 1);
         return -1;
     }
 }

@@ -2,6 +2,25 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages.
 
+Changelog for sg3_utils-1.18 [20051118]
+  - sg_map26: new utility to map sg devices in lk 2.6
+  - sg_luns: luns > 16,384 (sam-4 rev 4)
+  - sg_ses: bump fan speed field to 11 bits
+    - SAS connector names (ses2r13)
+  - sg_inq: add '-rr' option for "hdparm --Istdin"
+  - sg_get_config: tracking mmc-5
+  - sg_write_long: add support for COR_DIS bit
+  - sg_cmds: add sg_ll_test_unit_ready_progress()
+  - sg_turs: '-p' option shows progress
+  - sg_dd: add 'iflag=' and 'oflag=' options
+    - remove output of mode page info when verbose > 0
+    - add control of DPO bit via iflag/oflag
+  - sg_lib: add sg_get_pdt_str()
+    - update asc/ascq strings
+  - sg_modes + sginfo: add SAS(2) SSP shared mode subpage
+  - doc: rename "html" directory to "doc"
+  - Makefile: add 'libtool --finish' to install
+
 Changelog for sg3_utils-1.17 [20050922]
   - sg_inq: add '-a' option for ATA information VPD page
     - add '-b' option for Block limits VPD page (SBC)

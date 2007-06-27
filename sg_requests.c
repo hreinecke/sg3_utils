@@ -149,7 +149,7 @@ int main(int argc, char * argv[])
     if (0 == res) {
         resp_len = requestSenseBuff[7] + 8;
         fprintf(stderr, "Decode response as sense data:\n");
-        sg_print_sense(NULL, requestSenseBuff, resp_len, verbose);
+        sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
         if (verbose) {
             fprintf(stderr, "\nOutput response in hex\n");
             dStrHex((const char *)requestSenseBuff, resp_len, 1);

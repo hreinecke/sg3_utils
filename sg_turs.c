@@ -26,16 +26,19 @@
 
 */
 
-static char * version_str = "3.17 20050808";
+static char * version_str = "3.18 20051012";
 
 #define EBUFF_SZ 256
 
 static void usage()
 {
-    printf("Usage: 'sg_turs [-n=<num_of_test_unit_readys>] [-t] "
-           "[-v] [-V] <scsi_device>'\n"
+    printf("Usage: 'sg_turs [-n=<num_of_test_unit_readys>] [-p] [-t] "
+           "[-v] [-V]\n"
+           "                <scsi_device>'\n"
            " where '-n=<num>' number of test_unit_ready commands "
            "(def: 1)\n"
+           "       '-p'   outputs progress indication (percentage) "
+           "if available\n"
            "       '-t'   outputs total duration and commands per "
            "second\n"
            "       '-v'   increase verbosity\n"
@@ -50,6 +53,8 @@ int main(int argc, char * argv[])
     const char * cp;
     char ebuff[EBUFF_SZ];
     int num_turs = 1;
+    int do_progress = 0;
+    int progress;
     int num_errs = 0;
     int do_time = 0;
     int verbose = 0;
@@ -64,6 +69,9 @@ int main(int argc, char * argv[])
         if ('-' == *cp) {
             for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
                 switch (*cp) {
+                case 'p':
+                    do_progress = 1;
+                    break;
                 case 't':
                     do_time = 1;
                     break;
@@ -118,40 +126,58 @@ int main(int argc, char * argv[])
         perror(ebuff);
         return 1;
     }
-    if (do_time) {
-        start_tm.tv_sec = 0;
-        start_tm.tv_usec = 0;
-        gettimeofday(&start_tm, NULL);
-    }
-    for (k = 0; k < num_turs; ++k) {
-        if (sg_ll_test_unit_ready(sg_fd, k, ((1 == num_turs) ? 1 : 0),
-                                  verbose))
-            ++num_errs;
-    }
-    if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
-        struct timeval res_tm;
-        double a, b;
-
-        gettimeofday(&end_tm, NULL);
-        res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
-        res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
-        if (res_tm.tv_usec < 0) {
-            --res_tm.tv_sec;
-            res_tm.tv_usec += 1000000;
+    if (do_progress) {
+        for (k = 0; k < num_turs; ++k) {
+            if (k > 0)
+                sleep(30);
+            progress = -1;
+            sg_ll_test_unit_ready_progress(sg_fd, k, &progress,
+                                ((1 == num_turs) ? 1 : 0), verbose);
+            if (progress < 0)
+                break;
+	    else
+		printf("Progress indication: %d%% done\n",
+                                (progress * 100) / 65536);
         }
-        a = res_tm.tv_sec;
-        a += (0.000001 * res_tm.tv_usec);
-        b = (double)num_turs;
-        printf("time to perform commands was %d.%06d secs",
-               (int)res_tm.tv_sec, (int)res_tm.tv_usec);
-        if (a > 0.00001)
-            printf("; %.2f operations/sec\n", b / a);
-        else
-            printf("\n");
-    }
+        if (num_turs > 1)
+            printf("Completed %d Test Unit Ready commands\n",
+                   ((k < num_turs) ? k + 1 : k));
+    } else {
+        if (do_time) {
+            start_tm.tv_sec = 0;
+            start_tm.tv_usec = 0;
+            gettimeofday(&start_tm, NULL);
+        }
+        for (k = 0; k < num_turs; ++k) {
+            if (sg_ll_test_unit_ready(sg_fd, k, ((1 == num_turs) ? 1 : 0),
+                                      verbose))
+                ++num_errs;
+        }
+        if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+            struct timeval res_tm;
+            double a, b;
 
-    printf("Completed %d Test Unit Ready commands with %d errors\n",
-            num_turs, num_errs);
+            gettimeofday(&end_tm, NULL);
+            res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
+            res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
+            if (res_tm.tv_usec < 0) {
+                --res_tm.tv_sec;
+                res_tm.tv_usec += 1000000;
+            }
+            a = res_tm.tv_sec;
+            a += (0.000001 * res_tm.tv_usec);
+            b = (double)num_turs;
+            printf("time to perform commands was %d.%06d secs",
+                   (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+            if (a > 0.00001)
+                printf("; %.2f operations/sec\n", b / a);
+            else
+                printf("\n");
+        }
+
+        printf("Completed %d Test Unit Ready commands with %d errors\n",
+                num_turs, num_errs);
+    }
     close(sg_fd);
     return num_errs ? 1 : 0;
 }

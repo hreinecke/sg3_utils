@@ -68,7 +68,7 @@ static unsigned char sbuff[MAX_SENSE_SZ];
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.05 20050908";
+static char * version_str = "1.06 20051025";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -178,7 +178,7 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
         res = sg_err_category3(&io_hdr);
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("Format, continuing", &io_hdr, verbose);
+            sg_chk_n_print3("Format, continuing", &io_hdr, verbose > 1);
             /* fall through */
         case SG_LIB_CAT_CLEAN:
                 break;
@@ -210,56 +210,15 @@ scsi_format(int fd, int pinfo, int rto_req, int immed, int early, int verbose)
 
         for(;;) {
                 int progress;
-                struct sg_scsi_sense_hdr sshdr;
 
                 sleep(POLL_DURATION_SECS);
-                cdb[0] = TEST_UNIT_READY;       /* draft say REQUEST SENSE */
-                cdb[1] = 0;
-                cdb[2] = 0;
-                cdb[3] = 0;
-                cdb[4] = 0;
-                cdb[5] = 0;
-
-                memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
-                memset(sbuff, 0, MAX_SENSE_SZ);
-
-                io_hdr.interface_id = 'S';
-                io_hdr.dxfer_direction = SG_DXFER_NONE;
-                io_hdr.cmd_len = CDB_SIZE;
-                io_hdr.mx_sb_len = MAX_SENSE_SZ;
-                io_hdr.iovec_count = 0;         /* no scatter gather */
-                io_hdr.dxfer_len = 0;
-                io_hdr.dxferp = NULL;
-                io_hdr.cmdp = cdb;
-                io_hdr.sbp = sbuff;
-                io_hdr.timeout = SHORT_TIMEOUT;
-
-                if (verbose) {
-                        fprintf(stderr, "    test unit ready cdb: ");
-                        for (k = 0; k < 6; ++k)
-                                fprintf(stderr, "%02x ", cdb[k]);
-                        fprintf(stderr, "\n");
-                }
-        
-                if (ioctl(fd, SG_IO, &io_hdr) < 0) {
-                        perror("Test Unit Ready SG_IO ioctl error");
-                        return -1;
-                }
-                if (sg_normalize_sense(&io_hdr, &sshdr)) {
-                        if (sg_get_sense_progress_fld(sbuff,
-                                        io_hdr.sb_len_wr, &progress)) {
-                                printf("Format in progress, %d%% done\n",
-                                        progress * 100 / 65536);
-                                if (verbose > 1)
-                                        sg_print_sense("tur", sbuff,
-                                                       io_hdr.sb_len_wr, 1);
-                                continue;
-                        } else {
-                                sg_print_sense("tur: unexpected sense", sbuff,
-                                               io_hdr.sb_len_wr, verbose);
-                                continue;
-                        }
-                } else
+                progress = -1;
+                res = sg_ll_test_unit_ready_progress(fd, 0, &progress, 0,
+                                                      verbose);
+                if (progress >= 0)
+                        printf("Format in progress, %d%% done\n",
+                                (progress * 100) / 65536);
+                else
                         break;
         }
         printf("FORMAT Complete\n");
