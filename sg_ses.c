@@ -43,7 +43,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.34 20070419";    /* ses2r16 */
+static char * version_str = "1.35 20070629";    /* ses2r17 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -519,7 +519,7 @@ static char * find_sas_connector_type(int conn_type, char * buff,
 static const char * element_status_desc[] = {
     "Unsupported", "OK", "Critical", "Noncritical",
     "Unrecoverable", "Not installed", "Unknown", "Not available",
-    "reserved [8]", "reserved [9]", "reserved [10]", "reserved [11]",
+    "No access allowed", "reserved [9]", "reserved [10]", "reserved [11]",
     "reserved [12]", "reserved [13]", "reserved [14]", "reserved [15]",
 };
 
@@ -580,9 +580,10 @@ static void print_element_status(const char * pad,
             printf("%sIdent=%d, DC overvoltage=%d, DC undervoltage=%d, DC "
                    "overcurrent=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[2] & 0x8), !!(statp[2] & 0x4), !!(statp[2] & 0x2));
-        if ((! filter) || (0x78 & statp[3]))
-            printf("%sFail=%d, Requested on=%d, Off=%d, Overtemperature "
-                   "fail=%d\n", pad, !!(statp[3] & 0x40), !!(statp[3] & 0x20),
+        if ((! filter) || (0xf8 & statp[3]))
+            printf("%sHot swap=%d, Fail=%d, Requested on=%d, Off=%d, "
+                   "Overtmp fail=%d\n", pad, !!(statp[3] & 0x80),
+                   !!(statp[3] & 0x40), !!(statp[3] & 0x20),
                    !!(statp[3] & 0x10), !!(statp[3] & 0x8));
         if ((! filter) || (0x7 & statp[3]))
             printf("%sTemperature warn=%d, AC fail=%d, DC fail=%d\n",
@@ -590,10 +591,11 @@ static void print_element_status(const char * pad,
                    !!(statp[3] & 0x1));
         break;
     case COOLING_EL:
-        if ((! filter) || ((0xc0 & statp[1]) || (0x70 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Requested on=%d, Off=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[3] & 0x40),
-                   !!(statp[3] & 0x20), !!(statp[3] & 0x10));
+        if ((! filter) || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
+            printf("%sIdent=%d, Hot swap=%d, Fail=%d, Requested on=%d, "
+                   "Off=%d\n", pad, !!(statp[1] & 0x80), !!(statp[3] & 0x80),
+                   !!(statp[3] & 0x40), !!(statp[3] & 0x20),
+                   !!(statp[3] & 0x10));
         printf("%sActual speed=%d rpm, Fan %s\n", pad,
                (((0x7 & statp[1]) << 8) + statp[2]) * 10,
                actual_speed_desc[7 & statp[3]]);
@@ -630,10 +632,11 @@ static void print_element_status(const char * pad,
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case ENC_SC_ELECTR_EL:     /* enclosure services controller electronics */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2])))
-            printf("%sIdent=%d, Fail=%d, Report=%d\n", pad,
+        if ((! filter) || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
+            (0x80 & statp[3]))
+            printf("%sIdent=%d, Fail=%d, Report=%d, Hot swap=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[2] & 0x1));
+                   !!(statp[2] & 0x1), !!(statp[3] & 0x80));
         break;
     case SCC_CELECTR_EL:     /* SCC controller electronics */
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2])))
