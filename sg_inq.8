@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "February 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_INQ "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_inq \- sends a SCSI INQUIRY or ATA IDENTIFY (PACKET) DEVICE command
 and outputs the response
@@ -54,7 +54,8 @@ Arguments to long options are mandatory for short options as well.
 Assume given \fIDEVICE\fR is an ATA or ATAPI device which can receive ATA
 commands from the host operating system. Skip the SCSI INQUIRY command and
 use either the ATA IDENTIFY DEVICE command (for nonpacket devices) or the
-ATA IDENTIFY PACKET DEVICE command. This option is only available in Linux.
+ATA IDENTIFY PACKET DEVICE command. To show the response in hex, add
+a '\-\-verbose' option. This option is only available in Linux.
 .TP
 \fB\-c\fR, \fB\-\-cmddt\fR
 set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
