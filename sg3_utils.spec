@@ -1,7 +1,8 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
 Version: 1.25
-Release: 1%{?dist}
+# Release: 1%{?dist}
+Release: 1
 License: GPL
 Group: Utilities/System
 Source: ftp://www.torque.net/sg/p/sg3_utils-%{version}.tgz
@@ -78,7 +79,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/*.la
 
 %changelog
-* Wed Jun 06 2007 - dgilbert at interlog dot com
+* Tue Jul 10 2007 - dgilbert at interlog dot com
 - sg_dd oflag=sparse,null
   * sg3_utils-1.25
 
