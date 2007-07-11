@@ -137,7 +137,7 @@ rm -rf $RPM_BUILD_ROOT
  
 
 %changelog
-* Tue Jul 10 2007 - dgilbert at interlog dot com
+* Wed Jul 11 2007 - dgilbert at interlog dot com
 - sg_dd oflag=sparse,null
   * sg3_utils-1.25
 
