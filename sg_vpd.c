@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.19 20070419";    /* spc-4 rev 9 */
+static char * version_str = "0.20 20070711";    /* spc-4 rev 11 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -74,7 +74,8 @@ extern const struct svpd_values_name_t *
 #define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
 #define VPD_SA_DEV_CAP 0xb0     /* SSC-3 */
 #define VPD_OSD_INFO 0xb0       /* OSD */
-#define VPD_MAN_ASS_SN 0xb1     /* SSC-3 */
+#define VPD_BLOCK_DEV_CHAR 0xb1 /* SBC-3 */
+#define VPD_MAN_ASS_SN 0xb1     /* SSC-3, ADC-2 */
 #define VPD_SECURITY_TOKEN 0xb1 /* OSD */
 #define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
 
@@ -136,6 +137,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_ASCII_OP_DEF, 0, -1, 0, "aod",
      "ASCII implemented operating definition (obs)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
+    {VPD_BLOCK_DEV_CHAR, 0, 0, 0, "bdc", "Block device characteristics "
+     "(SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
      "but designators ordered as found"},
@@ -150,6 +153,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
      "Implemented operating definition (obs)"},
     {VPD_MAN_ASS_SN, 0, 1, 0, "mas",
      "Manufacturer assigned serial number (SSC)"},
+    {VPD_MAN_ASS_SN, 0, 0x12, 0, "masa",
+     "Manufacturer assigned serial number (ADC)"},
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
     {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
     {VPD_OSD_INFO, 0, 0x11, 0, "oi", "OSD information"},
@@ -1199,6 +1204,42 @@ static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+static void decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+{
+    unsigned int u;
+
+    if (do_hex) {
+        dStrHex((const char *)buff, len, 0);
+        return;
+    }
+    switch (pdt) {
+        case 0: case 4: case 7:
+            if (len < 64) {
+                fprintf(stderr, "Block device characteristics VPD page length "
+                        "too short=%d\n", len);
+                return;
+            }
+            u = (buff[4] << 8) | buff[5];
+            if (0 == u)
+                printf("  Medium rotation rate is not reported\n");
+            else if (1 == u)
+                printf("  Non-rotating medium (e.g. solid state)\n");
+            else if ((u < 0x401) || (0xffff == u))
+                printf("  Reserved [0x%x]\n", u);
+            else
+                printf("  Nominal rotation rate: %d rpm\n", u);
+            break;
+        case 1: case 8: case 0x12:
+            printf("  Manufacturer-assigned serial number: %.*s\n",
+                   len - 4, buff + 4);
+            break;
+        default:
+            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+            dStrHex((const char *)buff, len, 0);
+            break;
+    }
+}
+
 /* Returns 0 if successful */
 static int svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue,
                                  int do_hex, int do_raw, int do_long,
@@ -1559,7 +1600,7 @@ static int svpd_decode_standard(int sg_fd, int num_vpd, int subvalue,
             return 0;
         }
         break;
-    case 0xb0:  /* could be BLOCK LIMITS but need to know pdt to find out */
+    case 0xb0:  /* depends on pdt */
         res = sg_ll_inquiry(sg_fd, 0, 1, 0xb0, rsp_buff,
                             DEF_ALLOC_LEN, 1, verbose);
         if (0 == res) {
@@ -1574,7 +1615,7 @@ static int svpd_decode_standard(int sg_fd, int num_vpd, int subvalue,
                            "(SSC):\n");
                     break;
                 case 0x11:
-                    printf("OSD information (OSD) VPD page:\n");
+                    printf("OSD information VPD page (OSD):\n");
                     break;
                 default:
                     printf("VPD page=0x%x, pdt=0x%x:\n", 0xb0, pdt);
@@ -1613,6 +1654,65 @@ static int svpd_decode_standard(int sg_fd, int num_vpd, int subvalue,
             return 0;
         } else if (! do_raw)
             printf("VPD page=0xb0\n");
+        break;
+    case 0xb1:  /* depends on pdt */
+        res = sg_ll_inquiry(sg_fd, 0, 1, 0xb1, rsp_buff,
+                            DEF_ALLOC_LEN, 1, verbose);
+        if (0 == res) {
+            pdt = rsp_buff[0] & 0x1f;
+            if ((! do_raw) && (! do_quiet)) {
+                switch (pdt) {
+                case 0: case 4: case 7:
+                    printf("Block device characteristics VPD page (SBC):\n");
+                    break;
+                case 1: case 8:
+                    printf("Manufactured assigned serial number VPD page "
+                           "(SSC):\n");
+                    break;
+                case 0x11:
+                    printf("Security token VPD page (OSD):\n");
+                    break;
+                case 0x12:
+                    printf("Manufactured assigned serial number VPD page "
+                           "(ADC):\n");
+                    break;
+                default:
+                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb1, pdt);
+                    break;
+                }
+            }
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (0xb1 != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                if (verbose) {
+                    fprintf(stderr, "First 32 bytes of bad response\n");
+                        dStrHex((const char *)rsp_buff, 32, 0);
+                }
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > MX_ALLOC_LEN) {
+                fprintf(stderr, "response length too long: %d > %d\n", len,
+                       MX_ALLOC_LEN);
+                return SG_LIB_CAT_MALFORMED;
+            } else if (len > DEF_ALLOC_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, 0xb1, rsp_buff,
+                                  len, 1, verbose))
+                    return SG_LIB_CAT_OTHER;
+            }
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else {
+                pdt = rsp_buff[0] & 0x1f;
+                if (verbose || do_long)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rsp_buff[0] & 0xe0) >> 5, 
+                           sg_get_pdt_str(pdt, sizeof(buff), buff));
+                decode_b1_vpd(rsp_buff, len, do_hex, pdt);
+            }
+            return 0;
+        } else if (! do_raw)
+            printf("VPD page=0xb1\n");
         break;
     case VPD_SCSI_PORTS:
         if ((! do_raw) && (! do_quiet))
