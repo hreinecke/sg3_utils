@@ -33,6 +33,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 

@@ -18,11 +18,14 @@
 #include <unistd.h>
 #include <string.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
 
-static char * version_str = "1.06 20070101";
+static char * version_str = "1.06 20070714";
 
 unsigned char mode6_hdr[] = {
     75, /* Length */

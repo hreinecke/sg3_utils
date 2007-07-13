@@ -5,6 +5,9 @@
 #include <fcntl.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -27,7 +30,7 @@
  
 */
 
-static char * version_str = "0.55 20070419";
+static char * version_str = "0.55 20070714";
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},

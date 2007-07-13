@@ -13,6 +13,10 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
@@ -38,7 +42,7 @@
 */
 
 
-static char * version_str = "1.08 20070125";
+static char * version_str = "1.08 20070714";
 
 static const char * devfs_id = "/dev/.devfsd";
 

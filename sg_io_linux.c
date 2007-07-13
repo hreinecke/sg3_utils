@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2006 Douglas Gilbert.
+ * Copyright (c) 1999-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,10 +31,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+
+// need to include the file in the build when sg_scan is built for Win32.
+// Hence the following guard ...
+//
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#ifdef SG3_UTILS_LINUX
+
 #include "sg_io_linux.h"
 
 
-/* Version 1.01 20060626 */
+/* Version 1.02 20060714 */
 
 
 void sg_print_masked_status(int masked_status) 
@@ -240,3 +249,4 @@ int sg_err_category_new(int scsi_status, int host_status, int driver_status,
     return SG_LIB_CAT_OTHER;
 }
 
+#endif

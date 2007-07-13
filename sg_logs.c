@@ -8,6 +8,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -22,7 +25,7 @@
    
 */
 
-static char * version_str = "0.73 20070419";    /* SPC-4 revision 9 */
+static char * version_str = "0.73 20070714";    /* SPC-4 revision 11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128

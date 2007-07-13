@@ -36,6 +36,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -45,7 +48,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.09 20070419";
+static char * version_str = "1.09 20070714";
 
 #define ME "sg_verify: "
 

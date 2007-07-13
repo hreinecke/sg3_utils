@@ -46,24 +46,24 @@ developing applications.
 %setup -q
 
 %build
-./configure --prefix=%{_prefix} --mandir=%{_mandir}
+make
 
 %install
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
         rm -rf $RPM_BUILD_ROOT
 fi
-
-make install \
-        DESTDIR=$RPM_BUILD_ROOT
+%ifarch sparc64 ppc64 s390x x86_64
+make install PREFIX=$RPM_BUILD_ROOT/usr LIBDIR=$RPM_BUILD_ROOT/usr/lib64
+%else
+make install PREFIX=$RPM_BUILD_ROOT/usr
+%endif
 
 %clean
-if [ "$RPM_BUILD_ROOT" != "/" ]; then
-        rm -rf $RPM_BUILD_ROOT
-fi
+rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc AUTHORS ChangeLog COVERAGE CREDITS INSTALL NEWS README README.sg_start
+%doc CHANGELOG COVERAGE CREDITS INSTALL README README.sg_start
 %attr(755,root,root) %{_bindir}/*
 %{_mandir}/man8/*
 
@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Sun Jul 15 2007 - dgilbert at interlog dot com
+* Wed Jul 11 2007 - dgilbert at interlog dot com
 - sg_dd oflag=sparse,null
   * sg3_utils-1.25
 

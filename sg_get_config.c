@@ -35,6 +35,9 @@
 #include <ctype.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -46,7 +49,7 @@
 
 */
 
-static char * version_str = "0.30 20070419";
+static char * version_str = "0.30 20070714";
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64

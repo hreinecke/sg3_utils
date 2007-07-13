@@ -33,6 +33,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -42,7 +46,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.06 20070419";
+static char * version_str = "1.06 20070714";
 
 #define ME "sg_prevent: "
 

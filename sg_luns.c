@@ -36,6 +36,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -45,7 +48,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.12 20070419";
+static char * version_str = "1.12 20070714";
 
 #define REPORT_LUNS_BUFF_LEN (1024*64)
     

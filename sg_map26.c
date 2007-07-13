@@ -56,9 +56,12 @@
 #include <sys/stat.h>
 #include <linux/major.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 
-static char * version_str = "1.05 20070419";
+static char * version_str = "1.05 20070714";
 
 #define ME "sg_map26: "
 

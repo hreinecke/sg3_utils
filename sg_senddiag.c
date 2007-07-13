@@ -6,6 +6,9 @@
 #include <ctype.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -21,7 +24,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.34 20070419";
+static char * version_str = "0.34 20070714";
 
 #define ME "sg_senddiag: "
 

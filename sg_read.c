@@ -18,6 +18,10 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <linux/major.h> 
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
@@ -41,7 +45,7 @@
 
 */
 
-static const char * version_str = "1.17 20070121";
+static const char * version_str = "1.17 20070714";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -648,7 +652,7 @@ int main(int argc, char * argv[])
                                        (~(psz - 1)));
         } else if (do_mmap) {
             wrkPos = (unsigned char *)mmap(NULL, bs * bpt,
-			PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
+                        PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
             if (MAP_FAILED == wrkPos) {
                 perror(ME "error from mmap()");
                 return SG_LIB_CAT_OTHER;

@@ -2,13 +2,15 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
-#include "sg_io_linux.h"
 
 /* The program allows the user to send a trespass command to change the
  * LUN ownership from one Service-Processor to this one on an EMC
@@ -25,7 +27,7 @@
  *  any later version.
  */
 
-static char * version_str = "0.15 20070102";
+static char * version_str = "0.16 20070714";
 
 static int debug = 0;
 

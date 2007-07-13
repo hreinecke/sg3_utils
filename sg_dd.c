@@ -19,6 +19,10 @@
 #include <sys/time.h> 
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -51,7 +55,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.63 20070626";
+static char * version_str = "5.63 20070714";
 
 #define ME "sg_dd: "
 

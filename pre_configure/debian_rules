@@ -16,7 +16,6 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 	# Add here commands to configure the package.
-	CFLAGS="$(CFLAGS)" ./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --bindir=/bin --prefix=/usr --mandir=\$${prefix}/share/man
 	touch configure-stamp
 
 build: configure-stamp build-stamp
@@ -33,7 +32,7 @@ clean:
 	dh_testroot
 
 	# Add here commands to clean up after the build process.
-	-$(MAKE) distclean
+	-$(MAKE) clean
 
 	rm -f build-stamp configure-stamp debian/substvars
 
