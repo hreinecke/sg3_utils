@@ -34,6 +34,9 @@
 #include <string.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -46,7 +49,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static char * version_str = "1.06 20070419";
+static char * version_str = "1.06 20070714";
 
 #define ME "sg_ident: "
 

@@ -17,11 +17,14 @@
 #include <string.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.30 20070419";    /* spc4r09+07-159r0 */
+static char * version_str = "0.30 20070714";    /* spc4r11 */
 
 // #define USE_LINUX_SG_IO_IF 1
 

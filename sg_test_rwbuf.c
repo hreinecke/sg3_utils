@@ -31,11 +31,15 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <time.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
 
-static char * version_str = "1.05 20070121";
+static char * version_str = "1.05 20070714";
 
 #define BPI (signed)(sizeof(int))
 

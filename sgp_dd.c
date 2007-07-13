@@ -20,6 +20,10 @@
 #include <sys/time.h>
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
@@ -50,7 +54,7 @@
 
 */
 
-static char * version_str = "5.37 20070319";
+static char * version_str = "5.37 20070714";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

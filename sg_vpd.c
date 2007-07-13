@@ -37,6 +37,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -49,7 +52,7 @@
 
 */
 
-static char * version_str = "0.20 20070711";    /* spc-4 rev 11 */
+static char * version_str = "0.20 20070714";    /* spc-4 rev 11 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,

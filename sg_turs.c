@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #ifndef SG3_UTILS_MINGW
 #include <sys/time.h>
 #endif
@@ -24,7 +29,7 @@
 
  */
 
-static char * version_str = "3.26 20070419";
+static char * version_str = "3.26 20070714";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP

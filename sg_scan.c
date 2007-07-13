@@ -1,6 +1,11 @@
 /* N.B. There are two programs in this file, the first is for linux
  *      and the second is for Windows.
  */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #ifdef SG3_UTILS_LINUX
 
 #ifndef _GNU_SOURCE
@@ -20,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <scsi/scsi_ioctl.h>
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
@@ -49,7 +55,7 @@
    F. Jansen - modification to extend beyond 26 sg devices.
 */
 
-static char * version_str = "4.09 20070419";
+static char * version_str = "4.09 20070714";
 
 #define ME "sg_scan: "
 

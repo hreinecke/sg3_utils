@@ -7,6 +7,10 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_io_linux.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
@@ -24,7 +28,7 @@
 
 #define ME "sg_reset: "
 
-static char * version_str = "0.55 20070125";
+static char * version_str = "0.55 20070714";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284

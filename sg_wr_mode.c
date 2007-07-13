@@ -34,6 +34,9 @@
 #include <string.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -43,7 +46,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.08 20070419";
+static char * version_str = "1.08 20070714";
 
 #define ME "sg_wr_mode: "
 

@@ -6,6 +6,9 @@
 #include <ctype.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -23,7 +26,7 @@
    
 */
 
-static char * version_str = "1.25 20070425";
+static char * version_str = "1.25 20070714";
 
 #define MX_ALLOC_LEN (1024 * 4)
 #define PG_CODE_ALL 0x3f

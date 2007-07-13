@@ -38,6 +38,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -51,7 +54,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.11 20070419";
+static char * version_str = "1.11 20070714";
 
 #define ME "sg_reassign: "
 

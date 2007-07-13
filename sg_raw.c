@@ -19,10 +19,13 @@
 #include <string.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define VERSION "0.3.4 (2007-04-03)"
+#define SG_RAW_VERSION "0.3.4 (2007-07-14)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -66,7 +69,7 @@ struct opts_t {
 static void version()
 {
     fprintf(stderr,
-            "sg_raw " VERSION "\n"
+            "sg_raw " SG_RAW_VERSION "\n"
             "Copyright (C) 2007 Ingo van Lil <inguin@gmx.de>\n"
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"

@@ -35,6 +35,9 @@
 #include <getopt.h>
 #include <sys/time.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
@@ -44,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.17 20070419";
+static char * version_str = "1.17 20070714";
 
 #define REQUEST_SENSE_BUFF_LEN 252
 

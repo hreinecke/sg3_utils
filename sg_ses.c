@@ -34,6 +34,9 @@
 #include <string.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -43,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.35 20070629";    /* ses2r17 */
+static char * version_str = "1.35 20070714";    /* ses2r17 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024

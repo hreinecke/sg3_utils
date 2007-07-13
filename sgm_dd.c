@@ -20,6 +20,10 @@
 #include <sys/time.h>
 #include <linux/major.h> 
 #include <linux/fs.h>   /* <sys/mount.h> */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
@@ -55,7 +59,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.32 20070318 shared_mmap";
+static char * version_str = "1.32 20070714 shared_mmap";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

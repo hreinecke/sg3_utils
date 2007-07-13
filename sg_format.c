@@ -38,6 +38,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -69,7 +72,7 @@
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.14 20070327";
+static char * version_str = "1.14 20070714";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},

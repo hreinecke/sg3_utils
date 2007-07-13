@@ -8,6 +8,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -28,7 +31,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.14 20070419";
+static char * version_str = "1.14 20070714";
 
 
 #define MAX_XFER_LEN 10000

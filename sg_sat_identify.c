@@ -34,6 +34,9 @@
 #include <string.h>
 #include <getopt.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -61,7 +64,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.03 20070501";
+static char * version_str = "1.03 20070714";
 
 static struct option long_options[] = {
         {"chk_cond", no_argument, 0, 'c'},
@@ -183,7 +186,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
             case SPC_SK_NO_SENSE:
             case SPC_SK_RECOVERED_ERROR:
                 if ((0x0 == ssh.asc) &&
-		    (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
+                    (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
                     if (SAT_ATA_RETURN_DESC != ata_return_desc[0]) {
                         if (verbose)
                             fprintf(stderr, "did not find ATA Return "

@@ -8,6 +8,9 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #ifdef SG3_UTILS_LINUX
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -63,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.70 20070429";    /* spc-4 rev 10 */
+static char * version_str = "0.70 20070714";    /* spc-4 rev 10 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0

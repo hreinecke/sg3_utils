@@ -115,7 +115,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.25 [20070121]";
+static const char * version_str = "2.25 [20070714]";
 
 #include <stdio.h>
 #include <string.h>
@@ -130,9 +130,11 @@ static const char * version_str = "2.25 [20070121]";
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include "sg_io_linux.h"
 
-#include "sg_lib.h"
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#include "sg_io_linux.h"
 
 
 static int glob_fd;

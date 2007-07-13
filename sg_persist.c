@@ -9,6 +9,9 @@
 
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -24,7 +27,7 @@
 
 */
 
-static char * version_str = "0.33 20070314";
+static char * version_str = "0.33 20070714";
 
 
 #define PRIN_RKEY_SA     0x0

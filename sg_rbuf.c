@@ -16,6 +16,10 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
@@ -47,7 +51,7 @@
 #endif
 
 
-static char * version_str = "4.87 20070419";
+static char * version_str = "4.87 20070714";
 
 static struct option long_options[] = {
         {"buffer", 1, 0, 'b'},
