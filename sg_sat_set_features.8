@@ -1,12 +1,12 @@
-.TH SG_SAT_SET_FEATURES "8" "May 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_SAT_SET_FEATURES "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_sat_set_featutes \- sends a ATA SET FEATURES command via a
 SCSI to ATA Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_set_features
-[\fI\-\-count=\fRC] [\fI\-\-chk_cond\fR] [\fI\-\-feature=\fRF] [\fI\-\-help\fR]
-[\fI\-\-lba=\fRLBA] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-count=\fRCO] [\fI\-\-chk_cond\fR] [\fI\-\-feature=\fRFEA]
+[\fI\-\-help\fR] [\fI\-\-len=\fR12|16] [\fI\-\-lba=\fRLBA]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -17,7 +17,8 @@ command directly to the device it is sent via a SCSI transport which is
 assumed to contain a SCSI to ATA Translation (SAT) Layer (SATL). The SAT
 standard (SAT ANSI INCITS 431-2007; prior draft: sat\-r09.pdf at www.t10.org)
 defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16 byte "cdb" and
-the other with a 12 byte cdb. This utility uses the 16 byte cdb variant.
+the other with a 12 byte cdb. This utility defaults to the 16 byte cdb
+variant.
 .PP
 The SATL may be in an operating system driver, in host bus adapter firmware
 or in some external enclosure.
@@ -28,8 +29,8 @@ DEVICE (for packet devices) command.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
-\fB\-c\fR, \fB\-\-count\fR=\fIC\fR
-the number \fIC\fR is placed in the "count" field in the ATA SET
+\fB\-c\fR, \fB\-\-count\fR=\fICO\fR
+the number \fICO\fR is placed in the "count" field in the ATA SET
 FEATURES command. Only some subcommands (a term used for the value
 placed in the "feature" field) require the count field to be set.
 The default value placed in the "count" field is 0.
@@ -41,8 +42,8 @@ sense buffer containing a ATA Result descriptor irrespective of whether
 the command succeeded or failed. When clear the SATL should only yield
 a sense buffer containing a ATA Result descriptor if the command failed.
 .TP
-\fB\-f\fR, \fB\-\-feature\fR=\fIF\fR
-the number \fIF\fR is placed in the "feature" field in the ATA SET
+\fB\-f\fR, \fB\-\-feature\fR=\fIFEA\fR
+the number \fIFEA\fR is placed in the "feature" field in the ATA SET
 FEATURES command. The term "subcommand" is sometimes used for this
 value. The default value placed in the "feature" field is 0 which
 is reserved and hence should not change anything.
@@ -51,7 +52,12 @@ is reserved and hence should not change anything.
 outputs the usage message summarizing command line options
 then exits. Ignores \fIDEVICE\fR if given.
 .TP
-\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+\fB\-l\fR, \fB\-\-len\fR=12 | 16
+this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
+The argument can either be 12 or 16. The default is 16. Some SCSI
+transports cannot convey SCSI commands longer than 12 bytes.
+.TP
+\fB\-L\fR, \fB\-\-lba\fR=\fILBA\fR
 the number \fILBA\fR is placed in the "lba" field in the ATA SET
 FEATURES command. Only some subcommands (a term used for the value
 placed in the "feature" field) require the lba field to be set.
