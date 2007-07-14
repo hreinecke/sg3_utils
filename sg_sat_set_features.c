@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 
 #ifdef HAVE_CONFIG_H
@@ -40,12 +41,12 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
-#include "sg_pt.h"
 
-/* This program uses a ATA PASS-THROUGH SCSI command to package
-   an ATA IDENTIFY (PACKAGE) DEVICE command. See http://www.t10.org
-   for the most recent SAT: sat-r09.pdf . SAT is now a standard:
-   SAT ANSI INCITS 431-2007.
+/* This program performs a ATA PASS-THROUGH (16) SCSI command in order
+   to perform an ATA SET FEATURES command. See http://www.t10.org
+   SAT draft at time of writing: sat-r09.pdf
+
+   See man page (sg_sat_set_features.8) for details.
 
 */
 
@@ -56,72 +57,70 @@
 #define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
 #define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d
 
-#define ATA_IDENTIFY_DEVICE 0xec
-#define ATA_IDENTIFY_PACKET_DEVICE 0xa1
-#define ID_RESPONSE_LEN 512
+#define ATA_SET_FEATURES 0xef
 
 #define DEF_TIMEOUT 20
-
-#define EBUFF_SZ 256
 
 static char * version_str = "1.03 20070719";
 
 static struct option long_options[] = {
-        {"chk_cond", no_argument, 0, 'c'},
+        {"count", required_argument, 0, 'c'},
+        {"chk_cond", no_argument, 0, 'C'},
+        {"feature", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
         {"len", required_argument, 0, 'l'},
-        {"packet", no_argument, 0, 'p'},
-        {"raw", no_argument, 0, 'r'},
+        {"lba", required_argument, 0, 'L'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
-static void usage()
+void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sat_identify [--chk_cond] [--help] [--hex] [--len=16|12] "
-          "[--packet]\n"
-          "                       [--raw] [--verbose] [--version] "
-          "DEVICE\n"
+          "sg_sat_set_features [--count=CO] [--chk_cond] [--feature=FEA] "
+          "[--help]\n"
+          "                           [--lba=LBA] [--len=16|12] [--verbose] "
+          "[--version]\n"
+          "                           DEVICE\n"
           "  where:\n"
-          "    --chk_cond|-c    sets chk_cond bit in cdb (def: 0)\n"
-          "    --help|-h        print out usage message then exit\n"
-          "    --hex|-H         output response in hex\n"
+          "    --count=CO | -c CO      count field contents (def: 0)\n"
+          "    --chk_cond | -C         set chk_cond field in pass-through "
+          "(def: 0)\n"
+          "    --feature=FEA|-f FEA     feature field contents\n"
+          "                             (def: 0 (which is reserved))\n"
+          "    --help | -h             output this usage message\n"
+          "    --lba=LBA | -L LBA      LBA field contents (def: 0)\n"
           "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
-          "(default: 16)\n"
-          "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
-          "DEVICE) command\n"
-          "    --raw|-r         output response in binary to stdout\n"
-          "    --verbose|-v     increase verbosity\n"
-          "    --version|-V     print version string and exit\n\n"
-          "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
-          "layer\n");
+          "(def: 16)\n"
+          "    --verbose | -v          increase verbosity\n"
+          "    --version | -V          print version string and exit\n\n"
+          "Sends an ATA SET FEATURES command via a SAT pass through.\n"
+          "Primary feature code is placed in '--feature=FEA' with "
+          "'--count=CO' and\n"
+          "'--lba=LBA' being auxiliaries for some features.  The arguments "
+          "CO, FEA\n"
+          "and LBA are decimal unless prefixed by '0x' or have a trailing "
+          "'h'.\n"
+          "Example enabling write cache: 'sg_sat_set_feature --feature=2 "
+          "/dev/sdc'\n");
 }
 
-static void dStrRaw(const char* str, int len)
-{
-    int k;
 
-    for (k = 0 ; k < len; ++k)
-        printf("%c", str[k]);
-}
 
-static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
-                           int chk_cond, int do_hex, int do_raw, int verbose)
+static int do_set_features(int sg_fd, int feature, int count, int lba,
+                           int cdb_len, int chk_cond, int verbose)
 {
-    int ok, res, ret;
+    int res, ret;
     int extend = 0;
-    int protocol = 4;   /* PIO data-in */
+    int protocol = 3;   /* non-data */
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
-    int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
+    int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
     int resid = 0;
     int got_ard = 0;    /* got ATA result descriptor */
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
-    unsigned char inBuff[ID_RESPONSE_LEN];
     unsigned char sense_buffer[64];
     unsigned char ata_return_desc[16];
     unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
@@ -134,34 +133,38 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     sb_sz = sizeof(sense_buffer);
     memset(sense_buffer, 0, sb_sz);
     memset(ata_return_desc, 0, sizeof(ata_return_desc));
-    ok = 0;
-    if (SAT_ATA_PASS_THROUGH16_LEN == cdb_len) {
+    if (16 == cdb_len) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */
-        aptCmdBlk[6] = 1;   /* sector count */
-        aptCmdBlk[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
-                                     ATA_IDENTIFY_DEVICE);
+        aptCmdBlk[14] = ATA_SET_FEATURES;
+        aptCmdBlk[4] = feature;
+        aptCmdBlk[6] = count;
+        aptCmdBlk[8] = lba & 0xff;
+        aptCmdBlk[10] = (lba >> 8) & 0xff;
+        aptCmdBlk[12] = (lba >> 16) & 0xff;
         aptCmdBlk[1] = (protocol << 1) | extend;
         aptCmdBlk[2] = (chk_cond << 5) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
-                           NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
+        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, NULL,
+                           NULL /* doutp */, 0, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
     } else {
         /* Prepare ATA PASS-THROUGH COMMAND (12) command */
-        apt12CmdBlk[4] = 1;   /* sector count */
-        apt12CmdBlk[9] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
-                                      ATA_IDENTIFY_DEVICE);
+        apt12CmdBlk[9] = ATA_SET_FEATURES;
+        apt12CmdBlk[3] = feature;
+        apt12CmdBlk[4] = count;
+        apt12CmdBlk[5] = lba & 0xff;
+        apt12CmdBlk[6] = (lba >> 8) & 0xff;
+        apt12CmdBlk[7] = (lba >> 16) & 0xff;
         apt12CmdBlk[1] = (protocol << 1);
         apt12CmdBlk[2] = (chk_cond << 5) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
-                           NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
+        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, NULL,
+                           NULL /* doutp */, 0, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
     }
     if (0 == res) {
-        ok = 1;
         if (verbose > 2)
             fprintf(stderr, "command completed with SCSI GOOD status\n");
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
@@ -219,8 +222,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                             "hardware error\n", cdb_len);
                 return SG_LIB_CAT_MEDIUM_HARD;
             case SPC_SK_ABORTED_COMMAND:
-                fprintf(stderr, "Aborted command: try again with%s '-p' "
-                        "option\n", (do_packet ? "out" : ""));
+                fprintf(stderr, "Aborted command\n");
                 return SG_LIB_CAT_ABORTED_COMMAND;
             default:
                 if (verbose < 2)
@@ -254,65 +256,55 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         if (ata_return_desc[3] & 0x4) {
                 fprintf(stderr, "error indication in returned FIS: aborted "
                         "command\n");
-                fprintf(stderr, "    try again with%s '-p' option\n",
-                        (do_packet ? "out" : ""));
                 return SG_LIB_CAT_ABORTED_COMMAND;
         }
-        ok = 1;
-    }
-
-    if (ok) { /* output result if it is available */
-        if (do_raw)
-            dStrRaw((const char *)inBuff, 512);
-        else if (0 == do_hex) {
-            printf("Response for IDENTIFY %sDEVICE ATA command:\n",
-                   (do_packet ? "PACKET " : ""));
-            dWordHex((const unsigned short *)inBuff, 256, 0,
-                     sg_is_big_endian());
-        } else if (1 == do_hex)
-            dStrHex((const char *)inBuff, 512, 0);
-        else if (2 == do_hex)
-            dWordHex((const unsigned short *)inBuff, 256, 0,
-                     sg_is_big_endian());
-        else            /* '-HHH' output suitable for "hdparm --Istdin" */
-            dWordHex((const unsigned short *)inBuff, 256, -2,
-                     sg_is_big_endian());
     }
     return 0;
 }
 
+
 int main(int argc, char * argv[])
 {
-    int sg_fd, c, res;
+    int sg_fd, c, ret, res;
     char device_name[256];
-    int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
-    int do_packet = 0;
-    int do_hex = 0;
-    int do_raw = 0;
+    int count = 0;
+    int feature = 0;
+    int lba = 0;
     int verbose = 0;
-    int chk_cond = 0;   /* set to 1 to read register(s) back */
-    int ret = 0;
+    int chk_cond = 0;
+    int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
 
     memset(device_name, 0, sizeof(device_name));
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "chHl:prvV", long_options,
+        c = getopt_long(argc, argv, "c:Cf:hl:L:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'c':
+            count = sg_get_num(optarg);
+            if ((count < 0) || (count > 255)) {
+                fprintf(stderr, "bad argument for '--count'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
+        case 'C':
             chk_cond = 1;
+            break;
+        case 'f':
+            feature = sg_get_num(optarg);
+            if ((feature < 0) || (feature > 255)) {
+                fprintf(stderr, "bad argument for '--feature'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'h':
         case '?':
             usage();
             return 0;
-        case 'H':
-            ++do_hex;
-            break;
         case 'l':
            cdb_len = sg_get_num(optarg);
            if (! ((cdb_len == 12) || (cdb_len == 16))) {
@@ -320,11 +312,12 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
-        case 'p':
-            ++do_packet;
-            break;
-        case 'r':
-            ++do_raw;
+        case 'L':
+            lba = sg_get_num(optarg);
+            if ((lba < 0) || (lba > 255)) {
+                fprintf(stderr, "bad argument for '--lba'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'v':
             ++verbose;
@@ -366,8 +359,8 @@ int main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    ret = do_identify_dev(sg_fd, do_packet, cdb_len, chk_cond, do_hex,
-                          do_raw, verbose);
+    ret = do_set_features(sg_fd, feature, count, lba, cdb_len, chk_cond,
+                          verbose);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

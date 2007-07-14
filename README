@@ -150,9 +150,10 @@ of the sg3_utils directory:
     sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map, sg_map26,
     sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_raw, sg_rbuf, sg_rdac,
     sg_read, sg_readcap, sg_read_buffer, sg_read_long, sg_reassign,
-    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_sat_identify, sg_scan,
-    sg_senddiag, sg_ses, sg_start, sg_sync, sg_test_rwbuff, sg_turs,
-    sg_verify, sg_vpd, sg_write_buffer, sg_write_long, sg_wr_mode
+    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_sat_identify,
+    sg_sat_set_features, sg_scan, sg_senddiag, sg_ses, sg_start, sg_sync,
+    sg_test_rwbuff, sg_turs, sg_verify, sg_vpd, sg_write_buffer,
+    sg_write_long, sg_wr_mode
 
 These utilities and the libsgutils.so library which they depend on are built
 by the build scripts in the main directory. Only the code in the main
@@ -179,9 +180,8 @@ Some of these utilities have man pages.
 Here is a list in alphabetical order of utilities found in the examples
 subdirectory:
   - sg_excl, scsi_inquiry, sg_iovec_tst, sg_sat_chk_power,
-    sg__sat_identify, sg_sat_phy_event, sg_sat_set_features,
-    sg_sat_smart_rd_data, sg_simple1, sg_simple2, sg_simple3, sg_simple4,
-    sg_simple5 and sg_simple16
+    sg__sat_identify, sg_sat_phy_event, sg_sat_smart_rd_data, sg_simple1,
+    sg_simple2, sg_simple3, sg_simple4, sg_simple5 and sg_simple16
 
 Also in that subdirectory is a script to test sg_persist, an example
 data file for sg_persist (called "transport_ids.txt") and an example
@@ -252,9 +252,6 @@ descriptor (as defined in SAT).
 through the SAT-defined ATA PASS_THROUGH (16) SCSI command. If
 successful, the 256 word (512 byte) response is output.
 
-"sg_sat_set_features" attempts to push an ATA SET FEATURES command
-through the SAT-defined ATA PASS_THROUGH (16) SCSI command.
-
 
 Command line processing
 =======================
@@ -283,9 +280,9 @@ or using '-O' as the first command line option.
 The more recent utilities that use "getopt_long" only are:
   - sg_format sg_get_config sg_ident sg_luns sg_map26 sg_persist
     sg_prevent sg_raw sg_read_buffer sg_read_long sg_reassign sg_requests
-    sg_rmsn sg_rtpg sg_sat_identify sg_scan (w), sg_ses sg_sync
-    sg_test_rwbuf sg_verify sg_vpd sg_write_buffer sg_write_long
-    sg_wr_mode
+    sg_rmsn sg_rtpg sg_sat_identify sg_sat_set_features
+    sg_sat_set_features sg_scan(w) sg_ses sg_sync sg_test_rwbuf sg_verify
+    sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
 
 Linux header file problems
@@ -322,4 +319,4 @@ See http://www.torque.net/sg/tools.html
 
 
 Doug Gilbert
-16th July 2007
+18th July 2007

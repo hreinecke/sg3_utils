@@ -63,7 +63,7 @@ fi
 
 %files
 %defattr(-,root,root)
-%doc AUTHORS ChangeLog COVERAGE CREDITS INSTALL NEWS README README.sg_start
+%doc AUTHORS ChangeLog COPYING COVERAGE CREDITS INSTALL NEWS README README.sg_start
 %attr(755,root,root) %{_bindir}/*
 %{_mandir}/man8/*
 
@@ -79,8 +79,8 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Sun Jul 15 2007 - dgilbert at interlog dot com
-- sg_dd oflag=sparse,null
+* Thu Jul 19 2007 - dgilbert at interlog dot com
+- add sg_sat_set_features, sg_dd oflag=sparse,null
   * sg3_utils-1.25
 
 * Mon May 07 2007 - dgilbert at interlog dot com

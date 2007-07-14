@@ -6,10 +6,11 @@ on the right. The second table lists supported ATA commands.
 
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
-ATA COMMAND PASS-THROUGH(16)  sg_sat_identify (main directory)
-                    sg_sat_chk_power, sg__sat_identify, 
-                    sg_sat_set_features, sg_sat_smart_rd_data 
-                    (last four in the examples directory), ++
+ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features
+                    (main directory); sg_sat_chk_power, sg__sat_identify, 
+                    sg_sat_phy_event, sg__sat_set_features,
+                    sg_sat_smart_rd_data (previous five in the examples
+                    directory), ++
 ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
 GET CONFIGURATION   sg_get_config, ++
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
@@ -73,7 +74,8 @@ IDENTIFY DEVICE     sg_inq, sg_scan, sg_sat_identify,
 IDENTIFY PACKET DEVICE     sg_inq, sg_sat_identify,
                     examples/sg__sat_identify
 READ LOG EXT        examples/sg_sat_phy_event
-SET FEATURES        examples/sg_sat_set_features
+SET FEATURES        sg_sat_set_features
+                    examples/sg__sat_set_features
 SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
@@ -84,4 +86,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Doug Gilbert
-21st April 2007
+18th July 2007

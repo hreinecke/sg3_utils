@@ -17,9 +17,10 @@ bin_PROGRAMS = \
 	sgm_dd sg_modes sg_opcodes sgp_dd sg_persist \
 	sg_prevent sg_raw sg_rbuf sg_rdac sg_read sg_readcap \
 	sg_read_long sg_reassign sg_requests sg_reset sg_rmsn \
-	sg_rtpg sg_sat_identify sg_scan sg_senddiag sg_ses \
-	sg_start sg_sync sg_test_rwbuf sg_turs sg_verify \
-	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
+	sg_rtpg sg_sat_identify sg_sat_set_features sg_scan \
+	sg_senddiag sg_ses sg_start sg_sync sg_test_rwbuf \
+	sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
+	sg_wr_mode
 
 man_MANS = \
 	sg3_utils.8 \
@@ -28,9 +29,10 @@ man_MANS = \
 	sgm_dd.8 sg_modes.8 sg_opcodes.8 sgp_dd.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rbuf.8 sg_rdac.8 sg_read.8 sg_readcap.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_reset.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_scan.8 sg_senddiag.8 sg_ses.8 \
-	sg_start.8 sg_sync.8 sg_test_rwbuf.8 sg_turs.8 sg_verify.8 \
-	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
+	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
+	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 sg_test_rwbuf.8 \
+	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
+	sg_wr_mode.8
 
 libsgutils_la_SOURCES = \
 	sg_lib.c sg_lib.h \
@@ -69,9 +71,10 @@ bin_PROGRAMS = \
 	sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap \
 	sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_sat_identify sg_scan sg_senddiag sg_ses \
-	sg_start sg_sync sg_turs sg_verify \
-	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
+	sg_rtpg sg_sat_identify sg_sat_set_features sg_scan \
+	sg_senddiag sg_ses sg_start sg_sync \
+	sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
+	sg_wr_mode
 
 man_MANS = \
 	sg3_utils.8 \
@@ -80,9 +83,10 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_scan.8 sg_senddiag.8 sg_ses.8 \
-	sg_start.8 sg_sync.8 sg_turs.8 sg_verify.8 \
-	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
+	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
+	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
+	sg_wr_mode.8
 
 libsgutils_la_SOURCES = \
 	sg_lib.c sg_lib.h \
@@ -121,9 +125,10 @@ bin_PROGRAMS = \
 	sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap \
 	sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_sat_identify sg_scan sg_senddiag sg_ses \
-	sg_start sg_sync sg_turs sg_verify \
-	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
+	sg_rtpg sg_sat_identify sg_sat_set_features sg_scan \
+	sg_senddiag sg_ses sg_start sg_sync \
+	sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
+	sg_wr_mode
 
 man_MANS = \
 	sg3_utils.8 \
@@ -132,9 +137,10 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_scan.8 sg_senddiag.8 sg_ses.8 \
-	sg_start.8 sg_sync.8 sg_turs.8 sg_verify.8 \
-	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
+	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
+	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
+	sg_wr_mode.8
 
 libsgutils_la_SOURCES = \
 	sg_lib.c sg_lib.h \
@@ -173,9 +179,10 @@ bin_PROGRAMS = \
 	sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap \
 	sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_sat_identify sg_senddiag sg_ses \
-	sg_start sg_sync sg_turs sg_verify \
-	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
+	sg_rtpg sg_sat_identify sg_sat_set_features \
+	sg_senddiag sg_ses sg_start sg_sync \
+	sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
+	sg_wr_mode
 
 man_MANS = \
 	sg3_utils.8 \
@@ -184,9 +191,10 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_senddiag.8 sg_ses.8 \
-	sg_start.8 sg_sync.8 sg_turs.8 sg_verify.8 \
-	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
+	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
+	sg_wr_mode.8
 
 libsgutils_la_SOURCES = \
 	sg_lib.c sg_lib.h \
@@ -225,9 +233,10 @@ bin_PROGRAMS = \
 	sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap \
 	sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_sat_identify sg_senddiag sg_ses \
-	sg_start sg_sync sg_turs sg_verify \
-	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
+	sg_rtpg sg_sat_identify sg_sat_set_features \
+	sg_senddiag sg_ses sg_start sg_sync \
+	sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
+	sg_wr_mode
 
 man_MANS = \
 	sg3_utils.8 \
@@ -236,9 +245,10 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_senddiag.8 sg_ses.8 \
-	sg_start.8 sg_sync.8 sg_turs.8 sg_verify.8 \
-	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
+	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
+	sg_wr_mode.8
 
 libsgutils_la_SOURCES = \
 	sg_lib.c sg_lib.h \
@@ -277,9 +287,10 @@ bin_PROGRAMS = \
 	sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap \
 	sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_sat_identify sg_senddiag sg_ses \
-	sg_start sg_sync sg_turs sg_verify \
-	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
+	sg_rtpg sg_sat_identify sg_sat_set_features \
+	sg_senddiag sg_ses sg_start sg_sync \
+	sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
+	sg_wr_mode
 
 man_MANS = \
 	sg3_utils.8 \
@@ -288,9 +299,10 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_senddiag.8 sg_ses.8 \
-	sg_start.8 sg_sync.8 sg_turs.8 sg_verify.8 \
-	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
+	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
+	sg_wr_mode.8
 
 libsgutils_la_SOURCES = \
 	sg_lib.c sg_lib.h \
@@ -418,6 +430,9 @@ sg_rtpg_LDADD = libsgutils.la @os_libs@
 
 sg_sat_identify_SOURCES = sg_sat_identify.c
 sg_sat_identify_LDADD = libsgutils.la @os_libs@
+
+sg_sat_set_features_SOURCES = sg_sat_set_features.c
+sg_sat_set_features_LDADD = libsgutils.la @os_libs@
 
 sg_scan_SOURCES = sg_scan.c sg_io_linux.c
 sg_scan_LDADD = libsgutils.la @os_libs@
