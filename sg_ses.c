@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.35 20070714";    /* ses2r17 */
+static char * version_str = "1.36 20070717";    /* ses2r18 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -545,7 +545,7 @@ static void print_element_status(const char * pad,
                                  const unsigned char * statp, int etype,
                                  int filter)
 {
-    int res;
+    int res, a, b;
     char buff[128];
 
     printf("%sPredicted failure=%d, Disabled=%d, Swap=%d, status: %s\n",
@@ -709,10 +709,15 @@ static void print_element_status(const char * pad,
                    !!(statp[1] & 0x40));
         break;
     case ENCLOSURE_EL:
-        if ((! filter) || ((0x80 & statp[1]) || (0x3 & statp[2])))
-            printf("%sIdent=%d, Failure indication=%d, Warning indication="
-                   "%d\n", pad, !!(statp[1] & 0x80), !!(statp[2] & 0x2),
-                   !!(statp[2] & 0x1));
+        a = ((statp[2] >> 2) & 0x3f);
+        if ((! filter) || ((0x80 & statp[1]) || a || (0x2 & statp[2])))
+            printf("%sIdent=%d, Time until power cycle=%d, "
+                   "Failure indication=%d\n", pad, !!(statp[1] & 0x80),
+                   a, !!(statp[2] & 0x2));
+        b = ((statp[3] >> 2) & 0x3f);
+        if ((! filter) || (0x1 & statp[2]) || a || b)
+            printf("%sWarning indication=%d, Requested power off "
+                   "duration=%d\n", pad, !!(statp[2] & 0x2), b);
         if ((! filter) || (0x3 & statp[3]))
             printf("%sFailure requested=%d, Warning requested=%d\n",
                    pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));

@@ -1,5 +1,5 @@
 # SUBDIRS = src
-EXTRA_DIST=autogen.sh
+EXTRA_DIST=autogen.sh COVERAGE CREDITS
 
 scsiincludedir      = $(includedir)/scsi
 
@@ -22,6 +22,7 @@ bin_PROGRAMS = \
 	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
 man_MANS = \
+	sg3_utils.8 \
 	sg_dd.8 sg_emc_trespass.8 sg_format.8 sg_get_config.8 sg_ident.8 \
 	sginfo.8 sg_inq.8 sg_logs.8 sg_luns.8 sg_map26.8 sg_map.8 \
 	sgm_dd.8 sg_modes.8 sg_opcodes.8 sgp_dd.8 sg_persist.8 \
@@ -73,6 +74,7 @@ bin_PROGRAMS = \
 	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
 man_MANS = \
+	sg3_utils.8 \
 	sg_format.8 sg_get_config.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -124,6 +126,7 @@ bin_PROGRAMS = \
 	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
 man_MANS = \
+	sg3_utils.8 \
 	sg_format.8 sg_get_config.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -175,6 +178,7 @@ bin_PROGRAMS = \
 	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
 man_MANS = \
+	sg3_utils.8 \
 	sg_format.8 sg_get_config.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -226,6 +230,7 @@ bin_PROGRAMS = \
 	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
 man_MANS = \
+	sg3_utils.8 \
 	sg_format.8 sg_get_config.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -277,6 +282,7 @@ bin_PROGRAMS = \
 	sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
 man_MANS = \
+	sg3_utils.8 \
 	sg_format.8 sg_get_config.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \

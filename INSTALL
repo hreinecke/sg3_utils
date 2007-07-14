@@ -20,6 +20,12 @@ will build executables that use a shared library. The name of that shared
 library starts with 'libsgutils'. To build without that shared library use
 this invocation instead of step b): './configure --disable-shared' .
 
+The default prefix for './configure' is "/usr/local". This means that by
+default 'make install' will place the executables in "/usr/local/bin". To
+change this, for example to drop the "local", use an invocation like
+this: './configure --prefix=/usr' . See the output of './configure --help'
+for more information on build options.
+
 The two script files that driven the autotools build are configure.ac
 and Makefile.am . If the former is changed, autoconf should be run
 and if the latter is chnaged, autmake should be run. More simply if
@@ -130,5 +136,5 @@ Makefile.am file for a definitive list. The executables have a '.exe'
 extension and can be executed in a MSYS or "cmd" shell.
 
 
-16th July 2007
+18th July 2007
 Doug Gilbert
