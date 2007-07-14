@@ -1,72 +1,39 @@
-During the development of sg3_utils version 1.25 this package
-was changed to use autotools. It previously used handed
-crafted Makefiles.
+                   Installing this package
+                   -----------------------
+
+Introduction
+============
+During the development of sg3_utils version 1.25 this package was changed
+to use autotools. Prior to version 1.25 it used handed crafted Makefiles.
 
 In most cases the build process is now:
-  a) fetch the source tarball, untar it and go to the top level
-     directory, then do
+  a) fetch the source tarball, untar it and go to the top level directory,
+     then do
   b) ./configure
   c) make
   d) make install
 
-Step d) usually requires root permissions. Notes on individual
-supported architectures are given below. If the architecture
-supports shared libraries (in Unix/Linux) then the default
-'./configure' generates a Makefile that will build executables
-that use a shared library. The name of that shared library starts
-with 'libsgutils'. To build without that shared library use this
-invocation instead of step b): './configure --disable-shared'
+Step d) usually requires root permissions. Notes specific to supported
+architectures are given below. If the architecture supports shared libraries
+(in Unix/Linux) then the default './configure' generates a Makefile that
+will build executables that use a shared library. The name of that shared
+library starts with 'libsgutils'. To build without that shared library use
+this invocation instead of step b): './configure --disable-shared' .
+
+The two script files that driven the autotools build are configure.ac
+and Makefile.am . If the former is changed, autoconf should be run
+and if the latter is chnaged, autmake should be run. More simply if
+either is changed the autogen.sh script can be run.
+
+Note that only the utilities in the main directory are build by the
+'./configure' infrastructure. [A caveat: the code is the getopt_long
+directory is built for OSF (Tru64).] Code in the examples, utils and
+archives directories can be built with simple Makefiles which are
+typically found in those directories.
 
 
-More information about the autotool build needs to be added
-
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-
-Unless otherwise noted, these install instructions are for the
-Linux operating system. See below for other operating systems.
-
-By default, the Makefile will build for Linux with a shared library.
-The invocation sequence is:
-
-make
-make install    [may need root permission]
-
-Unless overridden or edited in the Makefile, INSTDIR places the executables
-in the /usr/local/bin directory, LIBDIR places libraries in the
-/usr/local/lib directory, MANDIR places the man pages in the
-/usr/local/share/man directory and INCLUDEDIR places header files in the
-/usr/local/include/scsi directory. For FreeBSD the default MANDIR is
-/usr/local/man .
-
-Other Makefile targets that might be useful:
-make clean      # remove .o, executables, core and .depend file
-make depend     # generate dependency hierarchy in .depend file
-make dep        # same as 'make depend'
-make sg_inq     # build a specific executable (e.g. 'sg_inq')
-make uninstall  # removes executables, libraries and build remnants
-make -f no_lib/Makefile.linux  # build without a library
-
-./make_no_lib.sh sg_inq  # is a simple script; in this case it expands to:
-                         # make -f no_lib/Makefile.linux sg_inq
-
-Note that the main Makefile does _not_ call the Makefiles in the
-subdirectories (i.e. archive, examples and utils directories).
-
-By default, this package now builds a shared library called
-libsgutils.so and the corresponding static library: libsgutils.a .
-The GNU "libtool" is required by sg3_utils to build its libraries.
-The 'make' will build those libraries and executables and put them
-in the ".libs" subdirectory (as libtool requires/enforces).
-The 'make' puts scripts in the main directory with the same names as
-the utilities (e.g. sg_dd, sg_inq etc) which set up an appropriate
-environment and call the "real" executable "hiding" in the ".libs"
-subdirectory.
-The "make install" will install the libraries in the /usr/local/lib
-directory. If an executable cannot find the libsgutils shared library
-(check with 'ldd sg_inq' for example) then the addition of "/usr/local/lib"
-to the /etc/ld.so.conf file may be required in some distributions.
-
+Linux
+=====
 A "spec" file is included for building rpm packages. It is called
 sg3_utils.spec . To build binary and source rpms place a copy of the
 gzipped tarball in the "SOURCES" directory and place a copy of
@@ -101,45 +68,39 @@ can be found in the "no_lib" subdirectory.
 
 FreeBSD
 =======
-In FreeBSD, the utilities can be built with "make -f Makefile.freebsd".
-This will build a shared object (i.e. libsgutils.so and friends) that
-the utilities depend on. To install use "make -f Makefile.freebsd install".
-These makes depend on libtool. To build without reliance on a shared
-library (and thus libtool) use "make -f no_lib/Makefile.freebsd" (or
-execute the "make_no_lib_freebsd.sh" script which does the same thing).
+In FreeBSD, the utilities can be built and installed as shown in the
+Introduction section above.
+
 Utilities that are linux specific (e.g. sg_map) are not built for
-FreeBSD.
+FreeBSD. See the "bin_PROGRAMS" definition within the OS_FREEBSD
+conditional of the Makefile.am file for a definitive list.
 
 
 Solaris
 =======
-In Solaris, the utilities can be built with "make -f Makefile.solaris".
-This will build a shared object (i.e. libsgutils.so and friends) that
-the utilities depend on. To install use "make -f Makefile.solaris install".
-These makes depend on gcc and libtool. To build without reliance on a shared
-library (and thus libtool) use "make -f no_lib/Makefile.solaris" (or
-execute the "make_no_lib_solaris.sh" script which does the same thing).
+In Solaris, the utilities can be built and installed as shown in the
+Introduction section above.
+
 Utilities that are linux specific (e.g. sg_map) are not built for
-Solaris.
+Solaris. See the "bin_PROGRAMS" definition within the OS_SOLARIS
+conditional of the Makefile.am file for a definitive list.
 
 
 Tru64 (OSF)
 ===========
-In Tru64, the utilities can be built with "make -f Makefile.osf1".
-This will build a shared object (i.e. libsgutils.so and friends) that
-the utilities depend on. To install use "make -f Makefile.osf1 install".
-These makes depend on libtool. To build without reliance on a shared
-library (and thus libtool) use "make -f no_lib/Makefile.osf1" (or
-execute the "make_no_lib_osf1.sh" script which does the same thing).
+In Tru64 (OSF), the utilities can be built and installed as shown in the
+Introduction section above.
+
 Utilities that are linux specific (e.g. sg_map) are not built for
-Tru64.
+Tru64. See the "bin_PROGRAMS" definition within the OS_OSF
+conditional of the Makefile.am file for a definitive list.
 
 
 Windows
 =======
-In Windows only the Windows NT, 2000, 2003 and XP operating systems (and
-their variants) are currently supported. The various device names that the
-sg3_utils utilities will accept in Windows can be seen by running the
+In Windows only the Windows NT, 2000, 2003, XP and Vist operating systems
+(and their variants) are currently supported. The various device names that
+the sg3_utils utilities will accept in Windows can be seen by running the
 sg_scan utility (and perhaps looking at its man page (i.e. sg_scan.8 or
 sg_scan.8w)).
 
@@ -147,9 +108,11 @@ The source tarball can be built in a cygwin or MinGW environment on Windows.
 
 For cygwin see http://www.cygwin.com for more information. Various extras
 such as 'gcc' (the GNU C compiler) and 'make' need to be loaded as they are
-not in the minimal cygwin default distribution. The build command
-is "make -f Makefile.win32" and to install (for a cygwin environment)
-use "make -f Makefile.win32 install". Currently the make doesn't build a
+not in the minimal cygwin default distribution. The utilities can be built
+and installed as shown in the Introduction section above. Utilities that
+are linux specific (e.g. sg_map) are not built for cygwin. See the
+"bin_PROGRAMS" definition within the OS_CYGWIN conditional of the
+Makefile.am file for a definitive list. Currently the make doesn't build a
 dll (cf shared libraries are built on Linux and FreeBSD) so the executable
 files are bigger than they need to be. Once built, the various ".exe"
 commands can either be executed in a cygwin shell (typically "bash") or a
@@ -159,11 +122,13 @@ the "cygwin1.dll" (obtained from http://www.cygwin.com ) is required.
 There is also the "Minimalist Gnu for Windows" (MinGW) and its associated
 shell (MSYS) that can serve as a build environment for sg3_utils. This
 removes the dependence on the proprietary cygwin1.dll at the expense
-of some timing features. In a MSYS shell untar the sg3_utils tarball and
-in its top level directory use "make -f Makefile.mingw". The executables
-will be placed in that directory. They can be executed in a MSYS or "cmd"
-shell.
+of some timing features. In a MSYS shell the utilities can be built
+and installed as shown in the Introduction section above. Utilities that
+are linux specific (e.g. sg_map) are not built for MinGW. See the
+"bin_PROGRAMS" definition within the OS_MINGW conditional of the
+Makefile.am file for a definitive list. The executables have a '.exe'
+extension and can be executed in a MSYS or "cmd" shell.
 
 
-15th July 2007
+16th July 2007
 Doug Gilbert
