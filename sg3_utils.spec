@@ -18,7 +18,7 @@ Includes utilities to copy data based on "dd" syntax and semantics (called
 sg_dd, sgp_dd and sgm_dd); check INQUIRY data and VPD pages (sg_inq); check
 mode and log pages (sginfo, sg_modes and sg_logs); spin up and down
 disks (sg_start); do self tests (sg_senddiag); and various other functions.
-See the README, CHANGELOG and COVERAGE files. Requires the linux kernel 2.4
+See the README, ChangeLog and COVERAGE files. Requires the linux kernel 2.4
 series or later. In the 2.4 series SCSI generic device names (e.g. /dev/sg0)
 must be used. In the 2.6 series other device names may be used as
 well (e.g. /dev/sda).

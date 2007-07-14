@@ -81,12 +81,9 @@ via the function based interface defined in sg_pt.h . The linux specific
 implementation of that pass through is found in the sg_pt_linux.c file. Since
 almost all of the utilities use these files, a shared library called
 "libsgutils.so" is built. Use of this library cuts down the size of the
-binary distributions of sg3_utils significantly. The "Makefile" provided in
+binary distributions of sg3_utils significantly. The build scripts provided in
 the main directory builds libsgutils.so and then builds each utility to use
-that shared library. Alternatively there is a script called "make_no_lib.sh"
-that will build utilities without depending on libsgutils.so . For example
-"./make_no_lib.sh sg_dd" builds a version of the sg_dd utility that does not
-depend on libsgutils.so . See the INSTALL file for more information.
+that shared library. See the INSTALL file for more information.
 
 All the utilities in the main directory have "man" pages. There is also a
 sg3_utils (8) man page that summarizes common facilities including exit
@@ -158,9 +155,9 @@ of the sg3_utils directory:
     sg_verify, sg_vpd, sg_write_buffer, sg_write_long, sg_wr_mode
 
 These utilities and the libsgutils.so library which they depend on are built
-by the Makefile in the main directory. This Makefile does not invoke the
-Makefile's in the subdirectories. Each utility in the main directory has a
-"man" page in section 8 (system administration commands). Binary distributions
+by the build scripts in the main directory. Only the code in the main
+directory is built. Each utility in the main directory has a "man" page in
+section 8 (system administration commands). Binary distributions
 of the sg3_utils package (e.g. "rpm" and debian packages) typically contain
 the shared library, the utilities in the main directory, their associated man
 pages and some documentation files (e.g. README, INSTALL, CREDITS, COPYING
@@ -325,4 +322,4 @@ See http://www.torque.net/sg/tools.html
 
 
 Doug Gilbert
-15th July 2007
+16th July 2007
