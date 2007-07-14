@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG3_UTILS "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ sg3_utils is a package of utilities that send SCSI commands to the given
 operating system.
 .PP
 The names of all utilities start with "sg" and most start with "sg_" often
-followed by the name or a shortening of the name of the SCSI command that
+followed by the name, or a shortening of the name, of the SCSI command that
 they send. For example the "sg_verify" utility sends the SCSI VERIFY
 command. A mapping between SCSI commands and the sg3_utils utilities that
 issue them is shown in the COVERAGE file.
@@ -40,8 +40,9 @@ The \fIDEVICE\fR argument may appear after, between or prior to any options.
 The older utilities, such as sg_inq, had individual command line processing
 code (often found at the top of the main() function) based on a single "\-"
 followed by one or more characters. If an argument is needed then it follows
-a "=" (e.g. '\-p=1f' in sg_modes). Various options can be elided as long as
-it is not ambiguous (e.g. '\-vv' to increase the verbosity).
+a "=" (e.g. '\-p=1f' in sg_modes with its older interface). Various options
+can be elided as long as it is not ambiguous (e.g. '\-vv' to increase the
+verbosity).
 .PP
 Over time the command line interface of these older utilities became messy
 and overloaded with options. So in sg3_utils version 1.23 the command line

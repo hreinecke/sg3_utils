@@ -570,9 +570,10 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 
 # SUBDIRS = src
-EXTRA_DIST = autogen.sh
+EXTRA_DIST = autogen.sh COVERAGE CREDITS
 scsiincludedir = $(includedir)/scsi
 @OS_FREEBSD_TRUE@man_MANS = \
+@OS_FREEBSD_TRUE@	sg3_utils.8 \
 @OS_FREEBSD_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
 @OS_FREEBSD_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
 @OS_FREEBSD_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -583,6 +584,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_FREEBSD_TRUE@	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
 
 @OS_LINUX_TRUE@man_MANS = \
+@OS_LINUX_TRUE@	sg3_utils.8 \
 @OS_LINUX_TRUE@	sg_dd.8 sg_emc_trespass.8 sg_format.8 sg_get_config.8 sg_ident.8 \
 @OS_LINUX_TRUE@	sginfo.8 sg_inq.8 sg_logs.8 sg_luns.8 sg_map26.8 sg_map.8 \
 @OS_LINUX_TRUE@	sgm_dd.8 sg_modes.8 sg_opcodes.8 sgp_dd.8 sg_persist.8 \
@@ -593,6 +595,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_LINUX_TRUE@	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
 
 @OS_OSF_TRUE@man_MANS = \
+@OS_OSF_TRUE@	sg3_utils.8 \
 @OS_OSF_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
 @OS_OSF_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
 @OS_OSF_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -603,6 +606,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_OSF_TRUE@	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
 
 @OS_SOLARIS_TRUE@man_MANS = \
+@OS_SOLARIS_TRUE@	sg3_utils.8 \
 @OS_SOLARIS_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
 @OS_SOLARIS_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
 @OS_SOLARIS_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -613,6 +617,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_SOLARIS_TRUE@	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
 
 @OS_WIN32_CYGWIN_TRUE@man_MANS = \
+@OS_WIN32_CYGWIN_TRUE@	sg3_utils.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
@@ -623,6 +628,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_WIN32_CYGWIN_TRUE@	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
 
 @OS_WIN32_MINGW_TRUE@man_MANS = \
+@OS_WIN32_MINGW_TRUE@	sg3_utils.8 \
 @OS_WIN32_MINGW_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
 @OS_WIN32_MINGW_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
 @OS_WIN32_MINGW_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \

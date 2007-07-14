@@ -68,7 +68,10 @@ Peter Allworth <linsol at zeta dot org dot au> original dd clone design used
 
 Saeed Bishara contributed sg_write_long
 
-Time Hunt <tim at timhunt dot net> increased number of (sd and sg) devices
+Thomas Kolbe <tkolbe at partnersdata dot com>
+	Solaris port help and testing [20070503]
+
+Tim Hunt <tim at timhunt dot net> increased number of (sd and sg) devices
         that sginfo could detect.
 
 Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
@@ -79,4 +82,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-27th June 2007
+16th July 2007
