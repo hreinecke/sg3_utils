@@ -5,7 +5,7 @@ SCSI to ATA Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_set_features
 [\fI\-\-count=\fRCO] [\fI\-\-chk_cond\fR] [\fI\-\-feature=\fRFEA]
-[\fI\-\-help\fR] [\fI\-\-len=\fR12|16] [\fI\-\-lba=\fRLBA]
+[\fI\-\-help\fR] [\fI\-\-len=\fR16|12] [\fI\-\-lba=\fRLBA]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -43,18 +43,19 @@ the command succeeded or failed. When clear the SATL should only yield
 a sense buffer containing a ATA Result descriptor if the command failed.
 .TP
 \fB\-f\fR, \fB\-\-feature\fR=\fIFEA\fR
-the number \fIFEA\fR is placed in the "feature" field in the ATA SET
+the value \fIFEA\fR is placed in the "feature" field in the ATA SET
 FEATURES command. The term "subcommand" is sometimes used for this
 value. The default value placed in the "feature" field is 0 which
-is reserved and hence should not change anything.
+is reserved and hence should not change anything. Two common examples
+are 2h to enable the write cache and 82h to disable it.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options
 then exits. Ignores \fIDEVICE\fR if given.
 .TP
-\fB\-l\fR, \fB\-\-len\fR=12 | 16
+\fB\-l\fR, \fB\-\-len\fR=16 | 12
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
-The argument can either be 12 or 16. The default is 16. Some SCSI
+The argument can either be 16 or 12. The default is 16. Some SCSI
 transports cannot convey SCSI commands longer than 12 bytes.
 .TP
 \fB\-L\fR, \fB\-\-lba\fR=\fILBA\fR
