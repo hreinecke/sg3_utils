@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.73 20070714";    /* SPC-4 revision 11 */
+static char * version_str = "0.74 20070722";    /* SPC-4 revision 11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2111,12 +2111,12 @@ static const char * bms_status[] = {
 };
 
 static const char * reassign_status[] = {
-    "No reassignment needed",
-    "Reassignment pending receipt of Reassign command or Write command",
-    "Logical block successfully reassigned",
+    "Reassign status: Reserved [0x0]",
+    "Reassignment pending receipt of Reassign or Write command",
+    "Logical block successfully reassigned by device server",
     "Reassign status: Reserved [0x3]",
-    "Reassignment failed",
-    "Logical block recovered via rewrite in-place",
+    "Reassignment by device server failed",
+    "Logical block recovered by device server via rewrite",
     "Logical block reassigned by application client, has valid data",
     "Logical block reassigned by application client, contains no valid data",
     "Logical block unsuccessfully reassigned by application client", /* 8 */
@@ -2157,15 +2157,23 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
                 printf("%s\n", bms_status[j]);
             else
                 printf("unknown [0x%x] background scan status value\n", j);
-            printf("    Number of background scans performed: %d\n",
-                   (ucp[10] << 8) + ucp[11]);
+            j = (ucp[10] << 8) + ucp[11];
+            printf("    Number of background scans performed: %d\n", j);
+            j = (ucp[12] << 8) + ucp[13];
 #ifdef SG3_UTILS_MINGW
             printf("    Background medium scan progress: %g%%\n",
-                   (double)((ucp[12] << 8) + ucp[13]) * 100.0 / 65536.0);
+                   (double)(j * 100.0 / 65536.0));
 #else
             printf("    Background medium scan progress: %.2f%%\n",
-                   (double)((ucp[12] << 8) + ucp[13]) * 100.0 / 65536.0);
+                   (double)(j * 100.0 / 65536.0));
 #endif
+            j = (ucp[14] << 8) + ucp[15];
+            if (0 == j)
+                printf("    Number of background medium scans performed: "
+                       "not reported [0]\n");
+            else
+                printf("    Number of background medium scans performed: "
+                       "%d\n", j);
             break;
         default:
             printf("  Medium scan parameter # %d\n", pc);
