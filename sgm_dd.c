@@ -59,7 +59,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.32 20070714 shared_mmap";
+static char * version_str = "1.33 20070728 shared_mmap";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -285,13 +285,14 @@ void usage()
            "    if          file or device to read from (def: stdin)\n");
     fprintf(stderr, 
            "    iflag       comma separated list from: [direct,dpo,dsync,"
-           "excl,fua]\n"
+           "excl,fua,\n"
+           "                null]\n"
            "    of          file or device to write to (def: stdout), "
            "OFILE of '.'\n"
            "                treated as /dev/null\n"
            "    oflag       comma separated list from: [append,dio,direct,"
            "dpo,dsync,\n"
-           "                excl,fua,smmap]\n"
+           "                excl,fua,null,smmap]\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
@@ -704,6 +705,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
             fp->excl = 1;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = 1;
+        else if (0 == strcmp(cp, "null"))
+            ;
         else if (0 == strcmp(cp, "smmap"))
             fp->smmap = 1;
         else {

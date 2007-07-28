@@ -653,6 +653,7 @@ static struct page_code_desc pc_desc_t_sas[] = {
     {0x19, 0x0, "Protocol specific port (SAS)"},
     {0x19, 0x1, "Phy control and discover (SAS)"},
     {0x19, 0x2, "Shared port control (SAS)"},
+    {0x19, 0x3, "SAS-2 phy"},
 };
 
 static struct page_code_desc pc_desc_t_adt[] = {
