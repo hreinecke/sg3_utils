@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SGP_DD "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sgp_dd \- copies data to and from files and devices. Specialized for
 devices that understand the SCSI command set.
@@ -194,6 +194,9 @@ causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
 commands. This only has effect with sg devices. The 6 byte variants
 of the SCSI READ and WRITE commands do not support the FUA bit.
 Only active for sg device file names.
+.TP
+null
+has no affect, just a placeholder.
 .SH RETIRED OPTIONS
 Here are some retired options that are still present:
 .TP

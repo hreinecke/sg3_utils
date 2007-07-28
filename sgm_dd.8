@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SGM_DD "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from files and devices. Specialized for
 devices that understand the SCSI command set and does memory mapped
@@ -186,6 +186,9 @@ causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
 commands. This only has effect with sg devices. The 6 byte variants
 of the SCSI READ and WRITE commands do not support the FUA bit.
 Only active for sg device file names.
+.TP
+null
+has no affect, just a placeholder.
 .TP
 smmap
 is only active for oflag. It sets shared mmap IO usage on \fIOFILE\fR if

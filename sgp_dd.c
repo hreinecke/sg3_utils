@@ -54,7 +54,7 @@
 
 */
 
-static char * version_str = "5.37 20070714";
+static char * version_str = "5.38 20070728";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -347,13 +347,13 @@ static void usage()
            "    if          file or device to read from (def: stdin)\n"
            "    iflag       comma separated list from: [coe,dio,direct,dpo,"
            "dsync,excl,\n"
-           "                fua]\n"
+           "                fua, null]\n"
            "    of          file or device to write to (def: stdout), "
            "OFILE of '.'\n"
            "                treated as /dev/null\n"
            "    oflag       comma separated list from: [append,coe,dio,direct,"
            "dpo,dsync,\n"
-           "                excl,fua]\n"
+           "                excl,fua,null]\n"
            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
            "after copy\n"
            "    thr         is number of threads, must be > 0, default 4, "
@@ -1101,6 +1101,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
             fp->excl = 1;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = 1;
+        else if (0 == strcmp(cp, "null"))
+            ;
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
