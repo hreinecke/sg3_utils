@@ -221,8 +221,8 @@ extern int sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other failure.
- * If success_mask pointer is not NULL then zeros it then sets bit 0, 1,
- * 2 and/or 3 if the current, changeable, default and saved values
+ * If success_mask pointer is not NULL then first zeros it. Then set bits
+ * 0, 1, 2 and/or 3 if the current, changeable, default and saved values
  * respectively have been fetched. If error on current page
  * then stops and returns that error; otherwise continues if an error is
  * detected but returns the first error encountered.  */
