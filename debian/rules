@@ -46,12 +46,9 @@ install: build
 	dh_clean -k
 	dh_installdirs
 
-	# Add here commands to install the package into debian/tmp
-	$(MAKE) -e install DESTDIR=$(CURDIR)/debian/tmp PREFIX=/usr
+	# Add here commands to install the package into debian/sg3-utils.
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/sg3-utils
 
-	find debian/tmp/usr/bin debian/tmp/usr/lib -type f -exec chrpath -d {} \;
-	dh_install --autodest --sourcedir=debian/tmp
-	dh_installman
 
 # Build architecture-independent files here.
 # Pass -i to all debhelper commands in this target to reduce clutter.
@@ -65,7 +62,8 @@ binary-arch: build install
 	dh_installdocs -a
 	dh_installexamples -a 
 	dh_installmenu -a
-	dh_installchangelogs CHANGELOG -a
+	dh_installchangelogs ChangeLog -a
+	dh_installman
 	dh_strip -a
 	dh_link -a
 	dh_compress -a -X archive -X .c -X .h

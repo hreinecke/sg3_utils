@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.74 20070722";    /* SPC-4 revision 11 */
+static char * version_str = "0.75 20070821";    /* SPC-4 revision 11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1465,6 +1465,10 @@ static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
         printf("rel_target_port=%d\n", t);
     else
         printf("relative target port id = %d\n", t);
+    if (optsp->do_name)
+        printf("  gen_code=%d\n", ucp[6]);
+    else
+        printf("  generation code = %d\n", ucp[6]);
     nphys = ucp[7];
     if (optsp->do_name)
         printf("  num_phys=%d\n", nphys);

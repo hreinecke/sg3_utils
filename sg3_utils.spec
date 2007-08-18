@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Sat Jul 28 2007 - dgilbert at interlog dot com
+* Tue Aug 21 2007 - dgilbert at interlog dot com
 - add sg_sat_set_features, sg_dd oflag=sparse,null
   * sg3_utils-1.25
 
