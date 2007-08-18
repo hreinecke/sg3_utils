@@ -11,7 +11,7 @@ Depends: ${shlibs:Depends}
 Conflicts: sg-utils, cdwrite
 Replaces: sg-utils
 Description: Collection of Linux utilities for devices that use the
- SCSI command set. See the README, CHANGELOG and COVERAGE files.
+ SCSI command set. See the README, ChangeLog and COVERAGE files.
  .
  Requires the linux kernel 2.4 series or later. In the 2.4 series
  SCSI generic device names (e.g. /dev/sg0) must be used. In the 2.6

@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.3.4 (2007-07-14)"
+#define SG_RAW_VERSION "0.3.5 (2007-08-20)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -401,7 +401,7 @@ int main(int argc, char *argv[])
             ret = SG_LIB_CAT_OTHER;
         goto done;
     } else if (ret < 0) {
-        fprintf(stderr, "do_scsi_pt: %s\n", safe_strerror(-sg_fd));
+        fprintf(stderr, "do_scsi_pt: %s\n", safe_strerror(-ret));
         ret = SG_LIB_CAT_OTHER;
         goto done;
     }

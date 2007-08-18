@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.25 [20070728]
+Changelog for sg3_utils-1.25 [20070821]
   - sg_sat_set_features: new utility (actually copied from examples
     directory); renamed examples version: sg__sat_set_features
   - sg_dd: add oflag=sparse to step over bs*bpt number of zeros;
@@ -15,6 +15,8 @@ Changelog for sg3_utils-1.25 [20070728]
   - sg_ses: sync with ses2r17 the r18
   - sg_vpd: add block device characteristics VPD page
   - sg_logs: update background scan results log page, sbc3r11
+    - add generation code to protocol specific page for SAS SSP
+  - sg_raw: fix error message when do_scsi_pt() fails
   - place source in subversion repository
   - convert build logic to use autotools (i.e. './configure ; make')
     - rename this file from CHANGELOG to ChangeLog
