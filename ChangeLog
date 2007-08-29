@@ -2,13 +2,13 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.25 [20070821]
+Changelog for sg3_utils-1.25 [20070829]
   - sg_sat_set_features: new utility (actually copied from examples
     directory); renamed examples version: sg__sat_set_features
   - sg_dd: add oflag=sparse to step over bs*bpt number of zeros;
     - with oflag=sparse, write last bs*bpt segment at end or after
       error so file length of OFILE is appropriate
-    - when coe>1 then SCSI READ LONG logic remember extended block
+    - when coe>1 then SCSI READ LONG logic remembers extended block
       length of first encountered error
   - sg_dd, sgm_dd, sgp_dd: allow iflag=null and oflag=null both of
     which do nothing (placeholders)
