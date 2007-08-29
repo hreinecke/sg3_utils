@@ -1,4 +1,4 @@
-.TH SG_SAT_SET_FEATURES "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_SAT_SET_FEATURES "8" "August 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_sat_set_featutes \- sends a ATA SET FEATURES command via a
 SCSI to ATA Translation (SAT) layer
@@ -12,7 +12,7 @@ SCSI to ATA Translation (SAT) layer
 .PP
 This utility sends an ATA SET FEATURES command to the \fIDEVICE\fR.
 This command is used to change settings of ATA non-packet (i.e. disks) and
-packet devices (e.g.  cd/dvd drives). Rather than send the SET FEATURES
+packet devices (e.g. cd/dvd drives). Rather than send the SET FEATURES
 command directly to the device it is sent via a SCSI transport which is
 assumed to contain a SCSI to ATA Translation (SAT) Layer (SATL). The SAT
 standard (SAT ANSI INCITS 431-2007; prior draft: sat\-r09.pdf at www.t10.org)
@@ -39,8 +39,8 @@ The default value placed in the "count" field is 0.
 sets the CK_COND bit in the ATA PASS\-THROUGH SCSI cdb. The
 default setting is clear (i.e. 0). When set the SATL should yield a
 sense buffer containing a ATA Result descriptor irrespective of whether
-the command succeeded or failed. When clear the SATL should only yield
-a sense buffer containing a ATA Result descriptor if the command failed.
+the ATA command succeeded or failed. When clear the SATL should only yield
+a sense buffer containing a ATA Result descriptor if the ATA command failed.
 .TP
 \fB\-f\fR, \fB\-\-feature\fR=\fIFEA\fR
 the value \fIFEA\fR is placed in the "feature" field in the ATA SET
@@ -62,8 +62,8 @@ transports cannot convey SCSI commands longer than 12 bytes.
 the number \fILBA\fR is placed in the "lba" field in the ATA SET
 FEATURES command. Only some subcommands (a term used for the value
 placed in the "feature" field) require the lba field to be set.
-This value is not a "logical block address". The default value
-placed in the "lba" field is 0.
+This value is not a "logical block address" as the acronym might imply.
+The default value placed in the "lba" field is 0.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.

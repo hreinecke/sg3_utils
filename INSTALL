@@ -3,8 +3,8 @@
 
 Introduction
 ============
-During the development of sg3_utils version 1.25 this package was changed
-to use autotools. Prior to version 1.25 it used handed crafted Makefiles.
+During the development of sg3_utils version 1.25 this package was changed to
+use autotools. Prior to version 1.25 it used handed crafted Makefiles.
 
 In most cases the build process is now:
   a) fetch the source tarball, untar it and go to the top level directory,
@@ -15,10 +15,10 @@ In most cases the build process is now:
 
 Step d) usually requires root permissions. Notes specific to supported
 architectures are given below. If the architecture supports shared libraries
-(in Unix/Linux) then the default './configure' generates a Makefile that
-will build executables that use a shared library. The name of that shared
-library starts with 'libsgutils'. To build without that shared library use
-this invocation instead of step b): './configure --disable-shared' .
+(in Unix/Linux) then the default './configure' generates a Makefile that will
+ build executables that use a shared library. The name of that shared library
+starts with 'libsgutils'. To build without that shared library use this
+invocation instead of step b): './configure --disable-shared' .
 
 The default prefix for './configure' is "/usr/local". This means that by
 default 'make install' will place the executables in "/usr/local/bin". To
@@ -26,13 +26,13 @@ change this, for example to drop the "local", use an invocation like
 this: './configure --prefix=/usr' . See the output of './configure --help'
 for more information on build options.
 
-The two script files that driven the autotools build are configure.ac
-and Makefile.am . If the former is changed, autoconf should be run
-and if the latter is chnaged, autmake should be run. More simply if
-either is changed the autogen.sh script can be run.
+The two script files that drive the autotools build are configure.ac and
+Makefile.am . If the former is changed, autoconf should be run and if the
+latter is changed, automake should be run. More simply if either is changed
+the autogen.sh script can be run.
 
 Note that only the utilities in the main directory are build by the
-'./configure' infrastructure. [A caveat: the code is the getopt_long
+'./configure' infrastructure. [An exception: the code is the getopt_long
 directory is built for OSF (Tru64).] Code in the examples, utils and
 archives directories can be built with simple Makefiles which are
 typically found in those directories.
@@ -41,19 +41,18 @@ typically found in those directories.
 Linux
 =====
 A "spec" file is included for building rpm packages. It is called
-sg3_utils.spec . To build binary and source rpms place a copy of the
-gzipped tarball in the "SOURCES" directory and place a copy of
-sg3_utils.spec in the "SPEC" directory. These directories are found under
-/usr/src/redhat on redhat/fedora distributions. Then from the "SPEC"
-directory execute "rpmbuild -ba sg3_utils.spec". If all goes well a source
-rpm should be found in the SRPMS directory and binary rpms in the RPMS/i386
-directory (for i386 architecture). Note the spec file will only build those
-utilities found in the main directory. When the sg3_utils binary rpm is
-installed the executables and their associated man pages should be placed in
-appropriate places. The sg3_utils.spec file also builds a libsgutils shared
-object (shared library) and a libsgutils-*-devel shared object with a static
-library and the sg_lib.h, sg_cmds.h sg_cmds_basic.h, sg_cmds_extra.h and
-sg_pt.h header files.
+sg3_utils.spec . To build binary and source rpms place a copy of the gzipped
+tarball in the "SOURCES" directory and place a copy of sg3_utils.spec in the
+"SPEC" directory. These directories are found under /usr/src/redhat in
+redhat/fedora distributions. Then from the "SPEC" directory execute
+"rpmbuild -ba sg3_utils.spec". If all goes well a source rpm should be found
+in the SRPMS directory and binary rpms in the RPMS/i386 directory (for i386
+architecture). Note the spec file will only build those utilities found in
+the main directory. When the sg3_utils binary rpm is installed the executables
+and their associated man pages should be placed in appropriate places. The
+sg3_utils.spec file also builds a libsgutils shared object (shared library)
+and a libsgutils-*-devel shared object with a static library and the sg_lib.h,
+sg_cmds.h sg_cmds_basic.h, sg_cmds_extra.h and sg_pt.h header files.
 
 Binary rpms (at least in the RedHat distribution) tend to install
 executables in /usr/bin and libraries in /usr/lib .
@@ -66,10 +65,6 @@ The binary deb packages will be placed in the parent directory (of
 the sg3_utils source directory) if all goes well. There is now
 a script called build_debian.sh in the main directory which invokes
 those two commands.
-
-If the shared object (library) is troublesome or unwanted then
-a "no_lib" version of the Makefile and the sg3_utils.spec file
-can be found in the "no_lib" subdirectory.
 
 
 FreeBSD
@@ -136,5 +131,5 @@ Makefile.am file for a definitive list. The executables have a '.exe'
 extension and can be executed in a MSYS or "cmd" shell.
 
 
-18th July 2007
+29th August 2007
 Doug Gilbert
