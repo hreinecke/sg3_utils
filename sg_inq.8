@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_INQ "8" "August 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_inq \- sends a SCSI INQUIRY or ATA IDENTIFY (PACKET) DEVICE command
 and outputs the response
@@ -7,7 +7,7 @@ and outputs the response
 [\fI\-\-ata\fR] [\fI\-\-cmddt\fR] [\fI\-\-descriptors\fR] [\fI\-\-extended\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-len=LEN\fR]
 [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c\fR] [\fI\-cl\fR]
@@ -74,7 +74,13 @@ normal components of a standard INQUIRY are output (typically from
 the first 36 bytes of the response) followed by the version descriptors
 if any.
 .TP
-\fB\-e\fR, \fB\-x\fR, \fB\-\-extended\fR
+\fB\-e\fR, \fB\-\-vpd\fR
+set the Enable Vital Product Data (EVPD) bit (defaults to clear(0)). Used in
+conjunction with the \fI\-\-page=PG\fR option where \fIPG\fR specifies the
+VPD page number to query. If the \fI\-\-page=PG\fR is not given then \fIPG\fR
+defaults to zero which is the "Supported VPD page" VPD page. 
+.TP
+\fB\-E\fR, \fB\-x\fR, \fB\-\-extended\fR
 prints the extended INQUIRY VPD page [0x86].
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -124,6 +130,9 @@ increase level of verbosity. Can be used multiple times.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.
+.TP
+\fB\-\-vpd\fR
+see above entry for \fI\-e\fR.
 .SH NOTES
 Some devices with weak SCSI command set implementations lock up when
 they receive commands they don't understand (or even response lengths
