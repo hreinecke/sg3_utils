@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.70 20070714";    /* spc-4 rev 10 */
+static char * version_str = "0.70 20070829";    /* spc-4 rev 10 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -79,6 +79,7 @@ static char * version_str = "0.70 20070714";    /* spc-4 rev 10 */
 #define VPD_SCSI_PORTS  0x88
 #define VPD_ATA_INFO  0x89
 #define VPD_BLOCK_LIMITS  0xb0
+#define VPD_BLOCK_DEV_CHARS  0xb1
 #define VPD_UPR_EMC  0xc0
 #define VPD_RDAC_VERS 0xc2
 #define VPD_RDAC_VAC 0xc9
@@ -124,6 +125,8 @@ struct svpd_values_name_t {
 
 static struct svpd_values_name_t vpd_pg[] = {
     {VPD_ATA_INFO, 0, -1, 0, "ai", "ATA information (SAT)"},
+    {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc",
+     "Block device characteristics (SBC)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
 #if 0
@@ -166,6 +169,7 @@ static struct option long_options[] = {
         {"raw", 0, 0, 'r'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
+        {"vpd", 0, 0, 'e'},
         {0, 0, 0, 0},
 };
 
@@ -198,7 +202,7 @@ static void usage()
             "[--help] [--hex]\n"
             "              [--id] [--len=LEN] [--page=PG] [--raw] "
             "[--verbose] [--version]\n"
-            "              DEVICE\n"
+            "              [--vpd] DEVICE\n"
             "  where:\n"
             "    --ata|-a        treat DEVICE as (directly attached) ATA "
             "device\n");
@@ -207,7 +211,7 @@ static void usage()
             "Usage: sg_inq [--cmddt] [--descriptors] [--extended] [--help] "
             "[--hex] [--id]\n"
             "              [--len=LEN] [--page=PG] [--raw] [--verbose] "
-            "[--version]\n"
+            "[--version] [--vpd]\n"
             "              DEVICE\n"
             "  where:\n");
 #endif
@@ -217,7 +221,7 @@ static void usage()
             "                    use twice for list of supported "
             "commands; obsolete\n"
             "    --descriptors|-d    fetch and decode version descriptors\n"
-            "    --extended|-e|-x    decode extended INQUIRY data VPD page "
+            "    --extended|-E|-x    decode extended INQUIRY data VPD page "
             "(0x86)\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
@@ -233,7 +237,9 @@ static void usage()
             "'--cmddt' given)\n"
             "    --raw|-r        output response in binary (to stdout)\n"
             "    --verbose|-v    increase verbosity\n"
-            "    --version|-V    print version string then exit\n\n"
+            "    --version|-V    print version string then exit\n"
+            "    --vpd|-e        vital product data (set page with\n"
+            "                    '--page=PG')\n\n"
             "Performs a SCSI INQUIRY command.\n"
             "If no options given then does a 'standard' INQUIRY.\n");
 }
@@ -308,10 +314,10 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         int option_index = 0;
 
 #ifdef SG3_UTILS_LINUX
-        c = getopt_long(argc, argv, "acdehHil:NOp:rvVx", long_options,
+        c = getopt_long(argc, argv, "acdeEhHil:NOp:rvVx", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "cdehHil:NOp:rvVx", long_options,
+        c = getopt_long(argc, argv, "cdeEhHil:NOp:rvVx", long_options,
                         &option_index);
 #endif
         if (c == -1)
@@ -330,6 +336,9 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_descriptors;
             break;
         case 'e':
+            ++optsp->do_vpd;
+            break;
+        case 'E':
         case 'x':
             ++optsp->do_decode;
             ++optsp->do_vpd;
@@ -616,6 +625,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_SCSI_PORTS, 0, "SCSI ports"},
     {VPD_ATA_INFO, 0, "ATA information"},
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"}, 
+    {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"}, 
     {0xb0, 0x1, "Sequential access device capabilities (ssc3)"},
     {0xb2, 0x1, "TapeAlert supported flags (ssc3)"},
     {0xb0, 0x11, "OSD information (osd)"},
@@ -1342,6 +1352,42 @@ static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  WORM=%d\n", !!(buff[4] & 0x1));
             break;
         case 0x11:
+        default:
+            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+            dStrHex((const char *)buff, len, 0);
+            break;
+    }
+}
+
+static void decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+{
+    unsigned int u;
+
+    if (do_hex) {
+        dStrHex((const char *)buff, len, 0);
+        return;
+    }
+    switch (pdt) {
+        case 0: case 4: case 7:
+            if (len < 64) {
+                fprintf(stderr, "Block device characteristics VPD page length "
+                        "too short=%d\n", len);
+                return;
+            }
+            u = (buff[4] << 8) | buff[5];
+            if (0 == u)
+                printf("  Medium rotation rate is not reported\n");
+            else if (1 == u)
+                printf("  Non-rotating medium (e.g. solid state)\n");
+            else if ((u < 0x401) || (0xffff == u))
+                printf("  Reserved [0x%x]\n", u);
+            else
+                printf("  Nominal rotation rate: %d rpm\n", u);
+            break;
+        case 1: case 8: case 0x12:
+            printf("  Manufacturer-assigned serial number: %.*s\n",
+                   len - 4, buff + 4);
+            break;
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
             dStrHex((const char *)buff, len, 0);
@@ -2206,6 +2252,55 @@ static int decode_vpd(int sg_fd, const struct opts_t * optsp)
                 decode_b0_vpd(rsp_buff, len, optsp->do_hex, pdt);
         } else if (! optsp->do_raw)
             printf("VPD INQUIRY: page=0xb0\n");
+        break;
+    case 0xb1:  /* could be BLOCK DEVICE CHARACTERISTICS but need pdt */
+        res = sg_ll_inquiry(sg_fd, 0, 1, 0xb1, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
+        if (0 == res) {
+            pdt = rsp_buff[0] & 0x1f;
+            if (! optsp->do_raw) {
+                switch (pdt) {
+                case 0: case 4: case 7:
+                    printf("VPD INQUIRY: Block device characteristcis page "
+                           "(SBC)\n");
+                    break;
+                case 1: case 8:
+                    printf("Manufactured assigned serial number VPD page "
+                           "(SSC):\n");
+                    break;
+                case 0x11:
+                    printf("Security token VPD page (OSD):\n");
+                    break;
+                case 0x12:
+                    printf("Manufactured assigned serial number VPD page "
+                           "(ADC):\n");
+                    break;
+                default:
+                    printf("VPD INQUIRY: page=0x%x, pdt=0x%x\n", 0xb1, pdt);
+                    break;
+                }
+            }
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (0xb1 != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > MX_ALLOC_LEN) {
+                fprintf(stderr, "response length too long: %d > %d\n", len,
+                       MX_ALLOC_LEN);
+                return SG_LIB_CAT_MALFORMED;
+            } else if (len > DEF_ALLOC_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, 0xb1, rsp_buff,
+                                  len, 1, optsp->do_verbose))
+                    return SG_LIB_CAT_OTHER;
+            }
+            if (optsp->do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else
+                decode_b1_vpd(rsp_buff, len, optsp->do_hex, pdt);
+        } else if (! optsp->do_raw)
+            printf("VPD INQUIRY: page=0xb1\n");
         break;
     case VPD_UPR_EMC:   /* 0xc0 */
         if (!optsp->do_raw)

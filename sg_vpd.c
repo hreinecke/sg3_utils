@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.20 20070714";    /* spc-4 rev 11 */
+static char * version_str = "0.20 20070829";    /* spc-4 rev 11 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -77,7 +77,7 @@ extern const struct svpd_values_name_t *
 #define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
 #define VPD_SA_DEV_CAP 0xb0     /* SSC-3 */
 #define VPD_OSD_INFO 0xb0       /* OSD */
-#define VPD_BLOCK_DEV_CHAR 0xb1 /* SBC-3 */
+#define VPD_BLOCK_DEV_CHARS 0xb1 /* SBC-3 */
 #define VPD_MAN_ASS_SN 0xb1     /* SSC-3, ADC-2 */
 #define VPD_SECURITY_TOKEN 0xb1 /* OSD */
 #define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
@@ -140,7 +140,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_ASCII_OP_DEF, 0, -1, 0, "aod",
      "ASCII implemented operating definition (obs)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
-    {VPD_BLOCK_DEV_CHAR, 0, 0, 0, "bdc", "Block device characteristics "
+    {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc", "Block device characteristics "
      "(SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "

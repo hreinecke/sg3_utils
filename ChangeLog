@@ -13,7 +13,8 @@ Changelog for sg3_utils-1.25 [20070829]
   - sg_dd, sgm_dd, sgp_dd: allow iflag=null and oflag=null both of
     which do nothing (placeholders)
   - sg_ses: sync with ses2r17 the r18
-  - sg_vpd: add block device characteristics VPD page
+  - sg_vpd, sg_inq: add block device characteristics VPD page
+  - sg_inq: add '--vpd' option (or '-e') for backward compatibility
   - sg_logs: update background scan results log page, sbc3r11
     - add generation code to protocol specific page for SAS SSP
   - sg_raw: fix error message when do_scsi_pt() fails
