@@ -277,9 +277,18 @@ static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     vpp80 = buff[30] & 0x08;
     lun_z = buff[30] & 0x04;
 
-    printf("  System Type: %hhx, Failover mode: %s\n",
-                   buff[27],
-                   failover_mode == 4 ? "Set to 1" : "Unknown");
+    printf("  System Type: %hhx, ", buff[27]);
+    switch (failover_mode) {
+	case 4:
+	    printf("Failover mode: 1 (Linux)\n");
+	    break;
+	case 6:
+	    printf("Failover mode: 4 (ALUA)\n");
+	    break;
+	default:
+	    printf("Failover mode: Unknown (%d)\n", failover_mode);
+	    break;
+    }
 
     printf("  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
                    vpp80 ? "array serial#" : "LUN serial#",

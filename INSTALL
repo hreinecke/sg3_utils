@@ -16,15 +16,16 @@ In most cases the build process is now:
 Step d) usually requires root permissions. Notes specific to supported
 architectures are given below. If the architecture supports shared libraries
 (in Unix/Linux) then the default './configure' generates a Makefile that will
- build executables that use a shared library. The name of that shared library
+build executables that use a shared library. The name of that shared library
 starts with 'libsgutils'. To build without that shared library use this
 invocation instead of step b): './configure --disable-shared' .
 
 The default prefix for './configure' is "/usr/local". This means that by
 default 'make install' will place the executables in "/usr/local/bin". To
 change this, for example to drop the "local", use an invocation like
-this: './configure --prefix=/usr' . See the output of './configure --help'
-for more information on build options.
+this: './configure --prefix=/usr' . To check that the code compiles clean
+as C++ (with g++) step b) may be changed to "./configure CC=g++". See the
+output of './configure --help' for more information about build options.
 
 The two script files that drive the autotools build are configure.ac and
 Makefile.am . If the former is changed, autoconf should be run and if the
@@ -131,5 +132,5 @@ Makefile.am file for a definitive list. The executables have a '.exe'
 extension and can be executed in a MSYS or "cmd" shell.
 
 
-29th August 2007
+30th August 2007
 Doug Gilbert

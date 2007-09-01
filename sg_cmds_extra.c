@@ -59,6 +59,7 @@
 #define MAINTENANCE_OUT_CMD 0xa4
 #define MAINTENANCE_OUT_CMDLEN 12
 #define SET_IDENTIFYING_INFORMATION_SA 0x6
+#define SET_TGT_PRT_GRP_SA 0xa
 #define SEND_DIAGNOSTIC_CMD   0x1d
 #define SEND_DIAGNOSTIC_CMDLEN  6
 #define RECEIVE_DIAGNOSTICS_CMD   0x1c
@@ -135,6 +136,74 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
     ret = sg_cmds_process_resp(ptvp, "report target port group", res,
                                mx_resp_len, sense_b, noisy, verbose,
                                &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI SET TARGET PORT GROUPS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Set Target Port Groups not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+int sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp,
+			  int param_len, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char stpgCmdBlk[MAINTENANCE_OUT_CMDLEN] =
+                         {MAINTENANCE_OUT_CMD, SET_TGT_PRT_GRP_SA,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    stpgCmdBlk[6] = (param_len >> 24) & 0xff;
+    stpgCmdBlk[7] = (param_len >> 16) & 0xff;
+    stpgCmdBlk[8] = (param_len >> 8) & 0xff;
+    stpgCmdBlk[9] = param_len & 0xff;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    set target port groups cdb: ");
+        for (k = 0; k < MAINTENANCE_OUT_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", stpgCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_strm, "    set target port groups "
+                    "parameter list:\n");
+            dStrHex((const char *)paramp, param_len, -1);
+        }
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "set target port groups: out of "
+                "memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, stpgCmdBlk, sizeof(stpgCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "set target port group", res, 0,
+                               sense_b, noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
