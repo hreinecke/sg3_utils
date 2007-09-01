@@ -72,7 +72,7 @@
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.14 20070714";
+static char * version_str = "1.14 20070830";
 
 static struct option long_options[] = {
         {"count", 1, 0, 'c'},
@@ -563,7 +563,7 @@ int main(int argc, char **argv)
                 dbuff[offset + bd_len] &= 0x7f;  /* clear PS bit in mpage */
         prob = 0;
         bd_blk_len = 0;
-        printf("Mode sense (block descriptor) data, prior to changes:\n");
+        printf("Mode Sense (block descriptor) data, prior to changes:\n");
         if (dev_specific_param & 0x40)
                 printf("  <<< Write Protect (WP) bit set >>>\n");
         if (bd_len > 0) {

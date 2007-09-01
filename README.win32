@@ -43,6 +43,7 @@ Here is a list of utilities that have been ported:
     sg_senddiag
     sg_ses
     sg_start
+    sg_stpg
     sg_sync
     sg_turs
     sg_verify
@@ -129,4 +130,4 @@ See the INSTALL file for more details.
 
 
 Doug Gilbert
-3rd May 2007
+31st August 2007

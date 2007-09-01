@@ -58,6 +58,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_ses$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_start$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sync$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_turs$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_verify$(EXEEXT) \
@@ -89,6 +90,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_ses$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_start$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sync$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_turs$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_verify$(EXEEXT) \
@@ -119,6 +121,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_ses$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_start$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sync$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_turs$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_verify$(EXEEXT) \
@@ -149,6 +152,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_ses$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_start$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sync$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_turs$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_verify$(EXEEXT) \
@@ -190,6 +194,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_ses$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_start$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sync$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_test_rwbuf$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_turs$(EXEEXT) \
@@ -210,9 +215,10 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@	sg_rtpg$(EXEEXT) sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_start$(EXEEXT) sg_sync$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_turs$(EXEEXT) sg_verify$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_vpd$(EXEEXT) sg_write_buffer$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_start$(EXEEXT) sg_stpg$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_sync$(EXEEXT) sg_turs$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_verify$(EXEEXT) sg_vpd$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_write_long$(EXEEXT) sg_wr_mode$(EXEEXT)
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(am__noinst_HEADERS_DIST) \
@@ -367,6 +373,9 @@ sg_ses_DEPENDENCIES = libsgutils.la
 am_sg_start_OBJECTS = sg_start.$(OBJEXT)
 sg_start_OBJECTS = $(am_sg_start_OBJECTS)
 sg_start_DEPENDENCIES = libsgutils.la
+am_sg_stpg_OBJECTS = sg_stpg.$(OBJEXT)
+sg_stpg_OBJECTS = $(am_sg_stpg_OBJECTS)
+sg_stpg_DEPENDENCIES = libsgutils.la
 am_sg_sync_OBJECTS = sg_sync.$(OBJEXT)
 sg_sync_OBJECTS = $(am_sg_sync_OBJECTS)
 sg_sync_DEPENDENCIES = libsgutils.la
@@ -426,7 +435,7 @@ SOURCES = $(libsgutils_la_SOURCES) $(EXTRA_libsgutils_la_SOURCES) \
 	$(sg_reset_SOURCES) $(sg_rmsn_SOURCES) $(sg_rtpg_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_set_features_SOURCES) \
 	$(sg_scan_SOURCES) $(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
-	$(sg_start_SOURCES) $(sg_sync_SOURCES) \
+	$(sg_start_SOURCES) $(sg_stpg_SOURCES) $(sg_sync_SOURCES) \
 	$(sg_test_rwbuf_SOURCES) $(sg_turs_SOURCES) \
 	$(sg_verify_SOURCES) $(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
 	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
@@ -444,7 +453,7 @@ DIST_SOURCES = $(am__libsgutils_la_SOURCES_DIST) \
 	$(sg_reset_SOURCES) $(sg_rmsn_SOURCES) $(sg_rtpg_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_set_features_SOURCES) \
 	$(sg_scan_SOURCES) $(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
-	$(sg_start_SOURCES) $(sg_sync_SOURCES) \
+	$(sg_start_SOURCES) $(sg_stpg_SOURCES) $(sg_sync_SOURCES) \
 	$(sg_test_rwbuf_SOURCES) $(sg_turs_SOURCES) \
 	$(sg_verify_SOURCES) $(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
 	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
@@ -591,7 +600,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_FREEBSD_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 @OS_FREEBSD_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_FREEBSD_TRUE@	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
-@OS_FREEBSD_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+@OS_FREEBSD_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 @OS_FREEBSD_TRUE@	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 @OS_FREEBSD_TRUE@	sg_wr_mode.8
 
@@ -603,7 +612,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_LINUX_TRUE@	sg_prevent.8 sg_raw.8 sg_rbuf.8 sg_rdac.8 sg_read.8 sg_readcap.8 \
 @OS_LINUX_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_reset.8 sg_rmsn.8 \
 @OS_LINUX_TRUE@	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
-@OS_LINUX_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 sg_test_rwbuf.8 \
+@OS_LINUX_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 sg_test_rwbuf.8 \
 @OS_LINUX_TRUE@	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 @OS_LINUX_TRUE@	sg_wr_mode.8
 
@@ -615,7 +624,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_OSF_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 @OS_OSF_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_OSF_TRUE@	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
-@OS_OSF_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+@OS_OSF_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 @OS_OSF_TRUE@	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 @OS_OSF_TRUE@	sg_wr_mode.8
 
@@ -627,7 +636,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_SOLARIS_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 @OS_SOLARIS_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_SOLARIS_TRUE@	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
-@OS_SOLARIS_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+@OS_SOLARIS_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 @OS_SOLARIS_TRUE@	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 @OS_SOLARIS_TRUE@	sg_wr_mode.8
 
@@ -639,7 +648,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_WIN32_CYGWIN_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
-@OS_WIN32_CYGWIN_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+@OS_WIN32_CYGWIN_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_wr_mode.8
 
@@ -651,7 +660,7 @@ scsiincludedir = $(includedir)/scsi
 @OS_WIN32_MINGW_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
 @OS_WIN32_MINGW_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_WIN32_MINGW_TRUE@	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
-@OS_WIN32_MINGW_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_sync.8 \
+@OS_WIN32_MINGW_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 @OS_WIN32_MINGW_TRUE@	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 @OS_WIN32_MINGW_TRUE@	sg_wr_mode.8
 
@@ -885,6 +894,8 @@ sg_ses_SOURCES = sg_ses.c
 sg_ses_LDADD = libsgutils.la @os_libs@
 sg_start_SOURCES = sg_start.c
 sg_start_LDADD = libsgutils.la @os_libs@
+sg_stpg_SOURCES = sg_stpg.c
+sg_stpg_LDADD = libsgutils.la @os_libs@
 sg_sync_SOURCES = sg_sync.c
 sg_sync_LDADD = libsgutils.la @os_libs@
 sg_test_rwbuf_SOURCES = sg_test_rwbuf.c sg_io_linux.c
@@ -1106,6 +1117,9 @@ sg_ses$(EXEEXT): $(sg_ses_OBJECTS) $(sg_ses_DEPENDENCIES)
 sg_start$(EXEEXT): $(sg_start_OBJECTS) $(sg_start_DEPENDENCIES) 
 	@rm -f sg_start$(EXEEXT)
 	$(LINK) $(sg_start_OBJECTS) $(sg_start_LDADD) $(LIBS)
+sg_stpg$(EXEEXT): $(sg_stpg_OBJECTS) $(sg_stpg_DEPENDENCIES) 
+	@rm -f sg_stpg$(EXEEXT)
+	$(LINK) $(sg_stpg_OBJECTS) $(sg_stpg_LDADD) $(LIBS)
 sg_sync$(EXEEXT): $(sg_sync_OBJECTS) $(sg_sync_DEPENDENCIES) 
 	@rm -f sg_sync$(EXEEXT)
 	$(LINK) $(sg_sync_OBJECTS) $(sg_sync_LDADD) $(LIBS)
@@ -1186,6 +1200,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_senddiag.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ses.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_start.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_stpg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_test_rwbuf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_turs.Po@am__quote@

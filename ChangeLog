@@ -2,7 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.25 [20070829]
+Changelog for sg3_utils-1.25 [20070830]
+  - sg_stpg: new utility to Set Target Port Groups
+  - sg_cmds_extra: add sg_ll_set_tgt_prt_grp()
   - sg_sat_set_features: new utility (actually copied from examples
     directory); renamed examples version: sg__sat_set_features
   - sg_dd: add oflag=sparse to step over bs*bpt number of zeros;

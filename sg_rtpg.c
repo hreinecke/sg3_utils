@@ -281,7 +281,7 @@ int main(int argc, char * argv[])
 
             printf("  target port group id : 0x%x , Pref=%d\n",
                    (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));
-            printf("    target port group assymetric access state : ");
+            printf("    target port group asymmetric access state : ");
             printf("0x%02x", ucp[0] & 0x0f);
             if (decode)
                 decode_tpgs_state(ucp[0] & 0x0f);
