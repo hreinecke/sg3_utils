@@ -45,9 +45,9 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.1 20070830";
+static char * version_str = "1.1 20070903";
 
-#define SET_TGT_GRP_BUFF_LEN 1024
+#define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 
 #define TPGS_STATE_OPTIMIZED 0x0
@@ -256,8 +256,8 @@ void encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp
 int main(int argc, char * argv[])
 {
     int sg_fd, k, off, res, c, report_len, tgt_port_count, trunc, numgrp;
-    unsigned char reportTgtGrpBuff[SET_TGT_GRP_BUFF_LEN];
-    unsigned char setTgtGrpBuff[SET_TGT_GRP_BUFF_LEN];
+    unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
+    unsigned char setTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char rsp_buff[MX_ALLOC_LEN + 2];
     unsigned char * ucp;
     struct tgtgrp tgtGrpState[256], *tgtStatePtr;
