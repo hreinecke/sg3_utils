@@ -30,11 +30,13 @@
  *
  */
 
-/* Version 1.34 [20070422]
+/*
  *
  * On 5th October 2004 a FreeBSD license was added to this file.
  * The intention is to keep this file and the related sg_lib.c file
  * as open source and encourage their unencumbered use.
+ *
+ * Current version number is in the sg_lib.c file.
  */
 
 

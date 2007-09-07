@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.70 20070829";    /* spc-4 rev 10 */
+static char * version_str = "0.70 20070906";    /* spc-4 rev 11 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -3035,11 +3035,14 @@ static struct version_descriptor version_descriptor_arr[] = {
     {0xe20, "FC-LS (no version claimed)"},
     {0xe40, "FC-SP (no version claimed)"},
     {0xe42, "FC-SP T11/1570-D revision 1.6"},
+    {0xe45, "FC-SP ANSI INCITS 426-2007"},
     {0xe60, "FC-PI-3 (no version claimed)"},
     {0xe80, "FC-PI-4 (no version claimed)"},
     {0xea0, "FC 10GFC (no version claimed)"},
     {0xea2, "FC 10GFC ANSI INCITS 364-2003"},
     {0xea3, "FC 10GFC ISO/IEC 14165-116"},
+    {0xec0, "FC-SP-2 (no version claimed)"},
+    {0xee0, "FC-FS-3 (no version claimed)"},
     {0x12e0, "FC-DA (no version claimed)"},
     {0x12e2, "FC-DA T11/1513-DT revision 3.1"},
     {0x1300, "FC-Tape (no version claimed)"},
