@@ -71,7 +71,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.34 20070422";    /* spc-4 rev 10 */
+static char * version_str = "1.35 20070906";    /* spc-4 rev 11 */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -119,11 +119,11 @@ static const struct value_name_t normal_opcodes[] = {
     {0x13, 0, "Verify(6)"},  /* SSC */
     {0x14, 0, "Recover buffered data"},
     {0x15, 0, "Mode select(6)"},
-    {0x16, 0, "Reserve(6)"},
+    {0x16, 0, "Reserve(6)"},    /* obsolete in SPC-4 r11 */
     {0x16, 8, "Reserve element(6)"},
-    {0x17, 0, "Release(6)"},
+    {0x17, 0, "Release(6)"},    /* obsolete in SPC-4 r11 */
     {0x17, 8, "Release element(6)"},
-    {0x18, 0, "Copy"},
+    {0x18, 0, "Copy"},          /* obsolete in SPC-4 r11 */
     {0x19, 0, "Erase(6)"},
     {0x1a, 0, "Mode sense(6)"},
     {0x1b, 0, "Start stop unit"},
@@ -158,14 +158,14 @@ static const struct value_name_t normal_opcodes[] = {
     {0x37, 0, "Read defect data(10)"},
     {0x37, 8, "Initialize element status with range"},
     {0x38, 0, "Medium scan"},
-    {0x39, 0, "Compare"},
-    {0x3a, 0, "Copy and verify"},
+    {0x39, 0, "Compare"},               /* obsolete in SPC-4 r11 */
+    {0x3a, 0, "Copy and verify"},       /* obsolete in SPC-4 r11 */
     {0x3b, 0, "Write buffer"},
     {0x3c, 0, "Read buffer"},
     {0x3d, 0, "Update block"},
     {0x3e, 0, "Read long(10)"},
     {0x3f, 0, "Write long(10)"},
-    {0x40, 0, "Change definition"},
+    {0x40, 0, "Change definition"},     /* obsolete in SPC-4 r11 */
     {0x41, 0, "Write same(10)"},
     {0x42, 0, "Read sub-channel"},
     {0x43, 0, "Read TOC/PMA/ATIP"},
@@ -186,9 +186,9 @@ static const struct value_name_t normal_opcodes[] = {
     {0x53, 0, "Reserve track"},
     {0x54, 0, "Send OPC information"},
     {0x55, 0, "Mode select(10)"},
-    {0x56, 0, "Reserve(10)"},
+    {0x56, 0, "Reserve(10)"},           /* obsolete in SPC-4 r11 */
     {0x56, 8, "Reserve element(10)"},
-    {0x57, 0, "Release(10)"},
+    {0x57, 0, "Release(10)"},           /* obsolete in SPC-4 r11 */
     {0x57, 8, "Release element(10)"},
     {0x58, 0, "Repair track"},
     {0x5a, 0, "Mode sense(10)"},
@@ -1089,6 +1089,9 @@ static struct error_info additional[] =
     {0x74,0x06,"Unknown signature verification key"},
     {0x74,0x07,"Encryption parameters not useable"},
     {0x74,0x08,"Digital signature validation failure"},
+    {0x74,0x09,"Encryption mode mismatch on read"},
+    {0x74,0x0a,"Encrypted block not raw read enabled"},
+    {0x74,0x0b,"Incorrect Encryption parameters"},
     {0x74,0x71,"Logical unit access not authorized"},
     {0, 0, NULL}
 };
