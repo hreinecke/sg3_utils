@@ -16,7 +16,7 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 	# Add here commands to configure the package.
-	CFLAGS="$(CFLAGS)" ./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --bindir=/bin --prefix=/usr --mandir=\$${prefix}/share/man
+	CFLAGS="$(CFLAGS)" ./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --bindir=/usr/bin --prefix=/usr --mandir=\$${prefix}/share/man
 	touch configure-stamp
 
 build: configure-stamp build-stamp
@@ -46,8 +46,11 @@ install: build
 	dh_clean -k
 	dh_installdirs
 
-	# Add here commands to install the package into debian/sg3-utils.
+	# Add here commands to install the package into debian/sg3-utils .
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/sg3-utils
+
+	# This is questionable, copying scripts into /usr/bin ...
+	cp scripts/scsi* scripts/sas* debian/sg3-utils/usr/bin
 
 
 # Build architecture-independent files here.
