@@ -56,4 +56,4 @@ AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 
 
-AC_OUTPUT(Makefile)
+AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile)

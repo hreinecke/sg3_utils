@@ -1,4 +1,4 @@
-.TH SGINFO "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SGINFO "8" "September 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -143,7 +143,7 @@ page number \fISPN\fR) in decoded format (if known, otherwise in hex form).
 returns all pages supported by the device in ascending order except for
 page 0 which, if present, is last. Page 0 is vendor specific and not
 necessarily in mode page format. Alternatively hex values can be given for
-both \fIPN\f and \fISPN\fR (both prefixed by '0x'). 
+both \fIPN\fR and \fISPN\fR (both prefixed by '0x'). 
 .TP
 \fB\-t\fR
 Trace commands (for debugging). When used once SCSI commands are shown
