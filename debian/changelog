@@ -4,65 +4,62 @@ sg3-utils (1.25-0.1) unstable; urgency=low
 
  -- Doug Gilbert <dgilbert@interlog.com>  Sun, 09 Sep 2007 19:00:00 -0400
 
-sg3-utils (1.24-0.1) unstable; urgency=low
+sg3-utils (1.24-1) unstable; urgency=low
+
+  * New upstream release
+  * Conflicts with upstream libsgutils package libsgutils-1-0 (closes: #391077)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Tue,  5 Jun 2007 17:04:21 -0600
+
+sg3-utils (1.21-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix FTBFS due to old syscall usage (Closes: #395512).
+
+ -- Luk Claes <luk@debian.org>  Sun,  5 Nov 2006 17:23:29 +0100
+
+sg3-utils (1.21-2) unstable; urgency=low
+
+  * Added Depends on libsgutils1 to libsgutils1-dev (closes: #387798)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Fri, 22 Sep 2006 00:20:28 -0600
+
+sg3-utils (1.21-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Wed, 13 Sep 2006 21:54:30 -0600
+
+sg3-utils (1.20-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Wed, 26 Apr 2006 22:31:15 -0600
+
+sg3-utils (1.17-3) unstable; urgency=low
+
+  * Cleaned up sg_read(8) manpage (Closes: #294521)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Mon, 13 Feb 2006 17:59:46 -0700
+
+sg3-utils (1.17-2) unstable; urgency=low
+
+  * Add libtool to build-depends
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Tue,  4 Oct 2005 19:40:00 -0600
+
+sg3-utils (1.17-1) unstable; urgency=low
 
   * New upstream version
 
- -- Doug Gilbert <dgilbert@interlog.com>  Mon, 07 May 2007 16:00:00 -0400
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Sat,  1 Oct 2005 13:26:16 -0600
 
-sg3-utils (1.23-0.1) unstable; urgency=low
+sg3-utils (1.08-2) unstable; urgency=low
 
-  * New upstream version
+  * Fix packaging bug that accidentally left off binaries.  Sigh.
+    (closes: #271906)
 
- -- Doug Gilbert <dgilbert@interlog.com>  Wed, 31 Jan 2007 11:00:00 -0500
-
-sg3-utils (1.22-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Mon, 16 Oct 2006 19:00:00 -0400
-
-sg3-utils (1.21-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Thu,  6 Jul 2006 10:00:00 -0400
-
-sg3-utils (1.20-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Tue, 18 Apr 2006 22:00:00 -0400
-
-sg3-utils (1.19-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Fri, 27 Jan 2006 12:00:00 +1000
-
-sg3-utils (1.18-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Fri, 18 Nov 2005 13:00:00 +1000
-
-sg3-utils (1.17-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Thu, 22 Sep 2005 17:00:00 +1000
-
-sg3-utils (1.16-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Wed, 10 Aug 2005 14:20:00 +1000
-
-sg3-utils (1.15-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Martin Schwenke <martin@meltin.net>  Tue,  7 Jun 2005 13:22:44 +1000
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Wed, 15 Sep 2004 22:40:06 -0600
 
 sg3-utils (1.08-1) unstable; urgency=low
 

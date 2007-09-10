@@ -23,6 +23,7 @@ Changelog for sg3_utils-1.25 [20070909]
   - sg_lib: sync asc/ascq codes with spc4r11
   - place source in subversion repository
   - split code into src/ lib/ and include/ directories
+  - sync debian directory with their 1.24 version (sid unstable)
   - convert build logic to use autotools (i.e. './configure ; make')
     - rename this file from CHANGELOG to ChangeLog
     - note: only utilities in main directory built by autotools
