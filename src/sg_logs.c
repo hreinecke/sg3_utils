@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.75 20070821";    /* SPC-4 revision 11 */
+static char * version_str = "0.76 20070916";    /* SPC-4 revision 11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -108,7 +108,8 @@ struct opts_t {
     int opt_new;
 };
 
-static void usage()
+static void
+usage()
 {
     printf("Usage: sg_logs [--all] [--brief] [--control=PC] [--help] [--hex] "
            "[--list]\n"
@@ -163,7 +164,8 @@ static void usage()
            "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }
 
-static void usage_old()
+static void
+usage_old()
 {
     printf("Usage:  sg_logs [-a] [-A] [-b] [-c=PC] [-h] [-H] [-l] [-L] "
            "[-m=LEN] [-n]\n"
@@ -209,7 +211,8 @@ static void usage_old()
            "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }
 
-static void usage_for(const struct opts_t * optsp)
+static void
+usage_for(const struct opts_t * optsp)
 {
     if (optsp->opt_new)
         usage();
@@ -219,7 +222,8 @@ static void usage_for(const struct opts_t * optsp)
 
 /* Trying to decode multipliers as sg_get_num() [as sg_libs does] would
  * only confuse things here, so use this local trimmed version */
-static int get_num(const char * buf)
+static int
+get_num(const char * buf)
 {
     int res, len, num;
     unsigned int unum;
@@ -246,7 +250,8 @@ static int get_num(const char * buf)
         return -1;
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n, nn;
     char * cp;
@@ -393,7 +398,8 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num, n;
     unsigned int u, uu;
@@ -542,7 +548,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -562,7 +569,8 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
     return res;
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -578,8 +586,9 @@ static void dStrRaw(const char* str, int len)
    log_sense not supported, SG_LIB_CAT_ILLEGAL_REQ for bad field in log sense
    command, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
    SG_LIB_CAT_ABORTED_COMMAND and -1 for other errors. */
-static int do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
-                   int noisy, const struct opts_t * optsp)
+static int
+do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
+        const struct opts_t * optsp)
 {
     int actual_len;
     int res;
@@ -639,8 +648,9 @@ static int do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
     return 0;
 }
 
-static void show_page_name(int pg_code, int subpg_code,
-                           struct sg_simple_inquiry_resp * inq_dat)
+static void
+show_page_name(int pg_code, int subpg_code,
+               struct sg_simple_inquiry_resp * inq_dat)
 {
     int done;
     char b[64];
@@ -759,6 +769,9 @@ static void show_page_name(int pg_code, int subpg_code,
             case 0x15:
                 printf("%sElement statistics (smc-3)\n", b);
                 break;
+            case 0x16:
+                printf("%sMedia changer diagnostic data (smc-3)\n", b);
+                break;
             case 0x2e:
                 printf("%sTapeAlert (smc-3)\n", b);
                 break;
@@ -801,7 +814,8 @@ static void show_page_name(int pg_code, int subpg_code,
     printf("%s??\n", b);
 }
 
-static void get_pcb_str(int pcb, char * outp, int maxoutlen)
+static void
+get_pcb_str(int pcb, char * outp, int maxoutlen)
 {
     char buff[PCB_STR_LEN];
     int n;
@@ -826,8 +840,8 @@ static void get_pcb_str(int pcb, char * outp, int maxoutlen)
         outp[0] = '\0';
 }
 
-static void show_buffer_under_overrun_page(unsigned char * resp, int len,
-                                           int show_pcb)
+static void
+show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, count_basis, cause, pcb;
     unsigned char * ucp;
@@ -891,8 +905,8 @@ static void show_buffer_under_overrun_page(unsigned char * resp, int len,
     }
 }
 
-static void show_error_counter_page(unsigned char * resp, int len, 
-                                    int show_pcb)
+static void
+show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -958,8 +972,8 @@ static void show_error_counter_page(unsigned char * resp, int len,
     }
 }
 
-static void show_non_medium_error_page(unsigned char * resp, int len,
-                                       int show_pcb)
+static void
+show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -1007,8 +1021,8 @@ static void show_non_medium_error_page(unsigned char * resp, int len,
     }
 }
 
-static void show_last_n_error_page(unsigned char * resp, int len,
-                                   int show_pcb)
+static void
+show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -1048,8 +1062,8 @@ static void show_last_n_error_page(unsigned char * resp, int len,
     }
 }
 
-static void show_last_n_deferred_error_page(unsigned char * resp,
-                                            int len, int show_pcb)
+static void
+show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -1097,7 +1111,8 @@ static const char * self_test_result[] = {
     "reserved",
     "self test in progress"};
 
-static void show_self_test_page(unsigned char * resp, int len, int show_pcb)
+static void
+show_self_test_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, num, n, res, pcb;
     unsigned char * ucp;
@@ -1142,8 +1157,9 @@ static void show_self_test_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-static void show_temperature_page(unsigned char * resp, int len, 
-                                  int show_pcb, int hdr, int show_unknown)
+static void
+show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
+                      int show_unknown)
 {
     int k, num, extra, pc, pcb;
     unsigned char * ucp;
@@ -1193,8 +1209,8 @@ static void show_temperature_page(unsigned char * resp, int len,
     }
 }
 
-static void show_Start_Stop_page(unsigned char * resp, int len, int show_pcb,
-                                 int verbose)
+static void
+show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
 {
     int k, num, extra, pc, pcb;
     unsigned int n;
@@ -1270,7 +1286,8 @@ static void show_Start_Stop_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
-static void show_IE_page(unsigned char * resp, int len, int show_pcb, int full)
+static void
+show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 {
     int k, num, extra, pc, pcb;
     unsigned char * ucp;
@@ -1329,8 +1346,8 @@ static void show_IE_page(unsigned char * resp, int len, int show_pcb, int full)
     }
 }
 
-static void show_sas_phy_event_info(int peis, unsigned long val,
-                                    unsigned long thresh_val)
+static void
+show_sas_phy_event_info(int peis, unsigned long val, unsigned long thresh_val)
 {
     switch (peis) {
     case 0:
@@ -1448,8 +1465,9 @@ static void show_sas_phy_event_info(int peis, unsigned long val,
     }
 }
 
-static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
-                                     const struct opts_t * optsp)
+static void
+show_sas_rel_target_port(unsigned char * ucp, int param_len,
+                         const struct opts_t * optsp)
 {
     int j, m, n, nphys, pcb, t, sz, spld_len;
     unsigned char * vcp;
@@ -1630,8 +1648,9 @@ static void show_sas_rel_target_port(unsigned char * ucp, int param_len,
     }
 }
 
-static int show_protocol_specific_page(unsigned char * resp, int len,
-                                       const struct opts_t * optsp)
+static int
+show_protocol_specific_page(unsigned char * resp, int len,
+                            const struct opts_t * optsp)
 {
     int k, num, param_len;
     unsigned char * ucp;
@@ -1655,8 +1674,9 @@ static int show_protocol_specific_page(unsigned char * resp, int len,
     return 1;
 }
 
-static int show_stats_perform_page(unsigned char * resp, int len,
-                                   const struct opts_t * optsp)
+static int
+show_stats_perform_page(unsigned char * resp, int len,
+                        const struct opts_t * optsp)
 {
     int k, num, n, param_len, param_code, spf, subpg_code, extra;
     int pcb, nam;
@@ -1962,8 +1982,8 @@ static int show_stats_perform_page(unsigned char * resp, int len,
     return 1;
 }
 
-static void show_format_status_page(unsigned char * resp, int len, 
-                                    int show_pcb)
+static void
+show_format_status_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, pc, pcb, all_ff, counter;
     unsigned char * ucp;
@@ -2031,8 +2051,8 @@ static void show_format_status_page(unsigned char * resp, int len,
     }
 }
 
-static void show_non_volatile_cache_page(unsigned char * resp, int len,
-                                         int show_pcb)
+static void
+show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -2126,8 +2146,9 @@ static const char * reassign_status[] = {
     "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
-static void show_background_scan_results_page(unsigned char * resp, int len,
-                                              int show_pcb, int verbose)
+static void
+show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
+                                  int verbose)
 {
     int j, m, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -2225,8 +2246,9 @@ static void show_background_scan_results_page(unsigned char * resp, int len,
     }
 }
 
-static void show_sequential_access_page(unsigned char * resp, int len, 
-                                        int show_pcb, int verbose)
+static void
+show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
+                            int verbose)
 {
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -2330,8 +2352,8 @@ static void show_sequential_access_page(unsigned char * resp, int len,
     }
 }
 
-static void show_device_stats_page(unsigned char * resp, int len, 
-                                   int show_pcb)
+static void
+show_device_stats_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -2434,8 +2456,8 @@ static void show_device_stats_page(unsigned char * resp, int len,
     }
 }
 
-static void show_media_stats_page(unsigned char * resp, int len, 
-                                  int show_pcb)
+static void
+show_media_stats_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -2568,8 +2590,8 @@ static void show_media_stats_page(unsigned char * resp, int len,
     }
 }
 
-static void show_element_stats_page(unsigned char * resp, int len,
-                                    int show_pcb)
+static void
+show_element_stats_page(unsigned char * resp, int len, int show_pcb)
 {
     int num, pl, pc, pcb;
     unsigned int v;
@@ -2596,6 +2618,77 @@ static void show_element_stats_page(unsigned char * resp, int len,
         printf("    Number of determined volume identifiers: %u\n", v);
         v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
         printf("    Number of unreadable volume identifiers: %u\n", v);
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("\n        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static void
+show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
+{
+    int num, pl, pc, pcb;
+    unsigned int v;
+    unsigned char * ucp;
+    char str[PCB_STR_LEN];
+
+    printf("Media changer diagnostics data page (smc-3) [0x16]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        printf("  Parameter code: %d\n", pc);
+        printf("    Repeat: %d\n", !!(ucp[5] & 0x80));
+        printf("    Sense key: 0x%x\n", ucp[5] & 0xf);
+        printf("    Additional sense code: 0x%x\n", ucp[6]);
+        printf("    Additional sense code qualifier: 0x%x\n", ucp[7]);
+        v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
+        printf("    Vendor specific code qualifier: 0x%x\n", v);
+        v = (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15];
+        printf("    Product revision level: %u\n", v);
+        v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
+        printf("    Number of moves: %u\n", v);
+        v = (ucp[20] << 24) + (ucp[21] << 16) + (ucp[22] << 8) + ucp[23];
+        printf("    Number of pick: %u\n", v);
+        v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
+        printf("    Number of pick retries: %u\n", v);
+        v = (ucp[28] << 24) + (ucp[29] << 16) + (ucp[30] << 8) + ucp[31];
+        printf("    Number of places: %u\n", v);
+        v = (ucp[32] << 24) + (ucp[33] << 16) + (ucp[34] << 8) + ucp[35];
+        printf("    Number of place retries: %u\n", v);
+        v = (ucp[36] << 24) + (ucp[37] << 16) + (ucp[38] << 8) + ucp[39];
+        printf("    Number of determined volume identifiers: %u\n", v);
+        v = (ucp[40] << 24) + (ucp[41] << 16) + (ucp[42] << 8) + ucp[43];
+        printf("    Number of unreadable volume identifiers: %u\n", v);
+        printf("    Operation code: 0x%x\n", ucp[44]);
+        printf("    Service action: 0x%x\n", ucp[45] & 0xf);
+        printf("    Media changer error type: 0x%x\n", ucp[46]);
+        printf("    MTAV: %d\n", !!(ucp[47] & 0x8));
+        printf("    IAV: %d\n", !!(ucp[47] & 0x4));
+        printf("    LSAV: %d\n", !!(ucp[47] & 0x2));
+        printf("    DAV: %d\n", !!(ucp[47] & 0x1));
+        v = (ucp[48] << 8) + ucp[49];
+        printf("    Medium transport address: 0x%x\n", v);
+        v = (ucp[50] << 8) + ucp[51];
+        printf("    Intial address: 0x%x\n", v);
+        v = (ucp[52] << 8) + ucp[53];
+        printf("    Last successful address: 0x%x\n", v);
+        v = (ucp[54] << 8) + ucp[55];
+        printf("    Destination address: 0x%x\n", v);
+        if (pl > 91) {
+            printf("    Volume tag information:\n");
+            dStrHex((const char *)(ucp + 56), 36, 0);
+        }
+        if (pl > 99) {
+            printf("    Timestamp origin: 0x%x\n", ucp[92] & 0xf);
+            printf("    Timestamp:\n");
+            dStrHex((const char *)(ucp + 94), 6, 1);
+        }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("\n        <%s>\n", str);
@@ -2669,9 +2762,9 @@ static char * tape_alert_strs[] = {
     "WORM medium - overwrite attempted",
 };
 
-static void show_tape_alert_ssc_page(unsigned char * resp, int len,
-                                     int show_pcb,
-                                     const struct opts_t * optsp)
+static void
+show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
+                         const struct opts_t * optsp)
 {
     int num, pl, pc, pcb, flag;
     unsigned char * ucp;
@@ -2705,8 +2798,8 @@ static void show_tape_alert_ssc_page(unsigned char * resp, int len,
     }
 }
 
-static void show_seagate_cache_page(unsigned char * resp, int len, 
-                                    int show_pcb)
+static void
+show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -2754,8 +2847,8 @@ static void show_seagate_cache_page(unsigned char * resp, int len,
     }
 }
 
-static void show_seagate_factory_page(unsigned char * resp, int len,
-                                      int show_pcb)
+static void
+show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, j, num, pl, pc, pcb, valid;
     unsigned char * ucp;
@@ -2808,9 +2901,10 @@ static void show_seagate_factory_page(unsigned char * resp, int len,
     }
 }
 
-static void show_ascii_page(unsigned char * resp, int len, 
-                            struct sg_simple_inquiry_resp * inq_dat,
-                            const struct opts_t * optsp)
+static void
+show_ascii_page(unsigned char * resp, int len, 
+                struct sg_simple_inquiry_resp * inq_dat,
+                const struct opts_t * optsp)
 {
     int k, num, done, pg_code, subpg_code, spf;
 
@@ -2893,7 +2987,7 @@ static void show_ascii_page(unsigned char * resp, int len,
         show_temperature_page(resp, len, optsp->do_pcb, 1, 1);
         break;
     case START_STOP_LPAGE:
-        show_Start_Stop_page(resp, len, optsp->do_pcb, optsp->do_verbose);
+        show_start_stop_page(resp, len, optsp->do_pcb, optsp->do_verbose);
         break;
     case SELF_TEST_LPAGE:
         show_self_test_page(resp, len, optsp->do_pcb);
@@ -2931,6 +3025,17 @@ static void show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
+    case 0x16:
+        {
+            switch (inq_dat->peripheral_type) {
+            case 8: /* smc-3 */
+                show_mchanger_diag_data_page(resp, len, optsp->do_pcb);
+                break;
+            default:
+                done = 0;
+                break;
+            }
+        }
     case 0x17:
         {
             switch (inq_dat->peripheral_type) {
@@ -2963,7 +3068,7 @@ static void show_ascii_page(unsigned char * resp, int len,
         }
         break;
     case IE_LPAGE:
-        show_IE_page(resp, len, optsp->do_pcb, 1);
+        show_ie_page(resp, len, optsp->do_pcb, 1);
         break;
     case 0x37:
         {
@@ -3008,8 +3113,9 @@ static void show_ascii_page(unsigned char * resp, int len,
     }
 }
         
-static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
-                            struct opts_t * optsp)
+static int
+fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
+                 struct opts_t * optsp)
 {
     int len;
     int res = 0;
@@ -3037,7 +3143,7 @@ static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
             else if (optsp->do_hex)
                 dStrHex((const char *)resp, len, 1);
             else
-                show_IE_page(resp, len, 0, 0);
+                show_ie_page(resp, len, 0, 0);
         } else
             fprintf(stderr, "Unable to find temperature in either log page "
                     "(temperature or IE)\n");
@@ -3047,7 +3153,8 @@ static int fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, k, pg_len, res, resp_len;
     int ret = 0;
