@@ -49,7 +49,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static char * version_str = "1.06 20070714";
+static char * version_str = "1.07 20070918";
 
 #define ME "sg_ident: "
 
@@ -128,10 +128,9 @@ int main(int argc, char * argv[])
     int raw = 0;
     int do_set = 0;
     int verbose = 0;
-    char device_name[512];
+    const char * device_name = NULL;
     int ret = 0;
 
-    memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
@@ -178,9 +177,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -192,7 +190,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (0 == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;

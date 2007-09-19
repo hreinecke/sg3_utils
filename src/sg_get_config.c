@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.30 20070714";
+static char * version_str = "0.30 20070919";
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -885,13 +885,12 @@ int main(int argc, char * argv[])
     int rt = 0;
     int starting = 0;
     int verbose = 0;
-    char device_name[256];
+    const char * device_name = NULL;
     char buff[64];
     const char * cp;
     struct sg_simple_inquiry_resp inq_resp;
     int ret = 0;
 
-    memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
@@ -947,9 +946,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -965,7 +963,7 @@ int main(int argc, char * argv[])
         list_known(brief);
         return 0;
     }
-    if (0 == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;

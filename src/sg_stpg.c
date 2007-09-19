@@ -45,7 +45,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.1 20070903";
+static char * version_str = "1.2 20070918";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -56,6 +56,9 @@ static char * version_str = "1.1 20070903";
 #define TPGS_STATE_UNAVAILABLE 0x3
 #define TPGS_STATE_OFFLINE 0xe          /* SPC-4 rev 9 */
 #define TPGS_STATE_TRANSITIONING 0xf
+
+#define VPD_DEVICE_ID  0x83
+#define DEF_VPD_DEVICE_ID_LEN  252
 
 struct tgtgrp {
         int id;
@@ -77,7 +80,8 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
           "sg_stpg   [--active] [--help] [--hex] [--offline] [--optimized] "
@@ -88,11 +92,13 @@ static void usage()
           "    --active|-a        set asymm. access state to "
           "active/non-optimized\n"
           "    --help|-h          print out usage message\n"
-          "    --hex|-H           print out response in hex\n"
-          "    --offline|-l       set asymm. access state to unavailable\n"
+          "    --hex|-H           print out report response in hex, then "
+          "exit\n"
+          "    --offline|-l       set asymm. access state to offline\n"
           "    --optimized|-o     set asymm. access state to "
           "active/optimized\n"
-          "    --raw|-r           output response in binary to stdout\n"
+          "    --raw|-r           output report response in binary to "
+          "stdout, then exit\n"
           "    --standby|-s       set asymm. access state to standby\n"
           "    --unavailable|-u   set asymm. access state to unavailable\n"
           "    --verbose|-v       increase verbosity\n"
@@ -102,7 +108,8 @@ static void usage()
 
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -110,8 +117,8 @@ static void dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-static int decode_target_port(unsigned char * buff,
-                              int len, int *d_id, int *d_tpg)
+static int
+decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
 {
     int c_set, piv, assoc, desig_type, i_len;
     int off, u;
@@ -164,7 +171,8 @@ static int decode_target_port(unsigned char * buff,
     return 0;
 }
 
-static void decode_tpgs_state(const int st)
+static void
+decode_tpgs_state(const int st)
 {
     switch (st) {
     case TPGS_STATE_OPTIMIZED:
@@ -186,13 +194,14 @@ static void decode_tpgs_state(const int st)
         printf(" (transitioning between states)");
         break;
     default:
-        printf(" (unknown)");
+        printf(" (unknown: 0x%x)", st);
         break;
     }
 }
 
-int transition_tpgs_states(struct tgtgrp *tgtState, int numgrp,
-                                 int portgroup, int newstate)
+static int
+transition_tpgs_states(struct tgtgrp *tgtState, int numgrp, int portgroup,
+                       int newstate)
 {
      int i,oldstate;
 
@@ -241,7 +250,8 @@ int transition_tpgs_states(struct tgtgrp *tgtState, int numgrp,
      return 0;
 }
 
-void encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
+static void
+encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
 {
      int i;
      unsigned char *desc;
@@ -253,7 +263,8 @@ void encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp
      }
 } 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, k, off, res, c, report_len, tgt_port_count, trunc, numgrp;
     unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
@@ -267,14 +278,13 @@ int main(int argc, char * argv[])
     int verbose = 0;
     int portgroup = -1;
     int relport = -1;
-    char device_name[256];
+    const char * device_name = NULL;
     int ret = 0;
 
-    memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aosuhHrvV", long_options,
+        c = getopt_long(argc, argv, "ahHloOrsuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -283,18 +293,6 @@ int main(int argc, char * argv[])
         case 'a':
             state = TPGS_STATE_NONOPTIMIZED;
             break;
-        case 'o':
-            state = TPGS_STATE_OPTIMIZED;
-            break;
-        case 's':
-            state = TPGS_STATE_STANDBY;
-            break;
-        case 'u':
-            state = TPGS_STATE_UNAVAILABLE;
-            break;
-        case 'l':
-            state = TPGS_STATE_OFFLINE;
-            break;
         case 'h':
         case '?':
             usage();
@@ -302,8 +300,21 @@ int main(int argc, char * argv[])
         case 'H':
             hex = 1;
             break;
+        case 'l':
+        case 'O':
+            state = TPGS_STATE_OFFLINE;
+            break;
+        case 'o':
+            state = TPGS_STATE_OPTIMIZED;
+            break;
         case 'r':
             raw = 1;
+            break;
+        case 's':
+            state = TPGS_STATE_STANDBY;
+            break;
+        case 'u':
+            state = TPGS_STATE_UNAVAILABLE;
             break;
         case 'v':
             ++verbose;
@@ -318,9 +329,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -332,7 +342,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (0 == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
@@ -344,11 +354,11 @@ int main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rsp_buff,
-                            252, 1, verbose);
+    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
+                        DEF_VPD_DEVICE_ID_LEN, 1, verbose);
     if (0 == res) {
         report_len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-        if (0x83 != rsp_buff[1]) {
+        if (VPD_DEVICE_ID != rsp_buff[1]) {
             fprintf(stderr, "invalid VPD response; probably a STANDARD "
                     "INQUIRY response\n");
             if (verbose) {
@@ -361,9 +371,9 @@ int main(int argc, char * argv[])
             fprintf(stderr, "response length too long: %d > %d\n", report_len,
                     MX_ALLOC_LEN);
             return SG_LIB_CAT_MALFORMED;
-        } else if (report_len > 252) {
-            if (sg_ll_inquiry(sg_fd, 0, 1, 0x83, rsp_buff, report_len,
-                              1, verbose))
+        } else if (report_len > DEF_VPD_DEVICE_ID_LEN) {
+            if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
+                              report_len, 1, verbose))
                 return SG_LIB_CAT_OTHER;
         }
         decode_target_port(rsp_buff + 4, report_len - 4, &relport, &portgroup);

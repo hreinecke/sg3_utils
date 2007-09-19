@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.14 20070714";
+static char * version_str = "1.14 20070919";
 
 #define MAX_XFER_LEN 10000
 
@@ -141,12 +141,11 @@ int main(int argc, char * argv[])
     int verbose = 0;
     long long ll;
     int got_stdout;
-    char device_name[256];
+    const char * device_name = NULL;
     char out_fname[256];
     char ebuff[EBUFF_SZ];
     int ret = 0;
 
-    memset(device_name, 0, sizeof device_name);
     memset(out_fname, 0, sizeof out_fname);
     while (1) {
         int option_index = 0;
@@ -173,7 +172,7 @@ int main(int argc, char * argv[])
             llba = (unsigned long long)ll;
             break;
         case 'o':
-            strncpy(out_fname, optarg, sizeof(out_fname));
+            strncpy(out_fname, optarg, sizeof(out_fname) - 1);
             break;
         case 'p':
             pblock = 1;
@@ -201,9 +200,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -215,7 +213,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (0 == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;

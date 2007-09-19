@@ -46,7 +46,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static char * version_str = "1.04 20070714";    /* spc4r08 */
+static char * version_str = "1.05 20070919";    /* spc4r08 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -167,13 +167,12 @@ int main(int argc, char * argv[])
     int wb_offset = 0;
     int wb_skip = 0;
     int verbose = 0;
-    char device_name[256];
+    const char * device_name = NULL;
     const char * file_name = NULL;
     unsigned char * dop = NULL;
     char ebuff[EBUFF_SZ];
     int ret = 0;
 
-    memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
@@ -267,9 +266,8 @@ int main(int argc, char * argv[])
         return 0;
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -281,7 +279,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (0 == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;

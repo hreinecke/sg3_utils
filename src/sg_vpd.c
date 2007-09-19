@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.20 20070829";    /* spc-4 rev 11 */
+static char * version_str = "0.21 20070918";    /* spc-4 rev 11 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1765,7 +1765,7 @@ static int svpd_decode_standard(int sg_fd, int num_vpd, int subvalue,
 int main(int argc, char * argv[])
 {
     int sg_fd, c, res;
-    char device_name[256];
+    const char * device_name = NULL;
     const struct svpd_values_name_t * vnp;
     const char * page_str = NULL;
     const char * cp;
@@ -1780,7 +1780,6 @@ int main(int argc, char * argv[])
     int req_pdt = -1;
     int subvalue = 0;
 
-    memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
@@ -1834,9 +1833,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -1898,7 +1896,7 @@ int main(int argc, char * argv[])
             subvalue = VPD_DI_SEL_LU;
         }
     }
-    if ('\0' == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
