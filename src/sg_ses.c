@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.36 20070717";    /* ses2r18 */
+static char * version_str = "1.37 20070919";    /* ses2r18 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1692,7 +1692,7 @@ int main(int argc, char * argv[])
     int verbose = 0;
     int inner_hex = 0;
     int byte1 = 0;
-    char device_name[256];
+    const char * device_name = NULL;
     char buff[48];
     unsigned char data_arr[1024];
     int arr_len = 0;
@@ -1701,7 +1701,6 @@ int main(int argc, char * argv[])
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
 
-    memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
@@ -1773,9 +1772,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -1816,7 +1814,7 @@ int main(int argc, char * argv[])
     } else if (0 == do_status)
         do_status = 1;  /* default to receiving status pages */
 
-    if (0 == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;

@@ -48,7 +48,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.12 20070714";
+static char * version_str = "1.12 20070919";
 
 #define REPORT_LUNS_BUFF_LEN (1024*64)
     
@@ -224,10 +224,9 @@ int main(int argc, char * argv[])
     int do_raw = 0;
     int select_rep = 0;
     int verbose = 0;
-    char device_name[256];
+    const char * device_name = NULL;
     int ret = 0;
 
-    memset(device_name, 0, sizeof device_name);
     while (1) {
         int option_index = 0;
 
@@ -273,9 +272,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -287,7 +285,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (0 == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;

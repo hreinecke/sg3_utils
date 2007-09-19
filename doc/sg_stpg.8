@@ -1,4 +1,4 @@
-.TH SG_STPG "8" "August 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_STPG "8" "September 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_stpg \- sends a SCSI SET TARGET PORT GROUPS command
 .SH SYNOPSIS
@@ -9,24 +9,46 @@ sg_stpg \- sends a SCSI SET TARGET PORT GROUPS command
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send a SCSI SET TARGET PORT GROUPS command to \fIDEVICE\fR. 
+Send a SCSI SET TARGET PORT GROUPS command to \fIDEVICE\fR.
+.PP
+A sequence of SCSI commands are sent to the \fIDEVICE\fR leading up to the
+SET TARGET PORT GROUPS command. First a INQUIRY is sent to fetch the device
+identification VPD page to find the (primary) target port group. Then a
+REPORT TARGET PORT GROUPS command is issued to find the current state and
+whether a transition to the requested state is supported. If so the
+SET TARGET PORT GROUPS command is sent.
 .PP
 Target port group access is described in SPC\-4 found at www.t10.org
 in section 5.8 (in rev 11 dated 2007/5/14). The Set Target Port
 Groups command is also described in that document.
 .PP
-xxxxxxxxxxxxxx Placeholder  more to add xxxxxxxxxxxxxxxxxx
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-a\fR, \fB\-\-active\fR
+set active/non-optimized state.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-output response in hex (rather than partially or fully decode it).
+output response to the REPORT TARGET PORT GROUPS command in hex then exit.
+.TP
+\fB\-o\fR, \fB\-\-optimized\fR
+set active/optimized state.
+.TP
+\fB\-O\fR, \fB\-l\fR, \fB\-\-offline\fR
+set active/non-optimized state.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-output response in binary to stdout.
+output response to the REPORT TARGET PORT GROUPS command in binary to stdout
+then exit.
+.TP
+\fB\-s\fR, \fB\-\-standby\fR
+set standby state.
+.TP
+\fB\-u\fR, \fB\-\-unavailable\fR
+set unavailable state.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -35,8 +57,7 @@ increase the level of verbosity, (i.e. debug output).
 print the version string and then exit.
 .SH NOTES
 The Set Target Port Groups command should be supported whenever the TPGS
-bits in a standard INQUIRY response are greater than zero. [View with
-sg_inq utility.]
+value in a standard INQUIRY response is 2 or 3. [View with sg_inq utility.]
 .SH EXIT STATUS
 The exit status of sg_stpg is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

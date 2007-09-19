@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.70 20070906";    /* spc-4 rev 11 */
+static char * version_str = "0.70 20070919";    /* spc-4 rev 11 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1716,7 +1716,7 @@ static int process_std_inq(int sg_fd, const struct opts_t * optsp)
                    !!(rsp_buff[3] & 0x80), !!(rsp_buff[3] & 0x40),
                    !!(rsp_buff[3] & 0x20), !!(rsp_buff[3] & 0x10),
                    rsp_buff[3] & 0x0f, !!(rsp_buff[5] & 0x80));
-            printf("ACC=%d  TGPS=%d  3PC=%d  Protect=%d ",
+            printf("ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
                    !!(rsp_buff[5] & 0x40), ((rsp_buff[5] & 0x30) >> 4),
                    !!(rsp_buff[5] & 0x08), !!(rsp_buff[5] & 0x01));
             printf(" BQue=%d\n  EncServ=%d  ", !!(rsp_buff[6] & 0x80),

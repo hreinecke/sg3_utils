@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.33 20070714";
+static char * version_str = "0.33 20070919";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -692,7 +692,7 @@ int main(int argc, char * argv[])
     unsigned long long param_rk = 0;
     unsigned long long param_sark = 0;
     unsigned int param_rtp = 0;
-    char device_name[256];
+    const char * device_name = NULL;
     char buff[48];
     int num_prin_sa = 0;
     int num_prout_sa = 0;
@@ -716,7 +716,6 @@ int main(int argc, char * argv[])
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
 
-    device_name[0] = '\0';
     while (1) {
         int option_index = 0;
 
@@ -739,8 +738,7 @@ int main(int argc, char * argv[])
             ++num_prout_sa;
             break;
         case 'd':
-            strncpy(device_name, optarg, sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+            device_name = optarg;
             break;
         case 'G':
             prout_sa = PROUT_REG_SA;
@@ -865,9 +863,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -879,7 +876,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if ('\0' == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "No device name given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;

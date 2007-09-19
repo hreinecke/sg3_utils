@@ -61,7 +61,7 @@
 
 #define DEF_TIMEOUT 20
 
-static char * version_str = "1.03 20070719";
+static char * version_str = "1.04 20070918";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -266,7 +266,7 @@ static int do_set_features(int sg_fd, int feature, int count, int lba,
 int main(int argc, char * argv[])
 {
     int sg_fd, c, ret, res;
-    char device_name[256];
+    const char * device_name = NULL;
     int count = 0;
     int feature = 0;
     int lba = 0;
@@ -274,7 +274,6 @@ int main(int argc, char * argv[])
     int chk_cond = 0;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
 
-    memset(device_name, 0, sizeof(device_name));
     while (1) {
         int option_index = 0;
 
@@ -332,9 +331,8 @@ int main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if ('\0' == device_name[0]) {
-            strncpy(device_name, argv[optind], sizeof(device_name) - 1);
-            device_name[sizeof(device_name) - 1] = '\0';
+        if (NULL == device_name) {
+            device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -346,7 +344,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if ('\0' == device_name[0]) {
+    if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
         return 1;
