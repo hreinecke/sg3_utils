@@ -1,10 +1,16 @@
-.TH SG_PERSIST "8" "March 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_PERSIST "8" "September 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
 .SH SYNOPSIS
 .B sg_persist
-[\fIOPTIONS\fR] [\fIDEVICE\fR]
+[\fIOPTIONS\fR] \fIDEVICE\fR
+.PP
+.B sg_persist
+[\fIOPTIONS\fR] \fI\-\-device=DEVICE\fR
+.PP
+.B sg_persist
+\fI--help\fR | \fI--version\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -53,6 +59,8 @@ with the PROUT command (i.e. "service action reservation key"). To lessen
 the potential confusion the term "sub\-command" has been introduced. 
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The following options are sorted in alphabetical order, based on their
+long option name.
 .TP
 \fB\-C\fR, \fB\-\-clear\fR
 Clear is a sub\-command of the PROUT command. It releases the
@@ -71,8 +79,8 @@ output a usage message.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 the response to a valid PRIN sub\-command will be output in hexadecimal.
-Normally if the PRIN sub\-command is recognised then the response
-will be decoded as per SPC\-4.
+By default (i.e. without this option) if the PRIN sub\-command is recognised
+then the response will be decoded as per SPC\-4.
 .TP
 \fB\-i\fR, \fB\-\-in\fR
 specify that a SCSI PERSISTENT RESERVE IN command is required. This
@@ -81,7 +89,7 @@ is the default.
 \fB\-n\fR, \fB\-\-no\-inquiry\fR
 the default action is to do a standard SCSI INQUIRY command and output
 make, product and revision strings plus the peripheral device type
-prior to executing a PR In or Out command. With this option the
+prior to executing a PRIN or PROUT command. With this option the
 INQUIRY command is skipped.
 .TP
 \fB\-o\fR, \fB\-\-out\fR

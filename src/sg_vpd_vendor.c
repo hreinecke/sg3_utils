@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Douglas Gilbert.
+ * Copyright (c) 2006-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -98,7 +98,7 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
 };
 
 static const struct svpd_values_name_t *
-        svpd_get_v_detail(int page_num, int subvalue, int pdt)
+svpd_get_v_detail(int page_num, int subvalue, int pdt)
 {
     const struct svpd_values_name_t * vnp;
     int sv, ty;
@@ -119,7 +119,7 @@ static const struct svpd_values_name_t *
 }
 
 const struct svpd_values_name_t *
-                svpd_find_vendor_by_acron(const char * ap)
+svpd_find_vendor_by_acron(const char * ap)
 {
     const struct svpd_values_name_t * vnp;
 
@@ -130,7 +130,8 @@ const struct svpd_values_name_t *
     return NULL;
 }
 
-void svpd_enumerate_vendor()
+void
+svpd_enumerate_vendor()
 {
     const struct svpd_values_name_t * vnp;
     int seen;
@@ -147,7 +148,8 @@ void svpd_enumerate_vendor()
     }
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
     
@@ -182,7 +184,8 @@ static const char * lun_op_arr[] =
     "I/O Operations being rejected, SP reboot or NDU in progress",
 };
 
-static void decode_firm_vpd_c0_sea(unsigned char * buff, int len)
+static void
+decode_firm_vpd_c0_sea(unsigned char * buff, int len)
 {
     if (len < 28) {
         fprintf(stderr, "Seagate firmware numbers VPD page length too "
@@ -215,7 +218,8 @@ static void decode_firm_vpd_c0_sea(unsigned char * buff, int len)
     }
 }
 
-static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
+static void
+decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 {
     int k, ip_mgmt, failover_mode, vpp80, lun_z;
 
@@ -279,15 +283,15 @@ static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 
     printf("  System Type: %hhx, ", buff[27]);
     switch (failover_mode) {
-	case 4:
-	    printf("Failover mode: 1 (Linux)\n");
-	    break;
-	case 6:
-	    printf("Failover mode: 4 (ALUA)\n");
-	    break;
-	default:
-	    printf("Failover mode: Unknown (%d)\n", failover_mode);
-	    break;
+        case 4:
+            printf("Failover mode: 1 (Linux)\n");
+            break;
+        case 6:
+            printf("Failover mode: 4 (ALUA)\n");
+            break;
+        default:
+            printf("Failover mode: Unknown (%d)\n", failover_mode);
+            break;
     }
 
     printf("  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
@@ -300,7 +304,8 @@ static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     return;
 }
 
-static void decode_rdac_vpd_c2(unsigned char * buff, int len)
+static void
+decode_rdac_vpd_c2(unsigned char * buff, int len)
 {
     if (len < 3) {
         fprintf(stderr, "Software Version VPD page length too "
@@ -330,7 +335,8 @@ static void decode_rdac_vpd_c2(unsigned char * buff, int len)
     return;
 }
 
-static void decode_rdac_vpd_c9(unsigned char * buff, int len)
+static void
+decode_rdac_vpd_c9(unsigned char * buff, int len)
 {
     if (len < 3) {
         fprintf(stderr, "Volume Access Control VPD page length too "
@@ -379,8 +385,9 @@ static void decode_rdac_vpd_c9(unsigned char * buff, int len)
 
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_SYNTAX_ERROR for
    unsupported page */
-int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
-                       int do_raw, int do_long, int do_quiet, int verbose)
+int
+svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
+                   int do_raw, int do_long, int do_quiet, int verbose)
 {
     int len, t, res;
     char name[64];

@@ -304,6 +304,12 @@ extern void dWordHex(const unsigned short* words, int num, int no_ascii,
    GB *1,000,000,000 and <n>x<m> which multiplies <n> by <m> . */
 extern int sg_get_num(const char * buf);
 
+/* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
+   hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
+   assumed. Does not accept multipliers. Accept a comma (","), a whitespace
+   or newline as terminator.  */
+extern int sg_get_num_nomult(const char * buf);
+
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
    then -1LL is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
    suffix. Otherwise a decimal multiplier suffix may be given. In addition

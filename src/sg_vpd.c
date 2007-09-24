@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.21 20070918";    /* spc-4 rev 11 */
+static char * version_str = "0.22 20070923";    /* spc-4 rev 11 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -172,7 +172,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {0, 0, 0, 0, NULL, NULL},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr,
             "Usage: sg_vpd  [--enumerate] [--help] [--hex] [--ident] "
@@ -202,7 +203,7 @@ static void usage()
 }
 
 static const struct svpd_values_name_t *
-        sdp_get_vpd_detail(int page_num, int subvalue, int pdt)
+sdp_get_vpd_detail(int page_num, int subvalue, int pdt)
 {
     const struct svpd_values_name_t * vnp;
     int sv, ty;
@@ -223,7 +224,7 @@ static const struct svpd_values_name_t *
 }
 
 static const struct svpd_values_name_t *
-                sdp_find_vpd_by_acron(const char * ap)
+sdp_find_vpd_by_acron(const char * ap)
 {
     const struct svpd_values_name_t * vnp;
 
@@ -234,7 +235,8 @@ static const struct svpd_values_name_t *
     return NULL;
 }
 
-static void enumerate_vpds(int standard, int vendor)
+static void
+enumerate_vpds(int standard, int vendor)
 {
     const struct svpd_values_name_t * vnp;
 
@@ -249,36 +251,8 @@ static void enumerate_vpds(int standard, int vendor)
         svpd_enumerate_vendor();
 }
 
-/* Trying to decode multipliers as sg_get_num() [as sg_libs does] would
- * only confuse things here, so use this local trimmed version */
-static int get_num(const char * buf)
-{
-    int res, len, num;
-    unsigned int unum;
-    const char * commap;
-
-    if ((NULL == buf) || ('\0' == buf[0]))
-        return -1;
-    len = strlen(buf);
-    commap = strchr(buf + 1, ',');
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%x", &unum);
-        num = unum;
-    } else if (commap && ('H' == toupper(*(commap - 1)))) {
-        res = sscanf(buf, "%x", &unum);
-        num = unum;
-    } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
-        res = sscanf(buf, "%x", &unum);
-        num = unum;
-    } else
-        res = sscanf(buf, "%d", &num);
-    if (1 == res)
-        return num;
-    else
-        return -1;
-}
-
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char * str, int len)
 {
     int k;
     
@@ -294,8 +268,9 @@ static const char * assoc_arr[] =
     "Reserved [0x3]",
 };
 
-static void decode_id_vpd(unsigned char * buff, int len, int subvalue,
-                          int do_long, int do_quiet)
+static void
+decode_id_vpd(unsigned char * buff, int len, int subvalue, int do_long,
+              int do_quiet)
 {
     int m_a, m_d, m_cs;
 
@@ -347,7 +322,8 @@ static const char * network_service_type_arr[] =
     "reserved[0x1e]", "reserved[0x1f]",
 };
 
-static void decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump, na_len;
     unsigned char * ucp;
@@ -392,7 +368,8 @@ static const char * mode_page_policy_arr[] =
     "per I_T nexus",
 };
 
-static void decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump;
     unsigned char * ucp;
@@ -429,8 +406,9 @@ static void decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
-static void decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex,
-                                  int do_long, int do_quiet)
+static void
+decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
+                      int do_quiet)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
     unsigned char * ucp;
@@ -527,9 +505,9 @@ static const char * desig_type_arr[] =
 
 /* Prints outs an abridged set of device identification designators
    selected by association, designator type and/or code set. */
-static int decode_dev_ids_quiet(unsigned char * buff, int len,
-                                int m_assoc, int m_desig_type,
-                                int m_code_set)
+static int
+decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
+                     int m_desig_type, int m_code_set)
 {
     int m, p_id, c_set, piv, desig_type, i_len, naa, off, u;
     int assoc, is_sas, rtp;
@@ -685,9 +663,10 @@ static int decode_dev_ids_quiet(unsigned char * buff, int len,
 
 /* Prints outs device identification designators selected by association,
    designator type and/or code set. */
-static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
-                          int len, int m_assoc, int m_desig_type,
-                          int m_code_set, int long_out, int quiet)
+static int
+decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
+               int m_assoc, int m_desig_type, int m_code_set, int long_out,
+               int quiet)
 {
     int m, p_id, c_set, piv, assoc, desig_type, i_len;
     int ci_off, c_id, d_id, naa, vsi, printed, off, u;
@@ -960,8 +939,8 @@ static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
 
 /* Transport IDs are initiator port identifiers, typically other than the
    initiator port issuing a SCSI command. Code borrowed from sg_persist.c */
-static void decode_transport_id(const char * leadin, unsigned char * ucp,
-                                int len)
+static void
+decode_transport_id(const char * leadin, unsigned char * ucp, int len)
 {
     int format_code, proto_id, num, j, k;
     unsigned long long ull;
@@ -1064,7 +1043,8 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
     }
 }
 
-static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
     if (len < 7) {
         fprintf(stderr, "Extended INQUIRY data VPD page length too "
@@ -1086,7 +1066,8 @@ static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            !!(buff[7] & 0x1));
 }
 
-static void decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
+static void
+decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
     int k;
 
@@ -1104,8 +1085,8 @@ static void decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     }
 }
 
-static void decode_ata_info_vpd(unsigned char * buff, int len, int do_long,
-                                int do_hex)
+static void
+decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
 {
     char b[80];
     int num, is_be;
@@ -1166,7 +1147,8 @@ static void decode_ata_info_vpd(unsigned char * buff, int len, int do_long,
         dWordHex((const unsigned short *)(buff + 60), 256, 0, is_be);
 }
 
-static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+static void
+decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     unsigned int u;
 
@@ -1207,7 +1189,8 @@ static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
-static void decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+static void
+decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     unsigned int u;
 
@@ -1244,9 +1227,9 @@ static void decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 }
 
 /* Returns 0 if successful */
-static int svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue,
-                                 int do_hex, int do_raw, int do_long,
-                                 int do_quiet, int verbose)
+static int
+svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int do_hex,
+                      int do_raw, int do_long, int do_quiet, int verbose)
 {
     int len, t, res;
 
@@ -1299,9 +1282,9 @@ static int svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue,
 }
 
 /* Returns 0 if successful, else see sg_ll_inquiry() */
-static int svpd_decode_standard(int sg_fd, int num_vpd, int subvalue,
-                                int do_hex, int do_raw, int do_long,
-                                int do_quiet, int verbose)
+static int
+svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int do_hex,
+                     int do_raw, int do_long, int do_quiet, int verbose)
 {
     int len, pdt, num, k;
     char buff[48];
@@ -1762,7 +1745,8 @@ static int svpd_decode_standard(int sg_fd, int num_vpd, int subvalue,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, c, res;
     const char * device_name = NULL;
@@ -1863,7 +1847,7 @@ int main(int argc, char * argv[])
             req_pdt = vnp->pdt;
         } else {
             cp = strchr(page_str, ',');
-            num_vpd = get_num(page_str);
+            num_vpd = sg_get_num_nomult(page_str);
             if ((num_vpd < 0) || (num_vpd > 255)) {
                 fprintf(stderr, "Bad page code value after '-p' "
                         "option\n");
@@ -1872,7 +1856,7 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
-                subvalue = get_num(cp + 1);
+                subvalue = sg_get_num_nomult(cp + 1);
                 if ((subvalue < 0) || (subvalue > 255)) {
                     fprintf(stderr, "Bad subvalue code value after "
                             "'-p' option\n");

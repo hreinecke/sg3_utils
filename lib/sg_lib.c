@@ -71,7 +71,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.35 20070906";    /* spc-4 rev 11 */
+static char * version_str = "1.36 20070923";    /* spc-4 rev 11 */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -380,8 +380,9 @@ static const struct value_name_t variable_length_arr[] = {
 /* searches 'arr' for match on 'value' then 'peri_type'. If matches
    'value' but not 'peri_type' the yields first 'value' match entry.
    There are 'arr_sz' elements of 'arr', if no match yields NULL. */
-static const struct value_name_t * get_value_name(
-        const struct value_name_t * arr, int arr_sz, int value, int peri_type)
+static const struct value_name_t *
+get_value_name(const struct value_name_t * arr, int arr_sz, int value,
+               int peri_type)
 {
     const struct value_name_t * maxp = arr + arr_sz;
     const struct value_name_t * vp = arr;
@@ -404,14 +405,16 @@ static const struct value_name_t * get_value_name(
     return NULL;
 }
 
-void sg_set_warnings_strm(FILE * warnings_strm)
+void
+sg_set_warnings_strm(FILE * warnings_strm)
 {
     sg_warnings_strm = warnings_strm;
 }
 
 #define CMD_NAME_LEN 128
 
-void sg_print_command(const unsigned char * command) 
+void
+sg_print_command(const unsigned char * command) 
 {
     int k, sz;
     char buff[CMD_NAME_LEN];
@@ -431,7 +434,8 @@ void sg_print_command(const unsigned char * command)
     fprintf(sg_warnings_strm, "]\n");
 }
 
-void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
+void
+sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 {
     const char * ccp;
 
@@ -453,7 +457,8 @@ void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
     strncpy(buff, ccp, buff_len);
 }
 
-void sg_print_scsi_status(int scsi_status) 
+void
+sg_print_scsi_status(int scsi_status) 
 {
     char buff[128];
 
@@ -465,12 +470,12 @@ void sg_print_scsi_status(int scsi_status)
 }
 
 
-struct error_info{
+struct error_info {
     unsigned char code1, code2;
     const char * text;
 };
 
-struct error_info2{
+struct error_info2 {
     unsigned char code1, code2_min, code2_max;
     const char * text;
 };
@@ -1121,7 +1126,8 @@ static const char *sense_key_desc[] = {
     "Key=15"                    /* Reserved */
 };
 
-char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
+char *
+sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
 {
     if ((sense_key >= 0) && (sense_key < 16))
          snprintf(buff, buff_len, "%s", sense_key_desc[sense_key]);
@@ -1130,7 +1136,8 @@ char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
     return buff;
 }
 
-char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
+char *
+sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
     int k, num, rlen;
     int found = 0;
@@ -1173,8 +1180,9 @@ char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
     return buff;
 }
 
-const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
-                                              int sense_len, int desc_type)
+const unsigned char *
+sg_scsi_sense_desc_find(const unsigned char * sensep, int sense_len,
+                        int desc_type)
 {
     int add_sen_len, add_len, desc_len, k;
     const unsigned char * descp;
@@ -1198,8 +1206,9 @@ const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
     return NULL;
 }
 
-int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
-                          unsigned long long * info_outp)
+int
+sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
+                      unsigned long long * info_outp)
 {
     int j;
     const unsigned char * ucp;
@@ -1236,8 +1245,9 @@ int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
     }
 }
 
-int sg_get_sense_progress_fld(const unsigned char * sensep,
-                              int sb_len, int * progress_outp)
+int
+sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
+                          int * progress_outp)
 {
     const unsigned char * ucp;
     int sk;
@@ -1300,7 +1310,8 @@ static const char * scsi_pdt_strs[] = {
     "no physical device on this lu",
 };
 
-char * sg_get_pdt_str(int pdt, int buff_len, char * buff)
+char *
+sg_get_pdt_str(int pdt, int buff_len, char * buff)
 {
     if ((pdt < 0) || (pdt > 31))
         snprintf(buff, buff_len, "bad pdt");
@@ -1311,9 +1322,9 @@ char * sg_get_pdt_str(int pdt, int buff_len, char * buff)
 
 /* Print descriptor format sense descriptors (assumes sense buffer is
    in descriptor format) */
-static void sg_get_sense_descriptors_str(const unsigned char * sense_buffer,
-                                         int sb_len, int buff_len,
-                                         char * buff)
+static void
+sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
+                             int buff_len, char * buff)
 {
     int add_sen_len, add_len, desc_len, k, j, sense_key, processed;
     int n, progress;
@@ -1514,9 +1525,9 @@ static void sg_get_sense_descriptors_str(const unsigned char * sense_buffer,
 }
 
 /* Fetch sense information */
-void sg_get_sense_str(const char * leadin,
-                      const unsigned char * sense_buffer, int sb_len,
-                      int raw_sinfo, int buff_len, char * buff)
+void
+sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
+                 int sb_len, int raw_sinfo, int buff_len, char * buff)
 {
     int len, valid, progress, n, r;
     unsigned int info;
@@ -1713,8 +1724,9 @@ void sg_get_sense_str(const char * leadin,
 }
 
 /* Print sense information */
-void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
-                    int sb_len, int raw_sinfo)
+void
+sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
+               int sb_len, int raw_sinfo)
 {
     char b[1024];
 
@@ -1724,8 +1736,9 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
     fprintf(sg_warnings_strm, "%s", b);
 }
 
-int sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
-                            struct sg_scsi_sense_hdr * sshp)
+int
+sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
+                        struct sg_scsi_sense_hdr * sshp)
 {
     if (sshp)
         memset(sshp, 0, sizeof(struct sg_scsi_sense_hdr));
@@ -1758,7 +1771,8 @@ int sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
     return 1;
 }
 
-int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
+int
+sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
 {
     struct sg_scsi_sense_hdr ssh;
 
@@ -1792,7 +1806,8 @@ int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
 }
 
 /* gives wrong answer for variable length command (opcode=0x7f) */
-int sg_get_command_size(unsigned char opcode)
+int
+sg_get_command_size(unsigned char opcode)
 {
     switch ((opcode >> 5) & 0x7) {
     case 0:
@@ -1809,8 +1824,9 @@ int sg_get_command_size(unsigned char opcode)
     }
 }
 
-void sg_get_command_name(const unsigned char * cmdp, int peri_type,
-                         int buff_len, char * buff)
+void
+sg_get_command_name(const unsigned char * cmdp, int peri_type, int buff_len,
+                    char * buff)
 {
     int service_action;
 
@@ -1826,8 +1842,9 @@ void sg_get_command_name(const unsigned char * cmdp, int peri_type,
 }
 
 
-void sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
-                           int peri_type, int buff_len, char * buff)
+void
+sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
+                      int peri_type, int buff_len, char * buff)
 {
     const struct value_name_t * vnp;
 
@@ -1903,8 +1920,9 @@ void sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
     }
 }
 
-void sg_get_opcode_name(unsigned char cmd_byte0, int peri_type, 
-                        int buff_len, char * buff)
+void
+sg_get_opcode_name(unsigned char cmd_byte0, int peri_type, int buff_len,
+                   char * buff)
 {
     const struct value_name_t * vnp;
     int grp;
@@ -1942,9 +1960,9 @@ void sg_get_opcode_name(unsigned char cmd_byte0, int peri_type,
     }
 }
 
-int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc,
-                       int page_len, int * off, int m_assoc,
-                       int m_desig_type, int m_code_set)
+int
+sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
+                   int * off, int m_assoc, int m_desig_type, int m_code_set)
 {
     const unsigned char * ucp;
     int k, c_set, assoc, desig_type;
@@ -1977,7 +1995,8 @@ int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc,
 static char safe_errbuf[64] = {'u', 'n', 'k', 'n', 'o', 'w', 'n', ' ',
                                'e', 'r', 'r', 'n', 'o', ':', ' ', 0};
 
-char * safe_strerror(int errnum)
+char *
+safe_strerror(int errnum)
 {
     size_t len;
     char * errstr;
@@ -2001,7 +2020,8 @@ char * safe_strerror(int errnum)
        > 0     each line has address then up to 16 ASCII-hex bytes
        = 0     in addition, the bytes are listed in ASCII to the right
        < 0     only the ASCII-hex bytes are listed (i.e. without address) */
-void dStrHex(const char* str, int len, int no_ascii)
+void
+dStrHex(const char* str, int len, int no_ascii)
 {
     const char* p = str;
     unsigned char c;
@@ -2069,7 +2089,8 @@ void dStrHex(const char* str, int len, int no_ascii)
 
 /* Output to ASCII-Hex bytes to 'b' not to exceed 'b_len' characters.
  * 16 bytes per line with an extra space between the 8th and 9th bytes */
-static void dStrHexErr(const char* str, int len, int b_len, char * b)
+static void
+dStrHexErr(const char* str, int len, int b_len, char * b)
 {
     const char * p = str;
     unsigned char c;
@@ -2106,7 +2127,8 @@ static void dStrHexErr(const char* str, int len, int b_len, char * b)
 /* Returns 1 when executed on big endian machine; else returns 0.
    Useful for displaying ATA identify words (which need swapping on a
    big endian machine). */
-int sg_is_big_endian()
+int
+sg_is_big_endian()
 {
     union u_t {
         unsigned short s;
@@ -2118,7 +2140,8 @@ int sg_is_big_endian()
                                     the most significant byte */
 }
 
-static unsigned short swapb_ushort(unsigned short u)
+static unsigned short
+swapb_ushort(unsigned short u)
 {
     unsigned short r;
 
@@ -2137,8 +2160,8 @@ static unsigned short swapb_ushort(unsigned short u)
        < -2    same as -1
    If 'swapb' non-zero then bytes in each word swapped. Needs to be set
    for ATA IDENTIFY DEVICE response on big-endian machines. */
-void dWordHex(const unsigned short* words, int num, int no_ascii,
-              int swapb)
+void
+dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
 {
     const unsigned short * p = words;
     unsigned short c;
@@ -2224,7 +2247,8 @@ void dWordHex(const unsigned short* words, int num, int no_ascii,
    then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
    multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
    Main (SI) multipliers supported: K, M, G. */
-int sg_get_num(const char * buf)
+int
+sg_get_num(const char * buf)
 {
     int res, num, n, len;
     unsigned int unum;
@@ -2302,11 +2326,44 @@ int sg_get_num(const char * buf)
     }
 }
 
+/* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
+   hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
+   assumed. Does not accept multipliers. Accept a comma (","), a whitespace
+   or newline as terminator.  */
+int
+sg_get_num_nomult(const char * buf)
+{
+    int res, len, num;
+    unsigned int unum;
+    const char * commap;
+
+    if ((NULL == buf) || ('\0' == buf[0]))
+        return -1;
+    len = strlen(buf);
+    commap = strchr(buf + 1, ',');
+    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
+        res = sscanf(buf + 2, "%x", &unum);
+        num = unum;
+    } else if (commap && ('H' == toupper(*(commap - 1)))) {
+        res = sscanf(buf, "%x", &unum);
+        num = unum;
+    } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
+        res = sscanf(buf, "%x", &unum);
+        num = unum;
+    } else
+        res = sscanf(buf, "%d", &num);
+    if (1 == res)
+        return num;
+    else
+        return -1;
+}
+
 /* If the number in 'buf' can be decoded or the multiplier is unknown
    then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
    multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
    Main (SI) multipliers supported: K, M, G, T, P. */
-long long sg_get_llnum(const char * buf)
+long long
+sg_get_llnum(const char * buf)
 {
     int res, len;
     long long num, ll;
@@ -2405,8 +2462,9 @@ long long sg_get_llnum(const char * buf)
    in a IDENTIFY DEVICE response. Returns number of characters
    written to 'ochars' before 0 character is found or 'num' words
    are processed. */
-int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
-                     int num_words, int is_big_endian, char * ochars)
+int
+sg_ata_get_chars(const unsigned short * word_arr, int start_word,
+                 int num_words, int is_big_endian, char * ochars)
 {
     int k;
     unsigned short s;
@@ -2432,7 +2490,8 @@ int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
     return op - ochars;
 }
 
-const char * sg_lib_version()
+const char *
+sg_lib_version()
 {
     return version_str;
 }

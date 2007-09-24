@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.76 20070916";    /* SPC-4 revision 11 */
+static char * version_str = "0.77 20070923";    /* SPC-4 revision 11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -220,36 +220,6 @@ usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
-/* Trying to decode multipliers as sg_get_num() [as sg_libs does] would
- * only confuse things here, so use this local trimmed version */
-static int
-get_num(const char * buf)
-{
-    int res, len, num;
-    unsigned int unum;
-    const char * commap;
-
-    if ((NULL == buf) || ('\0' == buf[0]))
-        return -1;
-    len = strlen(buf);
-    commap = strchr(buf + 1, ',');
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%x", &unum);
-        num = unum;
-    } else if (commap && ('H' == toupper(*(commap - 1)))) {
-        res = sscanf(buf, "%x", &unum);
-        num = unum;
-    } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
-        res = sscanf(buf, "%x", &unum);
-        num = unum;
-    } else
-        res = sscanf(buf, "%d", &num);
-    if (1 == res)
-        return num;
-    else
-        return -1;
-}
-
 static int
 process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -315,14 +285,14 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             return 0;
         case 'p':
             cp = strchr(optarg, ',');
-            n = get_num(optarg);
+            n = sg_get_num_nomult(optarg);
             if ((n < 0) || (n > 63)) {
                 fprintf(stderr, "Bad argument to '--page='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
-                nn = get_num(cp + 1);
+                nn = sg_get_num_nomult(cp + 1);
                 if ((nn < 0) || (nn > 255)) {
                     fprintf(stderr, "Bad second value in argument to "
                             "'--page='\n");
