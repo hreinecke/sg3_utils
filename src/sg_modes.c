@@ -26,7 +26,7 @@
    
 */
 
-static char * version_str = "1.25 20070714";
+static char * version_str = "1.26 20070923";
 
 #define MX_ALLOC_LEN (1024 * 4)
 #define PG_CODE_ALL 0x3f
@@ -82,7 +82,8 @@ struct opts_t {
     int opt_new;
 };
 
-static void usage()
+static void
+usage()
 {
     printf("Usage: sg_modes [--all] [--control=PC] [--dbd] [--dbout] "
            "[--examine]\n"
@@ -128,7 +129,8 @@ static void usage()
            "Performs a SCSI MODE SENSE (10 or 6) command\n");
 }
 
-static void usage_old()
+static void
+usage_old()
 {
     printf("Usage:  sg_modes [-a] [-A] [-c=PC] [-d] [-D] [-e] [-f] [-h] "
            "[-H] [-l] [-L]\n"
@@ -163,7 +165,8 @@ static void usage_old()
            "Performs a SCSI MODE SENSE (10 or 6) command\n");
 }
 
-static void usage_for(const struct opts_t * optsp)
+static void
+usage_for(const struct opts_t * optsp)
 {
     if (optsp->opt_new)
         usage();
@@ -171,36 +174,8 @@ static void usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
-/* Trying to decode multipliers as sg_get_num() [as sg_libs does] would
- * only confuse things here, so use this local trimmed version */
-static int get_num(const char * buf)
-{
-    int res, len, num;
-    unsigned int unum;
-    const char * commap;
-
-    if ((NULL == buf) || ('\0' == buf[0]))
-        return -1;
-    len = strlen(buf);
-    commap = strchr(buf + 1, ',');
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%x", &unum);
-        num = unum;
-    } else if (commap && ('H' == toupper(*(commap - 1)))) {
-        res = sscanf(buf, "%x", &unum);
-        num = unum;
-    } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
-        res = sscanf(buf, "%x", &unum);
-        num = unum;
-    } else
-        res = sscanf(buf, "%d", &num);
-    if (1 == res)
-        return num;
-    else
-        return -1;
-}
-
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n, nn;
     char * cp;
@@ -264,14 +239,14 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             return 0;
         case 'p':
             cp = strchr(optarg, ',');
-            n = get_num(optarg);
+            n = sg_get_num_nomult(optarg);
             if ((n < 0) || (n > 63)) {
                 fprintf(stderr, "Bad argument to '--page='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
-                nn = get_num(cp + 1);
+                nn = sg_get_num_nomult(cp + 1);
                 if ((nn < 0) || (nn > 255)) {
                     fprintf(stderr, "Bad second value in argument to "
                             "'--page='\n");
@@ -323,7 +298,8 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     unsigned int u, uu;
@@ -459,7 +435,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -479,7 +456,8 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
     return res;
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -594,8 +572,8 @@ static struct page_code_desc pc_desc_adt[] = {
     {0xe, 0x4, "Target device serial number"},
 };
 
-static struct page_code_desc * mode_page_cs_table(int scsi_ptype,
-                                                  int * size)
+static struct page_code_desc *
+mode_page_cs_table(int scsi_ptype, int * size)
 {
     switch (scsi_ptype)
     {
@@ -664,8 +642,8 @@ static struct page_code_desc pc_desc_t_adt[] = {
     {0x19, 0x0, "Protocol specific port"},
 };
 
-static struct page_code_desc * mode_page_transp_table(int t_proto,
-                                                      int * size)
+static struct page_code_desc *
+mode_page_transp_table(int t_proto, int * size)
 {
     switch (t_proto)
     {
@@ -686,9 +664,9 @@ static struct page_code_desc * mode_page_transp_table(int t_proto,
     return NULL;
 }
 
-static const char * find_page_code_desc(int page_num, int subpage_num,
-                                        int scsi_ptype, int inq_byte6,
-                                        int t_proto)
+static const char *
+find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
+                    int inq_byte6, int t_proto)
 {
     int k;
     int num;
@@ -753,7 +731,8 @@ static const char * find_page_code_desc(int page_num, int subpage_num,
     return NULL;
 }
 
-static void list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
+static void
+list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
 {
     int num, num_ptype, pg, spg, c, d, valid_transport;
     const struct page_code_desc * dp;
@@ -847,8 +826,9 @@ static void list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     }
 }
 
-static int examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
-                         const struct opts_t * optsp)
+static int
+examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
+              const struct opts_t * optsp)
 {
     int k, res, header, mresp_len, len;
     unsigned char rbuf[256];
@@ -912,7 +892,8 @@ static const char * pg_control_str_arr[] = {
 };
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, k, num, len, res, md_len, bd_len, longlba, page_num, spf;
     char ebuff[EBUFF_SZ];

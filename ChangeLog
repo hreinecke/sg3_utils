@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.25 [20070919]
+Changelog for sg3_utils-1.25 [20070923]
   - sg_stpg: new utility to Set Target Port Groups
   - sg_cmds_extra: add sg_ll_set_tgt_prt_grp()
   - sg_sat_set_features: new utility (actually copied from examples
@@ -23,6 +23,7 @@ Changelog for sg3_utils-1.25 [20070919]
     - add media changer diagnostic data log page
   - sg_raw: fix error message when do_scsi_pt() fails
   - sg_lib: sync asc/ascq codes with spc4r11
+    - add sg_get_num_nomult()
   - place source in subversion repository
   - split code into src/ lib/ and include/ directories
   - sync debian directory with their 1.24 version (sid unstable)

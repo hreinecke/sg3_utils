@@ -5,11 +5,14 @@ sg_stpg \- sends a SCSI SET TARGET PORT GROUPS command
 .B sg_stpg
 [\fI\-\-active\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-offline\fR]
 [\fI\-\-optimized\fR] [\fI\-\-raw\fR] [\fI\-\-standby\fR]
-[\fI\-\-unavailable\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-state=S,S...\fR] [\fI\-\-tp=P,P...\fR] [\fI\-\-unavailable\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Send a SCSI SET TARGET PORT GROUPS command to \fIDEVICE\fR.
+This utility has different modes depending on whether the \fI\-\-tp=\fR
+option is given.
 .PP
 A sequence of SCSI commands are sent to the \fIDEVICE\fR leading up to the
 SET TARGET PORT GROUPS command. First a INQUIRY is sent to fetch the device
@@ -45,10 +48,21 @@ output response to the REPORT TARGET PORT GROUPS command in binary to stdout
 then exit.
 .TP
 \fB\-s\fR, \fB\-\-standby\fR
-set standby state.
+set standby state. Port group shall those commands listed for "unavailable"
+state plus LOG SELECT/SENSE, MODE SELECT/SENSE, RECEIVE DIAGNOSTIC RESULTS,
+SEND DIAGNOSTIC, PERSISTENT RESERVE IN/OUT commands.
+.TP
+\fB\-S\fR, \fB\-\-state\fR=\fIS,S...\fR
+.TP
+\fB\-t\fR, \fB\-\-tp\fR=\fIP,P...\fR
+Specify a comma separated list (one element of more). Each elements is
+either a target port group (when the corresponding state is other
+than "offline") or a relative target port identifier (when the
+corresponding state is "offline").
 .TP
 \fB\-u\fR, \fB\-\-unavailable\fR
-set unavailable state.
+set unavailable state. Port group shall only accept INQUIRY, REPORT LUNS,
+REPORT/SET TARGET PORT GROUPS, REQUEST SENSE and READ/WRITE BUFFER commands.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
