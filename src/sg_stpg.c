@@ -45,7 +45,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.2 20070918";
+static char * version_str = "1.2 20070924";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -74,6 +74,8 @@ static struct option long_options[] = {
         {"optimized", 0, 0, 'o'},
         {"raw", 0, 0, 'r'},
         {"standby", 0, 0, 's'},
+        {"state", required_argument, 0, 'S'},
+        {"tp", required_argument, 0, 't'},
         {"unavailable", 0, 0, 'u'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
@@ -86,8 +88,9 @@ usage()
     fprintf(stderr, "Usage: "
           "sg_stpg   [--active] [--help] [--hex] [--offline] [--optimized] "
           "[--raw]\n"
-          "                 [--standby] [--unavailable] [--verbose] "
-          "[--version] DEVICE\n"
+          "                 [--standby] [--state=S,S...] [--tp=P,P...] "
+          "[--unavailable]\n"
+          "                 [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --active|-a        set asymm. access state to "
           "active/non-optimized\n"
@@ -100,6 +103,11 @@ usage()
           "    --raw|-r           output report response in binary to "
           "stdout, then exit\n"
           "    --standby|-s       set asymm. access state to standby\n"
+          "    --state=S,S.. |-S S,S...     list of states (values or "
+          "acronyms)\n"
+          "    --tp=P,P.. |-t P,P...     list of target port group or "
+          "relative\n"
+          "                              identifiers\n"
           "    --unavailable|-u   set asymm. access state to unavailable\n"
           "    --verbose|-v       increase verbosity\n"
           "    --version|-V       print version string and exit\n\n"
@@ -272,7 +280,9 @@ main(int argc, char * argv[])
     unsigned char rsp_buff[MX_ALLOC_LEN + 2];
     unsigned char * ucp;
     struct tgtgrp tgtGrpState[256], *tgtStatePtr;
-    int state = TPGS_STATE_OPTIMIZED;
+    int state = -1;
+    const char * state_arg = NULL;
+    const char * tp_arg = NULL;
     int hex = 0;
     int raw = 0;
     int verbose = 0;
@@ -284,7 +294,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ahHloOrsuvV", long_options,
+        c = getopt_long(argc, argv, "ahHloOrsS:t:uvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -312,6 +322,12 @@ main(int argc, char * argv[])
             break;
         case 's':
             state = TPGS_STATE_STANDBY;
+            break;
+        case 'S':
+            state_arg = optarg;
+            break;
+        case 't':
+            tp_arg = optarg;
             break;
         case 'u':
             state = TPGS_STATE_UNAVAILABLE;
