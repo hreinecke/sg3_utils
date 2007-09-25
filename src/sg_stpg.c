@@ -45,7 +45,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.2 20070924";
+static char * version_str = "1.2 20070925";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -59,6 +59,8 @@ static char * version_str = "1.2 20070924";
 
 #define VPD_DEVICE_ID  0x83
 #define DEF_VPD_DEVICE_ID_LEN  252
+
+#define MAX_PORT_LIST_ARR_LEN 16
 
 struct tgtgrp {
         int id;
@@ -97,7 +99,10 @@ usage()
           "    --help|-h          print out usage message\n"
           "    --hex|-H           print out report response in hex, then "
           "exit\n"
-          "    --offline|-l       set asymm. access state to offline\n"
+          "    --offline|-l       set asymm. access state to offline, takes "
+	  "relative\n"
+	  "                       target port id, rather than target port "
+	  "group id\n"
           "    --optimized|-o     set asymm. access state to "
           "active/optimized\n"
           "    --raw|-r           output report response in binary to "
@@ -274,7 +279,7 @@ encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, off, res, c, report_len, tgt_port_count, trunc, numgrp;
+    int sg_fd, k, off, res, c, report_len, tgt_port_count, trunc;
     unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char setTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char rsp_buff[MX_ALLOC_LEN + 2];
@@ -286,8 +291,13 @@ main(int argc, char * argv[])
     int hex = 0;
     int raw = 0;
     int verbose = 0;
+    int port_arr[MAX_PORT_LIST_ARR_LEN];
+    int port_arr_len = 0;
+    int state_arr[MAX_PORT_LIST_ARR_LEN];
+    int state_arr_len = 0;
     int portgroup = -1;
     int relport = -1;
+    int numgrp = 0;
     const char * device_name = NULL;
     int ret = 0;
 
