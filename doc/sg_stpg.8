@@ -10,20 +10,27 @@ sg_stpg \- sends a SCSI SET TARGET PORT GROUPS command
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send a SCSI SET TARGET PORT GROUPS command to \fIDEVICE\fR.
-This utility has different modes depending on whether the \fI\-\-tp=\fR
-option is given.
+Send a SCSI SET TARGET PORT GROUPS command to \fIDEVICE\fR. This utility
+has different modes depending on whether the \fI\-\-tp=\fR option is given.
 .PP
-A sequence of SCSI commands are sent to the \fIDEVICE\fR leading up to the
-SET TARGET PORT GROUPS command. First a INQUIRY is sent to fetch the device
-identification VPD page to find the (primary) target port group. Then a
-REPORT TARGET PORT GROUPS command is issued to find the current state and
+If \fI\-\-tp=\fR is given then the SET TARGET PORT GROUPS command parameter
+block is built with a descriptor for each element in the list given to
+\fI\-\-tp=\fR. The corresponding asymmetric access state value is either
+taken from the \fI\-\-state=\fR list or, if that is not given, from one
+of the explicit state options (e.g. \fI\-\-unavailable\fR), used repeatedly
+if required.
+.PP
+If \fI\-\-tp=\fR is not given then a sequence of SCSI commands are sent to
+the \fIDEVICE\fR leading up to the SET TARGET PORT GROUPS command. First an
+INQUIRY is sent to fetch the device identification VPD page to find
+the (primary) target port group associated with \fIDEVICE\fR. Then a REPORT
+TARGET PORT GROUPS command is issued to find the current state and
 whether a transition to the requested state is supported. If so the
 SET TARGET PORT GROUPS command is sent.
 .PP
 Target port group access is described in SPC\-4 found at www.t10.org
-in section 5.8 (in rev 11 dated 2007/5/14). The Set Target Port
-Groups command is also described in that document.
+in section 5.8 (in rev 11 dated 2007/5/14). The SET TARGET PORT
+GROUPS command is also described in that document.
 .PP
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
@@ -38,27 +45,40 @@ output the usage message then exit.
 output response to the REPORT TARGET PORT GROUPS command in hex then exit.
 .TP
 \fB\-o\fR, \fB\-\-optimized\fR
-set active/optimized state.
+set active/optimized state. If no other state options or \fI\-\-tp=\fR
+option are given then active/optimized is the default state.
 .TP
 \fB\-O\fR, \fB\-l\fR, \fB\-\-offline\fR
-set active/non-optimized state.
+set offline state. This is the appropriate state to set a target port
+to prior to removing the device.  Note that a relative target port identifier
+should be given with this state (rather than a target port group identifier
+that all other states take).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response to the REPORT TARGET PORT GROUPS command in binary to stdout
 then exit.
 .TP
 \fB\-s\fR, \fB\-\-standby\fR
-set standby state. Port group shall those commands listed for "unavailable"
-state plus LOG SELECT/SENSE, MODE SELECT/SENSE, RECEIVE DIAGNOSTIC RESULTS,
-SEND DIAGNOSTIC, PERSISTENT RESERVE IN/OUT commands.
+set standby state. Port group shall accept those commands listed
+for "unavailable" state plus LOG SELECT/SENSE, MODE SELECT/SENSE, RECEIVE
+DIAGNOSTIC RESULTS, SEND DIAGNOSTIC, PERSISTENT RESERVE IN/OUT commands.
 .TP
 \fB\-S\fR, \fB\-\-state\fR=\fIS,S...\fR
+specifies a comma separated list (one element of more) of states. Either
+a number or an abbreviation can be given. A number is assumed to be a
+decimal number unless it is prefixed by "0x" or has a trailing "h" in
+which case a hexadecimal value is assumed. Only the values 0, 1, 2, 3
+or 14 are accepted. The accepted abbreviations are "an", "ao", "o", "s"
+or "u"; which represent active/non-optimized(1), active/optimized(0),
+offline(14), standby(2) or unavalable(3) respectively.
 .TP
 \fB\-t\fR, \fB\-\-tp\fR=\fIP,P...\fR
-Specify a comma separated list (one element of more). Each elements is
-either a target port group (when the corresponding state is other
-than "offline") or a relative target port identifier (when the
-corresponding state is "offline").
+specifies a comma separated list (one element of more). Each elements is
+either a target port group identifier (when the corresponding state is
+other than "offline") or a relative target port identifier (when the
+corresponding state is "offline"). Each element is assumed to be a
+decimal number unless it is prefixed by "0x" or has a trailing "h" in
+which case a hexadecimal value is assumed.
 .TP
 \fB\-u\fR, \fB\-\-unavailable\fR
 set unavailable state. Port group shall only accept INQUIRY, REPORT LUNS,
@@ -70,8 +90,20 @@ increase the level of verbosity, (i.e. debug output).
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
 .SH NOTES
-The Set Target Port Groups command should be supported whenever the TPGS
+The SET TARGET PORT GROUPS command should be supported whenever the TPGS
 value in a standard INQUIRY response is 2 or 3. [View with sg_inq utility.]
+.PP
+Notice that the offline state is termed as a "secondary target port
+asymmetric access state" and takes a relative target port identifier (i.e.
+acts on a single target port). All the other states are termed as "primary
+target port asymmetric access states" and each takes a target port group
+identifier (i.e. acts on one or more target ports).
+.PP
+When \fI\-\-tp=\fR is given then the same number of elements should be
+given to the \fI\-\-state=\fR option. If more than one list element is
+given to \fI\-\-tp=\fR and an equal number of elements is _not_ given
+to the the \fI\-\-state=\fR option, then if only one state is specified
+then it is repeated.
 .SH EXIT STATUS
 The exit status of sg_stpg is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

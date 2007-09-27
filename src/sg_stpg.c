@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <getopt.h>
 
 #include "sg_lib.h"
@@ -45,7 +46,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.2 20070925";
+static char * version_str = "1.2 20070926";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -100,9 +101,9 @@ usage()
           "    --hex|-H           print out report response in hex, then "
           "exit\n"
           "    --offline|-l       set asymm. access state to offline, takes "
-	  "relative\n"
-	  "                       target port id, rather than target port "
-	  "group id\n"
+          "relative\n"
+          "                       target port id, rather than target port "
+          "group id\n"
           "    --optimized|-o     set asymm. access state to "
           "active/optimized\n"
           "    --raw|-r           output report response in binary to "
@@ -110,9 +111,10 @@ usage()
           "    --standby|-s       set asymm. access state to standby\n"
           "    --state=S,S.. |-S S,S...     list of states (values or "
           "acronyms)\n"
-          "    --tp=P,P.. |-t P,P...     list of target port group or "
-          "relative\n"
-          "                              identifiers\n"
+          "    --tp=P,P.. |-t P,P...        list of target port group "
+          "identifiers,\n"
+          "                                 or relative target port "
+          "identifiers\n"
           "    --unavailable|-u   set asymm. access state to unavailable\n"
           "    --verbose|-v       increase verbosity\n"
           "    --version|-V       print version string and exit\n\n"
@@ -276,6 +278,133 @@ encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
      }
 } 
 
+/* Read numbers (up to 32 bits in size) from command line (comma separated */
+/* list). Assumed decimal unless prefixed by '0x', '0X' or contains */
+/* trailing 'h' or 'H' (which indicate hex). Returns 0 if ok, 1 if error. */
+static int
+build_port_arr(const char * inp, int * port_arr, int * port_arr_len,
+               int max_arr_len)
+{
+    int in_len, k;
+    const char * lcp;
+    int v;
+    char * cp;
+
+    if ((NULL == inp) || (NULL == port_arr) ||
+        (NULL == port_arr_len))
+        return 1;
+    lcp = inp;
+    in_len = strlen(inp);
+    if (0 == in_len)
+        *port_arr_len = 0;
+    k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX,");
+    if (in_len != k) {
+        fprintf(stderr, "build_port_arr: error at pos %d\n", k + 1);
+        return 1;
+    }
+    for (k = 0; k < max_arr_len; ++k) {
+        v = sg_get_num_nomult(lcp);
+        if (-1 != v) {
+            port_arr[k] = v;
+            cp = strchr(lcp, ',');
+            if (NULL == cp)
+                break;
+            lcp = cp + 1;
+        } else {
+            fprintf(stderr, "build_port_arr: error at pos %d\n",
+                    (int)(lcp - inp + 1));
+            return 1;
+        }
+    }
+    *port_arr_len = k + 1;
+    if (k == max_arr_len) {
+        fprintf(stderr, "build_port_arr: array length exceeded\n");
+        return 1;
+    }
+    return 0;
+}
+
+/* Read numbers (up to 32 bits in size) from command line (comma separated */
+/* list). Assumed decimal unless prefixed by '0x', '0X' or contains */
+/* trailing 'h' or 'H' (which indicate hex). Also accepts 'ao' for active */
+/* optimized [0], 'an' for active/non-optimized [1], 's' for standby [2], */
+/* 'u' for unavailable [3], 'o' for offline [14]. */
+/* Returns 0 if ok, 1 if error. */
+static int
+build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
+                int max_arr_len)
+{
+    int in_len, k, v, try_num;
+    const char * lcp;
+    char * cp;
+
+    if ((NULL == inp) || (NULL == state_arr) ||
+        (NULL == state_arr_len))
+        return 1;
+    lcp = inp;
+    in_len = strlen(inp);
+    if (0 == in_len)
+        *state_arr_len = 0;
+    k = strspn(inp, "0123456789aAbBcCdDeEfFhHnNoOsSuUxX,");
+    if (in_len != k) {
+        fprintf(stderr, "build_state_arr: error at pos %d\n", k + 1);
+        return 1;
+    }
+    for (k = 0; k < max_arr_len; ++k) {
+        try_num = 1;
+        if (isalpha(*lcp)) {
+            try_num = 0;
+            switch (toupper(*lcp)) {
+            case 'A':
+                if ('N' == toupper(*(lcp + 1))) 
+                    state_arr[k] = 1;
+                else if ('O' == toupper(*(lcp + 1))) 
+                    state_arr[k] = 0;
+                else
+                    try_num = 1;
+                break;
+            case 'O':
+                state_arr[k] = 14;
+                break;
+            case 'S':
+                state_arr[k] = 2;
+                break;
+            case 'U':
+                state_arr[k] = 3;
+                break;
+            default:
+                fprintf(stderr, "build_state_arr: expected 'ao', 'an', 'o', "
+                        "'s' or 'u' at pos %d\n", (int)(lcp - inp + 1));
+                return 1;
+            }
+        }
+        if (try_num) {
+            v = sg_get_num_nomult(lcp);
+            if (((v >= 0) && (v <= 3)) || (14 ==v))
+                state_arr[k] = v;
+            else if (-1 == v) {
+                fprintf(stderr, "build_state_arr: error at pos %d\n",
+                        (int)(lcp - inp + 1));
+                return 1;
+            } else {
+                fprintf(stderr, "build_state_arr: expect 0,1,2,3 or 14\n");
+                return 1;
+            }
+        }
+        cp = strchr(lcp, ',');
+        if (NULL == cp)
+            break;
+        lcp = cp + 1;
+    }
+    *state_arr_len = k + 1;
+    if (k == max_arr_len) {
+        fprintf(stderr, "build_state_arr: array length exceeded\n");
+        return 1;
+    }
+    return 0;
+}
+
+
 int
 main(int argc, char * argv[])
 {
@@ -368,6 +497,59 @@ main(int argc, char * argv[])
         }
     }
 
+    if (state_arg) {
+        if (build_state_arr(state_arg, state_arr, &state_arr_len,
+                            MAX_PORT_LIST_ARR_LEN)) {
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    if (tp_arg) {
+        if (build_port_arr(tp_arg, port_arr, &port_arr_len,
+                           MAX_PORT_LIST_ARR_LEN)) {
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    if ((state >= 0) && (state_arr_len > 0)) {
+        fprintf(stderr, "either use individual state option or '--state=' "
+                "but not both\n");
+        usage();
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if ((0 == state_arr_len) && (0 == port_arr_len) && (-1 == state))
+        state = 0;      /* default to active/optimized */
+    if ((1 == state_arr_len) && (0 == port_arr_len) && (-1 == state)) {
+        state = state_arr[0];
+        state_arr_len = 0;
+    }
+    if (state_arr_len > port_arr_len) {
+        fprintf(stderr, "'state=' list longer than expected\n");
+        usage();
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if ((port_arr_len > 0) && (0 == state_arr_len)) {
+        if (-1 == state) {
+            fprintf(stderr, "target port list given but no state "
+                    "indicated\n");
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        state_arr[0] = state;
+        state_arr_len = 1;
+        state = -1;
+    }
+    if ((port_arr_len > 1) && (1 == state_arr_len)) {
+        for (k = 1; k < port_arr_len; ++k)
+            state_arr[k] = state_arr[0];
+        state_arr_len = port_arr_len;
+    }
+    if (port_arr_len != state_arr_len) {
+        fprintf(stderr, "'state=' and '--tp=' lists mismatched\n");
+        usage();
+        return SG_LIB_SYNTAX_ERROR;
+    }
+
     if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
@@ -380,110 +562,120 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
-                        DEF_VPD_DEVICE_ID_LEN, 1, verbose);
-    if (0 == res) {
-        report_len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-        if (VPD_DEVICE_ID != rsp_buff[1]) {
-            fprintf(stderr, "invalid VPD response; probably a STANDARD "
-                    "INQUIRY response\n");
-            if (verbose) {
-                fprintf(stderr, "First 32 bytes of bad response\n");
-                dStrHex((const char *)rsp_buff, 32, 0);
+    if (0 == port_arr_len) {
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
+                            DEF_VPD_DEVICE_ID_LEN, 1, verbose);
+        if (0 == res) {
+            report_len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (VPD_DEVICE_ID != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                if (verbose) {
+                    fprintf(stderr, "First 32 bytes of bad response\n");
+                    dStrHex((const char *)rsp_buff, 32, 0);
+                }
+                return SG_LIB_CAT_MALFORMED;
             }
-            return SG_LIB_CAT_MALFORMED;
+            if (report_len > MX_ALLOC_LEN) {
+                fprintf(stderr, "response length too long: %d > %d\n", report_len,
+                        MX_ALLOC_LEN);
+                return SG_LIB_CAT_MALFORMED;
+            } else if (report_len > DEF_VPD_DEVICE_ID_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
+                                  report_len, 1, verbose))
+                    return SG_LIB_CAT_OTHER;
+            }
+            decode_target_port(rsp_buff + 4, report_len - 4, &relport, &portgroup);
+            printf("Device is at port Group 0x%02x, relative port 0x%02x\n",
+                   portgroup, relport);
         }
-        if (report_len > MX_ALLOC_LEN) {
-            fprintf(stderr, "response length too long: %d > %d\n", report_len,
-                    MX_ALLOC_LEN);
-            return SG_LIB_CAT_MALFORMED;
-        } else if (report_len > DEF_VPD_DEVICE_ID_LEN) {
-            if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
-                              report_len, 1, verbose))
-                return SG_LIB_CAT_OTHER;
-        }
-        decode_target_port(rsp_buff + 4, report_len - 4, &relport, &portgroup);
-        printf("Device is at port Group 0x%02x, relative port 0x%02x\n",
-               portgroup, relport);
-    }
 
-    memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
-    trunc = 0;
+        memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
+        trunc = 0;
 
-    res = sg_ll_report_tgt_prt_grp(sg_fd, reportTgtGrpBuff,
-                            sizeof(reportTgtGrpBuff), 1, verbose);
-    ret = res;
-    if (0 == res) {
-        report_len = (reportTgtGrpBuff[0] << 24) +
-                     (reportTgtGrpBuff[1] << 16) + 
-                     (reportTgtGrpBuff[2] << 8) +
-                     reportTgtGrpBuff[3] + 4;
-        if (report_len > (int)sizeof(reportTgtGrpBuff)) {
-            trunc = 1;
-            fprintf(stderr, "  <<report too long for internal buffer,"
-                    " output truncated\n");
-            report_len = (int)sizeof(reportTgtGrpBuff);
-        }
-        if (raw) {
-            dStrRaw((const char *)reportTgtGrpBuff, report_len);
-            goto err_out;
-        }
-        if (verbose)
-            printf("Report list length = %d\n", report_len);
-        if (hex) {
+        res = sg_ll_report_tgt_prt_grp(sg_fd, reportTgtGrpBuff,
+                                sizeof(reportTgtGrpBuff), 1, verbose);
+        ret = res;
+        if (0 == res) {
+            report_len = (reportTgtGrpBuff[0] << 24) +
+                         (reportTgtGrpBuff[1] << 16) + 
+                         (reportTgtGrpBuff[2] << 8) +
+                         reportTgtGrpBuff[3] + 4;
+            if (report_len > (int)sizeof(reportTgtGrpBuff)) {
+                trunc = 1;
+                fprintf(stderr, "  <<report too long for internal buffer,"
+                        " output truncated\n");
+                report_len = (int)sizeof(reportTgtGrpBuff);
+            }
+            if (raw) {
+                dStrRaw((const char *)reportTgtGrpBuff, report_len);
+                goto err_out;
+            }
             if (verbose)
-                fprintf(stderr, "\nOutput response in hex:\n");
-            dStrHex((const char *)reportTgtGrpBuff, report_len, 1);
-            goto err_out;
-        }
-        memset(tgtGrpState, 0, sizeof(struct tgtgrp) * 256);
-        tgtStatePtr = tgtGrpState;
-        printf("Current target port groups:\n");
-        for (k = 4, ucp = reportTgtGrpBuff + 4, numgrp = 0; k < report_len;
-             k += off, ucp += off, numgrp ++) {
+                printf("Report list length = %d\n", report_len);
+            if (hex) {
+                if (verbose)
+                    fprintf(stderr, "\nOutput response in hex:\n");
+                dStrHex((const char *)reportTgtGrpBuff, report_len, 1);
+                goto err_out;
+            }
+            memset(tgtGrpState, 0, sizeof(struct tgtgrp) * 256);
+            tgtStatePtr = tgtGrpState;
+            printf("Current target port groups:\n");
+            for (k = 4, ucp = reportTgtGrpBuff + 4, numgrp = 0; k < report_len;
+                 k += off, ucp += off, numgrp ++) {
 
-            printf("  target port group id : 0x%x , Pref=%d\n",
-                   (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));
-            printf("    target port group asymmetric access state : ");
-            printf("0x%02x", ucp[0] & 0x0f);
-            printf("\n");
-            tgtStatePtr->id = (ucp[2] << 8) + ucp[3];
-            tgtStatePtr->current = ucp[0] & 0x0f;
-            tgtStatePtr->valid = ucp[1];
+                printf("  target port group id : 0x%x , Pref=%d\n",
+                       (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));
+                printf("    target port group asymmetric access state : ");
+                printf("0x%02x", ucp[0] & 0x0f);
+                printf("\n");
+                tgtStatePtr->id = (ucp[2] << 8) + ucp[3];
+                tgtStatePtr->current = ucp[0] & 0x0f;
+                tgtStatePtr->valid = ucp[1];
             
-            tgt_port_count = ucp[7];
+                tgt_port_count = ucp[7];
 
-            tgtStatePtr++;
-            off = 8 + tgt_port_count * 4;
+                tgtStatePtr++;
+                off = 8 + tgt_port_count * 4;
+            }
+        } else if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "Report Target Port Groups command not supported\n");
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "bad field in Report Target Port Groups cdb "
+                    "including unsupported service action\n");
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "Report Target Port Groups, unit attention\n");
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "Report Target Port Groups, aborted command\n");
+        else {
+            fprintf(stderr, "Report Target Port Groups command failed\n");
+            if (0 == verbose)
+                fprintf(stderr, "    try '-v' for more information\n");
         }
-    } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Report Target Port Groups command not supported\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "bad field in Report Target Port Groups cdb "
-                "including unsupported service action\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Report Target Port Groups, unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Report Target Port Groups, aborted command\n");
-    else {
-        fprintf(stderr, "Report Target Port Groups command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' for more information\n");
+        if (0 != res)
+             goto err_out;
+
+        printf("Port group 0x%02x: Set asymmetric access state to", portgroup);
+        decode_tpgs_state(state);
+        printf("\n");
+
+        transition_tpgs_states(tgtGrpState, numgrp, portgroup, state);
+
+        memset(setTgtGrpBuff, 0x0, sizeof(setTgtGrpBuff));
+        trunc = 0;
+
+        encode_tpgs_states(setTgtGrpBuff, tgtGrpState, numgrp);
+        report_len = numgrp * 4 + 4;
+    } else { /* port_arr_len > 0 */
+        memset(setTgtGrpBuff, 0x0, sizeof(setTgtGrpBuff));
+        for (k = 0, ucp = setTgtGrpBuff + 4; k < port_arr_len; ++k, ucp +=4) {
+            ucp[0] = state_arr[k] & 0xf;
+            ucp[2] = (port_arr[k] >> 8) & 0xff;
+            ucp[3] = port_arr[k] & 0xff;
+        }
+        report_len = port_arr_len * 4 + 4;
     }
-    if (0 != res)
-         goto err_out;
-
-    printf("Port group 0x%02x: Set asymmetric access state to", portgroup);
-    decode_tpgs_state(state);
-    printf("\n");
-
-    transition_tpgs_states(tgtGrpState, numgrp, portgroup, state);
-
-    memset(setTgtGrpBuff, 0x0, sizeof(setTgtGrpBuff));
-    trunc = 0;
-
-    encode_tpgs_states(setTgtGrpBuff, tgtGrpState, numgrp);
-    report_len = numgrp * 4 + 4;
 
     res = sg_ll_set_tgt_prt_grp(sg_fd, setTgtGrpBuff, report_len, 1, verbose);
 
