@@ -54,7 +54,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.11 20070919";
+static char * version_str = "1.11 20070925";
 
 #define ME "sg_reassign: "
 
@@ -77,7 +77,8 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
           "sg_reassign [--address=A,A...] [--dummy] [--eight=0|1] "
@@ -118,7 +119,8 @@ static void usage()
 
 /* Trying to decode multipliers as sg_get_llnum() [in sg_libs does] would
  * only confuse things here, so use this local trimmed version */
-long long get_llnum(const char * buf)
+long long
+get_llnum(const char * buf)
 {
     int res, len;
     long long num;
@@ -151,8 +153,9 @@ long long get_llnum(const char * buf)
 /* space separated list). Assumed decimal unless prefixed by '0x', '0X' */
 /* or contains trailing 'h' or 'H' (which indicate hex). */
 /* Returns 0 if ok, or 1 if error. */
-static int build_lba_arr(const char * inp, unsigned long long * lba_arr,
-                           int * lba_arr_len, int max_arr_len)
+static int
+build_lba_arr(const char * inp, unsigned long long * lba_arr,
+              int * lba_arr_len, int max_arr_len)
 {
     int in_len, k, j, m;
     const char * lcp;
@@ -225,7 +228,7 @@ static int build_lba_arr(const char * inp, unsigned long long * lba_arr,
             off += (k + 1);
         }
         *lba_arr_len = off;
-    } else {        /* hex string on command line */
+    } else {        /* list of numbers (default decimal) on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX,");
         if (in_len != k) {
             fprintf(stderr, "build_lba_arr: error at pos %d\n", k + 1);
@@ -255,7 +258,8 @@ static int build_lba_arr(const char * inp, unsigned long long * lba_arr,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c, num, k, j;
     int dummy = 0;
