@@ -152,7 +152,7 @@ subdirectory of the sg3_utils package:
     sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map, sg_map26,
     sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_raw, sg_rbuf, sg_rdac,
     sg_read, sg_readcap, sg_read_buffer, sg_read_long, sg_reassign,
-    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_sat_identify,
+    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_safte, sg_sat_identify,
     sg_sat_set_features, sg_scan, sg_senddiag, sg_ses, sg_start, sg_stpg,
     sg_sync, sg_test_rwbuff, sg_turs, sg_verify, sg_vpd, sg_write_buffer,
     sg_write_long, sg_wr_mode
@@ -286,7 +286,7 @@ or using '-O' as the first command line option.
 The more recent utilities that use "getopt_long" only are:
   - sg_format sg_get_config sg_ident sg_luns sg_map26 sg_persist
     sg_prevent sg_raw sg_read_buffer sg_read_long sg_reassign sg_requests
-    sg_rmsn sg_rtpg sg_sat_identify sg_sat_set_features
+    sg_rmsn sg_rtpg sg_sat_identify sg_safte sg_sat_set_features
     sg_sat_set_features sg_scan(w) sg_ses sg_stpg sg_sync sg_test_rwbuf
     sg_verify sg_vpd sg_write_buffer sg_write_long sg_wr_mode
 
@@ -327,4 +327,4 @@ See http://www.torque.net/sg/tools.html
 
 
 Doug Gilbert
-26th September 2007
+29th September 2007
