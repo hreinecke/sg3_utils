@@ -51,6 +51,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_requests$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rtpg$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_safte$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_scan$(EXEEXT) \
@@ -84,6 +85,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_requests$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rtpg$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_safte$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_scan$(EXEEXT) \
@@ -117,6 +119,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_requests$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rtpg$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_safte$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_senddiag$(EXEEXT) \
@@ -149,6 +152,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_requests$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rtpg$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_safte$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_senddiag$(EXEEXT) \
@@ -191,6 +195,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_reset$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rtpg$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_safte$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_scan$(EXEEXT) \
@@ -216,7 +221,7 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@	sg_read_buffer$(EXEEXT) sg_read_long$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_reassign$(EXEEXT) sg_requests$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_rmsn$(EXEEXT) sg_rtpg$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sat_identify$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_safte$(EXEEXT) sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_start$(EXEEXT) sg_stpg$(EXEEXT) \
@@ -314,6 +319,9 @@ sg_rmsn_DEPENDENCIES = ../lib/libsgutils.la
 am_sg_rtpg_OBJECTS = sg_rtpg.$(OBJEXT)
 sg_rtpg_OBJECTS = $(am_sg_rtpg_OBJECTS)
 sg_rtpg_DEPENDENCIES = ../lib/libsgutils.la
+am_sg_safte_OBJECTS = sg_safte.$(OBJEXT)
+sg_safte_OBJECTS = $(am_sg_safte_OBJECTS)
+sg_safte_DEPENDENCIES = ../lib/libsgutils.la
 am_sg_sat_identify_OBJECTS = sg_sat_identify.$(OBJEXT)
 sg_sat_identify_OBJECTS = $(am_sg_sat_identify_OBJECTS)
 sg_sat_identify_DEPENDENCIES = ../lib/libsgutils.la
@@ -391,14 +399,14 @@ SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
 	$(sg_read_buffer_SOURCES) $(sg_read_long_SOURCES) \
 	$(sg_readcap_SOURCES) $(sg_reassign_SOURCES) \
 	$(sg_requests_SOURCES) $(sg_reset_SOURCES) $(sg_rmsn_SOURCES) \
-	$(sg_rtpg_SOURCES) $(sg_sat_identify_SOURCES) \
-	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
-	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) $(sg_start_SOURCES) \
-	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
-	$(sg_turs_SOURCES) $(sg_verify_SOURCES) $(sg_vpd_SOURCES) \
-	$(sg_wr_mode_SOURCES) $(sg_write_buffer_SOURCES) \
-	$(sg_write_long_SOURCES) $(sginfo_SOURCES) $(sgm_dd_SOURCES) \
-	$(sgp_dd_SOURCES)
+	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) \
+	$(sg_sat_identify_SOURCES) $(sg_sat_set_features_SOURCES) \
+	$(sg_scan_SOURCES) $(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
+	$(sg_start_SOURCES) $(sg_stpg_SOURCES) $(sg_sync_SOURCES) \
+	$(sg_test_rwbuf_SOURCES) $(sg_turs_SOURCES) \
+	$(sg_verify_SOURCES) $(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
+	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
+	$(sginfo_SOURCES) $(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
 DIST_SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
 	$(sg_format_SOURCES) $(sg_get_config_SOURCES) \
 	$(sg_ident_SOURCES) $(sg_inq_SOURCES) $(sg_logs_SOURCES) \
@@ -409,14 +417,14 @@ DIST_SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
 	$(sg_read_buffer_SOURCES) $(sg_read_long_SOURCES) \
 	$(sg_readcap_SOURCES) $(sg_reassign_SOURCES) \
 	$(sg_requests_SOURCES) $(sg_reset_SOURCES) $(sg_rmsn_SOURCES) \
-	$(sg_rtpg_SOURCES) $(sg_sat_identify_SOURCES) \
-	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
-	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) $(sg_start_SOURCES) \
-	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
-	$(sg_turs_SOURCES) $(sg_verify_SOURCES) $(sg_vpd_SOURCES) \
-	$(sg_wr_mode_SOURCES) $(sg_write_buffer_SOURCES) \
-	$(sg_write_long_SOURCES) $(sginfo_SOURCES) $(sgm_dd_SOURCES) \
-	$(sgp_dd_SOURCES)
+	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) \
+	$(sg_sat_identify_SOURCES) $(sg_sat_set_features_SOURCES) \
+	$(sg_scan_SOURCES) $(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
+	$(sg_start_SOURCES) $(sg_stpg_SOURCES) $(sg_sync_SOURCES) \
+	$(sg_test_rwbuf_SOURCES) $(sg_turs_SOURCES) \
+	$(sg_verify_SOURCES) $(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
+	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
+	$(sginfo_SOURCES) $(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -588,6 +596,8 @@ sg_rmsn_SOURCES = sg_rmsn.c
 sg_rmsn_LDADD = ../lib/libsgutils.la @os_libs@
 sg_rtpg_SOURCES = sg_rtpg.c
 sg_rtpg_LDADD = ../lib/libsgutils.la @os_libs@
+sg_safte_SOURCES = sg_safte.c
+sg_safte_LDADD = ../lib/libsgutils.la @os_libs@
 sg_sat_identify_SOURCES = sg_sat_identify.c
 sg_sat_identify_LDADD = ../lib/libsgutils.la @os_libs@
 sg_sat_set_features_SOURCES = sg_sat_set_features.c
@@ -757,6 +767,9 @@ sg_rmsn$(EXEEXT): $(sg_rmsn_OBJECTS) $(sg_rmsn_DEPENDENCIES)
 sg_rtpg$(EXEEXT): $(sg_rtpg_OBJECTS) $(sg_rtpg_DEPENDENCIES) 
 	@rm -f sg_rtpg$(EXEEXT)
 	$(LINK) $(sg_rtpg_OBJECTS) $(sg_rtpg_LDADD) $(LIBS)
+sg_safte$(EXEEXT): $(sg_safte_OBJECTS) $(sg_safte_DEPENDENCIES) 
+	@rm -f sg_safte$(EXEEXT)
+	$(LINK) $(sg_safte_OBJECTS) $(sg_safte_LDADD) $(LIBS)
 sg_sat_identify$(EXEEXT): $(sg_sat_identify_OBJECTS) $(sg_sat_identify_DEPENDENCIES) 
 	@rm -f sg_sat_identify$(EXEEXT)
 	$(LINK) $(sg_sat_identify_OBJECTS) $(sg_sat_identify_LDADD) $(LIBS)
@@ -845,6 +858,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_reset.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rmsn.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rtpg.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_safte.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_identify.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_set_features.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_scan.Po@am__quote@

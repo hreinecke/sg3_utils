@@ -14,7 +14,7 @@ man_MANS = \
 	sgm_dd.8 sg_modes.8 sg_opcodes.8 sgp_dd.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rbuf.8 sg_rdac.8 sg_read.8 sg_readcap.8 \
 	sg_read_buffer.8 sg_read_long.8 sg_reassign.8 sg_requests.8 \
-	sg_reset.8 sg_rmsn.8 sg_rtpg.8 sg_sat_identify.8 \
+	sg_reset.8 sg_rmsn.8 sg_rtpg.8 sg_safte.8 sg_sat_identify.8 \
 	sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 \
 	sg_stpg.8 sg_sync.8 sg_test_rwbuf.8 sg_turs.8 sg_verify.8 sg_vpd.8 \
 	sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
@@ -31,8 +31,8 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
-	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
+	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 	sg_wr_mode.8
 
@@ -48,8 +48,8 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 sg_scan.8 \
-	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
+	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 	sg_wr_mode.8
 
@@ -65,7 +65,7 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_set_features.8 \
 	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 	sg_wr_mode.8
@@ -82,7 +82,7 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_set_features.8 \
 	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 	sg_wr_mode.8
@@ -99,7 +99,7 @@ man_MANS = \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
 	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_sat_identify.8 sg_sat_set_features.8 \
+	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_set_features.8 \
 	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 	sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
 	sg_wr_mode.8

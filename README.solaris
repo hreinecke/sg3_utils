@@ -27,7 +27,9 @@ Here is a list of utilities that have been ported:
     sg_requests
     sg_rmsn
     sg_rtpg
+    sg_safte
     sg_sat_identify
+    sg_sat_set_features
     sg_senddiag
     sg_ses
     sg_start
@@ -76,4 +78,4 @@ See the Solaris section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-31st August 2007
+29th September 2007

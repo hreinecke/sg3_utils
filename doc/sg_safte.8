@@ -1,0 +1,118 @@
+.TH SG_SAFTE "8" "September 2007" "sg3_utils\-1.25" SG3_UTILS
+.SH NAME
+sg_safte \- Fetch status from a SCSI Accessed Fault\-Tolerant Enclosure
+(SAF\-TE) device
+.SH SYNOPSIS
+.B sg_safte
+[\fI\-\-config\fR] [\fI\-\-devstatus\fR] [\fI\-\-encstatus\fR]
+[\fI\-\-flags\fR] [\fI\-\-help\fR] [\fI\-\-insertions\fR]
+[\fI\-\-usage\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Fetches enclosure status (via a SCSI READ BUFFER command).
+The \fIDEVICE\fR should be a SAF\-TE device which may be a storage
+array controller (INQUIRY peripheral device type 0xc) or a generic
+processor device (INQUIRY peripheral device type 0x3).
+.PP
+If no options are given (only the \fIDEVICE\fR argument) then the
+overall enclosure status as reported by the option
+.I
+\-\-config
+.R
+is reported.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-c\fR, \fB\-\-config\fR
+will issues a 
+.I
+Read Enclosure Configuration
+.R
+(READ BUFFER ID 0) cdb to the device, which returns a list of the
+enclosure hardware resources.
+.TP
+\fB\-d\fR, \fB\-\-devstatus\fR
+will issue a
+.I
+Read Device Slot Status
+.R
+(READ BUFFER ID 4) cdb to the device, which returns information about
+the current state of each drive or slot.
+.TP
+\fB\-s\fR, \fB\-\-encstatus\fR
+will issue a
+.I
+Read Enclosure Status
+.R
+(READ BUFFER ID 1) cdb to the device, which returns the operational
+state of the components.
+.TP
+\fB\-f\fR, \fB\-\-flags\fR
+will issue a
+.I
+Read Global Flags
+.R
+(READ BUFFER ID 5) cdb to the device, which read the most recent state
+of the global flags of the RAID processor device.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-i\fR, \fB\-\-insertions\fR
+will issue a
+.I
+Read Device Insertions
+.R
+(READ BUFFER ID 3) cdb to the device, which returns information about
+the number of times devices have been inserted whilst the RAID system
+was powered on.
+.TP
+\fB\-u\fR, \fB\-\-usage\fR
+will issue a
+.I
+Read Usage Statistics
+.R
+(READ BUFFER ID 2) cdb to the device, which returns the information on
+total usage time and number of power\-on cycles of the RAID device.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+The implementation is based on the intermediate review document eg as
+found at
+.PP
+http://www.intel.com/design/servers/ipmi/saf\-te.htm
+.PP
+As the specification was never finalized this document serves as the
+de\-facto standard.
+.PP
+A similar functionality is provided by the SPC\-4 SCSI Enclosure
+Services devices (Peripheral device type 0xd), which can be queried
+with the sg_ses utility.
+.SH EXAMPLES
+To view the configuration:
+.PP
+   sg_safte /dev/sg1
+.PP
+To view the device slot status:
+.PP
+   sg_safte \-\-devstatus /dev/sg1
+.PP
+.SH EXIT STATUS
+The exit status of sg_ses is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Hannes Reinecke and Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004\-2007 Hannes Reinecke and Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq, sg_ses (in sg3_utils package)
