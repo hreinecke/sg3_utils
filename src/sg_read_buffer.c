@@ -46,7 +46,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.03 20070919";
+static char * version_str = "1.03 20070930";
 
 #define ME "sg_read_buffer: "
 
@@ -64,7 +64,8 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
           "sg_read_buffer [--help] [--hex] [--id=ID] [--length=LEN] "
@@ -116,7 +117,8 @@ static struct mode_s {
 
 #define NUM_MODES       ((int)(sizeof(modes)/sizeof(modes[0])))
 
-static void print_modes(void)
+static void
+print_modes(void)
 {
     int k;
 
@@ -128,7 +130,8 @@ static void print_modes(void)
     }
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -136,7 +139,8 @@ static void dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c, len, k;
     int do_help = 0;
