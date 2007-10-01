@@ -48,7 +48,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static char * version_str = "0.21 20070929";
+static char * version_str = "0.22 20070930";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -76,12 +76,21 @@ struct safte_cfg_t {
 
 struct safte_cfg_t safte_cfg;
 
-static int peri_type = 0; /* ugly but not easy to pass to alpha compare */
 static unsigned int buf_capacity = 64;
 
+static void
+dStrRaw(const char* str, int len)
+{
+    int k;
+
+    for (k = 0 ; k < len; ++k)
+        printf("%c", str[k]);
+}
+
 /* Buffer ID 0x0: Read Enclosure Configuration (mandatory) */
-static int read_safte_configuration (int sg_fd, unsigned char *rb_buff,
-                                   unsigned int rb_len, int verbose)
+static int
+read_safte_configuration(int sg_fd, unsigned char *rb_buff,
+                         unsigned int rb_len, int verbose)
 {
     int res;
 
@@ -113,7 +122,8 @@ static int read_safte_configuration (int sg_fd, unsigned char *rb_buff,
     return 0;
 }
 
-static int print_safte_configuration (void)
+static int
+print_safte_configuration(void)
 {
     printf("Enclosure Configuration:\n");
     printf("\tNumber of Fans: %d\n", safte_cfg.fans);
@@ -127,7 +137,8 @@ static int print_safte_configuration (void)
 }
 
 /* Buffer ID 0x01: Read Enclosure Status (mandatory) */
-static int do_safte_encl_status (int sg_fd, int verbose)
+static int
+do_safte_encl_status(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res, i, offset;
     unsigned int rb_len;
@@ -143,6 +154,14 @@ static int do_safte_encl_status (int sg_fd, int verbose)
     if (res && res != SG_LIB_CAT_RECOVERED)
         return res;
 
+    if (do_raw > 1) {
+        dStrRaw((const char *)rb_buff, buf_capacity);
+        return 0;
+    }
+    if (do_hex > 1) {
+        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        return 0;
+    }
     printf("Enclosure Status:\n");
     offset = 0;
     for (i = 0; i < safte_cfg.fans; i++) {
@@ -256,7 +275,8 @@ static int do_safte_encl_status (int sg_fd, int verbose)
 }
 
 /* Buffer ID 0x02: Read Usage Statistics (optional) */
-static int do_safte_usage_statistics (int sg_fd, int verbose)
+static int
+do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res;
     unsigned int rb_len;
@@ -279,6 +299,14 @@ static int do_safte_usage_statistics (int sg_fd, int verbose)
         }
     }
 
+    if (do_raw > 1) {
+        dStrRaw((const char *)rb_buff, buf_capacity);
+        return 0;
+    }
+    if (do_hex > 1) {
+        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        return 0;
+    }
     printf("Usage Statistics:\n");
     minutes = (rb_buff[0] << 24) + (rb_buff[1] << 16) +
         (rb_buff[2] <<  8) + rb_buff[3];
@@ -292,7 +320,8 @@ static int do_safte_usage_statistics (int sg_fd, int verbose)
 }
 
 /* Buffer ID 0x03: Read Device Insertions (optional) */
-static int do_safte_slot_insertions (int sg_fd, int verbose)
+static int
+do_safte_slot_insertions(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res, i;
     unsigned int rb_len;
@@ -314,6 +343,14 @@ static int do_safte_slot_insertions (int sg_fd, int verbose)
         }
     }
 
+    if (do_raw > 1) {
+        dStrRaw((const char *)rb_buff, buf_capacity);
+        return 0;
+    }
+    if (do_hex > 1) {
+        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        return 0;
+    }
     printf("Slot insertions:\n");
     for (i = 0; i < safte_cfg.slots; i++) {
         slot_status = (rb_buff[i * 2] << 8) + rb_buff[i * 2];
@@ -324,7 +361,8 @@ static int do_safte_slot_insertions (int sg_fd, int verbose)
 }
 
 /* Buffer ID 0x04: Read Device Slot Status (mandatory) */
-static int do_safte_slot_status (int sg_fd, int verbose)
+static int
+do_safte_slot_status(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res, i;
     unsigned int rb_len;
@@ -340,6 +378,14 @@ static int do_safte_slot_status (int sg_fd, int verbose)
         return res;
     }
 
+    if (do_raw > 1) {
+        dStrRaw((const char *)rb_buff, buf_capacity);
+        return 0;
+    }
+    if (do_hex > 1) {
+        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        return 0;
+    }
     printf("Slot status:\n");
     for (i = 0; i < safte_cfg.slots; i++) {
         slot_status = rb_buff[i * 4 + 3];
@@ -361,7 +407,8 @@ static int do_safte_slot_status (int sg_fd, int verbose)
 }
 
 /* Buffer ID 0x05: Read Global Flags (optional) */
-static int do_safte_global_flags (int sg_fd, int verbose)
+static int
+do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res;
     unsigned int rb_len;
@@ -383,6 +430,14 @@ static int do_safte_global_flags (int sg_fd, int verbose)
         }
     }
 
+    if (do_raw > 1) {
+        dStrRaw((const char *)rb_buff, buf_capacity);
+        return 0;
+    }
+    if (do_hex > 1) {
+        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        return 0;
+    }
     printf("Global Flags:\n");
     printf("\tAudible Alarm Control: %s\n",
            rb_buff[0] & 0x1?"on":"off");
@@ -413,13 +468,15 @@ static int do_safte_global_flags (int sg_fd, int verbose)
     return 0;
 }
 
-static void usage()
+static
+void usage()
 {
     fprintf(stderr,
             "Usage:  sg_safte [--config] [--devstatus] [--encstatus] "
             "[--flags] [--help]\n"
-            "                 [--insertions] [--usage] [--verbose] "
-            "[--version] DEVICE\n"
+            "                 [--hex] [--insertions] [--raw] [--usage] "
+            "[--verbose]\n"
+            "                 [--version] DEVICE\n"
             "  where:\n"
             "    --config|-c         output enclosure configuration\n"
             "    --devstatus|-d      output device slot status\n"
@@ -427,7 +484,10 @@ static void usage()
             "    --flags|-f          output global flags\n"
             "    --help|-h           output command usage message then "
             "exit\n"
+            "    --hex|-H            output enclosure config in hex\n"
             "    --insertions|-i     output insertion statistics\n"
+            "    --raw|-r            output enclosure config in binary "
+            "to stdout\n"
             "    --usage|-u          output usage statistics\n"
             "    --verbose|-v        increase verbosity\n"
             "    --version|-v        output version then exit\n\n"
@@ -440,16 +500,20 @@ static struct option long_options[] = {
     {"encstatus", 0, 0, 's'},
     {"flags", 0, 0, 'f'},
     {"help", 0, 0, 'h'},
+    {"hex", 0, 0, 'H'},
     {"insertions", 0, 0, 'i'},
+    {"raw", 0, 0, 'r'},
     {"usage", 0, 0, 'u'},
     {"verbose", 0, 0, 'v'},
     {"version", 0, 0, 'V'},
     {0, 0, 0, 0},
 };
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
-    int sg_fd, c, res = SG_LIB_CAT_OTHER;
+    int sg_fd, c, ret, peri_type, no_hex_raw;
+    int res = SG_LIB_CAT_OTHER;
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
     unsigned char *rb_buff;
@@ -458,6 +522,8 @@ int main(int argc, char * argv[])
     int do_slots = 0;
     int do_flags = 0;
     int do_usage = 0;
+    int do_hex = 0;
+    int do_raw = 0;
     int verbose = 0;
     int do_insertions = 0;
     const char * cp;
@@ -468,7 +534,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "cdfhisuvV?", long_options,
+        c = getopt_long(argc, argv, "cdfhHirsuvV?", long_options,
                         &option_index);
 
         if (c == -1)
@@ -488,8 +554,14 @@ int main(int argc, char * argv[])
             case '?':
                 usage();
                 return 0;
+            case 'H':
+                ++do_hex;
+                break;
             case 'i':
                 do_insertions = 1;
+                break;
+            case 'r':
+                ++do_raw;
                 break;
             case 's':
                 do_status = 1;
@@ -530,24 +602,28 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, "sg_safte: error opening file: %s (ro)",
+        snprintf(ebuff, EBUFF_SZ, "sg_safte: error opening file: %s (rw)",
                  device_name);
         perror(ebuff);
         return SG_LIB_FILE_ERROR;
     }
+    no_hex_raw = ((0 == do_hex) && (0 == do_raw));
 
-    if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
-        printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
-               inq_resp.revision);
-        peri_type = inq_resp.peripheral_type;
-        cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
-        if (strlen(cp) > 0)
-            printf("  Peripheral device type: %s\n", cp);
-        else
-            printf("  Peripheral device type: 0x%x\n", peri_type);
-    } else {
-        printf("sg_safte: %s doesn't respond to a SCSI INQUIRY\n", device_name);
-        return SG_LIB_CAT_OTHER;
+    if (no_hex_raw) {
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
+            printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
+                   inq_resp.product, inq_resp.revision);
+            peri_type = inq_resp.peripheral_type;
+            cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
+            if (strlen(cp) > 0)
+                printf("  Peripheral device type: %s\n", cp);
+            else
+                printf("  Peripheral device type: 0x%x\n", peri_type);
+        } else {
+            fprintf(stderr, "sg_safte: %s doesn't respond to a SCSI "
+                    "INQUIRY\n", device_name);
+            return SG_LIB_CAT_OTHER;
+        }
     }
 
     rb_buff = (unsigned char *)malloc(buf_capacity);
@@ -564,12 +640,22 @@ int main(int argc, char * argv[])
     default:
         goto err_out;
     }
+    if (1 == do_raw) {
+        dStrRaw((const char *)rb_buff, buf_capacity);
+        res = 0;
+        goto finish;
+    }
+    if (1 == do_hex) {
+        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        res = 0;
+        goto finish;
+    }
 
-    if (do_config)
+    if (do_config && no_hex_raw)
         print_safte_configuration();
 
     if (do_status) {
-        res = do_safte_encl_status(sg_fd, verbose);
+        res = do_safte_encl_status(sg_fd, do_hex, do_raw, verbose);
         switch (res) {
             case 0:
             case SG_LIB_CAT_RECOVERED:
@@ -580,7 +666,7 @@ int main(int argc, char * argv[])
     }
 
     if (do_usage) {
-        res = do_safte_usage_statistics(sg_fd, verbose);
+        res = do_safte_usage_statistics(sg_fd, do_hex, do_raw, verbose);
         switch (res) {
             case 0:
             case SG_LIB_CAT_RECOVERED:
@@ -591,7 +677,7 @@ int main(int argc, char * argv[])
     }
 
     if (do_insertions) {
-        res = do_safte_slot_insertions(sg_fd, verbose);
+        res = do_safte_slot_insertions(sg_fd, do_hex, do_raw, verbose);
         switch (res) {
             case 0:
             case SG_LIB_CAT_RECOVERED:
@@ -602,7 +688,7 @@ int main(int argc, char * argv[])
     }
 
     if (do_slots) {
-        res = do_safte_slot_status(sg_fd, verbose);
+        res = do_safte_slot_status(sg_fd, do_hex, do_raw, verbose);
         switch (res) {
             case 0:
             case SG_LIB_CAT_RECOVERED:
@@ -613,7 +699,7 @@ int main(int argc, char * argv[])
     }
 
     if (do_flags) {
-        res = do_safte_global_flags(sg_fd, verbose);
+        res = do_safte_global_flags(sg_fd, do_hex, do_raw, verbose);
         switch (res) {
             case 0:
             case SG_LIB_CAT_RECOVERED:
@@ -622,6 +708,7 @@ int main(int argc, char * argv[])
                 goto err_out;
         }
     }
+finish:
     res = 0;
 
 err_out:
@@ -648,7 +735,12 @@ err_out:
         fprintf(stderr, "%s failed\n", op_name);
         break;
     }
-
+    ret = res;
     res = sg_cmds_close_device(sg_fd);
-    return res;
+    if (res < 0) {
+        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
+    }
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.25 [20070929]
+Changelog for sg3_utils-1.25 [20070930]
   - sg_stpg: new utility to Set Target Port Groups
   - sg_safte: new utility to query SAF-TE processor (SES like)
   - sg_cmds_extra: add sg_ll_set_tgt_prt_grp()
@@ -30,8 +30,9 @@ Changelog for sg3_utils-1.25 [20070929]
   - sync debian directory with their 1.24 version (sid unstable)
   - convert build logic to use autotools (i.e. './configure ; make')
     - rename this file from CHANGELOG to ChangeLog
-    - note: only utilities in main directory built by autotools
-      infrastructure; subdirectories still use hand-crafted Makefiles
+    - note: only code in lib/ and src/ directories built by
+      autotools; some other subdirectories still use hand-crafted
+      Makefiles
 
 Changelog for sg3_utils-1.24 [20070507]
   - sg_raw: new utility to send arbirary SCSI commands

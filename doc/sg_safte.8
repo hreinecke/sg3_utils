@@ -5,8 +5,9 @@ sg_safte \- Fetch status from a SCSI Accessed Fault\-Tolerant Enclosure
 .SH SYNOPSIS
 .B sg_safte
 [\fI\-\-config\fR] [\fI\-\-devstatus\fR] [\fI\-\-encstatus\fR]
-[\fI\-\-flags\fR] [\fI\-\-help\fR] [\fI\-\-insertions\fR]
-[\fI\-\-usage\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-flags\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-insertions\fR]
+[\fI\-\-raw\fR] [\fI\-\-usage\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -59,6 +60,12 @@ of the global flags of the RAID processor device.
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
+\fB\-H\fR, \fB\-\-hex\fR
+output the response to a READ BUFFER command in ASCII hex to stdout. If used
+once, output the response to the first READ BUFFER command (i.e. with
+buffer_id=0). This should be the enclosure configuration. If used twice (or
+more often), the response to subsequent READ BUFFER commands is output.
+.TP
 \fB\-i\fR, \fB\-\-insertions\fR
 will issue a
 .I
@@ -67,6 +74,12 @@ Read Device Insertions
 (READ BUFFER ID 3) cdb to the device, which returns information about
 the number of times devices have been inserted whilst the RAID system
 was powered on.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output the response to a READ BUFFER command in binary to stdout. If used
+once, output the response to the first READ BUFFER command (i.e. with
+buffer_id=0). This should be the enclosure configuration. If used twice (or
+more often), the response to subsequent READ BUFFER commands is output.
 .TP
 \fB\-u\fR, \fB\-\-usage\fR
 will issue a
@@ -115,4 +128,4 @@ Copyright \(co 2004\-2007 Hannes Reinecke and Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq, sg_ses (in sg3_utils package)
+.B sg_inq, sg_ses (in sg3_utils package); safte-monitor (internet)
