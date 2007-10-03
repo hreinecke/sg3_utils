@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.25 [20070930]
+Changelog for sg3_utils-1.25 [20071002]
   - sg_stpg: new utility to Set Target Port Groups
   - sg_safte: new utility to query SAF-TE processor (SES like)
   - sg_cmds_extra: add sg_ll_set_tgt_prt_grp()

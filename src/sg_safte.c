@@ -48,7 +48,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static char * version_str = "0.22 20070930";
+static char * version_str = "0.23 20071002";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -100,6 +100,9 @@ read_safte_configuration(int sg_fd, unsigned char *rb_buff,
         return SG_LIB_CAT_ILLEGAL_REQ;
     }
 
+    if (verbose > 1)
+        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=0 "
+                "to fetch configuration\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 0, 0,
                             rb_buff, rb_len, 1, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED)
@@ -149,6 +152,9 @@ do_safte_encl_status(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_buff = (unsigned char *)malloc(rb_len);
 
 
+    if (verbose > 1)
+        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=1 "
+                "to read enclosure status\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 1, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED)
@@ -286,6 +292,9 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_len = 16 + safte_cfg.vendor_specific;
     rb_buff = (unsigned char *)malloc(rb_len);
 
+    if (verbose > 1)
+        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=2 "
+                "to read usage statistics\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 2, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res) {
@@ -330,6 +339,9 @@ do_safte_slot_insertions(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_len = safte_cfg.slots * 2;
     rb_buff = (unsigned char *)malloc(rb_len);
 
+    if (verbose > 1)
+        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=3 "
+                "to read device insertions\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 3, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res ) {
@@ -371,6 +383,9 @@ do_safte_slot_status(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_len = safte_cfg.slots * 4;
     rb_buff = (unsigned char *)malloc(rb_len);
 
+    if (verbose > 1)
+        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=4 "
+                "to read device slot status\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 4, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED) {
@@ -417,6 +432,9 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_len = 16;
     rb_buff = (unsigned char *)malloc(rb_len);
 
+    if (verbose > 1)
+        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=5 "
+                "to read global flags\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 5, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res ) {
@@ -459,9 +477,9 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
            rb_buff[1] & 0x1?"yes":"no");
     printf("\tArray Warning: %s\n",
            rb_buff[0] & 0x2?"yes":"no");
-    printf("\tEnclosre Lock: %s\n",
+    printf("\tEnclosure Lock: %s\n",
            rb_buff[0] & 0x4?"on":"off");
-    printf("\tEnclosre Identify: %s\n",
+    printf("\tEnclosure Identify: %s\n",
            rb_buff[0] & 0x8?"on":"off");
 
     free(rb_buff);
