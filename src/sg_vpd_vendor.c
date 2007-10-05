@@ -76,7 +76,7 @@ struct svpd_values_name_t {
     int subvalue;
     int pdt;         /* peripheral device type id, -1 is the default */
                      /* (all or not applicable) value */
-    int ro_vendor;   /* read-only or vendor flag */
+    int vendor;      /* vendor flag */
     const char * acron;
     const char * name;
 };

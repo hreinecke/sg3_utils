@@ -26,7 +26,7 @@
    
 */
 
-static char * version_str = "1.26 20070923";
+static char * version_str = "1.26 20071005";
 
 #define MX_ALLOC_LEN (1024 * 4)
 #define PG_CODE_ALL 0x3f
@@ -647,16 +647,16 @@ mode_page_transp_table(int t_proto, int * size)
 {
     switch (t_proto)
     {
-        case 0:         /* Fibre channel */
+        case TPROTO_FCP:
             *size = sizeof(pc_desc_t_fcp) / sizeof(pc_desc_t_fcp[0]);
             return &pc_desc_t_fcp[0];
-        case 1:         /* SPI-4 */
+        case TPROTO_SPI:
             *size = sizeof(pc_desc_t_spi4) / sizeof(pc_desc_t_spi4[0]);
             return &pc_desc_t_spi4[0];
-        case 6:         /* SAS-1.1 */
+        case TPROTO_SAS:
             *size = sizeof(pc_desc_t_sas) / sizeof(pc_desc_t_sas[0]);
             return &pc_desc_t_sas[0];
-        case 7:         /* ADT/ADC */
+        case TPROTO_ADT:
             *size = sizeof(pc_desc_t_adt) / sizeof(pc_desc_t_adt[0]);
             return &pc_desc_t_adt[0];
     }

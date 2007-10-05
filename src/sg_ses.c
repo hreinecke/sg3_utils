@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.37 20070919";    /* ses2r18 */
+static char * version_str = "1.38 20071005";    /* ses2r18 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1117,7 +1117,7 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
 
     eip_offset = (0x10 & ucp[0]) ? 2 : 0;
     switch (0xf & ucp[0]) {
-    case 0:     /* FCP */
+    case TPROTO_FCP:
         ports = ucp[2 + eip_offset];
         printf("    Transport protocol: FCP\n");
 #if 0
@@ -1142,7 +1142,7 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
             printf("\n");
         }
         break;
-    case 6:     /* SAS */
+    case TPROTO_SAS:
         desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
         printf("    Transport protocol: SAS\n");
 #if 0
