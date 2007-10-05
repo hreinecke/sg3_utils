@@ -87,6 +87,18 @@ extern "C" {
 #define SPC_SK_VOLUME_OVERFLOW 0xd
 #define SPC_SK_MISCOMPARE 0xe
 
+/* Transport protocol identifiers */
+#define TPROTO_FCP 0
+#define TPROTO_SPI 1
+#define TPROTO_SSA 2
+#define TPROTO_1394 3
+#define TPROTO_SRP 4
+#define TPROTO_ISCSI 5
+#define TPROTO_SAS 6
+#define TPROTO_ADT 7
+#define TPROTO_ATA 8
+#define TPROTO_NONE 0xf
+
 
 /* Returns length of SCSI command given the opcode (first byte). 
    Yields the wrong answer for variable length commands (opcode=0x7f)

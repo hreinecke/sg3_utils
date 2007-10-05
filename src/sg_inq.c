@@ -78,6 +78,8 @@ static char * version_str = "0.70 20070919";    /* spc-4 rev 11 */
 #define VPD_MODE_PG_POLICY  0x87
 #define VPD_SCSI_PORTS  0x88
 #define VPD_ATA_INFO  0x89
+#define VPD_PROTO_LU 0x90
+#define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS  0xb0
 #define VPD_BLOCK_DEV_CHARS  0xb1
 #define VPD_UPR_EMC  0xc0
@@ -118,7 +120,7 @@ struct svpd_values_name_t {
     int subvalue;
     int pdt;         /* peripheral device type id, -1 is the default */
                      /* (all or not applicable) value */
-    int ro_vendor;   /* read-only or vendor flag */
+    int vendor;      /* vendor flag */
     const char * acron;
     const char * name;
 };
@@ -142,13 +144,16 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
     {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
+    {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
+     "information"},
+    {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
     {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, 0, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
-    {VPD_UPR_EMC, 0, -1, 0, "upr", "Unit path report (EMC)"},
-    {VPD_RDAC_VERS, 0, -1, 0, "rdac_vers", "RDAC software version (IBM)"},
-    {VPD_RDAC_VAC, 0, -1, 0, "rdac_vac", "RDAC volume access control (IBM)"},
+    {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (IBM)"},
+    {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (IBM)"},
+    {VPD_UPR_EMC, 0, -1, 1, "upr", "Unit path report (EMC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
 
@@ -592,7 +597,7 @@ static void enumerate_vpds()
     const struct svpd_values_name_t * vnp;
 
     for (vnp = vpd_pg; vnp->acron; ++vnp) {
-        if (vnp->name && (0 == vnp->ro_vendor))
+        if (vnp->name)
             printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
                    vnp->name);
     }
@@ -1132,7 +1137,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
         format_code = ((ucp[0] >> 6) & 0x3);
         proto_id = (ucp[0] & 0xf);
         switch (proto_id) {
-        case 0: /* Fibre channel */
+        case TPROTO_FCP:
             printf("%s  FCP-2 World Wide Name:\n", leadin);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -1140,7 +1145,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             dStrHex((const char *)&ucp[8], 8, 0);
             bump = 24;
             break;
-        case 1: /* Parallel SCSI */
+        case TPROTO_SPI:
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
                    leadin, ((ucp[2] << 8) | ucp[3]));
             if (0 != format_code) 
@@ -1150,13 +1155,13 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                    "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
             bump = 24;
             break;
-        case 2: /* SSA */
+        case TPROTO_SSA: /* SSA */
             printf("%s  SSA (transport id not defined):\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
-        case 3: /* IEEE 1394 */
+        case TPROTO_1394:
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -1164,7 +1169,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             dStrHex((const char *)&ucp[8], 8, 0);
             bump = 24;
             break;
-        case 4: /* Remote Direct Memory Access (RDMA) */
+        case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -1172,7 +1177,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             dStrHex((const char *)&ucp[8], 16, 0);
             bump = 24;
             break;
-        case 5: /* iSCSI */
+        case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
             num = ((ucp[2] << 8) | ucp[3]);
             if (0 == format_code)
@@ -1185,7 +1190,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             }
             bump = (((num + 4) < 24) ? 24 : num + 4);
             break;
-        case 6: /* SAS */
+        case TPROTO_SAS:
             ull = 0;
             for (j = 0; j < 8; ++j) {
                 if (j > 0)
@@ -1198,18 +1203,19 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                        format_code);
             bump = 24;
             break;
-        case 7: /* Automation/Drive Interface Transport Protocol */
+        case TPROTO_ADT:
             printf("%s  ADT:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
-        case 8: /* ATAPI */
+        case TPROTO_ATA:
             printf("%s  ATAPI:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
+        case TPROTO_NONE:
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);

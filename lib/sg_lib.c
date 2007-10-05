@@ -71,7 +71,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.36 20070923";    /* spc-4 rev 11 */
+static char * version_str = "1.37 20071005";    /* spc-4 rev 11 */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 

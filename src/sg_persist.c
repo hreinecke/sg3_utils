@@ -187,7 +187,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
         format_code = ((ucp[0] >> 6) & 0x3);
         proto_id = (ucp[0] & 0xf);
         switch (proto_id) {
-        case 0: /* Fibre channel */
+        case TPROTO_FCP: /* Fibre channel */
             printf("%s  FCP-2 World Wide Name:\n", leadin);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -195,7 +195,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             dStrHex((const char *)&ucp[8], 8, 0);
             bump = 24;
             break;
-        case 1: /* Parallel SCSI */
+        case TPROTO_SPI: /* Parallel SCSI */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
                    leadin, ((ucp[2] << 8) | ucp[3]));
             if (0 != format_code) 
@@ -205,13 +205,13 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                    "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
             bump = 24;
             break;
-        case 2: /* SSA */
+        case TPROTO_SSA:
             printf("%s  SSA (transport id not defined):\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
-        case 3: /* IEEE 1394 */
+        case TPROTO_1394: /* IEEE 1394 */
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -219,7 +219,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             dStrHex((const char *)&ucp[8], 8, 0);
             bump = 24;
             break;
-        case 4: /* Remote Direct Memory Access (RDMA) */
+        case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
             if (0 != format_code) 
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -227,7 +227,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             dStrHex((const char *)&ucp[8], 16, 0);
             bump = 24;
             break;
-        case 5: /* iSCSI */
+        case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
             num = ((ucp[2] << 8) | ucp[3]);
             if (0 == format_code)
@@ -240,7 +240,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             }
             bump = (((num + 4) < 24) ? 24 : num + 4);
             break;
-        case 6: /* SAS */
+        case TPROTO_SAS:
             ull = 0;
             for (j = 0; j < 8; ++j) {
                 if (j > 0)
@@ -253,18 +253,19 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                        format_code);
             bump = 24;
             break;
-        case 7: /* Automation/Drive Interface */
+        case TPROTO_ADT:
             printf("%s  ADT:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
-        case 8: /* ATAPI */
+        case TPROTO_ATA:
             printf("%s  ATAPI:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
+        case TPROTO_NONE:
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
