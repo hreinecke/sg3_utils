@@ -30,8 +30,8 @@ Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
 Hannes Reinecke <hare at suse dot de> 
-        contributed sg_rdac, (and the corresponding VPD entry to
-        sg_vpd_vendor), sg_stpg and sg_safte [20070927]
+        contributed sg_rdac, (and some corresponding VPD entries to
+        sg_vpd_vendor), sg_stpg and sg_safte [20071013]
 
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]
@@ -86,4 +86,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-27th September 2007
+13th October 2007

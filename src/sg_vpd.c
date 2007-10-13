@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.23 20071004";    /* spc4r11 + 07-153r1 */
+static char * version_str = "0.24 20071012";    /* spc4r11 + 07-153r1 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
