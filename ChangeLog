@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.25 [20071005]
+Changelog for sg3_utils-1.25 [20071013]
   - sg_stpg: new utility to Set Target Port Groups
   - sg_safte: new utility to query SAF-TE processor (SES like)
   - sg_cmds_extra: add sg_ll_set_tgt_prt_grp()
@@ -20,6 +20,7 @@ Changelog for sg3_utils-1.25 [20071005]
   - sg_vpd, sg_inq: add block device characteristics VPD page
   - sg_inq: add '--vpd' option (or '-e') for backward compatibility
   - sg_vpd: decode protocol specific lu information page for SAS
+    - add more RDAC vendor VPD pages
   - sg_logs: update background scan results log page, sbc3r11
     - add generation code to protocol specific page for SAS SSP
     - add media changer diagnostic data log page
