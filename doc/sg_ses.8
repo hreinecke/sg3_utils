@@ -1,4 +1,4 @@
-.TH SG_SES "8" "September 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_SES "8" "October 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -23,6 +23,8 @@ diagnostic pages supported by the device (including SES pages)
 are listed.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
 .TP
 \fB\-b\fR, \fB\-\-byte\fR=\fIB1\fR
 some control pages need byte 1 (i.e. the second byte) of the cdb set.
@@ -42,7 +44,7 @@ specified (limit 512). This allows the parameters to a control diagnostic
 page to be specified. The string given should not include the first 4
 bytes (i.e. page code and length). See next entry for using stdin.
 .TP
-\fB\-d\fR, \fB\-\-data\fR=-
+\fB\-d\fR, \fB\-\-data\fR=\-
 reads a data string from stdin. Spaces, tabs and line feeds additionally
 are permitted as separators.
 .TP

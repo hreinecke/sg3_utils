@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "February 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_SENDDIAG "8" "October 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .\" Add any additional description here
 .PP
 This utility sends a SCSI SEND DIAGNOSTIC command to the \fIDEVICE\fR. It
-can issue self-tests, find supported diagnostic pages or send arbitrary
+can issue self\-tests, find supported diagnostic pages or send arbitrary
 diagnostic pages.
 .PP
 When the \fI\-\-list\fR option and a \fIDEVICE\fR are given then the utility
@@ -34,12 +34,12 @@ Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-d\fR, \fB\-\-doff\fR
 set the Device Offline (DevOffL) bit (default is clear). Only significant 
-when \fI\-\-test\fR option is set for the default self-test. When set other
+when \fI\-\-test\fR option is set for the default self\-test. When set other
 operations on any logical units controlled by the this device server (target)
-may be affected (delayed) while a default self-test is underway.
+may be affected (delayed) while a default self\-test is underway.
 .TP
 \fB\-e\fR, \fB\-\-extdur\fR
-outputs the expected extended self-test duration. The duration is given in
+outputs the expected extended self\-test duration. The duration is given in
 seconds (and minutes in parentheses). This figure is obtained from mode page
 0xa (i.e. the control mode page).
 .TP
@@ -80,20 +80,20 @@ a diagnostic page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly
 likely the \fI\-\-pf\fR option should also be given.
 .TP
 \fB\-s\fR, \fB\-\-selftest\fR=\fIST\fR
-where \fIST\fR is the self-test code. The default value is 0 which is
+where \fIST\fR is the self\-test code. The default value is 0 which is
 inactive. Some other values:
 .br
-  \fB1\fR : background short self-test
+  \fB1\fR : background short self\-test
 .br
-  \fB2\fR : background extended self-test
+  \fB2\fR : background extended self\-test
 .br
-  \fB4\fR : aborts a (background) self-test that is in progress
+  \fB4\fR : aborts a (background) self\-test that is in progress
 .br
-  \fB5\fR : foreground short self-test
+  \fB5\fR : foreground short self\-test
 .br
-  \fB6\fR : foreground extended self-test
+  \fB6\fR : foreground extended self\-test
 .br
-This option is mutually exclusive with default self-test (i.e. 
+This option is mutually exclusive with default self\-test (i.e. 
 can't have (\fIST\fR > 0) and \fI\-\-test\fR).
 .TP
 \fB\-t\fR, \fB\-\-test\fR
@@ -104,9 +104,9 @@ with this option.
 .TP
 \fB\-u\fR, \fB\-\-uoff\fR
 set the Unit Offline (UnitOffL) bit (default is clear). Only significant 
-when \fI\-\-test\fR option is set for the default self-test. When set other
+when \fI\-\-test\fR option is set for the default self\-test. When set other
 operations on this logical unit may be affected (delayed) while a default
-self-test is underway. Some devices (e.g. Fujitsu disks) do more tests
+self\-test is underway. Some devices (e.g. Fujitsu disks) do more tests
 when this bit is set.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
@@ -115,21 +115,21 @@ increase level of verbosity. Can be used multiple times.
 \fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.
 .SH NOTES
-All devices should support the default self-test. The 'short' self-test
-codes should complete in 2 minutes or less. The 'extended' self-test
+All devices should support the default self\-test. The 'short' self\-test
+codes should complete in 2 minutes or less. The 'extended' self\-test
 codes' maximum duration is vendor specific (e.g. a little over 10 minutes
-with the author's disks). The foreground self-test codes wait until they
-are completed while the background self-test codes return immediately. The
-results of both foreground and background self-test codes are placed in
-the 'self-test results' log page (see sg_logs(8)). The SCSI command timeout
+with the author's disks). The foreground self\-test codes wait until they
+are completed while the background self\-test codes return immediately. The
+results of both foreground and background self\-test codes are placed in
+the 'self\-test results' log page (see sg_logs(8)). The SCSI command timeout
 for this utility is set to 60 minutes to allow for slow foreground extended
-self-tests.
+self\-tests.
 .PP
 If the \fIDEVICE\fR is a disk then no file systems residing on that disk
-should be mounted during a foreground self-test. The reason is that other
-SCSI commands may become queued behind the foreground self-test and timeout.
+should be mounted during a foreground self\-test. The reason is that other
+SCSI commands may become queued behind the foreground self\-test and timeout.
 .PP
-When the \fI\-\-raw=H,H...\fR option is given then self-tests should not
+When the \fI\-\-raw=H,H...\fR option is given then self\-tests should not
 be selected. However the \fB\-\-pf\fR (i.e. "page format") option should be
 given. The length of the diagnostic page to be sent is derived from the
 number of bytes given to the \fI\-\-raw=H,H...\fR option. The diagnostic
@@ -169,11 +169,11 @@ or using '\-\-old' (or '\-O) as the first option.
 .TP
 \fB\-doff\fR
 set the Device Offline (DevOffL) bit (default is clear). Only significant 
-when \fI\-t\fR option is set for the default self-test. Equivalent to
+when \fI\-t\fR option is set for the default self\-test. Equivalent to
 \fI\-\-doff\fR in the main description.
 .TP
 \fB\-e\fR
-outputs the expected extended self-test duration. Equivalent to
+outputs the expected extended self\-test duration. Equivalent to
 \fI\-\-extdur\fR in the main description.
 .TP
 \fB\-h\fR
@@ -214,12 +214,12 @@ a diagnostic page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly
 likely the \fI\-pf\fR option should also be given.
 .TP
 \fB\-s\fR=\fIST\fR
-where \fIST\fR is the self-test code. The default value is 0 which is
-inactive. A value of 1 selects a background short self-test; 2 selects
-a background extended self-test; 5 selects a foreground short self-test;
+where \fIST\fR is the self\-test code. The default value is 0 which is
+inactive. A value of 1 selects a background short self\-test; 2 selects
+a background extended self\-test; 5 selects a foreground short self\-test;
 6 selects a foreground extended test. A value of 4 will abort
-a (background) self-test that is in progress. This option is mutually
-exclusive with default self-test (i.e. \fI\-t\fR).
+a (background) self\-test that is in progress. This option is mutually
+exclusive with default self\-test (i.e. \fI\-t\fR).
 .TP
 \fB\-t\fR
 sets the _default_ Self Test (SelfTest) bit. By default this is clear (0).

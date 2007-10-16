@@ -34,9 +34,11 @@ GROUPS command is also described in that document.
 .PP
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
 .TP
 \fB\-a\fR, \fB\-\-active\fR
-set active/non-optimized state.
+set active/non\-optimized state.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -44,15 +46,15 @@ output the usage message then exit.
 \fB\-H\fR, \fB\-\-hex\fR
 output response to the REPORT TARGET PORT GROUPS command in hex then exit.
 .TP
-\fB\-o\fR, \fB\-\-optimized\fR
-set active/optimized state. If no other state options or \fI\-\-tp=\fR
-option are given then active/optimized is the default state.
-.TP
 \fB\-O\fR, \fB\-l\fR, \fB\-\-offline\fR
 set offline state. This is the appropriate state to set a target port
 to prior to removing the device.  Note that a relative target port identifier
 should be given with this state (rather than a target port group identifier
 that all other states take).
+.TP
+\fB\-o\fR, \fB\-\-optimized\fR
+set active/optimized state. If no other state options or \fI\-\-tp=\fR
+option are given then active/optimized is the default state.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response to the REPORT TARGET PORT GROUPS command in binary to stdout
@@ -69,7 +71,7 @@ a number or an abbreviation can be given. A number is assumed to be a
 decimal number unless it is prefixed by "0x" or has a trailing "h" in
 which case a hexadecimal value is assumed. Only the values 0, 1, 2, 3
 or 14 are accepted. The accepted abbreviations are "an", "ao", "o", "s"
-or "u"; which represent active/non-optimized(1), active/optimized(0),
+or "u"; which represent active/non\-optimized(1), active/optimized(0),
 offline(14), standby(2) or unavalable(3) respectively.
 .TP
 \fB\-t\fR, \fB\-\-tp\fR=\fIP,P...\fR

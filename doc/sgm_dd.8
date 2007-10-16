@@ -27,7 +27,7 @@ If both \fIIFILE\fR and \fIOFILE\fR are sg devices then memory mapped
 transfers are performed on \fIIFILE\fR. If no other flags are specified
 then indirect IO is performed on \fIOFILE\fR. If 'oflag=dio' is given then
 direct IO is attempted on \fIOFILE\fR. If 'oflag=smmap' is given then
-shared mmap-ed IO (sharing the mmap-ed reserve buffer associated with
+shared mmap\-ed IO (sharing the mmap\-ed reserve buffer associated with
 \fIIFILE\fR) is attempted. In both latter cases if the faster IO option
 is not available, they fall back to indirect IO and report this at
 the end of the copy.
@@ -193,7 +193,7 @@ has no affect, just a placeholder.
 smmap
 is only active for oflag. It sets shared mmap IO usage on \fIOFILE\fR if
 it is a sg device node. The \fIIFILE\fR also needs to be a sg device
-node (or there is no mmap-ed reserve buffer to share).
+node (or there is no mmap\-ed reserve buffer to share).
 .SH RETIRED OPTIONS
 Here are some retired options that are still present:
 .TP

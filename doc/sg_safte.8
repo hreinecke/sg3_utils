@@ -24,6 +24,8 @@ overall enclosure status as reported by the option
 is reported.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
 .TP
 \fB\-c\fR, \fB\-\-config\fR
 will issues a 
@@ -103,9 +105,9 @@ http://www.intel.com/design/servers/ipmi/saf\-te.htm
 As the specification was never finalized this document serves as the
 de\-facto standard.
 .PP
-A similar functionality is provided by the SPC\-4 SCSI Enclosure
-Services devices (Peripheral device type 0xd), which can be queried
-with the sg_ses utility.
+Similar functionality is provided by SPC\-4 SCSI Enclosure Services
+devices (Peripheral device type 0xd), which can be queried with the
+sg_ses utility.
 .SH EXAMPLES
 To view the configuration:
 .PP
@@ -116,7 +118,7 @@ To view the device slot status:
    sg_safte \-\-devstatus /dev/sg1
 .PP
 .SH EXIT STATUS
-The exit status of sg_ses is 0 when it is successful. Otherwise see
+The exit status of sg_safte is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Hannes Reinecke and Douglas Gilbert.
@@ -128,4 +130,4 @@ Copyright \(co 2004\-2007 Hannes Reinecke and Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq, sg_ses (in sg3_utils package); safte-monitor (internet)
+.B sg_inq, sg_ses (in sg3_utils package); safte\-monitor (internet)
