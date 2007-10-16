@@ -47,6 +47,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_reset - exercises SCSI device/bus/host reset capability
      * sg_rmsn - READ SERIAL SERIAL NUMBER
      * sg_rtpg - REPORT TARGET PORT GROUPS
+     * sg_safte - fetch enclosure status from a SAF-TE processor
      * sg_sat_identify - ATA IDENTIFY (PACKET) DEVICE via SATL
      * sg_sat_set_features - ATA SET FEATURES via SATL
      * sg_scan - displays the SCSI bus on stdout

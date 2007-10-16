@@ -8,7 +8,7 @@
  * "sg_cmds_basic.h" header and the 'extra' ones found in the
  * "sg_cmds_extra.h" header. This header now simply includes those two
  * headers.
- * The wrappers function definitions are found in the "sg_cmds_basic.c"
+ * The corresponding function definitions are found in the "sg_cmds_basic.c"
  * and "sg_cmds_extra.c" files.
  ********************************************************************/
 
