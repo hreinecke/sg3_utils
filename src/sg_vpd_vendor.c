@@ -95,17 +95,18 @@ static unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 
 /* Supported vendor specific VPD pages */
 /* 'subvalue' used to disambiguate, 'vendor' should be set */
+/* Arrange in alphabetical order by acronym */
 static struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_DATC_SEA, 0, -1, 1, "datc", "Date code (Seagate)"},
     {VPD_V_DEV_BEH_SEA, 0, -1, 1, "devb", "Device behavior (Seagate)"},
-    {VPD_V_FIRM_SEA, 0, -1, 1, "firm", "Firmware numbers (Seagate)"},
-    {VPD_V_JUMP_SEA, 0, -1, 1, "jump", "Jump setting (Seagate)"},
-    {VPD_V_UPR_EMC, 1, -1, 1, "upr", "Unit path report (EMC)"},
-    {VPD_V_SVER_RDAC, 1, -1, 1, "sver", "Software version (RDAC)"},
-    {VPD_V_FEAT_RDAC, 1, -1, 1, "feat", "Feature Parameters (RDAC)"},
-    {VPD_V_SUBS_RDAC, 0, -1, 1, "sub", "Subsystem identifier (RDAC)"},
     {VPD_V_EDID_RDAC, 0, -1, 1, "edid", "Extended device identification "
      "(RDAC)"},
+    {VPD_V_FEAT_RDAC, 1, -1, 1, "feat", "Feature Parameters (RDAC)"},
+    {VPD_V_FIRM_SEA, 0, -1, 1, "firm", "Firmware numbers (Seagate)"},
+    {VPD_V_JUMP_SEA, 0, -1, 1, "jump", "Jump setting (Seagate)"},
+    {VPD_V_SUBS_RDAC, 0, -1, 1, "sub", "Subsystem identifier (RDAC)"},
+    {VPD_V_SVER_RDAC, 1, -1, 1, "sver", "Software version (RDAC)"},
+    {VPD_V_UPR_EMC, 1, -1, 1, "upr", "Unit path report (EMC)"},
     {VPD_V_VAC_RDAC, 0, -1, 1, "vac", "Volume access control (RDAC)"},
     {0, 0, 0, 0, NULL, NULL},
 };

@@ -49,6 +49,8 @@ the "Protection Field Usage" in the parameter header are associated with
 protection information and can be set by this utility.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
 .TP
 \fB\-C\fR, \fB\-\-cmplst\fR=0 | 1
 sets the CMPLST ("complete list") bit in the FORMAT cdb to 0 or 1.
@@ -278,7 +280,7 @@ to the manufacturer's maximum recommended value in a format or resize
 operation. This can be done by placing an address of 0xffffffff (or the
 64 bit equivalent) in the appropriate block descriptor field to a MODE
 SELECT command. In signed (two's complement) arithmetic that value
-corresponds to '\-1'. So a \fI\-\-count=\fR-1 causes the block count
+corresponds to '\-1'. So a \fI\-\-count=\fR\-1 causes the block count
 to be set back to the manufacturer's maximum recommended value. To see
 exactly which SCSI commands are being executed and parameters passed
 add "\-vvv" to the sg_format command line.

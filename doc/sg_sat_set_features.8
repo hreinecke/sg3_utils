@@ -11,11 +11,11 @@ SCSI to ATA Translation (SAT) layer
 .\" Add any additional description here
 .PP
 This utility sends an ATA SET FEATURES command to the \fIDEVICE\fR.
-This command is used to change settings of ATA non-packet (i.e. disks) and
+This command is used to change settings of ATA non\-packet (i.e. disks) and
 packet devices (e.g. cd/dvd drives). Rather than send the SET FEATURES
 command directly to the device it is sent via a SCSI transport which is
 assumed to contain a SCSI to ATA Translation (SAT) Layer (SATL). The SAT
-standard (SAT ANSI INCITS 431-2007; prior draft: sat\-r09.pdf at www.t10.org)
+standard (SAT ANSI INCITS 431\-2007; prior draft: sat\-r09.pdf at www.t10.org)
 defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16 byte "cdb" and
 the other with a 12 byte cdb. This utility defaults to the 16 byte cdb
 variant.
@@ -24,7 +24,7 @@ The SATL may be in an operating system driver, in host bus adapter firmware
 or in some external enclosure.
 .PP
 The features can be read using the sg_sat_identify utility which uses either
-the ATA IDENTIFY DEVICE (for non-packet devices) or the IDENTIFY PACKET
+the ATA IDENTIFY DEVICE (for non\-packet devices) or the IDENTIFY PACKET
 DEVICE (for packet devices) command.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.

@@ -1,4 +1,4 @@
-.TH SG_START "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_START "8" "October 2007" "sg3_utils\-1.25" SG3_UTILS
 .SH NAME
 sg_start \- send SCSI START STOP UNIT command to start, stop, load or
 eject medium
@@ -56,9 +56,9 @@ device with removable medium. Might be ignored (prevented), see below.
 print out the usage message then exit.
 .TP
 \fB\-f\fR, \fB\-\-fl\fR=\fIFL\fR
-sets the format layer number for the disc to "jump" to (defined in MMC-5).
+sets the format layer number for the disc to "jump" to (defined in MMC\-5).
 Values of \fIFL\fR can be 0 to 3. When this option is chosen, the FL, LoEj
-and Start bits are set in the cdb as required by MMC-5; thus the user does
+and Start bits are set in the cdb as required by MMC\-5; thus the user does
 not need to set the \fI\-\-start\fR and/or \fI\-\-load\fR options.
 .TP
 \fB\-i\fR, \fB\-\-immed\fR
