@@ -1,10 +1,11 @@
-.TH SG_VERIFY "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_VERIFY "8" "November 2007" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
 .B sg_verify
 [\fI\-\-bpc=BPC\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR] [\fI\-\-help\fR]
-[\fI\-\-lba=LBA\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-lba=LBA\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-vrprotect=VRP\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -18,6 +19,8 @@ no verify errors detected no messages are sent to stderr and the Unix return
 status is 0).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
 .TP
 \fB\-b\fR, \fB\-\-bpc\fR=\fIBPC\fR
 where \fIBPC\fR specifies the maximum number of blocks that will be verified
@@ -54,6 +57,11 @@ increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.TP
+\fB\-P\fR, \fB\-\-vrprotect\fR=\fIVRP\fR
+where \fIVRP\fR is the value in the vrprotect field in the VERIFY command
+cdb. It must be a value between 0 and 7 inclusive. The default value is
+zero.
 .SH NOTES
 The \fIBPC\fR, \fICOUNT\fR and \fILBA\fR arguments may be followed by one of
 these multiplicative suffixes:

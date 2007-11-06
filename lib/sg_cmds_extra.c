@@ -100,8 +100,9 @@
  * SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
-int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
-                             int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len, int noisy,
+                         int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char rtpgCmdBlk[MAINTENANCE_IN_CMDLEN] =
@@ -164,8 +165,9 @@ int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
  * SG_LIB_CAT_INVALID_OP -> Set Target Port Groups not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
-int sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp,
-			  int param_len, int noisy, int verbose)
+int
+sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, int noisy,
+                      int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char stpgCmdBlk[MAINTENANCE_OUT_CMDLEN] =
@@ -234,10 +236,10 @@ int sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
-                    int devofl_bit, int unitofl_bit, int long_duration,
-                    void * paramp, int param_len, int noisy,
-                    int verbose)
+int
+sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
+                int unitofl_bit, int long_duration, void * paramp,
+                int param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] = 
@@ -308,8 +310,9 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp, 
-                       int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
+                   int mx_resp_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char rcvdiagCmdBlk[RECEIVE_DIAGNOSTICS_CMDLEN] = 
@@ -374,9 +377,9 @@ int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
-                        int dl_format, void * resp, int mx_resp_len,
-                        int noisy, int verbose)
+int
+sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist, int dl_format,
+                    void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
     unsigned char rdefCmdBlk[READ_DEFECT10_CMDLEN] = 
@@ -448,8 +451,9 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
-                                int noisy, int verbose)
+int
+sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
+                            int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char rmsnCmdBlk[SERVICE_ACTION_IN_12_CMDLEN] =
@@ -521,8 +525,9 @@ int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_report_id_info(int sg_fd, int itype, void * resp,
-                         int max_resp_len, int noisy, int verbose)
+int
+sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
+                     int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char riiCmdBlk[MAINTENANCE_IN_CMDLEN] = {MAINTENANCE_IN_CMD,
@@ -596,8 +601,9 @@ int sg_ll_report_id_info(int sg_fd, int itype, void * resp,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
-                      int param_len, int noisy, int verbose)
+int
+sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
+                  int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char siiCmdBlk[MAINTENANCE_OUT_CMDLEN] = {MAINTENANCE_OUT_CMD,
@@ -668,10 +674,10 @@ int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
-                      int fmtdata, int cmplst, int dlist_format,
-                      int timeout_secs, void * paramp, int param_len,
-                      int noisy, int verbose)
+int
+sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
+                  int fmtdata, int cmplst, int dlist_format, int timeout_secs,
+                  void * paramp, int param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat, tmout;
     unsigned char fuCmdBlk[FORMAT_UNIT_CMDLEN] = 
@@ -746,9 +752,9 @@ int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
  * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
-int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist,
-                          void * paramp, int param_len, int noisy,
-                          int verbose)
+int
+sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
+                      int param_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
     unsigned char reassCmdBlk[REASSIGN_BLKS_CMDLEN] = 
@@ -811,8 +817,9 @@ int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist,
  * Returns 0 when successful, SG_LIB_CAT_INVALID_OP if command not
  * supported, SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
-int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
-                     int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
+                 int mx_resp_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
     unsigned char gcCmdBlk[GET_CONFIG_CMD_LEN] = {GET_CONFIG_CMD, 0, 0, 0, 
@@ -893,8 +900,9 @@ int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
  * SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
-int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
-                                int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
+                            int mx_resp_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
     unsigned char prinCmdBlk[PERSISTENT_RESERVE_IN_CMDLEN] =
@@ -962,9 +970,10 @@ int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
  * SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
-int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
-                                 unsigned int rq_type, void * paramp,
-                                 int param_len, int noisy, int verbose)
+int
+sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
+                             unsigned int rq_type, void * paramp,
+                             int param_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
     unsigned char proutCmdBlk[PERSISTENT_RESERVE_OUT_CMDLEN] =
@@ -1027,7 +1036,8 @@ int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
     return ret;
 }
 
-static int has_blk_ili(unsigned char * sensep, int sb_len)
+static int
+has_blk_ili(unsigned char * sensep, int sb_len)
 {
     int resp_code;
     const unsigned char * cup;
@@ -1051,9 +1061,10 @@ static int has_blk_ili(unsigned char * sensep, int sb_len)
  * SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO -> bad field in cdb, with info
  * field written to 'offsetp', SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
-int sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
-                      void * resp, int xfer_len, int * offsetp,
-                      int noisy, int verbose)
+int
+sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
+                  void * resp, int xfer_len, int * offsetp, int noisy,
+                  int verbose)
 {
     int k, res, sense_cat, ret;
     unsigned char readLongCmdBlk[READ_LONG10_CMDLEN];
@@ -1144,9 +1155,10 @@ int sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
  * SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO -> bad field in cdb, with info
  * field written to 'offsetp', SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
-int sg_ll_read_long16(int sg_fd, int pblock, int correct,
-                      unsigned long long llba, void * resp, int xfer_len,
-                      int * offsetp, int noisy, int verbose)
+int
+sg_ll_read_long16(int sg_fd, int pblock, int correct, unsigned long long llba,
+                  void * resp, int xfer_len, int * offsetp, int noisy,
+                  int verbose)
 {
     int k, res, sense_cat, ret;
     unsigned char readLongCmdBlk[SERVICE_ACTION_IN_16_CMDLEN];
@@ -1243,9 +1255,10 @@ int sg_ll_read_long16(int sg_fd, int pblock, int correct,
  * field written to 'offsetp', SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
-int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
-                       unsigned long lba, void * data_out, int xfer_len,
-                       int * offsetp, int noisy, int verbose)
+int
+sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
+                   unsigned long lba, void * data_out, int xfer_len,
+                   int * offsetp, int noisy, int verbose)
 {
     int k, res, sense_cat, ret;
     unsigned char writeLongCmdBlk[WRITE_LONG10_CMDLEN];
@@ -1340,9 +1353,10 @@ int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * field written to 'offsetp', SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
-int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
-                       unsigned long long llba, void * data_out,
-                       int xfer_len, int * offsetp, int noisy, int verbose)
+int
+sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
+                   unsigned long long llba, void * data_out, int xfer_len,
+                   int * offsetp, int noisy, int verbose)
 {
     int k, res, sense_cat, ret;
     unsigned char writeLongCmdBlk[SERVICE_ACTION_OUT_16_CMDLEN];
@@ -1443,9 +1457,11 @@ int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> as previous, with valid info,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
-                   int veri_len, void * data_out, int data_out_len,
-                   unsigned long * infop, int noisy, int verbose)
+int
+sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
+               unsigned long lba, int veri_len, void * data_out,
+               int data_out_len, unsigned long * infop, int noisy,
+               int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char vCmdBlk[VERIFY10_CMDLEN] = 
@@ -1453,10 +1469,8 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (dpo)
-        vCmdBlk[1] |= 0x10;
-    if (bytechk)
-        vCmdBlk[1] |= 0x2;
+    vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
+                 ((bytechk & 0x1) << 1) ;
     vCmdBlk[2] = (unsigned char)((lba >> 24) & 0xff);
     vCmdBlk[3] = (unsigned char)((lba >> 16) & 0xff);
     vCmdBlk[4] = (unsigned char)((lba >> 8) & 0xff);
@@ -1541,11 +1555,12 @@ int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
  * sense buffer themselves. If available the data in resid is written to
  * residp.
  */
-int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
-                 int timeout_secs, void * dinp, void * doutp, int dlen,
-                 unsigned char * sensep, int max_sense_len,
-                 unsigned char * ata_return_dp, int max_ata_return_len,
-                 int * residp, int verbose)
+int
+sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
+             int timeout_secs, void * dinp, void * doutp, int dlen,
+             unsigned char * sensep, int max_sense_len,
+             unsigned char * ata_return_dp, int max_ata_return_len,
+             int * residp, int verbose)
 {
     int k, res, slen, duration;
     unsigned char aptCmdBlk[ATA_PT_16_CMDLEN] = 
@@ -1688,8 +1703,9 @@ out:
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
-                      void * resp, int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
+                  void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
     unsigned char rbufCmdBlk[READ_BUFFER_CMDLEN] = 
@@ -1761,8 +1777,9 @@ int sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
-                       void * paramp, int param_len, int noisy, int verbose)
+int
+sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
+                   void * paramp, int param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char wbufCmdBlk[WRITE_BUFFER_CMDLEN] = 

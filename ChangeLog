@@ -2,6 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.26 [20071102]
+  - sg_get_config: sync with mmc6r01
+  - sg_cmds_extra: sg_ll_verify10() add vrprotect argument
+  - sg_verify: add --vrprotect= option
+
 Changelog for sg3_utils-1.25 [20071016]
   - sg_stpg: new utility to Set Target Port Groups
   - sg_safte: new utility to query SAF-TE processor (SES like)

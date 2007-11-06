@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.25
+Version: 1.26
 # Release: 1%{?dist}
 Release: 1
 License: GPL
@@ -79,6 +79,10 @@ fi
 %{_libdir}/*.la
 
 %changelog
+* Fri Nov 02 2007 - dgilbert at interlog dot com
+- sg_get_config sync with mmc6r01
+  * sg3_utils-1.26
+
 * Tue Oct 16 2007 - dgilbert at interlog dot com
 - add sg_sat_set_features, sg_stpg, sg_safte; sg_dd oflag=sparse,null
   * sg3_utils-1.25
