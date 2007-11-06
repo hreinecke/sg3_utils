@@ -45,7 +45,7 @@
 #include "sg_pt.h"
 
 
-static char * version_str = "1.40 20070803";
+static char * version_str = "1.41 20071102";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -94,21 +94,23 @@ static char * version_str = "1.40 20070803";
 #define INQUIRY_RESP_INITIAL_LEN 36
 
 
-const char * sg_cmds_version()
+const char *
+sg_cmds_version()
 {
     return version_str;
 }
 
 /* Returns file descriptor >= 0 if successful. If error in Unix returns
    negated errno. */
-int sg_cmds_open_device(const char * device_name, int read_only,
-                        int verbose)
+int
+sg_cmds_open_device(const char * device_name, int read_only, int verbose)
 {
     return scsi_pt_open_device(device_name, read_only, verbose);
 }
 
 /* Returns 0 if successful. If error in Unix returns negated errno. */
-int sg_cmds_close_device(int device_fd)
+int
+sg_cmds_close_device(int device_fd)
 {
     return scsi_pt_close_device(device_fd);
 }
@@ -120,9 +122,10 @@ int sg_cmds_close_device(int device_fd)
    output via 'o_sense_cat' pointer (if not NULL). Outputs to
    sg_warnings_strm (def: stderr) if problems; depending on 'noisy'
    and 'verbose' */
-int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
-                         int mx_resp_len, const unsigned char * sense_b,
-                         int noisy, int verbose, int * o_sense_cat)
+int
+sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
+                     int mx_resp_len, const unsigned char * sense_b,
+                     int noisy, int verbose, int * o_sense_cat)
 {
     int got, cat, duration, slen, scat, n, resid;
     char b[1024];
@@ -216,8 +219,9 @@ int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
  * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other errors */
-int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, 
-                  void * resp, int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
+              int mx_resp_len, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
@@ -291,8 +295,9 @@ int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op,
  * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other errors */
-int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
-                      int noisy, int verbose)
+int
+sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
+                  int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
@@ -376,8 +381,9 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
  * Return of 0 -> success, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY ->
  * device not ready, -1 -> other failure */
-int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
-                                   int noisy, int verbose)
+int
+sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
+                               int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char turCmdBlk[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
@@ -441,7 +447,8 @@ int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
  * Return of 0 -> success, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY ->
  * device not ready, -1 -> other failure */
-int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
+int
+sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
 {
     return sg_ll_test_unit_ready_progress(sg_fd, pack_id, NULL, noisy,
                                           verbose);
@@ -452,9 +459,10 @@ int sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
  * SG_LIB_CAT_INVALID_OP -> cdb not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
-int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
-                        unsigned int lba, unsigned int count, int noisy,
-                        int verbose)
+int
+sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
+                    unsigned int lba, unsigned int count, int noisy,
+                    int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char scCmdBlk[SYNCHRONIZE_CACHE_CMDLEN] =
@@ -527,8 +535,9 @@ int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
  *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY -> device not ready,
  * -1 -> other failure */
-int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba, 
-                     void * resp, int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba, void * resp,
+                 int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] = 
@@ -603,8 +612,9 @@ int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
  *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY -> device not ready,
  * -1 -> other failure */
-int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, 
-                     void * resp, int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
+                 int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rcCmdBlk[READ_CAPACITY_10_CMDLEN] =
@@ -669,8 +679,9 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
  * -1 -> other failure */
-int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
-                      void * resp, int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
+                  void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] = 
@@ -741,9 +752,10 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
  * -1 -> other failure */
-int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
-                       int sub_pg_code, void * resp, int mx_resp_len,
-                       int noisy, int verbose)
+int
+sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
+                   int sub_pg_code, void * resp, int mx_resp_len,
+                   int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] = 
@@ -815,8 +827,9 @@ int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
  * -1 -> other failure */
-int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
-                       int param_len, int noisy, int verbose)
+int
+sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
+                   int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SELECT6_CMDLEN] = 
@@ -885,8 +898,9 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
  * -1 -> other failure */
-int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
-                       int param_len, int noisy, int verbose)
+int
+sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
+                    int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char modesCmdBlk[MODE_SELECT10_CMDLEN] = 
@@ -957,8 +971,9 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
  * page. Set mode_sense_6 to 1 for MODE SENSE (6) and 0 for MODE SENSE (10).
  * Returns >= 0 is successful or -1 if failure. If there is a failure
  * a message is written to err_buff. */
-int sg_mode_page_offset(const unsigned char * resp, int resp_len,
-                        int mode_sense_6, char * err_buff, int err_buff_len)
+int
+sg_mode_page_offset(const unsigned char * resp, int resp_len,
+                    int mode_sense_6, char * err_buff, int err_buff_len)
 {
     int bd_len;
     int calc_len;
@@ -1011,11 +1026,11 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * respectively have been fetched. If error on current page
  * then stops and returns that error; otherwise continues if an error is
  * detected but returns the first error encountered.  */
-int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
-                              int sub_pg_code, int dbd, int flexible,
-                              int mx_mpage_len, int * success_mask,
-                              void * pcontrol_arr[], int * reported_len,
-                              int verbose)
+int
+sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
+                          int dbd, int flexible, int mx_mpage_len,
+                          int * success_mask, void * pcontrol_arr[],
+                          int * reported_len, int verbose)
 {
     int k, n, res, offset, calc_len, xfer_len, resp_mode6;
     unsigned char buff[MODE_RESP_ARB_LEN];
@@ -1117,8 +1132,9 @@ int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
  * SG_LIB_CAT_INVALID_OP -> Request Sense not supported??,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
-int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
-                        int noisy, int verbose)
+int
+sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
+                    int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] = 
@@ -1190,8 +1206,9 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
-int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
-                      int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
+                  int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rlCmdBlk[REPORT_LUNS_CMDLEN] =
@@ -1253,9 +1270,10 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code, 
-                    int subpg_code, int paramp, unsigned char * resp,
-                    int mx_resp_len, int noisy, int verbose)
+int
+sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code, 
+                int subpg_code, int paramp, unsigned char * resp,
+                int mx_resp_len, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] = 
@@ -1324,10 +1342,10 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
-                     int pg_code, int subpg_code,
-                     unsigned char * paramp, int param_len, 
-                     int noisy, int verbose)
+int
+sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
+                 int subpg_code, unsigned char * paramp, int param_len,
+                 int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] = 
@@ -1400,8 +1418,9 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_start_stop_unit(int sg_fd, int immed, int fl_num, int power_cond,
-                          int fl, int loej, int start, int noisy, int verbose)
+int
+sg_ll_start_stop_unit(int sg_fd, int immed, int fl_num, int power_cond,
+                      int fl, int loej, int start, int noisy, int verbose)
 {
     unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -1456,14 +1475,16 @@ int sg_ll_start_stop_unit(int sg_fd, int immed, int fl_num, int power_cond,
     return ret;
 }
 
-/* Invokes a SCSI PREVENT ALLOW MEDIUM REMOVAL command (SPC-3)
+/* Invokes a SCSI PREVENT ALLOW MEDIUM REMOVAL command
+ * [was in SPC-3 but displaced from SPC-4 into SBC-3, MMC-5, SSC-3]
  * prevent==0 allows removal, prevent==1 prevents removal ...
  * Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> command not supported
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
+int
+sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] = 

@@ -45,11 +45,11 @@
 /* A utility program for the Linux OS SCSI subsystem.
  *
  * This program outputs information provided by a SCSI "Get Configuration"
-   command [0x46] which is only defined for CD/DVDs (in MMC-2,3,4,5).
+   command [0x46] which is only defined for CD/DVDs (in MMC-2,3,4,5,6).
 
 */
 
-static char * version_str = "0.30 20070919";
+static char * version_str = "0.31 20071026";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -112,7 +112,7 @@ struct code_desc {
 
 static struct code_desc profile_desc_arr[] = {
         {0x0, "No current profile"},
-        {0x1, "Non-removable disk"},
+        {0x1, "Non-removable disk (obs)"},
         {0x2, "Removable disk"},
         {0x3, "Magneto optical erasable"},
         {0x4, "Optical write once"},
@@ -127,6 +127,8 @@ static struct code_desc profile_desc_arr[] = {
         {0x14, "DVD-RW sequential recording"},
         {0x15, "DVD-R dual layer sequental recording"},
         {0x16, "DVD-R dual layer jump recording"},
+        {0x17, "DVD-RW dual layer"},
+        {0x18, "DVD-Download disc recording"},
         {0x1a, "DVD+RW"},
         {0x1b, "DVD+R"},
         {0x20, "DDCD-ROM"},
@@ -141,6 +143,9 @@ static struct code_desc profile_desc_arr[] = {
         {0x50, "HD DVD-ROM"},
         {0x51, "HD DVD-R"},
         {0x52, "HD DVD-RAM"},
+        {0x53, "HD DVD-RW"},
+        {0x58, "HD DVD-R dual layer"},
+        {0x5a, "HD DVD-RW dual layer"},
         {0xffff, "Non-conforming profile"},
 };
 
@@ -189,6 +194,8 @@ static struct code_desc feature_desc_arr[] = {
         {0x31, "Double density CD-R write"},
         {0x32, "Double density CD-RW write"},
         {0x33, "Layer jump recording"},
+        {0x34, "LJ rigid restricted oberwrite"},
+        {0x35, "Stop long operation"},
         {0x37, "CD-RW media write support"},
         {0x38, "BD-R POW"},
         {0x3a, "DVD+RW dual layer"},
@@ -198,6 +205,7 @@ static struct code_desc feature_desc_arr[] = {
         {0x42, "TSR (timely safe recording)"},
         {0x50, "HD DVD read"},
         {0x51, "HD DVD write"},
+        {0x52, "HD DVD-RW fragment recording"},
         {0x80, "Hybrid disc"},
         {0x100, "Power management"},
         {0x101, "SMART"},
@@ -213,7 +221,9 @@ static struct code_desc feature_desc_arr[] = {
         {0x10b, "DVD CPRM"},
         {0x10c, "Firmware information"},
         {0x10d, "AACS"},
+        {0x10e, "DVD CSS managed recording"},
         {0x110, "VCPS"},
+        {0x113, "SecurDisc"},
         {0x120, "BD CPS"},
 };
 
@@ -316,8 +326,9 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             break;
         }
         printf("      Loading mechanism: %s\n", cp);
-        printf("      Eject=%d, Prevent jumper=%d, Lock=%d\n",
-               !!(ucp[4] & 0x8), !!(ucp[4] & 0x4), !!(ucp[4] & 0x1));
+        printf("      Load=%d, Eject=%d, Prevent jumper=%d, Lock=%d\n",
+               !!(ucp[4] & 0x10), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
+               !!(ucp[4] & 0x1));
         break;
     case 4:     /* Write protect */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -346,11 +357,13 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
     case 0x22:     /* Sector erasable */
     case 0x26:     /* Restricted overwrite */
     case 0x27:     /* CDRW CAV write */
+    case 0x35:     /* Stop long operation */
     case 0x38:     /* BD-R pseudo-overwrite (POW) */
     case 0x42:     /* TSR (timely safe recording) */
     case 0x100:    /* Power management */
     case 0x109:    /* Media serial number */
     case 0x110:    /* VCPS */
+    case 0x113:    /* SecurDisc */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
@@ -374,8 +387,8 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      MULTI110=%d, Dual-R=%d\n", !!(ucp[4] & 0x1),
-               !!(ucp[6] & 0x1));
+        printf("      MULTI110=%d, Dual-RW=%d, Dual-R=%d\n",
+               !!(ucp[4] & 0x1), !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
         break;
     case 0x20:     /* Random writable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -407,14 +420,15 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         for (k = 0; k < num; ++k)
             printf("        %d\n", ucp[8 + k]);
         break;
+    /* case 0x22:     Sector erasable -> see 0x1d entry */
     case 0x23:     /* Formattable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 4)
-            printf("      BD-RE: RENoSA=%d, Expand=%d, QCert=%d, Cert=%d\n",
-                   !!(ucp[4] & 0x8), !!(ucp[4] & 0x4), !!(ucp[4] & 0x2),
-                   !!(ucp[4] & 0x1));
+            printf("      BD-RE: RENoSA=%d, Expand=%d, QCert=%d, Cert=%d, "
+                   "FRF=%d\n", !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
+                   !!(ucp[4] & 0x2), !!(ucp[4] & 0x1), !!(ucp[5] & 0x80));
         if (len > 8)
             printf("      BD-R: RRM=%d\n", !!(ucp[8] & 0x1));
         break;
@@ -437,6 +451,8 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
                num, ((ucp[8] << 8) + ucp[9]), !!(ucp[10] & 0x1));
         break;
+    /* case 0x26:     Restricted overwrite -> see 0x1d entry */
+    /* case 0x27:     CDRW CAV write -> see 0x1d entry */
     case 0x28:     /* MRW  (Mount Rainier reWriteable) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -528,7 +544,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      BUF=%d, RDL=%d, Test write=%d, DVD-RW=%d\n",
+        printf("      BUF=%d, RDL=%d, Test write=%d, DVD-RW SL=%d\n",
                !!(ucp[4] & 0x40), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
                !!(ucp[4] & 0x2));
         break;
@@ -545,6 +561,18 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         for (k = 0; k < num; ++k)
             printf("        %d\n", ucp[8 + k]);
         break;
+    case 0x34:     /* Layer jump rigid restricted overwrite */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      CLJB=%d\n", !!(ucp[4] & 0x1));
+        printf("      Buffer block size=%d\n", ucp[7]);
+        break;
+    /* case 0x35:     Stop long operation -> see 0x1d entry */
     case 0x37:     /* CD-RW media write support */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -555,6 +583,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      CD-RW media sub-type support (bitmask)=0x%x\n", ucp[5]);
         break;
+    /* case 0x38:     BD-R pseudo-overwrite (POW) -> see 0x1d entry */
     case 0x3a:     /* DVD+RW dual layer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -631,6 +660,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
                (ucp[28] << 8) + ucp[29],
                (ucp[30] << 8) + ucp[31]);
         break;
+    /* case 0x42:     TSR (timely safe recording) -> see 0x1d entry */
     case 0x50:     /* HD DVD Read */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -653,6 +683,16 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      HD DVD-R=%d, HD DVD-RAM=%d\n", !!(ucp[4] & 0x1),
                !!(ucp[6] & 0x1));
         break;
+    case 0x52:     /* HD DVD-RW fragment recording */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      BGP=%d\n", !!(ucp[4] & 0x1));
+        break;
     case 0x80:     /* Hybrid disc */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -663,6 +703,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      RI=%d\n", !!(ucp[4] & 0x1));
         break;
+    /* case 0x100:    Power management -> see 0x1d entry */
     case 0x101:    /* SMART */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -684,7 +725,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      SCC=%d, SDP=%d, highest slot number=%d\n",
                !!(ucp[4] & 0x10), !!(ucp[4] & 0x4), (ucp[7] & 0x1f));
         break;
-    case 0x103:    /* CD audio external play */
+    case 0x103:    /* CD audio external play (obsolete) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
@@ -748,6 +789,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         buff[n] = '\0';
         printf("      Drive serial number: %s\n", buff);
         break;
+    /* case 0x109:    Media serial number -> see 0x1d entry */
     case 0x10a:    /* Disc control blocks */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
@@ -792,6 +834,19 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("      Number of AGIDs=%d, AACS version=%d\n",
                (ucp[6] & 0xf), ucp[7]);
         break;
+    case 0x10e:    /* DVD CSS managed recording */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("      Maximum number of scrambled extent information "
+               "entries=%d\n", ucp[4]);
+        break;
+    /* case 0x110:    VCPS -> see 0x1d entry */
+    /* case 0x113:    SecurDisc -> see 0x1d entry */
     case 0x120:    /* BD CPS */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),

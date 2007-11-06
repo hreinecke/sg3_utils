@@ -48,7 +48,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.10 20070919";
+static char * version_str = "1.11 20071102";
 
 #define ME "sg_verify: "
 
@@ -61,15 +61,18 @@ static struct option long_options[] = {
         {"lba", 1, 0, 'l'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
+        {"vrprotect", 1, 0, 'P'},
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
           "sg_verify [--bpc=BPC] [--count=COUNT] [--dpo] [--help] "
           "[--lba=LBA]\n"
-          "                 [--verbose] [--version] DEVICE\n"
+          "                 [--verbose] [--version] [--vrprotect=VRP] "
+          "DEVICE\n"
           "  where:\n"
           "    --bpc=BPC|-b BPC    max blocks per verify command "
           "(def 128)\n"
@@ -81,17 +84,21 @@ static void usage()
           "    --lba=LBA|-l LBA    logical block address to start "
           "verify (def 0)\n"
           "    --verbose|-v        increase verbosity\n"
-          "    --version|-V        print version string and exit\n\n"
+          "    --version|-V        print version string and exit\n"
+          "    --vrprotect=VRP|-P VRP    set vrprotect field to VRP "
+          "(def 0)\n"
           "Performs a SCSI VERIFY(10) command\n"
           );
 }
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c, num;
     long long ll;
     int dpo = 0;
     int bytechk = 0;
+    int vrprotect = 0;
     long long count = 1;
     long long orig_count;
     int bpc = 128;
@@ -105,7 +112,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:c:dhl:vV", long_options,
+        c = getopt_long(argc, argv, "b:c:dhl:P:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -139,6 +146,18 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             lba = (unsigned long long)ll;
+            break;
+        case 'P':
+            vrprotect = sg_get_num(optarg);
+            if (-1 == vrprotect) {
+                fprintf(stderr, "bad argument to '--vrprotect'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if ((vrprotect < 0) || (vrprotect > 7)) {
+                fprintf(stderr, "'--vrprotect' requires a value from 0 to "
+                        "7 (inclusive)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'v':
             ++verbose;
@@ -192,8 +211,9 @@ int main(int argc, char * argv[])
 
     for (; count > 0; count -= bpc, lba +=bpc) {
         num = (count > bpc) ? bpc : count;
-        res = sg_ll_verify10(sg_fd, dpo, bytechk, (unsigned long)lba, num,
-                             NULL, 0, &info, 1, verbose);
+        res = sg_ll_verify10(sg_fd, vrprotect, dpo, bytechk,
+                             (unsigned long)lba, num, NULL, 0,
+                             &info, 1, verbose);
         if (0 != res) {
             ret = res;
             switch (res) {

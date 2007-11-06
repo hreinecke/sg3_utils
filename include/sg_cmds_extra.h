@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2006 Douglas Gilbert.
+ * Copyright (c) 2004-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -213,9 +213,10 @@ extern int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
  * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> as previous, with valid info,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-extern int sg_ll_verify10(int sg_fd, int dpo, int bytechk, unsigned long lba,
-                          int veri_len, void * data_out, int data_out_len,
-                          unsigned long * infop, int noisy, int verbose);
+extern int sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
+                          unsigned long lba, int veri_len, void * data_out,
+                          int data_out_len, unsigned long * infop, int noisy,
+                          int verbose);
 
 /* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
