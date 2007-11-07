@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Fri Nov 02 2007 - dgilbert at interlog dot com
+* Wed Nov 07 2007 - dgilbert at interlog dot com
 - sg_get_config sync with mmc6r01
   * sg3_utils-1.26
 
