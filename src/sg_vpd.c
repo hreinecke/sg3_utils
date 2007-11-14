@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.24 20071016";    /* spc4r11 + 07-153r1 */
+static char * version_str = "0.25 20071114";    /* spc4r11 + 07-153r1 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1318,6 +1318,32 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                 printf("  Reserved [0x%x]\n", u);
             else
                 printf("  Nominal rotation rate: %d rpm\n", u);
+            u = buff[7] & 0xf;
+            switch (u)
+            {
+            printf("  Nominal form factor");
+            case 0:
+                printf(" not reported\n");
+                break;
+            case 1:
+                printf(": 5.25 inch\n");
+                break;
+            case 2:
+                printf(": 3.5 inch\n");
+                break;
+            case 3:
+                printf(": 2.5 inch\n");
+                break;
+            case 4:
+                printf(": 1.8 inch\n");
+                break;
+            case 5:
+                printf(": less then 1.8 inch\n");
+                break;
+            default:
+                printf(": reserved\n");
+                break;
+            }
             break;
         case 1: case 8: case 0x12:
             printf("  Manufacturer-assigned serial number: %.*s\n",

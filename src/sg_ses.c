@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.38 20071005";    /* ses2r18 */
+static char * version_str = "1.39 20071112";    /* ses2r19 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1133,9 +1133,10 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
         per_ucp = ucp + 14 + eip_offset;
         for (j = 0; j < ports; ++j, per_ucp += 16) {
             printf("    port index: %d, port loop position: %d, port "
-                   "requested hard address: %d\n", j, per_ucp[0], per_ucp[4]);
-            printf("      n_port identifier: %02x%02x%02x\n",
-                   per_ucp[5], per_ucp[6], per_ucp[7]);
+                   "bypass reason: 0x%x\n", j, per_ucp[0], per_ucp[1]);
+            printf("      requested hard address: %d, n_port "
+                   "identifier: %02x%02x%02x\n", per_ucp[4], per_ucp[5],
+                   per_ucp[6], per_ucp[7]);
             printf("      n_port name: ");
             for (m = 0; m < 8; ++m)
                 printf("%02x", per_ucp[8 + m]);
