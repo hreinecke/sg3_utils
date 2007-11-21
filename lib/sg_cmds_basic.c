@@ -45,7 +45,7 @@
 #include "sg_pt.h"
 
 
-static char * version_str = "1.41 20071102";
+static char * version_str = "1.42 20071120";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
