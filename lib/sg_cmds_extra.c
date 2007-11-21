@@ -955,10 +955,19 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
             break;
         }
     } else {
-        if ((verbose > 2) && (ret > 0)) {
+        if ((verbose > 2) && (ret > 3)) {
+            unsigned char * ucp;
+            int len;
+
+            ucp = (unsigned char *)resp;
+            len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) + ucp[3] +
+                  4;
+            if (len < 0)
+                len = 0;
+            len = (ret < len) ? ret : len;
             fprintf(sg_warnings_strm, "    get configuration: response%s\n",
-                    (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                    (len > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (len > 256 ? 256 : len), -1);
         }
         ret = 0;
     }
@@ -1041,10 +1050,19 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned long starting_lba,
             break;
         }
     } else {
-        if ((verbose > 2) && (ret > 0)) {
-            fprintf(sg_warnings_strm, "    get performance: response%s\n",
-                    (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        if ((verbose > 2) && (ret > 3)) {
+            unsigned char * ucp;
+            int len;
+
+            ucp = (unsigned char *)resp;
+            len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) + ucp[3] +
+                  4;
+            if (len < 0)
+                len = 0;
+            len = (ret < len) ? ret : len;
+            fprintf(sg_warnings_strm, "    get performance:: response%s\n",
+                    (len > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (len > 256 ? 256 : len), -1);
         }
         ret = 0;
     }
