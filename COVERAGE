@@ -75,7 +75,7 @@ IDENTIFY DEVICE     sg_inq, sg_scan, sg_sat_identify,
                     examples/sg__sat_identify
 IDENTIFY PACKET DEVICE     sg_inq, sg_sat_identify,
                     examples/sg__sat_identify
-READ LOG EXT        examples/sg_sat_phy_event
+READ LOG EXT        sg_sat_phy_event, examples/sg__sat_phy_event
 SET FEATURES        sg_sat_set_features
                     examples/sg__sat_set_features
 SMART READ DATA     examples/sg_sat_smart_rd_data
@@ -88,4 +88,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Doug Gilbert
-29th October 2007
+2nd December 2007

@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -42,10 +43,14 @@
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"
 
-/* This program uses a ATA PASS-THROUGH SCSI command to package
-   an ATA IDENTIFY (PACKAGE) DEVICE command. See http://www.t10.org
-   for the most recent SAT: sat-r09.pdf . SAT is now a standard:
-   SAT ANSI INCITS 431-2007.
+/* This program uses a ATA PASS-THROUGH (16 or 12) SCSI command defined
+   by SAT to package an ATA READ LOG EXT (2Fh) command to fetch
+   log page 11h. That page contains SATA phy event counters.
+   For SAT see http://www.t10.org [draft prior to standard: sat-r09.pdf]
+   For ATA READ LOG EXT command see ATA-8/ACS at www.t13.org .
+   For SATA phy counter definitions see SATA 2.5 .
+
+   Invocation: sg_sat_phy_event [-v] [-V] <device>
 
 */
 
@@ -56,53 +61,98 @@
 #define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
 #define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d
 
-#define ATA_IDENTIFY_DEVICE 0xec
-#define ATA_IDENTIFY_PACKET_DEVICE 0xa1
-#define ID_RESPONSE_LEN 512
+#define ATA_READ_LOG_EXT 0x2f
+#define SATA_PHY_EVENT_LPAGE 0x11
+#define READ_LOG_EXT_RESPONSE_LEN 512
 
 #define DEF_TIMEOUT 20
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.05 20071202";
+static char * version_str = "1.01 20071202";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
         {"extend", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
-        {"len", required_argument, 0, 'l'},
-        {"packet", no_argument, 0, 'p'},
+        {"ignore", no_argument, 0, 'i'},
+        {"len", no_argument, 0, 'l'},
         {"raw", no_argument, 0, 'r'},
+        {"reset", no_argument, 0, 'R'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
-static void usage()
+struct phy_event_t {
+    int id;
+    char * desc;
+};
+
+static struct phy_event_t phy_event_arr[] = {   /* SATA 2.5 section 13.7.2 */
+    {0x1, "Command failed and ICRC error bit set in Error register"}, /* M */
+    {0x2, "R_ERR(p) response for data FIS"},
+    {0x3, "R_ERR(p) response for device-to-host data FIS"},
+    {0x4, "R_ERR(p) response for host-to-device data FIS"},
+    {0x5, "R_ERR(p) response for non-data FIS"},
+    {0x6, "R_ERR(p) response for device-to-host non-data FIS"},
+    {0x7, "R_ERR(p) response for host-to-device non-data FIS"},
+    {0x8, "Device-to-host non-data FIS retries"},
+    {0x9, "Transition from drive PHYRDY to drive PHYRDYn"},
+    {0xa, "Signature device-to-host register FISes due to COMRESET"}, /* M */
+    {0xb, "CRC errors within host-to-device FIS"},
+    {0xd, "non CRC errors within host-to-device FIS"},
+    {0xf, "R_ERR(p) response for host-to-device data FIS, CRC"},
+    {0x10, "R_ERR(p) response for host-to-device data FIS, non-CRC"},
+    {0x12, "R_ERR(p) response for host-to-device non-data FIS, CRC"},
+    {0x13, "R_ERR(p) response for host-to-device non-data FIS, non-CRC"},
+    {0xc00, "PM: host-to-device non-data FIS, R_ERR(p) due to collision"},
+    {0xc01, "PM: signature register - device-to-host FISes"},
+    {0xc02, "PM: corrupts CRC propagation of device-to-host FISes"},
+    {0x0, NULL},        /* end marker */        /* M(andatory) */
+};
+
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
-          "[--len=16|12]\n"
-          "                       [--packet] [--raw] [--verbose] [--version] "
-          "DEVICE\n"
+          "sg_sat_phy_event [--ck_cond] [--extend] [--help] [--hex] "
+          "[--ignore]\n"
+          "                        [--len=16|12] [--raw] [--reset] "
+          "[--verbose]\n"
+          "                        [--version] DEVICE\n"
           "  where:\n"
-          "    --ck_cond|-c     sets ck_cond bit in cdb (def: 0)\n"
-          "    --extend|-e      sets extend bit in cdb (def: 0)\n"
-          "    --help|-h        print out usage message then exit\n"
-          "    --hex|-H         output response in hex\n"
+          "    --ck_cond|-c    sets ck_cond bit in cdb (def: 0)\n"
+          "    --extend|-e     sets extend bit in cdb (def: 0)\n"
+          "    --help|-h       print this usage message then exit\n"
+          "    --hex|-H        output response in hex bytes, use twice for\n"
+          "                    hex words\n"
+          "    --ignore|-i     ignore identifier names, output id value "
+          "instead\n"
           "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
           "(default: 16)\n"
-          "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
-          "DEVICE) command\n"
-          "    --raw|-r         output response in binary to stdout\n"
-          "    --verbose|-v     increase verbosity\n"
-          "    --version|-V     print version string and exit\n\n"
-          "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
-          "layer\n");
+          "    --raw|-r        output response in binary to stdout\n"
+          "    --reset|-R      reset counters (after read)\n"
+          "    --verbose|-v    increase verbosity\n"
+          "    --version|-V    print version string then exit\n\n"
+          "Sends an ATA READ LOG EXT command via a SAT pass through to "
+          "fetch\nlog page 11h which contains SATA phy event counters\n");
 }
 
-static void dStrRaw(const char* str, int len)
+static const char *
+find_phy_desc(int id)
+{
+    const struct phy_event_t * pep;
+
+    for (pep = phy_event_arr; pep->desc; ++pep) {
+        if ((id & 0xfff) == pep->id)
+            return pep->desc;
+    }
+    return NULL;
+}
+
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -110,9 +160,12 @@ static void dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
-                           int ck_cond, int extend, int do_hex, int do_raw,
-                           int verbose)
+/* ATA READ LOG EXT command [2Fh, PIO data-in] */
+/* N.B. "log_addr" is the log page number, "page_in_log" is usually zero */
+static int 
+do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
+                int blk_count, void * resp, int mx_resp_len, int cdb_len,
+                int extend, int ck_cond, int do_hex, int do_raw, int verbose)
 {
     int ok, res, ret;
     int protocol = 4;   /* PIO data-in */
@@ -123,7 +176,6 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     int got_ard = 0;    /* got ATA result descriptor */
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
-    unsigned char inBuff[ID_RESPONSE_LEN];
     unsigned char sense_buffer[64];
     unsigned char ata_return_desc[16];
     unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
@@ -139,26 +191,34 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     ok = 0;
     if (SAT_ATA_PASS_THROUGH16_LEN == cdb_len) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */
-        aptCmdBlk[6] = 1;   /* sector count */
-        aptCmdBlk[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
-                                     ATA_IDENTIFY_DEVICE);
+        aptCmdBlk[3] = (feature >> 8) & 0xff;   /* feature(15:8) */
+        aptCmdBlk[4] = feature & 0xff;          /* feature(7:0) */
+        aptCmdBlk[5] = (blk_count >> 8) & 0xff; /* sector_count(15:8) */
+        aptCmdBlk[6] = blk_count & 0xff;        /* sector_count(7:0) */
+        aptCmdBlk[8] = log_addr & 0xff;  /* lba_low(7:0) == LBA(7:0) */
+        aptCmdBlk[9] = (page_in_log >> 8) & 0xff;
+                /* lba_mid(15:8) == LBA(39:32) */
+        aptCmdBlk[10] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
+        aptCmdBlk[14] = ATA_READ_LOG_EXT;
         aptCmdBlk[1] = (protocol << 1) | extend;
         aptCmdBlk[2] = (ck_cond << 5) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
-                           NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
+        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, resp,
+                           NULL /* doutp */, mx_resp_len, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
     } else {
         /* Prepare ATA PASS-THROUGH COMMAND (12) command */
-        apt12CmdBlk[4] = 1;   /* sector count */
-        apt12CmdBlk[9] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
-                                      ATA_IDENTIFY_DEVICE);
+        apt12CmdBlk[3] = feature & 0xff;        /* feature(7:0) */
+        apt12CmdBlk[4] = blk_count & 0xff;        /* sector_count(7:0) */
+        apt12CmdBlk[5] = log_addr & 0xff;  /* lba_low(7:0) == LBA(7:0) */
+        apt12CmdBlk[6] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
+        apt12CmdBlk[9] = ATA_READ_LOG_EXT;
         apt12CmdBlk[1] = (protocol << 1);
         apt12CmdBlk[2] = (ck_cond << 5) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
-                           NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
+        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, resp,
+                           NULL /* doutp */, mx_resp_len, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
     }
@@ -221,8 +281,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                             "hardware error\n", cdb_len);
                 return SG_LIB_CAT_MEDIUM_HARD;
             case SPC_SK_ABORTED_COMMAND:
-                fprintf(stderr, "Aborted command: try again with%s '-p' "
-                        "option\n", (do_packet ? "out" : ""));
+                fprintf(stderr, "Aborted command\n");
                 return SG_LIB_CAT_ABORTED_COMMAND;
             default:
                 if (verbose < 2)
@@ -256,8 +315,6 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         if (ata_return_desc[3] & 0x4) {
                 fprintf(stderr, "error indication in returned FIS: aborted "
                         "command\n");
-                fprintf(stderr, "    try again with%s '-p' option\n",
-                        (do_packet ? "out" : ""));
                 return SG_LIB_CAT_ABORTED_COMMAND;
         }
         ok = 1;
@@ -265,42 +322,48 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
 
     if (ok) { /* output result if it is available */
         if (do_raw)
-            dStrRaw((const char *)inBuff, 512);
+            dStrRaw((const char *)resp, mx_resp_len);
         else if (0 == do_hex) {
-            printf("Response for IDENTIFY %sDEVICE ATA command:\n",
-                   (do_packet ? "PACKET " : ""));
-            dWordHex((const unsigned short *)inBuff, 256, 0,
+            printf("Response for READ LOG EXT ATA command:\n");
+            dWordHex((const unsigned short *)resp, mx_resp_len / 2, 0,
                      sg_is_big_endian());
         } else if (1 == do_hex)
-            dStrHex((const char *)inBuff, 512, 0);
+            dStrHex((const char *)resp, mx_resp_len, 0);
         else if (2 == do_hex)
-            dWordHex((const unsigned short *)inBuff, 256, 0,
+            dWordHex((const unsigned short *)resp, mx_resp_len / 2, 0,
                      sg_is_big_endian());
         else            /* '-HHH' output suitable for "hdparm --Istdin" */
-            dWordHex((const unsigned short *)inBuff, 256, -2,
+            dWordHex((const unsigned short *)resp, mx_resp_len / 2, -2,
                      sg_is_big_endian());
     }
     return 0;
 }
 
+
 int main(int argc, char * argv[])
 {
-    int sg_fd, c, res;
-    const char * device_name = NULL;
-    int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
-    int do_packet = 0;
-    int do_hex = 0;
-    int do_raw = 0;
+    int sg_fd, c, k, j, res, id, len, vendor;
+    char * device_name = 0;
+    char ebuff[EBUFF_SZ];
+    unsigned char inBuff[READ_LOG_EXT_RESPONSE_LEN];
+    int cdb_len = 16;
+    int hex = 0;
+    int ignore = 0;
+    int raw = 0;
+    int reset = 0;
     int verbose = 0;
     int ck_cond = 0;   /* set to 1 to read register(s) back */
-    int extend = 0;    /* set to 1 to send 48 bit LBA with command */
+    int extend = 0;
     int ret = 0;
+    unsigned long long ull;
+    const char * cp;
 
+    memset(inBuff, 0, sizeof(inBuff));
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "cehHl:prvV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "cehHil:rRvV",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
@@ -314,9 +377,12 @@ int main(int argc, char * argv[])
         case 'h':
         case '?':
             usage();
-            return 0;
+            exit(0);
         case 'H':
-            ++do_hex;
+            ++hex;
+            break;
+        case 'i':
+            ++ignore;
             break;
         case 'l':
            cdb_len = sg_get_num(optarg);
@@ -325,20 +391,20 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
-        case 'p':
-            ++do_packet;
-            break;
         case 'r':
-            ++do_raw;
+            ++raw;
+            break;
+        case 'R':
+            ++reset;
             break;
         case 'v':
             ++verbose;
             break;
         case 'V':
             fprintf(stderr, "version: %s\n", version_str);
-            return 0;
+            exit(0);
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -356,24 +422,51 @@ int main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-
-    if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+    if (0 == device_name) {
+        fprintf(stderr, "no DEVICE name detected\n");
         usage();
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
-    if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,
-                                     verbose)) < 0) {
-        fprintf(stderr, "error opening file: %s: %s\n",
-                device_name, safe_strerror(-sg_fd));
+    if ((sg_fd = open(device_name, O_RDWR)) < 0) {
+        snprintf(ebuff, EBUFF_SZ,
+                 "sg_sat_phy_event: error opening file: %s", device_name);
+        perror(ebuff);
         return SG_LIB_FILE_ERROR;
     }
+    ret = do_read_log_ext(sg_fd, SATA_PHY_EVENT_LPAGE, 0 /* page_in_log */,
+                          (reset ? 1 : 0) /* feature */,
+                          1 /* blk_count */, inBuff,
+                          READ_LOG_EXT_RESPONSE_LEN, cdb_len, ck_cond,
+                          extend, hex, raw, verbose);
 
-    ret = do_identify_dev(sg_fd, do_packet, cdb_len, ck_cond, extend,
-                          do_hex, do_raw, verbose);
+    if ((0 == ret) && (0 == hex) && (0 == raw)) {
+        printf("SATA phy event counters:\n");
+        for (k = 4; k < 512; k += (len + 2)) {
+            id = (inBuff[k + 1] << 8) + inBuff[k];
+            if (0 == id)
+                break;
+            len = ((id >> 12) & 0x7) * 2;
+            vendor = !!(id & 0x8000);
+            id = id & 0xfff;
+            ull = 0;
+            for (j = len - 1; j >= 0; --j) {
+                if (j < (len - 1))
+                    ull <<= 8;
+                ull |= inBuff[k + 2 + j];
+            }
+            cp = NULL;
+            if ((0 == vendor) && (0 == ignore))
+                cp = find_phy_desc(id);
+            if (cp)
+                printf("  %s: %" PRIu64 "\n", cp, ull);
+            else
+                printf("  id=0x%x, vendor=%d, data_len=%d, "
+                       "val=%" PRIu64 "\n", id, vendor, len, ull);
+        }
+    }
 
-    res = sg_cmds_close_device(sg_fd);
+    res = close(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));
         if (0 == ret)
