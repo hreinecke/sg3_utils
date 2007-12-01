@@ -1,24 +1,24 @@
-.TH SG_SAT_IDENTIFY "8" "December 2007" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_SAT_PHY_EVENT "8" "December 2007" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
-sg_sat_identify \- sends a ATA IDENTIFY (PACKET) DEVICE command via a
-SCSI to ATA Translation (SAT) layer
+sg_sat_phy_event \- Sends an ATA READ LOG EXT command via a SAT pass through
+to fetch log page 11h which contains SATA phy event counters
 .SH SYNOPSIS
-.B sg_sat_identify
+.B sg_sat_phy_event
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-len=\fR12|16] [\fI\-\-packet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-ignore\fR] [\fI\-\-len=\fR12|16] [\fI\-\-raw\fR] [\fI\-\-reset\fR]
+\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility sends either an ATA IDENTIFY DEVICE command or an ATA IDENTIFY
-PACKET DEVICE command to \fIDEVICE\fR and outputs the response. The devices
-that respond to these commands are ATA disks and ATAPI devices respectively.
-Rather than send these commands directly to the device they are sent via a
-SCSI transport which is assumed to contain a SCSI to ATA Translation (SAT)
-Layer (SATL). The SAT standard (SAT ANSI INCITS 431\-2007, prior draft:
-sat\-r09.pdf at www.t10.org) defines two SCSI "ATA PASS\-THROUGH" commands:
-one using a 16 byte "cdb" and the other with a 12 byte cdb. This utility
-defaults to using the 16 byte cdb variant.
+This utility sends an ATA READ LOG EXT with the log page ("address") set to
+11h to \fIDEVICE\fR and outputs the response. Log page 11h is defined in
+the SATA 2.5 standard and contains phy event counters. Rather than send this
+command directly to the \fIDEVICE\fR, are sent via a SCSI transport which is
+assumed to contain a SCSI to ATA Translation (SAT) Layer (SATL). The SAT
+standard (SAT ANSI INCITS 431\-2007, prior draft: sat\-r09.pdf at www.t10.org)
+defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16 byte "cdb" and
+the other with a 12 byte cdb. This utility defaults to using the 16 byte cdb
+variant.
 .PP
 The SATL may be in an operating system driver, in host bus adapter firmware
 or in some external enclosure.
@@ -42,15 +42,17 @@ outputs the usage message summarizing command line options
 then exits. Ignores \fIDEVICE\fR if given.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-outputs the ATA IDENTIFY (PACKET) DEVICE response in hex. The default
+outputs the ATA READ LOG EXT response in hex. The default
 action (i.e. without any '\-H' options) is to output the response in
 hex, grouped in 16 bit words (i.e. the ATA standard's preference).
 When given once, the response is output in ASCII hex bytes (i.e. the
 SCSI standard's preference). When given twice (i.e. '\-HH') the output
 is in hex, grouped in 16 bit words, the same as the default but without
-a header. When given thrice (i.e. '\-HHH') the output is in hex, grouped in
-16 bit words, in a format that is acceptable for 'hdparm \-\-Istdin' to
-process.
+a header.
+.TP
+\fB\-i\fR, \fB\-\-ignore\fR
+usually the phy counter identifier names are decoded. When this option is
+given, the numeric value of the identifier is output.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=12 | 16
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
@@ -58,14 +60,14 @@ The argument can either be 12 or 16. The default is 16. The larger cdb
 size is needed for 48 bit LBA addressing of ATA devices. On the other
 hand some SCSI transports cannot convey SCSI commands longer than 12 bytes.
 .TP
-\fB\-p\fR, \fB\-\-packet\fR
-send an ATA IDENTIFY PACKET DEVICE command (via the SATL). The default
-action is to send an ATA IDENTIFY DEVICE command.
-.TP
 \fB\-r\fR, \fB\-\-raw\fR
-output the ATA IDENTIFY (PACKET) DEVICE response in binary. The output
+output the ATA READ LOG EXT response in binary. The output
 should be piped to a file or another utility when this option is used.
 The binary is sent to stdout, and errors are sent to stderr.
+.TP
+\fB\-R\fR, \fB\-\-reset\fR
+reset the counters after the current values are returned, decoded and
+displayed.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.
@@ -73,11 +75,6 @@ increases the level or verbosity.
 \fB\-V\fR, \fB\-\-version\fR
 print out version string
 .SH NOTES
-Since the response to the IDENTIFY (PACKET) DEVICE command is very
-important for the correct use of an ATA(PI) device (and is typically the
-first command sent), a SATL should provide an ATA Information VPD page
-which contains the similar information.
-.PP
 The SCSI ATA PASS\-THROUGH (12) command's opcode is 0xa1 and it clashes with
 the MMC set's BLANK command used by cd/dvd writers. So a SATL in front
 of an ATAPI device that uses MMC (i.e. has peripheral device type 5)
@@ -103,4 +100,5 @@ Copyright \(co 2006\-2007 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_vpd(sg3_utils), sg_inq(sg3_utils), sdparm(sdparm), hdparm(hdparm)
+.B sg_sat_identify(sg3_utils), smp_rep_phy_err_log(smp_utils),
+.B sdparm(sdparm), hdparm(hdparm)

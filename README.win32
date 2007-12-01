@@ -40,6 +40,7 @@ Here is a list of utilities that have been ported:
     sg_rtpg
     sg_safte
     sg_sat_identify
+    sg_sat_phy_event
     sg_sat_set_features
     sg_scan         [this is Windows specific]
     sg_senddiag
@@ -132,4 +133,4 @@ See the INSTALL file for more details.
 
 
 Doug Gilbert
-29th September 2007
+2nd December 2007
