@@ -5,7 +5,7 @@ to fetch log page 11h which contains SATA phy event counters
 .SH SYNOPSIS
 .B sg_sat_phy_event
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-ignore\fR] [\fI\-\-len=\fR12|16] [\fI\-\-raw\fR] [\fI\-\-reset\fR]
+[\fI\-\-ignore\fR] [\fI\-\-len=\fR16|12] [\fI\-\-raw\fR] [\fI\-\-reset\fR]
 \fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -54,9 +54,9 @@ a header.
 usually the phy counter identifier names are decoded. When this option is
 given, the numeric value of the identifier is output.
 .TP
-\fB\-l\fR, \fB\-\-len\fR=12 | 16
+\fB\-l\fR, \fB\-\-len\fR=16 | 12
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
-The argument can either be 12 or 16. The default is 16. The larger cdb
+The argument can either be 16 or 12. The default is 16. The larger cdb
 size is needed for 48 bit LBA addressing of ATA devices. On the other
 hand some SCSI transports cannot convey SCSI commands longer than 12 bytes.
 .TP
