@@ -5,7 +5,7 @@ SCSI to ATA Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_identify
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-len=\fR12|16] [\fI\-\-packet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
+[\fI\-\-len=\fR16|12] [\fI\-\-packet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -52,9 +52,9 @@ a header. When given thrice (i.e. '\-HHH') the output is in hex, grouped in
 16 bit words, in a format that is acceptable for 'hdparm \-\-Istdin' to
 process.
 .TP
-\fB\-l\fR, \fB\-\-len\fR=12 | 16
+\fB\-l\fR, \fB\-\-len\fR=16 | 12
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
-The argument can either be 12 or 16. The default is 16. The larger cdb
+The argument can either be 16 or 12. The default is 16. The larger cdb
 size is needed for 48 bit LBA addressing of ATA devices. On the other
 hand some SCSI transports cannot convey SCSI commands longer than 12 bytes.
 .TP

@@ -165,7 +165,7 @@ dStrRaw(const char* str, int len)
 static int 
 do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                 int blk_count, void * resp, int mx_resp_len, int cdb_len,
-                int extend, int ck_cond, int do_hex, int do_raw, int verbose)
+                int ck_cond, int extend, int do_hex, int do_raw, int verbose)
 {
     int ok, res, ret;
     int protocol = 4;   /* PIO data-in */
@@ -320,20 +320,13 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
         ok = 1;
     }
 
-    if (ok) { /* output result if it is available */
+    if (ok) { /* output result if ok and --hex or --raw given */
         if (do_raw)
             dStrRaw((const char *)resp, mx_resp_len);
-        else if (0 == do_hex) {
-            printf("Response for READ LOG EXT ATA command:\n");
-            dWordHex((const unsigned short *)resp, mx_resp_len / 2, 0,
-                     sg_is_big_endian());
-        } else if (1 == do_hex)
+        else if (1 == do_hex)
             dStrHex((const char *)resp, mx_resp_len, 0);
-        else if (2 == do_hex)
+        else if (do_hex > 1)
             dWordHex((const unsigned short *)resp, mx_resp_len / 2, 0,
-                     sg_is_big_endian());
-        else            /* '-HHH' output suitable for "hdparm --Istdin" */
-            dWordHex((const unsigned short *)resp, mx_resp_len / 2, -2,
                      sg_is_big_endian());
     }
     return 0;
