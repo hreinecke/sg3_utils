@@ -2800,7 +2800,7 @@ struct version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 3 [sorted numerically (Annex D listing)] */
+/* table from SPC-4 revision 11 [sorted numerically (from Annex C.8)] */
 static struct version_descriptor version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
