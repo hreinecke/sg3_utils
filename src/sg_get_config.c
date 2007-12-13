@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.31 20071026";    /* mmc6r01 */
+static char * version_str = "0.31 20071212";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -741,11 +741,12 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
-        if (len < 8) {
+        if (len < 4) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      M5=%d\n", !!(ucp[4] & 0x1));
+        if (len < 8)
+            printf("      M5=%d\n", !!(ucp[4] & 0x1));
         break;
     case 0x105:    /* Timeout */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
