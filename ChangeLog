@@ -2,10 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20071212]
+Changelog for sg3_utils-1.26 [20071214]
   - sg_ses: sync with ses2r19
   - sg_get_config: sync with mmc6r01
-    - allow Firmware upgrade feature descriptor be 4 bytes long
+    - allow Firmware upgrade feature descriptor to be 4 bytes long
   - sg_cmds_extra: add vrprotect argument to sg_ll_verify10()
     - add sg_ll_get_performance() and sg_ll_set_cd_speed()
   - sg_verify: add --vrprotect= option
