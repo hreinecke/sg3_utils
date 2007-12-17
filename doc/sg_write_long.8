@@ -1,4 +1,4 @@
-.TH SG_WRITE_LONG "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_WRITE_LONG "8" "December 2007" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_write_long \- send the SCSI WRITE LONG command
 .SH SYNOPSIS
@@ -36,11 +36,11 @@ be taken with the settings in the "read write error recovery" mode page.
 Specifically if the ARRE (for reads) and/or AWRE (for writes) are set
 then recovered errors will cause the lba to be reassigned (and the old
 location to be added to the grown defect list (PLIST)). This is not easily 
-reversed and uses the (finite number) of spare sectors set aside for
-this purpose. If in doubt it is probably safest to clear the ARRE and
-AWRE bits. These bits can be checked and modified with the sdparm utility.
-For example: "sdparm \-c AWRE,ARRE /dev/sda" will clear the bits until
-the disk is rebooted.
+reversed and uses (one of the finite number of) the spare sectors set
+aside for this purpose. If in doubt it is probably safest to clear the
+ARRE and AWRE bits. These bits can be checked and modified with the
+sdparm utility.  For example: "sdparm \-c AWRE,ARRE /dev/sda" will clear
+the bits until the disk is power cycled.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -52,7 +52,7 @@ the absence of this option) is to send a SCSI WRITE LONG (10) command.
 sets the correction disabled (i.e 'COR_DIS') bit. This inhibits various
 other mechanisms such as automatic block reallocation, error recovery
 and various informational exception conditions being triggered.
-This bit is new in SBC\-3 .
+This bit is relatively new in SBC\-3 .
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -74,7 +74,7 @@ sets the physical block (i.e 'PBLOCK') bit. This instructs \fIDEVICE\fR
 to use the given data (unless \fI\-\-wr_uncor\fR is also given) to write
 to the physical block specified by \fILBA\fR. The default action
 is to write to the logical block corresponding to the given lba.
-This bit is new in SBC\-3 .
+This bit is relatively new in SBC\-3 .
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the degree of verbosity (debug messages).
@@ -87,9 +87,10 @@ sets the "write uncorrected" (i.e 'WR_UNCOR') bit. This instructs the
 \fIDEVICE\fR to flag the given lba (or the physical block that contains it
 if \fI\-\-pblock\fR is also given) as having an unrecoverable error
 associated with it. Note: no data is transferred to \fIDEVICE\fR,
-other than the command (i.e. the cdb). The default action is to
-use the provided data (\fI\-\-xfer_len=BTL\fR in length) and write it to
-\fIDEVICE\fR.  This bit is new in SBC\-3 .
+other than the command (i.e. the cdb). In the absence of this option, the
+default action is to use the provided data or 0xff
+bytes (\fI\-\-xfer_len=BTL\fR in length) and write it to \fIDEVICE\fR.
+This bit is relatively new in SBC\-3 .
 .TP
 \fB\-x\fR, \fB\-\-xfer_len\fR=\fIBTL\fR
 where \fIBTL\fR is the byte transfer length (default to 520). If the
@@ -107,21 +108,59 @@ Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
 given, multipliers cannot be used.
 .PP
-To read from a defective sector (that, for example, has been filled with
-0xff bytes by this utility) use:
+The 10 byte SCSI WRITE LONG command limits the logical block address
+to a 32 bit quantity. For larger LBAs use the \fI\-\-16\fR option for the
+SCSI WRITE LONG (16) command.
+.SH EXAMPLES
+This section outlines setting up a block with corrupted data, checking the
+error condition, then restoring useful contents to that sector.
 .PP
-  sg_dd if=\fIDEVICE\fR skip=\fILBA\fR of=/dev/null bs=512 count=1
+First, if the data in a sector is important, save it with the sg_read_long
+utility:
 .PP
-To overwrite to a defective sector use:
+  sg_read_long \-\-lba=0x1234 \-\-out=0x1234_1.img \-x \fIBTL\fR /dev/sda
 .PP
-  sg_dd of=\fIDEVICE\fR seek=\fILBA\fR if=/dev/zero bs=512 count=1    
+This utility may need to be executed several time in order to determine
+what the correct value for \fIBTL\fR is.
+Next use this utility to "corrupt" that sector. That might be done with:
+.PP
+  sg_write_long \-\-lba=0x1234 \-x \fIBTL\fR /dev/sda
+.PP
+This will write a sector (and ECC data) of 0xff bytes. Some disks may
+reject this (at least one of the author's does). Another approach is
+to copy the 0x1234_1.img file (to 0x1234_2.img in this example) and
+change some values with a hex editor. Then write the changed image with:
+.PP
+  sg_write_long \-\-lba=0x1234 \-\-in=0x1234_2.img \-x \fIBTL\fR /dev/sda
+.PP
+Yet another approach is to use the \fI\-\-wr_uncor\fR option, if supported:
+.PP
+  sg_write_long \-\-lba=0x1234 \-\-wr_uncor /dev/sda
+.PP
+Next we use the sg_dd utility to check that the sector is corrupted. Here is an
+example:
+.PP
+  sg_dd if=/dev/sda blk_sgio=1 skip=0x1234 of=. bs=512 count=1 verbose=4
+.PP
+Notice that the "blk_sgio=1" option is given. This is to make sure that
+the sector is read (and no others) and the error is fully reported.
+The "blk_sgio=1" option causes the SG_IO ioctl to be used by sg_dd rather
+than the block subsystem.
+.PP
+Finally we should restore sector 0x1234 to a non-corrupted state. A sector
+full of zeroes could be written with:
+.PP
+  sg_dd if=/dev/zero of=/dev/sda blk_sgio=1 seek=0x1234 bs=512 count=1    
 .PP
 This will result in a sector (block) with 512 bytes of 0x0 without a
-MEDIUM ERROR since the ECC and associated data will be well formed.
+MEDIUM ERROR since the ECC and associated data will be regenerated and
+thus well formed. The 'blk_sgio=1' option is even more important in this
+case as it may stop the block subsystem doing a read before write (since
+the read will most likely fail).
+Another approach is to write back the original contents:
 .PP
-The 10 byte SCSI WRITE LONG command limits the logical block address
-to a 32 bit quantity. For larger lbas use the \fI\-\-16\fR option for the
-SCSI WRITE LONG (16) command.
+  sg_write_long \-\-lba=0x1234 \-\-in=0x1234_1.img \-x \fIBTL\fR /dev/sda
+.PP
 .SH EXIT STATUS
 The exit status of sg_write_long is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
