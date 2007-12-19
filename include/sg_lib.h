@@ -51,7 +51,7 @@
  * parallel ATA disk in a USB enclosure).
  */
 
-// #include <stdio.h>
+#include <stdio.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
