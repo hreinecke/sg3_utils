@@ -94,9 +94,9 @@ static void usage()
 int main(int argc, char * argv[])
 {
     int sg_fd, res, c;
-    long long count = 0;
+    int64_t count = 0;
     int group = 0;
-    long long lba = 0;
+    int64_t lba = 0;
     int immed = 0;
     int sync_nv = 0;
     int verbose = 0;

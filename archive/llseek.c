@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #if defined(__GNUC__) || defined(HAS_LONG_LONG)
-typedef long long       llse_loff_t;
+typedef int64_t       llse_loff_t;
 #else
 typedef long            llse_loff_t;
 #endif
@@ -65,8 +65,8 @@ static llse_loff_t my_llseek (unsigned int fd, llse_loff_t offset,
         llse_loff_t result;
         int retval;
 
-        retval = _llseek (fd, ((unsigned long long) offset) >> 32,
-                        ((unsigned long long) offset) & 0xffffffff,
+        retval = _llseek (fd, ((uint64_t) offset) >> 32,
+                        ((uint64_t) offset) & 0xffffffff,
                         &result, origin);
         return (retval == -1 ? (llse_loff_t) retval : result);
 }

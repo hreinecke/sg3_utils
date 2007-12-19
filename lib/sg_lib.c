@@ -1208,11 +1208,11 @@ sg_scsi_sense_desc_find(const unsigned char * sensep, int sense_len,
 
 int
 sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
-                      unsigned long long * info_outp)
+                      uint64_t * info_outp)
 {
     int j;
     const unsigned char * ucp;
-    unsigned long long ull;
+    uint64_t ull;
 
     if (info_outp)
         *info_outp = 0;
@@ -2362,12 +2362,12 @@ sg_get_num_nomult(const char * buf)
    then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
    multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
    Main (SI) multipliers supported: K, M, G, T, P. */
-long long
+int64_t
 sg_get_llnum(const char * buf)
 {
     int res, len;
-    long long num, ll;
-    unsigned long long unum;
+    int64_t num, ll;
+    uint64_t unum;
     char * cp;
     char c = 'c';
     char c2, c3;

@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.33 20070919";
+static char * version_str = "0.33 20071219";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -175,7 +175,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                                 int len)
 {
     int format_code, proto_id, num, j, k;
-    unsigned long long ull;
+    uint64_t ull;
     int bump;
 
     for (k = 0, bump = 24; k < len; k += bump, ucp += bump) {
@@ -280,7 +280,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
 {
     int k, j, num, res, add_len, add_desc_len, rel_pt_addr;
     unsigned int pr_gen;
-    unsigned long long ull;
+    uint64_t ull;
     unsigned char * ucp;
     unsigned char pr_buff[MX_ALLOC_LEN];
 
@@ -440,10 +440,10 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
 }
 
 static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type, 
-                      unsigned long long param_rk, 
-                      unsigned long long param_sark, int param_alltgpt,
-                      int param_aptpl, unsigned char * transportidp,
-                      int transportid_len, int do_verbose)
+                      uint64_t param_rk, uint64_t param_sark,
+                      int param_alltgpt, int param_aptpl,
+                      unsigned char * transportidp, int transportid_len,
+                      int do_verbose)
 {
     int j, len, res;
     unsigned char pr_buff[MX_ALLOC_LEN];
@@ -499,8 +499,7 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
 }
 
 static int prout_rmove_work(int sg_fd, unsigned int prout_type, 
-                      unsigned long long param_rk, 
-                      unsigned long long param_sark, int param_unreg,
+                      uint64_t param_rk, uint64_t param_sark, int param_unreg,
                       int param_aptpl, unsigned int rel_target_port,
                       unsigned char * transportidp, int transportid_len,
                       int do_verbose)
@@ -690,8 +689,8 @@ int main(int argc, char * argv[])
 {
     int sg_fd, c, res;
     unsigned int prout_type;
-    unsigned long long param_rk = 0;
-    unsigned long long param_sark = 0;
+    uint64_t param_rk = 0;
+    uint64_t param_sark = 0;
     unsigned int param_rtp = 0;
     const char * device_name = NULL;
     char buff[48];

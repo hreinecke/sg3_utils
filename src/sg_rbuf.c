@@ -74,7 +74,7 @@ struct opts_t {
     int do_help;
     int do_mmap;
     int do_quick;
-    long long do_size;
+    int64_t do_size;
     int do_time;
     int do_verbose;
     int do_version;
@@ -134,7 +134,7 @@ static void usage_for(const struct opts_t * optsp)
 static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n;
-    long long nn;
+    int64_t nn;
 
     while (1) {
         int option_index = 0;
@@ -217,7 +217,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
-    long long nn;
+    int64_t nn;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {
@@ -332,7 +332,7 @@ int main(int argc, char * argv[])
     unsigned char sense_buffer[32];
     int buf_capacity = 0;
     int buf_size = 0;
-    long long total_size = RB_DEF_SIZE;
+    int64_t total_size = RB_DEF_SIZE;
     size_t psz = getpagesize();
     int dio_incomplete = 0;
     struct sg_io_hdr io_hdr;
@@ -602,7 +602,7 @@ int main(int argc, char * argv[])
         printf(">> direct IO requested but not done\n");
     printf("Read %lld MiB (actual: %lld bytes), buffer size=%d KiB "
            "(%d bytes)\n", (total_size / (1024 * 1024)),
-           (long long)num * buf_size, buf_size / 1024, buf_size);
+           (int64_t)num * buf_size, buf_size / 1024, buf_size);
 
     if (rawp) free(rawp);
     res = close(sg_fd);

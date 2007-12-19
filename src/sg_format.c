@@ -189,7 +189,7 @@ print_read_cap(int fd, int do_16, int verbose)
         int res, k;
         unsigned char resp_buff[RCAP_REPLY_LEN];
         unsigned int last_blk_addr, block_size;
-        unsigned long long llast_blk_addr;
+        uint64_t llast_blk_addr;
 
         if (do_16) {
                 res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
@@ -309,8 +309,8 @@ int main(int argc, char **argv)
         const int mode_page = THIS_MPAGE_EXISTS;        /* hopefully */
         int fd, res, calc_len, bd_len, dev_specific_param;
         int offset, j, bd_blk_len, prob, len;
-        unsigned long long ull;
-        long long blk_count = 0;  /* -c value */
+        uint64_t ull;
+        int64_t blk_count = 0;  /* -c value */
         int blk_size = 0;     /* -s value */
         int format = 0;         /* -F */
         int resize = 0;         /* -r */

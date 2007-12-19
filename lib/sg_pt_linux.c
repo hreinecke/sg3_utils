@@ -171,7 +171,7 @@ void set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
     ptp->io_hdr.pack_id = pack_id;
 }
 
-void set_scsi_pt_tag(struct sg_pt_base * vp, unsigned long long tag)
+void set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag)
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 

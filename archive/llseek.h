@@ -2,7 +2,7 @@
 #define LLSEEK_H
 
 #if defined(__GNUC__) || defined(HAS_LONG_LONG)
-typedef long long llse_loff_t;
+typedef int64_t llse_loff_t;
 #else
 typedef long      llse_loff_t;
 #endif

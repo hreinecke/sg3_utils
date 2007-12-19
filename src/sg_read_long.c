@@ -80,7 +80,7 @@ static void usage()
 
 /* Returns 0 if successful */
 static int process_read_long(int sg_fd, int do_16, int pblock, int correct,
-                             unsigned long long llba, void * data_out,
+                             uint64_t llba, void * data_out,
                              int xfer_len, int verbose)
 {
     int offset, res;
@@ -137,9 +137,9 @@ int main(int argc, char * argv[])
     int xfer_len = 520;
     int do_16 = 0;
     int pblock = 0;
-    unsigned long long llba = 0;
+    uint64_t llba = 0;
     int verbose = 0;
-    long long ll;
+    int64_t ll;
     int got_stdout;
     const char * device_name = NULL;
     char out_fname[256];
@@ -169,7 +169,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            llba = (unsigned long long)ll;
+            llba = (uint64_t)ll;
             break;
         case 'o':
             strncpy(out_fname, optarg, sizeof(out_fname) - 1);

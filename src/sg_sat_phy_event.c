@@ -348,7 +348,7 @@ int main(int argc, char * argv[])
     int ck_cond = 0;   /* set to 1 to read register(s) back */
     int extend = 0;
     int ret = 0;
-    unsigned long long ull;
+    uint64_t ull;
     const char * cp;
 
     memset(inBuff, 0, sizeof(inBuff));

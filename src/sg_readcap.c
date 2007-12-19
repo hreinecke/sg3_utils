@@ -60,7 +60,7 @@ struct opts_t {
     int do_raw;
     int do_verbose;
     int do_version;
-    unsigned long long llba;
+    uint64_t llba;
     const char * device_name;
     int opt_new;
 };
@@ -128,7 +128,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c;
     int a_one = 0;
-    long long nn;
+    int64_t nn;
 
     while (1) {
         int option_index = 0;
@@ -217,7 +217,7 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     const char * cp;
-    unsigned long long uu;
+    uint64_t uu;
 
     for (k = 1; k < argc; ++k) {
         cp = argv[k];
@@ -338,7 +338,7 @@ static void dStrRaw(const char* str, int len)
 int main(int argc, char * argv[])
 {
     int sg_fd, k, res;
-    unsigned long long llast_blk_addr;
+    uint64_t llast_blk_addr;
     int ret = 0;
     unsigned int last_blk_addr, block_size;
     unsigned char resp_buff[RCAP16_REPLY_LEN];
@@ -408,7 +408,7 @@ int main(int argc, char * argv[])
                            last_blk_addr + 1);
                 printf("   Logical block length=%u bytes\n", block_size);
                 if (! opts.do_pmi) {
-                    unsigned long long total_sz = last_blk_addr + 1;
+                    uint64_t total_sz = last_blk_addr + 1;
                     double sz_mb, sz_gb;
 
                     total_sz *= block_size;
@@ -494,7 +494,7 @@ int main(int argc, char * argv[])
             printf("   Lowest aligned logical block address=%d\n",
                    ((resp_buff[14] & 0x3f) << 8) + resp_buff[15]);
             if (! opts.do_pmi) {
-                unsigned long long total_sz = llast_blk_addr + 1;
+                uint64_t total_sz = llast_blk_addr + 1;
                 double sz_mb, sz_gb;
 
                 total_sz *= block_size;

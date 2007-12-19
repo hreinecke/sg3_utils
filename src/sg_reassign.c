@@ -119,12 +119,12 @@ usage()
 
 /* Trying to decode multipliers as sg_get_llnum() [in sg_libs does] would
  * only confuse things here, so use this local trimmed version */
-long long
+int64_t
 get_llnum(const char * buf)
 {
     int res, len;
-    long long num;
-    unsigned long long unum;
+    int64_t num;
+    uint64_t unum;
     const char * commap;
 
     if ((NULL == buf) || ('\0' == buf[0]))
@@ -154,12 +154,12 @@ get_llnum(const char * buf)
 /* or contains trailing 'h' or 'H' (which indicate hex). */
 /* Returns 0 if ok, or 1 if error. */
 static int
-build_lba_arr(const char * inp, unsigned long long * lba_arr,
+build_lba_arr(const char * inp, uint64_t * lba_arr,
               int * lba_arr_len, int max_arr_len)
 {
     int in_len, k, j, m;
     const char * lcp;
-    long long ll;
+    int64_t ll;
     char * cp;
 
     if ((NULL == inp) || (NULL == lba_arr) ||
@@ -207,7 +207,7 @@ build_lba_arr(const char * inp, unsigned long long * lba_arr,
                                 "exceeded\n");
                         return 1;
                     }
-                    lba_arr[off + k] = (unsigned long long)ll;
+                    lba_arr[off + k] = (uint64_t)ll;
                     lcp = strpbrk(lcp, " ,\t");
                     if (NULL == lcp)
                         break;
@@ -237,7 +237,7 @@ build_lba_arr(const char * inp, unsigned long long * lba_arr,
         for (k = 0; k < max_arr_len; ++k) {
             ll = get_llnum(lcp);
             if (-1 != ll) {
-                lba_arr[k] = (unsigned long long)ll;
+                lba_arr[k] = (uint64_t)ll;
                 cp = strchr(lcp, ',');
                 if (NULL == cp)
                     break;
@@ -272,7 +272,7 @@ main(int argc, char * argv[])
     int primary = 0;
     int verbose = 0;
     const char * device_name = NULL;
-    unsigned long long addr_arr[MAX_NUM_ADDR];
+    uint64_t addr_arr[MAX_NUM_ADDR];
     unsigned char param_arr[4 + (MAX_NUM_ADDR * 8)];
     int param_len = 4;
     int ret = 0;

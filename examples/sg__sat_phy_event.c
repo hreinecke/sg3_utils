@@ -167,7 +167,7 @@ int main(int argc, char * argv[])
     int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
     const unsigned char * cucp;
     int ret = 0;
-    unsigned long long ull;
+    uint64_t ull;
     const char * cp;
 
     memset(inBuff, 0, sizeof(inBuff));

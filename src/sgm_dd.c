@@ -113,11 +113,11 @@ static char * version_str = "1.33 20070728 shared_mmap";
 
 static int sum_of_resids = 0;
 
-static long long dd_count = -1;
-static long long req_count = 0;
-static long long in_full = 0;
+static int64_t dd_count = -1;
+static int64_t req_count = 0;
+static int64_t in_full = 0;
 static int in_partial = 0;
-static long long out_full = 0;
+static int64_t out_full = 0;
 static int out_partial = 0;
 static int verbose = 0;
 
@@ -308,7 +308,7 @@ void usage()
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
-int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
+int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -323,7 +323,7 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
-        long long ls;
+        int64_t ls;
 
         res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
                                verb);
@@ -340,7 +340,7 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         ui = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
               rcBuff[3]);
         /* take care not to sign extend values > 0x7fffffff */
-        *num_sect = (long long)ui + 1;
+        *num_sect = (int64_t)ui + 1;
         *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
                    (rcBuff[6] << 8) | rcBuff[7];
     }
@@ -352,7 +352,7 @@ int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
 /* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
-int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
+int read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
 #ifdef BLKSSZGET
     if ((ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) && (*sect_sz > 0)) {
@@ -360,14 +360,14 @@ int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         return -1;
     } else {
  #ifdef BLKGETSIZE64
-        unsigned long long ull;
+        uint64_t ull;
 
         if (ioctl(sg_fd, BLKGETSIZE64, &ull) < 0) {
 
             perror("BLKGETSIZE64 ioctl error");
             return -1;
         }
-        *num_sect = ((long long)ull / (long long)*sect_sz);
+        *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
         if (verbose)
             fprintf(stderr, "      [bgs64] number of blocks=%lld [0x%llx], "
                     "block size=%d\n", *num_sect, *num_sect, *sect_sz);
@@ -378,7 +378,7 @@ int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
             perror("BLKGETSIZE ioctl error");
             return -1;
         }
-        *num_sect = (long long)ul;
+        *num_sect = (int64_t)ul;
         if (verbose)
             fprintf(stderr, "      [bgs] number of blocks=%lld [0x%llx], "
                     " block size=%d\n", *num_sect, *num_sect, *sect_sz);
@@ -395,7 +395,7 @@ int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 }
 
 int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
-                      long long start_block, int write_true, int fua,
+                      int64_t start_block, int write_true, int fua,
                       int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
@@ -490,7 +490,7 @@ int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ILLEGAL_REQ,
  * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
  * -1 -> unrecoverable error */
-int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
+int sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             int bs, int cdbsz, int fua, int dpo, int do_mmap)
 {
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
@@ -580,7 +580,7 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, long long from_block,
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ILLEGAL_REQ,
  * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
  * -1 -> unrecoverable error */
-int sg_write(int sg_fd, unsigned char * buff, int blocks, long long to_block,
+int sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
              int bs, int cdbsz, int fua, int dpo, int do_mmap,
              int mmap_shareable, int * diop)
 {
@@ -726,8 +726,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
 
 int main(int argc, char * argv[])
 {
-    long long skip = 0;
-    long long seek = 0;
+    int64_t skip = 0;
+    int64_t seek = 0;
     int ibs = 0;
     int obs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
@@ -744,9 +744,9 @@ int main(int argc, char * argv[])
     unsigned char * wrkPos;
     unsigned char * wrkBuff = NULL;
     unsigned char * wrkMmap = NULL;
-    long long in_num_sect = -1;
+    int64_t in_num_sect = -1;
     int in_res_sz = 0;
-    long long out_num_sect = -1;
+    int64_t out_num_sect = -1;
     int out_res_sz = 0;
     int scsi_cdbsz_in = DEF_SCSI_CDBSZ;
     int scsi_cdbsz_out = DEF_SCSI_CDBSZ;
@@ -998,7 +998,7 @@ int main(int argc, char * argv[])
                 if (verbose)
                     fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
                             "byte offset=0x%llx\n",
-                            (unsigned long long)offset);
+                            (uint64_t)offset);
             }
         }
     }
@@ -1097,7 +1097,7 @@ int main(int argc, char * argv[])
                 if (verbose)
                     fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
                             "byte offset=0x%llx\n",
-                            (unsigned long long)offset);
+                            (uint64_t)offset);
             }
         }
     }

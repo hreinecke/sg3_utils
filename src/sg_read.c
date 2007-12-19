@@ -75,9 +75,9 @@ static const char * version_str = "1.17 20070714";
 
 static int sum_of_resids = 0;
 
-static long long dd_count = -1;
-static long long orig_count = 0;
-static long long in_full = 0;
+static int64_t dd_count = -1;
+static int64_t orig_count = 0;
+static int64_t in_full = 0;
 static int in_partial = 0;
 
 static int pack_id_count = 0;
@@ -198,7 +198,7 @@ static void usage()
 }
 
 static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
-                             unsigned int blocks, long long start_block,
+                             unsigned int blocks, int64_t start_block,
                              int write_true, int fua, int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
@@ -293,7 +293,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
    1 -> recoverable (ENOMEM), 2 -> try again (e.g. unit attention),
    3 -> try again (e.g. aborted command), -1 -> other unrecoverable error */
 static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
-                    long long from_block, int bs, int cdbsz,
+                    int64_t from_block, int bs, int cdbsz,
                     int fua, int dpo, int * diop, int do_mmap,
                     int no_dxfer)
 {
@@ -387,7 +387,7 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
 
 int main(int argc, char * argv[])
 {
-    long long skip = 0;
+    int64_t skip = 0;
     int bs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
     char str[STR_SZ];

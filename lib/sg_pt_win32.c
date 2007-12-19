@@ -292,7 +292,7 @@ void set_scsi_pt_packet_id(struct sg_pt_base * vp __attribute__ ((unused)),
 }
 
 void set_scsi_pt_tag(struct sg_pt_base * vp,
-                     unsigned long long tag __attribute__ ((unused)))
+                     uint64_t tag __attribute__ ((unused)))
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 

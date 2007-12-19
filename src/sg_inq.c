@@ -885,8 +885,8 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
 {
     int u, j, m, id_len, p_id, c_set, piv, assoc, id_type, i_len;
     int off, ci_off, c_id, d_id, naa, vsi;
-    unsigned long long vsei;
-    unsigned long long id_ext;
+    uint64_t vsei;
+    uint64_t id_ext;
     const unsigned char * ucp;
     const unsigned char * ip;
 
@@ -1125,7 +1125,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                                 int len)
 {
     int format_code, proto_id, num, j, k;
-    unsigned long long ull;
+    uint64_t ull;
     int bump;
 
     for (k = 0, bump = 24; k < len; k += bump, ucp += bump) {

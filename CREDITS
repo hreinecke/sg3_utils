@@ -45,6 +45,9 @@ Ingo van Lil <inguin at gmx dot de>
 James Bottomley <jejb at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
+Joe Krahn <krahn at niehs dot nih dot gov> help with int64_t cleanup
+	[20071219]
+
 Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
         Additions to sginfo and sg_map.
 
@@ -86,4 +89,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-13th October 2007
+19th December 2007
