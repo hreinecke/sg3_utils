@@ -113,13 +113,13 @@ static char * version_str = "5.63 20070714";
 
 static int sum_of_resids = 0;
 
-static long long dd_count = -1;
-static long long req_count = 0;
-static long long in_full = 0;
+static int64_t dd_count = -1;
+static int64_t req_count = 0;
+static int64_t in_full = 0;
 static int in_partial = 0;
-static long long out_full = 0;
+static int64_t out_full = 0;
 static int out_partial = 0;
-static long long out_sparse = 0;
+static int64_t out_sparse = 0;
 static int recovered_errs = 0;
 static int unrecovered_errs = 0;
 static int read_longs = 0;
@@ -331,7 +331,7 @@ static void usage()
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
-static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
+static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -345,7 +345,7 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
-        long long ls;
+        int64_t ls;
 
         res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
                                verb);
@@ -362,7 +362,7 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         ui = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
               rcBuff[3]);
         /* take care not to sign extend values > 0x7fffffff */
-        *num_sect = (long long)ui + 1;
+        *num_sect = (int64_t)ui + 1;
         *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
                    (rcBuff[6] << 8) | rcBuff[7];
     }
@@ -374,7 +374,7 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
 /* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
-static int read_blkdev_capacity(int sg_fd, long long * num_sect,
+static int read_blkdev_capacity(int sg_fd, int64_t * num_sect,
                                 int * sect_sz)
 {
 #ifdef BLKSSZGET
@@ -383,14 +383,14 @@ static int read_blkdev_capacity(int sg_fd, long long * num_sect,
         return -1;
     } else {
  #ifdef BLKGETSIZE64
-        unsigned long long ull;
+        uint64_t ull;
 
         if (ioctl(sg_fd, BLKGETSIZE64, &ull) < 0) {
 
             perror("BLKGETSIZE64 ioctl error");
             return -1;
         }
-        *num_sect = ((long long)ull / (long long)*sect_sz);
+        *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
         if (verbose)
             fprintf(stderr, "      [bgs64] number of blocks=%lld [0x%llx], "
                     "block size=%d\n", *num_sect, *num_sect, *sect_sz);
@@ -401,7 +401,7 @@ static int read_blkdev_capacity(int sg_fd, long long * num_sect,
             perror("BLKGETSIZE ioctl error");
             return -1;
         }
-        *num_sect = (long long)ul;
+        *num_sect = (int64_t)ul;
         if (verbose)
             fprintf(stderr, "      [bgs] number of blocks=%lld [0x%llx], "
                     " block size=%d\n", *num_sect, *num_sect, *sect_sz);
@@ -418,7 +418,7 @@ static int read_blkdev_capacity(int sg_fd, long long * num_sect,
 }
 
 static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
-                             unsigned int blocks, long long start_block,
+                             unsigned int blocks, int64_t start_block,
                              int write_true, int fua, int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
@@ -517,9 +517,9 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
    -2 -> ENOMEM
    -1 other errors */
 static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
-                       long long from_block, int bs,
+                       int64_t from_block, int bs,
                        const struct flags_t * ifp, int * diop,
-                       unsigned long long * io_addrp)
+                       uint64_t * io_addrp)
 {
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -623,11 +623,11 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
    SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ABORTED_COMMAND,
    -2 -> ENOMEM, -1 other errors */
 static int sg_read(int sg_fd, unsigned char * buff, int blocks,
-                   long long from_block, int bs, struct flags_t * ifp,
+                   int64_t from_block, int bs, struct flags_t * ifp,
                    int * diop, int * blks_readp)
 {
-    unsigned long long io_addr;
-    long long lba;
+    uint64_t io_addr;
+    int64_t lba;
     int res, blks, repeat, xferred;
     unsigned char * bp;
     int retries_tmp;
@@ -672,7 +672,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
             if (retries_tmp > 0) {
                 fprintf(stderr, ">>> retrying a sgio read, lba=0x%llx\n",
-                        (unsigned long long)lba);
+                        (uint64_t)lba);
                 --retries_tmp;
                 ++num_retries;
                 if (unrecovered_errs > 0)
@@ -692,7 +692,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         default:
             if (retries_tmp > 0) {
                 fprintf(stderr, ">>> retrying a sgio read, lba=0x%llx\n",
-                        (unsigned long long)lba);
+                        (uint64_t)lba);
                 --retries_tmp;
                 ++num_retries;
                 if (unrecovered_errs > 0)
@@ -705,15 +705,15 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         }
         if (repeat)
             continue;
-        if ((io_addr < (unsigned long long)lba) ||
-            (io_addr >= (unsigned long long)(lba + blks))) {
+        if ((io_addr < (uint64_t)lba) ||
+            (io_addr >= (uint64_t)(lba + blks))) {
                 fprintf(stderr, "  Unrecovered error lba 0x%llx not in "
                     "correct range:\n\t[0x%llx,0x%llx]\n", io_addr,
-                    (unsigned long long)lba,
-                    (unsigned long long)(lba + blks - 1));
+                    (uint64_t)lba,
+                    (uint64_t)(lba + blks - 1));
             goto err_out;
         }
-        blks = (int)(io_addr - (unsigned long long)lba);
+        blks = (int)(io_addr - (uint64_t)lba);
         if (blks > 0) {
             if (verbose)
                 fprintf(stderr, "  partial read of %d blocks prior to "
@@ -869,14 +869,14 @@ err_out:
    SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
    -1 -> unrecoverable error + others */
 static int sg_write(int sg_fd, unsigned char * buff, int blocks,
-                    long long to_block, int bs, const struct flags_t * ofp,
+                    int64_t to_block, int bs, const struct flags_t * ofp,
                     int * diop)
 {
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
     int res, k, info_valid;
-    unsigned long long io_addr = 0;
+    uint64_t io_addr = 0;
 
     if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, 1, ofp->fua,
                           ofp->dpo)) {
@@ -964,7 +964,7 @@ static void calc_duration_throughput(int contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
-    long long blks;
+    int64_t blks;
 
     if (start_tm_valid && (start_tm.tv_sec || start_tm.tv_usec)) {
         blks = (in_full > out_full) ? in_full : out_full;
@@ -1039,8 +1039,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
 
 int main(int argc, char * argv[])
 {
-    long long skip = 0;
-    long long seek = 0;
+    int64_t skip = 0;
+    int64_t seek = 0;
     int ibs = 0;
     int obs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
@@ -1061,8 +1061,8 @@ int main(int argc, char * argv[])
     int infd, outfd, retries_tmp, blks_read;
     unsigned char * wrkBuff;
     unsigned char * wrkPos;
-    long long in_num_sect = -1;
-    long long out_num_sect = -1;
+    int64_t in_num_sect = -1;
+    int64_t out_num_sect = -1;
     int in_sect_sz, out_sect_sz;
     char ebuff[EBUFF_SZ];
     int blocks_per;
@@ -1338,7 +1338,7 @@ int main(int argc, char * argv[])
                     if (verbose)
                         fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
                                 "byte offset=0x%llx\n",
-                                (unsigned long long)offset);
+                                (uint64_t)offset);
                 }
             }
         }
@@ -1441,7 +1441,7 @@ int main(int argc, char * argv[])
                 if (verbose)
                     fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
                             "byte offset=0x%llx\n",
-                            (unsigned long long)offset);
+                            (uint64_t)offset);
             }
         }
     }
@@ -1701,18 +1701,18 @@ int main(int argc, char * argv[])
                 if (verbose > 2)
                     fprintf(stderr, "sparse bypassing write: "
                             "seek=%lld, rel offset=%lld\n", (seek * blk_sz),
-                            (long long)offset);
+                            (int64_t)offset);
                 off_res = lseek64(outfd, offset, SEEK_CUR);
                 if (off_res < 0) {
                     fprintf(stderr, "sparse tried to bypass write: "
                             "seek=%lld, rel offset=%lld but ...\n",
-                            (seek * blk_sz), (long long)offset);
+                            (seek * blk_sz), (int64_t)offset);
                     perror("lseek64 on output");
                     ret = SG_LIB_FILE_ERROR;
                     break;
                 } else if (verbose > 4)
                     fprintf(stderr, "oflag=sparse lseek64 result=%lld\n",
-                           (long long)off_res);
+                           (int64_t)off_res);
                 out_sparse += blocks;
             }
         } else if (FT_SG & out_type) {
@@ -1760,7 +1760,7 @@ int main(int argc, char * argv[])
                     break;
                 else if (retries_tmp > 0) {
                     fprintf(stderr, ">>> retrying a sgio write, "
-                            "lba=0x%llx\n", (unsigned long long)seek);
+                            "lba=0x%llx\n", (uint64_t)seek);
                     --retries_tmp;
                     ++num_retries;
                     if (unrecovered_errs > 0)

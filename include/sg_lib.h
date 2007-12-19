@@ -51,7 +51,8 @@
  * parallel ATA disk in a USB enclosure).
  */
 
-#include <stdio.h>
+// #include <stdio.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -169,7 +170,7 @@ extern char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len,
    information field is written out via 'info_outp' (except when it is
    NULL). Handles both fixed and descriptor sense formats. */
 extern int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
-                                 unsigned long long * info_outp);
+                                 uint64_t * info_outp);
 
 /* Returns 1 if sense key is NO_SENSE or NOT_READY and SKSV is set. Places
    progress field from sense data where progress_outp points. If progress
@@ -327,7 +328,7 @@ extern int sg_get_num_nomult(const char * buf);
    suffix. Otherwise a decimal multiplier suffix may be given. In addition
    to supporting the multipliers of sg_get_num(), this function supports:
    t T TiB  *(2**40); TB *(10**12); p P PiB  *(2**50); PB  *(10**15) . */
-extern long long sg_get_llnum(const char * buf);
+extern int64_t sg_get_llnum(const char * buf);
 
 extern const char * sg_lib_version();
 

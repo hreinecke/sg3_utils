@@ -536,7 +536,7 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
  * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY -> device not ready,
  * -1 -> other failure */
 int
-sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba, void * resp,
+sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
                  int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;

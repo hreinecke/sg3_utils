@@ -114,24 +114,24 @@ struct flags_t {
 typedef struct request_collection
 {       /* one instance visible to all threads */
     int infd;
-    long long skip;
+    int64_t skip;
     int in_type;
     int cdbsz_in;
     struct flags_t in_flags;
-    long long in_blk;                 /* -\ next block address to read */
-    long long in_count;               /*  | blocks remaining for next read */
-    long long in_rem_count;           /*  | count of remaining in blocks */
+    int64_t in_blk;                 /* -\ next block address to read */
+    int64_t in_count;               /*  | blocks remaining for next read */
+    int64_t in_rem_count;           /*  | count of remaining in blocks */
     int in_partial;                   /*  | */
     int in_stop;                      /*  | */
     pthread_mutex_t in_mutex;         /* -/ */
     int outfd;
-    long long seek;
+    int64_t seek;
     int out_type;
     int cdbsz_out;
     struct flags_t out_flags;
-    long long out_blk;                /* -\ next block address to write */
-    long long out_count;              /*  | blocks remaining for next write */
-    long long out_rem_count;          /*  | count of remaining out blocks */
+    int64_t out_blk;                /* -\ next block address to write */
+    int64_t out_count;              /*  | blocks remaining for next write */
+    int64_t out_rem_count;          /*  | count of remaining out blocks */
     int out_partial;                  /*  | */
     int out_stop;                     /*  | */
     pthread_mutex_t out_mutex;        /*  | */
@@ -149,7 +149,7 @@ typedef struct request_element
     int infd;
     int outfd;
     int wr;
-    long long blk;
+    int64_t blk;
     int num_blks;
     unsigned char * buffp;
     unsigned char * alloc_bp;
@@ -185,7 +185,7 @@ static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 static int do_time = 0;
 static Rq_coll rcoll;
 static struct timeval start_tm;
-static long long dd_count = -1;
+static int64_t dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
 static int do_sync = 0;
 static int exit_status = 0;
@@ -217,7 +217,7 @@ static void calc_duration_throughput(int contin)
 
 static void print_stats(const char * str)
 {
-    long long infull, outfull;
+    int64_t infull, outfull;
 
     if (0 != rcoll.out_rem_count)
         fprintf(stderr, "  remaining block count=%lld\n",
@@ -388,7 +388,7 @@ static void guarded_stop_both(Rq_coll * clp)
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
-static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
+static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -400,7 +400,7 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
-        long long ls;
+        int64_t ls;
 
         res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0, 0);
         if (0 != res)
@@ -416,7 +416,7 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         ui = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
               rcBuff[3]);
         /* take care not to sign extend values > 0x7fffffff */
-        *num_sect = (long long)ui + 1;
+        *num_sect = (int64_t)ui + 1;
         *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
                    (rcBuff[6] << 8) | rcBuff[7];
     }
@@ -425,7 +425,7 @@ static int scsi_read_capacity(int sg_fd, long long * num_sect, int * sect_sz)
 
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
 /* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
-static int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
+static int read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
 #ifdef BLKSSZGET
     if ((ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) && (*sect_sz > 0)) {
@@ -433,14 +433,14 @@ static int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
         return -1;
     } else {
  #ifdef BLKGETSIZE64
-        unsigned long long ull;
+        uint64_t ull;
 
         if (ioctl(sg_fd, BLKGETSIZE64, &ull) < 0) {
 
             perror("BLKGETSIZE64 ioctl error");
             return -1;
         }
-        *num_sect = ((long long)ull / (long long)*sect_sz);
+        *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
  #else
         unsigned long ul;
 
@@ -448,7 +448,7 @@ static int read_blkdev_capacity(int sg_fd, long long * num_sect, int * sect_sz)
             perror("BLKGETSIZE ioctl error");
             return -1;
         }
-        *num_sect = (long long)ul;
+        *num_sect = (int64_t)ul;
  #endif
     }
     return 0;
@@ -505,7 +505,7 @@ static void * read_write_thread(void * v_clp)
     size_t psz = 0;
     int sz = clp->bpt * clp->bs;
     int stop_after_write = 0;
-    long long seek_skip =  clp->seek - clp->skip;
+    int64_t seek_skip =  clp->seek - clp->skip;
     int blocks, status;
 
     memset(rep, 0, sizeof(Rq_elem));
@@ -699,7 +699,7 @@ static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 }
 
 static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
-                             unsigned int blocks, long long start_block,
+                             unsigned int blocks, int64_t start_block,
                              int write_true, int fua, int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
@@ -1119,8 +1119,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
 
 int main(int argc, char * argv[])
 {
-    long long skip = 0;
-    long long seek = 0;
+    int64_t skip = 0;
+    int64_t seek = 0;
     int ibs = 0;
     int obs = 0;
     int bpt_given = 0;
@@ -1131,8 +1131,8 @@ int main(int argc, char * argv[])
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
     int res, k;
-    long long in_num_sect = 0;
-    long long out_num_sect = 0;
+    int64_t in_num_sect = 0;
+    int64_t out_num_sect = 0;
     pthread_t threads[MAX_NUM_THREADS];
     int in_sect_sz, out_sect_sz, status, n, flags;
     void * vp;

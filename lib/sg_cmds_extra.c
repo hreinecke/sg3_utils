@@ -1295,14 +1295,14 @@ sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
         case SG_LIB_CAT_ILLEGAL_REQ:
             {
                 int valid, slen, ili;
-                unsigned long long ull = 0;
+                uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 ili = has_blk_ili(sense_b, slen);
                 if (valid && ili) {
                     if (offsetp)
-                        *offsetp = (int)(long long)ull;
+                        *offsetp = (int)(int64_t)ull;
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
@@ -1330,7 +1330,7 @@ sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
  * field written to 'offsetp', SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
 int
-sg_ll_read_long16(int sg_fd, int pblock, int correct, unsigned long long llba,
+sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
                   void * resp, int xfer_len, int * offsetp, int noisy,
                   int verbose)
 {
@@ -1394,14 +1394,14 @@ sg_ll_read_long16(int sg_fd, int pblock, int correct, unsigned long long llba,
         case SG_LIB_CAT_ILLEGAL_REQ:
             {
                 int valid, slen, ili;
-                unsigned long long ull = 0;
+                uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 ili = has_blk_ili(sense_b, slen);
                 if (valid && ili) {
                     if (offsetp)
-                        *offsetp = (int)(long long)ull;
+                        *offsetp = (int)(int64_t)ull;
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
@@ -1491,14 +1491,14 @@ sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
         case SG_LIB_CAT_ILLEGAL_REQ:
             {
                 int valid, slen, ili;
-                unsigned long long ull = 0;
+                uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 ili = has_blk_ili(sense_b, slen);
                 if (valid && ili) {
                     if (offsetp)
-                        *offsetp = (int)(long long)ull;
+                        *offsetp = (int)(int64_t)ull;
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
@@ -1529,7 +1529,7 @@ sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
 int
 sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
-                   unsigned long long llba, void * data_out, int xfer_len,
+                   uint64_t llba, void * data_out, int xfer_len,
                    int * offsetp, int noisy, int verbose)
 {
     int k, res, sense_cat, ret;
@@ -1594,14 +1594,14 @@ sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
         case SG_LIB_CAT_ILLEGAL_REQ:
             {
                 int valid, slen, ili;
-                unsigned long long ull = 0;
+                uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 ili = has_blk_ili(sense_b, slen);
                 if (valid && ili) {
                     if (offsetp)
-                        *offsetp = (int)(long long)ull;
+                        *offsetp = (int)(int64_t)ull;
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
@@ -1689,7 +1689,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
         case SG_LIB_CAT_MEDIUM_HARD:
             {
                 int valid, slen;
-                unsigned long long ull = 0;
+                uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);

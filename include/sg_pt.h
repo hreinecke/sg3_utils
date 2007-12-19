@@ -30,6 +30,8 @@
  *
  */
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -68,7 +70,7 @@ extern void set_scsi_pt_data_out(struct sg_pt_base * objp,    /* to device */
                                  const unsigned char * dxferp, int dxfer_len);
 /* The following "set_"s implementations may be dummies */
 extern void set_scsi_pt_packet_id(struct sg_pt_base * objp, int pack_id);
-extern void set_scsi_pt_tag(struct sg_pt_base * objp, unsigned long long tag);
+extern void set_scsi_pt_tag(struct sg_pt_base * objp, uint64_t tag);
 extern void set_scsi_pt_task_management(struct sg_pt_base * objp,
                                         int tmf_code);
 extern void set_scsi_pt_task_attr(struct sg_pt_base * objp, int attribute,

@@ -101,7 +101,7 @@ static void decode_lun(const char * leadin, unsigned char * lunp)
     unsigned char not_spec[8] = {0xff, 0xff, 0xff, 0xff,
                                  0xff, 0xff, 0xff, 0xff};
     char l_leadin[128];
-    unsigned long long ull;
+    uint64_t ull;
 
     if (0 == memcmp(lunp, not_spec, sizeof(not_spec))) {
         printf("%sLogical unit not specified\n", leadin);

@@ -1,1 +1,1 @@
-#include "../sg_lib.h"
+#include "../include/sg_lib.h"

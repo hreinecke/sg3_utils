@@ -141,9 +141,8 @@ extern int sg_ll_read_long10(int sg_fd, int pblock, int correct,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  *  -1 -> other failure */
 extern int sg_ll_read_long16(int sg_fd, int pblock, int correct,
-                             unsigned long long llba, void * resp,
-                             int xfer_len, int * offsetp, int noisy,
-                             int verbose);
+                             uint64_t llba, void * resp, int xfer_len,
+                             int * offsetp, int noisy, int verbose);
 
 /* Invokes a SCSI READ MEDIA SERIAL NUMBER command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Read media serial number not supported,
@@ -266,9 +265,8 @@ extern int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 extern int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
-                              unsigned long long llba, void * data_out,
-                              int xfer_len, int * offsetp, int noisy,
-                              int verbose);
+                              uint64_t llba, void * data_out, int xfer_len,
+                              int * offsetp, int noisy, int verbose);
 
 #ifdef __cplusplus
 }

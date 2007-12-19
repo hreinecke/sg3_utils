@@ -48,7 +48,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.11 20071102";
+static char * version_str = "1.11 20071219";
 
 #define ME "sg_verify: "
 
@@ -95,15 +95,15 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, res, c, num;
-    long long ll;
+    int64_t ll;
     int dpo = 0;
     int bytechk = 0;
     int vrprotect = 0;
-    long long count = 1;
-    long long orig_count;
+    int64_t count = 1;
+    int64_t orig_count;
     int bpc = 128;
-    unsigned long long lba = 0;
-    unsigned long long orig_lba;
+    uint64_t lba = 0;
+    uint64_t orig_lba;
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
@@ -145,7 +145,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            lba = (unsigned long long)ll;
+            lba = (uint64_t)ll;
             break;
         case 'P':
             vrprotect = sg_get_num(optarg);
@@ -253,8 +253,7 @@ main(int argc, char * argv[])
     if (verbose && (0 == ret) && (orig_count > 1))
         fprintf(stderr, "Verified %" PRId64 " [0x%" PRIx64 "] blocks from "
                 "lba %" PRIu64 " [0x%" PRIx64 "]\n    without error\n",
-                orig_count, (unsigned long long)orig_count, orig_lba,
-                orig_lba);
+                orig_count, (uint64_t)orig_count, orig_lba, orig_lba);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

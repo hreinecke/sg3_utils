@@ -346,7 +346,7 @@ static char * transport_proto_arr[] =
 
 static int next_parameter;
 static int n_replacement_values;
-static unsigned long long replacement_values[MAXPARM];
+static uint64_t replacement_values[MAXPARM];
 static char is_hex[MAXPARM];
 
 #define SMODE_SENSE 0x1a
@@ -604,9 +604,9 @@ static int getnbyte(const unsigned char *pnt, int nbyte)
     return result;
 }
 
-static long long getnbyte_ll(const unsigned char *pnt, int nbyte)
+static int64_t getnbyte_ll(const unsigned char *pnt, int nbyte)
 {
-    long long result;
+    int64_t result;
     int i;
 
     if (nbyte > 8)

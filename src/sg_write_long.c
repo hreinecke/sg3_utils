@@ -96,9 +96,9 @@ int main(int argc, char * argv[])
     int pblock = 0;
     int wr_uncor = 0;
     int do_16 = 0;
-    unsigned long long llba = 0;
+    uint64_t llba = 0;
     int verbose = 0;
-    long long ll;
+    int64_t ll;
     int got_stdin;
     const char * device_name = NULL;
     char file_name[256];
@@ -132,7 +132,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            llba = (unsigned long long)ll;
+            llba = (uint64_t)ll;
             break;
         case 'p':
             pblock = 1;

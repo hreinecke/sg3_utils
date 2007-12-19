@@ -120,9 +120,8 @@ extern int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba,
  *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-extern int sg_ll_readcap_16(int sg_fd, int pmi, unsigned long long llba,
-                            void * resp, int mx_resp_len, int noisy,
-                            int verbose);
+extern int sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
+                            int mx_resp_len, int noisy, int verbose);
 
 /* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Luns not supported,

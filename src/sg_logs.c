@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.78 20071217";    /* SPC-4 revision 11 */
+static char * version_str = "0.77 20070923";    /* SPC-4 revision 11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -816,7 +816,7 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, count_basis, cause, pcb;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Buffer over-run/under-run page\n");
@@ -881,7 +881,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     switch(resp[0] & 0x3f) {
@@ -948,7 +948,7 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Non-medium error page\n");
@@ -1086,7 +1086,7 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, num, n, res, pcb;
     unsigned char * ucp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
@@ -1441,7 +1441,7 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
 {
     int j, m, n, nphys, pcb, t, sz, spld_len;
     unsigned char * vcp;
-    unsigned long long ull;
+    uint64_t ull;
     unsigned long ul;
     char pcb_str[PCB_STR_LEN];
     char s[64];
@@ -1456,7 +1456,7 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
     if (optsp->do_name)
         printf("  gen_code=%d\n", ucp[6]);
     else
-        printf(" generation code = %d\n", ucp[6]);
+        printf("  generation code = %d\n", ucp[6]);
     nphys = ucp[7];
     if (optsp->do_name)
         printf("  num_phys=%d\n", nphys);
@@ -1652,7 +1652,7 @@ show_stats_perform_page(unsigned char * resp, int len,
     int pcb, nam;
     unsigned char * ucp;
     const char * ccp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     nam = optsp->do_name;
@@ -1958,7 +1958,7 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, pc, pcb, all_ff, counter;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Format status page (sbc-2) [0x8]\n");
@@ -2223,7 +2223,7 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull, gbytes;
+    uint64_t ull, gbytes;
     char pcb_str[PCB_STR_LEN];
 
     printf("Sequential access device page (ssc-3)\n");
@@ -2328,7 +2328,7 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Device statistics page (ssc-3 and adc)\n");
@@ -2432,7 +2432,7 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Media statistics page (smc-3)\n");
@@ -2774,7 +2774,7 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, pc, pcb;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Seagate cache page [0x37]\n");
@@ -2823,7 +2823,7 @@ show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
     int k, j, num, pl, pc, pcb, valid;
     unsigned char * ucp;
     unsigned char * xp;
-    unsigned long long ull;
+    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Seagate/Hitachi factory page [0x3e]\n");
