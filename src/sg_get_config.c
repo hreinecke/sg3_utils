@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.31 20071214";    /* mmc6r01 */
+static char * version_str = "0.31 20071220";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -383,12 +383,9 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
-        if (len < 8) {
-            printf("      additional length [%d] too short\n", len - 4);
-            break;
-        }
-        printf("      MULTI110=%d, Dual-RW=%d, Dual-R=%d\n",
-               !!(ucp[4] & 0x1), !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
+        if (len > 7)
+            printf("      MULTI110=%d, Dual-RW=%d, Dual-R=%d\n",
+                   !!(ucp[4] & 0x1), !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
         break;
     case 0x20:     /* Random writable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
