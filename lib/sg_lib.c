@@ -71,7 +71,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.37 20071005";    /* spc-4 rev 11 */
+static char * version_str = "1.38 20071221";    /* spc-4 rev 11+ */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -500,6 +500,7 @@ static struct error_info additional[] =
     {0x00,0x04,"Beginning-of-partition/medium detected"},
     {0x00,0x05,"End-of-data detected"},
     {0x00,0x06,"I/O process terminated"},
+    {0x00,0x07,"Programmable early warning detected"},
     {0x00,0x11,"Audio play operation in progress"},
     {0x00,0x12,"Audio play operation paused"},
     {0x00,0x13,"Audio play operation successfully completed"},
@@ -513,6 +514,7 @@ static struct error_info additional[] =
     {0x00,0x1b,"Set capacity operation in progress"},
     {0x00,0x1c,"Verify operation in progress"},
     {0x00,0x1d,"ATA pass through information available"},
+    {0x00,0x1e,"Conflicting SA creation request"},
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},
@@ -541,6 +543,7 @@ static struct error_info additional[] =
     {0x04,0x11,"Logical unit not ready, "
                 "notify (enable spinup) required"},
     {0x04,0x12,"Logical unit not ready, offline"},
+    {0x04,0x13,"Logical unit not ready, SA creation in progress"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -685,6 +688,7 @@ static struct error_info additional[] =
     {0x24,0x05,"Security working key frozen"},
     {0x24,0x06,"Nonce not unique"},
     {0x24,0x07,"Nonce timestamp out of range"},
+    {0x24,0x08,"Invalid xcdb"},
     {0x25,0x00,"Logical unit not supported"},
     {0x26,0x00,"Invalid field in parameter list"},
     {0x26,0x01,"Parameter not supported"},
@@ -737,6 +741,9 @@ static struct error_info additional[] =
     {0x2A,0x11,"Data encryption parameters changed by another i_t nexus"},
     {0x2A,0x12,"Data encryption parameters changed by vendor specific event"},
     {0x2A,0x13,"Data encryption key instance counter has changed"},
+    {0x2A,0x0a,"Error history i_t nexus cleared"},
+    {0x2A,0x0b,"Error history snapshot released"},
+    {0x2A,0x14,"SA creation capabilities data has changed"},
     {0x2B,0x00,"Copy cannot execute since host cannot disconnect"},
     {0x2C,0x00,"Command sequence error"},
     {0x2C,0x01,"Too many windows specified"},
@@ -1097,7 +1104,14 @@ static struct error_info additional[] =
     {0x74,0x09,"Encryption mode mismatch on read"},
     {0x74,0x0a,"Encrypted block not raw read enabled"},
     {0x74,0x0b,"Incorrect Encryption parameters"},
+    {0x74,0x0c,"Unable to decrypt parameter list"},
+    {0x74,0x10,"SA creation parameter value invalid"},
+    {0x74,0x11,"SA creation parameter value rejected"},
+    {0x74,0x12,"Invalid SA usage"},
+    {0x74,0x30,"SA creation parameter not supported"},
+    {0x74,0x40,"Authentication failed"},
     {0x74,0x71,"Logical unit access not authorized"},
+    {0x74,0x79,"Security conflict in translated device"},
     {0, 0, NULL}
 };
 
