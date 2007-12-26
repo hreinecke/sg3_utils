@@ -41,7 +41,7 @@ case "${host}" in
                 AC_SUBST([os_libs], ['']) ;;
         *-*-mingw*)
 		AC_DEFINE_UNQUOTED(SG3_UTILS_WIN32, 1, [sg3_utils on Win32])
-		AC_DEFINE_UNQUOTED(SG3_UTILS_MINGW, 1, [sg3_utils on Win32])
+		AC_DEFINE_UNQUOTED(SG3_UTILS_MINGW, 1, [also MinGW environment])
                 AC_SUBST([os_libs], ['']) ;;
         *)
 		AC_DEFINE_UNQUOTED(SG3_UTILS_LINUX, 1, [assume sg3_utils on linux])

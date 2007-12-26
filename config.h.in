@@ -60,7 +60,7 @@
 /* assume sg3_utils on linux */
 #undef SG3_UTILS_LINUX
 
-/* sg3_utils on Win32 */
+/* also MinGW environment */
 #undef SG3_UTILS_MINGW
 
 /* sg3_utils on Tru64 UNIX */
