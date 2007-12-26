@@ -19799,6 +19799,11 @@ cat >>confdefs.h <<_ACEOF
 #define SG3_UTILS_WIN32 1
 _ACEOF
 
+
+cat >>confdefs.h <<_ACEOF
+#define SG3_UTILS_MINGW 1
+_ACEOF
+
                 os_libs=''
  ;;
         *)
