@@ -13,6 +13,8 @@
 #include <limits.h>
 #include <pthread.h>
 #include <signal.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -54,7 +56,7 @@
 
 */
 
-static char * version_str = "5.38 20070728";
+static char * version_str = "5.39 20071226";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -220,14 +222,14 @@ static void print_stats(const char * str)
     int64_t infull, outfull;
 
     if (0 != rcoll.out_rem_count)
-        fprintf(stderr, "  remaining block count=%lld\n",
+        fprintf(stderr, "  remaining block count=%"PRId64"\n",
                 rcoll.out_rem_count);
     infull = dd_count - rcoll.in_rem_count;
-    fprintf(stderr, "%s%lld+%d records in\n", str, infull - rcoll.in_partial,
+    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, infull - rcoll.in_partial,
             rcoll.in_partial);
 
     outfull = dd_count - rcoll.out_rem_count;
-    fprintf(stderr, "%s%lld+%d records out\n", str,
+    fprintf(stderr, "%s%"PRId64"+%d records out\n", str,
             outfull - rcoll.out_partial, rcoll.out_partial);
 }
 
@@ -629,7 +631,7 @@ static int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     if (res < 0) {
         if (clp->in_flags.coe) {
             memset(rep->buffp, 0, rep->num_blks * rep->bs);
-            fprintf(stderr, ">> substituted zeros for in blk=%lld for "
+            fprintf(stderr, ">> substituted zeros for in blk=%"PRId64" for "
                     "%d bytes, %s\n", rep->blk, 
                     rep->num_blks * rep->bs, 
                     tsafe_strerror(errno, strerr_buff));
@@ -673,7 +675,7 @@ static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
         ;
     if (res < 0) {
         if (clp->out_flags.coe) {
-            fprintf(stderr, ">> ignored error for out blk=%lld for "
+            fprintf(stderr, ">> ignored error for out blk=%"PRId64" for "
                     "%d bytes, %s\n", rep->blk, 
                     rep->num_blks * rep->bs,
                     tsafe_strerror(errno, strerr_buff));
@@ -801,7 +803,7 @@ static void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
-            fprintf(stderr, ME "inputting to sg failed, blk=%lld\n",
+            fprintf(stderr, ME "inputting to sg failed, blk=%"PRId64"\n",
                     rep->blk);
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
@@ -831,7 +833,7 @@ static void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
                 return;
             } else {
                 memset(rep->buffp, 0, rep->num_blks * rep->bs);
-                fprintf(stderr, ">> substituted zeros for in blk=%lld for "
+                fprintf(stderr, ">> substituted zeros for in blk=%"PRId64" for "
                         "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
             }
             /* fall through */
@@ -871,7 +873,7 @@ static void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
-            fprintf(stderr, ME "outputting from sg failed, blk=%lld\n",
+            fprintf(stderr, ME "outputting from sg failed, blk=%"PRId64"\n",
                     rep->blk);
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
@@ -900,7 +902,7 @@ static void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
                 guarded_stop_both(clp);
                 return;
             } else
-                fprintf(stderr, ">> ignored error for out blk=%lld for "
+                fprintf(stderr, ">> ignored error for out blk=%"PRId64" for "
                         "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
             /* fall through */
         case 0:
@@ -939,7 +941,7 @@ static int sg_start_io(Rq_elem * rep)
 
     if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk, 
                           rep->wr, fua, dpo)) {
-        fprintf(stderr, ME "bad cdb build, start_blk=%lld, blocks=%d\n",
+        fprintf(stderr, ME "bad cdb build, start_blk=%"PRId64", blocks=%d\n",
                 rep->blk, rep->num_blks);
         return -1;
     }
@@ -958,7 +960,7 @@ static int sg_start_io(Rq_elem * rep)
     if (dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
     if (rep->debug > 8) {
-        fprintf(stderr, "sg_start_io: SCSI %s, blk=%lld num_blks=%d\n",
+        fprintf(stderr, "sg_start_io: SCSI %s, blk=%"PRId64" num_blks=%d\n",
                rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
         sg_print_command(hp->cmdp);
     }
@@ -1023,7 +1025,7 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
             {
                 char ebuff[EBUFF_SZ];
 
-                snprintf(ebuff, EBUFF_SZ, "%s blk=%lld",
+                snprintf(ebuff, EBUFF_SZ, "%s blk=%"PRId64,
                          wr ? "writing": "reading", rep->blk);
                 status = pthread_mutex_lock(a_mutp);
                 if (0 != status) err_exit(status, "lock aux_mutex");
@@ -1296,7 +1298,7 @@ int main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (rcoll.debug)
-        fprintf(stderr, ME "if=%s skip=%lld of=%s seek=%lld count=%lld\n",
+        fprintf(stderr, ME "if=%s skip=%"PRId64" of=%s seek=%"PRId64" count=%"PRId64"\n",
                inf, skip, outf, seek, dd_count);
 
     install_handler(SIGINT, interrupt_handler);
@@ -1518,8 +1520,8 @@ int main(int argc, char * argv[])
             dd_count = out_num_sect;
     }
     if (rcoll.debug > 1)
-        fprintf(stderr, "Start of loop, count=%lld, in_num_sect=%lld, "
-                "out_num_sect=%lld\n", dd_count, in_num_sect, out_num_sect);
+        fprintf(stderr, "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", "
+                "out_num_sect=%"PRId64"\n", dd_count, in_num_sect, out_num_sect);
     if (dd_count < 0) {
         fprintf(stderr, "Couldn't calculate count, please give one\n");
         return SG_LIB_CAT_OTHER;
@@ -1632,7 +1634,7 @@ int main(int argc, char * argv[])
         close(rcoll.outfd);
     res = exit_status;
     if (0 != rcoll.out_count) {
-        fprintf(stderr, ">>>> Some error occurred, remaining blocks=%lld\n",
+        fprintf(stderr, ">>>> Some error occurred, remaining blocks=%"PRId64"\n",
                rcoll.out_count);
         if (0 == res)
             res = SG_LIB_CAT_OTHER;

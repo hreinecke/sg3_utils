@@ -12,6 +12,8 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -55,7 +57,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.63 20070714";
+static char * version_str = "5.64 20071226";
 
 #define ME "sg_dd: "
 
@@ -177,13 +179,13 @@ static void install_handler(int sig_num, void (*sig_handler) (int sig))
 static void print_stats(const char * str)
 {
     if (0 != dd_count)
-        fprintf(stderr, "  remaining block count=%lld\n", dd_count);
-    fprintf(stderr, "%s%lld+%d records in\n", str, in_full - in_partial, 
+        fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
+    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial, 
             in_partial);
-    fprintf(stderr, "%s%lld+%d records out\n", str, out_full - out_partial, 
+    fprintf(stderr, "%s%"PRId64"+%d records out\n", str, out_full - out_partial, 
             out_partial);
     if (oflag.sparse)
-        fprintf(stderr, "%s%lld bypassed records out\n", str, out_sparse);
+        fprintf(stderr, "%s%"PRId64" bypassed records out\n", str, out_sparse);
     if (recovered_errs > 0)
         fprintf(stderr, "%s%d recovered errors\n", str, recovered_errs);
     if (num_retries > 0)
@@ -367,7 +369,7 @@ static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
                    (rcBuff[6] << 8) | rcBuff[7];
     }
     if (verbose)
-        fprintf(stderr, "      number of blocks=%lld [0x%llx], block "
+        fprintf(stderr, "      number of blocks=%"PRId64" [0x%"PRIx64"], block "
                 "size=%d\n", *num_sect, *num_sect, *sect_sz);
     return 0;
 }
@@ -392,7 +394,7 @@ static int read_blkdev_capacity(int sg_fd, int64_t * num_sect,
         }
         *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
         if (verbose)
-            fprintf(stderr, "      [bgs64] number of blocks=%lld [0x%llx], "
+            fprintf(stderr, "      [bgs64] number of blocks=%"PRId64" [0x%"PRIx64"], "
                     "block size=%d\n", *num_sect, *num_sect, *sect_sz);
  #else
         unsigned long ul;
@@ -403,7 +405,7 @@ static int read_blkdev_capacity(int sg_fd, int64_t * num_sect,
         }
         *num_sect = (int64_t)ul;
         if (verbose)
-            fprintf(stderr, "      [bgs] number of blocks=%lld [0x%llx], "
+            fprintf(stderr, "      [bgs] number of blocks=%"PRId64" [0x%"PRIx64"], "
                     " block size=%d\n", *num_sect, *num_sect, *sect_sz);
  #endif
     }
@@ -528,7 +530,7 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
 
     if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, 0,
                           ifp->fua, ifp->dpo)) {
-        fprintf(stderr, ME "bad rd cdb build, from_block=%lld, blocks=%d\n",
+        fprintf(stderr, ME "bad rd cdb build, from_block=%"PRId64", blocks=%d\n",
                 from_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -573,12 +575,12 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
                                            io_addrp);
         if (info_valid) {
             fprintf(stderr, "    lba of last recovered error in this "
-                    "READ=0x%llx\n", *io_addrp);
+                    "READ=0x%"PRIx64"\n", *io_addrp);
             if (verbose > 1)
                 sg_chk_n_print3("reading", &io_hdr, 1);
         } else {
             fprintf(stderr, "Recovered error: [no info] reading from "
-                    "block=0x%llx, num=%d\n", from_block, blocks);
+                    "block=0x%"PRIx64", num=%d\n", from_block, blocks);
             sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         }
         break;
@@ -671,7 +673,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             break;
         case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
             if (retries_tmp > 0) {
-                fprintf(stderr, ">>> retrying a sgio read, lba=0x%llx\n",
+                fprintf(stderr, ">>> retrying a sgio read, lba=0x%"PRIx64"\n",
                         (uint64_t)lba);
                 --retries_tmp;
                 ++num_retries;
@@ -691,7 +693,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         case SG_LIB_CAT_MEDIUM_HARD:
         default:
             if (retries_tmp > 0) {
-                fprintf(stderr, ">>> retrying a sgio read, lba=0x%llx\n",
+                fprintf(stderr, ">>> retrying a sgio read, lba=0x%"PRIx64"\n",
                         (uint64_t)lba);
                 --retries_tmp;
                 ++num_retries;
@@ -707,8 +709,8 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             continue;
         if ((io_addr < (uint64_t)lba) ||
             (io_addr >= (uint64_t)(lba + blks))) {
-                fprintf(stderr, "  Unrecovered error lba 0x%llx not in "
-                    "correct range:\n\t[0x%llx,0x%llx]\n", io_addr,
+                fprintf(stderr, "  Unrecovered error lba 0x%"PRIx64" not in "
+                    "correct range:\n\t[0x%"PRIx64",0x%"PRIx64"]\n", io_addr,
                     (uint64_t)lba,
                     (uint64_t)(lba + blks - 1));
             goto err_out;
@@ -764,7 +766,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
         bp += (blks * bs);
         lba += blks;
         if ((0 != ifp->pdt) || (ifp->coe < 2)) {
-            fprintf(stderr, ">> unrecovered read error at blk=%lld, "
+            fprintf(stderr, ">> unrecovered read error at blk=%"PRId64", "
                     "pdt=%d, use zeros\n", lba, ifp->pdt);
             memset(bp, 0, bs);
         } else if (io_addr < UINT_MAX) {
@@ -833,7 +835,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                 memset(bp, 0, bs);
             free(buffp);
         } else {
-            fprintf(stderr, ">> read_long(10) cannot handle blk=%lld, "
+            fprintf(stderr, ">> read_long(10) cannot handle blk=%"PRId64", "
                     "use zeros\n", lba);
             memset(bp, 0, bs);
         }
@@ -854,7 +856,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
 err_out:
     if (ifp->coe) {
         memset(bp, 0, bs * blks);
-        fprintf(stderr, ">> unable to read at blk=%lld for "
+        fprintf(stderr, ">> unable to read at blk=%"PRId64" for "
                 "%d bytes, use zeros\n", lba, bs * blks);
         /* fudge success */
         if (blks_readp)
@@ -880,7 +882,7 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
 
     if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, 1, ofp->fua,
                           ofp->dpo)) {
-        fprintf(stderr, ME "bad wr cdb build, to_block=%lld, blocks=%d\n",
+        fprintf(stderr, ME "bad wr cdb build, to_block=%"PRId64", blocks=%d\n",
                 to_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -926,12 +928,12 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
                                            &io_addr);
         if (info_valid) {
             fprintf(stderr, "    lba of last recovered error in this "
-                    "WRITE=0x%llx\n", io_addr);
+                    "WRITE=0x%"PRIx64"\n", io_addr);
             if (verbose > 1)
                 sg_chk_n_print3("writing", &io_hdr, 1);
         } else {
             fprintf(stderr, "Recovered error: [no info] writing to "
-                    "block=0x%llx, num=%d\n", to_block, blocks);
+                    "block=0x%"PRIx64", num=%d\n", to_block, blocks);
             sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         }
         break;
@@ -948,7 +950,7 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
         sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         ++unrecovered_errs;
         if (ofp->coe) {
-            fprintf(stderr, ">> ignored errors for out blk=%lld for "
+            fprintf(stderr, ">> ignored errors for out blk=%"PRId64" for "
                     "%d bytes\n", to_block, bs * blocks);
             return 0; /* fudge success */
         } else
@@ -1237,7 +1239,7 @@ int main(int argc, char * argv[])
     if ((blk_sz >= 2048) && (0 == bpt_given))
         bpt = DEF_BLOCKS_PER_2048TRANSFER;
 #ifdef SG_DEBUG
-    fprintf(stderr, ME "if=%s skip=%lld of=%s seek=%lld count=%lld\n",
+    fprintf(stderr, ME "if=%s skip=%"PRId64" of=%s seek=%"PRId64" count=%"PRId64"\n",
            inf, skip, outf, seek, dd_count);
 #endif
     install_handler(SIGINT, interrupt_handler);
@@ -1337,7 +1339,7 @@ int main(int argc, char * argv[])
                     }
                     if (verbose)
                         fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
-                                "byte offset=0x%llx\n",
+                                "byte offset=0x%"PRIx64"\n",
                                 (uint64_t)offset);
                 }
             }
@@ -1440,7 +1442,7 @@ int main(int argc, char * argv[])
                 }
                 if (verbose)
                     fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
-                            "byte offset=0x%llx\n",
+                            "byte offset=0x%"PRIx64"\n",
                             (uint64_t)offset);
             }
         }
@@ -1538,7 +1540,7 @@ int main(int argc, char * argv[])
             out_num_sect -= seek;
 #ifdef SG_DEBUG
         fprintf(stderr, 
-            "Start of loop, count=%lld, in_num_sect=%lld, out_num_sect=%lld\n", 
+            "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", out_num_sect=%"PRId64"\n", 
             dd_count, in_num_sect, out_num_sect);
 #endif
         if (dd_count < 0) {
@@ -1593,7 +1595,7 @@ int main(int argc, char * argv[])
 
     blocks_per = bpt;
 #ifdef SG_DEBUG
-    fprintf(stderr, "Start of loop, count=%lld, blocks_per=%d\n",
+    fprintf(stderr, "Start of loop, count=%"PRId64", blocks_per=%d\n",
             dd_count, blocks_per);
 #endif
     if (do_time) {
@@ -1632,8 +1634,8 @@ int main(int argc, char * argv[])
                 }
             }
             if (res) {
-                fprintf(stderr, "sg_read failed,%s at or after lba=%lld "
-                        "[0x%llx]\n",
+                fprintf(stderr, "sg_read failed,%s at or after lba=%"PRId64" "
+                        "[0x%"PRIx64"]\n",
                         ((-2 == res) ? " try reducing bpt," : ""), skip, skip);
                 ret = res;
                 break;
@@ -1654,7 +1656,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "read(unix): count=%d, res=%d\n",
                         blocks * blk_sz, res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%lld ", skip);
+                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%"PRId64" ", skip);
                 perror(ebuff);
                 ret = -1;
                 break;
@@ -1691,7 +1693,7 @@ int main(int argc, char * argv[])
                 out_sparse += blocks;
                 if (verbose > 2)
                     fprintf(stderr, "sparse bypassing sg_write: seek "
-                            "blk=%lld, offset blks=%d\n", seek, blocks);
+                            "blk=%"PRId64", offset blks=%d\n", seek, blocks);
             } else if (FT_DEV_NULL & out_type)
                 ;
             else {
@@ -1700,18 +1702,18 @@ int main(int argc, char * argv[])
 
                 if (verbose > 2)
                     fprintf(stderr, "sparse bypassing write: "
-                            "seek=%lld, rel offset=%lld\n", (seek * blk_sz),
+                            "seek=%"PRId64", rel offset=%"PRId64"\n", (seek * blk_sz),
                             (int64_t)offset);
                 off_res = lseek64(outfd, offset, SEEK_CUR);
                 if (off_res < 0) {
                     fprintf(stderr, "sparse tried to bypass write: "
-                            "seek=%lld, rel offset=%lld but ...\n",
+                            "seek=%"PRId64", rel offset=%"PRId64" but ...\n",
                             (seek * blk_sz), (int64_t)offset);
                     perror("lseek64 on output");
                     ret = SG_LIB_FILE_ERROR;
                     break;
                 } else if (verbose > 4)
-                    fprintf(stderr, "oflag=sparse lseek64 result=%lld\n",
+                    fprintf(stderr, "oflag=sparse lseek64 result=%"PRId64"\n",
                            (int64_t)off_res);
                 out_sparse += blocks;
             }
@@ -1760,7 +1762,7 @@ int main(int argc, char * argv[])
                     break;
                 else if (retries_tmp > 0) {
                     fprintf(stderr, ">>> retrying a sgio write, "
-                            "lba=0x%llx\n", (uint64_t)seek);
+                            "lba=0x%"PRIx64"\n", (uint64_t)seek);
                     --retries_tmp;
                     ++num_retries;
                     if (unrecovered_errs > 0)
@@ -1770,7 +1772,7 @@ int main(int argc, char * argv[])
                 first = 0;
             }
             if (0 != ret) {
-                fprintf(stderr, "sg_write failed,%s seek=%lld\n", 
+                fprintf(stderr, "sg_write failed,%s seek=%"PRId64"\n", 
                         ((-2 == ret) ? " try reducing bpt," : ""), seek);
                 break;
             } else {
@@ -1788,12 +1790,12 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "write(unix): count=%d, res=%d\n",
                         blocks * blk_sz, res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%lld ", seek);
+                snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%"PRId64" ", seek);
                 perror(ebuff);
                 ret = -1;
                 break;
             } else if (res < blocks * blk_sz) {
-                fprintf(stderr, "output file probably full, seek=%lld ", seek);
+                fprintf(stderr, "output file probably full, seek=%"PRId64" ", seek);
                 blocks = res / blk_sz;
                 out_full += blocks;
                 if ((res % blk_sz) > 0)
@@ -1822,7 +1824,7 @@ int main(int argc, char * argv[])
                         "res=%d\n", penult_blocks * blk_sz, res);
             if (res < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "writing(sparse after error), "
-                        "seek=%lld ", seek);
+                        "seek=%"PRId64" ", seek);
                 perror(ebuff);
             }
         }
