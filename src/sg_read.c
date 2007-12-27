@@ -11,6 +11,8 @@
 #include <signal.h>
 #include <ctype.h>
 #include <errno.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -45,7 +47,7 @@
 
 */
 
-static const char * version_str = "1.17 20070714";
+static const char * version_str = "1.18 20071226";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -102,8 +104,8 @@ static void print_stats(int iters, const char * str)
 {
     if (orig_count > 0) {
         if (0 != dd_count)
-            fprintf(stderr, "  remaining block count=%lld\n", dd_count);
-        fprintf(stderr, "%lld+%d records in", in_full - in_partial,
+            fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
+        fprintf(stderr, "%"PRId64"+%d records in", in_full - in_partial,
                 in_partial);
         if (iters > 0)
             fprintf(stderr, ", %s commands issued: %d\n", (str ? str : ""),
@@ -303,7 +305,7 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, dpo)) {
-        fprintf(stderr, ME "bad cdb build, from_block=%lld, blocks=%d\n",
+        fprintf(stderr, ME "bad cdb build, from_block=%"PRId64", blocks=%d\n",
                 from_block, blocks);
         return -1;
     }
@@ -672,7 +674,7 @@ int main(int argc, char * argv[])
     start_tm.tv_usec = 0;
 
     if (verbose && (dd_count < 0))
-        fprintf(stderr, "About to issue %lld zero block SCSI READs\n",
+        fprintf(stderr, "About to issue %"PRId64" zero block SCSI READs\n",
                 0 - dd_count);
 
     /* main loop */
@@ -749,7 +751,7 @@ int main(int argc, char * argv[])
                    (EINTR == errno))
                 ;
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%lld ", skip);
+                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%"PRId64" ", skip);
                 perror(ebuff);
                 break;
             } else if (res < blocks * bs) {

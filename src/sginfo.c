@@ -115,7 +115,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.25 [20070714]";
+static const char * version_str = "2.26 [20071226]";
 
 #include <stdio.h>
 #include <string.h>
@@ -126,6 +126,8 @@ static const char * version_str = "2.25 [20070714]";
 #include <errno.h>
 #include <stdlib.h>
 #include <ctype.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -638,13 +640,13 @@ static void check_parm_type(int i)
 
     if (i == 1 && is_hex[next_parameter] != 1) {
         snprintf(reason, REASON_SZ,
-                 "simple number (pos %i) instead of @ hexdatafield: %llu",
+                 "simple number (pos %i) instead of @ hexdatafield: %"PRIu64,
                  next_parameter, replacement_values[next_parameter]);
         usage (reason);
     }
     if (i != 1 && is_hex[next_parameter]) {
         snprintf(reason, REASON_SZ,
-                 "@ hexdatafield (pos %i) instead of a simple number: %llu",
+                 "@ hexdatafield (pos %i) instead of a simple number: %"PRIu64,
                  next_parameter, replacement_values[next_parameter]);
         usage (reason);
     }
@@ -1754,7 +1756,7 @@ trytenbyte:
                 }
             case 3:     /* lba (64 bit) */
                 while (len > 0) {
-                    printf("%15lld", getnbyte_ll(df, 8));
+                    printf("%15"PRId64, getnbyte_ll(df, 8));
                     len -= 8;
                     df += 8;
                     i++;
