@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.39 20071112";    /* ses2r19 */
+static char * version_str = "1.40 20080108";    /* ses2r19a */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -98,7 +98,9 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
           "sg_ses [--byte1=B1] [--control] [--data=H,H...] [--filter] "
@@ -140,8 +142,9 @@ static void usage()
  * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, 
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, 
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failures */
-static int do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, 
-                       int outgoing_len, int noisy, int verbose)
+static int
+do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
+            int noisy, int verbose)
 {
     return sg_ll_send_diag(sg_fd, 0 /* sf_code */, pf_bit, 0 /* sf_bit */,
                            0 /* devofl_bit */, 0 /* unitofl_bit */,
@@ -196,7 +199,8 @@ static struct page_code_desc in_pc_desc_arr[] = {
         {0x41, "Device status (SBC)"},
 };
 
-static const char * find_page_code_desc(int page_num)
+static const char *
+find_page_code_desc(int page_num)
 {
     int k;
     int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
@@ -211,7 +215,8 @@ static const char * find_page_code_desc(int page_num)
     return NULL;
 }
 
-static const char * find_in_page_code_desc(int page_num)
+static const char *
+find_in_page_code_desc(int page_num)
 {
     int k;
     int num = sizeof(in_pc_desc_arr) / sizeof(in_pc_desc_arr[0]);
@@ -259,7 +264,8 @@ static struct element_desc element_desc_arr[] = {
         {SAS_CONNECTOR_EL, "SAS connector"},
 };
 
-static const char * find_element_desc(int elem_code)
+static const char *
+find_element_desc(int elem_code)
 {
     int k;
     int num = sizeof(element_desc_arr) / sizeof(element_desc_arr[0]);
@@ -275,7 +281,8 @@ static const char * find_element_desc(int elem_code)
 }
 
 #if 0
-static const char * get_element_desc(int elem_code, int b_len, char * b)
+static const char *
+get_element_desc(int elem_code, int b_len, char * b)
 {
     const char * elem_desc;
 
@@ -299,7 +306,8 @@ struct element_hdr {
 
 static struct element_hdr element_hdr_arr[MX_ELEM_HDR];
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -307,7 +315,8 @@ static void dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
+static void
+ses_configuration_sdg(const unsigned char * resp, int resp_len)
 {
     int j, k, el, num_subs, sum_elem_types;
     unsigned int gen_code;
@@ -322,7 +331,7 @@ static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     sum_elem_types = 0;
     last_ucp = resp + resp_len - 1;
-    printf("  number of subenclosures (other than primary): %d\n",
+    printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
@@ -336,7 +345,7 @@ static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
         printf("    Subenclosure identifier: %d\n", ucp[1]);
         printf("      relative ES process id: %d, number of ES processes"
                ": %d\n", ((ucp[0] & 0x70) >> 4), (ucp[0] & 0x7));
-        printf("      number of element type descriptor headers: %d\n", ucp[2]);
+        printf("      number of type descriptor headers: %d\n", ucp[2]);
         if (el < 40) {
             fprintf(stderr, "      enc descriptor len=%d ??\n", el);
             continue;
@@ -363,7 +372,7 @@ static void ses_configuration_sdg(const unsigned char * resp, int resp_len)
         else
             printf("    Element type: [0x%x], subenclosure id: %d\n",
                    ucp[0], ucp[2]);
-        printf("      possible number of elements: %d\n", ucp[1]);
+        printf("      number of possible elements: %d\n", ucp[1]);
         if (ucp[3] > 0) {
             if (text_ucp > last_ucp)
                 goto truncated;
@@ -379,8 +388,9 @@ truncated:
 
 /* Returns number of elements written to 'ehp' or -1 if there is
    a problem */ 
-static int populate_element_hdr_arr(int fd, struct element_hdr * ehp,
-                                    unsigned int * generationp, int verbose)
+static int
+populate_element_hdr_arr(int fd, struct element_hdr * ehp,
+                         unsigned int * generationp, int verbose)
 {
     int resp_len, k, el, num_subs, sum_elem_types, res;
     unsigned int gen_code;
@@ -451,8 +461,8 @@ p_truncated:
     return -1;
 }
 
-static char * find_sas_connector_type(int conn_type, char * buff,
-                                      int buff_len)
+static char *
+find_sas_connector_type(int conn_type, char * buff, int buff_len)
 {
     switch (conn_type) {
     case 0x0:
@@ -541,9 +551,9 @@ static const char * invop_type_desc[] = {
     "Reserved", "Vendor specific error"
 };
 
-static void print_element_status(const char * pad,
-                                 const unsigned char * statp, int etype,
-                                 int filter)
+static void
+print_element_status(const char * pad, const unsigned char * statp, int etype,
+                     int filter)
 {
     int res, a, b;
     char buff[128];
@@ -836,10 +846,10 @@ static void print_element_status(const char * pad,
     }
 }
 
-static void ses_enclosure_sdg(const struct element_hdr * ehp, int num_telems,
-                              unsigned int ref_gen_code, 
-                              const unsigned char * resp, int resp_len,
-                              int inner_hex, int filter)
+static void
+ses_enclosure_sdg(const struct element_hdr * ehp, int num_telems,
+                  unsigned int ref_gen_code, const unsigned char * resp,
+                  int resp_len, int inner_hex, int filter)
 {
     int j, k;
     unsigned int gen_code;
@@ -898,8 +908,8 @@ truncated:
     return;
 }
 
-static char * reserved_or_num(char * buff, int buff_len, int num,
-                              int reserve_num)
+static char *
+reserved_or_num(char * buff, int buff_len, int num, int reserve_num)
 {
     if (num == reserve_num)
         strncpy(buff, "<res>", buff_len);
@@ -910,9 +920,9 @@ static char * reserved_or_num(char * buff, int buff_len, int num,
     return buff;
 }
 
-static void ses_threshold_helper(const char * pad, const unsigned char *tp,
-                                 int etype, int p_num, int inner_hex,
-                                 int verbose)
+static void
+ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
+                     int p_num, int inner_hex, int verbose)
 {
     char buff[128];
     char b[128];
@@ -982,10 +992,10 @@ static void ses_threshold_helper(const char * pad, const unsigned char *tp,
     }
 }
 
-static void ses_threshold_sdg(const struct element_hdr * ehp, int num_telems,
-                              unsigned int ref_gen_code, 
-                              const unsigned char * resp, int resp_len,
-                              int inner_hex, int verbose)
+static void
+ses_threshold_sdg(const struct element_hdr * ehp, int num_telems,
+                  unsigned int ref_gen_code, const unsigned char * resp,
+                  int resp_len, int inner_hex, int verbose)
 {
     int j, k;
     unsigned int gen_code;
@@ -1032,9 +1042,10 @@ truncated:
     return;
 }
 
-static void ses_element_desc_sdg(const struct element_hdr * ehp,
-                         int num_telems, unsigned int ref_gen_code,
-                         const unsigned char * resp, int resp_len)
+static void
+ses_element_desc_sdg(const struct element_hdr * ehp, int num_telems,
+                     unsigned int ref_gen_code, const unsigned char * resp,
+                     int resp_len)
 {
     int j, k, desc_len;
     unsigned int gen_code;
@@ -1109,8 +1120,9 @@ static char * sas_device_type[] = {
     "reserved [4]", "reserved [5]", "reserved [6]", "reserved [7]"
 };
 
-static void ses_additional_elem_each(const unsigned char * ucp, int len,
-                                     int elem_num, int elem_type)
+static void
+ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
+                         int elem_type)
 {
     int ports, phys, j, m, desc_type, eip_offset;
     const unsigned char * per_ucp;
@@ -1235,10 +1247,10 @@ static void ses_additional_elem_each(const unsigned char * ucp, int len,
 
 /* Previously called "Device element status descriptor". Changed "device"
    to "additional" to allow for SAS expander and SATA devices */
-static void ses_additional_elem_sdg(const struct element_hdr * ehp,
-                         int num_telems, unsigned int ref_gen_code,
-                         const unsigned char * resp, int resp_len,
-                         int inner_hex)
+static void
+ses_additional_elem_sdg(const struct element_hdr * ehp, int num_telems,
+                        unsigned int ref_gen_code, const unsigned char * resp,
+                        int resp_len, int inner_hex)
 {
     int j, k, desc_len, elem_type, invalid;
     unsigned int gen_code;
@@ -1296,7 +1308,8 @@ truncated:
     return;
 }
 
-static void ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
+static void
+ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
 {
     int k, el, num_subs;
     unsigned int gen_code;
@@ -1308,7 +1321,7 @@ static void ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_ucp = resp + resp_len - 1;
-    printf("  number of subenclosures (other than primary): %d\n",
+    printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
@@ -1330,7 +1343,8 @@ truncated:
     return;
 }
 
-static void ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
+static void
+ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
 {
     int k, el, num_subs;
     unsigned int gen_code;
@@ -1342,7 +1356,7 @@ static void ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_ucp = resp + resp_len - 1;
-    printf("  number of subenclosures (other than primary): %d\n",
+    printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
@@ -1364,8 +1378,9 @@ truncated:
     return;
 }
 
-static void ses_supported_pages_sdg(const char * leadin,
-                                    const unsigned char * resp, int resp_len)
+static void
+ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
+                        int resp_len)
 {
     int k, code, prev;
     const char * cp;
@@ -1380,7 +1395,8 @@ static void ses_supported_pages_sdg(const char * leadin,
     }
 }
 
-static void ses_download_code_sdg(const unsigned char * resp, int resp_len)
+static void
+ses_download_code_sdg(const unsigned char * resp, int resp_len)
 {
     int k, num_subs;
     unsigned int gen_code;
@@ -1392,7 +1408,7 @@ static void ses_download_code_sdg(const unsigned char * resp, int resp_len)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_ucp = resp + resp_len - 1;
-    printf("  number of subenclosures (other than primary): %d\n",
+    printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
@@ -1417,7 +1433,8 @@ truncated:
 }
 
 
-static int read_hex(const char * inp, unsigned char * arr, int * arr_len)
+static int
+read_hex(const char * inp, unsigned char * arr, int * arr_len)
 {
     int in_len, k, j, m, off;
     unsigned int h;
@@ -1514,9 +1531,9 @@ static int read_hex(const char * inp, unsigned char * arr, int * arr_len)
     return 0;
 }
 
-static int ses_process_status(int sg_fd, int page_code, int do_raw,
-                              int do_hex, int inner_hex, int filter,
-                              int verbose)
+static int
+ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
+                   int inner_hex, int filter, int verbose)
 {
     int rsp_len, res;
     unsigned int ref_gen_code;
@@ -1679,7 +1696,8 @@ static int ses_process_status(int sg_fd, int page_code, int do_raw,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c;
     int do_control = 0;
