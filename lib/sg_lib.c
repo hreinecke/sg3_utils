@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2007 Douglas Gilbert.
+ * Copyright (c) 1999-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -71,7 +71,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.38 20071221";    /* spc-4 rev 11+ */
+static char * version_str = "1.39 20080111";    /* spc-4 rev 11+ */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -777,6 +777,8 @@ static struct error_info additional[] =
     {0x30,0x0C,"WORM medium - overwrite attempted"},
     {0x30,0x0D,"WORM medium - integrity check"},
     {0x30,0x10,"Medium not formatted"},
+    {0x30,0x11,"Incompatible volume type"},
+    {0x30,0x12,"Incompatible volume qualifier"},
     {0x31,0x00,"Medium format corrupted"},
     {0x31,0x01,"Format command failed"},
     {0x31,0x02,"Zoned formatting failed due to spare linking"},
@@ -914,6 +916,7 @@ static struct error_info additional[] =
     {0x55,0x06,"Auxiliary memory out of space"},
     {0x55,0x07,"Quota error"},
     {0x55,0x08,"Maximum number of supplemental decryption keys exceeded"},
+    {0x55,0x09,"Medium auxiliary memory not accessible"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
