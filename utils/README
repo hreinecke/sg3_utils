@@ -6,14 +6,19 @@ This directory contains these utilities:
     an ASCII interpretation to the right of each line.
   - sg_chk_asc: utility decodes the SCSI additional sense code table
     found at http://www.t10.org/lists/asc-num.txt and checks it
-    against the table found in sg_lib.c in the main directory.
+    against the table found in sg_lib.c in the lib/ subdirectory.
     It is designed to keep the table in sg_lib.c in "sync" with the
     table at the t10.org web site.
 
 
-These utilities can be built for Linux or FreeBSD. To build sg_chk_asc
-the sg_lib.o file must be present (i.e. compiled) in the lib/ directory.
+These utilities can be built for Linux, FreeBSD or Solaris.
 The hxascdmp utility can also be built in a Windows MinGW/MSYS environment.
+This command should be sufficient: 'make hxascdmp' .
+
+To build sg_chk_asc the sg_lib.o file must be present (i.e. compiled) in
+the lib/ subdirectory. One way to meet that requirement is to execute
+'./configure' in the main directory then 'cd lib ; make '.
+
 
 Doug Gilbert
-21st December 2007 
+11th January 2008 
