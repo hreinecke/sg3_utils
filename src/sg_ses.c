@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.40 20080108";    /* ses2r19a */
+static char * version_str = "1.41 20080111";    /* ses2r19a */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1379,6 +1379,41 @@ truncated:
 }
 
 static void
+ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
+{
+    int k, el, num_subs;
+    unsigned int gen_code;
+    const unsigned char * ucp;
+    const unsigned char * last_ucp;
+
+    printf("Subenclosure nickname status diagnostic page:\n");
+    if (resp_len < 4)
+        goto truncated;
+    num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
+    last_ucp = resp + resp_len - 1;
+    printf("  number of secondary subenclosures: %d\n",
+            num_subs - 1);
+    gen_code = (resp[4] << 24) | (resp[5] << 16) |
+               (resp[6] << 8) | resp[7];
+    printf("  generation code: 0x%x\n", gen_code);
+    ucp = resp + 8;
+    el = 40;
+    for (k = 0; k < num_subs; ++k, ucp += el) {
+        if ((ucp + el - 1) > last_ucp)
+            goto truncated;
+        printf("   subenclosure identifier: %d\n", ucp[1]);
+        printf("   nickname status: 0x%x\n", ucp[2]);
+        printf("   nickname additional status: 0x%x\n", ucp[3]);
+        printf("   nickname language code: %.2s\n", ucp + 6);
+// xxxxxxxxxxxxxxxxxxxxx <<<<<<<<<<<<<<<<<<<
+    }
+    return;
+truncated:
+    fprintf(stderr, "    <<<subence str: response too short>>>\n");
+    return;
+}
+
+static void
 ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
                         int resp_len)
 {
@@ -1657,6 +1692,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 ses_download_code_sdg(rsp_buff, rsp_len);
                 break;
             case 0xf: 
+                ses_subenc_nickname_sdg(rsp_buff, rsp_len);
                 /* subenclosure nickname: place holder */
                 break;
             default:
