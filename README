@@ -66,13 +66,14 @@ as they please. Attribution is encouraged. Please check the code as other
 contributors (apart from the author) may also have copyright notices. For a
 list of contributors see the CREDITS file.
 
-The "sg_lib.[hc]" files contain ASCII text corresponding to most of the SCSI
-commands, errors and warning conditions. The "sg_cmds_basic.[hc]" files
-contains code to invoke common SCSI commands and associated response
-processing. The "sg_cmds_extra.[hc]" files contains code to invoke lesser
-used SCSI commands and associated response processing. All are guided by
-recent drafts at www.t10.org which is the home site of SCSI (draft)
-standards. Linux specific code has been removed from sg_lib.[hc],
+The "sg_lib_data.[hc]" files contain ASCII text corresponding to most of the
+SCSI commands, errors and warning conditions. The interface to this data
+plus several related helper functions are found in the sg_lib.[hc] files.
+The "sg_cmds_basic.[hc]" files contains code to invoke common SCSI commands
+and associated response processing. The "sg_cmds_extra.[hc]" files contains
+code to invoke lesser used SCSI commands and associated response processing.
+All are guided by recent drafts at www.t10.org which is the home site of
+SCSI (draft) standards. Linux specific code has been removed from sg_lib.[hc],
 sg_cmds_basic.[hc] and sg_cmds_extra.[hc] . The SCSI command implementations
 in sg_cmds_basic.c and sg_cmds_extra.c access the OS pass through mechanism
 via the function based interface defined in sg_pt.h . The linux specific
@@ -198,7 +199,7 @@ which accepts binary data from stdin (or a file on the command line) and
 outputs an ASCII-HEX and ASCII representation of it. It is similar to the
 Unix od command. There is also code to sg_chk_asc.c which checks a given
 text file (typically a copy of http://www.t10.org/lists/asc-num.txt ) and
-checks it against the asc/ascq text strings held in sg_lib.c .
+checks it against the asc/ascq text strings held in sg_lib_data.c .
 
 The 'doc' subdirectory contains a README.doc file containing the urls of
 various related documents.
@@ -327,4 +328,4 @@ See http://www.torque.net/sg/tools.html
 
 
 Doug Gilbert
-8th January 2008
+14th January 2008

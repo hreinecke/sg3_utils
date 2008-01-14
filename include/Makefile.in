@@ -46,9 +46,9 @@ CONFIG_CLEAN_FILES =
 SOURCES =
 DIST_SOURCES =
 am__noinst_HEADERS_DIST = sg_linux_inc.h sg_io_linux.h sg_pt_win32.h
-am__scsiinclude_HEADERS_DIST = sg_lib.h sg_cmds.h sg_cmds_basic.h \
-	sg_cmds_extra.h sg_pt.h sg_linux_inc.h sg_io_linux.h \
-	sg_pt_win32.h
+am__scsiinclude_HEADERS_DIST = sg_lib.h sg_lib_data.h sg_cmds.h \
+	sg_cmds_basic.h sg_cmds_extra.h sg_pt.h sg_linux_inc.h \
+	sg_io_linux.h sg_pt_win32.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -172,6 +172,7 @@ top_srcdir = @top_srcdir@
 scsiincludedir = $(includedir)/scsi
 @OS_FREEBSD_TRUE@scsiinclude_HEADERS = \
 @OS_FREEBSD_TRUE@	sg_lib.h \
+@OS_FREEBSD_TRUE@	sg_lib_data.h \
 @OS_FREEBSD_TRUE@	sg_cmds.h \
 @OS_FREEBSD_TRUE@	sg_cmds_basic.h \
 @OS_FREEBSD_TRUE@	sg_cmds_extra.h \
@@ -179,6 +180,7 @@ scsiincludedir = $(includedir)/scsi
 
 @OS_LINUX_TRUE@scsiinclude_HEADERS = \
 @OS_LINUX_TRUE@	sg_lib.h \
+@OS_LINUX_TRUE@	sg_lib_data.h \
 @OS_LINUX_TRUE@	sg_cmds.h \
 @OS_LINUX_TRUE@	sg_cmds_basic.h \
 @OS_LINUX_TRUE@	sg_cmds_extra.h \
@@ -188,6 +190,7 @@ scsiincludedir = $(includedir)/scsi
 
 @OS_OSF_TRUE@scsiinclude_HEADERS = \
 @OS_OSF_TRUE@	sg_lib.h \
+@OS_OSF_TRUE@	sg_lib_data.h \
 @OS_OSF_TRUE@	sg_cmds.h \
 @OS_OSF_TRUE@	sg_cmds_basic.h \
 @OS_OSF_TRUE@	sg_cmds_extra.h \
@@ -195,6 +198,7 @@ scsiincludedir = $(includedir)/scsi
 
 @OS_SOLARIS_TRUE@scsiinclude_HEADERS = \
 @OS_SOLARIS_TRUE@	sg_lib.h \
+@OS_SOLARIS_TRUE@	sg_lib_data.h \
 @OS_SOLARIS_TRUE@	sg_cmds.h \
 @OS_SOLARIS_TRUE@	sg_cmds_basic.h \
 @OS_SOLARIS_TRUE@	sg_cmds_extra.h \
@@ -202,6 +206,7 @@ scsiincludedir = $(includedir)/scsi
 
 @OS_WIN32_CYGWIN_TRUE@scsiinclude_HEADERS = \
 @OS_WIN32_CYGWIN_TRUE@	sg_lib.h \
+@OS_WIN32_CYGWIN_TRUE@	sg_lib_data.h \
 @OS_WIN32_CYGWIN_TRUE@	sg_cmds.h \
 @OS_WIN32_CYGWIN_TRUE@	sg_cmds_basic.h \
 @OS_WIN32_CYGWIN_TRUE@	sg_cmds_extra.h \
@@ -210,6 +215,7 @@ scsiincludedir = $(includedir)/scsi
 
 @OS_WIN32_MINGW_TRUE@scsiinclude_HEADERS = \
 @OS_WIN32_MINGW_TRUE@	sg_lib.h \
+@OS_WIN32_MINGW_TRUE@	sg_lib_data.h \
 @OS_WIN32_MINGW_TRUE@	sg_cmds.h \
 @OS_WIN32_MINGW_TRUE@	sg_cmds_basic.h \
 @OS_WIN32_MINGW_TRUE@	sg_cmds_extra.h \

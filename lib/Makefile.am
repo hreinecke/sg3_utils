@@ -4,6 +4,7 @@ if OS_LINUX
 
 libsgutils_la_SOURCES = \
 	sg_lib.c \
+	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
 	sg_pt_linux.c
@@ -22,6 +23,7 @@ if OS_WIN32_MINGW
 
 libsgutils_la_SOURCES = \
 	sg_lib.c \
+	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
 	sg_pt_win32.c
@@ -40,6 +42,7 @@ if OS_WIN32_CYGWIN
 
 libsgutils_la_SOURCES = \
 	sg_lib.c \
+	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
 	sg_pt_win32.c
@@ -58,6 +61,7 @@ if OS_FREEBSD
 
 libsgutils_la_SOURCES = \
 	sg_lib.c \
+	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
 	sg_pt_freebsd.c
@@ -77,6 +81,7 @@ if OS_SOLARIS
 
 libsgutils_la_SOURCES = \
 	sg_lib.c \
+	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
 	sg_pt_solaris.c
@@ -96,6 +101,7 @@ if OS_OSF
 
 libsgutils_la_SOURCES = \
 	sg_lib.c \
+	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
 	sg_pt_osf1.c
