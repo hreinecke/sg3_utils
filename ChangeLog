@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080111]
+Changelog for sg3_utils-1.26 [20080113]
   - sg_ses: sync with ses2r19a
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
@@ -14,6 +14,7 @@ Changelog for sg3_utils-1.26 [20080111]
   - sg_write_long: add examples section to man page
   - sg_sat_phy_event: copied from examples directory and enhanced,
     rename original to sg__sat_phy_event
+  - sg_modes: add --maxlen= option to specify allocation length
   - change 'long long' to int64_t and 'unsigned long long' to
     uint64_t to stress that 64 bit integer wanted, not larger
   - sg_lib: update asc/ascq code pending spc4r12
