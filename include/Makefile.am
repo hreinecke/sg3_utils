@@ -5,6 +5,7 @@ if OS_LINUX
 
 scsiinclude_HEADERS = \
 	sg_lib.h \
+	sg_lib_data.h \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
@@ -22,6 +23,7 @@ if OS_WIN32_MINGW
 
 scsiinclude_HEADERS = \
 	sg_lib.h \
+	sg_lib_data.h \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
@@ -39,6 +41,7 @@ if OS_WIN32_CYGWIN
 
 scsiinclude_HEADERS = \
 	sg_lib.h \
+	sg_lib_data.h \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
@@ -56,6 +59,7 @@ if OS_FREEBSD
 
 scsiinclude_HEADERS = \
 	sg_lib.h \
+	sg_lib_data.h \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
@@ -73,6 +77,7 @@ if OS_SOLARIS
 
 scsiinclude_HEADERS = \
 	sg_lib.h \
+	sg_lib_data.h \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
@@ -90,6 +95,7 @@ if OS_OSF
 
 scsiinclude_HEADERS = \
 	sg_lib.h \
+	sg_lib_data.h \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
