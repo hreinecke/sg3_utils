@@ -13,7 +13,7 @@
 #include "sg_cmds_basic.h"
 
 /*
-*  Copyright (C) 2000-2007 D. Gilbert
+*  Copyright (C) 2000-2008 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,9 +26,10 @@
    
 */
 
-static char * version_str = "1.26 20071005";
+static char * version_str = "1.27 20080113";
 
-#define MX_ALLOC_LEN (1024 * 4)
+#define DEF_ALLOC_LEN (1024 * 4)
+#define DEF_6_ALLOC_LEN 252
 #define PG_CODE_ALL 0x3f
 #define PG_CODE_MASK 0x3f
 #define PG_CODE_MAX 0x3f
@@ -40,23 +41,24 @@ static char * version_str = "1.26 20071005";
 
 
 static struct option long_options[] = {
-        {"all", 0, 0, 'a'},
-        {"control", 1, 0, 'c'},
-        {"dbd", 0, 0, 'd'},
-        {"dbout", 0, 0, 'D'},
-        {"examine", 0, 0, 'e'},
-        {"flexible", 0, 0, 'f'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"list", 0, 0, 'l'},
-        {"llbaa", 0, 0, 'L'},
-        {"new", 0, 0, 'N'},
-        {"old", 0, 0, 'O'},
-        {"page", 1, 0, 'p'},
-        {"raw", 0, 0, 'r'},
-        {"six", 0, 0, '6'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"all", no_argument, 0, 'a'},
+        {"control", required_argument, 0, 'c'},
+        {"dbd", no_argument, 0, 'd'},
+        {"dbout", no_argument, 0, 'D'},
+        {"examine", no_argument, 0, 'e'},
+        {"flexible", no_argument, 0, 'f'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"list", no_argument, 0, 'l'},
+        {"llbaa", no_argument, 0, 'L'},
+        {"maxlen", required_argument, 0, 'm'},
+        {"new", no_argument, 0, 'N'},
+        {"old", no_argument, 0, 'O'},
+        {"page", required_argument, 0, 'p'},
+        {"raw", no_argument, 0, 'r'},
+        {"six", no_argument, 0, '6'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -70,6 +72,7 @@ struct opts_t {
     int do_hex;
     int do_list;
     int do_llbaa;
+    int maxlen;
     int do_raw;
     int do_six;
     int do_verbose;
@@ -89,9 +92,9 @@ usage()
            "[--examine]\n"
            "                [--flexible] [--help] [--hex] [--list] "
            "[--llbaa]\n"
-           "                [--page=PG[,SPG]] [--raw] [-R] [--six] "
-           "[--verbose] [--version]\n"
-           "                [DEVICE]\n"
+           "                [--maxlen=LEN] [--page=PG[,SPG]] [--raw] [-R] "
+           "[--six]\n"
+           "                [--verbose] [--version] [DEVICE]\n"
            "  where:\n"
            "    --all|-a        get all mode pages supported by device\n"
            "                    use twice to get all mode pages and subpages\n"
@@ -114,6 +117,10 @@ usage()
            "                    if no device given then assume disk type\n"
            "    --llbaa|-L      set Long LBA Accepted (LLBAA field in mode "
            "sense (10) cdb)\n"
+           "    --maxlen=LEN|-m LEN    max response length (allocation "
+           "length in cdb)\n"
+           "                           (def: 0 -> 4096 or 252 (for MODE SENSE 6) "
+           "bytes)\n"
            "    --page=PG|-p PG    page code to fetch (def: 63)\n"
            "    --page=PG,SPG|-p PG,SPG\n"
            "                       page code and subpage code to fetch "
@@ -134,8 +141,9 @@ usage_old()
 {
     printf("Usage:  sg_modes [-a] [-A] [-c=PC] [-d] [-D] [-e] [-f] [-h] "
            "[-H] [-l] [-L]\n"
-           "                 [-p=PG[,SPG]] [-r] [-subp=SPG] [-v] [-V] "
-           "[-6] [DEVICE]\n"
+           "                 [-m=LEN] [-p=PG[,SPG]] [-r] [-subp=SPG] [-v] "
+           "[-V] [-6]\n"
+           "                 [DEVICE]\n"
            " where:\n"
            "   -a    get all mode pages supported by device\n"
            "   -A    get all mode pages and subpages supported by device\n"
@@ -153,7 +161,9 @@ usage_old()
            "         if no device given then assume disk type\n"
            "   -L    set Long LBA Accepted (LLBAA field in mode sense "
            "10 cdb)\n"
-           "   -p=PG    page code in hex (def: 3f)\n"
+           "   -m=LEN    max response length (allocation length in cdb)\n"
+           "             (def: 0 -> 4096 or 252 (for MODE SENSE 6) bytes)\n"
+           "   -p=PG     page code in hex (def: 3f)\n"
            "   -p=PG,SPG    both in hex, (defs: 3f,0)\n"
            "   -r    mode page output to stdout, a byte per line in "
            "ASCII hex\n"
@@ -183,7 +193,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "6aAc:dDefhHlLNOp:rRsvV", long_options,
+        c = getopt_long(argc, argv, "6aAc:dDefhHlLm:NOp:rRsvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -231,6 +241,15 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'L':
             ++optsp->do_llbaa;
+            break;
+        case 'm':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 65535)) {
+                fprintf(stderr, "bad argument to '--maxlen='\n");
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            optsp->maxlen = n;
             break;
         case 'N':
             break;      /* ignore */
@@ -301,7 +320,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num;
+    int k, jmp_out, plen, num, n;
     unsigned int u, uu;
     const char * cp;
 
@@ -378,6 +397,14 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 optsp->page_control = u;
+            } else if (0 == strncmp("m=", cp, 2)) {
+                num = sscanf(cp + 2, "%d", &n);
+                if ((1 != num) || (n < 0) || (n > 65535)) {
+                    fprintf(stderr, "Bad argument after 'm=' option\n");
+                    usage_old();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                optsp->maxlen = n;
             } else if (0 == strncmp("p=", cp, 2)) {
                 if (NULL == strchr(cp + 2, ',')) {
                     num = sscanf(cp + 2, "%x", &u);
@@ -898,8 +925,10 @@ main(int argc, char * argv[])
     int sg_fd, k, num, len, res, md_len, bd_len, longlba, page_num, spf;
     char ebuff[EBUFF_SZ];
     const char * descp;
-    unsigned char rsp_buff[MX_ALLOC_LEN];
-    int rsp_buff_size = MX_ALLOC_LEN;
+    unsigned char * rsp_buff = NULL;
+    unsigned char def_rsp_buff[DEF_ALLOC_LEN];
+    unsigned char * malloc_rsp_buff = NULL;
+    int rsp_buff_size = DEF_ALLOC_LEN;
     int ret = 0;
     int density_code_off, t_proto, inq_pdt, inq_byte6, resp_mode6;
     int num_ua_pages;
@@ -949,14 +978,31 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    /* The 6 bytes command only allows up to 252 bytes of response data */
-    if (opts.do_six) { 
-        if (opts.do_llbaa) {
-            fprintf(stderr, "LLBAA not defined for MODE SENSE 6, try "
-                    "without '-L'\n");
+    if ((opts.do_six) && (opts.do_llbaa)) {
+        fprintf(stderr, "LLBAA not defined for MODE SENSE 6, try "
+                "without '-L'\n");
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if (opts.maxlen > 0) {
+        if (opts.do_six && (opts.maxlen > 255)) {
+            fprintf(stderr, "For Mode Sense (6) maxlen cannot exceed "
+                    "255\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        rsp_buff_size = 252;
+        if (opts.maxlen > DEF_ALLOC_LEN) {
+            malloc_rsp_buff = malloc(opts.maxlen);
+            if (NULL == malloc_rsp_buff) {
+                fprintf(stderr, "Unable to malloc maxlen=%d bytes\n",
+                        opts.maxlen);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            rsp_buff = malloc_rsp_buff;
+        } else
+            rsp_buff = def_rsp_buff;
+        rsp_buff_size = opts.maxlen;
+    } else {    /* maxlen == 0 */
+        rsp_buff_size = opts.do_six ? DEF_6_ALLOC_LEN : DEF_ALLOC_LEN;
+        rsp_buff = def_rsp_buff;
     }
     /* If no pages or list selected than treat as 'a' */
     if (! ((opts.pg_code >= 0) || opts.do_all || opts.do_list ||
@@ -967,14 +1013,16 @@ main(int argc, char * argv[])
                                      opts.do_verbose)) < 0) {
         fprintf(stderr, "error opening file: %s: %s\n",
                 opts.device_name, safe_strerror(-sg_fd));
+        if (malloc_rsp_buff)
+            free(malloc_rsp_buff);
         return SG_LIB_FILE_ERROR;
     }
 
     if (sg_simple_inquiry(sg_fd, &inq_out, 1, opts.do_verbose)) {
         fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
                 opts.device_name);
-        sg_cmds_close_device(sg_fd);
-        return SG_LIB_CAT_OTHER;
+        ret = SG_LIB_CAT_OTHER;
+        goto finish;
     }
     inq_pdt = inq_out.peripheral_type;
     inq_byte6 = inq_out.byte_6;
@@ -987,7 +1035,7 @@ main(int argc, char * argv[])
             list_page_codes(inq_pdt, inq_byte6, opts.subpg_code);
         else
             list_page_codes(inq_pdt, inq_byte6, -1);
-        return 0;
+        goto finish;
     }
     if (opts.do_examine) {
         ret = examine_pages(sg_fd, inq_pdt, inq_byte6, &opts);
@@ -1010,7 +1058,8 @@ main(int argc, char * argv[])
                 fprintf(stderr, "'-r' requires a specific (sub)page, not "
                         "all\n");
             usage_for(&opts);
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto finish;
         }
     }
 
@@ -1109,13 +1158,11 @@ main(int argc, char * argv[])
                 for (k = 0; k < len; ++k)
                     printf("%02x\n", ucp[k]);
             }
-            sg_cmds_close_device(sg_fd);
-            return 0;
+            goto finish;
         }
         if (1 == opts.do_hex) {
             dStrHex((const char *)rsp_buff, md_len, 1);
-            sg_cmds_close_device(sg_fd);
-            return 0;
+            goto finish;
         } else if (opts.do_hex > 1)
             dStrHex((const char *)rsp_buff, headerlen, 1);
         if (0 == inq_pdt)
@@ -1231,5 +1278,7 @@ main(int argc, char * argv[])
 
 finish:
     sg_cmds_close_device(sg_fd);
+    if (malloc_rsp_buff)
+        free(malloc_rsp_buff);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
