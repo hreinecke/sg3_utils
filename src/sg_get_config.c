@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.31 20071220";    /* mmc6r01 */
+static char * version_str = "0.32 20080114";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -279,7 +279,7 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
         case 4: cp = "IEEE 1394A"; break;
         case 5: cp = "Fibre channel"; break;
         case 6: cp = "IEEE 1394B"; break;
-        case 7: cp = "serial ATAPI"; break;
+        case 7: cp = "Serial ATAPI"; break;
         case 8: cp = "USB (both 1 and 2)"; break;
         case 0xffff: cp = "vendor unique"; break;
         default:

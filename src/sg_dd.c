@@ -33,7 +33,7 @@
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2007 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2008 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -57,7 +57,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.64 20071226";
+static char * version_str = "5.65 20080114";
 
 #define ME "sg_dd: "
 
@@ -1429,7 +1429,8 @@ int main(int argc, char * argv[])
                 }
             }
             if (verbose)
-                fprintf(stderr, "        open output, flags=0x%x\n", flags);
+                fprintf(stderr, "        %s output, flags=0x%x\n",
+                        ((O_CREAT & flags) ? "create" : "open"), flags);
             if (seek > 0) {
                 off64_t offset = seek;
 
