@@ -115,7 +115,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.26 [20071226]";
+static const char * version_str = "2.27 [20080115]";
 
 #include <stdio.h>
 #include <string.h>
@@ -326,22 +326,6 @@ static struct mpage_name_func mpage_smc[] =
     { 0x1f, 1, PC_SMC, "Extended device capabilities", NULL},
 };
 static const int mpage_smc_len = sizeof(mpage_smc) / sizeof(mpage_smc[0]);
-
-
-static char * transport_proto_arr[] =
-{
-    "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-4)",
-    "SSA (SSA-S3P)",
-    "IEEE 1394 (SBP-3)",
-    "Remote Direct Memory Access (RDMA)",
-    "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface (ADT)",
-    "ATA Packet Interface (ATA/ATAPI-7)",
-    "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
-    "No specific protocol"
-};
 
 
 #define MAXPARM 64
@@ -1118,6 +1102,7 @@ static int get_protocol_id(int port_not_lu, unsigned char * buff,
 {
     int status, off, proto_id, spf;
     struct mpage_info mp_i;
+    char b[64];
 
     memset(&mp_i, 0, sizeof(mp_i));
     mp_i.page = (port_not_lu ? 0x19 : 0x18);
@@ -1133,7 +1118,7 @@ static int get_protocol_id(int port_not_lu, unsigned char * buff,
     if (trace_cmd > 0)
         printf("Protocol specific %s, protocol_id=%s\n",
                (port_not_lu ? "port" : "lu"), 
-               transport_proto_arr[proto_id]);
+               sg_get_trans_proto_str(proto_id, sizeof(b), b));
     if (proto_idp)
         *proto_idp = proto_id;
     if (offp)

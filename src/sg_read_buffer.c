@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2008 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.03 20070930";
+static char * version_str = "1.04 20080115";
 
 #define ME "sg_read_buffer: "
 
@@ -108,11 +108,12 @@ static struct mode_s {
         { "vendor",     MODE_VENDOR,    "vendor specific"},
         { "data",       MODE_DATA,      "data"},
         { "desc",       MODE_DESCRIPTOR, "descriptor"},
-        { "echo",       MODE_ECHO_BUFFER, "echo (spc-2)"},
-        { "echo_desc",  MODE_ECHO_BDESC, "echo descriptor (spc-2)"},
+        { "echo",       MODE_ECHO_BUFFER, "read data from echo buffer "
+          "(spc-2)"},
+        { "echo_desc",  MODE_ECHO_BDESC, "echo buffer descriptor (spc-2)"},
         { "en_ex",      MODE_EN_EX_ECHO,
           "enable expander communications protocol and echo buffer (spc-3)"},
-        { "err_hist",   MODE_ERR_HISTORY, "retrieve error history (spc-4)"},
+        { "err_hist",   MODE_ERR_HISTORY, "error history (spc-4)"},
 };
 
 #define NUM_MODES       ((int)(sizeof(modes)/sizeof(modes[0])))

@@ -468,21 +468,6 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
     }
 }
         
-static const char * transport_proto_arr[] =
-{
-    "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-4)",
-    "SSA (SSA-S3P)",
-    "IEEE 1394 (SBP-3)",
-    "Remote Direct Memory Access (RDMA)",
-    "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface (ADT)",
-    "ATA Packet Interface (ATA/ATAPI-7)",
-    "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
-    "No specific protocol"
-};
-
 static const char * code_set_arr[] =
 {
     "Reserved [0x0]",
@@ -681,6 +666,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
     uint64_t id_ext;
     const unsigned char * ucp;
     const unsigned char * ip;
+    char b[64];
 
     if (quiet)
         return decode_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
@@ -711,7 +697,8 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
         printf("    designator type: %s,  code_set: %s\n",
                desig_type_arr[desig_type], code_set_arr[c_set]);
         if (piv && ((1 == assoc) || (2 == assoc)))
-            printf("     transport: %s\n", transport_proto_arr[p_id]);
+            printf("     transport: %s\n",
+                   sg_get_trans_proto_str(p_id, sizeof(b), b));
         /* printf("    associated with the %s\n", assoc_arr[assoc]); */
         switch (desig_type) {
         case 0: /* vendor specific */

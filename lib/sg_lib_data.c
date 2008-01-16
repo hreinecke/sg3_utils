@@ -32,7 +32,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.39 20080113";    /* spc-4 rev 12 */
+const char * sg_lib_version_str = "1.40 20080115";    /* spc-4 rev 12 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -139,6 +139,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x5d, 0, "Send cue sheet"},
     {0x5e, 0, "Persistent reserve in"},
     {0x5f, 0, "Persistent reserve out"},
+    {0x7e, 0, "Extended cdb"},          /* added in SPC-4 r12 */
     {0x80, 0, "Xdwrite extended(16)"},
     {0x80, 1, "Write filemarks(16)"},
     {0x81, 0, "Rebuild(16)"},
@@ -985,9 +986,24 @@ const char * sg_lib_pdt_strs[] = {
     /* 0x10 */ "bridge controller commands",
     "object based storage",
     "automation/driver interface",
-    "0x13", "0x14", "0x15", "0x16", "0x17", "0x18",
+    "security manager device",
+    "0x14", "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d", 
     "well known logical unit",
     "no physical device on this lu",
 };
 
+const char * sg_lib_transport_proto_strs[] =
+{
+    "Fibre Channel (FCP-2)",
+    "Parallel SCSI (SPI-4)",
+    "SSA (SSA-S3P)",
+    "IEEE 1394 (SBP-3)",
+    "Remote Direct Memory Access (RDMA)",
+    "Internet SCSI (iSCSI)",
+    "Serial Attached SCSI (SAS)",
+    "Automation/Drive Interface (ADT)",
+    "ATA Packet Interface (ATA/ATAPI-7)",
+    "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
+    "No specific protocol"
+};

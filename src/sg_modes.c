@@ -26,7 +26,7 @@
    
 */
 
-static char * version_str = "1.27 20080113";
+static char * version_str = "1.28 20080115";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -493,21 +493,6 @@ dStrRaw(const char* str, int len)
 }
 
 
-static const char * transport_proto_arr[] =
-{
-    "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-4)",
-    "SSA (SSA-S3P)",
-    "IEEE 1394 (SBP-3)",
-    "Remote Direct Memory Access (SRP)",
-    "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface (ADT)",
-    "ATA Packet Interface (ATA/ATAPI-7)",
-    "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
-    "No specific protocol"
-};
-
 struct page_code_desc {
     int page_code;
     int subpage_code;
@@ -764,6 +749,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     int num, num_ptype, pg, spg, c, d, valid_transport;
     const struct page_code_desc * dp;
     const struct page_code_desc * pe_dp;
+    char b[64];
 
     valid_transport = ((t_proto >= 0) && (t_proto <= 0xf)) ? 1 : 0;
     printf("Page[,subpage]   Name\n");
@@ -839,7 +825,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     }
     if (valid_transport) {
         printf("\n    Transport protocol: %s\n",
-               transport_proto_arr[t_proto]);
+               sg_get_trans_proto_str(t_proto, sizeof(b), b));
         dp = mode_page_transp_table(t_proto, &num);
         while (dp) {
             if (dp->subpage_code)

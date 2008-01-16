@@ -89,6 +89,7 @@ extern struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
 extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
 extern const char * sg_lib_sense_key_desc[];
 extern const char * sg_lib_pdt_strs[];
+extern const char * sg_lib_transport_proto_strs[];
 
 
 #ifdef __cplusplus

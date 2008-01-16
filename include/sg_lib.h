@@ -191,6 +191,10 @@ extern void sg_get_sense_str(const char * leadin,
    'buff'. If 'pdt' out of range yields "bad pdt" string. */
 extern char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
 
+/* Yield string associated with transport protocol identifier (tpi). Returns
+ *    'buff'. If 'tpi' out of range yields "bad tpi" string. */
+extern char * sg_get_trans_proto_str(int tpi, int buff_len, char * buff);
+
 extern FILE * sg_warnings_strm;
 
 extern void sg_set_warnings_strm(FILE * warnings_strm);
