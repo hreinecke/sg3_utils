@@ -1098,19 +1098,6 @@ truncated:
     return;
 }
 
-static const char * transport_proto_arr[] = {
-    "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-5)",
-    "SSA (SSA-S3P)",
-    "IEEE 1394 (SBP-3)",
-    "Remote Direct Memory Access (RDMA)",
-    "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface (ADT)",
-    "ATA Packet Interface (ATA/ATAPI-7)",
-    "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
-    "No specific protocol"
-};
 
 static char * sas_device_type[] = {
     "no device attached",
@@ -1126,6 +1113,7 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
 {
     int ports, phys, j, m, desc_type, eip_offset;
     const unsigned char * per_ucp;
+    char b[64];
 
     eip_offset = (0x10 & ucp[0]) ? 2 : 0;
     switch (0xf & ucp[0]) {
@@ -1239,7 +1227,8 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
         break;
     default:
         printf("   [%d] Transport protocol: %s not decoded, in hex:\n",
-               elem_num + 1, transport_proto_arr[0xf & ucp[0]]);
+               elem_num + 1,
+               sg_get_trans_proto_str((0xf & ucp[0]), sizeof(b), b));
         dStrHex((const char *)ucp, len, 0);
         break;
     }

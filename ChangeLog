@@ -19,6 +19,7 @@ Changelog for sg3_utils-1.26 [20080115]
     uint64_t to stress that 64 bit integer wanted, not larger
   - sg_lib: update asc/ascq code pending spc4r12
     - split sg_lib into sg_lib_data.[hc] and sg_lib.[hc]
+    - add sg_get_trans_proto_str()
   - win32/MinGW: define SG3_UTILS_MINGW when detected
   - remove archive/pre_configure subdirectory
   - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace

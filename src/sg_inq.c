@@ -23,7 +23,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2007 D. Gilbert
+*  Copyright (C) 2000-2008 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.70 20070919";    /* spc-4 rev 11 */
+static char * version_str = "0.71 20080115";    /* spc-4 rev 12 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -834,21 +834,6 @@ static void decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
         
-static const char * transport_proto_arr[] =
-{
-    "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-4)",
-    "SSA (SSA-S3P)",
-    "IEEE 1394 (SBP-3)",
-    "Remote Direct Memory Access (RDMA)",
-    "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface (ADT)",
-    "ATA Packet Interface (ATA/ATAPI-7)",
-    "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
-    "No specific protocol"
-};
-
 static const char * code_set_arr[] =
 {
     "Reserved [0x0]",
@@ -889,6 +874,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
     uint64_t id_ext;
     const unsigned char * ucp;
     const unsigned char * ip;
+    char b[64];
 
     for (j = 1, off = -1;
          (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
@@ -911,7 +897,8 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
         assoc = ((ucp[1] >> 4) & 0x3);
         id_type = (ucp[1] & 0xf);
         if (piv && ((1 == assoc) || (2 == assoc)))
-            printf("    transport: %s\n", transport_proto_arr[p_id]);
+            printf("    transport: %s\n",
+                   sg_get_trans_proto_str(p_id, sizeof(b), b));
         printf("    id_type: %s,  code_set: %s\n", id_type_arr[id_type],
                code_set_arr[c_set]);
         printf("    associated with the %s\n", assoc_arr[assoc]);

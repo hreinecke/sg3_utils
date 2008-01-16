@@ -337,6 +337,17 @@ sg_get_pdt_str(int pdt, int buff_len, char * buff)
     return buff;
 }
 
+char *
+sg_get_trans_proto_str(int tpi, int buff_len, char * buff)
+{
+    if ((tpi < 0) || (tpi > 15))
+        snprintf(buff, buff_len, "bad tpi");
+    else
+        snprintf(buff, buff_len, "%s", sg_lib_transport_proto_strs[tpi]);
+    return buff;
+}
+
+
 /* Print descriptor format sense descriptors (assumes sense buffer is
    in descriptor format) */
 static void
