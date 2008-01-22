@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.78 20080114";    /* SPC-4 revision 12 */
+static char * version_str = "0.79 20080122";    /* SPC-4 revision 12 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -714,6 +714,12 @@ show_page_name(int pg_code, int subpg_code,
             case 0xc:
                 printf("%sSequential access device (ssc-2)\n", b);
                 break;
+            case 0x11:
+                printf("%sDT Device status (ssc-3)\n", b);
+                break;
+            case 0x12:
+                printf("%sTape alert response (ssc-3)\n", b);
+                break;
             case 0x13:
                 printf("%sRequested recovery (ssc-3)\n", b);
                 break;
@@ -761,7 +767,7 @@ show_page_name(int pg_code, int subpg_code,
         {
             switch (pg_code) {
             case 0x11:
-                printf("%sDTD status (adc)\n", b);
+                printf("%sDT Device status (adc)\n", b);
                 break;
             case 0x12:
                 printf("%sTape alert response (adc)\n", b);
