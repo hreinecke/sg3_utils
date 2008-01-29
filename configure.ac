@@ -7,6 +7,7 @@ AC_PROG_CC
 # AC_PROG_CXX
 AC_PROG_INSTALL
 		
+# Adding libtools to the build seems to bring in C++ environment
 AC_PROG_LIBTOOL
 
 # check for headers

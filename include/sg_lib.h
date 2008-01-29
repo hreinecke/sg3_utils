@@ -172,6 +172,14 @@ extern char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len,
 extern int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
                                  uint64_t * info_outp);
 
+/* Returns 1 if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
+   In descriptor format if the stream commands descriptor not found
+   then returns 0. Writes 1 or 0 corresponding to these bits to the
+   last three arguments if they are non-NULL. */
+extern int sg_get_sense_filemark_eom_ili(const unsigned char * sensep,
+                                         int sb_len, int * filemark_p,
+                                         int * eom_p, int * ili_p);
+
 /* Returns 1 if sense key is NO_SENSE or NOT_READY and SKSV is set. Places
    progress field from sense data where progress_outp points. If progress
    field is not available returns 0. Handles both fixed and descriptor
@@ -236,8 +244,8 @@ extern void sg_print_scsi_status(int scsi_status);
                                 /*       [sk,asc,ascq: 0x1,*,*] */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
-#define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred
-                                   (e.g. a transport or driver error) */
+#define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
+                                /* (e.g. a transport or driver error) */
 
 extern int sg_err_category_sense(const unsigned char * sense_buffer,
                                  int sb_len);

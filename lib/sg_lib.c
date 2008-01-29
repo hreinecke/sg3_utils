@@ -289,6 +289,48 @@ sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
 }
 
 int
+sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
+                              int * filemark_p, int * eom_p, int * ili_p)
+{
+    const unsigned char * ucp;
+
+    if (sb_len < 7)
+        return 0;
+    switch (sensep[0] & 0x7f) {
+    case 0x70:
+    case 0x71:
+        if (sensep[2] & 0xe0) {
+            if (filemark_p)
+                *filemark_p = !!(sensep[2] & 0x80);
+            if (eom_p)
+                *eom_p = !!(sensep[2] & 0x40);
+            if (ili_p)
+                *ili_p = !!(sensep[2] & 0x20);
+            return 1;
+        } else
+            return 0;
+    case 0x72:
+    case 0x73:
+       /* Look for stream commands sense data descriptor */
+        ucp = sg_scsi_sense_desc_find(sensep, sb_len, 4);
+        if (ucp && (ucp[1] >= 2)) {
+            if (ucp[3] & 0xe0) {
+                if (filemark_p)
+                    *filemark_p = !!(ucp[3] & 0x80);
+                if (eom_p)
+                    *eom_p = !!(ucp[3] & 0x40);
+                if (ili_p)
+                    *ili_p = !!(ucp[3] & 0x20);
+                return 1;
+            }
+        }
+        return 0;
+    default:
+        return 0;
+    }
+}
+
+int
 sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
                           int * progress_outp)
 {
