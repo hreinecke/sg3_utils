@@ -57,7 +57,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.65 20080114";
+static char * version_str = "5.66 20080130";
 
 #define ME "sg_dd: "
 
@@ -525,8 +525,9 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
 {
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
+    const unsigned char * sbp;
     struct sg_io_hdr io_hdr;
-    int res, k, info_valid;
+    int res, k, info_valid, slen;
 
     if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, 0,
                           ifp->fua, ifp->dpo)) {
@@ -566,13 +567,14 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
     if (verbose > 2)
         fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     res = sg_err_category3(&io_hdr);
+    sbp = io_hdr.sbp;
+    slen = io_hdr.sb_len_wr;
     switch (res) {
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
         ++recovered_errs;
-        info_valid = sg_get_sense_info_fld(io_hdr.sbp, io_hdr.sb_len_wr,
-                                           io_addrp);
+        info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
         if (info_valid) {
             fprintf(stderr, "    lba of last recovered error in this "
                     "READ=0x%"PRIx64"\n", *io_addrp);
@@ -592,8 +594,7 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         if (verbose > 1)
             sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         ++unrecovered_errs;
-        info_valid = sg_get_sense_info_fld(io_hdr.sbp, io_hdr.sb_len_wr,
-                                           io_addrp);
+        info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
         /* MMC devices don't necessarily set VALID bit */
         if ((info_valid) || ((5 == ifp->pdt) && (*io_addrp > 0)))
             return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
@@ -608,6 +609,27 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
         if (verbose > 0)
             sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         return res;
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (5 == ifp->pdt) {    /* MMC READs can go down this path */
+            struct sg_scsi_sense_hdr ssh;
+            int ili;
+
+            if (verbose > 1)
+                sg_chk_n_print3("reading", &io_hdr, verbose > 1);
+            if (sg_scsi_normalize_sense(sbp, slen, &ssh) &&
+                (0x64 == ssh.asc) && (0x0 == ssh.ascq) &&
+                (sg_get_sense_filemark_eom_ili(sbp, slen, NULL, NULL, &ili))
+                && ili) {
+                info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
+                if (*io_addrp > 0) {
+                    ++unrecovered_errs;
+                    return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
+                } else
+                    fprintf(stderr, "MMC READ gave 'illegal mode for this "
+                            "track' and ILI but no LBA of failure\n");
+            }
+        }
+        /* drop through */
     default:
         ++unrecovered_errs;
         sg_chk_n_print3("reading", &io_hdr, verbose > 1);
