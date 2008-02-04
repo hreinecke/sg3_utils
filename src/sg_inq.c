@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.71 20080115";    /* spc-4 rev 12 */
+static char * version_str = "0.72 20080204";    /* spc-4 rev 12 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -350,8 +350,11 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             optsp->page_num = VPD_EXT_INQ;
             break;
         case 'h':
-        case '?':
             ++optsp->do_help;
+            break;
+        case '?':
+            if (! optsp->do_help)
+                ++optsp->do_help;
             break;
         case 'H':
             ++optsp->do_hex;
@@ -511,7 +514,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     ++optsp->num_pages;
                     break;
                 case '?':
-                    ++optsp->do_help;
+                    if (! optsp->do_help)
+                        ++optsp->do_help;
                     break;
                 default:
                     jmp_out = 1;
@@ -2448,7 +2452,7 @@ int main(int argc, char * argv[])
     if (opts.do_help) {
         usage_for(&opts);
         if (opts.do_help > 1) {
-            fprintf(stderr, "/n>>> Available VPD page abbreviations:\n");
+            fprintf(stderr, "\n>>> Available VPD page abbreviations:\n");
             enumerate_vpds();
         }
         return 0;
