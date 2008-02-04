@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080130]
+Changelog for sg3_utils-1.26 [20080204]
   - sg_ses: sync with ses2r19a
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
