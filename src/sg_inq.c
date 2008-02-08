@@ -168,6 +168,7 @@ static struct option long_options[] = {
         {"hex", 0, 0, 'H'},
         {"id", 0, 0, 'i'},
         {"len", 1, 0, 'l'},
+        {"maxlen", 1, 0, 'm'},
         {"new", 0, 0, 'N'},
         {"old", 0, 0, 'O'},
         {"page", 1, 0, 'p'},
@@ -199,15 +200,16 @@ struct opts_t {
     int opt_new;
 };
 
-static void usage()
+static void
+usage()
 {
 #ifdef SG3_UTILS_LINUX
     fprintf(stderr,
             "Usage: sg_inq [--ata] [--cmddt] [--descriptors] [--extended] "
             "[--help] [--hex]\n"
-            "              [--id] [--len=LEN] [--page=PG] [--raw] "
-            "[--verbose] [--version]\n"
-            "              [--vpd] DEVICE\n"
+            "              [--id] [--len=LEN] [--maxlen=LEN] [--page=PG] "
+            "[--raw]\n"
+            "              [--verbose] [--version] [--vpd] DEVICE\n"
             "  where:\n"
             "    --ata|-a        treat DEVICE as (directly attached) ATA "
             "device\n");
@@ -215,9 +217,9 @@ static void usage()
     fprintf(stderr,
             "Usage: sg_inq [--cmddt] [--descriptors] [--extended] [--help] "
             "[--hex] [--id]\n"
-            "              [--len=LEN] [--page=PG] [--raw] [--verbose] "
-            "[--version] [--vpd]\n"
-            "              DEVICE\n"
+            "              [--len=LEN] [--maxlen=LEN] [--page=PG] [--raw] "
+            "[--verbose]\n"
+            "              [--version] [--vpd] DEVICE\n"
             "  where:\n");
 #endif
     fprintf(stderr,
@@ -236,6 +238,7 @@ static void usage()
             "-> fetch 36\n"
             "                        bytes first, then fetch again as "
             "indicated)\n"
+            "    --maxlen=LEN|-m LEN    same as '--len='\n"
             "    --page=PG|-p PG     Vital Product Data (VPD) page number "
             "or\n"
             "                        abbreviation (opcode number if "
@@ -249,7 +252,8 @@ static void usage()
             "If no options given then does a 'standard' INQUIRY.\n");
 }
 
-static void usage_old()
+static void
+usage_old()
 {
 #ifdef SG3_UTILS_LINUX
     fprintf(stderr,
@@ -303,7 +307,8 @@ static void usage_old()
             "If no options given then does a standard SCSI INQUIRY\n");
 }
 
-static void usage_for(const struct opts_t * optsp)
+static void
+usage_for(const struct opts_t * optsp)
 {
     if (optsp->opt_new)
         usage();
@@ -311,7 +316,8 @@ static void usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n;
 
@@ -319,10 +325,10 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         int option_index = 0;
 
 #ifdef SG3_UTILS_LINUX
-        c = getopt_long(argc, argv, "acdeEhHil:NOp:rvVx", long_options,
+        c = getopt_long(argc, argv, "acdeEhHil:m:NOp:rvVx", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "cdeEhHil:NOp:rvVx", long_options,
+        c = getopt_long(argc, argv, "cdeEhHil:m:NOp:rvVx", long_options,
                         &option_index);
 #endif
         if (c == -1)
@@ -365,6 +371,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             optsp->page_num = VPD_DEVICE_ID;
             break;
         case 'l':
+        case 'm':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 65532)) {
                 fprintf(stderr, "bad argument to '--len='\n");
@@ -414,7 +421,8 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num, n;
     const char * cp;
@@ -564,7 +572,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -585,7 +594,7 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static const struct svpd_values_name_t *
-                sdp_find_vpd_by_acron(const char * ap)
+sdp_find_vpd_by_acron(const char * ap)
 {
     const struct svpd_values_name_t * vnp;
 
@@ -596,7 +605,8 @@ static const struct svpd_values_name_t *
     return NULL;
 }
 
-static void enumerate_vpds()
+static void
+enumerate_vpds()
 {
     const struct svpd_values_name_t * vnp;
 
@@ -607,7 +617,8 @@ static void enumerate_vpds()
     }
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
     
@@ -646,7 +657,8 @@ static struct vpd_name vpd_name_arr[] = {
     {0xc9, 0, "Volume Access Control (RDAC)"},
 };
 
-const char * get_vpd_page_str(int vpd_page_num, int scsi_ptype)
+static const char *
+get_vpd_page_str(int vpd_page_num, int scsi_ptype)
 {
     int k;
     int vpd_name_arr_sz = 
@@ -683,7 +695,8 @@ const char * get_vpd_page_str(int vpd_page_num, int scsi_ptype)
     }
 }
 
-static void decode_id_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_id_vpd(unsigned char * buff, int len, int do_hex)
 {
     if (len < 4) {
         fprintf(stderr, "Device identification VPD page length too "
@@ -718,7 +731,8 @@ static const char * network_service_type_arr[] =
     "reserved[0x1e]", "reserved[0x1f]",
 };
 
-static void decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump, na_len;
     unsigned char * ucp;
@@ -759,7 +773,8 @@ static const char * mode_page_policy_arr[] =
     "per I_T nexus",
 };
 
-static void decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump;
     unsigned char * ucp;
@@ -792,7 +807,8 @@ static void decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
-static void decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
     unsigned char * ucp;
@@ -864,13 +880,9 @@ static const char * id_type_arr[] =
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
-extern int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc,
-                              int page_len, int * off, int m_assoc,
-                              int m_desig_type, int m_code_set);
-
 /* These are target port, device server (i.e. target) and lu identifiers */
-static void decode_dev_ids(const char * leadin, unsigned char * buff,
-                           int len, int do_hex)
+static void
+decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
 {
     int u, j, m, id_len, p_id, c_set, piv, assoc, id_type, i_len;
     int off, ci_off, c_id, d_id, naa, vsi;
@@ -1112,8 +1124,8 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
 
 /* Transport IDs are initiator port identifiers, typically other than the
    initiator port issuing a SCSI command. Code borrowed from sg_persist.c */
-static void decode_transport_id(const char * leadin, unsigned char * ucp,
-                                int len)
+static void
+decode_transport_id(const char * leadin, unsigned char * ucp, int len)
 {
     int format_code, proto_id, num, j, k;
     uint64_t ull;
@@ -1217,7 +1229,8 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
     }
 }
 
-static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
     if (len < 7) {
         fprintf(stderr, "Extended INQUIRY data VPD page length too "
@@ -1239,7 +1252,8 @@ static void decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            !!(buff[7] & 0x1));
 }
 
-static void decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
+static void
+decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
     int k;
 
@@ -1257,7 +1271,8 @@ static void decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     }
 }
 
-static void decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
+static void
+decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
 {
     char b[80];
     int is_be, num;
@@ -1315,7 +1330,8 @@ static void decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
                  sg_is_big_endian());
 }
 
-static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+static void
+decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     unsigned int u;
 
@@ -1356,7 +1372,8 @@ static void decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
-static void decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+static void
+decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     unsigned int u;
 
@@ -1419,7 +1436,8 @@ static const char * lun_op_arr[] =
     "I/O Operations being rejected, SP reboot or NDU in progress",
 };
 
-static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
+static void
+decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 {
     int k, ip_mgmt, failover_mode, vpp80, lun_z;
 
@@ -1495,7 +1513,8 @@ static void decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     return;
 }
 
-static void decode_rdac_vpd_c2(unsigned char * buff, int len)
+static void
+decode_rdac_vpd_c2(unsigned char * buff, int len)
 {
     if (len < 3) {
         fprintf(stderr, "Software Version VPD page length too "
@@ -1525,7 +1544,8 @@ static void decode_rdac_vpd_c2(unsigned char * buff, int len)
     return;
 }
 
-static void decode_rdac_vpd_c9(unsigned char * buff, int len)
+static void
+decode_rdac_vpd_c9(unsigned char * buff, int len)
 {
     if (len < 3) {
         fprintf(stderr, "Volume Access Control VPD page length too "
@@ -1574,8 +1594,8 @@ static void decode_rdac_vpd_c9(unsigned char * buff, int len)
 
 /* Returns 0 if Unit Serial Number VPD page contents found, else see
    sg_ll_inquiry() */
-static int fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len,
-                                 int verbose)
+static int
+fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
     int sz, len, k, res;
     unsigned char b[DEF_ALLOC_LEN];
@@ -1638,8 +1658,8 @@ static const char * ansi_version_arr[] =
     "ANSI version: 7",
 };
 
-static const char * get_ansi_version_str(int version, char * buff,
-                                         int buff_len)
+static const char *
+get_ansi_version_str(int version, char * buff, int buff_len)
 {
     version &= 0x7;
     buff[buff_len - 1] = '\0';
@@ -1649,7 +1669,8 @@ static const char * get_ansi_version_str(int version, char * buff,
 
 
 /* Returns 0 if successful */
-static int process_std_inq(int sg_fd, const struct opts_t * optsp)
+static int
+process_std_inq(int sg_fd, const struct opts_t * optsp)
 {
     int res, len, rlen, act_len, pqual, peri_type, ansi_version, k, j;
     const char * cp;
@@ -1835,7 +1856,8 @@ static int process_std_inq(int sg_fd, const struct opts_t * optsp)
 }
 
 /* Returns 0 if successful */
-static int process_cmddt(int sg_fd, const struct opts_t * optsp)
+static int
+process_cmddt(int sg_fd, const struct opts_t * optsp)
 {
     int k, j, num, len, peri_type, reserved_cmddt, support_num, res;
     char op_name[128];
@@ -1946,7 +1968,8 @@ static int process_cmddt(int sg_fd, const struct opts_t * optsp)
 }
 
 /* Returns 0 if successful */
-static int process_evpd(int sg_fd, const struct opts_t * optsp)
+static int
+process_evpd(int sg_fd, const struct opts_t * optsp)
 {
     int res, len, num, k, peri_type, vpd;
     const char * cp;
@@ -2015,7 +2038,8 @@ static int process_evpd(int sg_fd, const struct opts_t * optsp)
 }
 
 /* Returns 0 if successful */
-static int decode_vpd(int sg_fd, const struct opts_t * optsp)
+static int
+decode_vpd(int sg_fd, const struct opts_t * optsp)
 {
     int len, pdt;
     int res = 0;
@@ -2436,7 +2460,8 @@ static int decode_vpd(int sg_fd, const struct opts_t * optsp)
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, num, res, n;
     unsigned int u;
@@ -2649,8 +2674,8 @@ struct ata_identify_device {
 #define ATA_IDENTIFY_BUFF_SZ  sizeof(struct ata_identify_device)
 #define HDIO_DRIVE_CMD_OFFSET 4
 
-static int ata_command_interface(int device, char *data, int * atapi_flag,
-                                 int verbose)
+static int
+ata_command_interface(int device, char *data, int * atapi_flag, int verbose)
 {
     unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     unsigned short get_ident[256];
@@ -2726,8 +2751,8 @@ static int ata_command_interface(int device, char *data, int * atapi_flag,
 }
 
 /* Returns 0 if successful, else errno of error */
-static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
-                            int verbose)
+static int
+try_ata_identify(int ata_fd, int do_hex, int do_raw, int verbose)
 {
     struct ata_identify_device ata_ident;
     char model[64];
@@ -3085,7 +3110,8 @@ static struct version_descriptor version_descriptor_arr[] = {
 static int version_descriptor_arr_sz = (sizeof(version_descriptor_arr) /
                                         sizeof(version_descriptor_arr[0]));
 
-static const char * find_version_descriptor_str(int value)
+static const char *
+find_version_descriptor_str(int value)
 {
     int k;
 
