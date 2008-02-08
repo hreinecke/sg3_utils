@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -74,7 +74,6 @@
 
 #define DEF_ALLOC_LEN 252
 #define MX_ALLOC_LEN (0xc000 + 0x80)
-#define VPD_ATA_INFO_LEN  572
 
 /* This structure is a duplicate of one of the same name in sg_vpd.c .
    Take care that both have the same fields (and types). */
@@ -90,7 +89,8 @@ struct svpd_values_name_t {
 };
 
 
-static unsigned char rsp_buff[MX_ALLOC_LEN + 2];
+/* Size of this array must match the array of the same name in sg_vpd.c */
+static unsigned char rsp_buff[MX_ALLOC_LEN + 2];        
 
 
 /* Supported vendor specific VPD pages */
@@ -563,12 +563,14 @@ decode_rdac_vpd_c9(unsigned char * buff, int len)
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_SYNTAX_ERROR for
    unsupported page */
 int
-svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
-                   int do_raw, int do_long, int do_quiet, int verbose)
+svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
+                   int do_hex, int do_raw, int do_long, int do_quiet,
+                   int verbose)
 {
     int len, t, res;
     char name[64];
     const struct svpd_values_name_t * vnp;
+    int alloc_len = maxlen;
 
     t = do_long;        /* suppress warning */
     vnp = svpd_get_v_detail(num_vpd, subvalue, -1);
@@ -576,27 +578,35 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
         strcpy(name, vnp->name);
     else
         snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x", num_vpd);
+    if (0 == alloc_len)
+        alloc_len = DEF_ALLOC_LEN;
     switch(num_vpd) {
-    case 0xc0:
+    case VPD_V_UPR_EMC:
         if ((! do_raw) && (! do_quiet))
             printf("%s VPD Page:\n", name);
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_V_UPR_EMC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (VPD_V_UPR_EMC != rsp_buff[1]) {
+            if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_V_UPR_EMC, rsp_buff, len, 1,
-                           verbose))
-                    return SG_LIB_CAT_OTHER;
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching 0xc0 page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
@@ -614,23 +624,29 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
     case VPD_V_SVER_RDAC:
         if ((! do_raw) && (! do_quiet))
             printf("%s VPD Page:\n", name);
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_V_SVER_RDAC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (VPD_V_SVER_RDAC != rsp_buff[1]) {
+            if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_V_SVER_RDAC, rsp_buff, len, 1,
-                           verbose))
-                    return SG_LIB_CAT_OTHER;
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching 0xc2 page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
@@ -646,23 +662,29 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
     case VPD_V_FEAT_RDAC:
         if ((! do_raw) && (! do_quiet))
             printf("%s VPD Page:\n", name);
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_V_FEAT_RDAC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (VPD_V_FEAT_RDAC != rsp_buff[1]) {
+            if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_V_FEAT_RDAC, rsp_buff, len, 1,
-                           verbose))
-                    return SG_LIB_CAT_OTHER;
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching 0xc3 page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
@@ -678,23 +700,29 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
     case VPD_V_SUBS_RDAC:
         if ((! do_raw) && (! do_quiet))
             printf("%s VPD Page:\n", name);
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_V_SUBS_RDAC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (VPD_V_SUBS_RDAC != rsp_buff[1]) {
+            if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_V_SUBS_RDAC, rsp_buff, len, 1,
-                           verbose))
-                    return SG_LIB_CAT_OTHER;
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching 0xc4 page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
@@ -710,23 +738,29 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
     case VPD_V_EDID_RDAC:
         if ((! do_raw) && (! do_quiet))
             printf("%s VPD Page:\n", name);
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_V_EDID_RDAC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (VPD_V_EDID_RDAC != rsp_buff[1]) {
+            if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_V_VAC_RDAC, rsp_buff, len, 1,
-                           verbose))
-                    return SG_LIB_CAT_OTHER;
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching 0xc8 page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
@@ -742,23 +776,29 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int do_hex,
     case VPD_V_VAC_RDAC:
         if ((! do_raw) && (! do_quiet))
             printf("%s VPD Page:\n", name);
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_V_VAC_RDAC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, verbose);
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
         if (0 == res) {
             len = rsp_buff[3] + 4;
-            if (VPD_V_VAC_RDAC != rsp_buff[1]) {
+            if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably not "
                         "supported\n");
                 return SG_LIB_CAT_MALFORMED;
             }
-            if (len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_V_VAC_RDAC, rsp_buff, len, 1,
-                           verbose))
-                    return SG_LIB_CAT_OTHER;
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching 0xc9 page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
