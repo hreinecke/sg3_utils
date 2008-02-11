@@ -122,7 +122,7 @@ sg_ident_LDADD = ../lib/libsgutils.la @os_libs@
 sginfo_SOURCES = sginfo.c sg_io_linux.c
 sginfo_LDADD = ../lib/libsgutils.la @os_libs@
 
-sg_inq_SOURCES = sg_inq.c
+sg_inq_SOURCES = sg_inq.c sg_inq_data.c
 sg_inq_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_logs_SOURCES = sg_logs.c
