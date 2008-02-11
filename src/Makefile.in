@@ -262,7 +262,7 @@ sg_get_config_DEPENDENCIES = ../lib/libsgutils.la
 am_sg_ident_OBJECTS = sg_ident.$(OBJEXT)
 sg_ident_OBJECTS = $(am_sg_ident_OBJECTS)
 sg_ident_DEPENDENCIES = ../lib/libsgutils.la
-am_sg_inq_OBJECTS = sg_inq.$(OBJEXT)
+am_sg_inq_OBJECTS = sg_inq.$(OBJEXT) sg_inq_data.$(OBJEXT)
 sg_inq_OBJECTS = $(am_sg_inq_OBJECTS)
 sg_inq_DEPENDENCIES = ../lib/libsgutils.la
 am_sg_logs_OBJECTS = sg_logs.$(OBJEXT)
@@ -561,7 +561,7 @@ sg_ident_SOURCES = sg_ident.c
 sg_ident_LDADD = ../lib/libsgutils.la @os_libs@
 sginfo_SOURCES = sginfo.c sg_io_linux.c
 sginfo_LDADD = ../lib/libsgutils.la @os_libs@
-sg_inq_SOURCES = sg_inq.c
+sg_inq_SOURCES = sg_inq.c sg_inq_data.c
 sg_inq_LDADD = ../lib/libsgutils.la @os_libs@
 sg_logs_SOURCES = sg_logs.c
 sg_logs_LDADD = ../lib/libsgutils.la @os_libs@
@@ -853,6 +853,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_get_config.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ident.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_inq.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_inq_data.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_io_linux.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_logs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_luns.Po@am__quote@
