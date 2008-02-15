@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.41 20080111";    /* ses2r19a */
+static char * version_str = "1.42 20080214";    /* ses2r19b */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -54,31 +54,50 @@ static char * version_str = "1.41 20080111";    /* ses2r19a */
 #define TEMPERATURE_OFFSET 20   /* 8 bits represents -19 C to +235 C */
                                 /* value of 0 (would imply -20 C) reserved */
 
-#define DEVICE_EL 0x1
-#define POWER_SUPPLY_EL 0x2
-#define COOLING_EL 0x3
-#define TEMPERATURE_EL 0x4
-#define DOOR_LOCK_EL 0x5
-#define AUD_ALARM_EL 0x6
-#define ENC_SC_ELECTR_EL 0x7
-#define SCC_CELECTR_EL 0x8
-#define NV_CACHE_EL 0x9
-#define INV_OP_REASON_EL 0xa
-#define UI_POWER_SUPPLY_EL 0xb
-#define DISPLAY_EL 0xc
-#define KEY_PAD_EL 0xd
-#define ENCLOSURE_EL 0xe
-#define SCSI_PORT_TRAN_EL 0xf
-#define LANGUAGE_EL 0x10
-#define COMM_PORT_EL 0x11
-#define VOLT_SENSOR_EL 0x12
-#define CURR_SENSOR_EL 0x13
-#define SCSI_TPORT_EL 0x14
-#define SCSI_IPORT_EL 0x15
-#define SIMPLE_SUBENC_EL 0x16
-#define ARRAY_DEV_EL 0x17
-#define SAS_EXPANDER_EL 0x18
-#define SAS_CONNECTOR_EL 0x19
+/* Send Diagnostic and Receive Diagnostic Results page codes */
+#define DPC_SUPPORTED 0x0
+#define DPC_CONFIGURATION 0x1
+#define DPC_ENC_CONTROL 0x2
+#define DPC_ENC_STATUS 0x2
+#define DPC_HELP_TEXT 0x3
+#define DPC_STRING 0x4
+#define DPC_THRESHOLD 0x5
+#define DPC_ELEM_DESC 0x7
+#define DPC_SHORT_ENC_STATUS 0x8
+#define DPC_ENC_BUSY 0x9
+#define DPC_ADD_ELEM_STATUS 0xa
+#define DPC_SUBENC_HELP_TEXT 0xb
+#define DPC_SUBENC_STRING 0xc
+#define DPC_SUPPORTED_SES 0xd
+#define DPC_DOWNLOAD_MICROCODE 0xe
+#define DPC_SUBENC_NICKNAME 0xf
+
+/* Element Type codes */
+#define DEVICE_ETC 0x1
+#define POWER_SUPPLY_ETC 0x2
+#define COOLING_ETC 0x3
+#define TEMPERATURE_ETC 0x4
+#define DOOR_LOCK_ETC 0x5
+#define AUD_ALARM_ETC 0x6
+#define ESC_ELECTRONICS_ETC 0x7
+#define SCC_CELECTR_ETC 0x8
+#define NV_CACHE_ETC 0x9
+#define INV_OP_REASON_ETC 0xa
+#define UI_POWER_SUPPLY_ETC 0xb
+#define DISPLAY_ETC 0xc
+#define KEY_PAD_ETC 0xd
+#define ENCLOSURE_ETC 0xe
+#define SCSI_PORT_TRAN_ETC 0xf
+#define LANGUAGE_ETC 0x10
+#define COMM_PORT_ETC 0x11
+#define VOLT_SENSOR_ETC 0x12
+#define CURR_SENSOR_ETC 0x13
+#define SCSI_TPORT_ETC 0x14
+#define SCSI_IPORT_ETC 0x15
+#define SIMPLE_SUBENC_ETC 0x16
+#define ARRAY_DEV_ETC 0x17
+#define SAS_EXPANDER_ETC 0x18
+#define SAS_CONNECTOR_ETC 0x19
 
 
 static struct option long_options[] = {
@@ -124,7 +143,7 @@ usage()
           "    --inner-hex|-i      print innermost level of a"
           " status page in hex\n"
           "    --list|-l           list known pages and elements (ignore"
-          " device)\n"
+          " DEVICE)\n"
           "    --page=PG|-p PG     SES page code PG (prefix with '0x' "
           "for hex; def: 0)\n"
           "    --raw|-r            print status page in ASCII hex suitable "
@@ -152,59 +171,60 @@ do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
                            noisy, verbose);
 }
 
-struct page_code_desc {
+struct diag_page_code {
         int page_code;
         const char * desc;
 };
-static struct page_code_desc pc_desc_arr[] = {
-        {0x0, "Supported diagnostic pages"},
-        {0x1, "Configuration (SES)"},
-        {0x2, "Enclosure status/control (SES)"},
-        {0x3, "Help text (SES)"},
-        {0x4, "String In/Out (SES)"},
-        {0x5, "Threshold In/Out (SES)"},
+
+static struct diag_page_code dpc_arr[] = {
+        {DPC_SUPPORTED, "Supported diagnostic pages"},  /* 0 */
+        {DPC_CONFIGURATION, "Configuration (SES)"},
+        {DPC_ENC_STATUS, "Enclosure status/control (SES)"},
+        {DPC_HELP_TEXT, "Help text (SES)"},
+        {DPC_STRING, "String In/Out (SES)"},
+        {DPC_THRESHOLD, "Threshold In/Out (SES)"},
         {0x6, "Array Status/Control (SES, obsolete)"},
-        {0x7, "Element descriptor (SES)"},
-        {0x8, "Short enclosure status (SES)"},
-        {0x9, "Enclosure busy (SES-2)"},
-        {0xa, "Additional (device) element status (SES-2)"},
-        {0xb, "Subenclosure help text (SES-2)"},
-        {0xc, "Subenclosure string In/Out (SES-2)"},
-        {0xd, "Supported SES diagnostic pages (SES-2)"},
-        {0xe, "Download microcode (SES-2)"},
-        {0xf, "Subenclosure nickname (SES-2)"},
+        {DPC_ELEM_DESC, "Element descriptor (SES)"},
+        {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
+        {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
+        {DPC_ADD_ELEM_STATUS, "Additional (device) element status (SES-2)"},
+        {DPC_SUBENC_HELP_TEXT, "Subenclosure help text (SES-2)"},
+        {DPC_SUBENC_STRING, "Subenclosure string In/Out (SES-2)"},
+        {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
+        {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
+        {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
         {0x3f, "Protocol specific SAS (SAS-1)"},
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
 };
-static struct page_code_desc in_pc_desc_arr[] = {
-        {0x0, "Supported diagnostic pages"},
-        {0x1, "Configuration (SES)"},
-        {0x2, "Enclosure status (SES)"},
-        {0x3, "Help text (SES)"},
-        {0x4, "String In (SES)"},
-        {0x5, "Threshold In (SES)"},
+static struct diag_page_code in_dpc_arr[] = {
+        {DPC_SUPPORTED, "Supported diagnostic pages"},  /* 0 */
+        {DPC_CONFIGURATION, "Configuration (SES)"},
+        {DPC_ENC_STATUS, "Enclosure status (SES)"},
+        {DPC_HELP_TEXT, "Help text (SES)"},
+        {DPC_STRING, "String In (SES)"},
+        {DPC_THRESHOLD, "Threshold In (SES)"},
         {0x6, "Array Status (SES, obsolete)"},
-        {0x7, "Element descriptor (SES)"},
-        {0x8, "Short enclosure status (SES)"},
-        {0x9, "Enclosure busy (SES-2)"},
-        {0xa, "Additional (device) element status (SES-2)"},
-        {0xb, "Subenclosure help text (SES-2)"},
-        {0xc, "Subenclosure string In (SES-2)"},
-        {0xd, "Supported SES diagnostic pages (SES-2)"},
-        {0xe, "Download microcode (SES-2)"},
-        {0xf, "Subenclosure nickname (SES-2)"},
+        {DPC_ELEM_DESC, "Element descriptor (SES)"},
+        {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
+        {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
+        {DPC_ADD_ELEM_STATUS, "Additional (device) element status (SES-2)"},
+        {DPC_SUBENC_HELP_TEXT, "Subenclosure help text (SES-2)"},
+        {DPC_SUBENC_STRING, "Subenclosure string In (SES-2)"},
+        {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
+        {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
+        {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
         {0x3f, "Protocol specific SAS (SAS-1)"},
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
 };
 
 static const char *
-find_page_code_desc(int page_num)
+find_diag_page_desc(int page_num)
 {
     int k;
-    int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
-    const struct page_code_desc * pcdp = &pc_desc_arr[0];
+    int num = sizeof(dpc_arr) / sizeof(dpc_arr[0]);
+    const struct diag_page_code * pcdp = &dpc_arr[0];
 
     for (k = 0; k < num; ++k, ++pcdp) {
         if (page_num == pcdp->page_code)
@@ -216,11 +236,11 @@ find_page_code_desc(int page_num)
 }
 
 static const char *
-find_in_page_code_desc(int page_num)
+find_in_diag_page_desc(int page_num)
 {
     int k;
-    int num = sizeof(in_pc_desc_arr) / sizeof(in_pc_desc_arr[0]);
-    const struct page_code_desc * pcdp = &in_pc_desc_arr[0];
+    int num = sizeof(in_dpc_arr) / sizeof(in_dpc_arr[0]);
+    const struct diag_page_code * pcdp = &in_dpc_arr[0];
 
     for (k = 0; k < num; ++k, ++pcdp) {
         if (page_num == pcdp->page_code)
@@ -231,50 +251,50 @@ find_in_page_code_desc(int page_num)
     return NULL;
 }
 
-struct element_desc {
-        int elem_code;
+struct element_type_t {
+        int elem_type_code;
         const char * desc;
 };
-static struct element_desc element_desc_arr[] = {
+static struct element_type_t element_type_arr[] = {
         {0x0, "Unspecified"},
-        {DEVICE_EL, "Device"},
-        {POWER_SUPPLY_EL, "Power supply"},
-        {COOLING_EL, "Cooling"},
-        {TEMPERATURE_EL, "Temperature sense"},
-        {DOOR_LOCK_EL, "Door lock"},
-        {AUD_ALARM_EL, "Audible alarm"},
-        {ENC_SC_ELECTR_EL, "Enclosure services controller electronics"},
-        {SCC_CELECTR_EL, "SCC controller electronics"},
-        {NV_CACHE_EL, "Nonvolatile cache"},
-        {INV_OP_REASON_EL, "Invalid operation reason"},
-        {UI_POWER_SUPPLY_EL, "Uninterruptible power supply"},
-        {DISPLAY_EL, "Display"},
-        {KEY_PAD_EL, "Key pad entry"},
-        {ENCLOSURE_EL, "Enclosure"},
-        {SCSI_PORT_TRAN_EL, "SCSI port/transceiver"},
-        {LANGUAGE_EL, "Language"},
-        {COMM_PORT_EL, "Communication port"},
-        {VOLT_SENSOR_EL, "Voltage sensor"},
-        {CURR_SENSOR_EL, "Current sensor"},
-        {SCSI_TPORT_EL, "SCSI target port"},
-        {SCSI_IPORT_EL, "SCSI initiator port"},
-        {SIMPLE_SUBENC_EL, "Simple subenclosure"},
-        {ARRAY_DEV_EL, "Array device"},
-        {SAS_EXPANDER_EL, "SAS expander"},
-        {SAS_CONNECTOR_EL, "SAS connector"},
+        {DEVICE_ETC, "Device"},
+        {POWER_SUPPLY_ETC, "Power supply"},
+        {COOLING_ETC, "Cooling"},
+        {TEMPERATURE_ETC, "Temperature sense"},
+        {DOOR_LOCK_ETC, "Door lock"},
+        {AUD_ALARM_ETC, "Audible alarm"},
+        {ESC_ELECTRONICS_ETC, "Enclosure services controller electronics"},
+        {SCC_CELECTR_ETC, "SCC controller electronics"},
+        {NV_CACHE_ETC, "Nonvolatile cache"},
+        {INV_OP_REASON_ETC, "Invalid operation reason"},
+        {UI_POWER_SUPPLY_ETC, "Uninterruptible power supply"},
+        {DISPLAY_ETC, "Display"},
+        {KEY_PAD_ETC, "Key pad entry"},
+        {ENCLOSURE_ETC, "Enclosure"},
+        {SCSI_PORT_TRAN_ETC, "SCSI port/transceiver"},
+        {LANGUAGE_ETC, "Language"},
+        {COMM_PORT_ETC, "Communication port"},
+        {VOLT_SENSOR_ETC, "Voltage sensor"},
+        {CURR_SENSOR_ETC, "Current sensor"},
+        {SCSI_TPORT_ETC, "SCSI target port"},
+        {SCSI_IPORT_ETC, "SCSI initiator port"},
+        {SIMPLE_SUBENC_ETC, "Simple subenclosure"},
+        {ARRAY_DEV_ETC, "Array device"},
+        {SAS_EXPANDER_ETC, "SAS expander"},
+        {SAS_CONNECTOR_ETC, "SAS connector"},
 };
 
 static const char *
-find_element_desc(int elem_code)
+find_element_desc(int elem_type_code)
 {
     int k;
-    int num = sizeof(element_desc_arr) / sizeof(element_desc_arr[0]);
-    const struct element_desc * edp = &element_desc_arr[0];
+    int num = sizeof(element_type_arr) / sizeof(element_type_arr[0]);
+    const struct element_type_t * etp = &element_type_arr[0];
 
-    for (k = 0; k < num; ++k, ++edp) {
-        if (elem_code == edp->elem_code)
-            return edp->desc;
-        else if (elem_code < edp->elem_code)
+    for (k = 0; k < num; ++k, ++etp) {
+        if (elem_type_code == etp->elem_type_code)
+            return etp->desc;
+        else if (elem_type_code < etp->elem_type_code)
             return NULL;
     }
     return NULL;
@@ -282,29 +302,29 @@ find_element_desc(int elem_code)
 
 #if 0
 static const char *
-get_element_desc(int elem_code, int b_len, char * b)
+get_element_type_desc(int elem_type_code, int b_len, char * b)
 {
     const char * elem_desc;
 
     if (b_len > 0)
         b[b_len - 1] = '\0';
-    elem_desc = find_element_desc(elem_code);
+    elem_desc = find_element_desc(elem_type_code);
     if (elem_desc)
         snprintf(b, b_len - 1, "%s", elem_desc);
     else
-        snprintf(b, b_len - 1, "unknown element code=0x%x", elem_code);
+        snprintf(b, b_len - 1, "unknown element type code=0x%x", elem_type_code);
     return b;
 }
 #endif
 
-struct element_hdr {
+struct type_desc_hdr_t {
     unsigned char etype;
     unsigned char num_elements;
     unsigned char se_id;
-    unsigned char unused;
+    unsigned char unused;       /* type descriptor text length; not needed */
 };
 
-static struct element_hdr element_hdr_arr[MX_ELEM_HDR];
+static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
 
 static void
 dStrRaw(const char* str, int len)
@@ -386,10 +406,10 @@ truncated:
     return;
 }
 
-/* Returns number of elements written to 'ehp' or -1 if there is
+/* Returns number of elements written to 'tdhp' or -1 if there is
    a problem */ 
 static int
-populate_element_hdr_arr(int fd, struct element_hdr * ehp,
+populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                          unsigned int * generationp, int verbose)
 {
     int resp_len, k, el, num_subs, sum_elem_types, res;
@@ -399,7 +419,8 @@ populate_element_hdr_arr(int fd, struct element_hdr * ehp,
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
-    res = sg_ll_receive_diag(fd, 1, 1, resp, rsp_buff_size, 1, verbose);
+    res = sg_ll_receive_diag(fd, 1 /* pcv */, DPC_ENC_STATUS, resp,
+                             rsp_buff_size, 1, verbose);
     if (0 == res) {
         resp_len = (resp[2] << 8) + resp[3] + 4;
         if (resp_len > rsp_buff_size) {
@@ -446,10 +467,10 @@ populate_element_hdr_arr(int fd, struct element_hdr * ehp,
                 fprintf(stderr, "populate: too many elements\n");
                 return -1;
             }
-            ehp[k].etype = ucp[0];
-            ehp[k].num_elements = ucp[1];
-            ehp[k].se_id = ucp[2];
-            ehp[k].unused = 0;
+            tdhp[k].etype = ucp[0];
+            tdhp[k].num_elements = ucp[1];
+            tdhp[k].se_id = ucp[2];
+            tdhp[k].unused = 0;    /* actually type descriptor text length */
         }
         return sum_elem_types;
     } else {
@@ -529,7 +550,7 @@ find_sas_connector_type(int conn_type, char * buff, int buff_len)
     return buff;
 }
 
-static const char * element_status_desc[] = {
+static const char * elem_status_code_desc[] = {
     "Unsupported", "OK", "Critical", "Noncritical",
     "Unrecoverable", "Not installed", "Unknown", "Not available",
     "No access allowed", "reserved [9]", "reserved [10]", "reserved [11]",
@@ -560,13 +581,13 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
 
     printf("%sPredicted failure=%d, Disabled=%d, Swap=%d, status: %s\n",
            pad, !!(statp[0] & 0x40), !!(statp[0] & 0x20),
-           !!(statp[0] & 0x10), element_status_desc[statp[0] & 0xf]);
+           !!(statp[0] & 0x10), elem_status_code_desc[statp[0] & 0xf]);
     switch (etype) { /* element types */
     case 0:     /* unspecified */
         printf("%sstatus in hex: %02x %02x %02x %02x\n",
                pad, statp[0], statp[1], statp[2], statp[3]);
         break;
-    case DEVICE_EL:
+    case DEVICE_ETC:
         printf("%sSlot address: %d\n", pad, statp[1]);
         if ((! filter) || (0xe0 & statp[2]))
             printf("%sApp client bypassed A=%d, Do not remove=%d, Enc "
@@ -588,7 +609,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
         if ((! filter) || (0x1 & statp[3]))
             printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
         break;
-    case POWER_SUPPLY_EL:
+    case POWER_SUPPLY_ETC:
         if ((! filter) || ((0x80 & statp[1]) || (0xe & statp[2])))
             printf("%sIdent=%d, DC overvoltage=%d, DC undervoltage=%d, DC "
                    "overcurrent=%d\n", pad, !!(statp[1] & 0x80),
@@ -603,7 +624,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                    pad, !!(statp[3] & 0x4), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
-    case COOLING_EL:
+    case COOLING_ETC:
         if ((! filter) || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
             printf("%sIdent=%d, Hot swap=%d, Fail=%d, Requested on=%d, "
                    "Off=%d\n", pad, !!(statp[1] & 0x80), !!(statp[3] & 0x80),
@@ -613,7 +634,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                (((0x7 & statp[1]) << 8) + statp[2]) * 10,
                actual_speed_desc[7 & statp[3]]);
         break;
-    case TEMPERATURE_EL:     /* temperature sensor */
+    case TEMPERATURE_ETC:     /* temperature sensor */
         if ((! filter) || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
             printf("%sIdent=%d, Fail=%d, OT failure=%d, OT warning=%d, "
                    "UT failure=%d\n", pad, !!(statp[1] & 0x80), 
@@ -627,13 +648,13 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
         else
             printf("%sTemperature: <reserved>\n", pad);
         break;
-    case DOOR_LOCK_EL:
+    case DOOR_LOCK_ETC:
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Unlock=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x1));
         break;
-    case AUD_ALARM_EL:     /* audible alarm */
+    case AUD_ALARM_ETC:     /* audible alarm */
         if ((! filter) || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Request mute=%d, Mute=%d, "
                    "Remind=%d\n", pad, !!(statp[1] & 0x80),
@@ -644,20 +665,20 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                    "Unrecov=%d\n", pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case ENC_SC_ELECTR_EL:     /* enclosure services controller electronics */
+    case ESC_ELECTRONICS_ETC:     /* enclosure services controller electronics */
         if ((! filter) || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
             (0x80 & statp[3]))
             printf("%sIdent=%d, Fail=%d, Report=%d, Hot swap=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x80));
         break;
-    case SCC_CELECTR_EL:     /* SCC controller electronics */
+    case SCC_CELECTR_ETC:     /* SCC controller electronics */
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2])))
             printf("%sIdent=%d, Fail=%d, Report=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1));
         break;
-    case NV_CACHE_EL:     /* Non volatile cache */
+    case NV_CACHE_ETC:     /* Non volatile cache */
         res = (statp[2] << 8) + statp[3];
         printf("%sIdent=%d, Fail=%d, Size multiplier=%d, Non volatile cache "
                "size=0x%x\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
@@ -665,7 +686,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
         printf("%sHence non volatile cache size: %d %s\n", pad, res,
                nv_cache_unit[statp[1] & 0x3]);
         break;
-    case INV_OP_REASON_EL:   /* Invalid operation reason */
+    case INV_OP_REASON_ETC:   /* Invalid operation reason */
         res = ((statp[1] >> 6) & 3);
         printf("%sInvop type=%d   %s\n", pad, res, invop_type_desc[res]);
         switch (res) {
@@ -685,7 +706,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
             break;
         }
         break;
-    case UI_POWER_SUPPLY_EL:   /* Uninterruptible power supply */
+    case UI_POWER_SUPPLY_ETC:   /* Uninterruptible power supply */
         if (0 == statp[1])
             printf("%sBattery status: discharged or unknown\n", pad);
         else if (255 == statp[1])
@@ -706,19 +727,19 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
             printf("%sBPF=%d\n", pad, !!(statp[3] & 0x1));
         }
         break;
-    case DISPLAY_EL:   /* Display (ses2r15) */
+    case DISPLAY_ETC:   /* Display (ses2r15) */
         if ((! filter) || (0xc0 & statp[1]))
             printf("%sIdent=%d, Fail=%d, Display mode status=%d, Display "
                    "character status=0x%x\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), (statp[1] & 0x3),
                    ((statp[2] << 8) & statp[3]));
         break;
-    case KEY_PAD_EL:   /* Key pad entry */
+    case KEY_PAD_ETC:   /* Key pad entry */
         if ((! filter) || (0xc0 & statp[1]))
             printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40));
         break;
-    case ENCLOSURE_EL:
+    case ENCLOSURE_ETC:
         a = ((statp[2] >> 2) & 0x3f);
         if ((! filter) || ((0x80 & statp[1]) || a || (0x2 & statp[2])))
             printf("%sIdent=%d, Time until power cycle=%d, "
@@ -732,7 +753,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
             printf("%sFailure requested=%d, Warning requested=%d\n",
                    pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case SCSI_PORT_TRAN_EL:   /* SCSI port/transceiver */
+    case SCSI_PORT_TRAN_ETC:   /* SCSI port/transceiver */
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x13 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Disabled=%d, Loss of "
@@ -741,17 +762,17 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                    !!(statp[3] & 0x10), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
-    case LANGUAGE_EL:
+    case LANGUAGE_ETC:
         printf("%sIdent=%d, Language code: %.2s\n", pad, !!(statp[1] & 0x80),
                statp + 2);
         break;
-    case COMM_PORT_EL:   /* Communication port */
+    case COMM_PORT_ETC:   /* Communication port */
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Disabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x1));
         break;
-    case VOLT_SENSOR_EL:   /* Voltage sensor */
+    case VOLT_SENSOR_ETC:   /* Voltage sensor */
         if ((! filter) || (0xcf & statp[1])) {
             printf("%sIdent=%d, Fail=%d,  Warn Over=%d, Warn Under=%d, "
                    "Crit Over=%d\n", pad, !!(statp[1] & 0x80),
@@ -767,7 +788,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
 #endif
         break;
-    case CURR_SENSOR_EL:   /* Current sensor */
+    case CURR_SENSOR_ETC:   /* Current sensor */
         if ((! filter) || (0xca & statp[1]))
             printf("%sIdent=%d, Fail=%d, Warn Over=%d, Crit Over=%d\n",
                     pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
@@ -780,25 +801,25 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
 #endif
         break;
-    case SCSI_TPORT_EL:   /* SCSI target port */
+    case SCSI_TPORT_ETC:   /* SCSI target port */
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x1));
         break;
-    case SCSI_IPORT_EL:   /* SCSI initiator port */
+    case SCSI_IPORT_ETC:   /* SCSI initiator port */
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x1));
         break;
-    case SIMPLE_SUBENC_EL:   /* Simple subenclosure */
+    case SIMPLE_SUBENC_ETC:   /* Simple subenclosure */
         printf("%sIdent=%d, Fail=%d, Short enclosure status: 0x%x\n", pad,
                !!(statp[1] & 0x80), !!(statp[1] & 0x40), statp[3]);
         break;
-    case ARRAY_DEV_EL:   /* Array device */
+    case ARRAY_DEV_ETC:   /* Array device */
         if ((! filter) || (0xf0 & statp[1]))
             printf("%sOK=%d, Reserved device=%d, Hot spare=%d, Cons check="
                    "%d\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
@@ -828,11 +849,11 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                    pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case SAS_EXPANDER_EL:
+    case SAS_EXPANDER_ETC:
         printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
                !!(statp[1] & 0x40));
         break;
-    case SAS_CONNECTOR_EL:
+    case SAS_CONNECTOR_ETC:
         printf("%sIdent=%d, %s, Connector physical "
                "link=0x%x\n", pad, !!(statp[1] & 0x80), 
                find_sas_connector_type((statp[1] & 0x7f), buff, sizeof(buff)),
@@ -847,7 +868,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
 }
 
 static void
-ses_enclosure_sdg(const struct element_hdr * ehp, int num_telems,
+ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
                   int resp_len, int inner_hex, int filter)
 {
@@ -878,27 +899,27 @@ ses_enclosure_sdg(const struct element_hdr * ehp, int num_telems,
     for (k = 0; k < num_telems; ++k) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        cp = find_element_desc(ehp[k].etype);
+        cp = find_element_desc(tdhp[k].etype);
         if (cp)
             printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, ehp[k].se_id);
+                   cp, tdhp[k].se_id);
         else
             printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   ehp[k].etype, ehp[k].se_id);
+                   tdhp[k].etype, tdhp[k].se_id);
         if (inner_hex)
             printf("    Overall status(hex): %02x %02x %02x %02x\n", ucp[0],
                    ucp[1], ucp[2], ucp[3]);
         else {
             printf("    Overall status:\n");
-            print_element_status("     ", ucp, ehp[k].etype, filter);
+            print_element_status("     ", ucp, tdhp[k].etype, filter);
         }
-        for (ucp += 4, j = 0; j < ehp[k].num_elements; ++j, ucp += 4) {
+        for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
             if (inner_hex)
-                printf("      Element %d status(hex): %02x %02x %02x %02x\n",
-                       j + 1, ucp[0], ucp[1], ucp[2], ucp[3]);
+                printf("      Individual element %d status(hex): %02x %02x "
+                       "%02x %02x\n", j + 1, ucp[0], ucp[1], ucp[2], ucp[3]);
             else {
-                printf("      Element %d status:\n", j + 1);
-                print_element_status("       ", ucp, ehp[k].etype, filter);
+                printf("      Individual element %d status:\n", j + 1);
+                print_element_status("       ", ucp, tdhp[k].etype, filter);
             }
         }
     }
@@ -931,7 +952,8 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
     if (p_num < 0)
         strcpy (buff, "Overall threshold");
     else
-        snprintf(buff, sizeof(buff) - 1, "Element %d threshold", p_num + 1);
+        snprintf(buff, sizeof(buff) - 1, "Individual threshold status "
+                 "element %d", p_num + 1);
     if (inner_hex) {
         printf("%s%s (in hex): %02x %02x %02x %02x\n", pad, buff,
                tp[0], tp[1], tp[2], tp[3]);
@@ -993,7 +1015,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
 }
 
 static void
-ses_threshold_sdg(const struct element_hdr * ehp, int num_telems,
+ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
                   int resp_len, int inner_hex, int verbose)
 {
@@ -1022,17 +1044,17 @@ ses_threshold_sdg(const struct element_hdr * ehp, int num_telems,
     for (k = 0; k < num_telems; ++k) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        cp = find_element_desc(ehp[k].etype);
+        cp = find_element_desc(tdhp[k].etype);
         if (cp)
             printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, ehp[k].se_id);
+                   cp, tdhp[k].se_id);
         else
             printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   ehp[k].etype, ehp[k].se_id);
-        ses_threshold_helper("    ", ucp, ehp[k].etype, -1, inner_hex,
+                   tdhp[k].etype, tdhp[k].se_id);
+        ses_threshold_helper("    ", ucp, tdhp[k].etype, -1, inner_hex,
                              verbose);
-        for (ucp += 4, j = 0; j < ehp[k].num_elements; ++j, ucp += 4) {
-            ses_threshold_helper("      ", ucp, ehp[k].etype, j, inner_hex,
+        for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
+            ses_threshold_helper("      ", ucp, tdhp[k].etype, j, inner_hex,
                                  verbose);
         }
     }
@@ -1043,7 +1065,7 @@ truncated:
 }
 
 static void
-ses_element_desc_sdg(const struct element_hdr * ehp, int num_telems,
+ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                      unsigned int ref_gen_code, const unsigned char * resp,
                      int resp_len)
 {
@@ -1071,19 +1093,19 @@ ses_element_desc_sdg(const struct element_hdr * ehp, int num_telems,
     for (k = 0; k < num_telems; ++k) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        cp = find_element_desc(ehp[k].etype);
+        cp = find_element_desc(tdhp[k].etype);
         if (cp)
             printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, ehp[k].se_id);
+                   cp, tdhp[k].se_id);
         else
             printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   ehp[k].etype, ehp[k].se_id);
+                   tdhp[k].etype, tdhp[k].se_id);
         desc_len = (ucp[2] << 8) + ucp[3] + 4;
         if (desc_len > 4)
             printf("    Overall descriptor: %.*s\n", desc_len - 4, ucp + 4);
         else
             printf("    Overall descriptor: <empty>\n");
-        for (ucp += desc_len, j = 0; j < ehp[k].num_elements; ++j, ucp += desc_len) {
+        for (ucp += desc_len, j = 0; j < tdhp[k].num_elements; ++j, ucp += desc_len) {
             desc_len = (ucp[2] << 8) + ucp[3] + 4;
             if (desc_len > 4)
                 printf("      Element %d descriptor: %.*s\n", j + 1,
@@ -1181,7 +1203,7 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
             }
         } else if (1 == desc_type) {
             phys = ucp[2 + eip_offset];
-            if (SAS_EXPANDER_EL == elem_type) {
+            if (SAS_EXPANDER_ETC == elem_type) {
                 printf("    number of phys: %d\n", phys);
                 printf("    SAS address: 0x");
                 for (m = 0; m < 8; ++m)
@@ -1198,9 +1220,9 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
                         printf(", other element index: %d", per_ucp[1]);
                     printf("\n");
                 }
-            } else if ((SCSI_TPORT_EL == elem_type) ||
-                       (SCSI_IPORT_EL == elem_type) ||
-                       (ENC_SC_ELECTR_EL == elem_type)) {
+            } else if ((SCSI_TPORT_ETC == elem_type) ||
+                       (SCSI_IPORT_ETC == elem_type) ||
+                       (ESC_ELECTRONICS_ETC == elem_type)) {
                 printf("    number of phys: %d\n", phys);
                 per_ucp = ucp + 6 + eip_offset;
                 for (j = 0; j < phys; ++j, per_ucp += 12) {
@@ -1237,7 +1259,7 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
 /* Previously called "Device element status descriptor". Changed "device"
    to "additional" to allow for SAS expander and SATA devices */
 static void
-ses_additional_elem_sdg(const struct element_hdr * ehp, int num_telems,
+ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                         unsigned int ref_gen_code, const unsigned char * resp,
                         int resp_len, int inner_hex)
 {
@@ -1261,24 +1283,24 @@ ses_additional_elem_sdg(const struct element_hdr * ehp, int num_telems,
     }
     ucp = resp + 8;
     for (k = 0; k < num_telems; ++k) {
-        elem_type = ehp[k].etype;
-        if (! ((DEVICE_EL == elem_type) ||
-               (SCSI_TPORT_EL == elem_type) ||
-               (SCSI_IPORT_EL == elem_type) ||
-               (ARRAY_DEV_EL == elem_type) ||
-               (SAS_EXPANDER_EL == elem_type) ||
-               (ENC_SC_ELECTR_EL == elem_type)))
+        elem_type = tdhp[k].etype;
+        if (! ((DEVICE_ETC == elem_type) ||
+               (SCSI_TPORT_ETC == elem_type) ||
+               (SCSI_IPORT_ETC == elem_type) ||
+               (ARRAY_DEV_ETC == elem_type) ||
+               (SAS_EXPANDER_ETC == elem_type) ||
+               (ESC_ELECTRONICS_ETC == elem_type)))
             continue;   /* skip if not one of above element types */
         if ((ucp + 1) > last_ucp)
             goto truncated;
         cp = find_element_desc(elem_type);
         if (cp)
             printf("  Element type: %s, subenclosure id: %d\n",
-                   cp, ehp[k].se_id);
+                   cp, tdhp[k].se_id);
         else
             printf("  Element type: [0x%x], subenclosure id: %d\n",
-                   ehp[k].etype, ehp[k].se_id);
-        for (j = 0; j < ehp[k].num_elements; ++j, ucp += desc_len) {
+                   tdhp[k].etype, tdhp[k].se_id);
+        for (j = 0; j < tdhp[k].num_elements; ++j, ucp += desc_len) {
             invalid = !!(ucp[0] & 0x80);
             if (ucp[0] & 0x10)  /* eip=1 */
                 printf("    element index: %d [0x%x]\n", ucp[3], ucp[3]);
@@ -1394,7 +1416,7 @@ ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
         printf("   nickname status: 0x%x\n", ucp[2]);
         printf("   nickname additional status: 0x%x\n", ucp[3]);
         printf("   nickname language code: %.2s\n", ucp + 6);
-// xxxxxxxxxxxxxxxxxxxxx <<<<<<<<<<<<<<<<<<<
+        printf("   nickname: %s\n", ucp + 8);
     }
     return;
 truncated:
@@ -1414,7 +1436,7 @@ ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
         code = resp[k + 4];
         if (code < prev)
             break;      /* assume to be padding at end */
-        cp = find_page_code_desc(code);
+        cp = find_diag_page_desc(code);
         printf("  %s [0x%x]\n", (cp ? cp : "<unknown>"), code);
     }
 }
@@ -1566,7 +1588,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
     const char * cp;
 
     memset(rsp_buff, 0, rsp_buff_size);
-    cp = find_in_page_code_desc(page_code);
+    cp = find_in_diag_page_desc(page_code);
     res = sg_ll_receive_diag(sg_fd, 1, page_code, rsp_buff,
                              rsp_buff_size, 1, verbose);
     if (0 == res) {
@@ -1603,22 +1625,22 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
             dStrHex((const char *)rsp_buff, rsp_len, 0);
         } else {
             switch (page_code) {
-            case 0: 
+            case DPC_SUPPORTED: 
                 ses_supported_pages_sdg("Supported diagnostic pages",
                                         rsp_buff, rsp_len);
                 break;
-            case 1: 
+            case DPC_CONFIGURATION: 
                 ses_configuration_sdg(rsp_buff, rsp_len);
                 break;
-            case 2: 
-                res = populate_element_hdr_arr(sg_fd, element_hdr_arr,
+            case DPC_ENC_STATUS: 
+                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
                     break;
-                ses_enclosure_sdg(element_hdr_arr, res, ref_gen_code,
+                ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
                                   rsp_buff, rsp_len, inner_hex, filter);
                 break;
-            case 3: 
+            case DPC_HELP_TEXT: 
                 printf("Help text diagnostic page (for primary "
                        "subenclosure):\n");
                 if (rsp_len > 4)
@@ -1626,7 +1648,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 else
                     printf("  <empty>\n");
                 break;
-            case 4: 
+            case DPC_STRING: 
                 printf("String In diagnostic page (for primary "
                        "subenclosure):\n");
                 if (rsp_len > 4)
@@ -1634,55 +1656,54 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 else
                     printf("  <empty>\n");
                 break;
-            case 5: 
-                res = populate_element_hdr_arr(sg_fd, element_hdr_arr,
+            case DPC_THRESHOLD: 
+                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
                     break;
-                ses_threshold_sdg(element_hdr_arr, res, ref_gen_code,
+                ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                   rsp_buff, rsp_len, inner_hex, verbose);
                 break;
-            case 7: 
-                res = populate_element_hdr_arr(sg_fd, element_hdr_arr,
+            case DPC_ELEM_DESC: 
+                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
                     break;
-                ses_element_desc_sdg(element_hdr_arr, res, ref_gen_code,
+                ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                      rsp_buff, rsp_len);
                 break;
-            case 8: 
+            case DPC_SHORT_ENC_STATUS: 
                 printf("Short enclosure status diagnostic page, "
                        "status=0x%x\n", rsp_buff[1]);
                 break;
-            case 9: 
+            case DPC_ENC_BUSY: 
                 printf("Enclosure busy diagnostic page, "
                        "busy=%d [vendor specific=0x%x]\n",
                        rsp_buff[1] & 1, (rsp_buff[1] >> 1) & 0xff);
                 break;
-            case 0xa: 
-                res = populate_element_hdr_arr(sg_fd, element_hdr_arr,
+            case DPC_ADD_ELEM_STATUS: 
+                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
                     break;
-                ses_additional_elem_sdg(element_hdr_arr, res, ref_gen_code,
+                ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                         rsp_buff, rsp_len, inner_hex);
                 break;
-            case 0xb: 
+            case DPC_SUBENC_HELP_TEXT: 
                 ses_subenc_help_sdg(rsp_buff, rsp_len);
                 break;
-            case 0xc: 
+            case DPC_SUBENC_STRING: 
                 ses_subenc_string_sdg(rsp_buff, rsp_len);
                 break;
-            case 0xd: 
+            case DPC_SUPPORTED_SES: 
                 ses_supported_pages_sdg("Supported SES diagnostic pages",
                                         rsp_buff, rsp_len);
                 break;
-            case 0xe: 
+            case DPC_DOWNLOAD_MICROCODE: 
                 ses_download_code_sdg(rsp_buff, rsp_len);
                 break;
-            case 0xf: 
+            case DPC_SUBENC_NICKNAME: 
                 ses_subenc_nickname_sdg(rsp_buff, rsp_len);
-                /* subenclosure nickname: place holder */
                 break;
             default:
                 printf("Cannot decode response from diagnostic "
@@ -1830,9 +1851,9 @@ main(int argc, char * argv[])
     }
     if (do_list) {
         int k;
-        int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
-        const struct page_code_desc * pcdp = &pc_desc_arr[0];
-        const struct element_desc * edp = &element_desc_arr[0];
+        int num = sizeof(dpc_arr) / sizeof(dpc_arr[0]);
+        const struct diag_page_code * pcdp = &dpc_arr[0];
+        const struct element_type_t * etp = &element_type_arr[0];
 
     
         printf("Known diagnostic pages (followed by page code):\n");
@@ -1840,9 +1861,9 @@ main(int argc, char * argv[])
             printf("    %s  [0x%x]\n", pcdp->desc, pcdp->page_code);
         printf("\nKnown SES element type names (followed by element type "
                "code):\n");
-        num = sizeof(element_desc_arr) / sizeof(element_desc_arr[0]);
-        for (k = 0; k < num; ++k, ++edp)
-            printf("    %s  [0x%x]\n", edp->desc, edp->elem_code);
+        num = sizeof(element_type_arr) / sizeof(element_type_arr[0]);
+        for (k = 0; k < num; ++k, ++etp)
+            printf("    %s  [0x%x]\n", etp->desc, etp->elem_type_code);
         return 0;
     }
     if (do_control && do_status) {
