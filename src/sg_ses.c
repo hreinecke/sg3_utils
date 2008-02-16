@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.42 20080214";    /* ses2r19b */
+static char * version_str = "1.42 20080215";    /* ses2r19b */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -187,7 +187,7 @@ static struct diag_page_code dpc_arr[] = {
         {DPC_ELEM_DESC, "Element descriptor (SES)"},
         {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
         {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
-        {DPC_ADD_ELEM_STATUS, "Additional (device) element status (SES-2)"},
+        {DPC_ADD_ELEM_STATUS, "Additional element status (SES-2)"},
         {DPC_SUBENC_HELP_TEXT, "Subenclosure help text (SES-2)"},
         {DPC_SUBENC_STRING, "Subenclosure string In/Out (SES-2)"},
         {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
@@ -208,7 +208,7 @@ static struct diag_page_code in_dpc_arr[] = {
         {DPC_ELEM_DESC, "Element descriptor (SES)"},
         {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
         {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
-        {DPC_ADD_ELEM_STATUS, "Additional (device) element status (SES-2)"},
+        {DPC_ADD_ELEM_STATUS, "Additional element status (SES-2)"},
         {DPC_SUBENC_HELP_TEXT, "Subenclosure help text (SES-2)"},
         {DPC_SUBENC_STRING, "Subenclosure string In (SES-2)"},
         {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
@@ -356,6 +356,7 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
     printf("  generation code: 0x%x\n", gen_code);
+    printf("  enclosure descriptor list\n");
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += el) {
         if ((ucp + 3) > last_ucp)
@@ -381,6 +382,7 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
         }
     }
     /* printf("\n"); */
+    printf("  type descriptor header/text list\n");
     text_ucp = ucp + (sum_elem_types * 4);
     for (k = 0; k < sum_elem_types; ++k, ucp += 4) {
         if ((ucp + 3) > last_ucp)
@@ -396,7 +398,7 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
         if (ucp[3] > 0) {
             if (text_ucp > last_ucp)
                 goto truncated;
-            printf("      Description: %.*s\n", ucp[3], text_ucp);
+            printf("      text: %.*s\n", ucp[3], text_ucp);
             text_ucp += ucp[3];
         }
     }
@@ -419,7 +421,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
-    res = sg_ll_receive_diag(fd, 1 /* pcv */, DPC_ENC_STATUS, resp,
+    res = sg_ll_receive_diag(fd, 1 /* pcv */, DPC_CONFIGURATION, resp,
                              rsp_buff_size, 1, verbose);
     if (0 == res) {
         resp_len = (resp[2] << 8) + resp[3] + 4;
@@ -428,7 +430,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                     "[%d but need %d]>>>\n", rsp_buff_size, resp_len);
             resp_len = rsp_buff_size;
         }
-        if (1 != resp[0]) {
+        if (DPC_CONFIGURATION != resp[0]) {
             if ((0x9 == resp[0]) && (1 & resp[1]))
                 printf("Enclosure busy, try again later\n");
             else if (0x8 == resp[0])
@@ -895,6 +897,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
                 "again>>\n");
         return;
     }
+    printf("  status descriptor list\n");
     ucp = resp + 8;
     for (k = 0; k < num_telems; ++k) {
         if ((ucp + 3) > last_ucp)
@@ -907,11 +910,11 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: [0x%x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
         if (inner_hex)
-            printf("    Overall status(hex): %02x %02x %02x %02x\n", ucp[0],
+            printf("      Overall status(hex): %02x %02x %02x %02x\n", ucp[0],
                    ucp[1], ucp[2], ucp[3]);
         else {
-            printf("    Overall status:\n");
-            print_element_status("     ", ucp, tdhp[k].etype, filter);
+            printf("      Overall status:\n");
+            print_element_status("        ", ucp, tdhp[k].etype, filter);
         }
         for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
             if (inner_hex)
@@ -919,7 +922,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
                        "%02x %02x\n", j + 1, ucp[0], ucp[1], ucp[2], ucp[3]);
             else {
                 printf("      Individual element %d status:\n", j + 1);
-                print_element_status("       ", ucp, tdhp[k].etype, filter);
+                print_element_status("        ", ucp, tdhp[k].etype, filter);
             }
         }
     }
@@ -1040,6 +1043,7 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                 "again>>\n");
         return;
     }
+    printf("  threshold status descriptor list\n");
     ucp = resp + 8;
     for (k = 0; k < num_telems; ++k) {
         if ((ucp + 3) > last_ucp)
@@ -1051,7 +1055,7 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
         else
             printf("    Element type: [0x%x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
-        ses_threshold_helper("    ", ucp, tdhp[k].etype, -1, inner_hex,
+        ses_threshold_helper("      ", ucp, tdhp[k].etype, -1, inner_hex,
                              verbose);
         for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
             ses_threshold_helper("      ", ucp, tdhp[k].etype, j, inner_hex,
@@ -1089,6 +1093,7 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                 "again>>\n");
         return;
     }
+    printf("  element descriptor by type list\n");
     ucp = resp + 8;
     for (k = 0; k < num_telems; ++k) {
         if ((ucp + 3) > last_ucp)
@@ -1102,9 +1107,9 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                    tdhp[k].etype, tdhp[k].se_id);
         desc_len = (ucp[2] << 8) + ucp[3] + 4;
         if (desc_len > 4)
-            printf("    Overall descriptor: %.*s\n", desc_len - 4, ucp + 4);
+            printf("      Overall descriptor: %.*s\n", desc_len - 4, ucp + 4);
         else
-            printf("    Overall descriptor: <empty>\n");
+            printf("      Overall descriptor: <empty>\n");
         for (ucp += desc_len, j = 0; j < tdhp[k].num_elements; ++j, ucp += desc_len) {
             desc_len = (ucp[2] << 8) + ucp[3] + 4;
             if (desc_len > 4)
@@ -1141,12 +1146,12 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
     switch (0xf & ucp[0]) {
     case TPROTO_FCP:
         ports = ucp[2 + eip_offset];
-        printf("    Transport protocol: FCP\n");
+        printf("      Transport protocol: FCP\n");
 #if 0
         printf("%s element\n", get_element_desc(elem_type, sizeof(b), b));
 #endif
-        printf("    number of ports: %d\n", ports);
-        printf("    node_name: ");
+        printf("      number of ports: %d\n", ports);
+        printf("      node_name: ");
         for (m = 0; m < 8; ++m)
             printf("%02x", ucp[6 + eip_offset + m]);
         if (eip_offset)
@@ -1154,12 +1159,12 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
         printf("\n");
         per_ucp = ucp + 14 + eip_offset;
         for (j = 0; j < ports; ++j, per_ucp += 16) {
-            printf("    port index: %d, port loop position: %d, port "
+            printf("      port index: %d, port loop position: %d, port "
                    "bypass reason: 0x%x\n", j, per_ucp[0], per_ucp[1]);
-            printf("      requested hard address: %d, n_port "
+            printf("        requested hard address: %d, n_port "
                    "identifier: %02x%02x%02x\n", per_ucp[4], per_ucp[5],
                    per_ucp[6], per_ucp[7]);
-            printf("      n_port name: ");
+            printf("        n_port name: ");
             for (m = 0; m < 8; ++m)
                 printf("%02x", per_ucp[8 + m]);
             printf("\n");
@@ -1167,51 +1172,51 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
         break;
     case TPROTO_SAS:
         desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
-        printf("    Transport protocol: SAS\n");
+        printf("      Transport protocol: SAS\n");
 #if 0
         printf("%s element\n", get_element_desc(elem_type, sizeof(b), b));
 #endif
         if (0 == desc_type) {
             phys = ucp[2 + eip_offset];
-            printf("    number of phys: %d, not all phys: %d", phys,
+            printf("      number of phys: %d, not all phys: %d", phys,
                    ucp[3 + eip_offset] & 1);
             if (eip_offset)
                 printf(", bay number: %d", ucp[5 + eip_offset]);
             printf("\n");
             per_ucp = ucp + 4 + eip_offset + eip_offset;
             for (j = 0; j < phys; ++j, per_ucp += 28) {
-                printf("    phy index: %d\n", j);
-                printf("      device type: %s\n",
+                printf("      phy index: %d\n", j);
+                printf("        device type: %s\n",
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
-                printf("      initiator port for:%s%s%s\n",
+                printf("        initiator port for:%s%s%s\n",
                        ((per_ucp[2] & 8) ? " SSP" : ""),
                        ((per_ucp[2] & 4) ? " STP" : ""),
                        ((per_ucp[2] & 2) ? " SMP" : ""));
-                printf("      target port for:%s%s%s%s%s\n",
+                printf("        target port for:%s%s%s%s%s\n",
                        ((per_ucp[3] & 0x80) ? " SATA_port_selector" : ""),
                        ((per_ucp[3] & 8) ? " SSP" : ""),
                        ((per_ucp[3] & 4) ? " STP" : ""),
                        ((per_ucp[3] & 2) ? " SMP" : ""),
                        ((per_ucp[3] & 1) ? " SATA_device" : ""));
-                printf("      attached SAS address: 0x");
+                printf("        attached SAS address: 0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", per_ucp[4 + m]);
-                printf("\n      SAS address: 0x");
+                printf("\n        SAS address: 0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", per_ucp[12 + m]);
-                printf("\n      phy identifier: 0x%x\n", per_ucp[20]);
+                printf("\n        phy identifier: 0x%x\n", per_ucp[20]);
             }
         } else if (1 == desc_type) {
             phys = ucp[2 + eip_offset];
             if (SAS_EXPANDER_ETC == elem_type) {
-                printf("    number of phys: %d\n", phys);
-                printf("    SAS address: 0x");
+                printf("      number of phys: %d\n", phys);
+                printf("      SAS address: 0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", ucp[6 + eip_offset + m]);
                 printf("\n");
                 per_ucp = ucp + 14 + eip_offset;
                 for (j = 0; j < phys; ++j, per_ucp += 2) {
-                    printf("      [%d] ", j);
+                    printf("        [%d] ", j);
                     if (0xff == per_ucp[0])
                         printf("no attached connector");
                     else
@@ -1223,32 +1228,32 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
             } else if ((SCSI_TPORT_ETC == elem_type) ||
                        (SCSI_IPORT_ETC == elem_type) ||
                        (ESC_ELECTRONICS_ETC == elem_type)) {
-                printf("    number of phys: %d\n", phys);
+                printf("      number of phys: %d\n", phys);
                 per_ucp = ucp + 6 + eip_offset;
                 for (j = 0; j < phys; ++j, per_ucp += 12) {
-                    printf("    phy index: %d\n", j);
-                    printf("      phy identifier: 0x%x\n", per_ucp[0]);
+                    printf("      phy index: %d\n", j);
+                    printf("        phy identifier: 0x%x\n", per_ucp[0]);
                     if (0xff == per_ucp[2])
-                        printf("      no attached connector");
+                        printf("        no attached connector");
                     else
-                        printf("      connector element index: %d",
+                        printf("        connector element index: %d",
                                per_ucp[2]);
                     if (0xff != per_ucp[3])
                         printf(", other element index: %d", per_ucp[3]);
                     printf("\n");
-                    printf("      SAS address: 0x");
+                    printf("        SAS address: 0x");
                     for (m = 0; m < 8; ++m)
                         printf("%02x", per_ucp[4 + m]);
                     printf("\n");
                 }
             } else
-                printf("    unrecognised element type [%d] for desc_type 1\n",
-                       elem_type);
+                printf("      unrecognised element type [%d] for desc_type "
+                       "1\n", elem_type);
         } else
-            printf("    unrecognised descriptor type [%d]\n", desc_type);
+            printf("      unrecognised descriptor type [%d]\n", desc_type);
         break;
     default:
-        printf("   [%d] Transport protocol: %s not decoded, in hex:\n",
+        printf("     [%d] Transport protocol: %s not decoded, in hex:\n",
                elem_num + 1,
                sg_get_trans_proto_str((0xf & ucp[0]), sizeof(b), b));
         dStrHex((const char *)ucp, len, 0);
@@ -1269,7 +1274,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     const unsigned char * last_ucp;
     const char * cp;
 
-    printf("Additional (device) element status diagnostic page:\n");
+    printf("Additional element status diagnostic page:\n");
     if (resp_len < 4)
         goto truncated;
     last_ucp = resp + resp_len - 1;
@@ -1281,6 +1286,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                 "again>>\n");
         return;
     }
+    printf("  additional element status descriptor list\n");
     ucp = resp + 8;
     for (k = 0; k < num_telems; ++k) {
         elem_type = tdhp[k].etype;
@@ -1295,20 +1301,20 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             goto truncated;
         cp = find_element_desc(elem_type);
         if (cp)
-            printf("  Element type: %s, subenclosure id: %d\n",
+            printf("    Element type: %s, subenclosure id: %d\n",
                    cp, tdhp[k].se_id);
         else
-            printf("  Element type: [0x%x], subenclosure id: %d\n",
+            printf("    Element type: [0x%x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
         for (j = 0; j < tdhp[k].num_elements; ++j, ucp += desc_len) {
             invalid = !!(ucp[0] & 0x80);
             if (ucp[0] & 0x10)  /* eip=1 */
-                printf("    element index: %d [0x%x]\n", ucp[3], ucp[3]);
+                printf("      element index: %d [0x%x]\n", ucp[3], ucp[3]);
             desc_len = ucp[1] + 2;
             if (inner_hex)
                 dStrHex((const char *)ucp + 4, desc_len, 0);
             else if (invalid)
-                printf("      flagged as invalid (no further information)\n");
+                printf("        flagged as invalid (no further information)\n");
             else
                 ses_additional_elem_each(ucp, desc_len, j, elem_type);
         }
