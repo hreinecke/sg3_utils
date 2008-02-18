@@ -29,7 +29,7 @@ clean:
 hxascdmp: hxascdmp.o
 	$(LD) -o $@ $(LDFLAGS) $@.o
 
-sg_chk_asc: sg_chk_asc.o ../sg_lib.o
+sg_chk_asc: sg_chk_asc.o ../sg_lib.o ../sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $@.o ../sg_lib.o
 
 
