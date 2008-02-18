@@ -9,6 +9,7 @@ scsiinclude_HEADERS = \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
+	sg_cmds_mmc.h \
 	sg_pt.h \
 	sg_linux_inc.h \
 	sg_io_linux.h
@@ -27,6 +28,7 @@ scsiinclude_HEADERS = \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
+	sg_cmds_mmc.h \
 	sg_pt.h \
 	sg_pt_win32.h
 	
@@ -45,6 +47,7 @@ scsiinclude_HEADERS = \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
+	sg_cmds_mmc.h \
 	sg_pt.h \
 	sg_pt_win32.h
 	
@@ -63,6 +66,7 @@ scsiinclude_HEADERS = \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
+	sg_cmds_mmc.h \
 	sg_pt.h
 	
 noinst_HEADERS = \
@@ -81,6 +85,7 @@ scsiinclude_HEADERS = \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
+	sg_cmds_mmc.h \
 	sg_pt.h
 	
 noinst_HEADERS = \
@@ -99,6 +104,7 @@ scsiinclude_HEADERS = \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
+	sg_cmds_mmc.h \
 	sg_pt.h
 	
 noinst_HEADERS = \

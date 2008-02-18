@@ -70,23 +70,25 @@ The "sg_lib_data.[hc]" files contain ASCII text corresponding to most of the
 SCSI commands, errors and warning conditions. The interface to this data
 plus several related helper functions are found in the sg_lib.[hc] files.
 The "sg_cmds_basic.[hc]" files contains code to invoke common SCSI commands
-and associated response processing. The "sg_cmds_extra.[hc]" files contains
-code to invoke lesser used SCSI commands and associated response processing.
-All are guided by recent drafts at www.t10.org which is the home site of
-SCSI (draft) standards. Linux specific code has been removed from sg_lib.[hc],
-sg_cmds_basic.[hc] and sg_cmds_extra.[hc] . The SCSI command implementations
-in sg_cmds_basic.c and sg_cmds_extra.c access the OS pass through mechanism
-via the function based interface defined in sg_pt.h . The linux specific
-implementation of that pass through is found in the sg_pt_linux.c file. Since
-almost all of the utilities use these files, a shared library called
-"libsgutils.so" is built. Use of this library cuts down the size of the
-binary distributions of sg3_utils significantly. In sg3_utils version 1.25
-then header files mentioned in this paragraph were relocated in the 'include'
-subdirectory while the source code files (i.e. those ending in ".c") were
-reloacted in the 'lib' subdirectory. The build scripts provided in the 'lib'
-subdirectory builds libsgutils.so The rest of the source code files have
-been relocated to the 'src' subdirectory. See the INSTALL file for more
-information.
+and associated response processing. The "sg_cmds_mmc.[hc]" files contain
+code to invoke SCSI commands specific to MMC (fro cd/dvd/bd devices).
+The "sg_cmds_extra.[hc]" files contains code to invoke lesser used SCSI
+commands and associated response processing. All are guided by recent drafts
+at www.t10.org which is the home site of SCSI (draft) standards. Linux
+specific code has been removed from sg_lib.[hc], sg_cmds_basic.[hc],
+sg_cmds_mmc.[hc] and sg_cmds_extra.[hc] . The SCSI command implementations
+in sg_cmds_basic.c, sg_cmds_mmc.c and sg_cmds_extra.c access the OS
+pass-through mechanism via the function based interface defined in sg_pt.h .
+The linux specific implementation of that pass through is found in the
+sg_pt_linux.c file. Since almost all of the utilities use these files, a
+shared library called "libsgutils.so" is built. Use of this library cuts
+down the size of the binary distributions of sg3_utils significantly. In
+sg3_utils version 1.25 then header files mentioned in this paragraph were
+relocated in the 'include' subdirectory while the source code files (i.e.
+those ending in ".c") were relocated in the 'lib' subdirectory. The build
+scripts provided in the 'lib' subdirectory builds libsgutils.so The rest
+of the source code files have been relocated to the 'src' subdirectory.
+See the INSTALL file for more information.
 
 All the utilities in the 'src' subdirectory have "man" pages that are now
 placed in the 'doc' subdirectory. There is also a sg3_utils (8) man page that
@@ -328,4 +330,4 @@ See http://www.torque.net/sg/tools.html
 
 
 Doug Gilbert
-17th February 2008
+18th February 2008

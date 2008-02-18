@@ -58,7 +58,8 @@ the main directory. When the sg3_utils binary rpm is installed the executables
 and their associated man pages should be placed in appropriate places. The
 sg3_utils.spec file also builds a libsgutils shared object (shared library)
 and a libsgutils-*-devel shared object with a static library and the sg_lib.h,
-sg_cmds.h sg_cmds_basic.h, sg_cmds_extra.h and sg_pt.h header files.
+sg_cmds.h sg_cmds_basic.h, sg_cmds_mmc.h, sg_cmds_extra.h and sg_pt.h header
+files.
 
 Binary rpms (at least in the RedHat distribution) tend to install
 executables in /usr/bin and libraries in /usr/lib .
@@ -137,5 +138,5 @@ Makefile.am file for a definitive list. The executables have a '.exe'
 extension and can be executed in a MSYS or "cmd" shell.
 
 
-16th September 2007
 Doug Gilbert
+18th February 2008

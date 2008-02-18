@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.79 20080122";    /* SPC-4 revision 12 */
+static char * version_str = "0.80 20080218";    /* SPC-4 revision 12 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -679,7 +679,7 @@ show_page_name(int pg_code, int subpg_code,
 
     done = 1;
     switch (inq_dat->peripheral_type) {
-    case 0: case 4: case 7: case 0xe:
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
         /* disk (direct access) type devices */
         {
             switch (pg_code) {
@@ -707,7 +707,7 @@ show_page_name(int pg_code, int subpg_code,
             }
         }
         break;
-    case 1: case 2:
+    case PDT_TAPE: case PDT_PRINTER:
         /* tape (streaming) and printer (obsolete) devices */
         {
             switch (pg_code) {
@@ -741,7 +741,7 @@ show_page_name(int pg_code, int subpg_code,
             }
         }
         break;
-    case 8:
+    case PDT_MCHANGER:
         /* medium changer type devices */
         {
             switch (pg_code) {
@@ -763,7 +763,7 @@ show_page_name(int pg_code, int subpg_code,
             }
         }
         break;
-    case 0x12: /* Automation Device interface (ADC) */
+    case PDT_ADC: /* Automation Device interface (ADC) */
         {
             switch (pg_code) {
             case 0x11:
@@ -2938,7 +2938,7 @@ show_ascii_page(unsigned char * resp, int len,
     case 0x8:
         {
             switch (inq_dat->peripheral_type) {
-            case 0: case 4: case 7: case 0xe:
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
                 show_format_status_page(resp, len, optsp->do_pcb);
                 break;
@@ -2954,7 +2954,7 @@ show_ascii_page(unsigned char * resp, int len,
     case 0xc:
         {
             switch (inq_dat->peripheral_type) {
-            case 1: case 2:
+            case PDT_TAPE: case PDT_PRINTER:
                 /* tape and (printer) type devices */
                 show_sequential_access_page(resp, len, optsp->do_pcb,
                                             optsp->do_verbose);
@@ -2977,11 +2977,11 @@ show_ascii_page(unsigned char * resp, int len,
     case 0x14:
         {
             switch (inq_dat->peripheral_type) {
-            case 1: case 0x12:
+            case PDT_TAPE: case PDT_ADC:
                 /* tape and adc type devices */
                 show_device_stats_page(resp, len, optsp->do_pcb);
                 break;
-            case 8: /* smc-3 */
+            case PDT_MCHANGER: /* smc-3 */
                 show_media_stats_page(resp, len, optsp->do_pcb);
                 break;
             default:
@@ -2993,12 +2993,12 @@ show_ascii_page(unsigned char * resp, int len,
     case 0x15:
         {
             switch (inq_dat->peripheral_type) {
-            case 0: case 4: case 7: case 0xe:
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
                 show_background_scan_results_page(resp, len, optsp->do_pcb,
                                                   optsp->do_verbose);
                 break;
-            case 8: /* smc-3 */
+            case PDT_MCHANGER: /* smc-3 */
                 show_element_stats_page(resp, len, optsp->do_pcb);
                 break;
             default:
@@ -3010,7 +3010,7 @@ show_ascii_page(unsigned char * resp, int len,
     case 0x16:
         {
             switch (inq_dat->peripheral_type) {
-            case 8: /* smc-3 */
+            case PDT_MCHANGER: /* smc-3 */
                 show_mchanger_diag_data_page(resp, len, optsp->do_pcb);
                 break;
             default:
@@ -3021,7 +3021,7 @@ show_ascii_page(unsigned char * resp, int len,
     case 0x17:
         {
             switch (inq_dat->peripheral_type) {
-            case 0: case 4: case 7: case 0xe:
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
                 show_non_volatile_cache_page(resp, len, optsp->do_pcb);
                 break;
@@ -3040,7 +3040,7 @@ show_ascii_page(unsigned char * resp, int len,
     case TAPE_ALERT_LPAGE:
         {
             switch (inq_dat->peripheral_type) {
-            case 1:     /* ssc only */
+            case PDT_TAPE:     /* ssc only */
                 show_tape_alert_ssc_page(resp, len, optsp->do_pcb, optsp);
                 break;
             default:
@@ -3055,7 +3055,7 @@ show_ascii_page(unsigned char * resp, int len,
     case 0x37:
         {
             switch (inq_dat->peripheral_type) {
-            case 0: case 4: case 7: case 0xe:
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
                 show_seagate_cache_page(resp, len, optsp->do_pcb);
                 break;
@@ -3068,7 +3068,7 @@ show_ascii_page(unsigned char * resp, int len,
     case 0x3e:
         {
             switch (inq_dat->peripheral_type) {
-            case 0: case 4: case 7: case 0xe:
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
                 show_seagate_factory_page(resp, len, optsp->do_pcb);
                 break;

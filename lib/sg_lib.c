@@ -189,9 +189,9 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 
     for (k = 0; sg_lib_asc_ascq_range[k].text; ++k) {
         ei2p = &sg_lib_asc_ascq_range[k];
-        if ((ei2p->code1 == asc) &&
-            (ascq >= ei2p->code2_min)  &&
-            (ascq <= ei2p->code2_max)) {
+        if ((ei2p->asc == asc) &&
+            (ascq >= ei2p->ascq_min)  &&
+            (ascq <= ei2p->ascq_max)) {
             found = 1;
             num = snprintf(buff, buff_len, "Additional sense: ");
             rlen = buff_len - num;
@@ -204,8 +204,8 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 
     for (k = 0; sg_lib_asc_ascq[k].text; ++k) {
         eip = &sg_lib_asc_ascq[k];
-        if (eip->code1 == asc &&
-            eip->code2 == ascq) {
+        if (eip->asc == asc &&
+            eip->ascq == ascq) {
             found = 1;
             snprintf(buff, buff_len, "Additional sense: %s", eip->text);
         }
