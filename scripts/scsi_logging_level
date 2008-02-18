@@ -4,6 +4,8 @@
 # readable form.
 #
 # (C) Copyright IBM Corp. 2006
+#
+# Modified by D. Gilbert to replace the use of sysctl [20080218]
 ###############################################################################
 
 
@@ -185,7 +187,8 @@ invalid_cmdline()
 get_logging_level()
 {
     echo "Current scsi logging level:"
-    LEVEL=`sysctl -n dev.scsi.logging_level`
+#   LEVEL=`sysctl -n dev.scsi.logging_level`
+    LEVEL=`cat /proc/sys/dev/scsi/logging_level`
     if [ $? != 0 ]
     then
  	echo "$SCRIPTNAME: could not read scsi logging level" \
@@ -196,7 +199,7 @@ get_logging_level()
 
 show_logging_level()
 {
-    echo "dev.scsi.logging_level = $LEVEL"
+    echo "/proc/sys/dev/scsi/logging_level = $LEVEL"
 
     LOG_ERROR=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
     LOG_TIMEOUT=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
@@ -224,7 +227,8 @@ show_logging_level()
 set_logging_level()
 {
     echo "New scsi logging level:"
-    sysctl -q -w dev.scsi.logging_level=$LEVEL
+#   sysctl -q -w dev.scsi.logging_level=$LEVEL
+    echo $LEVEL > /proc/sys/dev/scsi/logging_level
     if [ $? != 0 ]
     then
  	echo "$SCRIPTNAME: could not write scsi logging level" \
