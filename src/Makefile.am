@@ -104,7 +104,7 @@ endif
 AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 # AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c99
 
-sg_dd_SOURCES =	sg_dd.c sg_io_linux.c
+sg_dd_SOURCES =	sg_dd.c
 sg_dd_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_emc_trespass_SOURCES = sg_emc_trespass.c
@@ -119,7 +119,7 @@ sg_get_config_LDADD = ../lib/libsgutils.la @os_libs@
 sg_ident_SOURCES = sg_ident.c
 sg_ident_LDADD = ../lib/libsgutils.la @os_libs@
 
-sginfo_SOURCES = sginfo.c sg_io_linux.c
+sginfo_SOURCES = sginfo.c
 sginfo_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_inq_SOURCES = sg_inq.c sg_inq_data.c
@@ -134,10 +134,10 @@ sg_luns_LDADD = ../lib/libsgutils.la @os_libs@
 sg_map26_SOURCES = sg_map26.c
 sg_map26_LDADD = @os_libs@
 
-sg_map_SOURCES = sg_map.c sg_io_linux.c
+sg_map_SOURCES = sg_map.c
 sg_map_LDADD = ../lib/libsgutils.la @os_libs@
 
-sgm_dd_SOURCES = sgm_dd.c sg_io_linux.c
+sgm_dd_SOURCES = sgm_dd.c
 sgm_dd_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_modes_SOURCES = sg_modes.c
@@ -146,7 +146,7 @@ sg_modes_LDADD = ../lib/libsgutils.la @os_libs@
 sg_opcodes_SOURCES = sg_opcodes.c
 sg_opcodes_LDADD = ../lib/libsgutils.la @os_libs@
 
-sgp_dd_SOURCES = sgp_dd.c sg_io_linux.c
+sgp_dd_SOURCES = sgp_dd.c
 sgp_dd_LDADD = ../lib/libsgutils.la @os_libs@ -lpthread
 
 sg_persist_SOURCES = sg_persist.c
@@ -158,13 +158,13 @@ sg_prevent_LDADD = ../lib/libsgutils.la @os_libs@
 sg_raw_SOURCES = sg_raw.c
 sg_raw_LDADD = ../lib/libsgutils.la @os_libs@
 
-sg_rbuf_SOURCES = sg_rbuf.c sg_io_linux.c
+sg_rbuf_SOURCES = sg_rbuf.c
 sg_rbuf_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_rdac_SOURCES = sg_rdac.c
 sg_rdac_LDADD = ../lib/libsgutils.la @os_libs@
 
-sg_read_SOURCES = sg_read.c sg_io_linux.c
+sg_read_SOURCES = sg_read.c
 sg_read_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_readcap_SOURCES = sg_readcap.c
@@ -203,7 +203,7 @@ sg_sat_phy_event_LDADD = ../lib/libsgutils.la @os_libs@
 sg_sat_set_features_SOURCES = sg_sat_set_features.c
 sg_sat_set_features_LDADD = ../lib/libsgutils.la @os_libs@
 
-sg_scan_SOURCES = sg_scan.c sg_io_linux.c
+sg_scan_SOURCES = sg_scan.c
 sg_scan_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_senddiag_SOURCES = sg_senddiag.c
@@ -221,7 +221,7 @@ sg_stpg_LDADD = ../lib/libsgutils.la @os_libs@
 sg_sync_SOURCES = sg_sync.c
 sg_sync_LDADD = ../lib/libsgutils.la @os_libs@
 
-sg_test_rwbuf_SOURCES = sg_test_rwbuf.c sg_io_linux.c
+sg_test_rwbuf_SOURCES = sg_test_rwbuf.c
 sg_test_rwbuf_LDADD = ../lib/libsgutils.la @os_libs@
 
 sg_turs_SOURCES = sg_turs.c
