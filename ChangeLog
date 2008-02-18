@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080214]
+Changelog for sg3_utils-1.26 [20080217]
   - sg_ses: sync with ses2r19b
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
@@ -31,6 +31,7 @@ Changelog for sg3_utils-1.26 [20080214]
   - remove archive/pre_configure subdirectory
   - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace
     "%lld" and friends with PRI macros
+  - move sg_io_linux.c into the lib subdirectory
 
 Changelog for sg3_utils-1.25 [20071016]
   - sg_stpg: new utility to Set Target Port Groups

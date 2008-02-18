@@ -52,7 +52,7 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__libsgutils_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
 	sg_cmds_basic.c sg_cmds_extra.c sg_pt_freebsd.c sg_pt_linux.c \
-	sg_pt_osf1.c sg_pt_solaris.c sg_pt_win32.c
+	sg_io_linux.c sg_pt_osf1.c sg_pt_solaris.c sg_pt_win32.c
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@am_libsgutils_la_OBJECTS = sg_lib.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_lib_data.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_cmds_basic.lo \
@@ -78,13 +78,13 @@ am__libsgutils_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_lib_data.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_cmds_basic.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_cmds_extra.lo \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_pt_linux.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_pt_linux.lo sg_io_linux.lo
 @OS_FREEBSD_TRUE@am_libsgutils_la_OBJECTS = sg_lib.lo sg_lib_data.lo \
 @OS_FREEBSD_TRUE@	sg_cmds_basic.lo sg_cmds_extra.lo \
 @OS_FREEBSD_TRUE@	sg_pt_freebsd.lo
-am__EXTRA_libsgutils_la_SOURCES_DIST = sg_pt_linux.c sg_linux_inc.h \
-	sg_pt_osf1.c sg_pt_solaris.c sg_pt_win32.c getopt_long.c \
-	sg_pt_freebsd.c
+am__EXTRA_libsgutils_la_SOURCES_DIST = sg_pt_linux.c sg_io_linux.c \
+	sg_linux_inc.h sg_pt_osf1.c sg_pt_solaris.c sg_pt_win32.c \
+	getopt_long.c sg_pt_freebsd.c
 libsgutils_la_OBJECTS = $(am_libsgutils_la_OBJECTS)
 libsgutils_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -227,7 +227,8 @@ top_srcdir = @top_srcdir@
 @OS_LINUX_TRUE@	sg_lib_data.c \
 @OS_LINUX_TRUE@	sg_cmds_basic.c \
 @OS_LINUX_TRUE@	sg_cmds_extra.c \
-@OS_LINUX_TRUE@	sg_pt_linux.c
+@OS_LINUX_TRUE@	sg_pt_linux.c \
+@OS_LINUX_TRUE@	sg_io_linux.c
 
 @OS_OSF_TRUE@libsgutils_la_SOURCES = \
 @OS_OSF_TRUE@	sg_lib.c \
@@ -259,6 +260,7 @@ top_srcdir = @top_srcdir@
 
 @OS_FREEBSD_TRUE@EXTRA_libsgutils_la_SOURCES = \
 @OS_FREEBSD_TRUE@	sg_pt_linux.c \
+@OS_FREEBSD_TRUE@	sg_io_linux.c \
 @OS_FREEBSD_TRUE@	sg_linux_inc.h \
 @OS_FREEBSD_TRUE@	sg_pt_osf1.c \
 @OS_FREEBSD_TRUE@	sg_pt_solaris.c \
@@ -274,6 +276,7 @@ top_srcdir = @top_srcdir@
 
 @OS_OSF_TRUE@EXTRA_libsgutils_la_SOURCES = \
 @OS_OSF_TRUE@	sg_pt_linux.c \
+@OS_OSF_TRUE@	sg_io_linux.c \
 @OS_OSF_TRUE@	sg_pt_freebsd.c \
 @OS_OSF_TRUE@	sg_pt_solaris.c \
 @OS_OSF_TRUE@	sg_pt_win32.c \
@@ -281,6 +284,7 @@ top_srcdir = @top_srcdir@
 
 @OS_SOLARIS_TRUE@EXTRA_libsgutils_la_SOURCES = \
 @OS_SOLARIS_TRUE@	sg_pt_linux.c \
+@OS_SOLARIS_TRUE@	sg_io_linux.c \
 @OS_SOLARIS_TRUE@	sg_linux_inc.h \
 @OS_SOLARIS_TRUE@	sg_pt_freebsd.c \
 @OS_SOLARIS_TRUE@	sg_pt_osf1.c \
@@ -289,6 +293,7 @@ top_srcdir = @top_srcdir@
 
 @OS_WIN32_CYGWIN_TRUE@EXTRA_libsgutils_la_SOURCES = \
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_linux.c \
+@OS_WIN32_CYGWIN_TRUE@	sg_io_linux.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_freebsd.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_osf1.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_solaris.c \
@@ -296,6 +301,7 @@ top_srcdir = @top_srcdir@
 
 @OS_WIN32_MINGW_TRUE@EXTRA_libsgutils_la_SOURCES = \
 @OS_WIN32_MINGW_TRUE@	sg_pt_linux.c \
+@OS_WIN32_MINGW_TRUE@	sg_io_linux.c \
 @OS_WIN32_MINGW_TRUE@	sg_pt_freebsd.c \
 @OS_WIN32_MINGW_TRUE@	sg_pt_osf1.c \
 @OS_WIN32_MINGW_TRUE@	sg_pt_solaris.c \
@@ -379,6 +385,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/getopt_long.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_cmds_basic.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_cmds_extra.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_io_linux.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_lib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_lib_data.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_freebsd.Plo@am__quote@
