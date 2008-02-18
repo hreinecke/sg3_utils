@@ -57,20 +57,20 @@ extern "C" {
 
 struct sg_lib_value_name_t {
     int value;
-    int peri_dev_type; /* only non-zero to disambiguate by command set */
+    int peri_dev_type; /* 0 -> SPC and/or PDT_DISK, >0 -> PDT */
     const char * name;
 };
 
 struct sg_lib_asc_ascq_t {
-    unsigned char code1;
-    unsigned char code2;
+    unsigned char asc;          /* additional sense code */
+    unsigned char ascq;         /* additional sense code qualifier */
     const char * text;
 };
 
 struct sg_lib_asc_ascq_range_t {
-    unsigned char code1;
-    unsigned char code2_min;
-    unsigned char code2_max;
+    unsigned char asc;  /* additional sense code (ASC) */
+    unsigned char ascq_min;     /* ASCQ minimum in range */
+    unsigned char ascq_max;     /* ASCQ maximum in range */
     const char * text;
 };
 

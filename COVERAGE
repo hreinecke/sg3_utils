@@ -81,11 +81,11 @@ SET FEATURES        sg_sat_set_features
 SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
-++  command wrapper found in sg_cmds_basic.c or sg_cmds_extra.c for
-    this command
+++  command wrapper found in sg_cmds_basic.c, sg_cmds_mmc.c  or
+    sg_cmds_extra.c for this command
 (2) this command was known as REPORT DEVICE IDENTIFIER prior to spc4r07
 (3) this command was known as SET DEVICE IDENTIFIER prior to spc4r07
 
 
 Doug Gilbert
-2nd December 2007
+18th February 2008

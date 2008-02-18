@@ -7,6 +7,7 @@ libsgutils_la_SOURCES = \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
+	sg_cmds_mmc.c \
 	sg_pt_linux.c \
 	sg_io_linux.c
 
@@ -27,6 +28,7 @@ libsgutils_la_SOURCES = \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
+	sg_cmds_mmc.c \
 	sg_pt_win32.c
 
 EXTRA_libsgutils_la_SOURCES = \
@@ -47,6 +49,7 @@ libsgutils_la_SOURCES = \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
+	sg_cmds_mmc.c \
 	sg_pt_win32.c
 
 EXTRA_libsgutils_la_SOURCES = \
@@ -67,6 +70,7 @@ libsgutils_la_SOURCES = \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
+	sg_cmds_mmc.c \
 	sg_pt_freebsd.c
 
 EXTRA_libsgutils_la_SOURCES = \
@@ -88,6 +92,7 @@ libsgutils_la_SOURCES = \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
+	sg_cmds_mmc.c \
 	sg_pt_solaris.c
 
 EXTRA_libsgutils_la_SOURCES = \
@@ -109,6 +114,7 @@ libsgutils_la_SOURCES = \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
 	sg_cmds_extra.c \
+	sg_cmds_mmc.c \
 	sg_pt_osf1.c
 
 EXTRA_libsgutils_la_SOURCES = \

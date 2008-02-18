@@ -40,7 +40,7 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
-#include "sg_cmds_extra.h"
+#include "sg_cmds_mmc.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.32 20080114";    /* mmc6r01 */
+static char * version_str = "0.33 20080218";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64

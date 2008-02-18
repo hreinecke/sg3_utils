@@ -8,11 +8,14 @@
  * "sg_cmds_basic.h" header and the 'extra' ones found in the
  * "sg_cmds_extra.h" header. This header now simply includes those two
  * headers.
- * The corresponding function definitions are found in the "sg_cmds_basic.c"
- * and "sg_cmds_extra.c" files.
+ * In sg3_utils version 1.26 the sg_cmds_mmc.h header was added and
+ * contains some MMC specific commands.
+ * The corresponding function definitions are found in the sg_cmds_basic.c,
+ * sg_cmds_extra.c and sg_cmds_mmc.c files.
  ********************************************************************/
 
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_cmds_mmc.h"
 
 #endif

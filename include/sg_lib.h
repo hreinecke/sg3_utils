@@ -58,6 +58,28 @@
 extern "C" {
 #endif
 
+/* SCSI Peripheral Device Types (PDT) [5 bit field] */
+#define PDT_DISK 0x0    /* direct access block device (disk) */
+#define PDT_TAPE 0x1    /* sequential access device (magnetic tape) */
+#define PDT_PRINTER 0x2 /* printer device (see SSC-1) */
+#define PDT_PROCESSOR 0x3       /* processor device (e.g. SAFTE device) */
+#define PDT_WO 0x4      /* write once device (some optical disks) */
+#define PDT_MMC 0x5     /* CD/DVD/BD (multi-media) */
+#define PDT_SCANNER 0x6 /* obsolete */
+#define PDT_OPTICAL 0x7 /* optical memory device (some optical disks) */
+#define PDT_MCHANGER 0x8        /* media changer device (e.g. tape robot) */
+#define PDT_COMMS 0x9   /* communications device (obsolete) */
+#define PDT_SAC 0xc     /* storage array controller device */
+#define PDT_SES 0xd     /* SCSI Enclosure Services (SES) device */
+#define PDT_RBC 0xe     /* Reduced Block Commands (simplified PDT_DISK) */
+#define PDT_OCRW 0xf    /* optical card read/write device */
+#define PDT_BCC 0x10    /* bridge controller commands */
+#define PDT_OSD 0x11    /* Object Storage Device (OSD) */
+#define PDT_ADC 0x12    /* Automation/drive commands (ADC) */
+#define PDT_SMD 0x13    /* Security Manager Device (SMD) */
+#define PDT_WLUN 0x1e   /* Well known logical unit (WLUN) */
+#define PDT_UNKNOWN 0x1f        /* Unknown or no device type */
+
 #ifndef SAM_STAT_GOOD
 /* The SCSI status codes as found in SAM-4 at www.t10.org */
 #define SAM_STAT_GOOD 0x0

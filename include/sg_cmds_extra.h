@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -68,22 +68,6 @@ extern int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req,
                              int dlist_format, int timeout_secs,
                              void * paramp, int param_len, int noisy,
                              int verbose);
-
-/* Invokes a SCSI GET CONFIGURATION command (MMC-3...6).
- * Returns 0 when successful, SG_LIB_CAT_INVALID_OP if command not
- * supported, SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
- * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
-extern int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
-                            int mx_resp_len, int noisy, int verbose);
-
-/* Invokes a SCSI GET PERFORMANCE command (MMC-3...6).
- * Returns 0 when successful, SG_LIB_CAT_INVALID_OP if command not
- * supported, SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
- * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
-extern int sg_ll_get_performance(int sg_fd, int data_type,
-                                 unsigned long starting_lba, int max_num_desc,
-                                 int type, void * resp, int mx_resp_len,
-                                 int noisy, int verbose);
 
 /* Invokes a SCSI PERSISTENT RESERVE IN command (SPC). Returns 0
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
@@ -202,14 +186,6 @@ extern int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
                            int devofl_bit, int unitofl_bit, int long_duration,
                            void * paramp, int param_len, int noisy,
                            int verbose);
-
-/* Invokes a SCSI SET CD SPEED command (MMC).
- * Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> command not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
-extern int sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
-                              int drv_write_speed, int noisy, int verbose);
 
 /* Invokes a SCSI SET IDENTIFYING INFORMATION command. This command was
  * called SET DEVICE IDENTIFIER prior to spc4r07. Return of 0 -> success,

@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.72 20080204";    /* spc-4 rev 12 */
+static char * version_str = "0.73 20080218";    /* spc-4 rev 12 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -646,10 +646,10 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_ATA_INFO, 0, "ATA information"},
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"}, 
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"}, 
-    {0xb0, 0x1, "Sequential access device capabilities (ssc3)"},
-    {0xb2, 0x1, "TapeAlert supported flags (ssc3)"},
-    {0xb0, 0x11, "OSD information (osd)"},
-    {0xb1, 0x11, "Security token (osd)"},
+    {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
+    {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},
+    {0xb0, PDT_OSD, "OSD information (osd)"},
+    {0xb1, PDT_OSD, "Security token (osd)"},
     {0xc0, 0, "vendor: Firmware numbers (seagate); Unit path report (EMC)"},
     {0xc1, 0, "vendor: Date code (seagate)"},
     {0xc2, 0, "vendor: Jumper settings (seagate); Software version (RDAC)"},
@@ -1340,7 +1340,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-        case 0: case 4: case 7:
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 16) {
                 fprintf(stderr, "Block limits VPD page length too "
                         "short=%d\n", len);
@@ -1361,10 +1361,10 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                        "blocks\n", u);
             }
             break;
-        case 1: case 8:
+        case PDT_TAPE: case PDT_MCHANGER:
             printf("  WORM=%d\n", !!(buff[4] & 0x1));
             break;
-        case 0x11:
+        case PDT_OSD:
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
             dStrHex((const char *)buff, len, 0);
@@ -1382,7 +1382,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-        case 0: case 4: case 7:
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 64) {
                 fprintf(stderr, "Block device characteristics VPD page length "
                         "too short=%d\n", len);
@@ -1398,7 +1398,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             else
                 printf("  Nominal rotation rate: %d rpm\n", u);
             break;
-        case 1: case 8: case 0x12:
+        case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
             printf("  Manufacturer-assigned serial number: %.*s\n",
                    len - 4, buff + 4);
             break;
@@ -2227,14 +2227,14 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
             pdt = rsp_buff[0] & 0x1f;
             if (! optsp->do_raw) {
                 switch (pdt) {
-                case 0: case 4: case 7:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
                     printf("VPD INQUIRY: Block limits page (SBC)\n");
                     break;
-                case 1: case 8:
+                case PDT_TAPE: case PDT_MCHANGER:
                     printf("VPD INQUIRY: Sequential access device "
                            "capabilities (SSC)\n");
                     break;
-                case 0x11:
+                case PDT_OSD:
                     printf("VPD INQUIRY: OSD information (OSD)\n");
                     break;
                 default:
@@ -2271,18 +2271,18 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
             pdt = rsp_buff[0] & 0x1f;
             if (! optsp->do_raw) {
                 switch (pdt) {
-                case 0: case 4: case 7:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
                     printf("VPD INQUIRY: Block device characteristcis page "
                            "(SBC)\n");
                     break;
-                case 1: case 8:
+                case PDT_TAPE: case PDT_MCHANGER:
                     printf("Manufactured assigned serial number VPD page "
                            "(SSC):\n");
                     break;
-                case 0x11:
+                case PDT_OSD:
                     printf("Security token VPD page (OSD):\n");
                     break;
-                case 0x12:
+                case PDT_ADC:
                     printf("Manufactured assigned serial number VPD page "
                            "(ADC):\n");
                     break;

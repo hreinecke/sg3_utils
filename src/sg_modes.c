@@ -26,7 +26,7 @@
    
 */
 
-static char * version_str = "1.28 20080115";
+static char * version_str = "1.29 20080218";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -592,31 +592,31 @@ mode_page_cs_table(int scsi_ptype, int * size)
         case -1:        /* common list */
             *size = sizeof(pc_desc_common) / sizeof(pc_desc_common[0]);
             return &pc_desc_common[0];
-        case 0:         /* disk (direct access) type devices */
-        case 4:
-        case 7:
+        case PDT_DISK:         /* disk (direct access) type devices */
+        case PDT_WO:
+        case PDT_OPTICAL:
             *size = sizeof(pc_desc_disk) / sizeof(pc_desc_disk[0]);
             return &pc_desc_disk[0];
-        case 1:         /* tape devices */
-        case 2:
+        case PDT_TAPE:         /* tape devices */
+        case PDT_PRINTER:
             *size = sizeof(pc_desc_tape) / sizeof(pc_desc_tape[0]);
             return &pc_desc_tape[0];
-        case 5:         /* cd/dvd devices */
+        case PDT_MMC:         /* cd/dvd/bd devices */
             *size = sizeof(pc_desc_cddvd) / sizeof(pc_desc_cddvd[0]);
             return &pc_desc_cddvd[0];
-        case 8:         /* medium changer devices */
+        case PDT_MCHANGER:         /* medium changer devices */
             *size = sizeof(pc_desc_smc) / sizeof(pc_desc_smc[0]);
             return &pc_desc_smc[0];
-        case 0xc:       /* storage array devices */
+        case PDT_SAC:       /* storage array devices */
             *size = sizeof(pc_desc_scc) / sizeof(pc_desc_scc[0]);
             return &pc_desc_scc[0];
-        case 0xd:       /* enclosure services devices */
+        case PDT_SES:       /* enclosure services devices */
             *size = sizeof(pc_desc_ses) / sizeof(pc_desc_ses[0]);
             return &pc_desc_ses[0];
-        case 0xe:       /* simplified direct access device */
+        case PDT_RBC:       /* simplified direct access device */
             *size = sizeof(pc_desc_rbc) / sizeof(pc_desc_rbc[0]);
             return &pc_desc_rbc[0];
-        case 0x12:       /* automation device/interface */
+        case PDT_ADC:       /* automation device/interface */
             *size = sizeof(pc_desc_adt) / sizeof(pc_desc_adt[0]);
             return &pc_desc_adt[0];
     }
