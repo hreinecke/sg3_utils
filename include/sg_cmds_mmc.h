@@ -59,6 +59,13 @@ extern int sg_ll_get_performance(int sg_fd, int data_type,
 extern int sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
                               int drv_write_speed, int noisy, int verbose);
 
+/* Invokes a SCSI SET STREAMING command (MMC). Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Set Streaming not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+extern int sg_ll_set_streaming(int sg_fd, int type, void * paramp,
+                               int param_len, int noisy, int verbose);
+
 
 #ifdef __cplusplus
 }
