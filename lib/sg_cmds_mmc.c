@@ -51,6 +51,8 @@
 #define GET_PERFORMANCE_CMD_LEN 12
 #define SET_CD_SPEED_CMD 0xbb
 #define SET_CD_SPEED_CMDLEN 12
+#define SET_STREAMING_CMD 0xb6
+#define SET_STREAMING_CMDLEN 12
 
 
 /* Invokes a SCSI SET CD SPEED command (MMC).
@@ -301,6 +303,72 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned long starting_lba,
         }
         ret = 0;
     }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI SET STREAMING command (MMC). Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Set Streaming not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+int
+sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
+                    int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char ssCmdBlk[SET_STREAMING_CMDLEN] =
+                 {SET_STREAMING_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    ssCmdBlk[8] = type;
+    ssCmdBlk[9] = (param_len >> 8) & 0xff;
+    ssCmdBlk[10] = param_len & 0xff;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    set streaming cdb: ");
+        for (k = 0; k < SET_STREAMING_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", ssCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_strm, "    set streaming "
+                    "parameter list:\n");
+            dStrHex((const char *)paramp, param_len, -1);
+        }
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "set streaming: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, ssCmdBlk, sizeof(ssCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "set streaming", res, 0,
+                               sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }

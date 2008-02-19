@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080218]
+Changelog for sg3_utils-1.26 [20080219]
   - sg_ses: sync with ses2r19b
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
@@ -28,6 +28,7 @@ Changelog for sg3_utils-1.26 [20080218]
     - add osd2r03 service actions (all different from osd-r10)
     - add sg_get_trans_proto_str()
     - add sg_get_sense_filemark_eom_ili() function (MMC uses ILI)
+  - sg_cmds_mmc: add sg_ll_set_streaming() function
   - win32/MinGW: define SG3_UTILS_MINGW when detected
   - remove archive/pre_configure subdirectory
   - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace
