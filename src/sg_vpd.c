@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.27 20080219";    /* spc4r12 */
+static char * version_str = "0.27 20080220";    /* spc4r12 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -570,7 +570,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");
             } else if ((3 == naa) || (5 == naa)) {
-                /* NAA=3 Locally administered; NAA=5 IEEE Registered */
+                /* NAA=3 Locally assigned; NAA=5 IEEE Registered */
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 3 or 5 "
                             "identifier length: 0x%x>>\n", i_len);

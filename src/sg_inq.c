@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.74 20080219";    /* spc-4 rev 12 */
+static char * version_str = "0.74 20080220";    /* spc-4 rev 12 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1008,14 +1008,14 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("]\n");
-            } else if (3 == naa) {      /* NAA Locally administered */  
+            } else if (3 == naa) {      /* NAA Locally assigned */  
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 3 identifier "
                             "length: 0x%x>>\n", i_len);
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
-                printf("      NAA 3, Locally administered:\n");
+                printf("      NAA 3, Locally assigned:\n");
                 printf("      [0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
