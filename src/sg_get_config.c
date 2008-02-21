@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.33 20080218";    /* mmc6r01 */
+static char * version_str = "0.33 20080220";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -73,7 +73,9 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr,
             "Usage:  sg_get_config [--brief] [--current] [--help] [--hex] "
@@ -105,12 +107,12 @@ static void usage()
             "Get configuration information for MMC drive and/or media\n");
 }
 
-struct code_desc {
-        int code;
+struct val_desc_t {
+        int val;
         const char * desc;
 };
 
-static struct code_desc profile_desc_arr[] = {
+static struct val_desc_t profile_desc_arr[] = {
         {0x0, "No current profile"},
         {0x1, "Non-removable disk (obs)"},
         {0x2, "Removable disk"},
@@ -147,16 +149,17 @@ static struct code_desc profile_desc_arr[] = {
         {0x58, "HD DVD-R dual layer"},
         {0x5a, "HD DVD-RW dual layer"},
         {0xffff, "Non-conforming profile"},
+        {-1, NULL},
 };
 
-static const char * get_profile_str(int profile_num, char * buff)
+static const char *
+get_profile_str(int profile_num, char * buff)
 {
-    int k, num;
+    const struct val_desc_t * pdp;
 
-    num = sizeof(profile_desc_arr) / sizeof(profile_desc_arr[0]);
-    for (k = 0; k < num; ++k) {
-        if (profile_desc_arr[k].code == profile_num) {
-            strcpy(buff, profile_desc_arr[k].desc);
+    for (pdp = profile_desc_arr; pdp->desc; ++pdp) {
+        if (pdp->val == profile_num) {
+            strcpy(buff, pdp->desc);
             return buff;
         }
     }
@@ -164,7 +167,7 @@ static const char * get_profile_str(int profile_num, char * buff)
     return buff;
 }
 
-static struct code_desc feature_desc_arr[] = {
+static struct val_desc_t feature_desc_arr[] = {
         {0x0, "Profile list"},
         {0x1, "Core"},
         {0x2, "Morphing"},
@@ -227,13 +230,14 @@ static struct code_desc feature_desc_arr[] = {
         {0x120, "BD CPS"},
 };
 
-static const char * get_feature_str(int feature_num, char * buff)
+static const char *
+get_feature_str(int feature_num, char * buff)
 {
     int k, num;
 
     num = sizeof(feature_desc_arr) / sizeof(feature_desc_arr[0]);
     for (k = 0; k < num; ++k) {
-        if (feature_desc_arr[k].code == feature_num) {
+        if (feature_desc_arr[k].val == feature_num) {
             strcpy(buff, feature_desc_arr[k].desc);
             return buff;
         }
@@ -242,7 +246,8 @@ static const char * get_feature_str(int feature_num, char * buff)
     return buff;
 }
 
-static void decode_feature(int feature, unsigned char * ucp, int len)
+static void
+decode_feature(int feature, unsigned char * ucp, int len)
 {
     int k, num, n, profile;
     char buff[128];
@@ -866,8 +871,9 @@ static void decode_feature(int feature, unsigned char * ucp, int len)
     }
 }
 
-static void decode_config(unsigned char * resp, int max_resp_len, int len,
-                          int brief, int inner_hex)
+static void
+decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
+              int inner_hex)
 {
     int k, curr_profile, extra, feature;
     unsigned char * ucp;
@@ -901,14 +907,15 @@ static void decode_config(unsigned char * resp, int max_resp_len, int len,
             continue;
         }
         if (0 != (extra % 4))
-        printf("    additional length [%d] not a multiple of 4, ignore\n",
-               extra - 4);
+            printf("    additional length [%d] not a multiple of 4, ignore\n",
+                   extra - 4);
         else
             decode_feature(feature, ucp, extra);
     }
 }
 
-static void list_known(int brief)
+static void
+list_known(int brief)
 {
     int k, num;
 
@@ -916,18 +923,19 @@ static void list_known(int brief)
     printf("Known features:\n");
     for (k = 0; k < num; ++k)
         printf("  %s [0x%x]\n", feature_desc_arr[k].desc,
-               feature_desc_arr[k].code);
+               feature_desc_arr[k].val);
     if (! brief) {
         printf("Known profiles:\n");
         num = sizeof(profile_desc_arr) / sizeof(profile_desc_arr[0]);
         for (k = 0; k < num; ++k)
             printf("  %s [0x%x]\n", profile_desc_arr[k].desc,
-                   profile_desc_arr[k].code);
+                   profile_desc_arr[k].val);
     }
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c, len;
     int peri_type = 0;
