@@ -16,7 +16,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2007 D. Gilbert
+*  Copyright (C) 1999 - 2008 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.81 20070714";
+static char * version_str = "3.82 20080222";
 
 #define ME "sg_readcap: "
 
@@ -488,9 +488,8 @@ int main(int argc, char * argv[])
                        PRIx64 "), Number of logical blocks=%" PRIu64 "\n",
                        llast_blk_addr, llast_blk_addr, llast_blk_addr + 1);
             printf("   Logical block length=%u bytes\n", block_size);
-            printf("   Logical blocks per physical block=%d (log base 2) "
-                   "[actual=%d]\n", (resp_buff[13] & 0xf),
-                   (1 << (resp_buff[13] & 0xf)));
+            printf("   Logical blocks per physical block exponent=%d\n",
+                   resp_buff[13] & 0xf);
             printf("   Lowest aligned logical block address=%d\n",
                    ((resp_buff[14] & 0x3f) << 8) + resp_buff[15]);
             if (! opts.do_pmi) {

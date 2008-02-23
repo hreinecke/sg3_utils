@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080220]
+Changelog for sg3_utils-1.26 [20080222]
   - sg_ses: sync with ses2r19b
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
@@ -12,10 +12,11 @@ Changelog for sg3_utils-1.26 [20080220]
   - sg_verify: add --vrprotect= option
   - sg_vpd: add nominal form factor to block dev. char. VPD page
     - add --maxlen= option to set allocation length in cdb
-    - logic for "NAA Locally assigned" identifier
+    - logic for "NAA-3 Locally assigned" identifier
   - sg_inq: add --maxlen= option that does same as --len=
     - move version descriptors into sg_inq_data.c file
-    - logic for "NAA Locally assigned" identifier
+    - logic for "NAA-3 Locally assigned" identifier
+    - update version descriptors
   - sg_write_long: add examples section to man page
   - sg_sat_phy_event: copied from examples directory and enhanced,
     rename original to sg__sat_phy_event

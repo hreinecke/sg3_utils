@@ -33,7 +33,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.41 20080218";    /* spc-4 rev 12 */
+const char * sg_lib_version_str = "1.41 20080222";    /* spc-4 rev 12 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -334,6 +334,8 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xffff, 0, NULL},
 };
 
+/* A conveniently formatted list of SCSI ASC/ASCQ codes and their
+ * corresponding text can be found at: www.t10.org/lists/asc-num.txt */
 
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
 {
@@ -393,6 +395,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
                 "not accessible, target port in standby state"},
     {0x04,0x0c,"Logical unit " 
                 "not accessible, target port in unavailable state"},
+    {0x04,0x0d,"Logical unit not ready, structure check required"},
     {0x04,0x10,"Logical unit not ready, "
                 "auxiliary memory not accessible"},
     {0x04,0x11,"Logical unit not ready, "
@@ -592,6 +595,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2A,0x07,"Implicit asymmetric access state transition failed"},
     {0x2A,0x08,"Priority changed"},
     {0x2A,0x09,"Capacity data has changed"},
+    {0x2A,0x0c, "Error recovery attributes have changed"},
+    {0x2A,0x0d, "Data encryption capabilities changed"},
     {0x2A,0x10,"Timestamp changed"},
     {0x2A,0x11,"Data encryption parameters changed by another i_t nexus"},
     {0x2A,0x12,"Data encryption parameters changed by vendor specific event"},
@@ -963,11 +968,19 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x74,0x0a,"Encrypted block not raw read enabled"},
     {0x74,0x0b,"Incorrect Encryption parameters"},
     {0x74,0x0c,"Unable to decrypt parameter list"},
+    {0x74,0x0d,"Encryption algorithm disabled"},
     {0x74,0x10,"SA creation parameter value invalid"},
     {0x74,0x11,"SA creation parameter value rejected"},
     {0x74,0x12,"Invalid SA usage"},
+    {0x74,0x21,"Data encryption configuration prevented"},
     {0x74,0x30,"SA creation parameter not supported"},
     {0x74,0x40,"Authentication failed"},
+    {0x74,0x61,"External data encryption key manager access error"},
+    {0x74,0x62,"External data encryption key manager error"},
+    {0x74,0x63,"External data encryption key not found"},
+    {0x74,0x64,"External data encryption request not authorized"},
+    {0x74,0x6e,"External data encryption control timeout"},
+    {0x74,0x6f,"External data encryption control error"},
     {0x74,0x71,"Logical unit access not authorized"},
     {0x74,0x79,"Security conflict in translated device"},
     {0, 0, NULL}

@@ -53,7 +53,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 11 [sorted numerically (from Annex C.8)] */
+/* table from SPC-4 revision 12 [sorted numerically (from Annex C.8)] */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
@@ -70,6 +70,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x76, "SAM-3 T10/1561-D revision 14"},
     {0x77, "SAM-3 ANSI INCITS 402-2005"},
     {0x80, "SAM-4 (no version claimed)"},
+    {0x87, "SAM-4 T10/1683-D revision 13"},
     {0x120, "SPC (no version claimed)"},
     {0x13b, "SPC T10/0995-D revision 11a"},
     {0x13c, "SPC ANSI INCITS 301-1997"},
@@ -159,18 +160,23 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x3d6, "ADC T10/1558-D revision 7"},
     {0x3d7, "ADC ANSI INCITS 403-2005"},
     {0x3e0, "SES-2 (no version claimed)"},
+    {0x3e1, "SES-2 T10/1559-D revision 16"},
+    {0x3e7, "SES-2 T10/1559-D revision 19"},
     {0x400, "SSC-3 (no version claimed)"},
     {0x420, "MMC-5 (no version claimed)"},
     {0x42f, "MMC-5 T10/1675-D revision 03"},
     {0x431, "MMC-5 T10/1675-D revision 03b"},
     {0x432, "MMC-5 T10/1675-D revision 04"},
+    {0x434, "MMC-5 ANSI INCITS 430-2007"},
     {0x440, "OSD-2 (no version claimed)"},
     {0x460, "SPC-4 (no version claimed)"},
     {0x480, "SMC-3 (no version claimed)"},
     {0x4a0, "ADC-2 (no version claimed)"},
     {0x4a7, "ADC-2 T10/1741-D revision 7"},
+    {0x4aa, "ADC-2 T10/1741-D revision 8"},
     {0x4c0, "SBC-3 (no version claimed)"},
     {0x4e0, "MMC-6 (no version claimed)"},
+    {0x500, "ADC-3 (no version claimed)"},
     {0x820, "SSA-TL2 (no version claimed)"},
     {0x83b, "SSA-TL2 T10/1147-D revision 05b"},
     {0x83c, "SSA-TL2 ANSI INCITS 308-1998"},
@@ -292,6 +298,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xe02, "FC-FS-2 ANSI INCITS 242-2007"},
     {0xe04, "FC-FS-2 ANSI INCITS 242-2007 with AM1 ANSI INCITS 242/AM1-2007"},
     {0xe20, "FC-LS (no version claimed)"},
+    {0xe29, "FC-LS ANSI INCITS 433-2007"},
     {0xe40, "FC-SP (no version claimed)"},
     {0xe42, "FC-SP T11/1570-D revision 1.6"},
     {0xe45, "FC-SP ANSI INCITS 426-2007"},
