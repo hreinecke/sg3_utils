@@ -310,7 +310,8 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned long starting_lba,
 /* Invokes a SCSI SET STREAMING command (MMC). Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Set Streaming not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+ * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_NOT_READY -> device not ready,
+ * -1 -> other failure */
 int
 sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
                     int noisy, int verbose)
@@ -353,6 +354,7 @@ sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_INVALID_OP:
         case SG_LIB_CAT_ILLEGAL_REQ:
         case SG_LIB_CAT_UNIT_ATTENTION:
