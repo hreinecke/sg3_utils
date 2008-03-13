@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Douglas Gilbert.
+ * Copyright (c) 2006-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static char * version_str = "1.02 20060706";
+static char * version_str = "1.03 20080313";
 
 #define ME "sg_chk_asc: "
 

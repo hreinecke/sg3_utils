@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.74 20080222";    /* spc-4 rev 12 */
+static char * version_str = "0.75 20080313";    /* spc-4 rev 13 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1256,12 +1256,13 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  SPT=%d GRD_CHK=%d APP_CHK=%d REF_CHK=%d\n",
            ((buff[4] >> 3) & 0x7), !!(buff[4] & 0x4), !!(buff[4] & 0x2),
            !!(buff[4] & 0x1));
-    printf("  GRP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d SIMPSUP=%d\n",
-           !!(buff[5] & 0x10), !!(buff[5] & 0x8), !!(buff[5] & 0x4),
-           !!(buff[5] & 0x2), !!(buff[5] & 0x1));
-    printf("  CORR_D_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
-           !!(buff[6] & 0x4), !!(buff[6] & 0x2), !!(buff[6] & 0x1),
-           !!(buff[7] & 0x1));
+    printf("  UASK_SUP=%d GROUP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d "
+           "SIMPSUP=%d\n", !!(buff[5] & 0x20), !!(buff[5] & 0x10),
+           !!(buff[5] & 0x8), !!(buff[5] & 0x4), !!(buff[5] & 0x2),
+           !!(buff[5] & 0x1));
+    printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
+           !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
+           !!(buff[6] & 0x1), !!(buff[7] & 0x1));
 }
 
 static void
