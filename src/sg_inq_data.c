@@ -53,7 +53,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 12 [sorted numerically (from Annex C.8)] */
+/* table from SPC-4 revision 13 [sorted numerically (from Annex D.8)] */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
@@ -163,6 +163,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x3e1, "SES-2 T10/1559-D revision 16"},
     {0x3e7, "SES-2 T10/1559-D revision 19"},
     {0x400, "SSC-3 (no version claimed)"},
+    {0x403, "SSC-3 T10/1611-D revision 04a"},
     {0x420, "MMC-5 (no version claimed)"},
     {0x42f, "MMC-5 T10/1675-D revision 03"},
     {0x431, "MMC-5 T10/1675-D revision 03b"},
@@ -271,6 +272,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc0f, "SAS-1.1 T10/1602-D revision 10"},
     {0xc11, "SAS-1.1 ANSI INCITS 417-2006"},
     {0xc20, "SAS-2 (no version claimed)"},
+    {0xc23, "SAS-2 T10/1760-D revision 14"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
     {0xd3c, "FC-PH ANSI INCITS 230-1994 with Amnd 1 ANSI INCITS "

@@ -483,7 +483,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     processed = 0;
                     break;
                 }
-                n += sprintf(b + n, "    Relative to start of %s, byte %d",
+                n += sprintf(b + n, " Relative to start of %s, byte %d",
                         (descp[4] & 0x20) ? "segment descriptor" : 
                                             "parameter list",
                         (descp[5] << 8) | descp[6]);
@@ -491,6 +491,11 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     n += sprintf(b + n, " bit %d\n", descp[4] & 0x07);
                 else
                     n += sprintf(b + n, "\n");
+                break;
+            case SPC_SK_UNIT_ATTENTION:
+                n += sprintf(b + n, " Unit attention condition queue: ");
+                n += sprintf(b + n, "overflow flag is %d\n",
+                             !!(descp[4] & 0x1));
                 break;
             default:
                 n += sprintf(b + n, " Sense_key: 0x%x unexpected\n",
@@ -743,6 +748,11 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                                      sense_buffer[15] & 0x07);
                     else
                         r += sprintf(b + r, "\n");
+                    break;
+                case SPC_SK_UNIT_ATTENTION:
+                    r += sprintf(b + r, "  Unit attention condition queue: ");
+                    r += sprintf(b + r, "overflow flag is %d\n",
+                                 !!(sense_buffer[15] & 0x1));
                     break;
                 default:
                     r += sprintf(b + r, "  Sense_key: 0x%x unexpected\n",

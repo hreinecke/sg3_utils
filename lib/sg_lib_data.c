@@ -33,7 +33,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.41 20080222";    /* spc-4 rev 12 */
+const char * sg_lib_version_str = "1.42 20080313";    /* spc-4 rev 13 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -577,6 +577,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x28,0x00,"Not ready to ready change, medium may have changed"},
     {0x28,0x01,"Import or export element accessed"},
     {0x28,0x02,"Format-layer may have changed"},
+    {0x28,0x03,"Import/export element accessed, medium changed"},
     {0x29,0x00,"Power on, reset, or bus device reset occurred"},
     {0x29,0x01,"Power on occurred"},
     {0x29,0x02,"SCSI bus reset occurred"},
@@ -687,6 +688,10 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3B,0x15,"Medium magazine unlocked"},
     {0x3B,0x16,"Mechanical positioning or changer error"},
     {0x3B,0x17,"Read past end of user object"},
+    {0x3B,0x18,"Element disabled"},
+    {0x3B,0x19,"Element enabled"},
+    {0x3B,0x1a,"Data transfer device removed"},
+    {0x3B,0x1b,"Data transfer device inserted"},
     {0x3D,0x00,"Invalid bits in identify message"},
     {0x3E,0x00,"Logical unit has not self-configured yet"},
     {0x3E,0x01,"Logical unit failure"},

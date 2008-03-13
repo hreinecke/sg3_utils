@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080223]
+Changelog for sg3_utils-1.26 [20080313]
   - sg_ses: sync with ses2r19b
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
@@ -12,11 +12,11 @@ Changelog for sg3_utils-1.26 [20080223]
   - sg_verify: add --vrprotect= option
   - sg_vpd: add nominal form factor to block dev. char. VPD page
     - add --maxlen= option to set allocation length in cdb
-    - logic for "NAA-3 Locally assigned" identifier
   - sg_inq: add --maxlen= option that does same as --len=
     - move version descriptors into sg_inq_data.c file
-    - logic for "NAA-3 Locally assigned" identifier
-    - update version descriptors
+    - update version descriptors to spc4r13
+  - sg_inq+sg_vpd: logic for "NAA-3 Locally assigned" identifier
+    - update extended inquiry VPD page
   - sg_write_long: add examples section to man page
   - sg_sat_phy_event: copied from examples directory and enhanced,
     rename original to sg__sat_phy_event
@@ -25,12 +25,14 @@ Changelog for sg3_utils-1.26 [20080223]
   - sg_modes: add --maxlen= option to specify allocation length
   - change 'long long' to int64_t and 'unsigned long long' to
     uint64_t to stress that 64 bit integer wanted, not larger
-  - sg_lib: update asc/ascq code pending spc4r12
+  - sg_lib: update asc/ascq code pending spc4r13
     - split sg_lib into sg_lib_data.[hc] and sg_lib.[hc]
     - split sg_cmds_extra into sg_cmds_extra and sg_cmds_mmc
     - add osd2r03 service actions (all different from osd-r10)
     - add sg_get_trans_proto_str()
     - add sg_get_sense_filemark_eom_ili() function (MMC uses ILI)
+    - add sense key specific unit attention condition queue
+      overflow decoding
   - sg_cmds_mmc: add sg_ll_set_streaming() function
   - win32/MinGW: define SG3_UTILS_MINGW when detected
   - remove archive/pre_configure subdirectory
