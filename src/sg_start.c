@@ -12,7 +12,7 @@
 #include "sg_cmds_basic.h"
 
 /*
- *  Copyright (C) 1999-2007 D. Gilbert
+ *  Copyright (C) 1999-2008 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
  
 */
 
-static char * version_str = "0.55 20070714";
+static char * version_str = "0.56 20080316";  /* sbc3r13+08-139r1; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},
@@ -39,6 +39,8 @@ static struct option long_options[] = {
         {"immed", 0, 0, 'i'},
         {"load", 0, 0, 'l'},
         {"loej", 0, 0, 'L'},
+        {"mod", 1, 0, 'm'},
+        {"noflush", 0, 0, 'n'},
         {"new", 0, 0, 'N'},
         {"old", 0, 0, 'O'},
         {"pc", 1, 0, 'p'},
@@ -56,6 +58,8 @@ struct opts_t {
     int do_immed;
     int do_load;
     int do_loej;
+    int do_mod;
+    int do_noflush;
     int do_pc;
     int do_start;
     int do_stop;
@@ -65,13 +69,14 @@ struct opts_t {
     int opt_new;
 };
 
-void usage()
+static void
+usage()
 {
         fprintf(stderr, "Usage: sg_start [--eject] [--fl=FL] [--help] "
                 "[--immed] [--load] [--loej]\n"
-                "                [--pc=PC] [--start] [--stop] "
-                "[--verbose] [--version]\n"
-                "                DEVICE\n"
+                "                [--mod=PC_MOD] [--noflush] [--pc=PC] "
+                "[--start] [--stop]\n"
+                "                [--verbose] [--version] DEVICE\n"
                 "  where:\n"
                 "    --eject|-e      stop unit then eject the medium\n"
                 "    --fl=FL|-f FL    format layer number (mmc5)\n"
@@ -85,10 +90,15 @@ void usage()
                 "in cdb;\n"
                 "                    load when START bit also set, else "
                 "eject\n"
-                "    --pc=PC|-p PC    power conditions: 0 (default) -> no "
+                "    --mod=PC_MOD|-m PC_MOD    power condition modifier "
+                "(def: 0) (sbc)\n"
+                "    --noflush|-n    no flush prior to operation that limits "
+                "access (sbc)\n"
+                "    --load|-l       load medium then start the unit\n"
+                "    --pc=PC|-p PC    power condition: 0 (default) -> no "
                 "power condition,\n"
                 "                    1 -> active, 2 -> idle, 3 -> standby, "
-                "5 -> sleep (MMC)\n"
+                "5 -> sleep (mmc)\n"
                 "    --start|-s      start unit, corresponds to START bit "
                 "in cdb,\n"
                 "                    default (START=1) if no other options "
@@ -103,12 +113,14 @@ void usage()
                 );
 }
 
-void usage_old()
+static void
+usage_old()
 {
         fprintf(stderr, "Usage:  sg_start [0] [1] [--eject] [--fl=FL] "
                 "[-i] [--imm=0|1]\n"
-                "                 [--load] [--loej] [--pc=PC] [--start] "
-                "[--stop] [-v] [-V]\n"
+                "                 [--load] [--loej] [--mod=PC_MOD] "
+                "[--noflush] [--pc=PC]\n"
+                "                 [--start] [--stop] [-v] [-V]\n"
                 "                 DEVICE\n"
                 "  where:\n"
                 "    0          stop unit (e.g. spin down a disk or a "
@@ -124,10 +136,14 @@ void usage_old()
                 "    --loej     load the medium if '-start' option is "
                 "also given\n"
                 "               or stop unit and eject\n"
-                "    --pc=PC    power conditions (in hex, default 0 -> no "
+                "    --mod=PC_MOD    power condition modifier "
+                "(def: 0) (sbc)\n"
+                "    --noflush    no flush prior to operation that limits "
+                "access (sbc)\n"
+                "    --pc=PC    power condition (in hex, default 0 -> no "
                 "power condition)\n"
                 "               1 -> active, 2 -> idle, 3 -> standby, "
-                "5 -> sleep (MMC)\n"
+                "5 -> sleep (mmc)\n"
                 "    --start    start unit (same as '1'), default "
                 "action\n"
                 "    --stop     stop unit (same as '0')\n"
@@ -140,14 +156,15 @@ void usage_old()
                 );
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n, err;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ef:hilLNOp:sSvV", long_options,
+        c = getopt_long(argc, argv, "ef:hilLm:nNOp:sSvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -181,6 +198,18 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'L':
             ++optsp->do_loej;
+            break;
+        case 'm':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 15)) {
+                fprintf(stderr, "bad argument to '--mod='\n");
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            optsp->do_mod = n;
+            break;
+        case 'n':
+            ++optsp->do_noflush;
             break;
         case 'N':
             break;      /* ignore */
@@ -241,7 +270,8 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     int ambigu = 0;
@@ -334,6 +364,16 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 optsp->do_pc = u;
+            } else if (0 == strncmp("mod=", cp, 4)) {
+                num = sscanf(cp + 3, "%x", &u);
+                if (1 != num) {
+                    fprintf(stderr, "Bad value after 'mod=' option\n");
+                    usage_old();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                optsp->do_mod = u;
+            } else if (0 == strncmp(cp, "noflush", 7)) {
+                optsp->do_noflush = 1;
             } else if (0 == strncmp(cp, "start", 5)) {
                 if (startstop == 0)
                     ambigu = 1;
@@ -382,7 +422,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -403,7 +444,8 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int fd, res;
     int ret = 0;
@@ -480,11 +522,13 @@ int main(int argc, char * argv[])
                                     1 /*start */, 1 /* noisy */,
                                     opts.do_verbose);
     else if (opts.do_pc > 0)
-        res = sg_ll_start_stop_unit(fd, opts.do_immed, 0, opts.do_pc, 0, 0,
-                                    0, 1, opts.do_verbose);
+        res = sg_ll_start_stop_unit(fd, opts.do_immed, opts.do_mod,
+                                    opts.do_pc, opts.do_noflush, 0, 0, 1,
+                                    opts.do_verbose);
     else
-        res = sg_ll_start_stop_unit(fd, opts.do_immed, 0, 0, 0, opts.do_loej,
-                                    opts.do_start, 1, opts.do_verbose);
+        res = sg_ll_start_stop_unit(fd, opts.do_immed, 0, 0, opts.do_noflush,
+                                    opts.do_loej, opts.do_start, 1,
+                                    opts.do_verbose);
     ret = res;
     if (res) {
         if (opts.do_verbose < 2) {

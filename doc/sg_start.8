@@ -1,18 +1,19 @@
-.TH SG_START "8" "October 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_START "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_start \- send SCSI START STOP UNIT command to start, stop, load or
 eject medium
 .SH SYNOPSIS
 .B sg_start
 [\fI0\fR] [\fI1\fR] [\fI\-\-eject\fR] [\fI\-\-help\fR] [\fI\-\-fl=FL\fR]
-[\fI\-\-immed\fR] [\fI\-\-load\fR] [\fI\-\-loej\fR] [\fI\-\-pc=PC\fR]
-[\fI\-\-start\fR] [\fI\-\-stop\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-immed\fR] [\fI\-\-load\fR] [\fI\-\-loej\fR] [\fI\-\-mod=PC_MOD\fR]
+[\fI\-\-noflush\fR] [\fI\-\-pc=PC\fR] [\fI\-\-start\fR] [\fI\-\-stop\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_start
 [\fI\-\-eject\fR] [\fI\-\-fl=FL\fR] [\fI\-i\fR] [\fI\-\-imm=0|1\fR]
-[\fI\-\-load\fR] [\fI\-\-loej\fR] [\fI\-\-pc=PC\fR] [\fI\-\-start\fR]
-[\fI\-\-stop\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI0|1\fR] \fIDEVICE\fR
+[\fI\-\-load\fR] [\fI\-\-loej\fR] [\fI\-\-mod=PC_MOD\fR] [\fI\-\-noflush\fR]
+[\fI\-\-pc=PC\fR] [\fI\-\-start\fR] [\fI\-\-stop\fR] [\fI\-v\fR] [\fI\-V\fR]
+[\fI0|1\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -20,7 +21,7 @@ sg_start sends a SCSI START STOP UNIT command to the \fIDEVICE\fR with
 the selected options. The most used options are \fI\-\-stop\fR to spin
 down a disk and \fI\-\-start\fR to spin up a disk. Using \fI\-\-start\fR
 on a disk that is already spinning is harmless. There is also finer grain
-control with "power conditions": active, idle and standby. This is set
+control with "power condition": active, idle or standby. This is set
 with the \fI\-\-pc=PC\fR option. In some contexts the "stop" state can
 be considered an additional power condition. 
 .PP
@@ -78,6 +79,17 @@ conjunction with START bit in cdb). This option is ignored if 'pc > 0'.
 Default is off (i.e. don't attempt to load or eject media). If a start/start
 indication is not given (i.e. neither \fI\-\-start\fR nor \fI\-\-stop\fR)
 and this option is given then a load and start action is assumed.
+.TP
+\fB\-m\fR, \fB\-\-mod\fR=\fIPC_MOD\fR
+where \fIPC_MOD\fR is the 'power condition modifier' value. 0 to 15 (inclusive)
+are valid and 0 is the default. This  'power condition modifier' field in the
+cdb was added after sbc3r13.
+.TP
+\fB\-n\fR, \fB\-\-noflush\fR
+do not perform a flush to media (e.g. like SYNCHRONIZE CACHE does) before
+a variant of this utility that limits access to the media. Using the
+\fB\-\-stop\fR option is an example of something that limits access to the
+media. This 'noflush' field in the cdb was added after sbc3r13.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
@@ -195,8 +207,18 @@ defaults to load and start.]
 \fB\-N\fR
 switch to the newer style options.
 .TP
+\fB\-\-mod\fR=\fIPC_MOD\fR
+where \fIPC_MOD\fR is the 'power condition modifier' value. 0 to 15 (inclusive)
+are valid and 0 is the default. This field was added after sbc3r13.
+.TP
+\fB\-\-noflush\fR
+do not perform a flush to media (e.g. like SYNCHRONIZE CACHE does) before
+a variant of this utility that limits access to the media. Using the
+\fB\-\-stop\fR option is an example of something that limits access to the
+media. This field was added after sbc3r13.
+.TP
 \fB\-\-pc\fR=\fIPC\fR
-where \fIPC\fR is the 'power conditions' value (in hex). 0 to f (inclusive)
+where \fIPC\fR is the 'power condition' value (in hex). 0 to f (inclusive)
 are valid. Default value is 0.
 .TP
 \fB\-\-start\fR
@@ -216,7 +238,7 @@ Written by K. Garloff and D. Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2007 Kurt Garloff, Douglas Gilbert
+Copyright \(co 2002\-2008 Kurt Garloff, Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

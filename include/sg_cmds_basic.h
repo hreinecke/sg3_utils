@@ -137,14 +137,18 @@ extern int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
 extern int sg_ll_request_sense(int sg_fd, int desc, void * resp,
                                int mx_resp_len, int noisy, int verbose);
 
-/* Invokes a SCSI START STOP UNIT command (MMC + SBC).
+/* Invokes a SCSI START STOP UNIT command (SBC + MMC).
  * Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Start stop unit not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
-extern int sg_ll_start_stop_unit(int sg_fd, int immed, int fl_num,
-                                 int power_cond, int fl, int loej,
+ * -1 -> other failure
+ * SBC-3 and MMC partially overlap on the power_condition_modifier(sbc) and
+ * format_layer_number(mmc) fields. They also overlap on the noflush(sbc)
+ * and fl(mmc) one bit field. This is the cause of the awkardly named
+ * pc_mod__fl_num and noflush__fl arguments to this function.  */
+extern int sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
+                                 int power_cond, int noflush__fl, int loej,
                                  int start, int noisy, int verbose);
 
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
