@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080313]
+Changelog for sg3_utils-1.26 [20080316]
   - sg_ses: sync with ses2r19b
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
@@ -23,9 +23,10 @@ Changelog for sg3_utils-1.26 [20080313]
   - sg_dd: improve MMC handling of 'illegal mode for this track'
     read errors (with ILI and info field)
   - sg_modes: add --maxlen= option to specify allocation length
+  - sg_start: add '--noflush' and '--mod=PC_MOD' options (08-139r1)
   - change 'long long' to int64_t and 'unsigned long long' to
     uint64_t to stress that 64 bit integer wanted, not larger
-  - sg_lib: update asc/ascq code pending spc4r13
+  - sg_lib: update asc/ascq code to spc4r13
     - split sg_lib into sg_lib_data.[hc] and sg_lib.[hc]
     - split sg_cmds_extra into sg_cmds_extra and sg_cmds_mmc
     - add osd2r03 service actions (all different from osd-r10)

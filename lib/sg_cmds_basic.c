@@ -1412,15 +1412,21 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
     return ret;
 }
 
-/* Invokes a SCSI START STOP UNIT command (MMC + SBC).
+/* Invokes a SCSI START STOP UNIT command (SBC + MMC).
  * Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Start stop unit not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * -1 -> other failure
+ * SBC-3 and MMC partially overlap on the power_condition_modifier(sbc) and
+ * format_layer_number(mmc) fields. They also overlap on the noflush(sbc)
+ * and fl(mmc) one bit field. This is the cause of the awkardly named
+ * pc_mod__fl_num and noflush__fl arguments to this function.
+ *  */
 int
-sg_ll_start_stop_unit(int sg_fd, int immed, int fl_num, int power_cond,
-                      int fl, int loej, int start, int noisy, int verbose)
+sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
+                      int power_cond, int noflush__fl, int loej, int start,
+                      int noisy, int verbose)
 {
     unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -1428,8 +1434,8 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int fl_num, int power_cond,
     struct sg_pt_base * ptvp;
 
     ssuBlk[1] = immed & 1;
-    ssuBlk[3] = fl_num & 3;
-    ssuBlk[4] = ((power_cond & 0xf) << 4) | (fl ? 0x4 : 0) |
+    ssuBlk[3] = pc_mod__fl_num & 0xf;  /* bits 2 and 3 are reserved in MMC */
+    ssuBlk[4] = ((power_cond & 0xf) << 4) | (noflush__fl ? 0x4 : 0) |
                  (loej ? 0x2 : 0) | (start ? 0x1 : 0);
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
