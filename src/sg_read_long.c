@@ -16,7 +16,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2007 D. Gilbert
+   *  Copyright (C) 2004-2008 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.14 20070919";
+static char * version_str = "1.15 20080318";
 
 #define MAX_XFER_LEN 10000
 
@@ -244,8 +244,8 @@ int main(int argc, char * argv[])
             (do_16 ? "16" : "10"), device_name, xfer_len, xfer_len, llba,
             llba, correct);
 
-    if (process_read_long(sg_fd, do_16, pblock, correct, llba, readLongBuff,
-                          xfer_len, verbose))
+    if ((res = process_read_long(sg_fd, do_16, pblock, correct, llba,
+                                 readLongBuff, xfer_len, verbose)))
         goto err_out;
 
     if ('\0' == out_fname[0])

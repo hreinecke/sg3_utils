@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "October 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_PERSIST "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
@@ -171,7 +171,7 @@ with '\-\-param\-rk=<old_rk>' and '\-\-param\-sark=0'.
 \fB\-I\fR, \fB\-\-register\-ignore\fR
 Register and Ignore Existing Key is a sub\-command of the PROUT command.
 Similar to \fI\-\-register\fR except that when changing a reservation key
-the old key is not specified. The '\-\-prout-sark=<new_rk>' option should
+the old key is not specified. The '\-\-param\-sark=<new_rk>' option should
 also be given.
 .TP
 \fB\-M\fR, \fB\-\-register\-move\fR
@@ -332,7 +332,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2007 Douglas Gilbert
+Copyright \(co 2004\-2008 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

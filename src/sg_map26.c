@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,7 @@
 #endif
 #include "sg_lib.h"
 
-static char * version_str = "1.05 20070714";
+static char * version_str = "1.06 20080318";
 
 #define ME "sg_map26: "
 
@@ -169,7 +169,7 @@ static void usage()
                 "path\n"
                 "    --symlink|-s    symlinks to special included in "
                 "result\n"
-                "    --verbose|-v    set device identifier\n"
+                "    --verbose|-v    increase verbosity of output\n"
                 "    --version|-V    print version string and exit\n\n"
                 "Maps SCSI device node to corresponding generic node (and "
                 "vv)\n"

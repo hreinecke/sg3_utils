@@ -1,4 +1,4 @@
-.TH SGINFO "8" "September 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SGINFO "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sginfo \- access mode page information for a SCSI (or ATAPI) device
 .SH SYNOPSIS
@@ -20,7 +20,9 @@ available.
 .PP
 Those interested in SCSI mode pages may find the
 .B sdparm
-utility easier use, especially for changing parameters. 
+utility easier use, especially for changing parameters. Also the author
+considers this utility legacy so the mode pages are not being updated
+as http://www.t10.org adds and modifies mode page fields.
 .PP
 Four sets of values are maintained by a SCSI device for each mode
 page: current (active), default (manufacturer's supplied values),
@@ -164,9 +166,15 @@ for both \fIPN\fR and \fISPN\fR (both prefixed by '0x'). For example 63 and
 0x3f are equivalent.
 .TP
 \fB\-v\fR
+Display version string then exit. [N.B. This option increases verbosity for
+most other utilities in this package as outlined in 'man 8 sg3_utils'.
+This odd usage is for backward compatibility with the scsiinfo utility.] 
 .TP
 \fB\-V\fR
-Access information in the Verify Error Recovery mode page.
+Access information in the Verify Error Recovery mode page. [N.B. This
+option prints the version string then exits in most other utilities in
+this package as outlined in 'man 8 sg3_utils'. This odd usage is for
+backward compatibility with the scsiinfo utility.] 
 .TP
 \fB\-z\fR
 do a single fetch for mode pages (over\-estimating the expected length
