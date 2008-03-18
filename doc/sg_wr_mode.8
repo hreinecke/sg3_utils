@@ -1,4 +1,4 @@
-.TH SG_WR_MODE "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_WR_MODE "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_wr_mode \- write mode page
 .SH SYNOPSIS
@@ -79,7 +79,7 @@ doesn't do checks on the existing mode page. Note that \fIDEVICE\fR may
 still reject the new contents for the mode page. Cannot be given with
 the \fI\-\-mask=M,M...\fR option.
 .TP
-\fB\-h\fR, \fB\-\-hex\fR
+\fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=10 | 6
@@ -158,7 +158,7 @@ the default mode page values (i.e. the mode page values chosen by the
 manufacturer of the device) as both the current and saved mode page
 values the following sequence could be used:
 .PP
-  $ sg_modes \-c=2 \-p=1a \-r /dev/sda > t
+  $ sg_modes \-\-control=2 \-\-page=1a \-r /dev/sda > t
 .br
   $ sg_wr_mode \-\-page=1a \-\-contents=\- \-\-save /dev/sda < t
 .PP
@@ -167,7 +167,7 @@ of the "power condition" mode page (0x1a) from 0x28 to 0x37. Note that the
 change is not saved so the "idle condition counter" will revert to 0x28
 after the next power cycle. The output from sg_modes is abridged.
 .PP
- $ sg_modes \-p=1a /dev/hdc
+ $ sg_modes \-\-page=1a /dev/hdc
 .br
 >> Power condition (mmc), page_control: current
 .br
@@ -175,7 +175,7 @@ after the next power cycle. The output from sg_modes is abridged.
 .PP
  $ sg_wr_mode \-p 1a \-c 0,0,0,0,0,0,0,37 \-m 0,0,0,0,0,0,0,ff /dev/hdc
 .PP
- $ sg_modes \-p=1a /dev/hdc
+ $ sg_modes \-p 1a /dev/hdc
 .br
 >> Power condition (mmc), page_control: current
 .br
@@ -188,7 +188,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2007 Douglas Gilbert
+Copyright \(co 2004\-2008 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

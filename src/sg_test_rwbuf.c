@@ -9,7 +9,7 @@
  * somebody else in the meantime.
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Doug Gilbert's sg_rbuf program.
- * (c) 1999-2007 Doug Gilbert
+ * (c) 1999-2008 Doug Gilbert
  * 
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 #include "sg_io_linux.h"
 
 
-static char * version_str = "1.06 20070919";
+static char * version_str = "1.07 20080318";
 
 #define BPI (signed)(sizeof(int))
 
@@ -344,7 +344,7 @@ void usage ()
                 "    --times=NUM      number of times to run test "
                 "(default 1)\n"
                 "    --verbose        increase verbosity of output\n"
-                "    --verbose        output version then exit\n");
+                "    --version        output version then exit\n");
         printf ("\nWARNING: If you access the device at the same time, e.g. "
                 "because it's a\n");
         printf (" mounted hard disk, the device's buffer may be used by the "

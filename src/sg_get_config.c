@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.33 20080220";    /* mmc6r01 */
+static char * version_str = "0.34 20080318";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -60,7 +60,7 @@ static char * version_str = "0.33 20080220";    /* mmc6r01 */
 static unsigned char resp_buffer[MX_ALLOC_LEN];
 
 static struct option long_options[] = {
-        {"brief", 0, 0, '1'},
+        {"brief", 0, 0, 'b'},
         {"current", 0, 0, 'c'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
