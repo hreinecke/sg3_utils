@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.15 20080318";
+static char * version_str = "1.15 20080319";
 
 #define MAX_XFER_LEN 10000
 
@@ -51,7 +51,8 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
           "sg_read_long [--16] [--correct] [--help] [--lba=LBA] "
@@ -79,9 +80,9 @@ static void usage()
 }
 
 /* Returns 0 if successful */
-static int process_read_long(int sg_fd, int do_16, int pblock, int correct,
-                             uint64_t llba, void * data_out,
-                             int xfer_len, int verbose)
+static int
+process_read_long(int sg_fd, int do_16, int pblock, int correct,
+                  uint64_t llba, void * data_out, int xfer_len, int verbose)
 {
     int offset, res;
     const char * ten_or;
@@ -128,7 +129,8 @@ static int process_read_long(int sg_fd, int do_16, int pblock, int correct,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, outfd, res, c;
     unsigned char * readLongBuff = NULL;
@@ -244,7 +246,7 @@ int main(int argc, char * argv[])
             (do_16 ? "16" : "10"), device_name, xfer_len, xfer_len, llba,
             llba, correct);
 
-    if ((res = process_read_long(sg_fd, do_16, pblock, correct, llba,
+    if ((ret = process_read_long(sg_fd, do_16, pblock, correct, llba,
                                  readLongBuff, xfer_len, verbose)))
         goto err_out;
 
