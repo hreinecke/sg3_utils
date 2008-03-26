@@ -1,18 +1,19 @@
 SHELL = /bin/sh
 
-PREFIX=/usr/local
+PREFIX=/usr
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
-MANDIR=$(DESTDIR)/$(PREFIX)/man
+MANDIR=$(DESTDIR)/$(PREFIX)/share/man
 
 CC = gcc
 LD = gcc
 
-EXECS = hxascdmp sg_chk_asc
+EXECS = hxascdmp
+# EXECS = hxascdmp sg_chk_asc
 
-MAN_PGS = 
-MAN_PREF = man8
+MAN_PGS = hxascdmp.1
+MAN_PREF = man1
 
-CFLAGS = -g -O2 -W 
+CFLAGS = -g -O2 -W -Wall
 # CFLAGS = -g -O2 -W -pedantic -std=c99
 
 LDFLAGS =
@@ -29,6 +30,7 @@ clean:
 hxascdmp: hxascdmp.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
+# building sg_chk_asc depends on a prior successful make in ../lib
 sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 

@@ -30,7 +30,7 @@
  
 */
 
-static char * version_str = "0.56 20080316";  /* sbc3r13+08-139r1; mmc6r01a */
+static char * version_str = "0.57 20080325";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},

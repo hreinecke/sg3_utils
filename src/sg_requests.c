@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,9 +47,20 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.18 20070919";
+static char * version_str = "1.19 20080325";
 
 #define REQUEST_SENSE_BUFF_LEN 252
+
+/* Not all environments support the Unix sleep() */
+#if defined(MSC_VER) || defined(__MINGW32__)
+#define HAVE_MS_SLEEP
+#endif
+#ifdef HAVE_MS_SLEEP
+#include <windows.h>
+#define sleep_for(seconds)    Sleep( (seconds) * 1000)
+#else
+#define sleep_for(seconds)    sleep(seconds)
+#endif
 
 #define ME "sg_requests: "
 
@@ -59,6 +70,7 @@ static struct option long_options[] = {
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"num", 1, 0, 'n'},
+        {"progress", 0, 0, 'p'},
         {"raw", 0, 0, 'r'},
         {"status", 0, 0, 's'},
         {"time", 0, 0, 't'},
@@ -70,7 +82,8 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_requests [--desc] [--help] [--hex] [--num=NUM] [--raw]\n"
+          "sg_requests [--desc] [--help] [--hex] [--num=NUM] [--progress] "
+          "[--raw]\n"
           "                   [--status] [--time] [--verbose] [--version] "
           "DEVICE\n"
           "  where:\n"
@@ -80,6 +93,8 @@ static void usage()
           "     --hex|-H          output in hexadecimal\n"
           "     --num=NUM|-n NUM  number of REQUEST SENSE commands "
           "to send (def: 1)\n"
+          "     --progress|-p     output a progress indication (percentage) "
+          "if available\n"
           "     --raw|-r          output in binary (to stdout)\n"
           "     --status|-s       set exit status from parameter data "
           "(def: only set\n"
@@ -103,11 +118,12 @@ static void dStrRaw(const char* str, int len)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, c, resp_len, k;
+    int sg_fd, res, c, resp_len, k, progress;
     unsigned char requestSenseBuff[REQUEST_SENSE_BUFF_LEN];
     int desc = 0;
     int num_rs = 1;
     int do_hex = 0;
+    int do_progress = 0;
     int do_raw = 0;
     int do_status = 0;
     int do_time = 0;
@@ -121,7 +137,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHn:rstvV", long_options,
+        c = getopt_long(argc, argv, "dhHn:prstvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -143,6 +159,9 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "bad argument to '--num'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'p':
+            ++do_progress;
             break;
         case 'r':
             ++do_raw;
@@ -190,6 +209,62 @@ int main(int argc, char * argv[])
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
+    if (do_progress) {
+        for (k = 0; k < num_rs; ++k) {
+            if (k > 0)
+                sleep_for(30);
+            memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
+            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
+                                      sizeof(requestSenseBuff), 1, verbose);
+            if (res) {
+                ret = res;
+                if (SG_LIB_CAT_INVALID_OP == res)
+                    fprintf(stderr, "Request Sense command not supported\n");
+                else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                    fprintf(stderr, "bad field in Request Sense cdb\n");
+                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                    fprintf(stderr, "Request Sense, aborted command\n");
+                else {
+                    fprintf(stderr, "Request Sense command unexpectedly "
+                            "failed\n");
+                    if (0 == verbose)
+                        fprintf(stderr, "    try the '-v' option for "
+                                "more information\n");
+                }
+                break;
+            }
+            resp_len = requestSenseBuff[7] + 8;
+            if (verbose > 1) {
+                fprintf(stderr, "Parameter data in hex\n");
+                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+            }
+            progress = -1;
+#if 1
+{
+    static int p1 = 0x22;
+
+    requestSenseBuff[15] = 0x80;
+    if (k > 0)
+        p1 += 0x08;
+    requestSenseBuff[16] = p1;
+    requestSenseBuff[17] = 0x0;
+}
+#endif
+            sg_get_sense_progress_fld(requestSenseBuff, resp_len,
+                                      &progress);
+            if (progress < 0) {
+                ret = res;
+                if (verbose > 1)
+                     fprintf(stderr, "No progress indication found, "
+                             "iteration %d\n", k + 1);
+                /* N.B. exits first time there isn't a progress indication */
+                break;  
+            } else
+                printf("Progress indication: %d%% done\n",
+                       (progress * 100) / 65536);
+        }
+        goto finish;
+    }
 
 #ifndef SG3_UTILS_MINGW
     if (do_time) {
@@ -215,7 +290,7 @@ int main(int argc, char * argv[])
             else if (1 == num_rs) {
                 fprintf(stderr, "Decode parameter data as sense data:\n");
                 sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
-                if (verbose) {
+                if (verbose > 1) {
                     fprintf(stderr, "\nParameter data in hex\n");
                     dStrHex((const char *)requestSenseBuff, resp_len, 1);
                 }
@@ -270,6 +345,8 @@ int main(int argc, char * argv[])
             printf("\n");
     }
 #endif
+
+finish:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));

@@ -1,4 +1,4 @@
-.TH SG_TURS "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_TURS "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
@@ -15,9 +15,7 @@ sg_turs \- send one or more SCSI TEST UNIT READY commands
 This utility sends one or more SCSI TEST UNIT READY commands to the
 \fIDEVICE\fR. This may be useful for timing the per command overhead.
 Note that TEST UNIT READY has no associated data, just a 6 byte command
-and a returned SCSI status value. If the SCSI status value is CHECK
-CONDITION then most modern initiators fetch sense data from
-the device (i.e. autosense).
+and a returned SCSI status value.
 .PP
 This utility supports two command line syntaxes, the preferred one is
 shown first in the synopsis and explained in this section. A later section
@@ -40,10 +38,11 @@ number may be given, prefixed by either '0x' or has a trailing 'h'.
 switch to older style options.
 .TP
 \fB\-p\fR, \fB\-\-progress\fR
-show progress indication (a percentage) if available.  If \fI\-\-number=NUM\fR
-is given and \fINUM\fR is greater than 1 then waits 30 seconds before
-subsequent checks. Exits when \fINUM\fR is reached or there is no more
-progress indication. Ignores \fI\-\-time\fR option.
+show progress indication (a percentage) if available. If \fI\-\-number=NUM\fR
+is given, \fINUM\fR is greater than 1 and an initial progress indication
+was detected then this utility waits 30 seconds before subsequent checks.
+Exits when \fINUM\fR is reached or there are no more progress indications.
+Ignores \fI\-\-time\fR option. See NOTES section below.
 .TP
 \fB\-t\fR, \fB\-\-time\fR
 after completing the requested number of TEST UNIT READY commands, outputs
@@ -54,6 +53,22 @@ increase level or verbosity.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print version string then exit.
+.SH NOTES
+The progress indication is optionally part of the sense data. When a prior
+command that takes a long time to complete (and typically precludes other
+media access commands) is still underway, the progress indication can be used
+to determine how long before the device returns to its normal state. 
+.PP
+The SCSI FORMAT command for disks used with the IMMED bit set is an example
+of an operation that takes a significant amount of time and precludes other
+media access during that time. The IMMED bit set instructs the FORMAT command
+to return control to the application client once the format has commenced (see
+SBC-3). Several long duration SCSI commands associated with tape drives also
+use the progress indication (see SSC-3).
+.PP
+Early standards suggested that the SCSI TEST UNIT READY command be used for
+polling the progress indication. More recent standards seem to suggest
+the SCSI REQUEST SENSE command should be used instead.
 .SH EXIT STATUS
 The exit status of sg_turs is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -87,9 +102,9 @@ print out version string then exit.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000\-2006 Douglas Gilbert
+Copyright \(co 2000\-2008 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq(sg3_utils)
+.B sg_inq, sg_request (sg3_utils)
