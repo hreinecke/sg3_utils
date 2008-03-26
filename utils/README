@@ -3,7 +3,8 @@ This directory contains these utilities:
     which is sent to stdout. The incoming binary stream can either be
     from a file or, in the absence of a file name, from stdin. Similar to
     the Unix "od" command. By default, it decodes 16 bytes per line with
-    an ASCII interpretation to the right of each line.
+    an ASCII interpretation to the right of each line. See its
+    hxascdmp(1) man page.
   - sg_chk_asc: utility decodes the SCSI additional sense code table
     found at http://www.t10.org/lists/asc-num.txt and checks it
     against the table found in sg_lib.c in the lib/ subdirectory.
@@ -21,4 +22,4 @@ the lib/ subdirectory. One way to meet that requirement is to execute
 
 
 Doug Gilbert
-11th January 2008 
+26th March 2008 
