@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2007 Douglas Gilbert.
+ * Copyright (c) 1999-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
 #include "sg_pt.h"
 
 
-static char * version_str = "1.42 20071120";
+static char * version_str = "1.43 20080327";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */

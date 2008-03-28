@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2008 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static char * version_str = "0.23 20071002";
+static char * version_str = "0.24 20080327";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -287,7 +287,7 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
     int res;
     unsigned int rb_len;
     unsigned char *rb_buff;
-    unsigned long minutes;
+    unsigned int minutes;
 
     rb_len = 16 + safte_cfg.vendor_specific;
     rb_buff = (unsigned char *)malloc(rb_len);
@@ -319,10 +319,10 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
     printf("Usage Statistics:\n");
     minutes = (rb_buff[0] << 24) + (rb_buff[1] << 16) +
         (rb_buff[2] <<  8) + rb_buff[3];
-    printf("\tPower on Minutes: %ld\n", minutes);
+    printf("\tPower on Minutes: %u\n", minutes);
     minutes = (rb_buff[4] << 24) + (rb_buff[5] << 16) +
         (rb_buff[6] <<  8) + rb_buff[7];
-    printf("\tPower on Cycles: %ld\n", minutes);
+    printf("\tPower on Cycles: %u\n", minutes);
 
     free(rb_buff);
     return 0;

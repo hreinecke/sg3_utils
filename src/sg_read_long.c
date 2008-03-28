@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.15 20080319";
+static char * version_str = "1.15 20080327";
 
 #define MAX_XFER_LEN 10000
 
@@ -91,7 +91,7 @@ process_read_long(int sg_fd, int do_16, int pblock, int correct,
         res = sg_ll_read_long16(sg_fd, pblock, correct, llba, data_out,
                                 xfer_len, &offset, 1, verbose);
     else
-        res = sg_ll_read_long10(sg_fd, pblock, correct, (unsigned long)llba,
+        res = sg_ll_read_long10(sg_fd, pblock, correct, (unsigned int)llba,
                                 data_out, xfer_len, &offset, 1, verbose);
     ten_or = do_16 ? "16" : "10";
     switch (res) {

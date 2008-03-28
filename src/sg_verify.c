@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.11 20071219";
+static char * version_str = "1.12 20080327";
 
 #define ME "sg_verify: "
 
@@ -107,7 +107,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
-    unsigned long info = 0;
+    unsigned int info = 0;
 
     while (1) {
         int option_index = 0;
@@ -212,7 +212,7 @@ main(int argc, char * argv[])
     for (; count > 0; count -= bpc, lba +=bpc) {
         num = (count > bpc) ? bpc : count;
         res = sg_ll_verify10(sg_fd, vrprotect, dpo, bytechk,
-                             (unsigned long)lba, num, NULL, 0,
+                             (unsigned int)lba, num, NULL, 0,
                              &info, 1, verbose);
         if (0 != res) {
             ret = res;
@@ -239,7 +239,7 @@ main(int argc, char * argv[])
                 break;
             case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
                 fprintf(stderr, "medium or hardware error, reported "
-                        "lba=0x%lx\n", info);
+                        "lba=0x%u\n", info);
                 break;
             default:
                 fprintf(stderr, "Verify(10) failed near lba=%" PRIu64

@@ -265,7 +265,7 @@ sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
     case 0x70:
     case 0x71:
         if (info_outp)
-            *info_outp = (sensep[3] << 24) + (sensep[4] << 16) +
+            *info_outp = ((unsigned int)sensep[3] << 24) + (sensep[4] << 16) +
                          (sensep[5] << 8) + sensep[6];
         return (sensep[0] & 0x80) ? 1 : 0;
     case 0x72:
