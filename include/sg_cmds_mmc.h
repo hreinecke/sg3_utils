@@ -47,7 +47,7 @@ extern int sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
  * supported, SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
 extern int sg_ll_get_performance(int sg_fd, int data_type,
-                                 unsigned long starting_lba, int max_num_desc,
+                                 unsigned int starting_lba, int max_num_desc,
                                  int type, void * resp, int mx_resp_len,
                                  int noisy, int verbose);
 

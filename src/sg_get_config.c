@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.34 20080318";    /* mmc6r01 */
+static char * version_str = "0.34 20080327";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -799,8 +799,8 @@ decode_feature(int feature, unsigned char * ucp, int len)
                feature);
         printf("      Disc control blocks:\n");
         for (k = 4; k < len; k += 4) {
-            printf("        0x%x\n", (ucp[k] << 24) + (ucp[k + 1] << 16) +
-                   (ucp[k + 2] << 8) + ucp[k + 3]);
+            printf("        0x%x\n", ((unsigned int)ucp[k] << 24) +
+                   (ucp[k + 1] << 16) + (ucp[k + 2] << 8) + ucp[k + 3]);
         }
         break;
     case 0x10b:    /* DVD CPRM */

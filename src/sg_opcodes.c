@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2007 D. Gilbert
+ *  Copyright (C) 2004-2008 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.30 20070714";    /* spc4r11 */
+static char * version_str = "0.31 20080327";    /* spc4r11 */
 
 // #define USE_LINUX_SG_IO_IF 1
 
@@ -511,7 +511,7 @@ static void list_all_codes(unsigned char * rsoc_buff, int rsoc_len,
                            int unsorted, int alpha, int rctd)
 {
     int k, j, cd_len, serv_act, len;
-    unsigned long to;
+    unsigned int to;
     unsigned char * ucp;
     char name_buff[NAME_BUFF_SZ];
     char sa_buff[8];
@@ -572,18 +572,18 @@ static void list_all_codes(unsigned char * rsoc_buff, int rsoc_len,
             if (ucp[5] & 0x2) {
                 printf(" %.2x     %.4s       %3d", ucp[0], sa_buff,
                        ((ucp[6] << 8) | ucp[7]));
-                to = (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) +
-                     ucp[15];
+                to = ((unsigned int)ucp[12] << 24) + (ucp[13] << 16) +
+                     (ucp[14] << 8) + ucp[15];
                 if (0 == to)
                     printf("         -");
                 else
-                    printf("  %8lu", to);
-                to = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) +
-                     ucp[19];
+                    printf("  %8u", to);
+                to = ((unsigned int)ucp[16] << 24) + (ucp[17] << 16) +
+                     (ucp[18] << 8) + ucp[19];
                 if (0 == to)
                     printf("          -");
                 else
-                    printf("   %8lu", to);
+                    printf("   %8u", to);
                 printf("    %s\n", name_buff);
             } else
                 printf(" %.2x     %.4s       %3d                         "
@@ -599,7 +599,7 @@ static void decode_cmd_to_descriptor(unsigned char * dp, int max_b_len,
                                      char * b)
 {
     int len;
-    unsigned long to;
+    unsigned int to;
 
     if ((max_b_len < 2) || (NULL == dp))
         return;
@@ -611,19 +611,19 @@ static void decode_cmd_to_descriptor(unsigned char * dp, int max_b_len,
                  "(expect 10)", len);
         return;
     }
-    to = (dp[4] << 24) + (dp[5] << 16) + (dp[6] << 8) + dp[7];
+    to = ((unsigned int)dp[4] << 24) + (dp[5] << 16) + (dp[6] << 8) + dp[7];
     if (0 == to)
         snprintf(b, max_b_len, "no nominal timeout, ");
     else
-        snprintf(b, max_b_len, "nominal timeout: %lu secs, ", to);
+        snprintf(b, max_b_len, "nominal timeout: %u secs, ", to);
     len = strlen(b);
     max_b_len -= len;
     b += len;
-    to = (dp[8] << 24) + (dp[9] << 16) + (dp[10] << 8) + dp[11];
+    to = ((unsigned int)dp[8] << 24) + (dp[9] << 16) + (dp[10] << 8) + dp[11];
     if (0 == to)
         snprintf(b, max_b_len, "no recommended timeout");
     else
-        snprintf(b, max_b_len, "recommended timeout: %lu secs", to);
+        snprintf(b, max_b_len, "recommended timeout: %u secs", to);
     return;
 }
 

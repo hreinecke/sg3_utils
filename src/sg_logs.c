@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.80 20080218";    /* SPC-4 revision 12 */
+static char * version_str = "0.80 20080227";    /* SPC-4 revision 12 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1329,118 +1329,118 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 }
 
 static void
-show_sas_phy_event_info(int peis, unsigned long val, unsigned long thresh_val)
+show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
 {
     switch (peis) {
     case 0:
         printf("     No event\n");
         break;
     case 0x1:
-        printf("     Invalid word count: %lu\n", val);
+        printf("     Invalid word count: %u\n", val);
         break;
     case 0x2:
-        printf("     Running disparity error count: %lu\n", val);
+        printf("     Running disparity error count: %u\n", val);
         break;
     case 0x3:
-        printf("     Loss of dword synchronization count: %lu\n", val);
+        printf("     Loss of dword synchronization count: %u\n", val);
         break;
     case 0x4:
-        printf("     Phy reset problem count: %lu\n", val);
+        printf("     Phy reset problem count: %u\n", val);
         break;
     case 0x5:
-        printf("     Elasticity buffer overflow count: %lu\n", val);
+        printf("     Elasticity buffer overflow count: %u\n", val);
         break;
     case 0x6:
-        printf("     Received ERROR  count: %lu\n", val);
+        printf("     Received ERROR  count: %u\n", val);
         break;
     case 0x20:
-        printf("     Received address frame error count: %lu\n", val);
+        printf("     Received address frame error count: %u\n", val);
         break;
     case 0x21:
-        printf("     Transmitted OPEN_REJECT abandon count: %lu\n", val);
+        printf("     Transmitted OPEN_REJECT abandon count: %u\n", val);
         break;
     case 0x22:
-        printf("     Received OPEN_REJECT abandon count: %lu\n", val);
+        printf("     Received OPEN_REJECT abandon count: %u\n", val);
         break;
     case 0x23:
-        printf("     Transmitted OPEN_REJECT retry count: %lu\n", val);
+        printf("     Transmitted OPEN_REJECT retry count: %u\n", val);
         break;
     case 0x24:
-        printf("     Received OPEN_REJECT retry count: %lu\n", val);
+        printf("     Received OPEN_REJECT retry count: %u\n", val);
         break;
     case 0x25:
-        printf("     Received AIP (PARTIAL) count: %lu\n", val);
+        printf("     Received AIP (PARTIAL) count: %u\n", val);
         break;
     case 0x26:
-        printf("     Received AIP (CONNECTION) count: %lu\n", val);
+        printf("     Received AIP (CONNECTION) count: %u\n", val);
         break;
     case 0x27:
-        printf("     Transmitted BREAK count: %lu\n", val);
+        printf("     Transmitted BREAK count: %u\n", val);
         break;
     case 0x28:
-        printf("     Received BREAK count: %lu\n", val);
+        printf("     Received BREAK count: %u\n", val);
         break;
     case 0x29:
-        printf("     Break timeout count: %lu\n", val);
+        printf("     Break timeout count: %u\n", val);
         break;
     case 0x2a:
-        printf("     Connection count: %lu\n", val);
+        printf("     Connection count: %u\n", val);
         break;
     case 0x2b:
-        printf("     Peak transmitted pathway blocked count: %lu\n",
+        printf("     Peak transmitted pathway blocked count: %u\n",
                val & 0xff);
-        printf("         Peak value detector threshold: %lu\n",
+        printf("         Peak value detector threshold: %u\n",
                thresh_val & 0xff);
         break;
     case 0x2c:
         printf("     Peak transmitted arbitration wait time (us to 32767): "
-               "%lu\n", val & 0xffff);
-        printf("         Peak value detector threshold: %lu\n",
+               "%u\n", val & 0xffff);
+        printf("         Peak value detector threshold: %u\n",
                thresh_val & 0xffff);
         break;
     case 0x2d:
-        printf("     Peak arbitration time (us): %lu\n", val);
-        printf("         Peak value detector threshold: %lu\n", thresh_val);
+        printf("     Peak arbitration time (us): %u\n", val);
+        printf("         Peak value detector threshold: %u\n", thresh_val);
         break;
     case 0x2e:
-        printf("     Peak connection time (us): %lu\n", val);
-        printf("         Peak value detector threshold: %lu\n", thresh_val);
+        printf("     Peak connection time (us): %u\n", val);
+        printf("         Peak value detector threshold: %u\n", thresh_val);
         break;
     case 0x40:
-        printf("     Transmitted SSP frame count: %lu\n", val);
+        printf("     Transmitted SSP frame count: %u\n", val);
         break;
     case 0x41:
-        printf("     Received SSP frame count: %lu\n", val);
+        printf("     Received SSP frame count: %u\n", val);
         break;
     case 0x42:
-        printf("     Transmitted SSP frame error count: %lu\n", val);
+        printf("     Transmitted SSP frame error count: %u\n", val);
         break;
     case 0x43:
-        printf("     Received SSP frame error count: %lu\n", val);
+        printf("     Received SSP frame error count: %u\n", val);
         break;
     case 0x44:
-        printf("     Transmitted CREDIT_BLOCKED count: %lu\n", val);
+        printf("     Transmitted CREDIT_BLOCKED count: %u\n", val);
         break;
     case 0x45:
-        printf("     Received CREDIT_BLOCKED count: %lu\n", val);
+        printf("     Received CREDIT_BLOCKED count: %u\n", val);
         break;
     case 0x50:
-        printf("     Transmitted SATA frame count: %lu\n", val);
+        printf("     Transmitted SATA frame count: %u\n", val);
         break;
     case 0x51:
-        printf("     Received SATA frame count: %lu\n", val);
+        printf("     Received SATA frame count: %u\n", val);
         break;
     case 0x52:
-        printf("     SATA flow control buffer overflow count: %lu\n", val);
+        printf("     SATA flow control buffer overflow count: %u\n", val);
         break;
     case 0x60:
-        printf("     Transmitted SMP frame count: %lu\n", val);
+        printf("     Transmitted SMP frame count: %u\n", val);
         break;
     case 0x61:
-        printf("     Received SMP frame count: %lu\n", val);
+        printf("     Received SMP frame count: %u\n", val);
         break;
     case 0x63:
-        printf("     Received SMP frame error count: %lu\n", val);
+        printf("     Received SMP frame error count: %u\n", val);
         break;
     default:
         break;
@@ -1454,7 +1454,7 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
     int j, m, n, nphys, pcb, t, sz, spld_len;
     unsigned char * vcp;
     uint64_t ull;
-    unsigned long ul;
+    unsigned int ui;
     char pcb_str[PCB_STR_LEN];
     char s[64];
 
@@ -1503,15 +1503,15 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
             }
             printf("      att_sas_addr=0x%" PRIx64 "\n", ull);
             printf("      att_tport_mask=0x%x\n", vcp[7]);
-            ul = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
-            printf("      inv_dwords=%ld\n", ul);
-            ul = (vcp[40] << 24) | (vcp[41] << 16) | (vcp[42] << 8) | vcp[43];
-            printf("      loss_dword_sync=%ld\n", ul);
+            ui = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
+            printf("      inv_dwords=%u\n", ui);
+            ui = (vcp[40] << 24) | (vcp[41] << 16) | (vcp[42] << 8) | vcp[43];
+            printf("      loss_dword_sync=%u\n", ui);
             printf("      neg_log_lrate=%d\n", 0xf & vcp[5]);
-            ul = (vcp[44] << 24) | (vcp[45] << 16) | (vcp[46] << 8) | vcp[47];
-            printf("      phy_reset_probs=%ld\n", ul);
-            ul = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
-            printf("      running_disparity=%ld\n", ul);
+            ui = (vcp[44] << 24) | (vcp[45] << 16) | (vcp[46] << 8) | vcp[47];
+            printf("      phy_reset_probs=%u\n", ui);
+            ui = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
+            printf("      running_disparity=%u\n", ui);
             printf("      reason=0x%x\n", (vcp[5] & 0xf0) >> 4);
             for (n = 0, ull = vcp[8]; n < 8; ++n) {
                 ull <<= 8; ull |= vcp[8 + n];
@@ -1595,19 +1595,19 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
             }
             printf("    attached SAS address = 0x%" PRIx64 "\n", ull);
             printf("    attached phy identifier = %d\n", vcp[24]);
-            ul = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
-            printf("    Invalid DWORD count = %ld\n", ul);
-            ul = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
-            printf("    Running disparity error count = %ld\n", ul);
-            ul = (vcp[40] << 24) | (vcp[41] << 16) | (vcp[42] << 8) | vcp[43];
-            printf("    Loss of DWORD synchronization = %ld\n", ul);
-            ul = (vcp[44] << 24) | (vcp[45] << 16) | (vcp[46] << 8) | vcp[47];
-            printf("    Phy reset problem = %ld\n", ul);
+            ui = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
+            printf("    Invalid DWORD count = %u\n", ui);
+            ui = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
+            printf("    Running disparity error count = %u\n", ui);
+            ui = (vcp[40] << 24) | (vcp[41] << 16) | (vcp[42] << 8) | vcp[43];
+            printf("    Loss of DWORD synchronization = %u\n", ui);
+            ui = (vcp[44] << 24) | (vcp[45] << 16) | (vcp[46] << 8) | vcp[47];
+            printf("    Phy reset problem = %u\n", ui);
         }
         if (spld_len > 51) {
             int num_ped, peis;
             unsigned char * xcp;
-            unsigned long pvdt;
+            unsigned int pvdt;
 
             num_ped = vcp[51];
             if (num_ped > 0) {
@@ -1620,11 +1620,11 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
             xcp = vcp + 52;
             for (m = 0; m < (num_ped * 12); m += 12, xcp += 12) {
                 peis = xcp[3];
-                ul = (xcp[4] << 24) | (xcp[5] << 16) | (xcp[6] << 8) |
+                ui = (xcp[4] << 24) | (xcp[5] << 16) | (xcp[6] << 8) |
                      xcp[7];
                 pvdt = (xcp[8] << 24) | (xcp[9] << 16) | (xcp[10] << 8) |
                        xcp[11];
-                show_sas_phy_event_info(peis, ul, pvdt);
+                show_sas_phy_event_info(peis, ui, pvdt);
             }
         }
     }

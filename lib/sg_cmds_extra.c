@@ -978,7 +978,7 @@ has_blk_ili(unsigned char * sensep, int sb_len)
  * field written to 'offsetp', SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
 int
-sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned long lba,
+sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
                   void * resp, int xfer_len, int * offsetp, int noisy,
                   int verbose)
 {
@@ -1173,7 +1173,7 @@ sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
 int
 sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
-                   unsigned long lba, void * data_out, int xfer_len,
+                   unsigned int lba, void * data_out, int xfer_len,
                    int * offsetp, int noisy, int verbose)
 {
     int k, res, sense_cat, ret;
@@ -1375,8 +1375,8 @@ sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * -1 -> other failure */
 int
 sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
-               unsigned long lba, int veri_len, void * data_out,
-               int data_out_len, unsigned long * infop, int noisy,
+               unsigned int lba, int veri_len, void * data_out,
+               int data_out_len, unsigned int * infop, int noisy,
                int verbose)
 {
     int k, res, ret, sense_cat;
@@ -1437,7 +1437,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 if (valid) {
                     if (infop)
-                        *infop = (unsigned long)ull;
+                        *infop = (unsigned int)ull;
                     ret = SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
                 } else
                     ret = SG_LIB_CAT_MEDIUM_HARD;

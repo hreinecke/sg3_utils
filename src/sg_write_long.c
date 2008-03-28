@@ -16,7 +16,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2007 D. Gilbert
+   *  Copyright (C) 2004-2008 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.15 20070919";
+static char * version_str = "1.16 20080327";
 
 
 #define MAX_XFER_LEN 10000
@@ -250,7 +250,7 @@ int main(int argc, char * argv[])
                                  writeLongBuff, xfer_len, &offset, 1, verbose);
     else
         res = sg_ll_write_long10(sg_fd, cor_dis, wr_uncor, pblock,
-                                 (unsigned long)llba, writeLongBuff, xfer_len,
+                                 (unsigned int)llba, writeLongBuff, xfer_len,
                                  &offset, 1, verbose);
     ret = res;
     switch (res) {

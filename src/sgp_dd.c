@@ -501,15 +501,18 @@ static void cleanup_out(void * v_clp)
 
 static void * read_write_thread(void * v_clp)
 {
-    Rq_coll * clp = (Rq_coll *)v_clp;
+    Rq_coll * clp;
     Rq_elem rel;
     Rq_elem * rep = &rel;
     size_t psz = 0;
-    int sz = clp->bpt * clp->bs;
-    int stop_after_write = 0;
-    int64_t seek_skip =  clp->seek - clp->skip;
+    int sz;
+    volatile int stop_after_write = 0;
+    int64_t seek_skip;
     int blocks, status;
 
+    clp = (Rq_coll *)v_clp;
+    sz = clp->bpt * clp->bs;
+    seek_skip =  clp->seek - clp->skip;
     memset(rep, 0, sizeof(Rq_elem));
     psz = getpagesize();
     if (NULL == (rep->alloc_bp = (unsigned char *)malloc(sz + psz)))
@@ -615,7 +618,7 @@ static void * read_write_thread(void * v_clp)
     status = pthread_mutex_unlock(&clp->in_mutex);
     if (0 != status) err_exit(status, "unlock in_mutex");
     pthread_cond_broadcast(&clp->out_sync_cv);
-    return stop_after_write ? NULL : v_clp;
+    return stop_after_write ? NULL : clp;
 }
 
 static int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)

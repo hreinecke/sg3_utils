@@ -113,7 +113,7 @@ extern int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 extern int sg_ll_read_long10(int sg_fd, int pblock, int correct,
-                             unsigned long lba, void * resp, int xfer_len,
+                             unsigned int lba, void * resp, int xfer_len,
                              int * offsetp, int noisy, int verbose);
 
 /* Invokes a SCSI READ LONG (16) command (SBC). Note that 'xfer_len'
@@ -206,8 +206,8 @@ extern int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 extern int sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
-                          unsigned long lba, int veri_len, void * data_out,
-                          int data_out_len, unsigned long * infop, int noisy,
+                          unsigned int lba, int veri_len, void * data_out,
+                          int data_out_len, unsigned int * infop, int noisy,
                           int verbose);
 
 /* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
@@ -228,7 +228,7 @@ extern int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 extern int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
-                              unsigned long lba, void * data_out,
+                              unsigned int lba, void * data_out,
                               int xfer_len, int * offsetp, int noisy,
                               int verbose);
 
