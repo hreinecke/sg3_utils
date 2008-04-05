@@ -79,8 +79,8 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Thu Mar 27 2008 - dgilbert at interlog dot com
-- sg_get_config sync with mmc6r01, add sg_sat_phy_event
+* Fri Apr 04 2008 - dgilbert at interlog dot com
+- add sg_sat_phy_event, sync with drafts prior to this date
   * sg3_utils-1.26
 
 * Tue Oct 16 2007 - dgilbert at interlog dot com

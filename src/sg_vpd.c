@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.28 20080313";    /* spc4r13 */
+static char * version_str = "0.29 20080404";    /* spc4r14 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1066,6 +1066,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
            !!(buff[6] & 0x1), !!(buff[7] & 0x1));
+    printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
 static void
@@ -2111,8 +2112,8 @@ main(int argc, char * argv[])
             ++do_long;
             break;
         case 'm':
-           maxlen = sg_get_num(optarg);
-           if ((maxlen < 0) || (maxlen > MX_ALLOC_LEN)) {
+            maxlen = sg_get_num(optarg);
+            if ((maxlen < 0) || (maxlen > MX_ALLOC_LEN)) {
                 fprintf(stderr, "argument to '--maxlen' should be %d or "
                         "less\n", MX_ALLOC_LEN);
                 return SG_LIB_SYNTAX_ERROR;

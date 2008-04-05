@@ -173,7 +173,7 @@ device names may be used as well (e.g. "/dev/st0m").
 .SH ATA DEVICES
 There are two major types of ATA devices: non\-packet devices (e.g. ATA
 disks) and packet devices (ATAPI). The majority of ATAPI devices are
-CD/DVD drives in which the ATAPI transport carries the MMC set (i.e.
+CD/DVD/BD drives in which the ATAPI transport carries the MMC set (i.e.
 a SCSI command set). Further, both types of ATA devices can be connected
 to a host computer via a "SCSI" (or some other) transport. When an
 ATA disk is controlled via a SCSI (or non\-ATA) transport then two
@@ -188,7 +188,7 @@ The main identifying command for any SCSI device is an INQUIRY. The
 corresponding command for an ATA non\-packet device is IDENTIFY DEVICE
 while for an ATA packet device it is IDENTIFY PACKET DEVICE.
 .PP
-When this utility is invoked for an ATAPI device (e.g. a CD/DVD
+When this utility is invoked for an ATAPI device (e.g. a CD/DVD/BD
 drive with "sg_inq /dev/hdc") then a SCSI INQUIRY is sent to the
 device and if it responds then the response to decoded and output and
 this utility exits. To see the response for an ATA IDENTIFY PACKET

@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "July 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SGM_DD "8" "April 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sgm_dd \- copies data to and from files and devices. Specialized for
 devices that understand the SCSI command set and does memory mapped
@@ -245,10 +245,10 @@ All informative, warning and error output is sent to stderr so that
 dd's output file can be stdout and remain unpolluted. If no options
 are given, then the usage message is output and nothing else happens.
 .PP
-For sg devices this utility issues SCSI READ and WRITE (SBC) commands
-which are appropriate for disks and reading from CD/DVD drives. Those
-commands are not formatted correctly for tape devices so sgm_dd should
-not be used on tape devices.
+For sg devices this utility issues SCSI READ and WRITE (SBC) commands which
+are appropriate for disks and reading from CD/DVD/BD drives. Those commands
+are not formatted correctly for tape devices so sgm_dd should not be used
+on tape devices.
 .PP
 This utility stops the copy if any error is encountered. For more
 advanced "copy on error" logic see the
@@ -275,7 +275,7 @@ Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2007 Douglas Gilbert
+Copyright \(co 2000\-2008 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
