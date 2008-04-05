@@ -1146,9 +1146,8 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
         rsCmdBlk[1] |= 0x1;
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
-    if (mx_resp_len > 0xfc) {
-        fprintf(sg_warnings_strm, "SPC-3 says request sense allocation "
-                "length should be <= 252\n");
+    if (mx_resp_len > 0xff) {
+        fprintf(sg_warnings_strm, "mx_resp_len cannot exceed 255\n");
         return -1;
     }
     rsCmdBlk[4] = mx_resp_len & 0xff;

@@ -47,9 +47,10 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
  */
 
-static char * version_str = "1.19 20080325";
+static char * version_str = "1.20 20080404";
 
-#define REQUEST_SENSE_BUFF_LEN 252
+#define MAX_REQS_RESP_LEN 255
+#define DEF_REQS_RESP_LEN 252
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -66,45 +67,51 @@ static char * version_str = "1.19 20080325";
 
 
 static struct option long_options[] = {
-        {"desc", 0, 0, 'd'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"num", 1, 0, 'n'},
-        {"progress", 0, 0, 'p'},
-        {"raw", 0, 0, 'r'},
-        {"status", 0, 0, 's'},
-        {"time", 0, 0, 't'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"desc", no_argument, 0, 'd'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"maxlen", required_argument, 0, 'm'},
+        {"num", required_argument, 0, 'n'},
+        {"progress", no_argument, 0, 'p'},
+        {"raw", no_argument, 0, 'r'},
+        {"status", no_argument, 0, 's'},
+        {"time", no_argument, 0, 't'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_requests [--desc] [--help] [--hex] [--num=NUM] [--progress] "
-          "[--raw]\n"
-          "                   [--status] [--time] [--verbose] [--version] "
-          "DEVICE\n"
-          "  where:\n"
-          "     --desc|-d         set flag for descriptor sense "
-          "format\n"
-          "     --help|-h         print out usage message\n"
-          "     --hex|-H          output in hexadecimal\n"
-          "     --num=NUM|-n NUM  number of REQUEST SENSE commands "
-          "to send (def: 1)\n"
-          "     --progress|-p     output a progress indication (percentage) "
-          "if available\n"
-          "     --raw|-r          output in binary (to stdout)\n"
-          "     --status|-s       set exit status from parameter data "
-          "(def: only set\n"
-          "                       exit status from autosense)\n"
-          "     --time|-t         time the transfer, calculate commands "
-          "per second\n"
-          "     --verbose|-v      increase verbosity\n"
-          "     --version|-V      print version string and exit\n\n"
-          "Performs a SCSI REQUEST SENSE command\n"
-          );
+            "sg_requests [--desc] [--help] [--hex] [--maxlen=LEN] "
+            "[--num=NUM]\n"
+            "                   [--progress] [--raw] [--status] [--time] "
+            "[--verbose]\n"
+            "                   [--version] DEVICE\n"
+            "  where:\n"
+            "    --desc|-d         set flag for descriptor sense "
+            "format\n"
+            "    --help|-h         print out usage message\n"
+            "    --hex|-H          output in hexadecimal\n"
+            "    --maxlen=LEN|-m LEN    max response length (allocation "
+            "length in cdb)\n"
+            "                           (def: 0 -> 252 bytes)\n"
+            "    --num=NUM|-n NUM  number of REQUEST SENSE commands "
+            "to send (def: 1)\n"
+            "    --progress|-p     output a progress indication (percentage) "
+            "if available\n"
+            "    --raw|-r          output in binary (to stdout)\n"
+            "    --status|-s       set exit status from parameter data "
+            "(def: only set\n"
+            "                       exit status from autosense)\n"
+            "    --time|-t         time the transfer, calculate commands "
+            "per second\n"
+            "    --verbose|-v      increase verbosity\n"
+            "    --version|-V      print version string and exit\n\n"
+            "Performs a SCSI REQUEST SENSE command\n"
+            );
 
 }
 
@@ -119,10 +126,11 @@ static void dStrRaw(const char* str, int len)
 int main(int argc, char * argv[])
 {
     int sg_fd, res, c, resp_len, k, progress;
-    unsigned char requestSenseBuff[REQUEST_SENSE_BUFF_LEN];
+    unsigned char requestSenseBuff[MAX_REQS_RESP_LEN + 1];
     int desc = 0;
     int num_rs = 1;
     int do_hex = 0;
+    int maxlen = 0;
     int do_progress = 0;
     int do_raw = 0;
     int do_status = 0;
@@ -137,7 +145,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHn:prstvV", long_options,
+        c = getopt_long(argc, argv, "dhHm:n:prstvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -152,6 +160,14 @@ int main(int argc, char * argv[])
             return 0;
         case 'H':
             ++do_hex;
+            break;
+        case 'm':
+            maxlen = sg_get_num(optarg);
+            if ((maxlen < 0) || (maxlen > MAX_REQS_RESP_LEN)) {
+                fprintf(stderr, "argument to '--maxlen' should be %d or "
+                        "less\n", MAX_REQS_RESP_LEN);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'n':
            num_rs = sg_get_num(optarg);
@@ -198,6 +214,8 @@ int main(int argc, char * argv[])
         }
     }
 
+    if (0 == maxlen)
+        maxlen = DEF_REQS_RESP_LEN;
     if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
@@ -214,8 +232,8 @@ int main(int argc, char * argv[])
             if (k > 0)
                 sleep_for(30);
             memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
-                                      sizeof(requestSenseBuff), 1, verbose);
+            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
+                                      1, verbose);
             if (res) {
                 ret = res;
                 if (SG_LIB_CAT_INVALID_OP == res)
@@ -278,8 +296,8 @@ int main(int argc, char * argv[])
     requestSenseBuff[7] = '\0';
     for (k = 0; k < num_rs; ++k) {
         memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-        res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
-                                  sizeof(requestSenseBuff), 1, verbose);
+        res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
+                                  1, verbose);
         ret = res;
         if (0 == res) {
             resp_len = requestSenseBuff[7] + 8;

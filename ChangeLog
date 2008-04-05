@@ -2,50 +2,50 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080327]
-  - sg_ses: sync with ses2r19b
+Changelog for sg3_utils-1.26 [20080404]
+  - sg_sat_phy_event: new utility; copied from examples
+    directory and enhanced, rename original to sg__sat_phy_event
+  - sg_ses: sync with ses2r19b, many nomenclature changes
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
       to be 4 bytes long
-  - sg_cmds_extra: add vrprotect argument to sg_ll_verify10()
-    - add sg_ll_get_performance() and sg_ll_set_cd_speed()
   - sg_verify: add --vrprotect= option
   - sg_vpd: add nominal form factor to block dev. char. VPD page
     - add --maxlen= option to set allocation length in cdb
   - sg_inq: add --maxlen= option that does same as --len=
-    - move version descriptors into sg_inq_data.c file
-    - update version descriptors to spc4r13
+    - move version descriptors (spc4r14) to sg_inq_data.c file
   - sg_inq+sg_vpd: logic for "NAA-3 Locally assigned" identifier
     - update extended inquiry VPD page
-  - sg_write_long: add examples section to man page
-  - sg_sat_phy_event: copied from examples directory and enhanced,
-    rename original to sg__sat_phy_event
+  - sg_modes: add --maxlen= option to specify allocation length
+  - sg_start: add '--noflush' and '--mod=PC_MOD' options (sbc3r14)
+  - sg_request: add a '--progress' option (similar to sg_turs)
+    - add --maxlen= option to set allocation length in cdb
   - sg_dd: improve MMC handling of 'illegal mode for this track'
     read errors (with ILI and info field)
-  - sg_modes: add --maxlen= option to specify allocation length
-  - sg_start: add '--noflush' and '--mod=PC_MOD' options (08-139r1)
-  - change 'long long' to int64_t and 'unsigned long long' to
-    uint64_t to stress that 64 bit integer wanted, not larger
-  - sg_request: add a '--progress' option (similar to sg_turs)
+  - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace
+    "%lld" and friends with PRI macros
   - sg_turs: add more to man page about '--progress' indication
-  - sg_lib: update asc/ascq code to spc4r13
-  - audit of dangerous 'u64 = uch[24] << 24' code, replace most
-    'unsigned long's
-  - utils/hxascdmp: add hxascdmp(1) man page
+  - sg_write_long: add examples section to man page
+  - sg_lib: update asc/ascq strings to spc4r14
     - split sg_lib into sg_lib_data.[hc] and sg_lib.[hc]
     - split sg_cmds_extra into sg_cmds_extra and sg_cmds_mmc
     - add osd2r03 service actions (all different from osd-r10)
     - add sg_get_trans_proto_str()
     - add sg_get_sense_filemark_eom_ili() function (MMC uses ILI)
     - add sense key specific unit attention condition queue
-      overflow decoding
-  - multiple documentation corrections provided by Dan Horak
+      overflow decoding (added in spc4r13)
   - sg_cmds_mmc: add sg_ll_set_streaming() function
+  - sg_cmds_extra: add vrprotect argument to sg_ll_verify10()
+    - add sg_ll_get_performance() and sg_ll_set_cd_speed()
+  - change 'long long' to int64_t and 'unsigned long long' to
+    uint64_t to stress that 64 bit integer wanted, not larger
+  - audit of dangerous 'u64 = uch[24] << 24' code, replace most
+    'unsigned long's
+  - multiple documentation corrections provided by Dan Horak
   - win32/MinGW: define SG3_UTILS_MINGW when detected
   - remove archive/pre_configure subdirectory
-  - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace
-    "%lld" and friends with PRI macros
   - move sg_io_linux.c into the lib subdirectory
+  - utils/hxascdmp: add hxascdmp(1) man page
 
 Changelog for sg3_utils-1.25 [20071016]
   - sg_stpg: new utility to Set Target Port Groups

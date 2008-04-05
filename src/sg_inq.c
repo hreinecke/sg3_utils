@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.75 20080313";    /* spc-4 rev 13 */
+static char * version_str = "0.76 20080404";    /* spc-4 rev 14 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1263,6 +1263,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
            !!(buff[6] & 0x1), !!(buff[7] & 0x1));
+    printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
 static void

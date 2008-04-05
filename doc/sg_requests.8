@@ -1,11 +1,11 @@
-.TH SG_REQUESTS "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_REQUESTS "8" "April 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_requests \- send one or more SCSI REQUEST SENSE commands
 .SH SYNOPSIS
 .B sg_requests
-[\fI\-\-desc\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-progress\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-time\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-desc\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-num=NUM\fR] [\fI\-\-progress\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR]
+[\fI\-\-time\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -24,13 +24,19 @@ sets the DESC bit in the REQUEST SENSE SCSI cdb. The \fIDEVICE\fR
 should return sense data in descriptor (rather than fixed) format. This
 will only occur if the \fIDEVICE\fR recognizes descriptor format (SPC\-3
 and later). If the device is pre SPC\-3 then setting a bit in a reserved
-field may cause a check condition status with an illegal request sense key.
+field may cause a check condition status with an illegal request sense key,
+but will most likely be ignored.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 output response in ASCII hexadecimal.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+where \fILEN\fR is the (maximum) response length in bytes. It is placed in the
+cdb's "allocation length" field. If not given (or \fILEN\fR is zero) then
+252 is used. The maximum value of \fILEN\fR is 255 (but SPC-4 recommends 252).
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 perform \fINUM\fR SCSI REQUEST SENSE commands, stopping when either \fINUM\fR
@@ -76,13 +82,13 @@ In SCSI 1 and 2 the REQUEST SENSE command was very important for error
 and warning processing in SCSI. The autosense capability rendered this
 command almost superfluous.
 .PP
-However recent SCSI drafts (e.g. SPC\-3 rev 23 and SBC\-2 rev 16) increase
+However recent SCSI drafts (e.g. SPC\-4 rev 14 and SBC\-3 rev 14) increase
 the utility of the REQUEST SENSE command. Idle and standby (low) power
 conditions can be detected with this command.
 .PP
 The REQUEST SENSE command is not marked as mandatory in SPC\-3 (i.e. for
 all SCSI devices) but is marked as mandatory in SBC\-2 (i.e. for disks),
-SSC\-3 (i.e. for tapes) and MMC\-4 (i.e. for CD/DVD drives).
+SSC\-3 (i.e. for tapes) and MMC\-4 (i.e. for CD/DVD/HD-DVD/BD drives).
 .PP
 The progress indication is optionally part of the sense data. When a prior
 command that takes a long time to complete (and typically precludes other

@@ -1,4 +1,4 @@
-.TH SG_GET_CONFIG "8" "February 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_GET_CONFIG "8" "April 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_get_config \- sends a SCSI GET CONFIGURATION command
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ sg_get_config \- sends a SCSI GET CONFIGURATION command
 .PP
 Sends a SCSI GET CONFIGURATION command to \fIDEVICE\fR and decodes the
 response. The response includes the features and profiles of the device.
-Typically these devices are CD and DVD players that may (but not
+Typically these devices are CD, DVD, HD-DVD and BD players that may (but not
 necessarily) have media in them. These devices may well be connected via
 ATAPI, USB or IEEE 1394 transports. In such cases they are "SCSI" devices
 only in the sense that they use the "Multi\-Media command" set (MMC).
@@ -24,9 +24,9 @@ section 5 on "Features and Profile for Multi_Media devices" for more
 information on specific feature parameters and profiles. The manufacturer's
 product manual may also be useful.
 .PP
-Since modern DVD writers support many features and profiles, the decoded
-output from this utility can be large. There are various ways to cut down
-the output. If the \fI\-\-brief\fR option is used only the feature names
+Since modern DVD and BD writers support many features and profiles, the
+decoded output from this utility can be large. There are various ways to cut
+down the output. If the \fI\-\-brief\fR option is used only the feature names
 are shown and the feature parameters are not decoded. Alternatively if only
 one feature is of interest then this combination of options is
 appropriate: "\-\-rt=2 \-\-starting=\fIFC\fR". Another possibility is to show
@@ -122,7 +122,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2007 Douglas Gilbert
+Copyright \(co 2004\-2008 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

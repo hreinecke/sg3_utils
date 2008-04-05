@@ -1,10 +1,10 @@
-.TH SG3_UTILS "8" "January 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG3_UTILS "8" "April 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
 .B sg_*
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -25,7 +25,7 @@ http://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
 of the diagram. SCSI commands in common with all device types can be found
 in SPC of which SPC\-4 is the latest major version. Block device specific
 commands (e.g.  as used by disks) are in SBC, those for tape drives in
-SSC and those for CD/DVD drives in MMC. 
+SSC and those for CD/DVD/HD_DVD/BD drives in MMC. 
 .PP
 There are two generations of command line option usage. The newer
 utilities (written since July 2004) use the getopt_long() function to parse
@@ -152,6 +152,19 @@ output the usage message then exit.
 \fB\-H\fR, \fB\-\-hex\fR
 for SCSI commands that yield a non\-trivial response, print out that
 response in ASCII hexadecimal.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
+lengths that vary depending on many factors, only some of which these
+utilities take into account. The maximum response length is typically
+specified in the 'allocation length' field of the cdb. In the absence of
+this option, several utilities use a default allocation length (sometimes
+recommended in the SCSI draft standards) or a "double fetch" strategy.
+See sg_logs(8) for its description of a "double fetch" strategy. These
+techniques are imperfect and in the presence of faulty SCSI targets can
+cause problems (e.g. some USB mass storage devices freeze if they receive
+an INQUIRY allocation length other than 36). Also use of this option
+disables any "double fetch" strategy that may have otherwise been used.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 for SCSI commands that yield a non\-trivial response, output that response
