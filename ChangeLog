@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080404]
+Changelog for sg3_utils-1.26 [20080406]
   - sg_sat_phy_event: new utility; copied from examples
     directory and enhanced, rename original to sg__sat_phy_event
   - sg_ses: sync with ses2r19b, many nomenclature changes
@@ -20,6 +20,7 @@ Changelog for sg3_utils-1.26 [20080404]
   - sg_start: add '--noflush' and '--mod=PC_MOD' options (sbc3r14)
   - sg_request: add a '--progress' option (similar to sg_turs)
     - add --maxlen= option to set allocation length in cdb
+  - sg_luns: add --maxlen= option to specify allocation length
   - sg_dd: improve MMC handling of 'illegal mode for this track'
     read errors (with ILI and info field)
   - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace
