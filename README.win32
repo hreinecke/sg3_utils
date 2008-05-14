@@ -131,6 +131,17 @@ Makefile.mingw respectively. The executables produced are console
 applications that can be executed in either a cygwin, MSYS or "cmd" shell.
 See the INSTALL file for more details.
 
+Binary and Text files
+=====================
+A problem has been reported with binary output being written in a MinGW
+environment (or executables build by MinGW). Windows has a concept of text
+and binary files which is not found in Unix. Recent versions of MinGW
+default to opening files in text mode. This can lead to binary output
+(such as when the '--raw' option is given) having 0xa (i.e. LF) translated
+to 0xd,0xa (i.e. CR,LF). sg3_utils version 1.26 attempts to fix this
+problem by changing what it knows to be binary output files to "binary
+mode" with the setmode() Windows command.
+
 
 Doug Gilbert
-2nd December 2007
+14th May 2008
