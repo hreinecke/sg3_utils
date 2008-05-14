@@ -48,7 +48,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static char * version_str = "0.24 20080327";
+static char * version_str = "0.24 20080513";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -617,6 +617,12 @@ main(int argc, char * argv[])
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
+    }
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {

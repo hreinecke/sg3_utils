@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.15 20080327";
+static char * version_str = "1.16 20080510";
 
 #define MAX_XFER_LEN 10000
 
@@ -255,7 +255,7 @@ main(int argc, char * argv[])
     else {
         got_stdout = (0 == strcmp(out_fname, "-")) ? 1 : 0;
         if (got_stdout)
-            outfd = 1;
+            outfd = STDOUT_FILENO;
         else {
             if ((outfd = open(out_fname, O_WRONLY | O_CREAT | O_TRUNC,
                               0666)) < 0) {
@@ -264,6 +264,10 @@ main(int argc, char * argv[])
                 perror(ebuff);
                 goto err_out;
             }
+        }
+        if (sg_set_binary_mode(outfd) < 0) {
+            perror("sg_set_binary_mode");
+            goto err_out;
         }
         res = write(outfd, readLongBuff, xfer_len);
         if (res < 0) {

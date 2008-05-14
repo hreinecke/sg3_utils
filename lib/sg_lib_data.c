@@ -33,7 +33,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.44 20080405";    /* spc-4 rev 14 */
+const char * sg_lib_version_str = "1.45 20080510";    /* spc-4 rev 14 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},

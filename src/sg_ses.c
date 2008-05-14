@@ -1620,8 +1620,11 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
         } else if (do_raw) {
             if (1 == do_raw)
                 dStrHex((const char *)rsp_buff + 4, rsp_len - 4, -1);
-            else
+            else {
+                if (sg_set_binary_mode(STDOUT_FILENO) < 0)
+                    perror("sg_set_binary_mode");
                 dStrRaw((const char *)rsp_buff, rsp_len);
+            }
         } else if (do_hex) {
             if (cp)
                 printf("Response in hex from diagnostic page: %s\n", cp);

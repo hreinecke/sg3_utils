@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2007 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2008 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.3.6 (2008-04-17)"
+#define SG_RAW_VERSION "0.3.7 (2008-05-10)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -71,7 +71,7 @@ version()
 {
     fprintf(stderr,
             "sg_raw " SG_RAW_VERSION "\n"
-            "Copyright (C) 2007 Ingo van Lil <inguin@gmx.de>\n"
+            "Copyright (C) 2007-2008 Ingo van Lil <inguin@gmx.de>\n"
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"
             "the GNU General Public License "
@@ -83,7 +83,7 @@ static void
 usage()
 {
     fprintf(stderr,
-            "Usage: sg_raw [OPTION] DEVICE CDB0 CDB1 ...\n"
+            "Usage: sg_raw [OPTION]* DEVICE CDB0 CDB1 ...\n"
             "\n"
             "Options:\n"
             "  -b, --binary           Dump data in binary form, even when "
@@ -94,8 +94,8 @@ usage()
             "  -k, --skip=LEN         Skip the first LEN bytes when reading "
             "data to send\n"
             "  -n, --nosense          Don't display sense information\n"
-            "  -o, --outfile=OFILE    Write data to OFILE (default: hexdump "
-            "to stdout)\n"
+            "  -o, --outfile=OFILE    Write binary data to OFILE (def: "
+            "hexdump to stdout)\n"
             "  -r, --request=RLEN     Request up to RLEN bytes of data\n"
             "  -s, --send=SLEN        Send SLEN bytes of data\n"
             "  -t, --timeout=SEC      Timeout in seconds (default: 20)\n"
@@ -314,14 +314,19 @@ write_dataout(const char *filename, unsigned char *buf, int len)
     int ret = SG_LIB_CAT_OTHER;
     int fd;
 
-    if (filename != NULL) {
+    if ((filename == NULL) ||
+        ((1 == strlen(filename)) && ('-' == filename[0])))
+        fd = STDOUT_FILENO;
+    else {
         fd = creat(filename, 0666);
         if (fd < 0) {
             perror(filename);
             goto bail;
         }
-    } else {
-        fd = STDOUT_FILENO;
+    }
+    if (sg_set_binary_mode(fd) < 0) {
+        perror("sg_set_binary_mode");
+        goto bail;
     }
 
     if (write(fd, buf, len) != len) {
@@ -440,8 +445,14 @@ main(int argc, char *argv[])
                 fprintf(stderr, "Received %d bytes of data:\n", data_len);
                 dStrHex((const char *)dxfer_buffer, data_len, 0);
             } else {
+                const char * cp = "stdout";
+
+                if (opts.datain_file && 
+                    ! ((1 == strlen(opts.datain_file)) &&
+                       ('-' == opts.datain_file[0])))
+                    cp = opts.datain_file;
                 fprintf(stderr, "Writing %d bytes of data to %s\n", data_len,
-                        opts.datain_file? opts.datain_file : "stdout");
+                        cp);
                 ret = write_dataout(opts.datain_file, dxfer_buffer, data_len);
                 if (ret != 0)
                     goto done;

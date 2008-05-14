@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.76 20080404";    /* spc-4 rev 14 */
+static char * version_str = "0.77 20080510";    /* spc-4 rev 14 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2581,6 +2581,12 @@ main(int argc, char * argv[])
         fprintf(stderr, "No DEVICE argument given\n");
         usage_for(&opts);
         return SG_LIB_SYNTAX_ERROR;
+    }
+    if (opts.do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = sg_cmds_open_device(opts.device_name, 1 /* ro */,

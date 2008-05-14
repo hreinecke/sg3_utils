@@ -1,10 +1,10 @@
-.TH SG_GET_CONFIG "8" "April 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_GET_CONFIG "8" "May 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_get_config \- sends a SCSI GET CONFIGURATION command
 .SH SYNOPSIS
 .B sg_get_config
 [\fI\-\-brief\fR] [\fI\-\-current\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-inner\-hex\fR] [\fI\-\-list\fR] [\fI\-\-rt=RT\fR]
+[\fI\-\-inner\-hex\fR] [\fI\-\-list\fR] [\fI\-\-raw\fR] [\fI\-\-rt=RT\fR]
 [\fI\-\-starting=FC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
@@ -79,6 +79,11 @@ yields an "illegal field in cdb" error). To simplify the meanings of the
 .br
   \fB3\fR : reserved
 .br
+.TP
+\fB\-R\fR, \fB\-\-raw\fR
+output response in binary (to stdout). Note that the short form is \fI\-R\fR
+unlike most other utilities in this package that use \fI\-r\fR for this
+action.
 .TP
 \fB\-s\fR, \fB\-\-starting\fR=\fIFC\fR
 where \fIFC\fR is the feature code value. This option works closely with
