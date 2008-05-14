@@ -1,4 +1,4 @@
-.TH SG_RAW "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_RAW "8" "May 2008" "sg3_utils\-1.26" SG3_UTILS
 .SH NAME
 sg_raw \- sends an arbitrary SCSI command (with an optional data phase) to a
 device
@@ -37,9 +37,10 @@ is ignored if \fB\-\-send\fR is not specified.
 Don't display SCSI Sense information.
 .TP
 \fB\-o\fR, \fB\-\-outfile\fR=\fIOFILE\fR
-Write data received from the \fIDEVICE\fR to \fIOFILE\fR. By default,
-data is dumped in hex format to stdout. This option is ignored if
-\fB\-\-request\fR is not specified.
+Write data received from the \fIDEVICE\fR to \fIOFILE\fR. The data is
+written in binary. By default, data is dumped in hex format to stdout.
+If \fIOFILE\fR is '-' then data is dumped in binary to stdout.
+This option is ignored if \fB\-\-request\fR is not specified.
 .TP
 \fB\-r\fR, \fB\-\-request\fR=\fIRLEN\fR
 Expect to receive up to \fIRLEN\fR bytes of data from the \fIDEVICE\fR.
@@ -90,7 +91,7 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2007 Ingo van Lil
+Copyright \(co 2001\-2008 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

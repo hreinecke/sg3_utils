@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.34 20080327";    /* mmc6r01 */
+static char * version_str = "0.35 20080510";    /* mmc6r01 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -66,6 +66,7 @@ static struct option long_options[] = {
         {"hex", 0, 0, 'H'},
         {"inner-hex", 0, 0, 'i'},
         {"list", 0, 0, 'l'},
+        {"raw", 0, 0, 'R'},
         {"rt", 1, 0, 'r'},
         {"starting", 1, 0, 's'},
         {"verbose", 0, 0, 'v'},
@@ -80,10 +81,10 @@ usage()
     fprintf(stderr,
             "Usage:  sg_get_config [--brief] [--current] [--help] [--hex] "
             "[--inner-hex]\n"
-            "                      [--list] [--rt=RT] [--starting=FC] "
-            "[--verbose]\n"
-            "                      [--version] DEVICE\n"
-            "  where\n"
+            "                      [--list] [--raw] [--rt=RT] "
+            "[--starting=FC]\n"
+            "                      [--verbose] [--version] DEVICE\n"
+            "  where:\n"
             "    --brief|-b       only give feature names of DEVICE "
             "(don't decode)\n"
             "    --current|-c     equivalent to '--rt=1' (show "
@@ -94,6 +95,7 @@ usage()
             "features in hex\n"
             "    --list|-l        list all known features + profiles "
             "(ignore DEVICE)\n"
+            "    --raw|-R         output in binary (to stdout)\n"
             "    --rt=RT|-r RT    default value is 0\n"
             "                     0 -> all feature descriptors (regardless "
             "of currency)\n"
@@ -244,6 +246,15 @@ get_feature_str(int feature_num, char * buff)
     }
     snprintf(buff, 64, "0x%x", feature_num);
     return buff;
+}
+
+static void
+dStrRaw(const char * str, int len)
+{
+    int k;
+
+    for (k = 0 ; k < len; ++k)
+        printf("%c", str[k]);
 }
 
 static void
@@ -880,17 +891,17 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
     char buff[128];
 
     if (max_resp_len < len) {
-        printf("<<<warning: response to long for buffer, resp_len=%d>>>\n",
-               len);
+        fprintf(stderr, "<<<warning: response to long for buffer, "
+                "resp_len=%d>>>\n", len);
             len = max_resp_len;
     }
     if (len < 8) {
-        printf("response length too short: %d\n", len);
+        fprintf(stderr, "response length too short: %d\n", len);
         return;
     }
     curr_profile = (resp[6] << 8) + resp[7];
     if (0 == curr_profile)
-        printf("No current profile\n");
+        fprintf(stderr, "No current profile\n");
     else
         printf("Current profile: %s\n", get_profile_str(curr_profile, buff));
     printf("Features%s:\n", (brief ? " (in brief)" : ""));
@@ -940,9 +951,10 @@ main(int argc, char * argv[])
     int sg_fd, res, c, len;
     int peri_type = 0;
     int brief = 0;
-    int hex = 0;
+    int do_hex = 0;
     int inner_hex = 0;
     int list = 0;
+    int do_raw = 0;
     int rt = 0;
     int starting = 0;
     int verbose = 0;
@@ -955,7 +967,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bchHilr:s:vV", long_options,
+        c = getopt_long(argc, argv, "bchHilr:Rs:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -972,7 +984,7 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'H':
-            hex = 1;
+            ++do_hex;
             break;
         case 'i':
             inner_hex = 1;
@@ -986,6 +998,9 @@ main(int argc, char * argv[])
                 fprintf(stderr, "bad argument to '--rt'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'R':
+            ++do_raw;
             break;
         case 's':
             starting = sg_get_num(optarg);
@@ -1035,14 +1050,17 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
-        printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
-               inq_resp.revision);
+        if (0 == do_raw)
+            printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
+                   inq_resp.revision);
         peri_type = inq_resp.peripheral_type;
         cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
-        if (strlen(cp) > 0)
-            printf("  Peripheral device type: %s\n", cp);
-        else
-            printf("  Peripheral device type: 0x%x\n", peri_type);
+        if (0 == do_raw) {
+            if (strlen(cp) > 0)
+                printf("  Peripheral device type: %s\n", cp);
+            else
+                printf("  Peripheral device type: 0x%x\n", peri_type);
+        }
     } else {
         fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
                 device_name);
@@ -1055,6 +1073,12 @@ main(int argc, char * argv[])
         fprintf(stderr, ME "open error (rw): %s\n", safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
 
     res = sg_ll_get_config(sg_fd, rt, starting, resp_buffer, 
                               sizeof(resp_buffer), 1, verbose);
@@ -1062,11 +1086,13 @@ main(int argc, char * argv[])
     if (0 == res) {
         len = (resp_buffer[0] << 24) + (resp_buffer[1] << 16) +
               (resp_buffer[2] << 8) + resp_buffer[3] + 4;
-        if (hex) {
+        if (do_hex) {
             if (len > (int)sizeof(resp_buffer))
                 len = sizeof(resp_buffer);
             dStrHex((const char *)resp_buffer, len, 0);
-        } else
+        } else if (do_raw)
+            dStrRaw((const char *)resp_buffer, len);
+        else
             decode_config(resp_buffer, sizeof(resp_buffer), len, brief,
                           inner_hex);
     } else if (SG_LIB_CAT_INVALID_OP == res)

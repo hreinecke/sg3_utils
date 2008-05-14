@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -64,7 +64,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.05 20071202";
+static char * version_str = "1.06 20080513";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -361,6 +361,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "missing device name!\n");
         usage();
         return 1;
+    }
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,

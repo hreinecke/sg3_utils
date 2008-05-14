@@ -2,13 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080406]
+Changelog for sg3_utils-1.26 [20080513]
   - sg_sat_phy_event: new utility; copied from examples
     directory and enhanced, rename original to sg__sat_phy_event
   - sg_ses: sync with ses2r19b, many nomenclature changes
   - sg_get_config: sync with mmc6r01
     - allow Microcode upgrade and DVD read feature descriptors
       to be 4 bytes long
+    - add '--raw' option
   - sg_verify: add --vrprotect= option
   - sg_vpd: add nominal form factor to block dev. char. VPD page
     - add --maxlen= option to set allocation length in cdb
@@ -27,6 +28,8 @@ Changelog for sg3_utils-1.26 [20080406]
     "%lld" and friends with PRI macros
   - sg_turs: add more to man page about '--progress' indication
   - sg_write_long: add examples section to man page
+  - '--raw' modify utilities that can send binary output to
+    call sg_set_binary_mode(). For MingGW port CR problem.
   - sg_lib: update asc/ascq strings to spc4r14
     - split sg_lib into sg_lib_data.[hc] and sg_lib.[hc]
     - split sg_cmds_extra into sg_cmds_extra and sg_cmds_mmc
@@ -35,6 +38,8 @@ Changelog for sg3_utils-1.26 [20080406]
     - add sg_get_sense_filemark_eom_ili() function (MMC uses ILI)
     - add sense key specific unit attention condition queue
       overflow decoding (added in spc4r13)
+    - add sg_set_text_mode() and sg_set_binary_mode() functions
+      for non-Unix OSes
   - sg_cmds_mmc: add sg_ll_set_streaming() function
   - sg_cmds_extra: add vrprotect argument to sg_ll_verify10()
     - add sg_ll_get_performance() and sg_ll_set_cd_speed()

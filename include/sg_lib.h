@@ -36,7 +36,8 @@
  * The intention is to keep this file and the related sg_lib.c file
  * as open source and encourage their unencumbered use.
  *
- * Current version number is in the sg_lib.c file.
+ * Current version number is in the sg_lib.c file and can be accessed
+ * with the sg_lib_version() function.
  */
 
 
@@ -365,6 +366,18 @@ extern int sg_get_num_nomult(const char * buf);
 extern int64_t sg_get_llnum(const char * buf);
 
 extern const char * sg_lib_version();
+
+
+/* <<< Architectural support functions [is there a better place?] >>> */
+
+/* Non Unix OSes distinguish between text and binary files.
+   Set text mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+extern int sg_set_text_mode(int fd);
+
+/* Set binary mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+extern int sg_set_binary_mode(int fd);
 
 #ifdef __cplusplus
 }

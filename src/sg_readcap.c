@@ -362,6 +362,12 @@ int main(int argc, char * argv[])
         usage_for(&opts);
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (opts.do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
 
     memset(resp_buff, 0, sizeof(resp_buff));
 

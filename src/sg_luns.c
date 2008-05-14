@@ -48,7 +48,7 @@
  * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
  */
 
-static char * version_str = "1.13 20080406";
+static char * version_str = "1.14 20080510";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN MAX_RLUNS_BUFF_LEN
@@ -312,6 +312,12 @@ main(int argc, char * argv[])
     }
     if (0 == maxlen)
         maxlen = DEF_RLUNS_BUFF_LEN;
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {

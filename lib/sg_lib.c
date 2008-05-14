@@ -1568,3 +1568,39 @@ sg_lib_version()
 {
     return sg_lib_version_str;
 }
+
+
+#ifdef SG3_UTILS_MINGW
+/* Non Unix OSes distinguish between text and binary files.
+   Set text mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+int
+sg_set_text_mode(int fd)
+{
+    return setmode(fd, O_TEXT);
+}
+
+/* Set binary mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+int
+sg_set_binary_mode(int fd)
+{
+    return setmode(fd, O_BINARY);
+}
+
+#else
+/* For Unix the following functions are dummies. */
+int
+sg_set_text_mode(int fd)
+{
+    return fd;  /* fd should be >= 0 */
+}
+
+int
+sg_set_binary_mode(int fd)
+{
+    return fd;
+}
+
+#endif
+

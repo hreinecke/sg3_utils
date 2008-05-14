@@ -25,7 +25,7 @@
    
 */
 
-static char * version_str = "0.80 20080227";    /* SPC-4 revision 12 */
+static char * version_str = "0.81 20080510";    /* SPC-4 revision 12 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -3163,6 +3163,12 @@ main(int argc, char * argv[])
         fprintf(stderr, "No DEVICE argument given\n");
         usage_for(&opts);
         return SG_LIB_SYNTAX_ERROR;
+    }
+    if (opts.do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = sg_cmds_open_device(opts.device_name, 0 /* rw */,

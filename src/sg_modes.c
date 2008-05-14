@@ -995,6 +995,13 @@ main(int argc, char * argv[])
             opts.do_examine))
         opts.do_all = 1;
 
+    if (opts.do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
+
     if ((sg_fd = sg_cmds_open_device(opts.device_name, 1 /* ro */,
                                      opts.do_verbose)) < 0) {
         fprintf(stderr, "error opening file: %s: %s\n",
