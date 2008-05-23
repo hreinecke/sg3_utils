@@ -36,7 +36,9 @@ The script files that drive the autotools build are configure.ac and
 Makefile.am . There is an instance of Makefile.am found in the main directory
 and the 'lib', 'include', 'src' and 'doc' subdirectories. If any of these
 files are changed, the 'autogen.sh' script in the main directory should be
-run.
+run. The libtool command is required and if it is not present the
+autoconf utility within the 'autogen.sh' script may fail with this error
+message: "undefined macro: AC_PROG_LIBTOOL".
 
 Note that only the utilities in the 'src' subdirectory are build by
 the './configure' infrastructure. Code in the 'examples', 'utils'
@@ -139,4 +141,4 @@ extension and can be executed in a MSYS or "cmd" shell.
 
 
 Doug Gilbert
-18th February 2008
+18th May 2008

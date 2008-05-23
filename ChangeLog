@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080514]
+Changelog for sg3_utils-1.26 [20080523]
   - sg_sat_phy_event: new utility; copied from examples
     directory and enhanced, rename original to sg__sat_phy_event
   - sg_ses: sync with ses2r19b, many nomenclature changes
@@ -52,6 +52,8 @@ Changelog for sg3_utils-1.26 [20080514]
   - remove archive/pre_configure subdirectory
   - move sg_io_linux.c into the lib subdirectory
   - utils/hxascdmp: add hxascdmp(1) man page
+  - switch primary build to ubuntu environment, rename
+    library to libsgutils2 to avoid clash
 
 Changelog for sg3_utils-1.25 [20071016]
   - sg_stpg: new utility to Set Target Port Groups

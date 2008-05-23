@@ -73,7 +73,7 @@ binary-arch: build install
 	dh_fixperms -a
 	dh_makeshlibs -V -v
 	dh_installdeb -a
-	dh_shlibdeps -ldebian/tmp/usr/lib -L libsgutils1
+	dh_shlibdeps -ldebian/tmp/usr/lib -L libsgutils2
 	dh_gencontrol -a
 	dh_md5sums -a
 	dh_builddeb -a

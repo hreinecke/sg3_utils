@@ -67,7 +67,7 @@ Description: Collection of Linux utilities for devices that use the
  It also includes source code for some example programs that demonstrate
  how to use the scsi generic driver.
 
-Package: libsgutils1
+Package: libsgutils2
 Section: libs
 Depends: ${shlibs:Depends}
 Conflicts: libsgutils-1-0
@@ -76,10 +76,10 @@ Recommends: sg3-utils
 Description: Utilities for working with generic SCSI devices (shared libraries)
  This package contains the shared libraries that allow other programs to use it.
 
-Package: libsgutils1-dev
+Package: libsgutils2-dev
 Section: devel
 Architecture: any
-Depends: libsgutils1, ${shlibs:Depends}
+Depends: libsgutils2, ${shlibs:Depends}
 Recommends: sg3-utils
 Description: Utilities for working with generic SCSI devices (developer files)
  This package contains the <scsi/sg_cmds.h> , <scsi/sg_cmds_basic.h> ,
