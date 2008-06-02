@@ -1,0 +1,88 @@
+Source: sg3-utils
+Section: admin
+Priority: optional
+Maintainer: Eric Schwartz (Skif) <emschwar@debian.org>
+Build-Depends: debhelper (>> 4.0.0), chrpath, libtool
+Standards-Version: 3.7.2
+
+Package: sg3-utils
+Architecture: any
+Depends: ${shlibs:Depends}
+Conflicts: sg-utils, cdwrite
+Replaces: sg-utils
+Description: Collection of Linux utilities for devices that use the
+ SCSI command set. See the README, ChangeLog and COVERAGE files.
+ .
+ Requires the linux kernel 2.4 series or later. In the 2.4 series
+ SCSI generic device names (e.g. /dev/sg0) must be used. In the 2.6
+ series other device names may be used as well (e.g. /dev/sda).
+ .
+ The package includes:
+     * sg_dd - a variant of 'dd' that works at the SCSI command level
+     * sg_emc_trespass - vendor specific for Clariion hardware
+     * sg_format - format SCSI disks
+     * sg_get_config - get features and profiles of MMC devices
+     * sg_ident - report and set device identifiers
+     * sginfo - a re-porting of the 'scsiinfo' program, updated
+     * sg_inq - a utility for poking around with the SCSI INQUIRY command
+     * sg_logs - prints out log sense pages
+     * sg_luns - prints out REPORT LUNS response
+     * sg_map - shows the mapping between SCSI devices and sg devices
+     * sg_map26 - map primary device node to generic node (lk 2.6 only)
+     * sgm_dd - like sg_dd, but uses mmap()'d IO
+     * sg_modes - prints out mode sense pages
+     * sg_opcodes - reports supported opcodes and task management fcns
+     * sgp_dd - like sg_dd, only multithreaded
+     * sg_persist - accesses the Persistent Reservation In and Out commands
+     * sg_prevent - issues PREVENT ALLOW MEDIUM REMOVAL command (MMC + SSC)
+     * sg_raw - send arbitrary SCSI commands
+     * sg_rbuf - tests SCSI bus speed
+     * sg_rdac - vendor specific for RDAC hardware
+     * sg_read - reads multiple blocks, useful for timing
+     * sg_read_buffer - READ BUFFER
+     * sg_read_long - read a "long" block from the given device
+     * sg_readcap - prints the output of a READ CAPACITY command
+     * sg_reassign - issues a REASSIGN BLOCKS command (map out bad sectors)
+     * sg_requests - issues a REQUEST SENSE command (event polling)
+     * sg_reset - exercises SCSI device/bus/host reset capability
+     * sg_rmsn - READ SERIAL SERIAL NUMBER
+     * sg_rtpg - REPORT TARGET PORT GROUPS
+     * sg_safte - fetch enclosure status from a SAF-TE processor
+     * sg_sat_identify - ATA IDENTIFY (PACKET) DEVICE via SATL
+     * sg_sat_set_features - ATA SET FEATURES via SATL
+     * sg_scan - displays the SCSI bus on stdout
+     * sg_senddiag - runs SCSI self tests
+     * sg_ses - fetches status and send control to a SES device
+     * sg_start - spins up (or down) disks and optical drives
+     * sg_stpg - SET TARGET PORT GROUPS
+     * sg_sync - issues a SYNCHRONIZE CACHE command
+     * sg_test_rwbuf - tests the SCSI host adapter
+     * sg_turs - execute a TEST UNIT READY command on the given device
+     * sg_verify - issues VERIFY command on SCSI disks
+     * sg_vpd - utility for decoding VPD pages
+     * sg_write_buffer - WRITE BUFFER, may be used to load firmware
+     * sg_write_long - write a "long" block to the given device
+     * sg_wr_mode - low level utility to change mode pages
+ .
+ It also includes source code for some example programs that demonstrate
+ how to use the scsi generic driver.
+
+Package: libsgutils1
+Section: libs
+Depends: ${shlibs:Depends}
+Conflicts: libsgutils-1-0
+Architecture: any
+Recommends: sg3-utils
+Description: Utilities for working with generic SCSI devices (shared libraries)
+ This package contains the shared libraries that allow other programs to use it.
+
+Package: libsgutils1-dev
+Section: devel
+Architecture: any
+Depends: libsgutils1, ${shlibs:Depends}
+Recommends: sg3-utils
+Description: Utilities for working with generic SCSI devices (developer files)
+ This package contains the <scsi/sg_cmds.h> , <scsi/sg_cmds_basic.h> ,
+ <scsi/sg_cmds_extra.h> , <scsi/sg_lib.h> , <scsi/sg_linux_inc.h> and
+ <scsi/sg_io_linux.h> header files, the /usr/lib/libsgutils.a static library
+ plus other assorted development tidbits.

@@ -1,0 +1,142 @@
+                   Installing this package
+                   -----------------------
+
+Introduction
+============
+During the development of sg3_utils version 1.25 this package was changed to
+use autotools. Prior to version 1.25 it used handed crafted Makefiles. Also
+the relatively flat directory structure was made deeper in version 1.25. Now
+each utility's main source file is found in the 'src' subdirectory. That
+code typically depends on header files now placed in the 'include'
+subdirectory and library code placed in the 'lib' subdirectory. The man page
+code for each utility has been moved to the 'doc' subdirectory.
+
+In most cases the build process is now:
+  a) fetch the source tarball, untar it and go to the top level directory,
+     then do
+  b) ./configure
+  c) make
+  d) make install
+
+Step d) usually requires root permissions. Notes specific to supported
+architectures are given below. If the architecture supports shared libraries
+(in Unix/Linux) then the default './configure' generates a Makefile that will
+build executables that use a shared library. The name of that shared library
+starts with 'libsgutils'. To build without that shared library use this
+invocation instead of step b): './configure --disable-shared' .
+
+The default prefix for './configure' is "/usr/local". This means that by
+default 'make install' will place the executables in "/usr/local/bin". To
+change this, for example to drop the "local", use an invocation like
+this: './configure --prefix=/usr' . To check that the code compiles clean
+as C++ (with g++) step b) may be changed to "./configure CC=g++". See the
+output of './configure --help' for more information about build options.
+
+The script files that drive the autotools build are configure.ac and
+Makefile.am . There is an instance of Makefile.am found in the main directory
+and the 'lib', 'include', 'src' and 'doc' subdirectories. If any of these
+files are changed, the 'autogen.sh' script in the main directory should be
+run.
+
+Note that only the utilities in the 'src' subdirectory are build by
+the './configure' infrastructure. Code in the 'examples', 'utils'
+and 'archives' directories can be built with simple Makefiles which are
+typically found in those directories.
+
+
+Linux
+=====
+A "spec" file is included for building rpm packages. It is called
+sg3_utils.spec . To build binary and source rpms place a copy of the gzipped
+tarball in the "SOURCES" directory and place a copy of sg3_utils.spec in the
+"SPEC" directory. These directories are found under /usr/src/redhat in
+redhat/fedora distributions. Then from the "SPEC" directory execute
+"rpmbuild -ba sg3_utils.spec". If all goes well a source rpm should be found
+in the SRPMS directory and binary rpms in the RPMS/i386 directory (for i386
+architecture). Note the spec file will only build those utilities found in
+the main directory. When the sg3_utils binary rpm is installed the executables
+and their associated man pages should be placed in appropriate places. The
+sg3_utils.spec file also builds a libsgutils shared object (shared library)
+and a libsgutils-*-devel shared object with a static library and the sg_lib.h,
+sg_cmds.h sg_cmds_basic.h, sg_cmds_mmc.h, sg_cmds_extra.h and sg_pt.h header
+files.
+
+Binary rpms (at least in the RedHat distribution) tend to install
+executables in /usr/bin and libraries in /usr/lib .
+
+To build debian "deb" (binary) packages, first untar the tarball, then
+change directory to the top level within the sg3_utils source. Then:
+ # chmod +x debian/rules
+ # dpkg-buildpackage -b -rfakeroot
+The binary deb packages will be placed in the parent directory (of
+the sg3_utils source directory) if all goes well. There is now
+a script called build_debian.sh in the main directory which invokes
+those two commands.
+
+
+FreeBSD
+=======
+In FreeBSD, the utilities can be built and installed as shown in the
+Introduction section above.
+
+Utilities that are linux specific (e.g. sg_map) are not built for
+FreeBSD. See the "bin_PROGRAMS" definition within the OS_FREEBSD
+conditional of the various Makefile.am files for a definitive list.
+
+
+Solaris
+=======
+In Solaris, the utilities can be built and installed as shown in the
+Introduction section above.
+
+Utilities that are linux specific (e.g. sg_map) are not built for
+Solaris. See the "bin_PROGRAMS" definition within the OS_SOLARIS
+conditional of the various Makefile.am files for a definitive list.
+
+
+Tru64 (OSF)
+===========
+In Tru64 (OSF), the utilities can be built and installed as shown in the
+Introduction section above.
+
+Utilities that are linux specific (e.g. sg_map) are not built for
+Tru64. See the "bin_PROGRAMS" definition within the OS_OSF
+conditional of the various Makefile.am files for a definitive list.
+
+
+Windows
+=======
+In Windows only the Windows NT, 2000, 2003, XP and Vist operating systems
+(and their variants) are currently supported. The various device names that
+the sg3_utils utilities will accept in Windows can be seen by running the
+sg_scan utility (and perhaps looking at its man page (i.e. sg_scan.8 or
+sg_scan.8w)).
+
+The source tarball can be built in a cygwin or MinGW environment on Windows.
+
+For cygwin see http://www.cygwin.com for more information. Various extras
+such as 'gcc' (the GNU C compiler) and 'make' need to be loaded as they are
+not in the minimal cygwin default distribution. The utilities can be built
+and installed as shown in the Introduction section above. Utilities that
+are linux specific (e.g. sg_map) are not built for cygwin. See the
+"bin_PROGRAMS" definition within the OS_CYGWIN conditional of the various
+Makefile.am files for a definitive list. Currently the make doesn't build a
+dll (cf shared libraries are built on Linux and FreeBSD) so the executable
+files are bigger than they need to be. Once built, the various ".exe"
+commands can either be executed in a cygwin shell (typically "bash") or a
+DOS shell. If cygwin has not been installed on the target machine then
+the "cygwin1.dll" (obtained from http://www.cygwin.com ) is required.
+
+There is also the "Minimalist Gnu for Windows" (MinGW) and its associated
+shell (MSYS) that can serve as a build environment for sg3_utils. This
+removes the dependence on the proprietary cygwin1.dll at the expense
+of some timing features. In a MSYS shell the utilities can be built
+and installed as shown in the Introduction section above. Utilities that
+are linux specific (e.g. sg_map) are not built for MinGW. See the
+"bin_PROGRAMS" definition within the OS_MINGW conditional of the
+Makefile.am file for a definitive list. The executables have a '.exe'
+extension and can be executed in a MSYS or "cmd" shell.
+
+
+Doug Gilbert
+18th February 2008

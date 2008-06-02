@@ -1,0 +1,115 @@
+.TH SG_REQUESTS "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.SH NAME
+sg_requests \- send one or more SCSI REQUEST SENSE commands
+.SH SYNOPSIS
+.B sg_requests
+[\fI\-\-desc\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-progress\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-time\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send SCSI REQUEST SENSE command to \fIDEVICE\fR and output the parameter
+data response which is expected to be in sense data format. Both fixed
+and descriptor sense data formats are supported.
+.PP
+Multiple REQUEST SENSE commands can be sent with the \fI\-\-num=NUM\fR
+option. This can be used for timing purposes or monitoring the progress
+indication.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-d\fR, \fB\-\-desc\fR
+sets the DESC bit in the REQUEST SENSE SCSI cdb. The \fIDEVICE\fR
+should return sense data in descriptor (rather than fixed) format. This
+will only occur if the \fIDEVICE\fR recognizes descriptor format (SPC\-3
+and later). If the device is pre SPC\-3 then setting a bit in a reserved
+field may cause a check condition status with an illegal request sense key.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output response in ASCII hexadecimal.
+.TP
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
+perform \fINUM\fR SCSI REQUEST SENSE commands, stopping when either \fINUM\fR
+is reached or an error occurs. The default value for \fINUM\fR is 1 .
+.TP
+\fB\-p\fR, \fB\-\-progress\fR
+show progress indication (a percentage) if available. If \fI\-\-number=NUM\fR
+is given, \fINUM\fR is greater than 1 and an initial progress indication
+was detected then this utility waits 30 seconds before subsequent checks.
+Exits when \fINUM\fR is reached or there are no more progress indications.
+Ignores \fI\-\-hex\fR, \fI\-\-raw\fR and \fI\-\-time\fR options. See
+NOTES section below.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output response in binary (to stdout).
+.TP
+\fB\-s\fR, \fB\-\-status\fR
+if the REQUEST SENSE command finished without error (as indicated by its
+SCSI status) then the contents of the parameter data are analysed as
+sense data and the exit status is set accordingly. The default
+action (i.e. when this option is not given) is to ignore the contents
+of the parameter data for the purposes of setting the exit status.
+Some types of error set a sense key of "NO SENSE" with non\-zero
+information in the additional sense code (e.g. the FAILURE PREDICTION
+THRESHOLD EXCEEDED group of codes); this results in an exit status
+value of 10. If the sense key is "NO SENSE" and both asc and ascq are
+zero then the exit status is set to 0 . See the sg3_utils(8) man page
+for exit status values.
+.TP
+\fB\-t\fR, \fB\-\-time\fR
+time the SCSI REQUEST SENSE command(s) and calculate the average number
+of operations per second.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+Additionally the response (if received) is output in ASCII\-HEX. Use
+this option multiple times for greater verbosity.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+In SCSI 1 and 2 the REQUEST SENSE command was very important for error
+and warning processing in SCSI. The autosense capability rendered this
+command almost superfluous.
+.PP
+However recent SCSI drafts (e.g. SPC\-3 rev 23 and SBC\-2 rev 16) increase
+the utility of the REQUEST SENSE command. Idle and standby (low) power
+conditions can be detected with this command.
+.PP
+The REQUEST SENSE command is not marked as mandatory in SPC\-3 (i.e. for
+all SCSI devices) but is marked as mandatory in SBC\-2 (i.e. for disks),
+SSC\-3 (i.e. for tapes) and MMC\-4 (i.e. for CD/DVD drives).
+.PP
+The progress indication is optionally part of the sense data. When a prior
+command that takes a long time to complete (and typically precludes other
+media access commands) is still underway, the progress indication can be used
+to determine how long before the device returns to its normal state.
+.PP
+The SCSI FORMAT command for disks used with the IMMED bit set is an example
+of an operation that takes a significant amount of time and precludes other
+media access during that time. The IMMED bit set instructs the FORMAT command
+to return control to the application client once the format has commenced (see
+SBC-3). Several long duration SCSI commands associated with tape drives also
+use the progress indication (see SSC-3).
+.PP
+Early standards suggested that the SCSI TEST UNIT READY command be used for
+polling the progress indication. More recent standards seem to suggest
+the SCSI REQUEST SENSE command should be used instead.
+.SH EXIT STATUS
+The exit status of sg_requests is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004\-2008 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg3_utils

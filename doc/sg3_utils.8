@@ -1,0 +1,185 @@
+.TH SG3_UTILS "8" "January 2008" "sg3_utils\-1.26" SG3_UTILS
+.SH NAME
+sg3_utils \- a package of utilities for sending SCSI commands
+.SH SYNOPSIS
+.B sg_*
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg3_utils is a package of utilities that send SCSI commands to the given
+\fIDEVICE\fR via a SCSI pass through interface provided by the host
+operating system.
+.PP
+The names of all utilities start with "sg" and most start with "sg_" often
+followed by the name, or a shortening of the name, of the SCSI command that
+they send. For example the "sg_verify" utility sends the SCSI VERIFY
+command. A mapping between SCSI commands and the sg3_utils utilities that
+issue them is shown in the COVERAGE file.
+.PP
+SCSI draft standards can be found at http://www.t10.org . The standards
+themselves can be purchased from ANSI and other standards organizations.
+A good overview of various SCSI standards can be seen in
+http://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
+of the diagram. SCSI commands in common with all device types can be found
+in SPC of which SPC\-4 is the latest major version. Block device specific
+commands (e.g.  as used by disks) are in SBC, those for tape drives in
+SSC and those for CD/DVD drives in MMC. 
+.PP
+There are two generations of command line option usage. The newer
+utilities (written since July 2004) use the getopt_long() function to parse
+command line options. With that function, each option has two representations:
+a short form (e.g. '\-v') and a longer form (e.g. '\-\-verbose'). If an
+argument is required then it follows a space (optionally) in the short form
+and a "=" in the longer form (e.g. in the sg_verify utility '\-l 2a6h'
+and '\-\-lba=2a6h' are equivalent). Note that with getopt_long(), short form
+options can be elided, for example: '\-all' is equivalent to '\-a \-l \-l'.
+The \fIDEVICE\fR argument may appear after, between or prior to any options.
+.PP
+The older utilities, such as sg_inq, had individual command line processing
+code (often found at the top of the main() function) based on a single "\-"
+followed by one or more characters. If an argument is needed then it follows
+a "=" (e.g. '\-p=1f' in sg_modes with its older interface). Various options
+can be elided as long as it is not ambiguous (e.g. '\-vv' to increase the
+verbosity).
+.PP
+Over time the command line interface of these older utilities became messy
+and overloaded with options. So in sg3_utils version 1.23 the command line
+interface of these older utilities was altered to have both a cleaner
+getopt_long() interface and their older interface for backward compatibility.
+By default these older utilities use their getopt_long() based interface.
+That can be overridden by defining the SG3_UTILS_OLD_OPTS environment
+variable or using '\-O' or '\-\-old' as the first command line option. The
+man pages of the older utilities documents the details.
+.PP
+Several sg3_utils utilities are based on the Unix dd command (e.g. sg_dd)
+and share dd's rather quirky command line interface.
+.SH EXIT STATUS
+To aid scripts that call these utilities, the exit status is set to indicate
+success (0) or failure (1 or more). Note that some of the lower values
+correspond to the SCSI sense key values. The exit status values are:
+.TP
+.B 0
+success
+.TP
+.B 1
+syntax error. Either illegal command line options, options with bad
+arguments or a combination of options that is not permitted.
+.TP
+.B 2
+the \fIDEVICE\fR reports that it is not ready for the operation
+requested. The device may be in the process of becoming ready (e.g.
+spinning up but not at speed) so the utility may work after a wait.
+.TP
+.B 3
+the \fIDEVICE\fR reports a medium or hardware error (or a blank check). For
+example an attempt to read a corrupted block on a disk will yield this value.
+.TP
+.B 5
+the \fIDEVICE\fR reports an "illegal request" with an additional sense code
+other than "invalid command operation code". This is often a supported
+command with a field set requesting an unsupported capability. For commands
+that require a "service action" field this value can indicate that the
+command with that service action value is not supported.
+.TP
+.B 6
+the \fIDEVICE\fR reports a "unit attention" condition. This usually indicates
+that something unrelated to the requested command has occurred (e.g. a device
+reset) potentially before the current SCSI command was sent. The requested
+command has not been executed by the device. Note that unit attention
+conditions are usually only reported once by a device.
+.TP
+.B 9
+the \fIDEVICE\fR reports an illegal request with an additional sense code
+of "invalid command operation code" which means that it doesn't support the
+requested command.
+.TP
+.B 11
+the \fIDEVICE\fR reports an aborted command. In some cases aborted
+commands can be retried immediately (e.g. if the transport aborted
+the command due to congestion).
+.TP
+.B 15
+the utility is unable to open, close or use the given \fIDEVICE\fR.
+The given file name could be incorrect or there may be permission
+problems. Adding the '\-v' option may give more information.
+.TP
+.B 20
+the \fIDEVICE\fR reports it has a check condition but "no sense"
+and non\-zero information in its additional sense codes. Some polling
+commands (e.g. REQUEST SENSE) can receive this response.
+.TP
+.B 21
+the \fIDEVICE\fR reports a "recovered error". The requested command
+was successful. Most likely a utility will report a recovered error
+to stderr and continue, probably leaving the utility with an exit
+status of 0 .
+.TP
+.B 33
+the command sent to \fIDEVICE\fR has timed out.
+.TP
+.B 97
+the response to a SCSI command failed sanity checks.
+.TP
+.B 98
+the \fIDEVICE\fR reports it has a check condition but the error
+doesn't fit into any of the above categories.
+.TP
+.B 99
+any errors that can't be categorized into values 1 to 98 may yield
+this value. This includes transport and operating system errors
+after the command has been sent to the device.
+.PP
+Most of the error conditions reported above will be repeatable (an
+example of one that is not is "unit attention") so the utility can
+be run again with the '\-v' option (or several) to obtain more
+information.
+.SH COMMON OPTIONS
+Arguments to long options are mandatory for short options as well. In the
+short form an argument to an option uses zero or more spaces as a
+separator (i.e. the short form does not use "=" as a separator).
+.PP
+If an option takes a numeric argument then that argument is assumed to
+be decimal unless otherwise indicated (e.g. with a leading "0x", a
+trailing "h" or as noted in the usage message).
+.TP
+\fB\-h\fR, \fB\-?\fR, \fB\-\-help\fR
+output the usage message then exit. In a few older utilities the '\-h'
+option requests hexadecimal output. In these cases the '\-?' option will
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+for SCSI commands that yield a non\-trivial response, print out that
+response in ASCII hexadecimal.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+for SCSI commands that yield a non\-trivial response, output that response
+in binary to stdout. If any error messages or warning are produced they are
+usually sent to stderr. Some utilities that consume data to send to the
+device along with the SCSI command, use this option to provide that data
+or indicate that it can be read from stdin.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output). Can be used multiple
+times to further increase verbosity. The additional output is usually sent
+to stderr.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit. Each utility has its own version
+number and date of last code change.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 1999\-2008 Douglas Gilbert
+.br
+Some utilities are distributed under a GPL version 2 license while
+others, usually more recent ones, are under a FreeBSD license. The files
+that are common to almost all utilities and thus contain the most reusable
+code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
+under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sdparm(sdparm)

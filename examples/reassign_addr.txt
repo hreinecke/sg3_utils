@@ -1,0 +1,11 @@
+# This file is an example for the sg_reassign utility.
+# That utility can take one or more logical block addresses from stdin when
+# either the '--address=-" or "-a -" option is given on the command line.
+
+# To see logical block addresses placed in the command parameter block
+# without executing them command try something like:
+# 'sg_reassign --address=- --dummy -vv /dev/sda < reassign_addr.txt
+
+1,34,0x33,0X444  0x89abcde	0xdeadbeef  	# 6 lba's
+
+# dpg 20070130

@@ -1,0 +1,118 @@
+sg3-utils (1.26-0.1) unstable; urgency=low
+
+  * New upstream version
+
+ -- Doug Gilbert <dgilbert@interlog.com>  Thu, 27 Mar 2008 16:00:00 -0400
+
+sg3-utils (1.25-0.1) unstable; urgency=low
+
+  * New upstream version
+
+ -- Doug Gilbert <dgilbert@interlog.com>  Tue, 16 Oct 2007 10:00:00 -0400
+
+sg3-utils (1.24-1) unstable; urgency=low
+
+  * New upstream release
+  * Conflicts with upstream libsgutils package libsgutils-1-0 (closes: #391077)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Tue,  5 Jun 2007 17:04:21 -0600
+
+sg3-utils (1.21-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix FTBFS due to old syscall usage (Closes: #395512).
+
+ -- Luk Claes <luk@debian.org>  Sun,  5 Nov 2006 17:23:29 +0100
+
+sg3-utils (1.21-2) unstable; urgency=low
+
+  * Added Depends on libsgutils1 to libsgutils1-dev (closes: #387798)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Fri, 22 Sep 2006 00:20:28 -0600
+
+sg3-utils (1.21-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Wed, 13 Sep 2006 21:54:30 -0600
+
+sg3-utils (1.20-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Wed, 26 Apr 2006 22:31:15 -0600
+
+sg3-utils (1.17-3) unstable; urgency=low
+
+  * Cleaned up sg_read(8) manpage (Closes: #294521)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Mon, 13 Feb 2006 17:59:46 -0700
+
+sg3-utils (1.17-2) unstable; urgency=low
+
+  * Add libtool to build-depends
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Tue,  4 Oct 2005 19:40:00 -0600
+
+sg3-utils (1.17-1) unstable; urgency=low
+
+  * New upstream version
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Sat,  1 Oct 2005 13:26:16 -0600
+
+sg3-utils (1.08-2) unstable; urgency=low
+
+  * Fix packaging bug that accidentally left off binaries.  Sigh.
+    (closes: #271906)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Wed, 15 Sep 2004 22:40:06 -0600
+
+sg3-utils (1.08-1) unstable; urgency=low
+
+  * New upstream version
+  * Unified package description with list of tools actually installed
+    (closes: #271093)
+
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Sun, 12 Sep 2004 21:22:42 -0600
+
+sg3-utils (1.05-1) unstable; urgency=low
+
+  * New upstream release
+  * updated description to match tools in package (closes: #221143)
+
+ -- Eric Schwartz <emschwar@debian.org>  Tue, 18 Nov 2003 22:22:29 -0700
+
+sg3-utils (1.03-1) unstable; urgency=low
+
+  * New upstream release (closes: #181999)
+
+ -- Eric Schwartz <emschwar@debian.org>  Tue, 29 Apr 2003 20:18:30 -0600
+
+sg3-utils (0.95-4) unstable; urgency=low
+
+  * Only warns if installed on a kernel version < 2.4 (closes: #136434)
+      
+ -- Eric Schwartz <emschwar@debian.org>  Tue, 28 May 2002 22:55:29 -0600
+
+sg3-utils (0.95-3) unstable; urgency=low
+
+  * Extended description to include descriptions of all tools included in
+    the package. (closes: #121968)
+
+ -- Eric Schwartz <emschwar@debian.org>  Sun, 13 Jan 2002 17:09:27 -0700
+
+sg3-utils (0.95-2) unstable; urgency=low
+
+  * Packaging manpages (closes: #122692)
+  * Conflicts with cdwrite (closes: #123779)
+
+ -- Eric Schwartz <emschwar@debian.org>  Wed,  2 Jan 2002 01:05:08 -0700
+
+sg3-utils (0.95-1) unstable; urgency=low
+
+  * Initial Release.
+  * Adjusted Makefile to include $DESTDIR
+
+ -- Eric Schwartz <emschwar@debian.org>  Wed, 14 Nov 2001 17:05:56 -0700
+
+

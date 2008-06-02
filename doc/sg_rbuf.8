@@ -1,0 +1,182 @@
+.TH SG_RBUF "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.SH NAME
+sg_rbuf \- reads data using SCSI READ BUFFER command
+.SH SYNOPSIS
+.B sg_rbuf
+[\fI\-\-buffer=EACH\fR] [\fI\-\-dio\fR] [\fI\-\-help\fR] [\fI\-\-mmap\fR]
+[\fI\-\-quick\fR] [\fI\-\-size=OVERALL\fR] [\fI\-\-test\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_rbuf
+[\fI\-b=EACH_KIB\fR] [\fI\-d\fR] [\fI\-m\fR] [\fI\-q\fR]
+[\fI\-s=OVERALL_MIB\fR] [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This command reads data with the SCSI READ BUFFER command and then discards
+it. Typically the data being read is from a disk's memory cache. It is
+assumed that the data is sourced quickly (although this is not guaranteed
+by the SCSI standards) so that it is faster than reading data from the media.
+This command is designed for timing transfer speeds across a SCSI transport.
+.PP
+To fetch the data with a SCSI READ BUFFER command and optionally decode it
+see the sg_read_buffer utility. There is also a sg_write_buffer utility
+useful for downloading firmware amongst other things.
+.PP
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later section
+on the old command line syntax outlines the second group of options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-buffer\fR=\fIEACH\fR
+where \fIEACH\fR is the number of bytes to be transferred by each READ
+BUFFER command. The default is the actual available buffer size returned
+by the READ BUFFER (descriptor) command. The maximum is
+the same as the default, hence this argument can only be used to reduce the
+size of each transfer to less than the device's actual available buffer size.
+.TP
+\fB\-d\fR, \fB\-\-dio\fR
+use direct IO if available. This option is only available if the \fIDEVICE\fR
+is a sg driver device node (e.g. /dev/sg1). In this case the sg driver will
+attempt to configure the DMA from the SCSI adapter to transfer directly into
+user memory. This will eliminate the copy via kernel buffers. If not
+available then this will be reported and indirect IO will be done instead.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print usage message then exit.
+.TP
+\fB\-m\fR, \fB\-\-mmap\fR
+use memory mapped IO if available. This option is only available if the
+\fIDEVICE\fR is a sg driver device node (e.g. /dev/sg1). In this case the
+sg driver will attempt to configure the DMA from the SCSI adapter to transfer
+directly into user memory. This will eliminate the copy via kernel buffers.
+.TP
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
+.TP
+\fB\-q\fR, \fB\-\-quick\fR
+only transfer the data into kernel buffers (typically by DMA from the SCSI
+adapter card) and do not move it into the user space. This option is only
+available if the \fIDEVICE\fR is a sg driver device node (e.g. /dev/sg1).
+.TP
+\fB\-s\fR, \fB\-\-size\fR=\fIOVERALL\fR
+where \fIOVERALL\fR is the size of total transfer in bytes. The default is
+200 MiB (200*1024*1024 bytes). The actual number of bytes transferred may
+be slightly less than requested since all transfers are the same size (and
+an integer division is involved rounding towards zero).
+.TP
+\fB\-t\fR, \fB\-\-time\fR
+times the bulk data transfer component of this command. The elapsed time
+is printed out plus a MB/sec calculation. In this case "MB" is 1,000,000
+bytes. The gettimeofday() system call is used internally for the time
+calculation.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level of verbosity. Can be used multiple times.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print out version string then exit.
+.SH NOTES
+This command is typically used on modern SCSI disks which have a RAM cache
+in their drive electronics. If no IO to the magnetic media, or slower devices
+like flash RAM, is involved then the disk may be able to source data fast
+enough to saturate the bandwidth of the SCSI transport. The bottleneck may
+then be the DMA element in the HBA, the Linux drivers or the host machine's
+hardware (e.g. speed of RAM).
+.PP
+\fIEACH\fR and \fIOVERALL\fR may include one of these multiplicative suffixes:
+c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
+MB *1,000,000 . This pattern continues for "G", "T" and "P". The latter two
+suffixes can only be used for \fIOVERALL\fR.
+Also a suffix of the form "x<n>" multiplies the leading number by <n>.
+These multiplicative suffixes are compatible with GNU's dd command (since
+2002) which claims compliance with SI and with IEC 60027\-2.
+.SH EXAMPLES
+.PP
+On the test system /dev/sg0 corresponds to a fast disk on a U2W SCSI
+bus (max 80 MB/sec). The disk specifications state that its cache is 4 MB.
+.br
+   $ time ./sg_rbuf /dev/sg0
+.br
+READ BUFFER reports: buffer capacity=3434944,
+.br
+    offset boundary=6
+.br
+Read 200 MiB (actual 199 MiB, 209531584 bytes),
+.br
+    buffer size=3354 KiB
+.br
+real 0m5.072s, user 0m0.000s, sys 0m2.280s
+.PP
+So that is approximately 40 MB/sec at 40 % utilization. Now with
+the addition of the "\-q" option this throughput improves and the
+utilization drops to 0%.
+.br
+   $ time ./sg_rbuf \-q /dev/sg0
+.br
+READ BUFFER reports: buffer capacity=3434944,
+.br
+    offset boundary=6
+.br
+Read 200 MiB (actual 199 MiB, 209531584 bytes),
+.br
+    buffer size=3354 KiB
+.br
+real 0m2.784s, user 0m0.000s, sys 0m0.000s
+.SH EXIT STATUS
+The exit status of sg_rbuf is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.TP
+\fB\-b\fR=\fIEACH_KIB\fR
+where \fIEACH_KIB\fR is the number of Kilobytes (i.e. 1024 byte units) to be
+transferred by each READ BUFFER command. Similar to the
+\fI\-\-buffer=EACH\fR option in the main description but the units are
+different.
+.TP
+\fB\-d\fR
+use direct IO if available. Equivalent to the \fI\-\-dio\fR option in the
+main description.
+.TP
+\fB\-m\fR
+use memory mapped IO if available. Equivalent to the \fI\-\-mmap\fR option
+in the main description.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-q\fR
+only transfer the data into kernel buffers (typically by DMA from
+the SCSI adapter card) and do not move it into the user space.
+Equivalent to the \fI\-\-quick\fR option in the main description.
+.TP
+\fB\-s\fR=\fIOVERALL_MIB\fR
+where \fIOVERALL_MIB\fR is the size of total transfer in Megabytes (1048576
+bytes). Similar to the \fI\-\-size=OVERALL\fR option in the main description
+but the units are different.
+.TP
+\fB\-t\fR
+times the bulk data transfer component of this command. Equivalent to
+the \fI\-\-time\fR option in the main description.
+.TP
+\fB\-v\fR
+increase level of verbosity. Can be used multiple times.
+.TP
+\fB\-V\fR
+print out version string then exit.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2000\-2007 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_read_buffer, sg_write_buffer, sg_test_rwbuf(all in sg3_utils)

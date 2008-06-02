@@ -1,0 +1,59 @@
+.TH SG_PREVENT "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.SH NAME
+sg_prevent \- sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command
+.SH SYNOPSIS
+.B sg_prevent
+[\fI\-\-allow\fR] [\fI\-\-help\fR] [\fI\-\-prevent=PC\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends a SCSI PREVENT ALLOW MEDIUM REMOVAL command to \fIDEVICE\fR.
+The default action of this utility is to prevent the removing or
+ejecting of the medium from a drive. This is done by ignoring the
+SCSI START STOP UNIT command (see sg_start) and ignoring the eject
+button on the drive when the user presses it. Drives that hold removable
+disks, tape cartridges or cd/dvd media typically implement this command.
+The definition of the "prevent" codes for this command differ between
+disks and tapes (covered by SBC\-3 and SSC\-3) and cd/dvd drives (covered
+by MMC\-5). The "prevent codes" described here are from MMC\-5.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-a\fR, \fB\-\-allow\fR
+allow medium removal. This is equivalent to setting to '\-\-prevent=2'.
+Cannot be used with \fI\-\-prevent=PC\fR option (i.e. either use
+no options (hence prevent removal), this option or \fI\-\-prevent=PC\fR).
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-p\fR, \fB\-\-prevent\fR=\fIPC\fR
+where \fIPC\fR is a prevent code value. Defined values are: 0 allows removal,
+1 prevents removal (default), 2 allows persistent removal while 3 prevents
+persistent removal. "Persistent" in this context means that the
+initiator (port) that successfully uses code 3 blocks other initiators (ports)
+from allowing removal. A "persistent prevent" state can be cleared by the
+owner allowing persistent removal (code 2) or a power cycle (or anything that
+resets the device (lun)) or some special commands (e.g. various service
+actions of Persistent Reserve Out, see SPC\-3).
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH EXIT STATUS
+The exit status of sg_prevent is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004\-2007 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_start(sg3_utils), sg_persist(sg3_utils)

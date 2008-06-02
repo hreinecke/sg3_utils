@@ -1,0 +1,791 @@
+Each utility has its own version number, date of last change and
+some description at the top of its ".c" file. All utilities in the main
+directory have their own "man" pages. There is also a sg3_utils man page.
+
+Changelog for sg3_utils-1.26 [20080327]
+  - sg_ses: sync with ses2r19b
+  - sg_get_config: sync with mmc6r01
+    - allow Microcode upgrade and DVD read feature descriptors
+      to be 4 bytes long
+  - sg_cmds_extra: add vrprotect argument to sg_ll_verify10()
+    - add sg_ll_get_performance() and sg_ll_set_cd_speed()
+  - sg_verify: add --vrprotect= option
+  - sg_vpd: add nominal form factor to block dev. char. VPD page
+    - add --maxlen= option to set allocation length in cdb
+  - sg_inq: add --maxlen= option that does same as --len=
+    - move version descriptors into sg_inq_data.c file
+    - update version descriptors to spc4r13
+  - sg_inq+sg_vpd: logic for "NAA-3 Locally assigned" identifier
+    - update extended inquiry VPD page
+  - sg_write_long: add examples section to man page
+  - sg_sat_phy_event: copied from examples directory and enhanced,
+    rename original to sg__sat_phy_event
+  - sg_dd: improve MMC handling of 'illegal mode for this track'
+    read errors (with ILI and info field)
+  - sg_modes: add --maxlen= option to specify allocation length
+  - sg_start: add '--noflush' and '--mod=PC_MOD' options (08-139r1)
+  - change 'long long' to int64_t and 'unsigned long long' to
+    uint64_t to stress that 64 bit integer wanted, not larger
+  - sg_request: add a '--progress' option (similar to sg_turs)
+  - sg_turs: add more to man page about '--progress' indication
+  - sg_lib: update asc/ascq code to spc4r13
+  - audit of dangerous 'u64 = uch[24] << 24' code, replace most
+    'unsigned long's
+  - utils/hxascdmp: add hxascdmp(1) man page
+    - split sg_lib into sg_lib_data.[hc] and sg_lib.[hc]
+    - split sg_cmds_extra into sg_cmds_extra and sg_cmds_mmc
+    - add osd2r03 service actions (all different from osd-r10)
+    - add sg_get_trans_proto_str()
+    - add sg_get_sense_filemark_eom_ili() function (MMC uses ILI)
+    - add sense key specific unit attention condition queue
+      overflow decoding
+  - multiple documentation corrections provided by Dan Horak
+  - sg_cmds_mmc: add sg_ll_set_streaming() function
+  - win32/MinGW: define SG3_UTILS_MINGW when detected
+  - remove archive/pre_configure subdirectory
+  - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace
+    "%lld" and friends with PRI macros
+  - move sg_io_linux.c into the lib subdirectory
+
+Changelog for sg3_utils-1.25 [20071016]
+  - sg_stpg: new utility to Set Target Port Groups
+  - sg_safte: new utility to query SAF-TE processor (SES like)
+  - sg_sat_set_features: new utility (actually copied from examples
+    directory); renamed examples version to: sg__sat_set_features
+  - sg_read_buffer: restore (had fallen out of build scripts)
+  - sg_dd: add oflag=sparse to step over bs*bpt number of zeros;
+    - with oflag=sparse, write last bs*bpt segment at end or after
+      error so file length of OFILE is appropriate
+    - when coe>1 then SCSI READ LONG logic remembers extended block
+      length of first encountered error
+  - sg_dd, sgm_dd, sgp_dd: allow iflag=null and oflag=null both of
+    which do nothing (placeholders)
+  - sg_ses: sync with ses2r17 then r18
+  - sg_vpd, sg_inq: add block device characteristics VPD page
+  - sg_inq: add '--vpd' option (or '-e') for backward compatibility
+  - sg_vpd: decode protocol specific lu information page for SAS
+    - add more RDAC vendor VPD pages
+  - sg_logs: update background scan results log page, sbc3r11
+    - add generation code to protocol specific page for SAS SSP
+    - add media changer diagnostic data log page
+  - sg_raw: fix error message when do_scsi_pt() fails
+  - sg_lib: sync asc/ascq codes with spc4r11
+    - add sg_get_num_nomult()
+    - add TPROTO_* protocol identifier constants to sg_lib.h
+  - sg_cmds_extra: add sg_ll_set_tgt_prt_grp()
+  - place source in subversion repository
+  - split code into src/ lib/ and include/ directories
+  - sync debian directory with their 1.24 version (sid unstable)
+  - convert build logic to use autotools (i.e. './configure ; make')
+    - rename this file from CHANGELOG to ChangeLog
+    - note: only code in lib/ and src/ directories built by
+      autotools; some other subdirectories still use hand-crafted
+      Makefiles
+
+Changelog for sg3_utils-1.24 [20070507]
+  - sg_raw: new utility to send arbirary SCSI commands
+  - sg_luns: increase number of luns that can be fetched
+    - fix length of raw and hex output
+    - add '--quiet' option to output only ASCII hex
+      representation of each lun
+  - sg_rtpg: update for changes in spc4r09
+  - sg_persist: update documentation, spc-4 references
+    - fix exit status values
+  - sg_inq: update version descriptors per spc4r09
+    - fix '--id' and '--extended'
+    - extend block limits VPD page (sbc3r09)
+  - sg_vpd: extend block limits VPD page (sbc3r09)
+    - append relative target port identifier to SAS target
+      port address with '-iq' option
+  - sg_logs: add decoding for stats+performance log pages
+    - fix showing of page names for pdt > 0
+    - implement '-HH' for single and all pages, fix '-r'
+    - when '--maxlen=' given, only do single fetch
+    - add Tape Alert (ssc), Media and Element statistics (smc) pages 
+    - add '--brief' option
+  - sg_ses: sync with ses2r16
+    - fix bay number for SAS
+  - sg_format: add '--dcrt' and '--security' options
+  - sgm_dd: add 'smmap' oflag for shared_mmap_io testing
+    - add 'dio' oflag
+  - sg_dd, sgp_dd: add 'dio' iflag and oflag
+  - sg_modes: change SAS mode page names per sas2r09
+    - check validity of block descriptors length
+  - sg_pt: change opaque context object from 'void *'
+    to 'struct sg_pt_base *'
+  - sg_opcodes: anticipate extra tmfs from 07-159r0
+  - sg_sat_set_features: add more usage information
+    - add man page
+  - sg_sat_phy_event: add to examples directory
+  - sg_lib: sync asc/ascq codes with spc4r10
+  - Solaris port: using uscsi interface
+
+Changelog for sg3_utils-1.23 [20070131]
+  - sg_read_buffer: new utility
+  - sg_write_buffer: new utility
+  - sg_opcodes, sg_senddiag, sg_logs, sg_modes, sg_start, sg_inq,
+    sg_turs, sg_readcap, sg_rbuf: add getopt_long() based cli;
+    old and new cli selectable, new getopt_long cli is default
+  - scripts: new subdirectory containing some bash scripts
+    - add scripts/README file
+  - sg_reassign: add '--hex' option for grown and primary lists
+  - sg_rtpg: add '--raw' option
+  - sg_lib.h, sg_cmds_basic.h + sg_cmds_extra.h: add C++ 
+    'extern "C" ' wrappers
+    - cleanup C code so it will compile as C++
+  - sg_lib: sync with spc4r08
+    - include <inttypes.h>, use PRId64 instead of %lld form
+    - fix sg_get_sense_str() when empty sense buffer
+  - win32 port: add Makefile.mingw + related support for MinGW
+  - sg_cmds_extra: add sg_ll_read_buffer() and sg_ll_write_buffer()
+  - sg_dd, sgp_dd, sgm_dd, sg_read: use lseek64() instead of llseek.c
+  - sgm_dd: accept coe=<n> for interworking with sg_dd
+  - sg_rdac: fix on non-linux ports
+  - sg_ses: fix spurious warning in additional element status page
+    - '-rr' option outputs a diagnostic page in binary to stdout
+  - sg_opcodes: add command timeout descriptor support (spc4r08)
+    - change linux specific pass through to generic pass through
+  - sg_logs: add 'name=value' decoding for SAS specific lpage
+  - examples+utils subdirectories: remove symlinks
+  - synchronize man pages with usage messages
+  - sg3_utils.spec: rework
+
+Changelog for sg3_utils-1.22 [20061016]
+  - sgp_dd: accept verbose=<n> as well as deb=<n> to ease
+    interworking with sg_dd and sgm_dd
+  - sg_sat_set_features: added to examples directory
+  - sg_lib: sync asc/ascq text with spc4r06
+    - move SG_LIB_CAT_NO_SENSE and SG_LIB_CAT_RECOVERED to
+      20 and 21 respectively; add SG_LIB_CAT_ABORTED_COMMAND
+      at 11 (its sense key value) 
+  - sg_vpd: tweak '--page=sp --quiet' output
+    - change '-HHH' so same as '-rr' (prepares ATA Information
+      (ai) response for hdparm)
+  - sg_requests: add '-s' option to set exit status from
+    parameter data
+  - sg_modes: exit quickly from '-e' if device not ready
+  - sg_logs: sync sas log pages with sas2r05a
+    - expand background scan results log page
+    - add '-m=<max_len>' to limit response length
+    - drop '-scum' and '-sthr' options and add '-select'
+  - sg_write_long: add '--16' option to send 16 byte cdb
+    - add '--wr_uncor' and '--pblock' options
+  - sg_senddiag: cleanup and add sdiag_sas_p1_stop.txt
+    to examples directory
+  - sg_format: add '--cmplst=<n>' option (default: 1)
+    - add '--pfu=<n>' option
+    - expand man page to discuss P/D/C/GLISTs
+  - sg_reassign: add '--primary' option to fetch primary
+    defect list (PLIST) length
+  - sg_readcap: add '-H' option to output response in hex
+    and '-r' to output response in binary to stdout
+    - add logical blocks per physical block (sbc3r07)
+  - sginfo: add PLIST and GLIST designation to defect lists
+  - sg_cmds: split this support file into sg_cmds_basic.[hc]
+    and sg_cmds_extra.[hc]
+    - add sg_ll_ata_pt() (SATL ATA pass) to sg_cmds_extra.[hc]
+  - sg_rdac: fix includes for FreeBSD
+  - sg_dd: add 'coe_limit=' option to exit after <n>
+    consecutive 'coe' type read errors
+  - sgm_dd: print out throughput information when signal arrives
+    if time=1 (like sg_dd does already)
+  - sg_inq: change '-HHH' so same as '-rr'. Now sg_inq, sg_vpd
+    and sdparm output for hdparm with '-HHH'
+    -add '-l=<resp_len>' option
+  - sg_read_long: add '--pblock' option for physical blocks
+  - sg_luns: add '--hex' and '--raw' options
+  - sg_requests: add '--hex' and '--raw' options
+  - sg_scan: windows version added (was previously linux only)
+    - 2 man pages: sg_scan.8l and sg_scan.8w that are installed
+      as sg_scan.8
+  - archive directory: removed all but rescan-scsi-bus.sh
+      - README points to previous version in that directory
+  - sg_sat_identify: add to main directory
+      - rename earlier version to examples/sg__sat_identify.c
+  - sg_ident: rework as spc4r07 changed command names and
+    expanded functionality
+
+Changelog for sg3_utils-1.21 [20060706]
+  - sg_vpd: new utility for decoding VPD pages. sg_inq's cli is
+    cluttered; also borrows from sdparm's VPD handling
+  - sg_rdac: new utility for vendor specific work
+  - sg_lib: add sg_vpd_dev_id_iter() to iterate over di VPD page
+    - add sg_ata_get_chars() to fetch chars from ATA words
+    - sync additional sense code strings with spc4r05a
+    - add SG_LIB_CAT_NOT_READY category when sense_key is NOT READY
+    - add SG_LIB_FILE_ERROR category for open problems
+    - add SG_LIB_SYNTAX_ERROR category for command line problems
+    - broaden SG_LIB_CAT_MEDIA_CHANGED to SG_LIB_CAT_UNIT_ATTENTION
+    - add SG_LIB_CAT_MALFORMED for bad responses
+    - BEWARE: these changes cause confusion if an executable from this
+      version is run with a libsgutils library from 1.20 or earlier
+  - sg_cmds: add SG_LIB_CAT_NOT_READY return to most "ll" functions
+    - alter many utilities to report SG_LIB_CAT_NOT_READY
+  - sg_dd: add retries=<n> option for sg_io
+  - sg_logs: add '-T' option to output protocol specific port log page
+    - add support for log subpages (new in spc4r05)
+    - more sanity checks in Start Stop Cycle Counter page
+  - sg_cmds: add sg_ll_read_long16()
+    - add page_code and subpage_code to sg_ll_log_select()
+    - add subpage_code to sg_ll_log_sense()
+  - sg_read_long: do READ LONG(16) when '--16' given
+  - sg_read: accept and ignore 'of=' arguments
+  - sg_dd: expand medium/hardware error "coe' processing to include
+    the "blank check" sense key (for optical devices)
+  - sg_ses: expand display element (per 05-011r2)
+  - sg_format: clear 'cmplst' bit (for MO disks)
+    - add '--six' ('-6') option for mode sense/select(6)
+  - sg_format + sg_test_rwbuf: fix for when char is unsigned
+  - sg_inq: VPD page 0x89: output ATA IDENTIFY DEVICE strings
+    - for IDENTIFY (PACKET) DEVICE response use sg_ata_get_chars()
+  - sg3_utils.html : new name, was previously u_index.html. Copy
+    placed in doc subdirectory
+  - tools.html : SCSI and storage tools reference, copy placed in
+    doc subdirectory
+  - sg3_utils.8 : add a new man page containing general information
+    especially common exit status values
+  - sg_sat_identify: added to examples directory (SAT passthrough test)
+    - extend to pass through IDENTIFY PACKET DEVICE with '-p' option
+  - sg_sat_chk_power: added to examples directory
+  - sg_sat_smart_rd_data: added to examples directory
+  - sg_chk_asc: added to utils directory to check asc_ascq codes
+  - debian: stop placing archive directory under examples
+    - add build_debian.sh script
+
+Changelog for sg3_utils-1.20 [20060418]
+  - sg_logs: decode phy event descriptors in SAS port specific
+    log page (sas2r03)
+    - new parameter control byte format (spc4r03), subpages to come
+  - update Makefile (linux) to install sg_io_linux.h + sg_linux_inc.h
+  - sg_map26: fix for block device mapping in lk 2.6.16-rc1 and beyond
+    - cope with sysfs removal of 'generic' symlink post lk 2.6.16,
+      anticipate removal of 'tape' symlink
+  - sg_dd, sgm_dd, sgp_dd: fix problem around 0x7fffffff blocks
+  - sg_dd: fix read_long processing error (when 'coe=2' or 3)
+    - expand 'coe=' to take 0...3 (invokes read long with 2 or 3)
+    - allow for SG_GET_RESERVED_SIZE yielding 0, lk 2.6.16 feature
+  - sgp_dd: add 'iflag=' and 'oflag=' arguments; signals (like sg_dd)
+  - sgm_dd: add 'iflag=' and 'oflag=' arguments; signals (like sg_dd)
+  - sg_get_config: double->dual renaming (mmc5r03)
+  - sg_read: add 'dpo=' and 'fua=' options
+    - allow 'count' < 0 (or 'bpt=0') for issuing zero block READs
+    - allow for SG_GET_RESERVED_SIZE yielding 0, lk 2.6.16 feature
+    - add 'no_dxfer=0|1' option
+  - sg_modes: fix exit value when MODE SENSE fails
+    - add '-e' to examine presence of page codes from 0x0 to 0x3e
+  - sg_requests: add '--num=' and '--time' options for timing multiple
+    invocations
+  - sg_inq: fix vpd 0x83 designator code 8 name: "scsi name string"
+  - sg_scan: if lk 2.6, use sysfs to find active sg device nodes
+  - sg_map: if lk 2.6, use sysfs to find active sg device nodes
+  - sg_ses: expand display element (per 05-011r1)
+  - sg_start: add an '-i' option which is equivalent to '--imm=1'
+  - sg_senddiag: update man page showing use of two scripts in
+    examples directory (sdiag_sas_p0_cjtpat.txt and _p1_) 
+  - sg_lib: fix sg_get_sense_descriptors_str() case 9 (ATA Return)
+
+Changelog for sg3_utils-1.19 [20060127]
+  - sg_start: accept '--' options (e.g. 'sg_start --stop')
+    - add '--fl=<n>' option for jump to format layer (mmc5)
+  - sg_logs: background scan log page, resync with sbc3r03
+    - add '-scum' and '-sthr' for setting defaults
+    - add device statistics log page (ssc + adc)
+    - fix "last n" deferred errors/error events incrementing
+    - partial addition of log subpages (spc4r03)
+  - sg_get_config: sync features with mmc5 rev 02b
+  - sg_wr_mode: mask out dpofua bit in mode select header
+  - sg_inq: try harder with '-A' to identify ATA device
+    - broaden meaning of '-d' option to decode ...
+    - decode software interface id VPD page ('-p=84 -d')
+    - decode device capabilities (ssc) VPD page ('-p=b0 -d')
+  - sginfo: correct defect list handling ('-d' and '-G')
+  - sg_verify: improve error processing (e.g. medium errors)
+  - sg_ses: scsi target_initiator port additional element
+     status (ses2r14)
+  - many: arguments that currently accept '0x' or '0X' to
+     indicate a hex number may alternatively take a trailing
+     'h' or 'H' to indicate hex
+  - sg_lib: update asc/ascq strings (spc4r03)
+  - sg_lib+sg_cmds: make independent of linux via
+    sg_pt.h function based interface.
+    - linux pass through code placed in sg_pt_linux.c
+    - rename sg_include.h to sg_linux_inc.h
+    - linux specific code in sg_lib.[hc] moved to
+      sg_io_linux.[hc]
+  - port to FreeBSD: using sg_pt_freebsd.c
+  - port to Tru64: using sg_pt_osf1.c
+  - sg_cmds: add sg_ll_get_config(), sg_ll_format_unit(),
+     sg_ll_reassign_blocks(), sg_ll_persistent_reserve_in+out(),
+     sg_ll_read_long10(), sg_ll_verify10(), sg_ll_write_long10()
+  - sg_persist: add "allow commands" to report capabilities
+  - sg_persist_tst: (examples) takes device node as argument
+  - sg_luns: add "security protocol" wlun
+
+Changelog for sg3_utils-1.18 [20051118]
+  - sg_map26: new utility to map sg devices in lk 2.6
+  - sg_luns: luns > 16,384 (sam-4 rev 4)
+  - sg_ses: bump fan speed field to 11 bits
+    - SAS connector names (ses2r13)
+  - sg_inq: add '-rr' option for "hdparm --Istdin"
+  - sg_get_config: tracking mmc-5
+  - sg_write_long: add support for COR_DIS bit
+  - sg_cmds: add sg_ll_test_unit_ready_progress()
+  - sg_turs: '-p' option shows progress
+  - sg_dd: add 'iflag=' and 'oflag=' options
+    - remove output of mode page info when verbose > 0
+    - add control of DPO bit via iflag/oflag
+  - sg_lib: add sg_get_pdt_str()
+    - update asc/ascq strings
+  - sg_modes + sginfo: add SAS(2) SSP shared mode subpage
+  - doc: rename "html" directory to "doc"
+  - Makefile: add 'libtool --finish' to install
+
+Changelog for sg3_utils-1.17 [20050922]
+  - sg_inq: add '-a' option for ATA information VPD page
+    - add '-b' option for Block limits VPD page (SBC)
+    - add '-A' option for probing ATA or ATAPI device
+    - increase raw ('-r') and verbose ('-v') output for
+      ATA(PI) devices to 512 bytes (was 256 bytes)
+    - output hex ('-H') and verbose response for ATA(PI)
+      devices in 16 bit words (corrected for endianness)
+      - output bytes if '-HH' option given
+    - sync with spc4 rev 02
+  - sg_lib: add dWordHex() and sg_is_big_endian()
+    - sync asc/ascq with spc4 rev 02
+  - sg_cmds: defensive prefill for inquiry commands
+  - sg_opcodes: sync with spc4 rev 02 (add tmf I_T nexus reset)
+  - sginfo: add EBACKERR in Informational exception mode page
+    - add Background control mode page (SBC-3)
+  - sgm_dd: add 'verbose=<n>' option
+
+Changelog for sg3_utils-1.16 [20050810]
+  - sg_ident: new utility to report+set device identifier
+  - sg_map: increase MAX_SG_DEVS from 256 to 2048
+  - debian: new directory to support deb package builds
+  - sg_get_config: add '--current' option, same as '--rt=1'
+    - update for DVD+RW Dual Layer
+  - sg_inq: add notes in source about use of SCSI INQUIRY
+     - decode Management network addresses VPD page ('-m')
+     - decode Mode page policy VPD page ('-M')
+  - sginfo: increase device mapping capability (> 78 disks)
+     - add '-r' option to scan /dev/raw* device nodes [Tim Hunt]
+  - sg_dd: change bpt default value to 32 when bs >= 2048 bytes
+  - sg_ses: mention SAF-TE in man page
+  - sg_readcap: add '-b' option for brief output (2 hex numbers)
+  - sg_cmds: add sg_ll_start_stop_unit(), sg_ll_prevent_allow(),
+      sg_ll_report_dev_id() and sg_ll_set_dev_id()
+  - sg_lib: add extra argument to sense print functions to enable
+      the suppression of the raw output of the sense buffer
+      - resid > 0 warnings now includes number actually fetched
+  - sg_start: add '-load' and '-eject' options
+    - default to start action when no other indication given
+    - change -imm=0|1 option default to 0 (was 1)
+  - gcc 4.0: cleanup warnings (apart from sgp_dd: revisit later)
+
+Changelog for sg3_utils-1.15 [20050605]
+  - sg_cmds: sg_get_mode_page_controls(): improve error processing,
+     add double fetch
+  - sg_turs, sg_rbuf, sg_requests, sg_test_rwbuf, sg_format,
+    sg_dd and sgm_dd: add O_NONBLOCK to open()
+  - sgm_dd: switch to use SG_IO ioctl (that leaves only
+     sgp_dd using the asynchronous sg write()/read() sequence)
+  - sg_ses: sync with rev 12 changes
+  - sg_map: extend to cope with sparse disk device names with
+     up to 3 letters (e.g. /dev/sdaaa) [Nate Dailey]
+  - sg_modes: add '-f' option to flexibly decode broken mode
+     sense responses.
+     - zero prefill response; stop decoding response after 3
+       unit attention mode pages seen (i.e. malformed)
+     - add '-L' option for LLBAA bit in msense 10 cdb
+  - sg_reset: update man page
+  - sg_inq: VPD page 0x83: output eui addresses in hex as well
+  - Makefile: fix bug in rules for sgp_dd (when 'make dep' used)
+  - sg_format: expand explanations in its man page
+  - sg_inq, sg_logs, sg_modes, sg_opcodes, sg_rbuf, sg_readcap,
+    sg_scan, sg_senddiag, sg_start and sg_turs: allow command
+    line to take concaternated options
+  - sg_start: add -start and -stop to parallel "1" and "0"
+  - sg_senddiag: set pf bit with '-l' option
+
+Changelog for sg3_utils-1.14 [20050506]
+  - sg_rmsn: new utility to read media serial number
+  - sg_rtpg: add T_SUP bit report
+  - sg_ses: ses-2 rev 11 changes (mainly to additional element status)
+        - add 'bay number' to SAS additional element status
+  - sg_modes: recognise attached enclosure and medium changer
+  - sg_inq: spell out non-zero peripheral qualifiers
+        - note VS bit preceding MultiP(ort) when latter set
+        - VPD page 0x83: output naa addresses in hex as well
+  - sginfo: recognise attached enclosure and medium changer
+        - increase device mapping capability (to 78 disks)
+          [Tim Hunt]
+  - sg_senddiag: add option to send raw diagnostic page
+  - sg_get_config: update some BD information
+  - sg_reasign: add '-g' option to give grown defect list length
+  - sg_dd: note default bpt value (128) may be too high for cd/dvds
+  - sg_lib: sync with SPC-3 rev 22a [opcodes + asc/q]
+        - add DID_IMM_RETRY and DID_REQUEUE [linux specific "host" bytes]
+  - sg_cmds: add send+receive diagnostic, read defect data commands
+        - add duration output on some commands when verbose > 2
+  - spec: change to produce libsgutils (and -devel variant) as well as
+          sg3_utils binary rpms
+  - sdparm: new utility like hdparm but for SCSI disks (or other devices)
+        - moved to its own package called: sdparm
+
+Changelog for sg3_utils-1.13 [20050313]
+  - sg_format: new utility to format disks (perhaps change block size)
+  - sg_ses: rename "device element" to "additional element" [SES-2 rev 10]
+        - add SAS expander and connector elements; add download
+          microcode and subenclosure nickname diagnostic pages
+        - fix additional element descriptor for SAS
+        - off by 1 error when no type descriptor text in config page
+          <David dot Baldwin at anu dot edu dot au>
+  - sg_logs: log page for background media scan results
+  - sginfo: add "-flba64" option for outputting 64 bit lba defect lists
+  - sg_get_config: additions for BD from MMC-5 rev 1b
+  - sg_lib: add SG_LIB_CAT_ILLEGAL_REQ sense category
+        - add sg_get_sense_progress_fld()
+        - SPC-3 rev21d updates: report + set timestamp
+        - sg_get_num() + sg_get_llnum(): switch to multipliers that
+          are compatible with SI and with IEC 60027-2. Used modern
+          GNU's dd command as guide.
+        - report field replaceable unit code in fixed format
+  - sg_dd: add logic to use read_long on unrecovered read errors when
+           'coe' set, read just prior to error if 'coe' clear
+        - both 'odir' and 'blk_sgio" are honoured on block devices
+        - add 'verbose' switch, output some mode page info when verbose
+        - print out elapsed time/throughput when signal received
+        - add new web page discussing sg_dd, copy in html subdirectory
+  - sg_read: add 'blk_sgio' and 'odir' options
+  - sg_wr_mode: clear mode data length in mode select(10)
+  - sg_test_rwbuf: add long options, allow test to run multiple times
+  - sg_cmds: add sg_get_mode_page_types() [get current, changeable, etc]
+  - llseek.c: add Makefile rule without "-std=c99", breaks on some archs
+
+Changelog for sg3_utils-1.12 [20050121]
+  - sg_wr_mode: new utility to modify (i.e. write to) mode pages
+  - sg_reassign: new utility: issues Reassign Blocks command
+  - sg_rtpg: new utility: issues Report Target Port Groups command
+             [Christophe Varoqui]
+  - ATA IDENTIFY command misspelt as "IDENTITY" in several places
+  - sginfo: tweak SAS mode pages to match sas 1.1 rev 07
+        - add NV_DIS bit to disk caching mode page
+  - sg_map: open /dev/nst* rather than /dev/st* (to stop spurious rewinds)
+  - sg_lib: ATA return sense descriptor
+        - add sg_get_sense_info_fld() to fetch info field from sense data
+        - fix bug in sg_scsi_sense_desc_find()
+        - add sense key specific decoding for fixed format sense data
+  - sg_modes: extend '-p' option to allow '-p=<page_code>,<subpage_code>'
+        - add '-A' option to output all mode pages and subpages
+        - extend '-l' option to show subpages, selected command set pages
+  - sg_inq: fix LUN WWN output in unit path report VPD page (emc)
+            [Hergen Lange]
+  - sg_get_config: some additions for DVD-R dual layer
+  - sg_modes: show write protect (WP) and DpoFua flags for disks
+  - sg_cmds: add llbaa argument to sg_ll_mode_sense10()
+
+Changelog for sg3_utils-1.11 [20041126]
+  - sg_sync: new utility: invokes the synchronize cache command
+  - sg_prevent: new utility: invokes the prevent allow medium removal command
+  - sg_get_config: new utility: get configuration command for dvds and cds
+  - sg_request: fix, allocation length wasn't set
+  - sg_start: remove '-s', as start_stop_unit implicitly syncs caches
+  - sg_ses: add SAS expander element type
+  - sg_inq: add sanity check to unit serial number (VPD page 0x80)
+        - output ANSI version string (e.g. "SPC-2", previously was number)
+        - add '-s' option to decode SCSI Ports VPD page
+  - sg_logs: decoding of format status and non-volatile cache log
+        pages (0x8 and 0x17 in sbc-2)
+  - sg_dd: handle compile error when O_DIRECT not defined
+  - sginfo: tighten sanity checks around Unit serial number VPD page
+
+Changelog for sg3_utils-1.10 [20041030]
+  - sg_readcap, sg_dd, sgm_dd, sgp_dd: fix sg_ll_readcap_10+16 (sg_cmds.c)
+  - sg_luns: new utility to report luns
+  - sg_logs: with '-t' (show temperature) ignore extra parameters in
+        temperature log page (still show them with '-p=d')
+  - sg_ses: clean argument sanity checks
+  - sg_cmds: add more common command wrappers
+
+Changelog for sg3_utils-1.09 [20041022]
+  - sg_ses: new utility to get status and set control on SES devices
+  - sg_verify: new utility to verify block devices
+  - sg_emc_trespass: new utility for EMC specific trespass mode page
+  - sg_request: new utility that sends a REQUEST SENSE command
+  - sg_logs: '-r' to reset to manufacturer's defaults
+      - decode last n error events and last n deferred errors pages
+      - add names of ADC log pages
+  - sg_inq: update to SPC-3 rev 21
+      - decode Extended INQUIRY data VPD page [0x86] {'-x'}
+      - decode Unit Path Report VPD page [0xc0] (EMC) {'-P'}
+  - sginfo: decode SAS protocol specific lu mode page
+  - sg_err: convert to sg_lib + update to SPC-3 rev 21
+      - change GPL to FreeBSD license
+      - flag vendor specific asc/ascq ranges
+  - libsgutils: library made from sg_lib.c and sg_cmds.c
+    - rpm "spec" file additionally builds a "-devel" rpm with
+      static libsgutils.a and sg_lib.h and sg_cmds.h
+  - utils/hxascdmp.c: add FreeBSD license
+  - sg_persist: additions to man page
+      - add sg_persist_tst.sh example script to examples directory
+  - sg_turs: add '-v' and '-V' options
+  - sg_senddiag: add '-v' option
+
+Changelog for sg3_utils-1.08 [20040831]
+  - sg_inq: fix noisy message when EVPD and raw modes set
+      - for VPD page 0, list supported page names if known {'-e'}
+      - add '-d' option to list version descriptors
+  - sg_opcodes: numerically sort list of opcodes unless '-u' given
+      - add '-a' to sort alphabetically list of opcode names
+      - add '-t' to report supported task management functions
+  - sg_persist: add 'register and move" PROUT service action
+      - add transportId support, document in sg_persist.8 and example
+  - sg_modes: handle subpage code for known pages (e.g. control extension)
+      - clean up sense buffer handling (allow for descriptor format)
+      - SPC-3 draft revision 20a updates
+  - sg_write_long: new utility to exercise WRITE LONG command
+  - sg_read_long: new utility to exercise READ LONG command
+  - sg_err.c: fix compile errors when SG_KERNEL_INCLUDES defined in lk 2.6
+      - sg_includes.h typedef of u64 for BLKGETSIZE64 ioctl in lk 2.4
+      - add safe_strerror(), sg_scsi_normalize_sense(), sg_normalize_sense()
+        and sg_scsi_sense_desc_find() functions
+      - add more sense data descriptor format decoding 
+      - move multiple implementations of dStrHex() into sg_err.c
+  - sg_logs: exit if SCSI INQUIRY fails (e.g. when applied to ATA disk)
+  - sginfo: bug fixes and SPC-3 revision 20a updates
+      - add '-E' option to access Control Extension mode (sub)page
+  - sg_start: change '-d' switch to '-v' (verbose) switch for consistency
+      - document extra power condition states in man page
+  - sg_readcap: output rto_en and prot_en bits from long read capacity data
+  - add COVERAGE file to list SCSI command coverage
+
+Changelog for sg3_utils-1.07 [20040708]
+  - sginfo: clean up inquiry vendor,product,revision strings
+      - '-Fhead': sort defect list by head 
+        Tom Steudten <steudten at mx dot ch>
+  - rework sg_err for better command name coverage: service actions,
+    variable length and peripheral device type
+      - update asc,ascq codes to SPC-3 revision 19
+  - move scsi_devfs_scan to archive directory
+  - add sg_opcodes utility to list supported operation codes
+  - add sg_persist utility to support persistent reservations
+  - add '-i' option to sg_inq to decode device identification VPD page (0x83)
+  - sg_inq tries an ATA IDENTIFY if SCSI INQUIRY fails
+  - sg_dd, sgm_dd and sgp_dd calculate block device sizes (if count not given)
+  - drop SG_GET_VERSION_NUM ioctl guard in most utilities
+
+Changelog for sg3_utils-1.06 [20040426]
+  - sg_logs: some HBAs don't like odd transfer lengths so increment
+      - do INQUIRY and output product strings
+      - add ASCII rendering of the Protocol specific SAS page
+      - add '-v' verbose option to output cdb
+  - sg_scan: optionally take device file names (e.g. /dev/hdc and /dev/sda)
+      - only request 36 byte INQUIRY responses
+  - sg_err: add sg_decode_sense() function
+  - sg_inq: update output (ref: SPC-3 t10/1416-d rev 17, 28 January 2004)
+      - remove '-p' option to print out PCI address of host
+      - add '-v' verbose option to output cdb
+  - sginfo: allow '-u' to take hex arguments (prefixed by '0x'),
+            when subpage value is 255 show multiple subpages
+      - accept /dev/hd? ATAPI devices directly in lk 2.6
+      - add '-t <pn>[,<spn>]' argument; like '-u' but decodes page
+        if it recognizes it
+      - drop '-L' argument
+      - add cd/dvd, tape, SES, more disk and more SPC-3 decoded mode pages
+      - add transport protocol decoded mode pages for SPI-4, FCP and SAS
+  - sg_modes: print all subpages when '-subp=ff' is selected
+      - do INQUIRY and output product strings
+      - add '-v' verbose option to output cdb
+  - Makefile: add -W compile flag and fix exposed warnings
+  - .spec file: change to build on Mandrake without errors
+
+Changelog for sg3_utils-1.05 [20031112]
+  - sginfo: major rework; add IE page, clean up control, cache +
+        disconnect pages (as per SPC-3 and SBC-2). 
+      - when storing, update saved page (change from previous version)
+      - use 10 byte mode sense and select by default (override with '-6')
+      - mode subpage support
+  - sg_dd, sgm_dd + sgp_dd: 
+      - 64 bit capable (read capacity; count, skip and seek values). 
+      - numerical arguments accept hex (prefixed by '0x' or '0X')
+      - require bpt > 0
+      - fix problem when reading /dev/null
+  - sg_dd: Treat SIGUSR1 properly: print stats and continue;
+  - sgp_dd: reduce READ CAPACITY response size to 8 bytes
+  - sg_read: require bpt > 0
+  - sg_test_rwbuf: switch from sg_header to sg_io_hdr interface
+    N.B. After these changes no sg3_utils utilities (in the main directory)
+    use the sg_header interface
+  - sg_scan: switch from sg_header to sg_io_hdr interface
+  - sg_senddiag: increase extended foreground timeout to 60 minutes
+  - sg_inq: add names of peripheral device types
+  - sg_readcap: show total size in bytes, MB, GB
+  - sg_logs: read log pages twice (first time to get response length), for
+    fragile HBAs; decode Seagate 0x37 + 0x3e pages; display pcbs
+  - sg_modes: fix core dump when corrupted response, don't print extra pages
+  - sg_map: increase sg device scanning from 128 to 256
+  - change man page references from lk 2.5 to lk 2.6
+  - examples/sg_iovec_tst: added testing sg_iovec (sg_io_hdr iovec's)
+    [retrospective addition to this log: "#define __user" added into
+     sg_include.h so user space programs aren't broken if they choose
+     to include kernel header.]
+  - utils/hxascdmp: add utility for displaying ASCII hex
+
+Changelog for sg3_utils-1.04 [20030513]
+  - all remaining utilities in the main directory have man pages [thanks
+    to Eric Schwartz <emschwar at debian dot org> for 7 man pages]
+  - add CREDITS file
+  - sg_simple1, sg_simple2, sg_simple3, sg_simple4, sg_simple16 and
+    scsi_inquiry: moved to the examples directory
+  - sg_debug: moved to the archive directory
+  - sg_modes: add '-subp=<n>' for sub page code, suggests 6/10 byte
+    alternative if bad opcode sense received, flip -cpf flag to -pf,
+    add page names for most peripheral types
+  - sg_turs: default '-n=' argument to 1, only when '-n=1' print error
+    message in full
+  - sg_logs: print temperature "<not available>" for 255, '-t' switch
+    for temperature (from either temperature or IE log page)
+  - sg_dd: add '-odir=0|1' switch for O_DIRECT on block devices
+  - sg_start: add '-imm', '-loej' and 'pc=<n>' switches plus man page
+  - sg_readcap: add '-pmi' and 'lba=<n>' switches
+  - open files O_NONBLOCK in sg_inq, sg_modes and sg_logs so they
+    can be used on cd/dvd drivers when there is no disk present
+
+Changelog for sg3_utils-1.03 [20030402]
+  - sg_senddiag: added, allows self tests and listing of diag pages
+  - sg_start: changed to use SG_IO so works on block devices
+  - sg_err: print out some "sense key specific" data [Trent Piepho]
+  - sg_modes: add "-6" switch for force 6 byte MODE SENSE [Trent Piepho]
+  - sg_modes: more information on page codes and controls
+  - sg_inq, sg_modes, sg_logs, sg_senddiag: add man pages
+  - sg_dd: add "append=0|1" switch for glueing together large files
+  - note in README about utilities offered by scsirastools package
+
+Changelog for sg3_utils-1.02 [20030101]
+  - sg_inq: check if cmddt or evpd bits ignored
+  - sg_inq: warn -o=<n> not used for standard INQUIRY
+  - sg_turs: add -t option to time Test Unit Ready commands
+  - sg_errs: (used by most utilities) warn if sense buffer empty
+  - sg_modes: make safe with block SG_IO (bypass SG_GET_SCSI_ID ioctl)
+  - sg_logs: make safe with block SG_IO, self-test page work
+  - sg_dd: add "blksg_io=" switch to experiment with block SG_IO
+  - sg_read: now use SG_IO ioctl rather than sg write/read
+  - sginfo: fix writing parameters, check for block devices that answer
+    sg's ioctls, recognize "scd<n>" device names
+  - sg_map: stop close error report on tape devices
+  - sg_readcap: make safe with block SG_IO
+  - sg_start: make safe with block SG_IO
+  - sg_test_rwbuf: make safe with block SG_IO
+
+Changelog for sg3_utils-1.01 [20020814]
+----------------------------
+  - add raw switch ("-r") to sg_inq [Martin Schwenke]
+
+Changelog for sg3_utils-1.00 [20020728]
+----------------------------
+  - update sg_err [to SPC-3 T10/1416-D Rev 07 3 May 2002]
+  - "sg_inq -cl" now outputs opcode names
+  - add "continue on error" option to sg_dd
+  - add _LARGEFILE64_SOURCE _FILE_OFFSET_BITS=64 defines to Makefile
+  - drop 'gen' argument from sg_dd and friends, allow any file types
+    except scsi tape device file names
+  - treat of=/dev/null as special (skip write). Accept of=. as alias
+    for of=/dev/null
+  - decode various log pages in sg_logs
+  - add 'dio' argument to sgm_dd for testing "zero copy" copies
+
+Changelog for sg3_utils-0.99 [20020317]
+----------------------------
+  - add 'fua' and 'sync' arguments to sg_dd, sgp_dd and sgm_dd
+  - improve sg_inq, add "-cl" and "-36" arguments
+  - add sg_modes + sg_logs for MODE SENSE and LOG SENSE queries
+  - add rescan-scsi-bus.sh [Kurt Garloff] to archive directory
+
+Changelog for sg3_utils-0.98 [20020216]
+----------------------------
+  - move sg_reset back from archive to main directory + build
+  - sprintf() to snprintf() changes
+  - add "time=<n>" argument to sg_dd, sgp_dd and sgm_dd to time transfer
+  - add man pages for sgm_dd and sg_read, update sg_dd and sgp_dd man pages
+  - add "cdbsz=" argument to sg_dd, sgp_dd, sgm_dd + sg_read
+  - add "gen=0|1" argument to sg_dd
+
+Changelog for sg3_utils-0.97 [20011223]
+----------------------------
+  - move isosize to archive since introduced into util-linux-2.10s
+
+Changelog for sg3_utils-0.96 [20011221]
+----------------------------
+  - add '-p' switch to sg_inq to provide PCI slot_name
+  - add '-n' switch to scsi_inquiry for non-blocking open
+  - new sgm_dd (dd variant) using mmap-ed IO
+  - sg_rbuf now has a '-m' argument to select mmap-ed IO
+  - sg_rbuf now has a '-t' switch to do timing + throughput calculation
+  - add sg_simple4 to demonstrate mmap-ed IO on an INQUIRY response
+  - add sg_simple16 to do a READ_16 (16 byte SCSI READ command)
+  - mmap-ed IO requires sg version 3.1.22 or later
+  - add sg_read to read multiple times starting at same offset
+
+Changelog for sg3_utils-0.95 [20010915]
+----------------------------
+  - make sg_dd, sgp_dd and archive/sgq_dd warn if dio selected but
+    /proc/scsi/sg/allow_dio is '0'
+  - sg_map can now do any INQUIRY (when '-i' argument given)
+  - expand example in scsi_inquiry
+
+Changelog for sg3_utils-0.94 [20010419]
+----------------------------
+  - add sg_start, documented in README.sg_start [Kurt Garloff]
+  - add osst suport in sg_map [Kurt Garloff]
+  - improvements to sginfo [Kurt Garloff]
+
+Changelog for sg3_utils-0.93 [20010415]
+----------------------------
+  - more include file fine tuning
+  - some "dio" work sg_rbuf
+  - extend sgp_dd so "continue on error" works on normal files
+  - introduce sg_include.h to encapsulate sg include problems
+  - add scsi_devfs_scan
+  - add sg_bus_xfer to archive directory
+  - more error info in sginfo
+
+Changelog for sg3_utils-0.92 [20010116]
+----------------------------
+  - change sg_err.c output from stdout to stderr
+  - change sg_debug to call system("cat /proc/scsi/sg/debug");
+  - fix in+out totals in sg_dd and sgp_dd when partial transfers
+  - lower include dependencies in sg_err.h
+  - add sgq_dd + Makefile to archive directory
+
+Changelog for sg3_utils-0.91 [20001221]
+----------------------------
+  - signalling handling added to sg_dd (and documented in sg_dd.8)
+  - add man page for sg_rbuf (and a small change to its code)
+  - add "-d" switch to isosize and cope with > 2 GB (and man page)
+
+Changelog for sg3_utils-0.90
+----------------------------
+  - switch from dated versioning. Previous version was sg3_utils001012.
+    Arbitrarily start at package version 0.90 . Start Changelog.
+  - incorporate Kurt Garloff's patches from Suse scsi.spm source rpm
+    compilation:
+    - add Kurt Garloff's sg_test_rwbuf utility to read and write to disk
+      buffer
+    - clean up Makefile to include a "make install" (and also add a
+      "make uninstall").
+    - add "-uno" switch to sginfo
+  - make raw and sg devices equally acceptable to sg_dd and sgp_dd.
+    [Raw devices still not as fast as sg devices doing disk to disk
+    copies in sgp_dd but this may be improved soon. Still faster than
+    using dd!]
+  - change lseek() in sg_dd and sgp_dd to _llseek() [using code borrowed
+    from fdisk] so big disks can be properly offset with 'skip' and
+    'seek' arguments. [This change is significant for raw devices and
+    normal files since sg devices already use 31 bit block addressing.]
+  - rename sg_s3_inq to sg_inq. This utility allows the INQUIRY response
+    to be decoded as per SCSI 3 and 4. Also can probe EVPD and CmdDt pages.
+  - change multiplier suffixes on sg_dd, sgp_dd and sg_turs so lower case
+    "k, m, g" are powers of 2 while "K, M, G" are powers of 10. This idea
+    borrowed from lmdd (lmbench suite)
+  - retire a few more less used utilities into the archive directory.
+  - add man pages for sg_dd, sgp_dd and sg_map

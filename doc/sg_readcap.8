@@ -1,0 +1,157 @@
+.TH SG_READCAP "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.SH NAME
+sg_readcap \- sends a SCSI READ CAPACITY command
+.SH SYNOPSIS
+.B sg_readcap 
+[\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-long\fR] [\fI\-\-pmi\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_readcap 
+[\fI\-16\fR] [\fI\-b\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-lba=LBA\fR]
+[\fI\-pmi\fR] [\fI\-r\fR] [\fI\-v\fR] [\fI\-V\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+The normal action of the SCSI READ CAPACITY command is to fetch the number
+of blocks (and block size) from the \fIDEVICE\fR.
+.PP
+The SCSI READ CAPACITY command (both 10 and 16 byte cdbs) actually yield
+the block address of the last block and the block size. The number of
+blocks is thus one plus the block address of the last block (as blocks
+are counted origin zero (i.e. starting at block zero)). This is the source
+of many "off by one" errors.
+.PP
+Device capacity is the product of the number of blocks by the block size.
+This utility outputs this figure in bytes, MiB (1048576 bytes per MiB)
+and GB (1000000000 bytes per GB).
+.PP
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later section
+on the old command line syntax outlines the second group of options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-brief\fR
+outputs two hex numbers (prefixed with '0x' and space separated)
+to stdout. The first number is the maximum number of blocks on the
+device (which is one plus the lba of the last accessible block). The
+second number is the size of each block. If the operation fails
+then "0x0 0x0" is written to stdout.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output the response to the READ CAPACITY command (either the 10 or 16
+byte cdb variant) in ASCII hexadecimal on stdout.
+.TP
+\fB\-L\fR, \fB\-\-lba\fR=\fILBA\fR
+used in conjunction with \fI\-\-pmi\fR option. This variant of READ CAPACITY
+will yield the last block address after \fILBA\fR prior to a delay. For a
+disk, given a \fILBA\fR it yields the highest numbered block on the same
+cylinder (i.e. before the heads need to move). \fILBA\fR is assumed to be
+decimal unless prefixed by "0x" or it has a trailing "h". Defaults to 0.
+.TP
+\fB\-l\fR, \fB\-\-long\fR
+Use the 16 byte cdb variant of the READ CAPACITY command. The default
+action is to use the 10 byte cdb variant which limits the maximum
+block address to (2**32 \- 2). When a 10 byte cdb READ CAPACITY command
+is used on a device whose size is too large then a last block address
+of 0xffffffff is returned (if the device complies with SBC\-2).
+.TP
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
+.TP
+\fB\-p\fR, \fB\-\-pmi\fR
+partial medium indicator: for finding the next block address prior to
+some delay (e.g. head movement). In the absence of this option, the
+total number of blocks and the block size of the device are output.
+Used in conjunction with the \fI\-\-lba=LBA\fR option.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output response in binary to stdout.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level of verbosity. Can be used multiple times.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+outputs version string then exits.
+.SH NOTES
+If sg_readcap is called without the \fI\-\-long\fR option then the 10 byte
+cdb version (i.e. READ CAPACITY (10)) is sent to the \fIDEVICE\fR. If the
+number of blocks in the response is reported as
+0xffffffff (i.e. (2**32 \- 1) ) and the \fI\-\-hex\fR option has not been
+given, then READ CAPACITY (16) is called and its response is output.
+.PP
+The read capacity(16) response shows additional information not found
+in the read capacity(10) response. This includes protection information
+and the number of logical blocks per physical block. So even though
+the media size may not exceed what READ CAPACITY(10) can show, it may
+still be useful to examine the response to READ CAPACITY(16).
+.PP
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
+generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
+and DVD drives) can also be specified. For example "sg_readcap /dev/sda"
+and "sg_readcap /dev/hdd" (if /dev/hdd is a ATAPI CD/DVD device) will
+work in the 2.6 series kernels.
+.SH EXIT STATUS
+The exit status of sg_readcap is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.TP
+\fB\-16\fR
+Use the 16 byte cdb variant of the READ CAPACITY command.
+Equivalent to \fI\-\-long\fR in the main description.
+.TP
+\fB\-b\fR
+utility outputs two hex numbers (prefixed with '0x' and space separated) to
+stdout. The first number is the maximum number of blocks on the device (which
+is one plus the lba of the last accessible block). The second number is the
+size of each block. If the operation fails then "0x0 0x0" is written to
+stdout.  Equivalent to \fI\-\-brief\fR in the main description.
+.TP
+\fB\-h\fR
+output the usage message then exit. Giving the \fI\-?\fR option also outputs
+the usage message then exits.
+.TP
+\fB\-H\fR
+output the response to the READ CAPACITY command (either the 10 or 16
+byte cdb variant) in ASCII hexadecimal on stdout.
+.TP
+\fB\-lba\fR=\fILBA\fR
+used in conjunction with \fI\-pmi\fR option. This variant of READ CAPACITY
+will yield the last block address after \fILBA\fR prior to a delay.
+Equivalent to \fI\-\-lba=LBA\fR in the main description.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-pmi\fR
+partial medium indicator: for finding the next block address prior to
+some delay (e.g. head movement). In the absence of this switch, the
+total number of blocks and the block size of the device are output.
+Equivalent to \fI\-\-pmi\fR in the main description.
+.TP
+\fB\-r\fR
+output response in binary (to stdout).
+.TP
+\fB\-v\fR
+verbose: print out cdb of issued commands prior to execution. '\-vv'
+and '\-vvv' are also accepted yielding greater verbosity.
+.TP
+\fB\-V\fR
+outputs version string then exits.
+.SH AUTHORS
+Written by Douglas Gilbert
+.SH COPYRIGHT
+Copyright \(co 1999\-2007 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq(sg3_utils)

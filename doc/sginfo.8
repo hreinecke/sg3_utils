@@ -1,0 +1,320 @@
+.TH SGINFO "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.SH NAME
+sginfo \- access mode page information for a SCSI (or ATAPI) device
+.SH SYNOPSIS
+.B sginfo
+[\fIOPTIONS\fR]
+[\fIDEVICE\fR]
+[\fIREPLACEMENT_PARAMETERS\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sginfo is a port of the Linux
+.B scsiinfo
+program by Eric Youngdale. It uses SCSI generic (sg) devices; however in
+some cases the high level device name (i.e. sd, sr, st, osst, or hd) can
+also be used. The primary role of this program is to access mode page
+information. If permitted, mode page information can be altered. In
+addition information from the INQUIRY and READ DEFECTS commands are also
+available.
+.PP
+Those interested in SCSI mode pages may find the
+.B sdparm
+utility easier use, especially for changing parameters. Also the author
+considers this utility legacy so the mode pages are not being updated
+as http://www.t10.org adds and modifies mode page fields.
+.PP
+Four sets of values are maintained by a SCSI device for each mode
+page: current (active), default (manufacturer's supplied values),
+saved (values that are retained if the SCSI device is powered down),
+and changeable (mask indicating those values that can be changed).
+By default when a mode page is displayed the current values are
+shown. This can be overridden by "\-M" (defaults), "\-S" (saved)
+or "\-m" (modifiable (i.e. changeable)).
+.PP
+Many mode pages are decoded: for disks (see SBC\-2), for CD/DVDs (see
+MMC\-2/3/4/5), for tapes (see SSC\-2) and for enclosures (see SES\-2).
+Some mode pages common to all SCSI peripheral device types are defined
+in SPC\-4 (primary commands). A decoded mode page has its field names
+in the first column and the corresponding value in the second column.
+A "hex" mode page (and subpage) has its byte position in the first 
+column (in hex and starting at 0x2) and the corresponding hex value
+in the second column. Decoded pages can be viewed with the '\-t' option
+or with a specific option (e.g. 'c' for the caching mode page). 
+Naturally decoded pages must be supplied by the \fIDEVICE\fR and
+recognised by this program. If supported by the device, decoded pages
+may be modified. All mode pages (and subpages) that the device supports
+can be viewed in hex (and potentially modified) via the "\-u" option
+.PP
+If no options are given that will cause mode page(s) or INQUIRY data
+to be printed out, then a brief INQUIRY response is output. This
+includes the vendor, product and revision level of the device.
+.SH OPTIONS
+.TP
+\fB\-6\fR
+Perform 6 byte MODE SENSE and MODE SELECT commands; by default the
+10 byte variants are used.
+.TP
+\fB\-a\fR
+Display some INQUIRY data and the unit serial number followed by
+all mode pages reported by the device. It is similar to 
+the '\-t 0x3f' option. If the mode page is known then it is output
+in decoded form otherwise it is output in hexadecimal.
+.TP
+\fB\-A\fR
+Display some INQUIRY data and the unit serial number followed by
+all mode pages and all mode subpages reported by the device.
+It is similar to the '\-t 0x3f,0xff' option. If a mode (sub)page 
+is known then it is output in decoded form otherwise it is output in
+hexadecimal.
+.TP
+\fB\-c\fR
+Access information in the Caching mode page.
+.TP
+\fB\-C\fR
+Access information in the Control mode Page.
+.TP
+\fB\-d\fR
+Display defect lists (default format: index).
+.TP
+\fB\-D\fR
+Access information in the Disconnect\-Reconnect mode page.
+.TP
+\fB\-e\fR
+Access information in the Error Recovery mode page.
+.TP
+\fB\-E\fR
+Access information in the Control Extension mode page.
+.TP
+\fB\-f\fR
+Access information in the Format Device mode page.
+.TP
+\fB\-F\fR\fIarg\fR
+Format of the defect lists:
+                \-Flogical  \- logical block addresses (32 bit)
+                \-Flba64    \- logical block addresses (64 bit)
+                \-Fphysical \- physical blocks
+                \-Findex    \- defect bytes from index
+                \-Fhead     \- sort by head 
+.br
+Used in conjunction with "\-d" or "\-G". If a format is not given "index" is
+assumed.
+.TP
+\fB\-g\fR
+Access information in the Rigid Disk Drive Geometry mode page.
+.TP
+\fB\-G\fR
+Display grown defect list (default format: index).
+.TP
+\fB\-i\fR
+Display the response to a standard INQUIRY command.
+.TP
+\fB\-I\fR
+Access the Informational Exceptions mode page.
+.TP
+\fB\-l\fR
+List known SCSI devices on the system.
+.TP
+\fB\-n\fR
+Access information in the Notch and Partition mode page.
+.TP
+\fB\-N\fR
+Negate (i.e. stop) mode page changes being placed in the "saved"
+page (by default changes go to the current and the saved page).
+Only active when used together with '\-R'.
+.TP
+\fB\-P\fR
+Access information in the Power Condition mode page.
+.TP
+\fB\-r\fR
+Display all raw (or primary) SCSI device names visible in the /dev
+directory. Examples are /dev/sda, /dev/st1 and /dev/scd2. Does not
+list sg device names so devices such as a SCSI enclosure which only
+have an sg device name are not listed.
+.TP
+\fB\-s\fR
+Display information in the unit serial number page which is a
+INQUIRY command variant.
+.TP
+\fB\-t\fR \fIPN\fR[,\fISPN\fR]
+Display information from mode page number \fIPN\fR (and optionally sub
+page number \fISPN\fR) in decoded format (if known, otherwise in hex form).
+\fIPN\fR is a mode page number in a decimal number from 0 to 63 inclusive.
+\fISPN\fR is the mode subpage number and is assumed to be 0 if not given.
+\fISPN\fR is a decimal number from 1 to 255 inclusive. A page number of 63
+returns all pages supported by the device in ascending order except for
+page 0 which, if present, is last. Page 0 is vendor specific and not
+necessarily in mode page format. Alternatively hex values can be given for
+both \fIPN\fR and \fISPN\fR (both prefixed by '0x'). 
+.TP
+\fB\-t\fR
+Trace commands (for debugging). When used once SCSI commands are shown
+(in hex) and any errors from these SCSI commands are spelt out (i.e.
+with a decoded and raw sense buffer). When used twice, the additional 
+data sent with mode select and the response from mode sense are 
+shown (in hex).
+.TP
+\fB\-u\fR \fIPN\fR[,\fISPN\fR]
+Display information from mode page number \fIPN\fR (and optionally \fISPN\fR)
+in hex form. \fIPN\f is a mode page number in a decimal number from 0 to 63
+inclusive. \fISPN\fR is the mode subpage number and is assumed to be 0 if
+not given. \fISPN\fR is a decimal number from 1 to 255 inclusive. A page
+number of 63 returns all pages supported by the device in ascending order
+except for page 0 which, if present, is last. Page 0 is vendor specific and
+not necessarily in mode page format. Alternatively hex values can be given
+for both \fIPN\fR and \fISPN\fR (both prefixed by '0x'). For example 63 and
+0x3f are equivalent.
+.TP
+\fB\-v\fR
+Display version string then exit. [N.B. This option increases verbosity for
+most other utilities in this package as outlined in 'man 8 sg3_utils'.
+This odd usage is for backward compatibility with the scsiinfo utility.] 
+.TP
+\fB\-V\fR
+Access information in the Verify Error Recovery mode page. [N.B. This
+option prints the version string then exits in most other utilities in
+this package as outlined in 'man 8 sg3_utils'. This odd usage is for
+backward compatibility with the scsiinfo utility.] 
+.TP
+\fB\-z\fR
+do a single fetch for mode pages (over\-estimating the expected length
+of the returned response). The default action is to do a double 
+fetch, the first fetch is to find the response length that could be
+returned. Devices that closely adhere to SCSI standards should not
+require this option, some real world devices do require it.
+.SH ADVANCED OPTIONS
+Only one of the following three options can be specified.
+None of these three implies the current values are returned.
+.TP
+\fB\-m\fR
+Display modifiable fields instead of current values
+.TP
+\fB\-M\fR
+Display manufacturer's defaults instead of current values
+.TP
+\fB\-S\fR
+Display saved defaults instead of current values
+.PP
+The following are advanced options, not generally suited for most users:
+.TP
+\fB\-X\fR
+Display output values in a list. Make them suitable for editing and
+being given back to the '\-R' (replace command).
+.TP
+\fB\\-R\fR
+Replace parameters \- best used with \-X (expert use only)
+.SH CHANGING MODE PAGE PARAMETERS
+Firstly you should know what you are doing before changing existing
+parameters. Taking the control page as an example, first list it out 
+normally (e.g. "sginfo \-C /dev/sda") and
+decide which parameter is to be changed (note its position relative
+to the other lines output). Then execute the same sginfo command with
+the "\-X" option added; this will output the parameter values in a
+single row in the same relative positions as the previous command. Now
+execute "sginfo \-CXR /dev/sda ..." with the "..." replaced by the
+single row of values output by the previous command, with the relevant
+parameter changed. Here is a simplified example:
+.PP
+   $ sginfo \-C /dev/sda
+.br
+   Control mode page (0xa)
+.br
+   \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+.br
+   TST                        0
+.br
+   D_SENSE                    0
+.br
+   GLTSD                      1
+.br
+   RLEC                       0
+.PP
+[Actually the Control page has more parameters that shown above.] Next
+output those parameters in single line form:
+.PP
+   $ sginfo \-CX /dev/sda
+.br
+   0 0 1 0
+.PP
+Let us assume that the GLTSD bit is to be cleared. The command that
+will clear it is:
+.PP
+   $ sginfo \-CXR /dev/sda 0 0 0 0
+.PP
+The same number of parameters output by the "\-CX" command needs to be
+placed at the end of the "\-CXR" command line (after the device name).
+Now check that the change took effect:
+.PP
+   $ sginfo \-C /dev/sda
+.br
+   Control mode page (0xa)
+.br
+   \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+.br
+   TST                        0
+.br
+   D_SENSE                    0
+.br
+   GLTSD                      0
+.br
+   RLEC                       0
+.PP
+When a mode page is "replaced" the default action is to change both the 
+current page and the saved page. [For some reason versions of sginfo and
+scsiinfo prior to 2.0 did not change the "saved" page.] To change only
+the current mode page but not the corresponding saved page use the "\-N" 
+option.
+.PP
+.SH GENERATING SCRIPT FILES AND HEX PAGES
+The "\-aX" or "\-AX" option generates output suitable for a script file.
+Mode pages are output in list format (after the INQUIRY and serial
+number) one page per line. To facilitate running the output as (part
+of) a script file to assert chosen mode page values, each line is 
+prefixed by "sginfo \-t \fIPN\fR[,\fISPN\fR] \-XR ". When such a script
+file is run, it will have the effect of re\-asserting the mode
+page values to what they were when the "\-aX" generated the output.
+.PP
+All mode pages (and subpages) supported by the device can be accessed via
+the \-t and \-u options. To see all
+mode pages supported by the device use "\-u 63". [To see all mode pages
+and all subpages use "\-u 63,255".] To list the control mode page in
+hex (mode page index in the first column and the corresponding byte
+value in the second column) use "\-u 0xa". Mode pages (subpage code == 0)
+start at index position 2 while subpages start at index position 4.
+If the "\-Xu ..." option is used then a list a hex values each value
+prefixed by "@" is output. Mode (sub)page values can then be modified with
+with the "\-RXu ..." option. 
+.PP
+.SH RESTRICTIONS
+The SCSI MODE SENSE command yields block descriptors as well as a mode
+page(s). This utility ignores block descriptors and does not display
+them. The "disable block descriptor" switch (DBD) in the MODE SENSE command
+is not set since some devices yield errors when it is set. When mode page
+values are being changed (the "\-R" option), the same block descriptor
+obtained by reading the mode page (i.e. via a MODE SENSE command) is sent
+back when the mode page is written (i.e. via a MODE SELECT command).
+.PP
+.SH REFERENCES
+SCSI (draft) standards can be found at http://www.t10.org . The relevant
+documents are SPC\-4 (mode pages common to all device types),
+SBC\-2 (direct access devices [e.g. disks]), MMC\-4 (CDs and DVDs) and
+SSC\-2 (tapes).
+.PP
+.SH AUTHORS
+Written by Eric Youngdale, Michael Weller, Douglas Gilbert, Kurt Garloff,
+Thomas Steudten
+.PP
+.SH HISTORY
+scsiinfo version 1.0 was released by Eric Youngdale on 1st November 1993.
+The most recent version of scsiinfo is version 1.7 with the last patches
+by Michael Weller. sginfo is derived from scsiinfo and uses the sg
+interface to get around the 4 KB buffer limit in scsiinfo that cramped
+the display of defect lists especially. sginfo was written by Douglas 
+Gilbert with patches from Kurt Garloff. This manpage corresponds with
+version 2.25 of sginfo.
+.PP
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B scsiinfo(internet); sg_modes, sg_inq, sg_vpd (sg3_utils),
+.B sdparm(sdparm)

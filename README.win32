@@ -1,0 +1,136 @@
+Introduction
+============
+The win32 port of sg3_utils contains those utilities that are _not_ specific
+to Linux. In some cases a utility could be ported but requires more work. An
+example is sg_dd which needs more work beyond the SCSI command pass through
+mechanism.
+
+Two build environments are caterered for: cygwin (see www.cygwin.com) and
+MinGW ("Minimalist GNU for Windows", see www.mingw.org). Both are based in
+the gcc compiler (although other C compilers should have little problem with
+the source code). Cygwin is a more sophisticated, commercial product that
+results in executables that depend on cygwin1.dll . No licensing is required
+since sg3_utils is open source (with either BSD or GPL licenses) but users
+will need to fetch that dll. On the other hand MinGW (and its companion MSYS
+shell) builds freestanding console executables. The Unix library support is
+not as advanced with MinGW which has led to some timing functions being
+compiled out when sg3_utils is built for MinGW.
+
+Supported Utilities
+===================
+Here is a list of utilities that have been ported:
+    sg_format
+    sg_get_config
+    sg_ident
+    sg_inq          [dropped ATA IDENTIFY DEVICE capability]
+    sg_logs
+    sg_luns
+    sg_modes
+    sg_persist
+    sg_opcodes
+    sg_prevent
+    sg_raw
+    sg_rdac
+    sg_read_buffer
+    sg_read_long
+    sg_readcap
+    sg_reassign
+    sg_requests
+    sg_rmsn
+    sg_rtpg
+    sg_safte
+    sg_sat_identify
+    sg_sat_phy_event
+    sg_sat_set_features
+    sg_scan         [this is Windows specific]
+    sg_senddiag
+    sg_ses
+    sg_start
+    sg_stpg
+    sg_sync
+    sg_turs
+    sg_verify
+    sg_vpd
+    sg_wr_mode
+    sg_write_buffer
+    sg_write_long
+
+Most utility names are indicative of the main SCSI command that they execute.
+Some utilities are slightly higher level, for example sg_ses fetches SCSI
+Enclosure Services (SES) status pages and can send control pages. Each
+utility has a man page (placed in section 8). There is summary of the mapping
+between utility names and the SCSI commands they execute in the COVERAGE
+file. An overview of sg3_utils can be found at:
+http://www.torque.net/sg/sg3_utils.html .
+A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
+
+
+See the INSTALL file (towards the end) for instructions on how to build
+sg3_utils on Windows operating systems. Some man pages have examples which
+use linux device names which hopefully will not confuse Windows users.
+
+
+Details
+=======
+The ported utilities listed above, all use SCSI command functions declared in
+sg_cmds_basic.h and sg_cmds_extra.h . Those SCSI command functions are
+implemented in the corresponding ".c" files. The ".c" files pass SCSI commands
+to the host operating system via an interface declared in sg_pt.h . There are
+currently four implementations of that interface depending on the host
+operating system:
+  - sg_pt_linux.c
+  - sg_pt_freebsd.c
+  - sg_pt_osf1.c  [Tru64]
+  - sg_pt_win32.c
+
+The sg_pt_win32.c file uses the Windows SCSI Pass Through (SPT) mechanism.
+It does not currently use the ASPI32 interface which requires a dll from
+Adaptec. The sg_scan utility is a special version for Windows and it attempts
+to show the various allowable device names, grouping various names for the
+same device on one line. Here is an example of sg_scan's output:
+
+# sg_scan
+SCSI0:0,0,0       C:    PD0      IC25N040ATCS05-0        CS4O  *
+SCSI1:0,0,0       D:    CDROM0   HITACHI DVD-ROM GD-S200 0034
+SCSI2:0,0,0       I: +  PD5      QUANTUM LPS525S         3110
+SCSI2:0,6,0             TAPE0    SONY    SDT-7000        0192
+                  E:             Generic USB SD Reader   1.00  pdt=0
+                        PD1      Generic USB SD Reader   1.00
+
+So the following device names all refer to the same (ATA) disk:
+"SCSI0:0,0,0", "C:" and "PD0". Recent version of windows will only allow the
+"SCSI0:0,0,0" to be used if there isn't another device name available.
+The right hand section of each line is the SCSI INQUIRY command response
+strings (which are constructed by Windows is some cases rather than the
+device). The "*" at the end of the first line flags that the INQUIRY
+response is not quite properly structured (according to SCSI-2) which is
+usually indicative of an ATA disk.
+
+If no class driver name (e.g. "PD0", "CDROM0" or "TAPE0") is available
+then the SCSI "peripheral device type" (pdt) is placed at the end of the
+line. Common pdt values are 0 for disks, 1 for tapes and 5 for cd/dvd
+drives. The "+" after the "I:" indicates that other volume names
+(letters) map to that device. This occurs when a disk has two or more
+partitions that windows recognizes. The longer "PhysicalDrive" name,
+shown in Windows documentation, may be used but "PD" is obviously
+quicker to type.
+
+Finally sg_scan does not manage to put all device names for USB and
+IEEE 1394 devices on one line. The last two lines of output are actually
+the same device.
+
+Several utilities have conditional compilation sections based on
+the SG3_UTILS_MINGW define. For those who want to try native C compilers
+on Windows setting the SG3_UTILS_MINGW define may help.
+
+Build environments
+==================
+This package has various Makefiles so that these utilities can be built
+in either a cygwin and MinGW environment, called Makefile.win32 and
+Makefile.mingw respectively. The executables produced are console
+applications that can be executed in either a cygwin, MSYS or "cmd" shell.
+See the INSTALL file for more details.
+
+
+Doug Gilbert
+2nd December 2007

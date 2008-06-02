@@ -1,0 +1,339 @@
+.TH SG_LOGS "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
+.SH NAME
+sg_logs \- access log pages with SCSI LOG SENSE command
+.SH SYNOPSIS
+.B sg_logs
+[\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
+[\fI\-\-page=PG[,SPG]\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR]
+[\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR]
+[\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_logs
+[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-h\fR] [\fI\-H\fR]
+[\fI\-l\fR] [\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG[,SPG]\fR]
+[\fI\-paramp=PP\fR] [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-select\fR]
+[\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
+\fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility sends a SCSI LOG SENSE command to the \fIDEVICE\fR and then
+outputs the response. The LOG SENSE command is used to fetch log pages. Known
+log pages are decoded by default. When the \fI\-\-reset\fR and/or
+\fI\-\-select\fR option is given then a SCSI LOG SELECT command is issued to
+reset parameters.
+.PP
+In SPC\-4 revision 5 a subpage code was introduced to both the LOG SENSE and
+LOG SELECT command. At the same time a page code field was introduced to the
+to the LOG SELECT command. The log subpage code can range from 0 to 255 (0xff)
+inclusive. The subpage code value 255 can be thought of as a wildcard.
+.PP
+This utility supports two command line syntaxes, the preferred one is shown
+first in the synopsis and explained in this section. A later section on the
+old command line syntax outlines the second group of options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+outputs all the log pages supported by the device. This requires a two stage
+process: first the "supported log pages" log page is fetched, then for each
+entry in the response, the corresponding log page is fetched and displayed.
+When used twice (e.g. '\-aa') all log pages and subpages are fetched.
+.TP
+\fB\-b\fR, \fB\-\-brief\fR
+shorten the amount of output for some log pages. For example the Tape
+Alert log page only outputs parameters whose flags are set when
+\fI\-\-brief\fR is given.
+.TP
+\fB\-c\fR, \fB\-\-control\fR=\fIPC\fR
+accepts 0, 1, 2 or 3 for the \fIPC\fR argument:
+.br
+  \fB0\fR : current threshold values
+.br
+  \fB1\fR : current cumulative values
+.br
+  \fB2\fR : default threshold values
+.br
+  \fB3\fR : default cumulative values
+.br
+The default value is 1 (i.e. current cumulative values).
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+The default action is to decode known mode page numbers (and subpage numbers)
+into text. When this option is used once, the response is output in
+hexadecimal.
+.TP
+\fB\-l\fR, \fB\-\-list\fR
+lists the names of all logs sense pages supported by this device. This is
+done by reading the "supported log pages" log page. When used
+twice (e.g. '\-ll') lists the names of all logs sense pages and subpages
+supported by this device. There is a list of common log page codes below.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+sets the "allocation length" field in the LOG SENSE cdb. The is the maximum
+length in bytes that the response will be. Without this option (or \fILEN\fR
+equal to 0) this utility first fetches the 4 byte response then does a second
+access with the length indicated in the first (4 byte) response. Negative
+values and 1 for \fILEN\fR are not accepted. Responses can be quite
+large (e.g. the background scan results log page) and this option can be
+used to limit the amount of information returned.
+.TP
+\fB\-n\fR, \fB\-\-name\fR
+decode some log pages into 'name=value' entries, one per line. The name
+contains no space and may be abbreviated and the value is decimal unless
+prefixed by '0x'. Nesting is indicated by leading spaces. This form
+is meant to be relatively easy to parse.
+.TP
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
+.TP
+\fB\-p\fR, \fB\-\-page\fR=\fIPG[,SPG]\fR
+log page code to access. \fIPG\fR is expected to be a decimal number between
+0 and 63 inclusive. A hexadecimal number can be specified by a leading "0x"
+or a trailing "h". Common log page codes are listed below. Optionally
+\fISPG\fR, a subpage code, can be given. \fISPG\fR is expected to be a
+decimal number between 0 and 255 inclusive.
+.TP
+\fB\-P\fR, \fB\-\-paramp\fR=\fIPP\fR
+\fIPP\fR is the parameter pointer value to place in a field of that name in
+the LOG SENSE cdb. A decimal number in the range 0 to 65535 (0xffff) is
+expected. When a value greater than 0 is given the \fI\-\-ppc\fR option
+should be selected. The default value is 0.
+.TP
+\fB\-q\fR, \fB\-\-pcb\fR
+show Parameter Control Byte settings (only relevant when log parameters
+being output in ASCII).
+.TP
+\fB\-Q\fR, \fB\-\-ppc\fR
+sets the Parameter Pointer Control (PPC) bit in the LOG SENSE cdb. Default
+is 0 (i.e. cleared).
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output the response in binary to stdout. Error messages and warnings are
+output to stderr.
+.TP
+\fB\-R\fR, \fB\-\-reset\fR
+use SCSI LOG SELECT command (PCR bit set) to reset the all log pages (or
+the given page). [SPC\-4 (rev 6) doesn't say that a given log (sub)page can
+be reset yet.] Exactly what is reset depends on the accompanying SP
+bit (i.e. \fI\-\-sp\fR option which defaults to 0) and the
+\fIPC\fR ("page control") value (which defaults to 1). Supplying this option
+implies the \fI\-\-select\fR option as well. This option seems to clear error
+counter log pages but leaves pages like self\-test results, start\-stop cycle
+counter and temperature log pages unaffected. This option may be required to
+clear log pages if a counter reaches its maximum value since the log page in
+which the counter is found will remain "stuck" until something is done.
+.TP
+\fB\-S\fR, \fB\-\-select\fR
+use a LOG SELECT command. The default action (i.e. when neither this option
+nor \fI\-\-reset\fR is given) is to do a LOG SENSE command. When this option
+is given, the SP bit (i.e. \fI\-\-sp\fR option which defaults to 0), the
+\fIPC\fR ("page control") value (which defaults to 1) and the PCR bit (i.e.
+\fI\-\-reset\fR option which defaults to 0) are placed in the LOG SELECT
+cdb. At some stage the log page and subpage options may also be active [but
+SPC\-4 (rev 6) doesn't say that].
+.TP
+\fB\-s\fR, \fB\-\-sp\fR
+sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared). When set
+this instructs the device to store the current log page parameters (as
+indicated by the DS and TSD parameter codes) in some non\-volatile location.
+Hence the log parameters will be preserved across power cycles. This option
+is typically not needed, especially if the GLTSD flag is clear in the
+control mode page as this instructs the device to periodically save all
+saveable log parameters to non\-volatile locations.
+.TP
+\fB\-t\fR, \fB\-\-temperature\fR
+outputs the temperature. First looks in the temperature log page and if
+that is not available tries the Informational Exceptions log page which
+may also have the current temperature (especially on older disks).
+.TP
+\fB\-T\fR, \fB\-\-transport\fR
+outputs the transport ('Protocol specific port') log page. Equivalent
+to setting '\-\-page=18h'.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level of verbosity.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print out version string then exit.
+.SH NOTES
+This utility will usually do a double fetch of log pages with the SCSI LOG
+SENSE command. The first fetch requests a 4 byte response (i.e. place 4 in
+the "allocation length" field in the cdb). From that response it can
+calculate the actual length of the response which is what it asks for
+on the second fetch. This is typical practice in SCSI and guaranteed to
+work in the standards. However some older devices don't comply. For
+those devices using the \fI\-\-maxlen=LEN\fR option will do a single fetch.
+A value of 252 should be a safe starting point.
+.PP
+Various log pages hold information error rates, device temperature,
+start stop cycles since device produced and the results of the last
+20 self tests. Self tests can be initiated by the sg_senddiag(8) utility.
+The smartmontools package provides much of the information found with
+sg_logs in a form suitable for monitoring the health of SCSI disks and
+tape drives.
+.PP
+Here is a list of log pages that are decoded by this utility. [The code
+values can be given to '\-\-page=' as is, with a trailing "h" instead of
+the leading "0x", or as their decimal equivalents.]:
+.PP
+0x0       Supported log pages
+.br
+0x0,0xff  Supported log pages and subpages
+.br
+0x1       Buffer overrun/underrun
+.br
+0x2       Write error counter
+.br
+0x3       Read error counter
+.br
+0x4       Read reverse error counter
+.br
+0x5       Verify error counter
+.br
+0x6       Non\-medium error
+.br
+0x7       Last n error events
+.br
+0x8       Format status (sbc\-2)
+.br
+0xb       Last n deferred errors or asynchronous events
+.br
+0xc       Sequential access device (ssc\-2)
+.br
+0xd       Temperature
+.br
+0xe       Start\-stop cycle counter
+.br
+0x10      Self\-test results
+.br
+0x15      Background scan results (sbc\-3)
+.br
+0x17      Non\-volatile cache (sbc\-3)
+.br
+0x18      Protocol specific port (SAS transport)
+.br
+0x19      General statistics and performance
+.br
+0x2f      Informational exceptions
+.br
+0x37      Seagate cache (vendor, disk)
+.br
+0x3e      Seagate factory (vendor, disk)
+.PP
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
+generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
+and DVD drives) can also be specified. For example "sg_logs \-a /dev/sda"
+will work in the 2.6 series kernels.
+.SH EXIT STATUS
+The exit status of sg_logs is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.PP
+Options with arguments or with two or more letters can have an extra '\-'
+prepended. For example: both '\-pcb' and '\-\-pcb' are acceptable.
+.TP
+\fB\-a\fR
+outputs all the log pages supported by the device. 
+Equivalent to \fI\-\-all\fR in the main description.
+.TP
+\fB\-A\fR
+outputs all the log pages and subpages supported by the device.
+Equivalent to '\-\-all \-\-all' in the main description.
+.TP
+\fB\-c\fR=\fIPC\fR
+Equivalent to \fI\-\-control=PC\fR in the main description.
+.TP
+\fB\-h\fR
+suppresses decoding of known log sense pages and prints out the
+response in hex instead.
+.TP
+\fB\-H\fR
+same action as '\-h' in this section and equivalent to \fI\-\-hex\fR in
+the main description.
+.TP
+\fB\-l\fR
+lists the names of all logs sense pages supported by this device.
+Equivalent to \fI\-\-list\fR in the main description.
+.TP
+\fB\-L\fR
+lists the names of all logs sense pages and subpages supported by this
+device. Equivalent to '\-\-list \-\-list' in the main description.
+.TP
+\fB\-m\fR=\fILEN\fR
+request only \fILEN\fR bytes of response data. Default is 0 which is
+interpreted as all that is available. \fILEN\fR is decimal unless it has
+a leading '0x' or trailing 'h'.  Equivalent to \fI\-\-maxlen=LEN\fR in
+the main description.
+.TP
+\fB\-n\fR
+Equivalent to \fI\-\-name\fR in the main description.
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-p\fR=\fIPG[,SPG]\fR
+\fIPG\fR is the log page code to access. Should be a hexadecimal number
+between 0 and 3f inclusive. If given \fISPG\fR is the log subpage code.
+\fISPG\fR should be a hexadecimal number between 0 and ff inclusive. The
+subpage code of 'ff' can be thought of as a wildcard.
+.TP
+\fB\-paramp\fR=\fIPP\fR
+\fIPP\fR is the parameter pointer value (in hex) to place in command.
+Should be a number between 0 and ffff inclusive. 
+.TP
+\fB\-pcb\fR
+show Parameter Control Byte settings (only relevant when log parameters
+being output in ASCII).
+.TP
+\fB\-ppc\fR
+sets the Parameter Pointer Control (PPC) bit. Default is 0 (i.e. cleared).
+.TP
+\fB\-r\fR
+use SCSI LOG SELECT command (PCR bit set) to reset the all log pages (or
+the given page). Equivalent to \fI\-\-reset\fR in the main description.
+.TP
+\fB\-select\fR
+use a LOG SELECT command. Equivalent to \fI\-\-select\fR in the main
+description.
+.TP
+\fB\-sp\fR
+sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared).
+Equivalent to \fI\-\-sp\fR in the main description.
+.TP
+\fB\-t\fR
+outputs the temperature. Equivalent to \fI\-\-temperature in the main
+description.
+.TP
+\fB\-T\fR
+outputs the transport ('Protocol specific port') log page. Equivalent
+to \fI\-\-transport\fR in the main description.
+.TP
+\fB\-v\fR
+increase level of verbosity.
+.TP
+\fB\-V\fR
+print out version string then exit.
+.TP
+\fB\-?\fR
+output usage message then exit.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2002\-2007 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B smartctl(smartmontools), sg_senddiag(8)

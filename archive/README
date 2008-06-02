@@ -1,0 +1,7 @@
+In order to save source code space, the files is this directory have
+been removed (apart from the rescan-scsi-bus.sh script). See the
+sg3_utils-1.22 source tarball for the most recent version that
+included this source.
+
+Douglas Gilbert
+10th October 2006

@@ -1,0 +1,91 @@
+                        Command coverage
+                        ================
+The following table lists SCSI commands in alphabetical order on the
+left and the sg3_utils utilities that implement invocations of them
+on the right. The second table lists supported ATA commands.
+
+SCSI command        sg3_utils utilities that use this SCSI command
+------------        -------------------------------------------------
+ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features
+                    (main directory); sg_sat_chk_power, sg__sat_identify, 
+                    sg_sat_phy_event, sg__sat_set_features,
+                    sg_sat_smart_rd_data (previous five in the examples
+                    directory), ++
+ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
+GET CONFIGURATION   sg_get_config, ++
+INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
+                    sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
+                    sg_persist, sg_scan, sg_ses, sg_vpd ++
+FORMAT UNIT         sg_format, ++
+LOG SELECT          sg_logs('-r' or '-select'), ++
+LOG SENSE           sg_logs, ++
+MODE SELECT(6)      sg_wr_mode, sginfo, sg_format,
+                    sg_emc_trespass, sg_rdac, ++
+MODE SELECT(10)     sg_wr_mode, sginfo, sg_format,
+                    sg_emc_trespass, sg_rdac, ++
+MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_format,
+                    sg_senddiag('-e'), sg_rdac, ++
+MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_format,
+                    sg_senddiag('-e'), sg_rdac, ++
+PERSISTENT RESERVE IN       sg_persist, ++
+PERSISTENT RESERVE OUT      sg_persist, ++
+PREVENT ALLOW MEDIUM REMOVAL        sg_prevent, ++
+READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
+READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
+READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
+READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
+READ BUFFER         sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
+READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
+READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
+READ DEFECT(10)     sginfo, sg_reassign('-g'), ++
+READ DEFECT(12)     sginfo
+READ LONG (10)      sg_read_long, sg_dd, ++
+READ LONG (16)      sg_read_long, ++
+READ MEDIA SERIAL NUMBER     sg_rmsn, ++
+REASSIGN BLOCKS     sg_reassign, ++
+RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses, ++
+REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
+REPORT LUNS         sg_luns, ++
+REPORT SUPPORTED OPERATION CODES              sg_opcodes
+REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
+REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg ++
+REQUEST SENSE       sg_requests, ++
+SEND DIAGNOSTIC     sg_senddiag, sg_ses, ++
+SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
+SET TARGET PORT GROUPS       sg_stpg, ++
+START STOP          sg_start, ++
+SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
+TEST UNIT READY     sg_turs, sg_format, ++
+VERIFY(10)          sg_verify, ++
+WRITE(6)            sg_dd, sgm_dd, sgp_dd
+WRITE(10)           sg_dd, sgm_dd, sgp_dd
+WRITE(12)           sg_dd, sgm_dd, sgp_dd
+WRITE(16)           sg_dd, sgm_dd, sgp_dd
+WRITE BUFFER        sg_test_rwbuf, sg_write_buffer, ++
+WRITE LONG (10)     sg_write_long, ++
+WRITE LONG (16)     sg_write_long, ++
+<most commands>     sg_raw
+
+
+
+ATA command         sg3_utils utilities that use this SCSI command
+-----------         ----------------------------------------------
+CHECK POWER MODE    examples/sg_sat_chk_power
+IDENTIFY DEVICE     sg_inq, sg_scan, sg_sat_identify,
+                    examples/sg__sat_identify
+IDENTIFY PACKET DEVICE     sg_inq, sg_sat_identify,
+                    examples/sg__sat_identify
+READ LOG EXT        sg_sat_phy_event, examples/sg__sat_phy_event
+SET FEATURES        sg_sat_set_features
+                    examples/sg__sat_set_features
+SMART READ DATA     examples/sg_sat_smart_rd_data
+
+
+++  command wrapper found in sg_cmds_basic.c, sg_cmds_mmc.c  or
+    sg_cmds_extra.c for this command
+(2) this command was known as REPORT DEVICE IDENTIFIER prior to spc4r07
+(3) this command was known as SET DEVICE IDENTIFIER prior to spc4r07
+
+
+Doug Gilbert
+18th February 2008

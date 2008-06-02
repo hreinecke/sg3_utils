@@ -1,0 +1,87 @@
+.TH HXASCDMP "1" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.SH NAME
+hxascdmp \- hexadecimal ASCII dump
+.SH SYNOPSIS
+.B hxascdmp
+[\fI\-b=BPL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-V\fR]
+[\fIFILE+\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility reads one or more \fIFILE\fR names and dumps them in hexadecimal
+and ASCII to stdout. If no \fIFILE\fR is given then stdin is read instead;
+reading continues (or stalls) until an EOF is received.
+.PP
+The default format is to start each line with the hexadecimal address (offset
+from the start of file) followed by 16 hexadecimal bytes separated by a
+single space (apart from the 8th and 9th bytes which are separated by two
+spaces). If the \fI\-H\fR is not given, there is then a string of 16 ASCII
+characters corresponding to the hexadecimal bytes earlier in the line; only
+bytes in the range 0x20 to 0x7e are printed in ASCII, other bytes values are
+printed as '.' . Each \fIFILE\fR name that appears on the command line is
+printed on a separate line prior to that file's hexadecimal ASCII dump.
+.PP
+This utility is pretty close to the 'hexdump -C' variant of BSD's
+.B hexdump(1)
+command.
+.SH OPTIONS
+.TP
+\fB\-b\fR=\fIBPL\fR
+where \fIBPL\fR specifies the number of bytes per line. The default value is
+16. 16 bytes per line is just enough to allow the address, 16 bytes in
+hexadecimal followed by 16 bytes as ASCII to fit on a standard 80 column
+wide terminal.
+.TP
+\fB\-h\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR
+output hexadecimal only (i.e. don't place an ASCII representation at the
+end of each line).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH EXIT STATUS
+The exit status of hxascdmp is 0 when it is successful. If any of the
+given \fIFILE\fR names cannot be opened then the exit status is 1.
+.SH EXAMPLES
+First we manufacture a short file with a mix of data in it: mostly ASCII with
+some control characters and 0xaa (which the echo command only accepts in
+octal (0252):
+.PP
+   $ echo -e "three blind mice,\t\r\0252" > 3bm.txt
+.PP
+Now we use this utility to see exactly what is in the file. To avoid
+problems with line wrapping, the bytes per line option is set to 8:
+.PP
+   $ hxascdmp -b=8 3bm.txt
+.br
+ASCII hex dump of file: 3bm.txt
+.br
+ 00      74 68 72 65  65 20 62 6c   three bl
+.br
+ 08      69 6e 64 20  6d 69 63 65   ind mice
+.br
+ 10      2c 09 0d aa  0a            ,....
+.PP
+Using the same file, use this utility to output only hexadecimal formatted
+16 bytes per line.
+.PP
+   $ hxascdmp -H 3bm.txt
+.br
+hex dump of file: 3bm.txt
+.br
+ 00      74 68 72 65 65 20 62 6c  69 6e 64 20 6d 69 63 65
+.br
+ 10      2c 09 0d aa 0a
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004\-2008 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B hexdump(1)

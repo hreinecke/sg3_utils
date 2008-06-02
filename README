@@ -1,0 +1,346 @@
+                      README for sg3_utils
+                      ====================
+Introduction
+============
+This package contains low level utilities for devices that use a SCSI
+command set. Apart from SCSI parallel interface (SPI) devices, the SCSI
+command set is used by ATAPI devices (CD/DVDs and tapes), USB
+mass storage devices, Fibre Channel disks, IEEE 1394 storage
+devices (that use the "SBP" protocol), SAS and iSCSI.
+
+This package originally targeted the Linux SCSI subsystem. Since most
+operating systems contain a SCSI command pass-through mechanism, many
+utilities within this package have been ported. This README mainly
+concentrates on Linux: see the README.freebsd file for the FreeBSD port,
+README.solaris for the Solaris port, the README.tru64 file for the Tru64
+(OSF) port and README.win32 for the Windows port.
+
+Most utilities within the sg3_utils package work at the SCSI command level.
+For example the sg_inq utility issues a SCSI INQUIRY command and decodes the
+response. To view the relationship between a sg3_utils' utility and the
+main SCSI command(s) that it issues see the COVERAGE file. Some utilities
+interface at a slightly higher level, for example: sg_dd, sgm_dd and sgp_dd.
+These are closely related to the Unix dd command and typically issue a
+sequence of SCSI READ and WRITE commands to copy data.
+
+Description
+===========
+A web site supporting the sg3_utils package, its predecessor sg_utils, and
+the Linux SCSI generic driver can be found at http://www.torque.net/sg .
+The most recent release version of sg3_utils and the most recent beta are
+available from that page. There is also a page describing the utilities in
+the sg3_utils and sg_utils packages: http://www.torque.net/sg/sg3_utils.html .
+
+In the Linux 2.4 kernel series these utilities need to use the SCSI generic
+(sg) driver to access SCSI devices. The name of this package (i.e. sg3_utils)
+refers to version 3 of the SCSI generic (sg) driver which was introduced at
+the beginning of the 2.4 linux kernel series. Significantly this added a new
+SCSI command interface structure (i.e. struct sg_io_hdr) that is more
+flexible than the older "sg_header" structure found in the sg driver in the
+2.2 and earlier linux kernel series. The sg_io_hdr structure is also more
+flexible than the awkward (and limiting) interface to the
+SCSI_IOCTL_SEND_COMMAND ioctl supported by the linux SCSI mid level. The
+version 3 sg driver also added the SG_IO ioctl that is synchronous (i.e. it
+issues the requested SCSI command and waits for the response (or a timeout)
+before the ioctl returns to the user space program that invoked it). The
+SG_IO ioctl is now supported in other parts of the linux kernel in the 2.6
+series.
+
+Utilities that wish to use the asynchronous SCSI command interface (i.e. via
+a write() read() sequence) or issue special "commands" (e.g. bus and device
+resets) still need to use the linux sg driver. Note that various
+drivers (e.g. cdrom/sr) have different open() flag and permissions policies
+that the user may need to take into account.
+
+If you have problems or questions about them please contact the author.
+Documentation for the linux sg device driver can be found at:
+http://www.torque.net/sg/p/sg_v3_ho.html . This is written in DocBook and the
+original xml can be found in the same directory with the ".xml" extension.
+Postscript and pdf renderings are also in that directory. Older documentation
+for the sg version 3 driver can be found at:
+http://www.torque.net/sg/p/scsi_generic_v3.txt .
+
+All utilities are either "GPL"-ed or have a FreeBSD license. The author's
+intention is that users may incorporate all or part of the code in their work
+as they please. Attribution is encouraged. Please check the code as other
+contributors (apart from the author) may also have copyright notices. For a
+list of contributors see the CREDITS file.
+
+The "sg_lib_data.[hc]" files contain ASCII text corresponding to most of the
+SCSI commands, errors and warning conditions. The interface to this data
+plus several related helper functions are found in the sg_lib.[hc] files.
+The "sg_cmds_basic.[hc]" files contains code to invoke common SCSI commands
+and associated response processing. The "sg_cmds_mmc.[hc]" files contain
+code to invoke SCSI commands specific to MMC (fro cd/dvd/bd devices).
+The "sg_cmds_extra.[hc]" files contains code to invoke lesser used SCSI
+commands and associated response processing. All are guided by recent drafts
+at www.t10.org which is the home site of SCSI (draft) standards. Linux
+specific code has been removed from sg_lib.[hc], sg_cmds_basic.[hc],
+sg_cmds_mmc.[hc] and sg_cmds_extra.[hc] . The SCSI command implementations
+in sg_cmds_basic.c, sg_cmds_mmc.c and sg_cmds_extra.c access the OS
+pass-through mechanism via the function based interface defined in sg_pt.h .
+The linux specific implementation of that pass through is found in the
+sg_pt_linux.c file. Since almost all of the utilities use these files, a
+shared library called "libsgutils.so" is built. Use of this library cuts
+down the size of the binary distributions of sg3_utils significantly. In
+sg3_utils version 1.25 then header files mentioned in this paragraph were
+relocated in the 'include' subdirectory while the source code files (i.e.
+those ending in ".c") were relocated in the 'lib' subdirectory. The build
+scripts provided in the 'lib' subdirectory builds libsgutils.so The rest
+of the source code files have been relocated to the 'src' subdirectory.
+See the INSTALL file for more information.
+
+All the utilities in the 'src' subdirectory have "man" pages that are now
+placed in the 'doc' subdirectory. There is also a sg3_utils (8) man page that
+summarizes common facilities including exit statuses. Additional
+information (including a version number) can be found towards the top of
+each ".c" file corresponding to each utility.
+
+The sg driver in Linux can be seen as having 3 distinct versions:
+
+   v1   lk < 2.2.6     sg_header based relatively unchanged since 1992
+   v2   lk >= 2.2.6    enhanced sg_header interface structure [1999/4/16]
+   v3   lk >= 2.4      additional sg_io_hdr interface structure [2001/1/4]
+   v3   lk >= 2.6      same interface as found in lk 2.4 [2.6.0: 2003/12/18]
+
+This package is targeted at "v3" only. Another package called "sg_utils"
+is targeted at "v2" and to a lesser extent "v1". The "sg_utils" package has
+a subset of the utilities found in this package.
+
+In linux some sg ioctls (notably SG_IO) are defined for many block devices in
+lk 2.6 . In practice this means all SCSI block devices, ATAPI block
+devices (mainly CD and DVD players) but _not_ ATA disks, depending on which
+kernel configuration options are chosen. SATA disks that use the libata kernel
+library (or some other SCSI to ATA Translation (SAT) Layer (SATL)) accept SCSI
+commands and thus are supported. Support for the SG_IO as been added to the
+scsi tape driver (st) in lk 2.6.6 .
+
+In linux no utilities in the 'src' subdirectory use the sg driver's
+older "sg_header" interface; instead they use the newer "sg_io_hdr" interface.
+The "sg_io_hdr" interface can be accessed two ways:
+  - using the SG_IO ioctl [for synchronous access]
+  - using a write()/read() sequence that convey instances of "sg_io_hdr"
+
+All utilities in the 'src' subdirectory that issue SCSI commands use the
+linux SG_IO ioctl except for sgp_dd. This is due to the asynchronous nature
+of sgp_dd. Note that sgp_dd does _not_ support the "blk_sgio" switch found
+in sg_dd. This is important since block devices often identify themselves
+(programmatically) as sg devices in lk 2.6 and it would cause serious damage
+to do a write() of the sg driver's "sg_io_hdr" meta data (i.e. disk
+corruption).
+
+Warning
+=======
+Many devices use SCSI command sets over transport protocols not normally
+associated with SCSI (as defined at http://www.t10.org ). Some of these
+devices react poorly (e.g. lock up) when sent SCSI commands that they don't
+support. Even sending a supported SCSI command with a field set to an
+unexpected value can cause problems.
+
+For example, all "SCSI" devices must support the INQUIRY command which the
+SCSI-2 standard says should request a 36 byte response. However later SCSI
+standards (e.g. SPC-2) have increased that length but some SCSI devices lock
+up when they receive a request for anything other than a 36 byte response.
+
+Any well implemented "SCSI" device should react sensibly when a utility in
+sg3_utils sends a SCSI command that it doesn't support. Unfortunately this
+cannot be guaranteed.
+
+
+Utilities
+=========
+Here is list in alphabetical order of utilities found in the 'src'
+subdirectory of the sg3_utils package:
+  - sginfo, sgm_dd, sgp_dd, sg_dd, sg_emc_trespass, sg_get_config,
+    sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map, sg_map26,
+    sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_raw, sg_rbuf, sg_rdac,
+    sg_read, sg_readcap, sg_read_buffer, sg_read_long, sg_reassign,
+    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_safte, sg_sat_identify,
+    sg_sat_phy_event, sg_sat_set_features, sg_scan, sg_senddiag, sg_ses,
+    sg_start, sg_stpg, sg_sync, sg_test_rwbuff, sg_turs, sg_verify, sg_vpd,
+    sg_write_buffer, sg_write_long, sg_wr_mode
+
+Each of the above utilities depends on header files found in the 'include'
+subdirectory and library code found in the 'lib' subdirectory. Associated
+man pages are found in the 'doc' subdirectory. Additional programs found
+in the 'archive', 'examples' and 'utils' subdirectories in not build by the
+top level build infrastructure. Linux binary distributions of the sg3_utils
+package (e.g. "rpm" and debian packages) typically contain the shared
+library, the utilities found in the 'src' subdirectory, their associated man
+pages and some documentation files (e.g. README, INSTALL, CREDITS, COPYING
+and COVERAGE). See the INSTALL file for instructions about building and
+installing from a source "tarball".
+
+Man pages can be read (without building and installing the package) by
+going to the 'doc' subdirectory and executing something like this:
+ $ man ./sg_dd.8
+
+To see which SCSI commands (and ATA commands) are used by these utilities
+refer to the COVERAGE file.
+
+Here is a list in alphabetical order of utilities found in the 'archive'
+subdirectory:
+  - isosize, scsi_devfs_scan, sg_debug, sgq_dd
+Some of these utilities have man pages.
+
+Here is a list in alphabetical order of utilities found in the 'examples'
+subdirectory:
+  - sg_excl, scsi_inquiry, sg_iovec_tst, sg_sat_chk_power,
+    sg__sat_identify, sg__sat_phy_event, sg__sat_set_features,
+    sg_sat_smart_rd_data, sg_simple1, sg_simple2, sg_simple3, sg_simple4,
+    sg_simple5 and sg_simple16
+
+Also in that subdirectory is a script to test sg_persist, an example data
+file for sg_persist (called "transport_ids.txt") and an example data file for
+sg_reassign (called "reassign_addr.txt"). There are several scripts
+for 'sg_senddiag -pf -raw=-' that will put some SAS disk phys into
+a "compliant jitter tolerance pattern" (CJTPAT). 
+
+The 'utils' subdirectory contains source and a Makefile to build "hxascdmp"
+which accepts binary data from stdin (or a file on the command line) and
+outputs an ASCII-HEX and ASCII representation of it. It is similar to the
+Unix od command. There is also code to sg_chk_asc.c which checks a given
+text file (typically a copy of http://www.t10.org/lists/asc-num.txt ) and
+checks it against the asc/ascq text strings held in sg_lib_data.c .
+
+The 'doc' subdirectory contains a README.doc file containing the urls of
+various related documents.
+
+The 'scripts' subdirectory contains some bourne (bash) shell scripts that
+rely on utilities in the main directory. One script uses the sdparm utility.
+These scripts are described in the scripts/README file and have usage
+messages.
+    
+
+Notes for utilities without man pages
+=====================================
+These utils are found in the 'examples' subdirectory.
+
+The "scsi_inquiry" program shows the use of the SCSI_IOCTL_SEND_COMMAND
+ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the 
+SCSI sub system mid level and so is common to all sd, sr, st and sg devices. 
+That ioctl is deprecated in the lk 2.6 series. This program has been placed
+in the "examples" subdirectory.
+
+"sgq_dd" is yet another variant of dd found in the archive directory.
+From the user's point of view it is very similar to sgp_dd but uses a
+non-blocking state machine rather then POSIX threads for parallelism.
+
+"sg_debug" is effectively defunct now. The user can instead execute:
+'cat /proc/scsi/sg/debug' . This command has been placed in the archive
+directory.
+
+"sg_simple1" and "sg_simple2" are example programs demonstrating calls
+to the SCSI INQUIRY and TEST UNIT READY commands. They only differ in their
+error processing: sg_simple1 uses sg_lib.[hc] for error processing while
+sg_simple2 does its own more primitive checks.
+
+"sg_simple3" tests out user space scatter gather added to the version 3
+sg driver.
+
+"sg_simple4" shows the INQUIRY command using mmap-ed IO to obtain its
+response buffer.
+
+"sg_simple5" also sends and INQUIRY and TEST UNIT READY commands. It
+uses the generic pass through mechanism based on sg_pt.h . It will
+currently build in linux and FreeBSD (with "make -f Makefile.freebsd").
+It has extensive error checking code.
+
+"sg_simple16" attempts to send a 16 byte SCSI command, READ_16, to the
+scsi device. This is only supported for lk >= 2.4.15 and for adapter
+drivers that indicate that they have 16 byte CDB capability (otherwise
+DID_ABORT will appear in the host_status).
+
+"sg_sat_chk_power" attempts to push an ATA CHECK POWER MODE command
+through the SAT-defined ATA PASS_THROUGH (16) SCSI command. That
+ATA command needs to read the "FIS" registers after the command is
+completed which involves using the ATA Status Return (sense data)
+descriptor (as defined in SAT).
+
+"sg_sat_smart_rd_data" attempts to push an ATA SMART/READ DATA command
+through the SAT-defined ATA PASS_THROUGH (16) SCSI command. If
+successful, the 256 word (512 byte) response is output.
+
+
+Command line processing
+=======================
+These utilities can be divided into 3 groups when their handling of command
+line arguments is considered:
+  - ad hoc, typically in a short form only, sometimes longer (e.g.
+    "sg_logs -pcb /dev/sdc")
+  - inspired by the dd Unix command (e.g. sg_dd, sgm_dd, sgp_dd, sg_read)
+  - recent utilities use "getopt_long" (see "man getopt_long")
+    type command lines. These have short form (starting with "-")
+    and corresponding longer form (starting with "--") options.
+
+The older utilities that use ad hoc options, in alphabetical order:
+  - sg_emc_trespass, sginfo(1/2), sg_inq, sg_logs, sg_map, sg_modes,
+    sg_opcodes, sg_rbuf, sg_rdac, sg_readcap, sg_reset, sg_scan (linux),
+    sg_senddiag, sg_start, sg_test_rwbuf, sg_turs
+In sg3_utils version 1.23 the following utilities from this group were
+converted to have a dual getopt_long/ad_hoc interface, defaulting to
+the getop_long interface:
+  - sg_inq, sg_logs, sg_modes, sg_opcodes, sg_rbuf, sg_readcap,
+    sg_senddiag, sg_start, sg_turs
+These can be switched back to the older (backward compatible) ad hoc
+interface by defining the SG3_UTILS_OLD_OPTS environment variable
+or using '-O' as the first command line option.
+
+The more recent utilities that use "getopt_long" only are:
+  - sg_format sg_get_config sg_ident sg_luns sg_map26 sg_persist
+    sg_prevent sg_raw sg_read_buffer sg_read_long sg_reassign sg_requests
+    sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event
+    sg_sat_set_features sg_scan(w) sg_ses sg_stpg sg_sync sg_test_rwbuf
+    sg_verify sg_vpd sg_write_buffer sg_write_long sg_wr_mode
+
+
+Linux header file problems
+==========================
+The problems discussed below do not appear in recent Linux distributions.
+
+Some utilities include 2 important header files:
+#include <scsi/sg.h>
+#include <scsi/scsi.h>
+These files are typically found in the directory /usr/include/scsi which
+is maintained by the GNU glibc team. Unfortunately these GNU supplied
+headers may not be (functionally) the same as those found in the kernel
+source:
+/usr/src/linux/include/scsi/sg.h   and
+/usr/src/linux/include/scsi/scsi.h
+
+If glibc and the kernel on a machine are of the same vintage then it is
+probably sufficient to use the simple includes listed at the start of this
+section. Another technique that used to work was to rely on
+/usr/include/linux being a symbolic link to /usr/src/linux/include/linux . 
+That caused the following:
+#include <linux/../scsi/sg.h> 
+#include <linux/../scsi/scsi.h>
+to find the kernel supplied header files. However recent versions of
+glibc have removed this symlink. Hence this technique is no longer
+recommended.
+
+The include file path issues are now all addressed in one file called
+"sg_linux_inc.h". Please read that file. This fetching of the scsi.h and
+sg.h header files has not been a problem in the latter lk 2.4 and lk 2.6
+series.
+
+Dangerous code
+==============
+This code:
+    unsigned char uc = 0x80;
+    unsigned long long = ull;
+    ull = (uc << 24);
+Gives an unexpected result because the 'unary conversion' of uc to a (32 bit
+signed) 'int' before the shift. The resultant type from the shift is also
+an int and it has its top bit set so there is sign extension when it is
+assigned into a 64 bit integer. The above will fail in a similar on 64
+bit architectures that use the LP64 data model, if 'unsigned long ul' is used
+instead of ull variable in the above code example.
+
+Other SCSI and storage tools
+============================
+See http://www.torque.net/sg/tools.html
+
+
+Doug Gilbert
+27th March 2008

@@ -1,0 +1,105 @@
+.TH SG_SAT_PHY_EVENT "8" "December 2007" "sg3_utils\-1.26" SG3_UTILS
+.SH NAME
+sg_sat_phy_event \- Sends an ATA READ LOG EXT command via a SAT pass through
+to fetch log page 11h which contains SATA phy event counters
+.SH SYNOPSIS
+.B sg_sat_phy_event
+[\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-ignore\fR] [\fI\-\-len=\fR16|12] [\fI\-\-raw\fR] [\fI\-\-reset\fR]
+\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility sends an ATA READ LOG EXT with the log page ("address") set to
+11h to \fIDEVICE\fR and outputs the response. Log page 11h is defined in
+the SATA 2.5 standard and contains phy event counters. Rather than send this
+command directly to the \fIDEVICE\fR, are sent via a SCSI transport which is
+assumed to contain a SCSI to ATA Translation (SAT) Layer (SATL). The SAT
+standard (SAT ANSI INCITS 431\-2007, prior draft: sat\-r09.pdf at www.t10.org)
+defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16 byte "cdb" and
+the other with a 12 byte cdb. This utility defaults to using the 16 byte cdb
+variant.
+.PP
+The SATL may be in an operating system driver, in host bus adapter firmware
+or in some external enclosure.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-c\fR, \fB\-\-ck_cond\fR
+sets the CK_COND bit in the ATA PASS\-THROUGH SCSI cdb. The
+default setting is clear (i.e. 0). When set the SATL should yield a
+sense buffer containing a ATA Result descriptor irrespective of whether
+the command succeeded or failed. When clear the SATL should only yield
+a sense buffer containing a ATA Result descriptor if the command failed.
+.TP
+\fB\-e\fR, \fB\-\-extend\fR
+sets the EXTEND bit in the ATA PASS\-THROUGH SCSI cdb. The
+default setting is clear (i.e. 0). When set a 48 bit LBA command is sent
+to the device. This option has no effect when \fI\-\-len=12\fR.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+outputs the usage message summarizing command line options
+then exits. Ignores \fIDEVICE\fR if given.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+outputs the ATA READ LOG EXT response in hex. The default
+action (i.e. without any '\-H' options) is to output the response in
+hex, grouped in 16 bit words (i.e. the ATA standard's preference).
+When given once, the response is output in ASCII hex bytes (i.e. the
+SCSI standard's preference). When given twice (i.e. '\-HH') the output
+is in hex, grouped in 16 bit words, the same as the default but without
+a header.
+.TP
+\fB\-i\fR, \fB\-\-ignore\fR
+usually the phy counter identifier names are decoded. When this option is
+given, the numeric value of the identifier is output, the vendor flag, the
+data length (in bytes) and the corresponding value.
+.TP
+\fB\-l\fR, \fB\-\-len\fR=16 | 12
+this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
+The argument can either be 16 or 12. The default is 16. The larger cdb
+size is needed for 48 bit LBA addressing of ATA devices. On the other
+hand some SCSI transports cannot convey SCSI commands longer than 12 bytes.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output the ATA READ LOG EXT response in binary. The output
+should be piped to a file or another utility when this option is used.
+The binary is sent to stdout, and errors are sent to stderr.
+.TP
+\fB\-R\fR, \fB\-\-reset\fR
+reset the counters after the current values are returned, decoded and
+displayed.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increases the level or verbosity.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print out version string
+.SH NOTES
+The SCSI ATA PASS\-THROUGH (12) command's opcode is 0xa1 and it clashes with
+the MMC set's BLANK command used by cd/dvd writers. So a SATL in front
+of an ATAPI device that uses MMC (i.e. has peripheral device type 5)
+probably should treat opcode 0xa1 as a BLANK command and send it through
+to the cd/dvd drive. The ATA PASS\-THROUGH (16) command's opcode (0x85)
+does not clash with anything so it is a better choice.
+.PP
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
+a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
+and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
+will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
+device names may be used as well (e.g. "/dev/st0m").
+.SH EXIT STATUS
+The exit status of sg_sat_identify is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHOR
+Written by Doug Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2006\-2007 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_sat_identify(sg3_utils), smp_rep_phy_err_log(smp_utils),
+.B sdparm(sdparm), hdparm(hdparm)

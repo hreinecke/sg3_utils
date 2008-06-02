@@ -1,0 +1,56 @@
+.TH SG_RTPG "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.SH NAME
+sg_rtpg \- sends a SCSI REPORT TARGET PORT GROUPS command
+.SH SYNOPSIS
+.B sg_rtpg
+[\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send a SCSI REPORT TARGET PORT GROUPS command to \fIDEVICE\fR and
+outputs the response. 
+.PP
+Target port group access is described in SPC\-3 found at www.t10.org
+in section 5.8 (in rev 21c dated 2005/1/15). The Report Target Port
+Groups command is also described in that document.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-d\fR, \fB\-\-decode\fR
+decodes the status code and asymmetric access state from each
+target port group descriptor returned. The default action is not
+to decode these values.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output response in hex (rather than partially or fully decode it).
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output response in binary to stdout.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+The Report Target Port Groups command should be supported whenever the TPGS
+bits in a standard INQUIRY response are greater than zero. [View with
+sg_inq utility.]
+.SH EXIT STATUS
+The exit status of sg_rtpg is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004\-2007 Christophe Varoqui and Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq(sg3_utils)

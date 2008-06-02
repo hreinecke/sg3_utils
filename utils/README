@@ -1,0 +1,25 @@
+This directory contains these utilities:
+  - hxascdmp: takes a binary stream and converts it to hexadecimal ASCII
+    which is sent to stdout. The incoming binary stream can either be
+    from a file or, in the absence of a file name, from stdin. Similar to
+    the Unix "od" command. By default, it decodes 16 bytes per line with
+    an ASCII interpretation to the right of each line. See its
+    hxascdmp(1) man page.
+  - sg_chk_asc: utility decodes the SCSI additional sense code table
+    found at http://www.t10.org/lists/asc-num.txt and checks it
+    against the table found in sg_lib.c in the lib/ subdirectory.
+    It is designed to keep the table in sg_lib.c in "sync" with the
+    table at the t10.org web site.
+
+
+These utilities can be built for Linux, FreeBSD or Solaris.
+The hxascdmp utility can also be built in a Windows MinGW/MSYS environment.
+This command should be sufficient: 'make hxascdmp' .
+
+To build sg_chk_asc the sg_lib.o file must be present (i.e. compiled) in
+the lib/ subdirectory. One way to meet that requirement is to execute
+'./configure' in the main directory then 'cd lib ; make '.
+
+
+Doug Gilbert
+26th March 2008 

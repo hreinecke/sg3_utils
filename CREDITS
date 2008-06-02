@@ -1,0 +1,92 @@
+The author of sg3_utils would like to thank the following people who
+have made contributions:
+
+
+Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
+        written by Joerg Schilling). isosize is now found in the util-linux
+        package and in the archive directory of this package.
+
+Christophe Varoqui <christophe dot varoqui at free dot fr> original sg_rtpg
+        [20041229]
+
+Clayton Weaver <cgweav at email dot com> contributed safe_strerror().
+
+Dave Johnson <ddj at ccv dot brown dot edu> improved disk defect list
+      handling [20051218]
+
+Dave Williams <dave at opensourcesolutions dot co dot uk> help with
+        sgp_dd especially and "> 0x7fffffff" with sg*_dd [20060303]
+
+Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
+        sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
+        sg_turs and sginfo
+
+Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
+        is based.
+
+F. Jansen: additions to sg_scan
+
+Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
+        that has become sg_format [20050201]
+
+Hannes Reinecke <hare at suse dot de> 
+        contributed sg_rdac, (and some corresponding VPD entries to
+        sg_vpd_vendor), sg_stpg and sg_safte [20071013]
+
+Hayashi Naoyuki <titan at culzean dot org>
+        port to Tru64 [20060127]
+
+Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example 
+        programs for the original sg driver
+
+Ingo van Lil <inguin at gmx dot de>
+        contributed sg_raw [20070331]
+
+James Bottomley <jejb at parisc-linux dot org> co-author of blk512-linux
+        that has become sg_format [20050201]
+
+Joe Krahn <krahn at niehs dot nih dot gov> help with int64_t cleanup
+	[20071219]
+
+Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
+        Additions to sginfo and sg_map.
+
+Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
+        page decoding in sg_inq (vendor specific: EMC) and sg_emc_trespass
+        utility
+
+Luben Tuikov <ltuikov at yahoo dot com>
+        help with documentation and other suggestions [20061014]
+        contribution sg_read_buffer and sg_write_buffer [20061103]
+
+Mark Knibbs <markk at clara dot co dot uk>
+        suggested and tested oflag=sparse for sg_dd
+
+Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
+
+Nate Dailey < Nate dot Dailey at stratus dot com > extended sg_map for sparse
+        disk node names (e.g. /dev/sdaaa) [20050511]
+
+Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
+        values in sg_dd (and friends); also problems when reading /dev/null
+
+Peter Allworth <linsol at zeta dot org dot au> original dd clone design used
+        by sg3_utils's dd variants (e.g. sg_dd).
+
+Saeed Bishara contributed sg_write_long
+
+Thomas Kolbe <tkolbe at partnersdata dot com>
+        Solaris port help and testing [20070503]
+
+Tim Hunt <tim at timhunt dot net> increased number of (sd and sg) devices
+        that sginfo could detect.
+
+Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
+        to sort defect list by head.
+
+Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific" 
+        data and "-6" switch for sg_modes
+
+
+Doug Gilbert
+19th December 2007

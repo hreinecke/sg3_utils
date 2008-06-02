@@ -1,0 +1,11 @@
+# This is the hex for a SAS protocol specific diagnostic
+# page. It will attempt to stop phy identifier 1 of the
+# given device producing a test pattern.
+# N.B. This should make phy id 1 usable for SAS protocols again.
+#
+# Usage example: 'sg_senddiag --pf --raw=- /dev/sg2 < {this_file}'
+#
+3f,6,0,1c,1,0,2,9,
+0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0

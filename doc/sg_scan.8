@@ -1,0 +1,71 @@
+.TH SG_SCAN "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
+.SH NAME
+sg_scan \- does a scan of sg devices (or given SCSI/ATAPI/ATA devices) and 
+prints the results
+.SH SYNOPSIS
+.B sg_scan
+[\fI\-a\fR] 
+[\fI\-i\fR] 
+[\fI\-n\fR] 
+[\fI\-w\fR] 
+[\fI\-x\fR] 
+[\fIDEVICE\fR]* 
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+If no \fIDEVICE\fR names are given, sg_scan does a scan of the sg 
+devices and outputs a line of information for each sg device that is 
+currently bound to a SCSI device. If one or more \fIDEVICE\fRs are given
+only those devices are scanned.
+Each device is opened with the O_NONBLOCK flag so that the scan will
+not "hang" on any device that another process holds an O_EXCL lock on.
+.PP
+Any given \fIDEVICE\fR name is expected to comply
+with (to some extent) the Storage Architecture Model (SAM see www.t10.org).
+Any device names associated with the Linux SCSI subsystem (e.g. /dev/sda
+and /dev/st0m) are suitable. Devices names associated with ATAPI
+devices (e.g. most CD/DVD drives and ATAPI tape drives) are also suitable.
+If the device does not fall into the above categories then an ATA
+IDENTIFY command is tried.
+.SH OPTIONS
+.TP
+\fB\-a\fR
+do alphabetical scan (i.e. sga, sgb, sgc). Note that sg device nodes with
+an alphabetical index have been deprecated since the linux kernel 2.2
+series.
+.TP
+\fB\-i\fR
+do a SCSI INQUIRY, output results in a second (indented) line. If the device
+is an ATA disk then output information from an ATA IDENTIFY command
+.TP
+\fB\-n\fR
+do numeric scan (i.e. sg0, sg1...) [default]
+.TP
+\fB\-w\fR
+use a read/write flag when opening sg device (default is read\-only)
+.TP
+\fB\-x\fR
+extra information output about queuing
+.SH NOTES
+This utility was written at a time when hotplugging of SCSI devices
+was not supported in Linux. It used a simple algorithm to scan sg
+device nodes in ascending numeric or alphabetical order, stopping
+after there were 4 consecutive errors.
+.PP
+In the linux kernel 2.6 series, this utility uses sysfs to find which
+sg device nodes are active and only checks those. Hence there can be
+large "holes" in the numbering of sg device nodes (e.g. after an
+adapter has been removed) and still all active sg device nodes will
+be listed. This utility assumes that sg device nodes are named using
+the normal conventions and searches from /dev/sg0 to /dev/sg4095
+inclusive.
+.SH EXIT STATUS
+The exit status of sg_scan is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by D. Gilbert and F. Jansen
+.SH COPYRIGHT
+Copyright \(co 1999\-2006 Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,0 +1,37 @@
+Hi,
+
+you can use sg_start to start (spin-up, 1) and stop (spin-down, 0) devices.
+I also offers a parameter (-s) to send a synchronize cache command to a
+device, so it should write back its internal buffers to the medium.
+
+Be aware that the Linux SCSI subsystem at this time does not autmatically
+starts stopped devices, so stopping a device which is in use may have fatal
+results for you.
+
+So, you should apply with care.
+I use it in my shutdown script at the end (before the poweroff command):
+
+# SG_SHUG_NOS is set in my config file rc.config
+# SG_SHUT_NOS="0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
+if test -x /bin/sg_start; then
+    if test "`basename $command`" = "reboot"; then
+        for no in $SG_SHUT_NOS;
+	      do /bin/sg_start /dev/sg$no -s >/dev/null 2>&1; 
+	 done
+    else
+        for no in $SG_SHUT_NOS;
+	    do /bin/sg_start /dev/sg$no -s 0 >/dev/null 2>&1;
+        done
+    fi
+fi
+
+Enjoy!
+					Kurt Garloff <garloff at suse dot de>
+
+
+Postscript
+==========
+sg_start has been reworked to allow a block device (e.g. /dev/sda) in
+addition to the sg device name (e.g. /dev/sg0) in the lk 2.6 series.
+sg_start now has more command line options, see its man page.
+	Doug Gilbert <dgilbert at interlog dot com> 2004/5/8

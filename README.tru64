@@ -1,0 +1,87 @@
+Introduction
+============
+The Tru64 port of sg3_utils contains those utilities that are _not_
+specific to Linux. In some cases a utility could be ported but
+requires more work. An example is sg_dd which needs more work
+beyond the SCSI command pass through mechanism.
+
+Supported Utilities
+===================
+Here is a list of utilities that have been ported:
+    sg_format
+    sg_get_config
+    sg_ident
+    sg_inq          [dropped ATA IDENTIFY DEVICE capability]
+    sg_logs
+    sg_luns
+    sg_modes
+    sg_opcodes
+    sg_persist
+    sg_prevent
+    sg_raw
+    sg_rdac
+    sg_read_buffer
+    sg_read_long
+    sg_readcap
+    sg_reassign
+    sg_requests
+    sg_rmsn
+    sg_rtpg
+    sg_safte
+    sg_sat_identify
+    sg_sat_phy_event
+    sg_sat_set_features
+    sg_senddiag
+    sg_ses
+    sg_start
+    sg_stpg
+    sg_sync
+    sg_turs
+    sg_verify
+    sg_vpd
+    sg_wr_mode
+    sg_write_buffer
+    sg_write_long
+
+Most utility names are indicative of the main SCSI command
+that they execute.  Some utilities are slightly higher level, for
+example sg_ses fetches SCSI Enclosure Services (SES) status pages and
+can send control pages. Each utility has a man page (placed in
+section 8). An overview of sg3_utils can be found at:
+http://www.torque.net/sg/sg3_utils.html .
+A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
+
+
+See the INSTALL file (at the end) for instructions on how to build
+sg3_utils on Tru64. Files that are Tru64 specific use the "osf1"
+suffix (apart from this one). Some man pages have examples which
+use linux device names which hopefully will not confuse the Tru64 users.
+
+
+Details
+=======
+The ported utilities listed above, all use SCSI command functions
+declared in sg_cmds_basic.h and sg_cmds_extra.h . Those SCSI command
+functions are implemented in the corresponding ".c" files. The ".c"
+files pass SCSI commands to the host operating system via
+an interface declared in sg_pt.h . There are currently four
+implementations of that interface depending on the host operating
+system:
+  - sg_pt_linux.c
+  - sg_pt_osf1.c  [Tru64]
+  - sg_pt_freebsd.c
+  - sg_pt_win32.c
+
+The sg_pt_osf1.c file uses the Tru64 CAM SCSI pass through
+mechanism.
+
+Tru64 does not have general library support for "long" options
+(e.g. "--verbose") which are used extensively by most of the
+utilities in this package. Rather than change all the utilities
+and their man/web pages a local implementation of the missing
+function "getopt_long()" has been placed in the "getopt_long"
+subdirectory. Currently only the Tru64 port uses it.
+
+
+Doug Gilbert
+2nd December 2007

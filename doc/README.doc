@@ -1,0 +1,23 @@
+Various html files used to be included in this directory but they were
+beginning to bloat the size of the source tarball so they have been
+removed in version 1.24 .
+
+Here are the urls of the files that were previously here plus a brief
+summary:
+
+http://www.torque.net/sg/sg3_utils.html
+    - overview and examples of this package
+
+http://www.torque.net/sg/sg_dd.html
+    - discussion and examples of the sg_dd utility which is a dd variant
+      (also discusses the sgm_dd, sgp_dd and sg_read utilities)
+
+http://www.torque.net/sg/sg_io.html
+    - discussion of Linux SG_IO ioctl (SCSI pass-through)
+
+http://www.torque.net/sg/tools.html
+    - overview of around 25 storage and SCSI tools
+
+
+Doug Gilbert
+28th February 2007

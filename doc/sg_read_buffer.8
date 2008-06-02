@@ -1,0 +1,72 @@
+.TH SG_READ_BUFFER "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.SH NAME
+sg_read_buffer \- send a SCSI READ BUFFER command
+.SH SYNOPSIS
+.B sg_read_buffer
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id=ID\fR] [\fI\-\-length=LEN\fR]
+[\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR] [\fI\-\-raw\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends a SCSI READ BUFFER command to the \fIDEVICE\fR, and if there
+is a response either decodes it, prints it in hexadecimal or sends
+it in binary to stdout. If a response is received for a "descriptor"
+mode then, in the absence of \fI\-\-hex\fR and \fI\-\-raw\fR, it is
+decoded. Response for non\-descriptor modes are output in hexadecimal
+unless the \fI\-\-raw\fR option is given.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit. If used multiple times also prints
+the mode names and their acronyms.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output the response in hexadecimal.
+.TP
+\fB\-i\fR, \fB\-\-id\fR=\fIID\fR
+this option sets the buffer id field in the cdb. \fIID\fR is a value between
+0 (default) and 255 inclusive.
+.TP
+\fB\-l\fR, \fB\-\-length\fR=\fILEN\fR
+where \fILEN\fR is the length, in bytes, that is placed in the "allocation
+length" field in the cdb. The default value is 4 (bytes). The device may
+respond with less bytes.
+.TP
+\fB\-m\fR, \fB\-\-mode\fR=\fIMO\fR
+this option sets the mode field in the cdb. \fIMO\fR is a value between
+0 (default) and 31 inclusive. Alternatively an abbreviation can be given.
+To list the available mode abbreviations given an invalid
+one (e.g. '\-\-mode=xxx').
+.TP
+\fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
+this option sets the buffer offset field in the cdb. \fIOFF\fR is a value
+between 0 (default) and 2**24\-1 . It is a byte offset.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+if a response is received then it is sent in binary to stdout.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+All numbers given with options are assumed to be decimal.
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X" (or has a trailing "h" or "H").
+.SH EXIT STATUS
+The exit status of sg_read_buffer is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Luben Tuikov and Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2006\-2007 Luben Tuikov and Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_write_buffer(sg3_utils)

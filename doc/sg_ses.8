@@ -1,0 +1,157 @@
+.TH SG_SES "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.SH NAME
+sg_ses \- send controls and fetch status from a SCSI Enclosure
+Services (SES) device
+.SH SYNOPSIS
+.B sg_ses
+[\fI\-\-byte1=B1\fR] [\fI\-\-control\fR] [\fI\-\-data=H,H...\fR]
+[\fI\-\-filter\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inner\-hex\fR]
+[\fI\-\-list\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send controls to a SES device (via a SCSI SEND DIAGNOSTIC command)
+or fetches status (via a SCSI RECEIVE DIAGNOSTIC RESULTS command).
+The \fIDEVICE\fR should be a SES device which may be a dedicated
+enclosure services processor (INQUIRY peripheral device type 0xd) or
+attached to another type of SCSI device (e.g. a disk) in which case
+the EncServ bit set in its INQUIRY response.
+.PP
+If no options are given (only the \fIDEVICE\fR argument) then all
+diagnostic pages supported by the device (including SES pages)
+are listed.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
+.TP
+\fB\-b\fR, \fB\-\-byte1\fR=\fIB1\fR
+some control pages need byte 1 (i.e. the second byte) of the cdb set.
+Only required in rare cases when the \fI\-\-control\fR option is also set.
+Default is 0; \fIB1\fR is in decimal unless it is prefixed by '0x'
+or '0X' (or has a trailing 'h' or 'H').
+.TP
+\fB\-c\fR, \fB\-\-control\fR
+will send control information to the \fIDEVICE\fR via a SCSI SEND
+DIAGNOSTIC command. Cannot give both this option and \fI\-\-status\fR.
+The Enclosure control, String Out, Threshold Out, Array control (obsolete
+in SES\-2) and Subenclosure String Out diagnostic pages can be set currently.
+.TP
+\fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
+permits a string of comma separated (ASCII) hex digits to be 
+specified (limit 512). This allows the parameters to a control diagnostic
+page to be specified. The string given should not include the first 4
+bytes (i.e. page code and length). See next entry for using stdin.
+.TP
+\fB\-d\fR, \fB\-\-data\fR=\-
+reads a data string from stdin. Spaces, tabs and line feeds additionally
+are permitted as separators.
+.TP
+\fB\-f\fR, \fB\-\-filter\fR
+cuts down on the amount of output from the enclosure status diagnostic
+page. When this option is given, any line which has all its binary flags
+cleared (i.e. 0) is filtered out (i.e. ignored). If a line has some other
+value on it (e.g. a temperature) then it is output.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output the response in hexadecimal.
+.TP
+\fB\-i\fR, \fB\-\-inner\-hex\fR
+the outer levels of a status diagnostic page are decoded and printed out
+but the innermost level (e.g. the element status descriptor) is output in
+hex. Implemented for the more complex diagnostic pages.
+.TP
+\fB\-l\fR, \fB\-\-list\fR
+list all known diagnostic page names and SES elements. \fIDEVICE\fR
+is ignored and utility exits.
+.TP
+\fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
+where \fIPG\fR is a page code. Assumed to be in decimal unless prefixed by
+0x for hex. Valid range is 0 to 255 (0x0 to 0xff) inclusive. Default is 
+page_code 0 (i.e. "Supported diagnostic pages").
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+outputs the chosen status page in (ASCII) hex in a format suitable for
+a later invocation using the \fI\-\-data=\fR option. A status diagnostic
+page less its first 4 bytes (page code and length) is output.
+When used twice (e.g. \fI\-rr\fR) outputs full diagnostic page in binary
+to stdout.
+.TP
+\fB\-s\fR, \fB\-\-status\fR
+will fetch status diagnostic page from the \fIDEVICE\fR via a SCSI RECEIVE
+DIAGNOSTIC RESULTS command. If this option is not given and
+\fI\-\-control\fR is not given then \fI\-\-status\fR is assumed.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+Currently all status pages, control pages and element types defined in
+SES\-2 revision 17 (14th May 2007) are decoded. 
+.PP
+This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
+pages (using the SCSI READ DIAGNOSTIC command). To this end the
+\fI\-\-page=PG\fR and \fI\-\-hex\fR options would be appropriate. Arbitrary
+diagnostic pages can be sent to a device with the sg_senddiag utility.
+.PP
+There is a related command set called SAF\-TE (SCSI attached fault\-tolerant
+enclosure) for enclosure (including RAID) status and control. SCSI devices
+that support SAF\-TE report "Processor" peripheral device type (0x3) in their
+INQUIRY response. See the sg_safte utility in this package or safte\-monitor
+on the internet.
+.SH EXAMPLES
+To view the supported pages:
+.PP
+   sg_ses /dev/sda
+.PP
+To view the configuration page:
+.PP
+   sg_ses \-\-page=1 /dev/sda
+.PP
+To view the status page:
+.PP
+   sg_ses \-\-page=2 /dev/sda
+.PP
+Changing a temperature threshold is possible, if a little awkward. The
+current thresholds can be shown with:
+.PP
+   sg_ses \-\-page=5 /dev/sda
+.PP
+The threshold to be changed can be chosen. Then output the threshold page
+in hex (suitable for editing) with:
+.PP
+   sg_ses \-\-page=5 \-\-raw /dev/sda > t
+.PP
+Then with the aid of the SES\-2 document (in revision 9: section 6.1.8)
+use your favourite editor to change t. The change can be sent to the
+device with:
+.PP
+   sg_ses \-\-control \-\-page=5 \-\-data=\- /dev/sda < t
+.PP
+If the above is successful, the threshold should have been changed. To
+check try:
+.PP
+   sg_ses \-\-page=5 /dev/sda
+.PP
+again.
+.SH EXIT STATUS
+The exit status of sg_ses is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2004\-2007 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq, sg_safte, sg_senddiag (in sg3_utils package);
+.B safte\-monitor (internet)

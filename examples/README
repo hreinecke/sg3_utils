@@ -1,0 +1,14 @@
+Building files in this directory depends on several files being already
+built in the ../lib directory. So to build files here, the ./configure
+needs to be executed in the parent directory followed by changing
+directory to the lib directory and calling 'make' there.
+Another way is to do a top level 'make' after the ./configure which
+will make the libraries followed by all the utilities in the src/
+directory.
+
+There is an brief explanation of each example in the README file in
+the main (i.e. this directory's parent) directory. There are also
+some notes at the top of each source file.
+
+Doug Gilbert
+17th February 2008

@@ -1,0 +1,247 @@
+.TH SG_START "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.SH NAME
+sg_start \- send SCSI START STOP UNIT command to start, stop, load or
+eject medium
+.SH SYNOPSIS
+.B sg_start
+[\fI0\fR] [\fI1\fR] [\fI\-\-eject\fR] [\fI\-\-help\fR] [\fI\-\-fl=FL\fR]
+[\fI\-\-immed\fR] [\fI\-\-load\fR] [\fI\-\-loej\fR] [\fI\-\-mod=PC_MOD\fR]
+[\fI\-\-noflush\fR] [\fI\-\-pc=PC\fR] [\fI\-\-start\fR] [\fI\-\-stop\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_start
+[\fI\-\-eject\fR] [\fI\-\-fl=FL\fR] [\fI\-i\fR] [\fI\-\-imm=0|1\fR]
+[\fI\-\-load\fR] [\fI\-\-loej\fR] [\fI\-\-mod=PC_MOD\fR] [\fI\-\-noflush\fR]
+[\fI\-\-pc=PC\fR] [\fI\-\-start\fR] [\fI\-\-stop\fR] [\fI\-v\fR] [\fI\-V\fR]
+[\fI0|1\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg_start sends a SCSI START STOP UNIT command to the \fIDEVICE\fR with
+the selected options. The most used options are \fI\-\-stop\fR to spin
+down a disk and \fI\-\-start\fR to spin up a disk. Using \fI\-\-start\fR
+on a disk that is already spinning is harmless. There is also finer grain
+control with "power condition": active, idle or standby. This is set
+with the \fI\-\-pc=PC\fR option. In some contexts the "stop" state can
+be considered an additional power condition. 
+.PP
+Devices that contain removable media such as cd/dvds can use the
+\fI\-\-loej\fR option to load the medium when used in conjunction
+with \fI\-\-start\fR (i.e. load medium then spin up). Alternatively
+\fI\-\-loej\fR may be used to eject the medium when used in conjunction
+with \fI\-\-stop\fR (i.e. spin down then eject medium). More simply, the
+loading or ejecting of a removable medium can be requested with the
+\fI\-\-load\fR or \fI\-\-eject\fR' option.
+.PP
+If no option or argument is given then a \fI\-\-start\fR is assumed; as the
+utility's name suggests.
+.PP
+This utility supports two command line syntaxes, the preferred one is
+shown first in the synopsis and explained in this section. A later
+section on the old command line syntax outlines the second group of
+options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB0\fR
+same action as \fI\-\-stop\fR.
+.TP
+\fB1\fR
+same action as \fI\-\-start\fR.
+.TP
+\fB\-e\fR, \fB\-\-eject\fR
+stop the medium and eject it from the drive. Only appropriate for a
+device with removable medium. Might be ignored (prevented), see below.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-f\fR, \fB\-\-fl\fR=\fIFL\fR
+sets the format layer number for the disc to "jump" to (defined in MMC\-5).
+Values of \fIFL\fR can be 0 to 3. When this option is chosen, the FL, LoEj
+and Start bits are set in the cdb as required by MMC\-5; thus the user does
+not need to set the \fI\-\-start\fR and/or \fI\-\-load\fR options.
+.TP
+\fB\-i\fR, \fB\-\-immed\fR
+sets the IMM bit on the START STOP UNIT command so this utility will
+return immediately and not wait for the media to complete the requested
+action. The default is to wait until the media to complete the requested
+action before returning.
+.TP
+\fB\-l\fR, \fB\-\-load\fR
+load the medium in the drive and start it. Only appropriate for a removable
+medium.
+.TP
+\fB\-L\fR, \fB\-\-loej\fR
+sets the LOEJ bit on the START STOP UNIT command. This loads the media when
+the unit is started or eject it when the unit is stopped (i.e.  works in
+conjunction with START bit in cdb). This option is ignored if 'pc > 0'.
+Default is off (i.e. don't attempt to load or eject media). If a start/start
+indication is not given (i.e. neither \fI\-\-start\fR nor \fI\-\-stop\fR)
+and this option is given then a load and start action is assumed.
+.TP
+\fB\-m\fR, \fB\-\-mod\fR=\fIPC_MOD\fR
+where \fIPC_MOD\fR is the 'power condition modifier' value. 0 to 15 (inclusive)
+are valid and 0 is the default. This  'power condition modifier' field in the
+cdb was added after sbc3r13.
+.TP
+\fB\-n\fR, \fB\-\-noflush\fR
+do not perform a flush to media (e.g. like SYNCHRONIZE CACHE does) before
+a variant of this utility that limits access to the media. Using the
+\fB\-\-stop\fR option is an example of something that limits access to the
+media. This 'noflush' field in the cdb was added after sbc3r13.
+.TP
+\fB\-O\fR, \fB\-\-old\fR
+switch to older style options.
+.TP
+\fB\-p\fR, \fB\-\-pc\fR=\fIPC\fR
+where \fIPC\fR is the 'power conditions' value. 0 to 15 (inclusive) are valid.
+Default value is 0. When '\-\-pc=0' then \fB\-\-eject\fR, \fB\-\-load\fR,
+\fB\-\-loej\fR, \fB\-\-start\fR and \fB\-\-stop\fR are active. Some common
+values are 1 for the "active" power condition (SBC); 2 for the idle power
+condition; 3 for the standby power condition; 5 for sleep power
+condition (MMC); 7 for LU_CONTROL (SBC), 0xa (decimal 10) for
+FORCE_IDLE_0 (SBC) and 0xb (decimal 11) for FORCE_STANDBY_0 (SBC). See recent
+SBC\-3, MMC\-5 and SAS drafts at www.t10.org for more information.
+.TP
+\fB\-s\fR, \fB\-\-start\fR
+start (spin\-up) the device. This sets the START bit in the cdb. Using
+this option on an already started device is harmless. In the absence of
+other options, this option defaults (i.e. set the START cdb bit).
+.TP
+\fB\-S\fR, \fB\-\-stop\fR
+stop (spin\-down) the device. This clears the START bit in the cdb.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity. Can be used multiple times.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print out version string then exit.
+.SH NOTES
+To avoid confusion, only one of \fI0\fR, \fI1\fR \fI\-\-eject\fR,
+\fI\-\-load\fR, \fI\-\-start\fR and \fI\-\-stop\fR should be given.
+.PP
+There is an associated "power condition" mode page (0x1a) in which timer
+values can be set for transitioning to either idle or standby state after
+a period of inactivity. The sdparm utility can be used to view the power
+condition mode page and if required change it. If a device is in either
+idle or standby power condition state then a REQUEST SENSE command (see
+the sg_requests utility) should yield a sense key of "no sense" and an
+additional sense code of "Low power condition on" on recent SCSI devices.
+.PP
+Ejection of removable media (e.g. 'sg_start \-\-eject /dev/hdd' where
+the device is an ATAPI cd/dvd drive) may be prevented by a prior
+SCSI PREVENT ALLOW MEDIUM REMOVAL command (see sg_prevent). In this
+case this utility should fail with an error generated by the device:
+illegal request / medium removal prevented. This can be overridden
+using sg_prevent or, for example, 'sdparm \-\-command=unlock /dev/hdd'.
+.PP
+The SCSI TEST UNIT READY command can be used to find out whether a
+device is ready to transfer data. If rotating media is stopped or
+still coming up to speed, then the TEST UNIT READY command will yield
+a "not ready" sense key and an more informative additional sense
+code. See the sg_turs utility.
+.PP
+In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
+generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
+and DVD drives) can also be specified. For example "sg_start 0 /dev/sda"
+will work in the 2.6 series kernels.
+.SH EXIT STATUS
+The exit status of sg_start is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH OLDER COMMAND LINE OPTIONS
+The options in this section were the only ones available prior to sg3_utils
+version 1.23 . In sg3_utils version 1.23 and later these older options can
+be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
+or using '\-\-old' (or '\-O) as the first option.
+.PP
+Note that the action of \fI\-\-loej\fR is slightly different in the older
+interface: when neither \fI\-\-start\fR nor \fI\-\-stop\fR (nor proxies
+for them) are given, \fI\-\-loej\fR performs an eject operation. In the
+same situation the newer interface will perform a load operation.
+.PP
+Earlier versions of sg_start had a '\-s' option to perform a SYNCHRONIZE
+CACHE command before the START STOP UNIT command was issued. According to
+recent SBC\-2 drafts this is done implicitly if required. Hence the '\-s'
+option has been dropped.
+.PP
+All options, other than '\-v' and '\-V', can be given with a single "\-".
+For example: "sg_start \-stop /dev/sda" and "sg_start \-\-stop /dev/sda"
+are equivalent. The single "\-" form is for backward compatibility.
+.TP
+\fB0\fR
+stop (spin\-down) \fIDEVICE\fR.
+.TP
+\fB1\fR
+start (spin\-up) \fIDEVICE\fR.
+.TP
+\fB\-\-eject\fR
+stop the medium and eject it from the drive.
+.TP
+\fB\-\-fl\fR=\fIFL\fR
+sets the format layer number for the disc to "jump" to (defined in MMC\-5).
+.TP
+\fB\-i\fR
+sets the IMM bit on the START STOP UNIT command so this utility will return
+immediately and not wait for the media to spin down. Same effect
+as '\-\-imm=1'. The default action (without this option or a '\-\-imm=1'
+option) is to wait until the media spins down before returning.
+.TP
+\fB\-\-imm\fR=\fI0|1\fR
+when the immediate bit is 1 then this utility returns immediately after the
+device has received the command. When this option is 0 (the default) then the
+utility returns once the command has completed its action (i.e. it waits
+until the device is started or stopped).
+.TP
+\fB\-\-load\fR
+load the medium in the drive and start it.
+.TP
+\fB\-\-loej\fR
+sets the LOEJ bit in the START STOP UNIT cdb. When a "start" operation is
+indicated, then a load and start is performed. When a "stop" operation is
+indicated, then a stop and eject is performed. When neither a "start"
+or "stop" operation is indicated does a stop and eject. [Note that the last
+action differs from the new interface in which the option of this name
+defaults to load and start.]
+.TP
+\fB\-N\fR
+switch to the newer style options.
+.TP
+\fB\-\-mod\fR=\fIPC_MOD\fR
+where \fIPC_MOD\fR is the 'power condition modifier' value. 0 to 15 (inclusive)
+are valid and 0 is the default. This field was added after sbc3r13.
+.TP
+\fB\-\-noflush\fR
+do not perform a flush to media (e.g. like SYNCHRONIZE CACHE does) before
+a variant of this utility that limits access to the media. Using the
+\fB\-\-stop\fR option is an example of something that limits access to the
+media. This field was added after sbc3r13.
+.TP
+\fB\-\-pc\fR=\fIPC\fR
+where \fIPC\fR is the 'power condition' value (in hex). 0 to f (inclusive)
+are valid. Default value is 0.
+.TP
+\fB\-\-start\fR
+start (spin\-up) \fIDEVICE\fR.
+.TP
+\fB\-\-stop\fR
+stop (spin\-down) \fIDEVICE\fR. Same meaning as "0" argument.
+.TP
+\fB\-v\fR
+verbose: outputs SCSI command in hex to console before with executing
+it. '\-vv' and '\-vvv' are also accepted yielding greater verbosity.
+.TP
+\fB\-V\fR
+print out version string then exit.
+.SH AUTHOR
+Written by K. Garloff and D. Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2002\-2008 Kurt Garloff, Douglas Gilbert
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_prevent(sg3_utils), sg_requests(sg3_utils), sg_turs(sg3_utils)
+.B sdparm(sdparm)

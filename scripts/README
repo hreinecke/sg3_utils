@@ -1,0 +1,45 @@
+                      README for sg3_utils/scripts
+                      ============================
+Introduction
+============
+This directory contains bash shell scripts. Most of them call one or
+more utilities from the sg3_utils package. They assume the sg3_utils
+package utilities are on the PATH of the user.
+
+scsi_logging_level is written by Andreas Herrmann <aherrman at de dot ibm
+dot com>. It sets the logging level of the SCSI subsystem in the linux
+2.6 series kernels. See that file for more information.
+
+The other scripts are written by the author. Some do testing while others
+do bulk tasks (e.g. stopping multiple disks).
+
+Details
+=======
+Each script supplies more information, typically by supplying a '-h'
+or '--help' option. The script source often contains explanatory
+information. Following is a usage summary with a one line description:
+   sas_disk_blink [-h] [-s <n>] <device>
+	- blink LED on <device> using RLM bit in SAS targets
+   scsi_logging_level [OPTIONS]
+        - set Linux SCSI subsystem logging level
+   scsi_mandat [-h] [-L] [-q] <device>
+        - check for mandatory SCSI command support
+   scsi_readcap [-b] [-h] [-v] <device>+
+        - fetch capacity/size information for each <device>
+   scsi_ready [-h] [-v] <device>+
+        - check the media ready status on each <device>
+   scsi_satl [-h] [-L] [-q] <device>
+	- check <device> for SCSI to ATA Translation Layer (SATL)
+   scsi_start [-h] [-v] <device>+
+        - start media (i.e. spin up) in each <device>
+   scsi_stop [-h] [-v] <device>+
+        - stop media (i.e. spin down) in each <device>
+   scsi_temperature [-h] [-v] <device>+
+        - check temperature in each <device>
+
+These scripts assume that the main sg3_utils utilities are installed
+and are on the user's PATH. The sas_disk_blink script relies on the
+sdparm utility.
+
+Douglas Gilbert
+25th January 2007

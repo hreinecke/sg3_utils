@@ -1,0 +1,39 @@
+.TH SG_RDAC "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.SH NAME
+sg_rdac \- Display or Modify RDAC Redundant Controller Page
+.SH SYNOPSIS
+.B sg_rdac
+[\fI\-a\fR] [\fI\-f=LUN\fR] [\fI\-v\fR] [\fI\-V\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+sg_rdac displays or modifies the RDAC controller settings via the
+Redundant Controller Page (0x2C). When modifying the settings it
+allows to transfer the ownership of individual drives to the
+controller the command was received on.
+.SH OPTIONS
+.TP
+\fB\-a\fR
+Transfer all (visible) devices
+.TP
+\fB\-f\fR=\fILUN\fR
+Transfer the device identified by \fILUN\fR. This command will only work
+if the controller supports 'Dual Active Mode' (aka active/active mode).
+.TP
+\fB\-v\fR
+be verbose
+.TP
+\fB\-V\fR
+print version string then exit
+.SH EXIT STATUS
+The exit status of sg_rdac is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHOR
+Written by Hannes Reinecke <hare at suse dot com>, based on sg_emc_trespass.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2006\-2007 Hannes Reinecke, Douglas Gilbert.
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
