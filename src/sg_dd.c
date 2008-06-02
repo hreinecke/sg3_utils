@@ -57,7 +57,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.66 20080130";
+static char * version_str = "5.67 20080530";
 
 #define ME "sg_dd: "
 
@@ -163,7 +163,9 @@ static struct flags_t oflag;
 
 static void calc_duration_throughput(int contin);
 
-static void install_handler(int sig_num, void (*sig_handler) (int sig))
+
+static void
+install_handler(int sig_num, void (*sig_handler) (int sig))
 {
     struct sigaction sigact;
     sigaction (sig_num, NULL, &sigact);
@@ -176,7 +178,9 @@ static void install_handler(int sig_num, void (*sig_handler) (int sig))
     }
 }
 
-static void print_stats(const char * str)
+
+static void
+print_stats(const char * str)
 {
     if (0 != dd_count)
         fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
@@ -199,7 +203,9 @@ static void print_stats(const char * str)
                 unrecovered_errs);
 }
 
-static void interrupt_handler(int sig)
+
+static void
+interrupt_handler(int sig)
 {
     struct sigaction sigact;
 
@@ -214,7 +220,9 @@ static void interrupt_handler(int sig)
     kill(getpid (), sig);
 }
 
-static void siginfo_handler(int sig)
+
+static void
+siginfo_handler(int sig)
 {
     sig = sig;  /* dummy to stop -W warning messages */
     fprintf(stderr, "Progress report, continuing ...\n");
@@ -223,7 +231,9 @@ static void siginfo_handler(int sig)
     print_stats("  ");
 }
 
-static int dd_filetype(const char * filename)
+
+static int
+dd_filetype(const char * filename)
 {
     struct stat st;
     size_t len = strlen(filename);
@@ -247,7 +257,9 @@ static int dd_filetype(const char * filename)
     return FT_OTHER;
 }
 
-static char * dd_filetype_str(int ft, char * buff)
+
+static char *
+dd_filetype_str(int ft, char * buff)
 {
     int off = 0;
 
@@ -268,7 +280,9 @@ static char * dd_filetype_str(int ft, char * buff)
     return buff;
 }
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
            "sg_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
@@ -332,8 +346,10 @@ static void usage()
            "specialized for SCSI devices\n");
 }
 
+
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
-static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
+static int
+scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -374,10 +390,11 @@ static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     return 0;
 }
 
+
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
 /* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
-static int read_blkdev_capacity(int sg_fd, int64_t * num_sect,
-                                int * sect_sz)
+static int
+read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
 #ifdef BLKSSZGET
     if ((ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) && (*sect_sz > 0)) {
@@ -419,9 +436,10 @@ static int read_blkdev_capacity(int sg_fd, int64_t * num_sect,
 #endif
 }
 
-static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
-                             unsigned int blocks, int64_t start_block,
-                             int write_true, int fua, int dpo)
+
+static int
+sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
+                  int64_t start_block, int write_true, int fua, int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
@@ -511,6 +529,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
     return 0;
 }
 
+
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_UNIT_ATTENTION -> try again,
    SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> 'io_addrp' written to,
@@ -518,10 +537,10 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
    SG_LIB_CAT_NOT_READY, SG_LIB_CAT_ABORTED_COMMAND,
    -2 -> ENOMEM
    -1 other errors */
-static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
-                       int64_t from_block, int bs,
-                       const struct flags_t * ifp, int * diop,
-                       uint64_t * io_addrp)
+static int
+sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
+            int bs, const struct flags_t * ifp, int * diop,
+            uint64_t * io_addrp)
 {
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -617,22 +636,26 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
             if (verbose > 1)
                 sg_chk_n_print3("reading", &io_hdr, verbose > 1);
             if (sg_scsi_normalize_sense(sbp, slen, &ssh) &&
-                (0x64 == ssh.asc) && (0x0 == ssh.ascq) &&
-                (sg_get_sense_filemark_eom_ili(sbp, slen, NULL, NULL, &ili))
-                && ili) {
-                info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
-                if (*io_addrp > 0) {
-                    ++unrecovered_errs;
-                    return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
-                } else
-                    fprintf(stderr, "MMC READ gave 'illegal mode for this "
-                            "track' and ILI but no LBA of failure\n");
+                (0x64 == ssh.asc) && (0x0 == ssh.ascq)) {
+                if (sg_get_sense_filemark_eom_ili(sbp, slen, NULL, NULL,
+                                                  &ili) && ili) {
+                    info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
+                    if (*io_addrp > 0) {
+                        ++unrecovered_errs;
+                        return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
+                    } else
+                        fprintf(stderr, "MMC READ gave 'illegal mode for "
+                                "this track' and ILI but no LBA of failure\n");
+                }
+                ++unrecovered_errs;
+                return SG_LIB_CAT_MEDIUM_HARD;
             }
         }
         /* drop through */
     default:
         ++unrecovered_errs;
-        sg_chk_n_print3("reading", &io_hdr, verbose > 1);
+        if (verbose > 0)
+            sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         return res;
     }
     if (diop && *diop && 
@@ -642,13 +665,14 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
     return 0;
 }
 
+
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_UNIT_ATTENTION -> try again, SG_LIB_CAT_NOT_READY,
    SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ABORTED_COMMAND,
    -2 -> ENOMEM, -1 other errors */
-static int sg_read(int sg_fd, unsigned char * buff, int blocks,
-                   int64_t from_block, int bs, struct flags_t * ifp,
-                   int * diop, int * blks_readp)
+static int
+sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
+        int bs, struct flags_t * ifp, int * diop, int * blks_readp)
 {
     uint64_t io_addr;
     int64_t lba;
@@ -656,12 +680,14 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
     unsigned char * bp;
     int retries_tmp;
     int ret = 0;
+    int may_coe = 0;
 
     retries_tmp = ifp->retries;
     for (xferred = 0, blks = blocks, lba = from_block, bp = buff;
          blks > 0; blks = blocks - xferred) {
         io_addr = 0;
         repeat = 0;
+        may_coe = 0;
         res = sg_read_low(sg_fd, bp, blks, lba, bs, ifp, diop, &io_addr);
         switch (res) {
         case 0:
@@ -713,6 +739,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             ret = res;
             goto err_out;
         case SG_LIB_CAT_MEDIUM_HARD:
+            may_coe = 1;
         default:
             if (retries_tmp > 0) {
                 fprintf(stderr, ">>> retrying a sgio read, lba=0x%"PRIx64"\n",
@@ -735,6 +762,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                     "correct range:\n\t[0x%"PRIx64",0x%"PRIx64"]\n", io_addr,
                     (uint64_t)lba,
                     (uint64_t)(lba + blks - 1));
+            may_coe = 1;
             goto err_out;
         }
         blks = (int)(io_addr - (uint64_t)lba);
@@ -880,21 +908,29 @@ err_out:
         memset(bp, 0, bs * blks);
         fprintf(stderr, ">> unable to read at blk=%"PRId64" for "
                 "%d bytes, use zeros\n", lba, bs * blks);
+        if (blks > 1)
+            fprintf(stderr, ">>   try reducing bpt to limit number "
+                    "of zeros written near bad block(s)\n");
         /* fudge success */
         if (blks_readp)
             *blks_readp = xferred + blks;
-        return ret;
+        if ((coe_limit > 0) && (++coe_count > coe_limit)) {
+            fprintf(stderr, ">> coe_limit on consecutive reads exceeded\n");
+            return ret;
+        }
+        return may_coe ? 0 : ret;
     } else
         return ret ? ret : -1;
 }
+
 
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_MEDIUM_HARD,
    SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
    -1 -> unrecoverable error + others */
-static int sg_write(int sg_fd, unsigned char * buff, int blocks,
-                    int64_t to_block, int bs, const struct flags_t * ofp,
-                    int * diop)
+static int
+sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
+         int bs, const struct flags_t * ofp, int * diop)
 {
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -984,7 +1020,9 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
     return 0;
 }
 
-static void calc_duration_throughput(int contin)
+
+static void
+calc_duration_throughput(int contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
@@ -1012,7 +1050,9 @@ static void calc_duration_throughput(int contin)
     }
 }
 
-static int process_flags(const char * arg, struct flags_t * fp)
+
+static int
+process_flags(const char * arg, struct flags_t * fp)
 {
     char buff[256];
     char * cp;
@@ -1061,7 +1101,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int64_t skip = 0;
     int64_t seek = 0;
