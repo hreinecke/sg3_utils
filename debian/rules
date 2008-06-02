@@ -16,7 +16,6 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 	# Add here commands to configure the package.
-	CFLAGS="$(CFLAGS)" ./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --bindir=/usr/bin --prefix=/usr --mandir=\$${prefix}/share/man
 	touch configure-stamp
 
 build: configure-stamp build-stamp
@@ -33,7 +32,7 @@ clean:
 	dh_testroot
 
 	# Add here commands to clean up after the build process.
-	-$(MAKE) distclean
+	-$(MAKE) clean
 
 	rm -f build-stamp configure-stamp debian/substvars
 
@@ -46,12 +45,12 @@ install: build
 	dh_clean -k
 	dh_installdirs
 
-	# Add here commands to install the package into debian/sg3-utils .
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/sg3-utils
+	# Add here commands to install the package into debian/tmp
+	$(MAKE) -e install DESTDIR=$(CURDIR)/debian/tmp PREFIX=/usr
 
-	# This is questionable, copying scripts into /usr/bin ...
-	cp scripts/scsi* scripts/sas* debian/sg3-utils/usr/bin
-
+	find debian/tmp/usr/bin debian/tmp/usr/lib -type f -exec chrpath -d {} \;
+	dh_install --autodest --sourcedir=debian/tmp
+	dh_installman
 
 # Build architecture-independent files here.
 # Pass -i to all debhelper commands in this target to reduce clutter.
@@ -66,7 +65,6 @@ binary-arch: build install
 	dh_installexamples -a 
 	dh_installmenu -a
 	dh_installchangelogs ChangeLog -a
-	dh_installman
 	dh_strip -a
 	dh_link -a
 	dh_compress -a -X archive -X .c -X .h
