@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080602] [svn: r176]
+Changelog for sg3_utils-1.26 [20080602] [svn: r177]
   - sg_sat_phy_event: new utility; copied from examples
     directory and enhanced, rename original to sg__sat_phy_event
   - sg_ses: sync with ses2r19b, many nomenclature changes
