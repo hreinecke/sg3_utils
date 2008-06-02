@@ -133,7 +133,7 @@ AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 
 lib_LTLIBRARIES = libsgutils.la
 
-libsgutils_la_LDFLAGS = -version-info 1:0:0
+libsgutils_la_LDFLAGS = -version-info 2:0:0
 
 libsgutils_la_LIBADD = @GETOPT_O_FILES@ @os_libs@
 libsgutils_la_DEPENDENCIES = @GETOPT_O_FILES@

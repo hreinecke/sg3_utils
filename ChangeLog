@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080523]
+Changelog for sg3_utils-1.26 [20080602] [svn: r176]
   - sg_sat_phy_event: new utility; copied from examples
     directory and enhanced, rename original to sg__sat_phy_event
   - sg_ses: sync with ses2r19b, many nomenclature changes
@@ -55,7 +55,7 @@ Changelog for sg3_utils-1.26 [20080523]
   - switch primary build to ubuntu environment, rename
     library to libsgutils2 to avoid clash
 
-Changelog for sg3_utils-1.25 [20071016]
+Changelog for sg3_utils-1.25 [20071016] [svn: r115]
   - sg_stpg: new utility to Set Target Port Groups
   - sg_safte: new utility to query SAF-TE processor (SES like)
   - sg_sat_set_features: new utility (actually copied from examples
@@ -90,7 +90,7 @@ Changelog for sg3_utils-1.25 [20071016]
       autotools; some other subdirectories still use hand-crafted
       Makefiles
 
-Changelog for sg3_utils-1.24 [20070507]
+Changelog for sg3_utils-1.24 [20070507] [svn: r77]
   - sg_raw: new utility to send arbirary SCSI commands
   - sg_luns: increase number of luns that can be fetched
     - fix length of raw and hex output

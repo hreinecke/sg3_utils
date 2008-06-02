@@ -637,6 +637,7 @@ uninstall-am:
 
 distclean-local:
 	rm -rf autom4te.cache
+	rm -f build-stamp configure-stamp
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
