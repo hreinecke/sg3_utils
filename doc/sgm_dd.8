@@ -15,15 +15,15 @@ transfers from sg devices.
 .\" Add any additional description here
 .PP
 Copy data to and from any files. Specialized for "files" that are
-Linux SCSI generic (sg) devices and raw devices. Uses memory mapped 
+Linux SCSI generic (sg) devices and raw devices. Uses memory mapped
 transfers on sg devices. Similar syntax and semantics to
-.B dd(1) 
+.B dd(1)
 but does not perform any conversions.
 .PP
 Will only perform memory mapped transfers when \fIIFILE\fR or \fIOFILE\fR
 are SCSI generic (sg) devices.
 .PP
-If both \fIIFILE\fR and \fIOFILE\fR are sg devices then memory mapped 
+If both \fIIFILE\fR and \fIOFILE\fR are sg devices then memory mapped
 transfers are performed on \fIIFILE\fR. If no other flags are specified
 then indirect IO is performed on \fIOFILE\fR. If 'oflag=dio' is given then
 direct IO is attempted on \fIOFILE\fR. If 'oflag=smmap' is given then
@@ -234,8 +234,8 @@ Data usually gets to the user space in a 2 stage process: first the
 SCSI adapter DMAs into kernel buffers and then the sg driver copies
 this data into user memory (write operations reverse this sequence).
 With memory mapped transfers a kernel buffer reserved by sg is memory
-mapped (see the 
-.B mmap(2) 
+mapped (see the
+.B mmap(2)
 system call) into the user space. When this is done
 the second (redundant) copy from kernel buffers to user space is
 not needed. Hence the transfer is faster and requires less "grunt"
@@ -256,7 +256,7 @@ advanced "copy on error" logic see the
 utility (and its 'coe' flag).
 .SH EXAMPLES
 .PP
-See the examples given in the man page for 
+See the examples given in the man page for
 .B sg_dd(8).
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and

@@ -35,7 +35,7 @@
  * This header file contains some structure declarations and array name
  * declarations which are defined in the sg_lib_data.c .
  * Typically this header does not need to be exposed to users of the
- * sg_lib interface declared in sg_libs.h . 
+ * sg_lib interface declared in sg_libs.h .
  */
 
 #include <stdint.h>

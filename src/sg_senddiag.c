@@ -345,7 +345,7 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
 
 /* Return of 0 -> success, otherwise see sg_ll_send_diag() */
 static int do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
-                       int devofl_bit, int unitofl_bit, void * outgoing_pg, 
+                       int devofl_bit, int unitofl_bit, void * outgoing_pg,
                        int outgoing_len, int noisy, int verbose)
 {
     int long_duration = 0;
@@ -553,7 +553,7 @@ static void list_page_codes()
     printf("Page_Code  Description\n");
     for (k = 0; k < num; ++k, ++pcdp)
         printf(" 0x%02x      %s\n", pcdp->page_code,
-               (pcdp->desc ? pcdp->desc : "<unknown>"));   
+               (pcdp->desc ? pcdp->desc : "<unknown>"));
 }
 
 
@@ -605,7 +605,7 @@ int main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    
+
     if ((opts.do_doff || opts.do_uoff) && (! opts.do_deftest)) {
         if (opts.opt_new) {
             printf("setting --doff or --uoff only useful when -t is set\n");

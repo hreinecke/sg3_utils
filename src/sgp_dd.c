@@ -45,7 +45,7 @@
    program complains if 'ibs' or 'obs' are given with some other value
    than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
    'of' is not given or 'of=-' then stdout assumed.
-   
+
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
    For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
@@ -283,7 +283,7 @@ static char * tsafe_strerror(int code, char * ebp)
     ebp[STRERR_BUFF_LEN - 1] = '\0';
     return ebp;
 }
-    
+
 
 /* Following macro from D.R. Butenhof's POSIX threads book:
    ISBN 0-201-63392-2 . [Highly recommended book.] */
@@ -558,7 +558,7 @@ static void * read_write_thread(void * v_clp)
         status = pthread_mutex_lock(&clp->out_mutex);
         if (0 != status) err_exit(status, "lock out_mutex");
         if (FT_DEV_NULL != clp->out_type) {
-            while ((! clp->out_stop) && 
+            while ((! clp->out_stop) &&
                    ((rep->blk + seek_skip) != clp->out_blk)) {
                 /* if write would be out of sequence then wait */
                 pthread_cleanup_push(cleanup_out, (void *)clp);
@@ -635,13 +635,13 @@ static int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
         if (clp->in_flags.coe) {
             memset(rep->buffp, 0, rep->num_blks * rep->bs);
             fprintf(stderr, ">> substituted zeros for in blk=%"PRId64" for "
-                    "%d bytes, %s\n", rep->blk, 
-                    rep->num_blks * rep->bs, 
+                    "%d bytes, %s\n", rep->blk,
+                    rep->num_blks * rep->bs,
                     tsafe_strerror(errno, strerr_buff));
             res = rep->num_blks * clp->bs;
         }
         else {
-            fprintf(stderr, "error in normal read, %s\n", 
+            fprintf(stderr, "error in normal read, %s\n",
                     tsafe_strerror(errno, strerr_buff));
             clp->in_stop = 1;
             guarded_stop_out(clp);
@@ -679,7 +679,7 @@ static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     if (res < 0) {
         if (clp->out_flags.coe) {
             fprintf(stderr, ">> ignored error for out blk=%"PRId64" for "
-                    "%d bytes, %s\n", rep->blk, 
+                    "%d bytes, %s\n", rep->blk,
                     rep->num_blks * rep->bs,
                     tsafe_strerror(errno, strerr_buff));
             res = rep->num_blks * clp->bs;
@@ -942,7 +942,7 @@ static int sg_start_io(Rq_elem * rep)
     int cdbsz = rep->wr ? rep->cdbsz_out : rep->cdbsz_in;
     int res;
 
-    if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk, 
+    if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk,
                           rep->wr, fua, dpo)) {
         fprintf(stderr, ME "bad cdb build, start_blk=%"PRId64", blocks=%d\n",
                 rep->blk, rep->num_blks);
@@ -1258,7 +1258,7 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         } else if (0 == strncmp(key, "--vers", 6)) {
-            fprintf(stderr, ME ": %s\n", 
+            fprintf(stderr, ME ": %s\n",
                     version_str);
             return 0;
         }
@@ -1445,7 +1445,7 @@ int main(int argc, char * argv[])
         if (FT_SG == rcoll.in_type) {
             res = scsi_read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Unit attention, media changed(in), continuing\n");
                 res = scsi_read_capacity(rcoll.infd, &in_num_sect,
                                          &in_sect_sz);
@@ -1480,7 +1480,7 @@ int main(int argc, char * argv[])
         if (FT_SG == rcoll.out_type) {
             res = scsi_read_capacity(rcoll.outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
-                fprintf(stderr,         
+                fprintf(stderr,
                         "Unit attention, media changed(out), continuing\n");
                 res = scsi_read_capacity(rcoll.outfd, &out_num_sect,
                                          &out_sect_sz);
@@ -1657,7 +1657,7 @@ int main(int argc, char * argv[])
             }
             close(fd);
         }
-    } 
+    }
     if (rcoll.sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                rcoll.sum_of_resids);

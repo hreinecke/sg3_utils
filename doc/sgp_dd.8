@@ -15,8 +15,8 @@ devices that understand the SCSI command set.
 .\" Add any additional description here
 .PP
 Copy data to and from any files. Specialised for "files" that are
-Linux SCSI generic (sg) and raw devices. Similar syntax and semantics to 
-.B dd(1) 
+Linux SCSI generic (sg) and raw devices. Similar syntax and semantics to
+.B dd(1)
 but does not perform any conversions. Uses POSIX threads to increase
 the amount of parallelism. This improves speed in some cases.
 .PP
@@ -39,7 +39,7 @@ implies 64 KiB transfers.
 where \fIBS\fR
 .B must
 be the block size of the physical device. Note that this differs from
-.B dd(1) 
+.B dd(1)
 which permits 'bs' to be an integral multiple of the actual device block
 size. Default is 512 which is usually correct for disks but incorrect for
 cdroms (which normally have 2048 byte blocks).
@@ -50,7 +50,7 @@ Default is 10 byte SCSI command blocks (unless calculations indicate
 that a 4 byte block number may be exceeded, in which case it defaults
 to 16 byte SCSI commands).
 .TP
-\fBcoe\fR=0 | 1 
+\fBcoe\fR=0 | 1
 set to 1 for continue on error. Only applies to errors on sg devices.
 Thus errors on other files will stop sgp_dd. Default is 0 which
 implies stop on any error. See the 'coe' flag for more information.
@@ -154,7 +154,7 @@ coe
 continue on error. When given with 'iflag=', an error that is detected
 in a single SCSI command (typically 'bpt' blocks) is noted (by an error
 message sent to stderr), then zeros are substituted into the buffer
-for the corresponding write operation and the copy continues. Note that the 
+for the corresponding write operation and the copy continues. Note that the
 .B sg_dd
 utility is more sophisticated in such error situations when 'iflag=coe'.
 When given with 'oflag=', any error reported by a SCSI WRITE command is

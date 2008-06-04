@@ -23,7 +23,7 @@
    Does 10 byte MODE SENSE commands by default, Trent Piepho added a "-6"
    switch for force 6 byte mode sense commands.
    This utility cannot modify mode pages. See the sdparm utility for that.
-   
+
 */
 
 static char * version_str = "1.29 20080218";
@@ -757,28 +757,28 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     dp = mode_page_cs_table(-1, &num);
     pe_dp = mode_page_cs_table(scsi_ptype, &num_ptype);
     while (1) {
-        pg = dp ? dp->page_code : PG_CODE_ALL + 1; 
-        spg = dp ? dp->subpage_code : SPG_CODE_ALL; 
+        pg = dp ? dp->page_code : PG_CODE_ALL + 1;
+        spg = dp ? dp->subpage_code : SPG_CODE_ALL;
         c = (pg << 8) + spg;
-        pg = pe_dp ? pe_dp->page_code : PG_CODE_ALL + 1; 
+        pg = pe_dp ? pe_dp->page_code : PG_CODE_ALL + 1;
         spg = pe_dp ? pe_dp->subpage_code : SPG_CODE_ALL;
         d = (pg << 8) + spg;
         if (valid_transport &&
             ((PROTO_SPECIFIC_1 == c) || (PROTO_SPECIFIC_2 == c)))
             dp = (--num <= 0) ? NULL : (dp + 1); /* skip protocol specific */
-        else if (c == d) { 
+        else if (c == d) {
             if (pe_dp->subpage_code)
                 printf(" 0x%02x,0x%02x    *  %s\n", pe_dp->page_code,
-                       pe_dp->subpage_code, pe_dp->desc);   
+                       pe_dp->subpage_code, pe_dp->desc);
             else
                 printf(" 0x%02x         *  %s\n", pe_dp->page_code,
-                       pe_dp->desc);   
+                       pe_dp->desc);
             dp = (--num <= 0) ? NULL : (dp + 1);
             pe_dp = (--num_ptype <= 0) ? NULL : (pe_dp + 1);
-        } else if (c < d) { 
+        } else if (c < d) {
             if (dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
-                       dp->subpage_code, dp->desc);   
+                       dp->subpage_code, dp->desc);
             else
                 printf(" 0x%02x            %s\n", dp->page_code,
                        dp->desc);
@@ -786,10 +786,10 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
         } else {
             if (pe_dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", pe_dp->page_code,
-                       pe_dp->subpage_code, pe_dp->desc);   
+                       pe_dp->subpage_code, pe_dp->desc);
             else
                 printf(" 0x%02x            %s\n", pe_dp->page_code,
-                       pe_dp->desc);   
+                       pe_dp->desc);
             pe_dp = (--num_ptype <= 0) ? NULL : (pe_dp + 1);
         }
         if ((NULL == dp) && (NULL == pe_dp))
@@ -802,7 +802,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
         while (dp) {
             if (dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
-                       dp->subpage_code, dp->desc);   
+                       dp->subpage_code, dp->desc);
             else
                 printf(" 0x%02x            %s\n", dp->page_code,
                        dp->desc);
@@ -816,7 +816,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
         while (dp) {
             if (dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
-                       dp->subpage_code, dp->desc);   
+                       dp->subpage_code, dp->desc);
             else
                 printf(" 0x%02x            %s\n", dp->page_code,
                        dp->desc);
@@ -830,7 +830,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
         while (dp) {
             if (dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
-                       dp->subpage_code, dp->desc);   
+                       dp->subpage_code, dp->desc);
             else
                 printf(" 0x%02x            %s\n", dp->page_code,
                        dp->desc);
@@ -1020,7 +1020,7 @@ main(int argc, char * argv[])
     inq_pdt = inq_out.peripheral_type;
     inq_byte6 = inq_out.byte_6;
     if (0 == opts.do_raw)
-        printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n", 
+        printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
                inq_out.vendor, inq_out.product, inq_out.revision,
                sg_get_pdt_str(inq_pdt, sizeof(pdt_name), pdt_name), inq_pdt);
     if (opts.do_list) {
@@ -1143,7 +1143,7 @@ main(int argc, char * argv[])
             if (1 == opts.do_raw)
                 dStrRaw((const char *)rsp_buff, md_len);
             else {
-                ucp = rsp_buff + bd_len + headerlen; 
+                ucp = rsp_buff + bd_len + headerlen;
                 md_len -= bd_len + headerlen;
                 spf = ((ucp[0] & 0x40) ? 1 : 0);
                 len = (spf ? ((ucp[2] << 8) + ucp[3] + 4) : (ucp[1] + 2));
@@ -1160,11 +1160,11 @@ main(int argc, char * argv[])
             dStrHex((const char *)rsp_buff, headerlen, 1);
         if (0 == inq_pdt)
             printf("  Mode data length=%d, medium type=0x%.2x, WP=%d,"
-                   " DpoFua=%d, longlba=%d\n", md_len, medium_type, 
+                   " DpoFua=%d, longlba=%d\n", md_len, medium_type,
                    !!(specific & 0x80), !!(specific & 0x10), longlba);
         else
             printf("  Mode data length=%d, medium type=0x%.2x, specific"
-                   " param=0x%.2x, longlba=%d\n", md_len, medium_type, 
+                   " param=0x%.2x, longlba=%d\n", md_len, medium_type,
                    specific, longlba);
         if (md_len > rsp_buff_size) {
             printf("Only fetched %d bytes of response, truncate output\n",
@@ -1185,13 +1185,13 @@ main(int argc, char * argv[])
                     len = 16;
                     density_code_off = 8;
                 }
-                else if (0 == inq_pdt) { 
+                else if (0 == inq_pdt) {
                     printf("> Direct access device block descriptors:\n");
                     density_code_off = 4;
                 }
                 else
                     printf("> General mode parameter block descriptors:\n");
-    
+
                 ucp = rsp_buff + headerlen;
                 while (num > 0) {
                     printf("   Density code=0x%x\n",

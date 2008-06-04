@@ -13,7 +13,7 @@ sg_wr_mode \- write mode page
 Writes a modified mode page to \fIDEVICE\fR. Uses the SCSI MODE SENSE (6
 or 10 byte variant) command to fetch the existing mode data which includes
 a mode page (or subpage). It then combines that with the contents,
-potentially masked, and writes the modified mode page with the SCSI MODE 
+potentially masked, and writes the modified mode page with the SCSI MODE
 SELECT (6 or 10 byte variant) command. This utility does not modify
 the block descriptor(s); if any block descriptors are fetched by the MODE
 SENSE command then the same block descriptors are written back with the

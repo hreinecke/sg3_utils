@@ -26,7 +26,7 @@ a SCSI generic (sg) node and the higher level SCSI device name; or
 vice versa. For example '/dev/sg0' may "map" to '/dev/sda'.
 Mappings may not exist, if a relevant module is not loaded, for
 example. Also there are SCSI devices that can only be accessed via a sg
-node (e.g. SAF\-TE and some SES devices). 
+node (e.g. SAF\-TE and some SES devices).
 .PP
 In this utility, "matching" refers to different representations of
 the same device accessed via the same driver. For example, '/dev/hdc'
@@ -89,7 +89,7 @@ special files can be anything the user desires (e.g. '/dev/sda'
 could be named '/dev/my_boot_disk'). When trying to
 find a resultant device special file, this utility uses the major
 and minor numbers (and whether a block or char device is sought)
-to search the device directory. 
+to search the device directory.
 .PP
 This utility only shows one relationship at a time. To get an
 overview of all SCSI devices, with special file names and optionally

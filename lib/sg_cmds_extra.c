@@ -241,7 +241,7 @@ sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
                 int param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] = 
+    unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] =
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -273,7 +273,7 @@ sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
     set_scsi_pt_cdb(ptvp, senddiagCmdBlk, sizeof(senddiagCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
-    res = do_scsi_pt(ptvp, sg_fd, 
+    res = do_scsi_pt(ptvp, sg_fd,
                      (long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT),
                      verbose);
     ret = sg_cmds_process_resp(ptvp, "send diagnostic", res, 0, sense_b,
@@ -314,7 +314,7 @@ sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
                    int mx_resp_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char rcvdiagCmdBlk[RECEIVE_DIAGNOSTICS_CMDLEN] = 
+    unsigned char rcvdiagCmdBlk[RECEIVE_DIAGNOSTICS_CMDLEN] =
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -381,7 +381,7 @@ sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist, int dl_format,
                     void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
-    unsigned char rdefCmdBlk[READ_DEFECT10_CMDLEN] = 
+    unsigned char rdefCmdBlk[READ_DEFECT10_CMDLEN] =
         {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -540,7 +540,7 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
     riiCmdBlk[8] = (max_resp_len >> 8) & 0xff;
     riiCmdBlk[9] = max_resp_len & 0xff;
     riiCmdBlk[10] |= (itype << 1) & 0xfe;
-    
+
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
     if (verbose) {
@@ -679,7 +679,7 @@ sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
                   void * paramp, int param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat, tmout;
-    unsigned char fuCmdBlk[FORMAT_UNIT_CMDLEN] = 
+    unsigned char fuCmdBlk[FORMAT_UNIT_CMDLEN] =
                 {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -756,7 +756,7 @@ sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
                       int param_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
-    unsigned char reassCmdBlk[REASSIGN_BLKS_CMDLEN] = 
+    unsigned char reassCmdBlk[REASSIGN_BLKS_CMDLEN] =
         {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1189,7 +1189,7 @@ sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
         writeLongCmdBlk[1] |= 0x40;
     if (pblock)
         writeLongCmdBlk[1] |= 0x20;
-  
+
     writeLongCmdBlk[2] = (lba >> 24) & 0xff;
     writeLongCmdBlk[3] = (lba >> 16) & 0xff;
     writeLongCmdBlk[4] = (lba >> 8) & 0xff;
@@ -1380,7 +1380,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
                int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char vCmdBlk[VERIFY10_CMDLEN] = 
+    unsigned char vCmdBlk[VERIFY10_CMDLEN] =
                 {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1479,7 +1479,7 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
              int * residp, int verbose)
 {
     int k, res, slen, duration;
-    unsigned char aptCmdBlk[ATA_PT_16_CMDLEN] = 
+    unsigned char aptCmdBlk[ATA_PT_16_CMDLEN] =
                 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * sp;
@@ -1624,7 +1624,7 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
-    unsigned char rbufCmdBlk[READ_BUFFER_CMDLEN] = 
+    unsigned char rbufCmdBlk[READ_BUFFER_CMDLEN] =
         {READ_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1698,7 +1698,7 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
                    void * paramp, int param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char wbufCmdBlk[WRITE_BUFFER_CMDLEN] = 
+    unsigned char wbufCmdBlk[WRITE_BUFFER_CMDLEN] =
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;

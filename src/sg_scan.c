@@ -268,10 +268,10 @@ int main(int argc, char * argv[])
     if ((! has_file_args) && (stat(sysfs_sg_dir, &a_stat) >= 0) &&
         (S_ISDIR(a_stat.st_mode)))
         has_sysfs_sg = sysfs_sg_scan(sysfs_sg_dir);
-    
+
     flags = O_NONBLOCK | (writeable ? O_RDWR : O_RDONLY);
 
-    for (k = 0, res = 0, j = 0, sg_fd = -1; 
+    for (k = 0, res = 0, j = 0, sg_fd = -1;
          (k < max_file_args)  && (has_file_args || (num_errors < MAX_ERRORS));
          ++k, res = ((sg_fd >= 0) ? close(sg_fd) : 0)) {
         if (res < 0) {
@@ -373,7 +373,7 @@ int main(int argc, char * argv[])
         if (do_inquiry) {
             if (-1 == sg_ver3) {
                 sg_ver3 = 0;
-                if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &f) >= 0) && 
+                if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &f) >= 0) &&
                     (f >= 30000))
                     sg_ver3 = 1;
             }
@@ -440,7 +440,7 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
 
         printf("    %.8s  %.16s  %.4s ", p + 8, p + 16, p + 32);
         printf("[rmb=%d cmdq=%d pqual=%d pdev=0x%x] ",
-               !!(p[1] & 0x80), !!(p[7] & 2), (p[0] & 0xe0) >> 5, 
+               !!(p[1] & 0x80), !!(p[7] & 2), (p[0] & 0xe0) >> 5,
                (p[0] & 0x1f));
         if (do_extra && sg_io)
             printf("dur=%ums\n", io_hdr.duration);
@@ -581,7 +581,7 @@ void printswap(char *output, char *in, unsigned int n)
 int ata_command_interface(int device, char *data)
 {
     unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
-    int retval; 
+    int retval;
 
     buff[0] = ATA_IDENTIFY_DEVICE;
     buff[3] = 1;

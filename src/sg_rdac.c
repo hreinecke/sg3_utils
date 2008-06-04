@@ -103,7 +103,7 @@ static int fail_all_paths(int fd)
         rdac_page->quiescence = RDAC_QUIESCENCE_TIME;
         rdac_page->options = RDAC_FORCE_QUIESCENCE;
         rdac_page->current_mode_lsb = RDAC_FAIL_ALL_PATHS;
-        
+
         res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
                                  fail_paths_pg, 118,
                                  1, (do_verbose ? 2 : 0));
@@ -243,7 +243,7 @@ static void print_rdac_mode( unsigned char *ptr )
                 printf("active/active mode; ");
                 break;
         default:
-                printf("(Unknown status 0x%x); ", 
+                printf("(Unknown status 0x%x); ",
                        rdac_ptr->alternate_mode_msb);
                 break;
         }
@@ -316,7 +316,7 @@ int main(int argc, char * argv[])
         int fail_all = 0;
         int fail_path = 0;
         int ret = 0;
-        
+
         if (argc < 2) {
                 usage ();
                 return SG_LIB_SYNTAX_ERROR;
@@ -362,14 +362,14 @@ int main(int argc, char * argv[])
                 usage();
                 return SG_LIB_FILE_ERROR;
         }
-                
+
         if (fail_all) {
                 res = fail_all_paths(fd);
         } else if (fail_path) {
                 res = fail_this_path(fd, lun);
         } else {
-                res = sg_ll_mode_sense6(fd, /*DBD*/ 0, /* page control */0, 
-                                        0x2c, 0, rsp_buff, 252, 
+                res = sg_ll_mode_sense6(fd, /*DBD*/ 0, /* page control */0,
+                                        0x2c, 0, rsp_buff, 252,
                                         1, do_verbose);
 
                 if (!res) {

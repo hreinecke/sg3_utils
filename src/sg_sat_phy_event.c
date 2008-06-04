@@ -162,7 +162,7 @@ dStrRaw(const char* str, int len)
 
 /* ATA READ LOG EXT command [2Fh, PIO data-in] */
 /* N.B. "log_addr" is the log page number, "page_in_log" is usually zero */
-static int 
+static int
 do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                 int blk_count, void * resp, int mx_resp_len, int cdb_len,
                 int ck_cond, int extend, int do_hex, int do_raw, int verbose)
@@ -244,7 +244,7 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                         fprintf(stderr, "ATA PASS-THROUGH (%d), bad "
                                 "field in cdb\n", cdb_len);
                 }
-                return ret; 
+                return ret;
             case SPC_SK_NO_SENSE:
             case SPC_SK_RECOVERED_ERROR:
                 if ((0x0 == ssh.asc) &&

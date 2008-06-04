@@ -184,7 +184,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                         fprintf(stderr, "ATA PASS-THROUGH (%d), bad "
                                 "field in cdb\n", cdb_len);
                 }
-                return ret; 
+                return ret;
             case SPC_SK_NO_SENSE:
             case SPC_SK_RECOVERED_ERROR:
                 if ((0x0 == ssh.asc) &&

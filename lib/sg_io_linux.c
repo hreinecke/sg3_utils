@@ -46,7 +46,7 @@
 /* Version 1.02 20060714 */
 
 
-void sg_print_masked_status(int masked_status) 
+void sg_print_masked_status(int masked_status)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
 
@@ -225,7 +225,7 @@ int sg_err_category(int masked_status, int host_status,
                                sense_buffer, sb_len);
 }
 
-int sg_err_category_new(int scsi_status, int host_status, int driver_status, 
+int sg_err_category_new(int scsi_status, int host_status, int driver_status,
                         const unsigned char * sense_buffer, int sb_len)
 {
     int masked_driver_status = (SG_LIB_DRIVER_MASK & driver_status);

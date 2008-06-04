@@ -20,7 +20,7 @@
 #include <sys/sysmacros.h>
 #include <sys/mman.h>
 #include <sys/time.h>
-#include <linux/major.h> 
+#include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
 
 #ifdef HAVE_CONFIG_H
@@ -41,7 +41,7 @@
 
    This program is a specialisation of the Unix "dd" command in which
    either the input or the output file is a scsi generic device or a
-   raw device. The block size ('bs') is assumed to be 512 if not given. 
+   raw device. The block size ('bs') is assumed to be 512 if not given.
    This program complains if 'ibs' or 'obs' are given with a value
    that differs from 'bs' (or the default 512).
    If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
@@ -99,7 +99,7 @@ static char * version_str = "1.34 20071226 shared_mmap";
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikey value */
-#endif 
+#endif
 
 #define FT_OTHER 1              /* filetype other than one of following */
 #define FT_SG 2                 /* filetype is sg char device */
@@ -163,7 +163,7 @@ static void print_stats()
     if (0 != dd_count)
         fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
     fprintf(stderr, "%"PRId64"+%d records in\n", in_full - in_partial, in_partial);
-    fprintf(stderr, "%"PRId64"+%d records out\n", out_full - out_partial, 
+    fprintf(stderr, "%"PRId64"+%d records out\n", out_full - out_partial,
             out_partial);
 }
 
@@ -285,7 +285,7 @@ void usage()
            "2->IFILE,\n"
            "                3->OFILE+IFILE\n"
            "    if          file or device to read from (def: stdin)\n");
-    fprintf(stderr, 
+    fprintf(stderr,
            "    iflag       comma separated list from: [direct,dpo,dsync,"
            "excl,fua,\n"
            "                null]\n"
@@ -938,7 +938,7 @@ int main(int argc, char * argv[])
             if (in_flags.dsync)
                 flags |= O_SYNC;
             if ((infd = open(inf, flags)) < 0) {
-                snprintf(ebuff, EBUFF_SZ, 
+                snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for sg reading", inf);
                 perror(ebuff);
                 return SG_LIB_FILE_ERROR;
@@ -1182,7 +1182,7 @@ int main(int argc, char * argv[])
         if (out_num_sect > seek)
             out_num_sect -= seek;
 #ifdef SG_DEBUG
-        fprintf(stderr, 
+        fprintf(stderr,
             "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", out_num_sect=%"PRId64"\n",
             dd_count, in_num_sect, out_num_sect);
 #endif
@@ -1238,7 +1238,7 @@ int main(int argc, char * argv[])
     if (wrkMmap) {
         wrkPos = wrkMmap;
         if (! (mmap_shareable && out_flags.smmap &&  (FT_SG == out_type)))
-            mmap_shareable = 0;                                                                                                
+            mmap_shareable = 0;
     } else {
         if ((FT_RAW == in_type) || (FT_RAW == out_type)) {
             wrkBuff = (unsigned char *)malloc(blk_sz * bpt + psz);
@@ -1261,7 +1261,7 @@ int main(int argc, char * argv[])
 
     blocks_per = bpt;
 #ifdef SG_DEBUG
-    fprintf(stderr, "Start of loop, count=%"PRId64", blocks_per=%d\n", 
+    fprintf(stderr, "Start of loop, count=%"PRId64", blocks_per=%d\n",
             dd_count, blocks_per);
 #endif
     if (do_time) {
@@ -1280,7 +1280,7 @@ int main(int argc, char * argv[])
     while (dd_count > 0) {
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG == in_type) {
-            ret = sg_read(infd, wrkPos, blocks, skip, blk_sz, scsi_cdbsz_in, 
+            ret = sg_read(infd, wrkPos, blocks, skip, blk_sz, scsi_cdbsz_in,
                           in_flags.fua, in_flags.dpo, 1);
             if ((SG_LIB_CAT_UNIT_ATTENTION == ret) ||
                 (SG_LIB_CAT_ABORTED_COMMAND == ret)) {
@@ -1407,10 +1407,10 @@ int main(int argc, char * argv[])
     }
     print_stats();
     if (sum_of_resids)
-        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
+        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                 sum_of_resids);
     if (num_dio_not_done)
-        fprintf(stderr, ">> dio requested but _not_ done %d times\n", 
+        fprintf(stderr, ">> dio requested but _not_ done %d times\n",
                 num_dio_not_done);
     if ((verbose > 0) && out_flags.smmap && (shared_mm_req > 0)) {
         fprintf(stderr, ">> shared_mm_req=%d,  shared_mm_done=%d\n",

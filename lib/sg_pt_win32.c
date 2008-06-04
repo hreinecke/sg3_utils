@@ -184,7 +184,7 @@ int scsi_pt_open_device(const char * device_name,
     }
     return index + WIN32_FDOFFSET;
 }
-            
+
 
 /* Returns 0 if successful. If error in Unix returns negated errno. */
 int scsi_pt_close_device(int device_fd)
@@ -236,7 +236,7 @@ void set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
-    if (psp->swb.spt.CdbLength > 0) 
+    if (psp->swb.spt.CdbLength > 0)
         ++psp->in_err;
     if (cdb_len > (int)sizeof(psp->swb.spt.Cdb)) {
         ++psp->in_err;

@@ -379,9 +379,9 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x03,0x02,"Excessive write errors"},
     {0x04,0x00,"Logical unit not ready, cause not reportable"},
     {0x04,0x01,"Logical unit is in process of becoming ready"},
-    {0x04,0x02,"Logical unit not ready, " 
+    {0x04,0x02,"Logical unit not ready, "
                 "initializing command required"},
-    {0x04,0x03,"Logical unit not ready, " 
+    {0x04,0x03,"Logical unit not ready, "
                 "manual intervention required"},
     {0x04,0x04,"Logical unit not ready, format in progress"},
     {0x04,0x05,"Logical unit not ready, rebuild in progress"},
@@ -389,11 +389,11 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x07,"Logical unit not ready, operation in progress"},
     {0x04,0x08,"Logical unit not ready, long write in progress"},
     {0x04,0x09,"Logical unit not ready, self-test in progress"},
-    {0x04,0x0a,"Logical unit " 
+    {0x04,0x0a,"Logical unit "
                 "not accessible, asymmetric access state transition"},
-    {0x04,0x0b,"Logical unit " 
+    {0x04,0x0b,"Logical unit "
                 "not accessible, target port in standby state"},
-    {0x04,0x0c,"Logical unit " 
+    {0x04,0x0c,"Logical unit "
                 "not accessible, target port in unavailable state"},
     {0x04,0x0d,"Logical unit not ready, structure check required"},
     {0x04,0x10,"Logical unit not ready, "
@@ -1038,7 +1038,7 @@ const char * sg_lib_pdt_strs[] = {
     "automation/driver interface",
     "security manager device",
     "0x14", "0x15", "0x16", "0x17", "0x18",
-    "0x19", "0x1a", "0x1b", "0x1c", "0x1d", 
+    "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
     "well known logical unit",
     "no physical device on this lu",
 };

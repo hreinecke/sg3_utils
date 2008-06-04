@@ -45,14 +45,14 @@
 /* A utility program for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
+ * This program issues the SCSI command REPORT LUNS to the given SCSI device.
  */
 
 static char * version_str = "1.14 20080510";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN MAX_RLUNS_BUFF_LEN
-    
+
 static unsigned char reportLunsBuff[MAX_RLUNS_BUFF_LEN];
 
 
@@ -102,7 +102,7 @@ usage()
 
 /* Decoded according to SAM-4 rev 4. Note that one draft: BCC rev 0,
  * defines its own "bridge addressing method" in place of the SAM-3
- * "logical addressing method".  */ 
+ * "logical addressing method".  */
 static void
 decode_lun(const char * leadin, unsigned char * lunp)
 {

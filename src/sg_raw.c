@@ -9,7 +9,7 @@
  * any later version.
  *
  * This program can be used to send raw SCSI commands (with an optional
- * data phase) through a Generic SCSI interface. 
+ * data phase) through a Generic SCSI interface.
  */
 
 #include <stdlib.h>
@@ -447,7 +447,7 @@ main(int argc, char *argv[])
             } else {
                 const char * cp = "stdout";
 
-                if (opts.datain_file && 
+                if (opts.datain_file &&
                     ! ((1 == strlen(opts.datain_file)) &&
                        ('-' == opts.datain_file[0])))
                     cp = opts.datain_file;

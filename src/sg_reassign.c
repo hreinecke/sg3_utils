@@ -49,7 +49,7 @@
  *
  * This utility invokes the REASSIGN BLOCKS SCSI command to reassign
  * an existing (possibly damaged) lba on a direct access device (e.g.
- * a disk) to a new physical location. The previous contents is 
+ * a disk) to a new physical location. The previous contents is
  * recoverable then it is written to the remapped lba otherwise
  * vendor specific data is written.
  */
@@ -415,14 +415,14 @@ main(int argc, char * argv[])
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
-    } 
+    }
 
     if (got_addr) {
         if (dummy) {
             fprintf(stderr, ">>> dummy: REASSIGN BLOCKS not executed\n");
             if (verbose) {
                 fprintf(stderr, "  Would have reassigned these blocks:\n");
-                for (j = 0; j < addr_arr_len; ++j) 
+                for (j = 0; j < addr_arr_len; ++j)
                     printf("    0x%" PRIx64 "\n", addr_arr[j]);
             }
             return 0;

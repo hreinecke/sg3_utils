@@ -1,20 +1,20 @@
 .TH SG_SCAN "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_scan \- does a scan of sg devices (or given SCSI/ATAPI/ATA devices) and 
+sg_scan \- does a scan of sg devices (or given SCSI/ATAPI/ATA devices) and
 prints the results
 .SH SYNOPSIS
 .B sg_scan
-[\fI\-a\fR] 
-[\fI\-i\fR] 
-[\fI\-n\fR] 
-[\fI\-w\fR] 
-[\fI\-x\fR] 
-[\fIDEVICE\fR]* 
+[\fI\-a\fR]
+[\fI\-i\fR]
+[\fI\-n\fR]
+[\fI\-w\fR]
+[\fI\-x\fR]
+[\fIDEVICE\fR]*
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-If no \fIDEVICE\fR names are given, sg_scan does a scan of the sg 
-devices and outputs a line of information for each sg device that is 
+If no \fIDEVICE\fR names are given, sg_scan does a scan of the sg
+devices and outputs a line of information for each sg device that is
 currently bound to a SCSI device. If one or more \fIDEVICE\fRs are given
 only those devices are scanned.
 Each device is opened with the O_NONBLOCK flag so that the scan will

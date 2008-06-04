@@ -37,10 +37,10 @@ MMC\-2/3/4/5), for tapes (see SSC\-2) and for enclosures (see SES\-2).
 Some mode pages common to all SCSI peripheral device types are defined
 in SPC\-4 (primary commands). A decoded mode page has its field names
 in the first column and the corresponding value in the second column.
-A "hex" mode page (and subpage) has its byte position in the first 
+A "hex" mode page (and subpage) has its byte position in the first
 column (in hex and starting at 0x2) and the corresponding hex value
 in the second column. Decoded pages can be viewed with the '\-t' option
-or with a specific option (e.g. 'c' for the caching mode page). 
+or with a specific option (e.g. 'c' for the caching mode page).
 Naturally decoded pages must be supplied by the \fIDEVICE\fR and
 recognised by this program. If supported by the device, decoded pages
 may be modified. All mode pages (and subpages) that the device supports
@@ -57,14 +57,14 @@ Perform 6 byte MODE SENSE and MODE SELECT commands; by default the
 .TP
 \fB\-a\fR
 Display some INQUIRY data and the unit serial number followed by
-all mode pages reported by the device. It is similar to 
+all mode pages reported by the device. It is similar to
 the '\-t 0x3f' option. If the mode page is known then it is output
 in decoded form otherwise it is output in hexadecimal.
 .TP
 \fB\-A\fR
 Display some INQUIRY data and the unit serial number followed by
 all mode pages and all mode subpages reported by the device.
-It is similar to the '\-t 0x3f,0xff' option. If a mode (sub)page 
+It is similar to the '\-t 0x3f,0xff' option. If a mode (sub)page
 is known then it is output in decoded form otherwise it is output in
 hexadecimal.
 .TP
@@ -95,7 +95,7 @@ Format of the defect lists:
                 \-Flba64    \- logical block addresses (64 bit)
                 \-Fphysical \- physical blocks
                 \-Findex    \- defect bytes from index
-                \-Fhead     \- sort by head 
+                \-Fhead     \- sort by head
 .br
 Used in conjunction with "\-d" or "\-G". If a format is not given "index" is
 assumed.
@@ -145,13 +145,13 @@ page number \fISPN\fR) in decoded format (if known, otherwise in hex form).
 returns all pages supported by the device in ascending order except for
 page 0 which, if present, is last. Page 0 is vendor specific and not
 necessarily in mode page format. Alternatively hex values can be given for
-both \fIPN\fR and \fISPN\fR (both prefixed by '0x'). 
+both \fIPN\fR and \fISPN\fR (both prefixed by '0x').
 .TP
 \fB\-t\fR
 Trace commands (for debugging). When used once SCSI commands are shown
 (in hex) and any errors from these SCSI commands are spelt out (i.e.
-with a decoded and raw sense buffer). When used twice, the additional 
-data sent with mode select and the response from mode sense are 
+with a decoded and raw sense buffer). When used twice, the additional
+data sent with mode select and the response from mode sense are
 shown (in hex).
 .TP
 \fB\-u\fR \fIPN\fR[,\fISPN\fR]
@@ -168,17 +168,17 @@ for both \fIPN\fR and \fISPN\fR (both prefixed by '0x'). For example 63 and
 \fB\-v\fR
 Display version string then exit. [N.B. This option increases verbosity for
 most other utilities in this package as outlined in 'man 8 sg3_utils'.
-This odd usage is for backward compatibility with the scsiinfo utility.] 
+This odd usage is for backward compatibility with the scsiinfo utility.]
 .TP
 \fB\-V\fR
 Access information in the Verify Error Recovery mode page. [N.B. This
 option prints the version string then exits in most other utilities in
 this package as outlined in 'man 8 sg3_utils'. This odd usage is for
-backward compatibility with the scsiinfo utility.] 
+backward compatibility with the scsiinfo utility.]
 .TP
 \fB\-z\fR
 do a single fetch for mode pages (over\-estimating the expected length
-of the returned response). The default action is to do a double 
+of the returned response). The default action is to do a double
 fetch, the first fetch is to find the response length that could be
 returned. Devices that closely adhere to SCSI standards should not
 require this option, some real world devices do require it.
@@ -205,7 +205,7 @@ being given back to the '\-R' (replace command).
 Replace parameters \- best used with \-X (expert use only)
 .SH CHANGING MODE PAGE PARAMETERS
 Firstly you should know what you are doing before changing existing
-parameters. Taking the control page as an example, first list it out 
+parameters. Taking the control page as an example, first list it out
 normally (e.g. "sginfo \-C /dev/sda") and
 decide which parameter is to be changed (note its position relative
 to the other lines output). Then execute the same sginfo command with
@@ -259,17 +259,17 @@ Now check that the change took effect:
 .br
    RLEC                       0
 .PP
-When a mode page is "replaced" the default action is to change both the 
+When a mode page is "replaced" the default action is to change both the
 current page and the saved page. [For some reason versions of sginfo and
 scsiinfo prior to 2.0 did not change the "saved" page.] To change only
-the current mode page but not the corresponding saved page use the "\-N" 
+the current mode page but not the corresponding saved page use the "\-N"
 option.
 .PP
 .SH GENERATING SCRIPT FILES AND HEX PAGES
 The "\-aX" or "\-AX" option generates output suitable for a script file.
 Mode pages are output in list format (after the INQUIRY and serial
 number) one page per line. To facilitate running the output as (part
-of) a script file to assert chosen mode page values, each line is 
+of) a script file to assert chosen mode page values, each line is
 prefixed by "sginfo \-t \fIPN\fR[,\fISPN\fR] \-XR ". When such a script
 file is run, it will have the effect of re\-asserting the mode
 page values to what they were when the "\-aX" generated the output.
@@ -283,7 +283,7 @@ value in the second column) use "\-u 0xa". Mode pages (subpage code == 0)
 start at index position 2 while subpages start at index position 4.
 If the "\-Xu ..." option is used then a list a hex values each value
 prefixed by "@" is output. Mode (sub)page values can then be modified with
-with the "\-RXu ..." option. 
+with the "\-RXu ..." option.
 .PP
 .SH RESTRICTIONS
 The SCSI MODE SENSE command yields block descriptors as well as a mode
@@ -309,7 +309,7 @@ scsiinfo version 1.0 was released by Eric Youngdale on 1st November 1993.
 The most recent version of scsiinfo is version 1.7 with the last patches
 by Michael Weller. sginfo is derived from scsiinfo and uses the sg
 interface to get around the 4 KB buffer limit in scsiinfo that cramped
-the display of defect lists especially. sginfo was written by Douglas 
+the display of defect lists especially. sginfo was written by Douglas
 Gilbert with patches from Kurt Garloff. This manpage corresponds with
 version 2.25 of sginfo.
 .PP

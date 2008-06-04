@@ -54,16 +54,16 @@ dStrHex(const char* str, int len, long start)
     char buff[MAX_LINE_LENGTH];
     long a = start;
     const int bpstart = BINARY_START_COL;
-    const int cpstart = BINARY_START_COL + 
+    const int cpstart = BINARY_START_COL +
                         ((CHARS_PER_HEX_BYTE * bytes_per_line) + 1) + 5;
     int cpos = cpstart;
     int bpos = bpstart;
     int midline_space = (bytes_per_line / 2) + 1;
     int i, k, line_length;
-    
-    if (len <= 0) 
+
+    if (len <= 0)
         return;
-    line_length = BINARY_START_COL + 
+    line_length = BINARY_START_COL +
                   (bytes_per_line * (1 + CHARS_PER_HEX_BYTE)) + 7;
     if (line_length >= MAX_LINE_LENGTH) {
         fprintf(stderr, "bytes_per_line causes maximum line length of %d "
@@ -112,10 +112,10 @@ dStrHexOnly(const char* str, int len, long start)
     int bpos = bpstart;
     int midline_space = (bytes_per_line / 2) + 1;
     int i, k, line_length;
-    
-    if (len <= 0) 
+
+    if (len <= 0)
         return;
-    line_length = BINARY_START_COL + 
+    line_length = BINARY_START_COL +
                   (bytes_per_line * CHARS_PER_HEX_BYTE) + 4;
     if (line_length >= MAX_LINE_LENGTH) {
         fprintf(stderr, "bytes_per_line causes maximum line length of %d "
@@ -228,7 +228,7 @@ main(int argc, const char ** argv)
                 ret = 1;
             } else {
                 start = 0;
-                printf("%shex dump of file: %s\n", 
+                printf("%shex dump of file: %s\n",
                        (doHex ? "" : "ASCII "), argv[k]);
                 while ((res = read(inFile, buff, num)) > 0) {
                     if (doHex)

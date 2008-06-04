@@ -267,7 +267,7 @@ static void
 dStrRaw(const char * str, int len)
 {
     int k;
-    
+
     for (k = 0 ; k < len; ++k)
         printf("%c", str[k]);
 }
@@ -316,7 +316,7 @@ decode_id_vpd(unsigned char * buff, int len, int subvalue, int do_long,
                            VPD_ASSOC_TDEVICE, m_d, m_cs, do_long, do_quiet);
     }
 }
-        
+
 static const char * network_service_type_arr[] =
 {
     "unspecified",
@@ -352,7 +352,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
-        printf("  %s, Service type: %s\n", 
+        printf("  %s, Service type: %s\n",
                assoc_arr[(ucp[0] >> 5) & 0x3],
                network_service_type_arr[ucp[0] & 0x1f]);
         na_len = (ucp[2] << 8) + ucp[3];
@@ -371,7 +371,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         }
     }
 }
-        
+
 static const char * mode_page_policy_arr[] =
 {
     "shared",
@@ -472,7 +472,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
         bump += tpd_len + 4;
     }
 }
-        
+
 static const char * code_set_arr[] =
 {
     "Reserved [0x0]",
@@ -812,7 +812,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
-                c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) | 
+                c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
                         (ip[2] << 4) | ((ip[3] & 0xf0) >> 4));
                 vsei = ip[3] & 0xf;
                 for (m = 1; m < 5; ++m) {
@@ -840,7 +840,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
-                c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) | 
+                c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
                         (ip[2] << 4) | ((ip[3] & 0xf0) >> 4));
                 vsei = ip[3] & 0xf;
                 for (m = 1; m < 5; ++m) {
@@ -957,7 +957,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
         switch (proto_id) {
         case TPROTO_FCP: /* Fibre channel */
             printf("%s  FCP-2 World Wide Name:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
@@ -966,7 +966,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
         case TPROTO_SPI:        /* Scsi Parallel Interface */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
                    leadin, ((ucp[2] << 8) | ucp[3]));
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
@@ -981,7 +981,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             break;
         case TPROTO_1394: /* IEEE 1394 */
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
@@ -989,7 +989,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             break;
         case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 16, 0);
@@ -1016,7 +1016,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                 ull |= ucp[4 + j];
             }
             printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             bump = 24;
@@ -1467,7 +1467,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 num = rsp_buff[3];
                 if (num > (len - 4))
@@ -1524,7 +1524,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 memset(obuff, 0, sizeof(obuff));
                 len -= 4;
@@ -1575,7 +1575,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_id_vpd(rsp_buff, len, subvalue, do_long, do_quiet);
             }
@@ -1619,7 +1619,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_softw_inf_id(rsp_buff, len, do_hex);
             }
@@ -1702,7 +1702,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_x_inq_vpd(rsp_buff, len, do_hex);
             }
@@ -1746,7 +1746,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_mode_policy_vpd(rsp_buff, len, do_hex);
             }
@@ -1790,7 +1790,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_scsi_ports_vpd(rsp_buff, len, do_hex, do_long, do_quiet);
             }
@@ -1837,7 +1837,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_ata_info_vpd(rsp_buff, len, do_long, do_hex);
             }
@@ -1881,7 +1881,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_proto_lu_vpd(rsp_buff, len, do_hex);
             }
@@ -1925,7 +1925,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_proto_port_vpd(rsp_buff, len, do_hex);
             }
@@ -1985,7 +1985,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_b0_vpd(rsp_buff, len, do_hex, pdt);
             }
@@ -2050,7 +2050,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rsp_buff[0] & 0xe0) >> 5, 
+                           (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_b1_vpd(rsp_buff, len, do_hex, pdt);
             }

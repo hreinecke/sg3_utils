@@ -1,6 +1,6 @@
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE  
+#define _GNU_SOURCE
 #endif
 
 #include <unistd.h>
@@ -564,10 +564,10 @@ int main(int argc, char * argv[])
             if (rawp) free(rawp);
             return (res >= 0) ? res : SG_LIB_CAT_OTHER;
         }
-        if (opts.do_dio &&  
+        if (opts.do_dio &&
             ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
             dio_incomplete = 1;    /* flag that dio not done (completely) */
-        
+
 #ifdef SG_DEBUG
         if (clear) {
             for (j = 0; j < buf_size; ++j) {
@@ -593,7 +593,7 @@ int main(int argc, char * argv[])
         a = res_tm.tv_sec;
         a += (0.000001 * res_tm.tv_usec);
         b = (double)buf_size * num;
-        printf("time to read data from buffer was %d.%06d secs", 
+        printf("time to read data from buffer was %d.%06d secs",
                (int)res_tm.tv_sec, (int)res_tm.tv_usec);
         if ((a > 0.00001) && (b > 511))
             printf(", %.2f MB/sec\n", b / (a * 1000000.0));

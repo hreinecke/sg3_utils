@@ -418,9 +418,9 @@ int main(int argc, char * argv[])
                     double sz_mb, sz_gb;
 
                     total_sz *= block_size;
-                    sz_mb = ((double)(last_blk_addr + 1) * block_size) / 
+                    sz_mb = ((double)(last_blk_addr + 1) * block_size) /
                             (double)(1048576);
-                    sz_gb = ((double)(last_blk_addr + 1) * block_size) / 
+                    sz_gb = ((double)(last_blk_addr + 1) * block_size) /
                             (double)(1000000000L);
                     printf("Hence:\n");
 #ifdef SG3_UTILS_MINGW
@@ -503,9 +503,9 @@ int main(int argc, char * argv[])
                 double sz_mb, sz_gb;
 
                 total_sz *= block_size;
-                sz_mb = ((double)(llast_blk_addr + 1) * block_size) / 
+                sz_mb = ((double)(llast_blk_addr + 1) * block_size) /
                         (double)(1048576);
-                sz_gb = ((double)(llast_blk_addr + 1) * block_size) / 
+                sz_gb = ((double)(llast_blk_addr + 1) * block_size) /
                         (double)(1000000000L);
                 printf("Hence:\n");
 #ifdef SG3_UTILS_MINGW
@@ -518,11 +518,11 @@ int main(int argc, char * argv[])
             }
             goto good;
         }
-        else if (SG_LIB_CAT_INVALID_OP == res) 
+        else if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "READ CAPACITY (16) not supported\n");
-        else if (SG_LIB_CAT_NOT_READY == res) 
+        else if (SG_LIB_CAT_NOT_READY == res)
             fprintf(stderr, "READ CAPACITY (16) failed, device not ready\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res) 
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
             fprintf(stderr, "READ CAPACITY (16) failed, aborted command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (16) cdb "

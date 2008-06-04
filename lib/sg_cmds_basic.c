@@ -540,8 +540,8 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
                  int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] = 
-                        {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA, 
+    unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] =
+                        {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -684,7 +684,7 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] =
         {MODE_SENSE6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -758,7 +758,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                    int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] =
         {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -832,7 +832,7 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
                    int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SELECT6_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SELECT6_CMDLEN] =
         {MODE_SELECT6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -903,7 +903,7 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
                     int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SELECT10_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SELECT10_CMDLEN] =
         {MODE_SELECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1137,7 +1137,7 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
                     int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] = 
+    unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1270,12 +1270,12 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int
-sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code, 
+sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
                 int mx_resp_len, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] = 
+    unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] =
         {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1347,7 +1347,7 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
                  int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] = 
+    unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] =
         {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1492,7 +1492,7 @@ int
 sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] = 
+    unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] =
                 {PREVENT_ALLOW_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;

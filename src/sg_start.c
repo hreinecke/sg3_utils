@@ -20,14 +20,14 @@
 
     Start/Stop parameter by Kurt Garloff <garloff at suse dot de>, 6/2000
     Sync cache parameter by Kurt Garloff <garloff at suse dot de>, 1/2001
-    Guard block device answering sg's ioctls. 
+    Guard block device answering sg's ioctls.
                      <dgilbert at interlog dot com> 12/2002
     Convert to SG_IO ioctl so can use sg or block devices in 2.6.* 3/2003
 
     This utility was written for the Linux 2.4 kernel series. It should
     now build for the Linux 2.6 kernel series and various other Operating
     Systems.
- 
+
 */
 
 static char * version_str = "0.57 20080325";  /* sbc3r14; mmc6r01a */
@@ -485,7 +485,7 @@ main(int argc, char * argv[])
     else if ((0 == opts.do_loej) && (-1 == opts.do_fl) && (0 == opts.do_pc))
        opts.do_start = 1;
     /* default action is to start when no other active options */
-        
+
     if (0 == opts.device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
         if (opts.opt_new)
@@ -507,7 +507,7 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-                
+
     fd = sg_cmds_open_device(opts.device_name, 0 /* rw */, opts.do_verbose);
     if (fd < 0) {
         fprintf(stderr, "Error trying to open %s: %s\n",
