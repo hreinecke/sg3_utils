@@ -517,8 +517,8 @@ static void list_all_codes(unsigned char * rsoc_buff, int rsoc_len,
     char sa_buff[8];
     unsigned char ** sort_arr = NULL;
 
-    cd_len = ((rsoc_buff[0] << 24) | (rsoc_buff[1] << 16) | 
-              (rsoc_buff[2] << 8) | rsoc_buff[3]); 
+    cd_len = ((rsoc_buff[0] << 24) | (rsoc_buff[1] << 16) |
+              (rsoc_buff[2] << 8) | rsoc_buff[3]);
     if (cd_len > (rsoc_len - 4)) {
         printf("sg_opcodes: command data length=%d, allocation=%d; "
                "truncate\n", cd_len, rsoc_len - 4);
@@ -552,7 +552,7 @@ static void list_all_codes(unsigned char * rsoc_buff, int rsoc_len,
             sort_arr[j] = ucp;
             len = (ucp[5] & 0x2) ? 20 : 8;
         }
-        qsort(sort_arr, j, sizeof(unsigned char *), 
+        qsort(sort_arr, j, sizeof(unsigned char *),
               (alpha ? opcode_alpha_compare : opcode_num_compare));
     }
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
@@ -564,7 +564,7 @@ static void list_all_codes(unsigned char * rsoc_buff, int rsoc_len,
                                   NAME_BUFF_SZ, name_buff);
             snprintf(sa_buff, sizeof(sa_buff), "%.4x", serv_act);
         } else {
-            sg_get_opcode_name(ucp[0], peri_type, 
+            sg_get_opcode_name(ucp[0], peri_type,
                                NAME_BUFF_SZ, name_buff);
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
@@ -662,7 +662,7 @@ static void list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
         break;
     default:
         snprintf(name_buff, NAME_BUFF_SZ, "support reserved [0x%x]",
-                 rsoc_buff[1] & 7); 
+                 rsoc_buff[1] & 7);
         cp = name_buff;
         break;
     }
@@ -710,7 +710,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
-    
+
     if (NULL == opts.device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
         if (opts.opt_new)
@@ -944,7 +944,7 @@ static int do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode,
                    int verbose)
 {
     int res, k;
-    unsigned char rsocCmdBlk[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0, 
+    unsigned char rsocCmdBlk[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
                                               0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;

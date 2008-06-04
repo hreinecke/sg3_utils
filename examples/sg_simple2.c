@@ -77,7 +77,7 @@ int main(int argc, char * argv[])
         printf("Usage: 'sg_simple2 [-x] <sg_device>'\n");
         return 1;
     }
-    
+
     /* N.B. An access mode of O_RDWR is required for some SCSI commands */
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
@@ -87,12 +87,12 @@ int main(int argc, char * argv[])
     }
     /* Just to be safe, check we have a new sg device by trying an ioctl */
     if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &k) < 0) || (k < 30000)) {
-        printf("sg_simple2: %s doesn't seem to be an new sg device\n", 
+        printf("sg_simple2: %s doesn't seem to be an new sg device\n",
                file_name);
         close(sg_fd);
         return 1;
     }
-    
+
     /* Prepare INQUIRY command */
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
@@ -145,7 +145,7 @@ int main(int argc, char * argv[])
     if (do_extra)
         printf("INQUIRY duration=%u millisecs, resid=%d, msg_status=%d\n",
                io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
-    
+
     /* Prepare TEST UNIT READY command */
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
@@ -178,7 +178,7 @@ int main(int argc, char * argv[])
         else if (io_hdr.host_status)
             printf("TEST UNIT READY host_status=0x%x\n", io_hdr.host_status);
         else if (io_hdr.driver_status)
-            printf("TEST UNIT READY driver_status=0x%x\n", 
+            printf("TEST UNIT READY driver_status=0x%x\n",
                    io_hdr.driver_status);
         else
             printf("TEST UNIT READY unexpected error\n");

@@ -124,7 +124,7 @@ extern "C" {
 #define TPROTO_NONE 0xf
 
 
-/* Returns length of SCSI command given the opcode (first byte). 
+/* Returns length of SCSI command given the opcode (first byte).
    Yields the wrong answer for variable length commands (opcode=0x7f)
    and potentially some vendor specific commands. */
 extern int sg_get_command_size(unsigned char cdb_byte0);
@@ -172,7 +172,7 @@ struct sg_scsi_sense_hdr {
    non-NULL then zero all fields and then set the appropriate fields in
    that structure. sshp::additional_length is always 0 for response
    codes 0x70 and 0x71 (fixed format). */
-extern int sg_scsi_normalize_sense(const unsigned char * sensep, 
+extern int sg_scsi_normalize_sense(const unsigned char * sensep,
                                    int sense_len,
                                    struct sg_scsi_sense_hdr * sshp);
 

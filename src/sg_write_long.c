@@ -22,7 +22,7 @@
    *  the Free Software Foundation; either version 2, or (at your option)
    *  any later version.
 
-   This program issues the SCSI command WRITE LONG to a given SCSI device. 
+   This program issues the SCSI command WRITE LONG to a given SCSI device.
    It sends the command with the logical block address passed as the lba
    argument, and the transfer length set to the xfer_len argument. the
    buffer to be writen to the device filled with 0xff, this buffer includes
@@ -105,7 +105,7 @@ int main(int argc, char * argv[])
     char ebuff[EBUFF_SZ];
     const char * ten_or;
     int ret = 1;
-    
+
     memset(file_name, 0, sizeof file_name);
     while (1) {
         int option_index = 0;
@@ -195,7 +195,7 @@ int main(int argc, char * argv[])
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-  
+
     if (wr_uncor) {
         if ('\0' != file_name[0])
             fprintf(stderr, ">>> warning: when '--wr_uncor' given "

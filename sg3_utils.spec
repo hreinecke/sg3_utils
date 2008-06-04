@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Mon Jun 02 2008 - dgilbert at interlog dot com
+* Wed Jun 04 2008 - dgilbert at interlog dot com
 - add sg_sat_phy_event, sync with drafts prior to this date
   * sg3_utils-1.26
 

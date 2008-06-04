@@ -20,7 +20,7 @@
  *
  * Based on sg_start.c; credits from there also apply.
  * Minor modifications for sg_lib, D. Gilbert 2004/10/19
- * 
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@ static int debug = 0;
 static int do_trespass(int fd, int hr, int short_cmd)
 {
         unsigned char long_trespass_pg[] =
-                { 0, 0, 0, 0, 0, 0, 0, 0x00, 
+                { 0, 0, 0, 0, 0, 0, 0, 0x00,
                   TRESPASS_PAGE,        /* Page code */
                   0x09,                 /* Page length - 2 */
                   0x81,                 /* Trespass code + Honor reservation bit */
@@ -44,7 +44,7 @@ static int do_trespass(int fd, int hr, int short_cmd)
                   0, 0, 0, 0, 0, 0      /* Reserved bytes / unknown */
         };
         unsigned char short_trespass_pg[] =
-                { 0, 0, 0, 0, 
+                { 0, 0, 0, 0,
                   TRESPASS_PAGE,        /* Page code */
                   0x02,                 /* Page length - 2 */
                   0x81,                 /* Trespass code + Honor reservation bit */
@@ -116,8 +116,8 @@ int main(int argc, char * argv[])
         int hr = 0;
         int short_cmd = 0;
         int ret = 0;
-        
-        if (argc < 2) 
+
+        if (argc < 2)
                 usage ();
 
         for (k = 1; k < argc; ++k) {
@@ -149,7 +149,7 @@ int main(int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
-                
+
         fd = open(file_name, O_RDWR | O_NONBLOCK);
         if (fd < 0) {
                 fprintf(stderr, "Error trying to open %s\n", file_name);
@@ -157,9 +157,9 @@ int main(int argc, char * argv[])
                 usage();
                 return SG_LIB_FILE_ERROR;
         }
-       
+
         ret = do_trespass(fd, hr, short_cmd);
-        
+
         close (fd);
         return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

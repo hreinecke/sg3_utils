@@ -18,7 +18,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <sys/time.h> 
+#include <sys/time.h>
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
 
@@ -41,8 +41,8 @@
 
    This program is a specialisation of the Unix "dd" command in which
    either the input or the output file is a scsi generic device, raw
-   device, a block device or a normal file. The block size ('bs') is 
-   assumed to be 512 if not given. This program complains if 'ibs' or 
+   device, a block device or a normal file. The block size ('bs') is
+   assumed to be 512 if not given. This program complains if 'ibs' or
    'obs' are given with a value that differs from 'bs' (or the default 512).
    If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
    not given or 'of=-' then stdout assumed.
@@ -90,7 +90,7 @@ static char * version_str = "5.67 20080530";
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikey value */
-#endif 
+#endif
 
 #define FT_OTHER 1              /* filetype is probably normal */
 #define FT_SG 2                 /* filetype is sg char device or supports
@@ -184,9 +184,9 @@ print_stats(const char * str)
 {
     if (0 != dd_count)
         fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
-    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial, 
+    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial,
             in_partial);
-    fprintf(stderr, "%s%"PRId64"+%d records out\n", str, out_full - out_partial, 
+    fprintf(stderr, "%s%"PRId64"+%d records out\n", str, out_full - out_partial,
             out_partial);
     if (oflag.sparse)
         fprintf(stderr, "%s%"PRId64" bypassed records out\n", str, out_sparse);
@@ -243,7 +243,7 @@ dd_filetype(const char * filename)
     if (stat(filename, &st) < 0)
         return FT_ERROR;
     if (S_ISCHR(st.st_mode)) {
-        if ((MEM_MAJOR == major(st.st_rdev)) && 
+        if ((MEM_MAJOR == major(st.st_rdev)) &&
             (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
             return FT_DEV_NULL;
         if (RAW_MAJOR == major(st.st_rdev))
@@ -658,7 +658,7 @@ sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         return res;
     }
-    if (diop && *diop && 
+    if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     sum_of_resids += io_hdr.resid;
@@ -847,7 +847,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 }
                 /* remember for next read_long attempt, if required */
                 read_long_blk_inc = nl - bs;
-                
+
                 if (verbose)
                     fprintf(stderr, "read_long(10): adjusted len=%d\n", nl);
                 r = sg_ll_read_long10(sg_fd, 0, corrct, lba, buffp, nl,
@@ -1014,7 +1014,7 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
         } else
             return res;
     }
-    if (diop && *diop && 
+    if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     return 0;
@@ -1142,7 +1142,7 @@ main(int argc, char * argv[])
     iflag.cdbsz = DEF_SCSI_CDBSZ;
     oflag.cdbsz = DEF_SCSI_CDBSZ;
     if (argc < 2) {
-        fprintf(stderr, 
+        fprintf(stderr,
                 "Won't default both IFILE to stdin _and_ OFILE to stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
@@ -1209,7 +1209,7 @@ main(int argc, char * argv[])
             if ('\0' != inf[0]) {
                 fprintf(stderr, "Second IFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else 
+            } else
                 strncpy(inf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &iflag)) {
@@ -1225,7 +1225,7 @@ main(int argc, char * argv[])
             if ('\0' != outf[0]) {
                 fprintf(stderr, "Second OFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else 
+            } else
                 strncpy(outf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oflag)) {
@@ -1512,14 +1512,14 @@ main(int argc, char * argv[])
         }
     }
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
-        fprintf(stderr, 
+        fprintf(stderr,
                 "Can't have both 'if' as stdin _and_ 'of' as stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (oflag.sparse) {
         if (STDOUT_FILENO == outfd) {
-            fprintf(stderr, "oflag=sparse needs seekable output file\n"); 
+            fprintf(stderr, "oflag=sparse needs seekable output file\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -1567,11 +1567,11 @@ main(int argc, char * argv[])
         if (FT_SG & out_type) {
             res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Unit attention (readcap out), continuing\n");
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Aborted command (readcap out), continuing\n");
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
@@ -1588,7 +1588,7 @@ main(int argc, char * argv[])
                         "bs=%d, device claims=%d\n", outf, blk_sz,
                          out_sect_sz);
         } else if (FT_BLOCK & out_type) {
-            if (0 != read_blkdev_capacity(outfd, &out_num_sect, 
+            if (0 != read_blkdev_capacity(outfd, &out_num_sect,
                                           &out_sect_sz)) {
                 fprintf(stderr, "Unable to read block capacity on %s\n",
                         outf);
@@ -1603,8 +1603,8 @@ main(int argc, char * argv[])
         if (out_num_sect > seek)
             out_num_sect -= seek;
 #ifdef SG_DEBUG
-        fprintf(stderr, 
-            "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", out_num_sect=%"PRId64"\n", 
+        fprintf(stderr,
+            "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", out_num_sect=%"PRId64"\n",
             dd_count, in_num_sect, out_num_sect);
 #endif
         if (dd_count < 0) {
@@ -1836,7 +1836,7 @@ main(int argc, char * argv[])
                 first = 0;
             }
             if (0 != ret) {
-                fprintf(stderr, "sg_write failed,%s seek=%"PRId64"\n", 
+                fprintf(stderr, "sg_write failed,%s seek=%"PRId64"\n",
                         ((-2 == ret) ? " try reducing bpt," : ""), seek);
                 break;
             } else {
@@ -1927,7 +1927,7 @@ main(int argc, char * argv[])
         int fd;
         char c;
 
-        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n", 
+        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
                 dio_incomplete);
         if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
@@ -1939,7 +1939,7 @@ main(int argc, char * argv[])
         }
     }
     if (sum_of_resids)
-        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
+        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                 sum_of_resids);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

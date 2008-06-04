@@ -27,7 +27,7 @@
 **      ST336704FC      71132960
 **      ST318304FC      35145034  (Factory spec is 35885167 sectors)
 **      ST336605FC      ???
-**      ST336753FC      71132960  (Factory spec is 71687372 sectors) 
+**      ST336753FC      71132960  (Factory spec is 71687372 sectors)
 */
 
 #include <stdio.h>
@@ -60,14 +60,14 @@
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
 #endif
- 
+
 #ifdef HAVE_MS_SLEEP
 #include <windows.h>
 #define sleep_for(seconds)    Sleep( (seconds) * 1000)
 #else
 #define sleep_for(seconds)    sleep(seconds)
 #endif
- 
+
 
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
@@ -225,16 +225,16 @@ print_read_cap(int fd, int do_16, int verbose)
                                       (resp_buff[6] << 8) |
                                       resp_buff[7]);
                         printf("Read Capacity (10) results:\n");
-                        printf("   Number of blocks=%u\n", 
+                        printf("   Number of blocks=%u\n",
                                last_blk_addr + 1);
                         printf("   Block size=%u bytes\n", block_size);
                         return (int)block_size;
                 }
         }
-        if (SG_LIB_CAT_NOT_READY == res) 
+        if (SG_LIB_CAT_NOT_READY == res)
                 fprintf(stderr, "READ CAPACITY (%d): device not ready\n",
                         (do_16 ? 16 : 10));
-        else if (SG_LIB_CAT_INVALID_OP == res) 
+        else if (SG_LIB_CAT_INVALID_OP == res)
                 fprintf(stderr, "READ CAPACITY (%d) not supported\n",
                         (do_16 ? 16 : 10));
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
@@ -516,9 +516,9 @@ int main(int argc, char **argv)
                                 "supported\n", (mode6 ? 6 : 10));
                         fprintf(stderr, "    try again %s the '--six' "
                                 "option\n", (mode6 ? "without" : "with"));
-        
+
                 } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-                        if (long_lba && (! mode6)) 
+                        if (long_lba && (! mode6))
                                 fprintf(stderr, "bad field in MODE SENSE "
                                         "(%d) [longlba flag not supported?]"
                                         "\n", (mode6 ? 6 : 10));

@@ -137,7 +137,7 @@ terabytes (almost 2 ** 41 bytes) on a single disk. This option selects
 commands and parameters that allow for 64 bit logical block addresses.
 Specifically this is the "longlba" flag in the MODE SENSE (10) command
 and READ CAPACITY (16) rather than READ CAPACITY (10). When a disk
-supports "protection information" then this option may also be useful. 
+supports "protection information" then this option may also be useful.
 .TP
 \fB\-P\fR, \fB\-\-pfu\fR=\fIPFU\fR
 sets the "Protection Field Usage" field in the parameter block associated
@@ -160,7 +160,7 @@ The contents of all logical blocks on the media remain unchanged when
 this option is used. This means that any resize operation can be
 reversed. This option cannot be used together with either \fI\-\-format\fR
 or a \fI\-\-size=SIZE\fR whose argument is different to the existing block
-size. 
+size.
 .TP
 \fB\-R\fR, \fB\-\-rto_req\fR
 instructs a format to enable application client ownership of
@@ -227,7 +227,7 @@ the CLIST is generated and used during the format process.
 .PP
 The sg_format utility does not permit a user to provide a defect
 list (i.e. DLIST). All protection information options are off by
-default. 
+default.
 .SH NOTES
 The SBC\-2 standard states that the REQUEST SENSE command should be used
 for obtaining a progress indication when the format command is underway.

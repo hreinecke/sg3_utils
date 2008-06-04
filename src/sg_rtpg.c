@@ -259,7 +259,7 @@ int main(int argc, char * argv[])
     ret = res;
     if (0 == res) {
         report_len = (reportTgtGrpBuff[0] << 24) +
-                     (reportTgtGrpBuff[1] << 16) + 
+                     (reportTgtGrpBuff[1] << 16) +
                      (reportTgtGrpBuff[2] << 8) +
                      reportTgtGrpBuff[3] + 4;
         if (report_len > (int)sizeof(reportTgtGrpBuff)) {

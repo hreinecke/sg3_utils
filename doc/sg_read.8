@@ -101,14 +101,14 @@ O_DIRECT flag. The default value is 0 (i.e. don't open block devices
 O_DIRECT).
 .TP
 \fBskip\fR=\fISKIP\fR
-all read operations will start offset by \fISKIP\fR bs\-sized blocks 
+all read operations will start offset by \fISKIP\fR bs\-sized blocks
 from the start of the input file (or device).
 .TP
 \fBtime\fR=\fITI\fR
 When \fITI\fR is 0 (default) doesn't perform timing.
 When 1, times transfer and does throughput calculation, starting at the
-first issued command until completion. When 2, times transfer and does 
-throughput calculation, starting at the second issued command until 
+first issued command until completion. When 2, times transfer and does
+throughput calculation, starting at the second issued command until
 completion. When 3 times from third command, etc. An average number of
 commands (SCSI READs or Unix read()s) executed per second is also
 output.
@@ -140,7 +140,7 @@ SCSI adapter DMAs into kernel buffers and then the sg driver copies
 this data into user memory.
 This is called "indirect IO" and there is a "dio" option to select
 "direct IO" which will DMA directly into user memory. Due to some
-issues "direct IO" is disabled in the sg driver and needs a 
+issues "direct IO" is disabled in the sg driver and needs a
 configuration change to activate it. This is typically done with
 "echo 1 > /proc/scsi/sg/allow_dio". An alternate way to avoid the
 2 stage copy is to select memory mapped IO with 'mmap=1'.
@@ -157,12 +157,12 @@ cache performance.
 .PP
    sg_read if=/dev/sg0 bs=512 count=1MB mmap=1 time=2
 .PP
-This command will continually read 128  512 byte blocks from block 0. 
-The "128" is the default value for 'bpt' while "block 0" is chosen 
-because the 'skip' argument was not given. This will continue until 
-1,000,000 blocks are read. The idea behind using 'time=2' is that the 
+This command will continually read 128  512 byte blocks from block 0.
+The "128" is the default value for 'bpt' while "block 0" is chosen
+because the 'skip' argument was not given. This will continue until
+1,000,000 blocks are read. The idea behind using 'time=2' is that the
 first 64 KiB read operation will involve reading the magnetic media
-while the remaining read operations will "hit" the disk's cache. The 
+while the remaining read operations will "hit" the disk's cache. The
 output of third command will look like this:
 .PP
   time from second command to end was 4.50 secs, 113.70 MB/sec

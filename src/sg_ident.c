@@ -96,7 +96,7 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
             if (ascii)
                 printf("%.*s\n", ii_len, (const char *)iip);
             else
-                dStrHex((const char *)iip, ii_len, 0); 
+                dStrHex((const char *)iip, ii_len, 0);
         }
     }
 }
@@ -228,7 +228,7 @@ int main(int argc, char * argv[])
     memset(rdi_buff, 0x0, sizeof(rdi_buff));
     if (do_set || do_clear) {
         if (do_set) {
-            res = fread(rdi_buff, 1, REPORT_ID_INFO_SANITY_LEN + 2, stdin); 
+            res = fread(rdi_buff, 1, REPORT_ID_INFO_SANITY_LEN + 2, stdin);
             if (res <= 0) {
                 fprintf(stderr, "no data read from stdin; to clear "
                         "identifying information use '--clear' instead\n");
@@ -272,7 +272,7 @@ int main(int argc, char * argv[])
     } else {    /* do report identifying information */
         res = sg_ll_report_id_info(sg_fd, itype, rdi_buff, 4, 1, verbose);
         if (0 == res) {
-            ii_len = (rdi_buff[0] << 24) + (rdi_buff[1] << 16) + 
+            ii_len = (rdi_buff[0] << 24) + (rdi_buff[1] << 16) +
                          (rdi_buff[2] << 8) + rdi_buff[3];
             if ((! raw) && (verbose > 0))
                 printf("Reported identifying information length = %d\n",

@@ -44,7 +44,7 @@
 /* A utility program for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI command REQUEST SENSE to the given SCSI device. 
+ * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
 static char * version_str = "1.21 20080510";
@@ -285,7 +285,7 @@ main(int argc, char * argv[])
                      fprintf(stderr, "No progress indication found, "
                              "iteration %d\n", k + 1);
                 /* N.B. exits first time there isn't a progress indication */
-                break;  
+                break;
             } else
                 printf("Progress indication: %d%% done\n",
                        (progress * 100) / 65536);

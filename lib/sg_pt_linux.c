@@ -259,7 +259,7 @@ int get_scsi_pt_result_category(const struct sg_pt_base * vp)
         return SCSI_PT_RESULT_OS_ERR;
     else if (ptp->io_hdr.host_status)
         return SCSI_PT_RESULT_TRANSPORT_ERR;
-    else if (dr_st && (SG_LIB_DRIVER_SENSE != dr_st)) 
+    else if (dr_st && (SG_LIB_DRIVER_SENSE != dr_st))
         return SCSI_PT_RESULT_TRANSPORT_ERR;
     else if ((SG_LIB_DRIVER_SENSE == dr_st) ||
              (SAM_STAT_CHECK_CONDITION == scsi_st) ||
@@ -378,7 +378,7 @@ char * get_scsi_pt_transport_err_str(const struct sg_pt_base * vp,
     n = snprintf(cp, m, "Driver_status=0x%02x [%s, %s]\n", ds, driv_cp,
                  sugg_cp);
     m -= n;
-    if (m < 1) 
+    if (m < 1)
         b[max_b_len - 1] = '\0';
     return b;
 }

@@ -1080,7 +1080,7 @@ main(int argc, char * argv[])
         }
     }
 
-    res = sg_ll_get_config(sg_fd, rt, starting, resp_buffer, 
+    res = sg_ll_get_config(sg_fd, rt, starting, resp_buffer,
                               sizeof(resp_buffer), 1, verbose);
     ret = res;
     if (0 == res) {

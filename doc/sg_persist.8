@@ -42,7 +42,7 @@ against accidental use, the \fI\-\-out\fR option must be given when a
 PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
 .PP
 The older SCSI RESERVE and RELEASE commands (both 6 and 10 byte variants)
-are not supported by this utility. In SPC\-3, RESERVE and RELEASE are 
+are not supported by this utility. In SPC\-3, RESERVE and RELEASE are
 deprecated, replaced by Persistent Reservations. RESERVE and RELEASE
 have been removed from SPC\-4 and Annex B is provided showing how to
 convert to persistent reservation commands. See a utility
@@ -56,7 +56,7 @@ the \fI\-\-device=DEVICE\fR option.
 SPC\-4 does not use the term "sub\-command". It uses the term "service action"
 for this and for part of a field's name in the parameter block associated
 with the PROUT command (i.e. "service action reservation key"). To lessen
-the potential confusion the term "sub\-command" has been introduced. 
+the potential confusion the term "sub\-command" has been introduced.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The following options are sorted in alphabetical order, based on their
@@ -131,15 +131,15 @@ needs to match the type of the reservation. ACA and other pending tasks are
 aborted.
 .TP
 \fB\-T\fR, \fB\-\-prout\-type\fR=\fITYPE\fR
-specify the PROUT command's 'type' argument. Required by 
+specify the PROUT command's 'type' argument. Required by
 the 'register\-move', 'reserve', 'release' and 'preempt (and abort)'
 sub\-commands. Valid \fITYPE\fR values: 1\-> write exclusive, 3\->
-exclusive access, 5\-> write exclusive \- registrants only, 6\-> 
+exclusive access, 5\-> write exclusive \- registrants only, 6\->
 exclusive access \- registrants only, 7\-> write exclusive \- all registrants,
 8\-> exclusive access \- all registrants. Default value is 0 (which is
 an invalid type). Each "persistent reservation type" is explained in more
 detail in a subsection of that name in the read reservation section of
-the PRIN command (section 6.13.3.4 of SPC\-4 revision 9). 
+the PRIN command (section 6.13.3.4 of SPC\-4 revision 9).
 .TP
 \fB\-s\fR, \fB\-\-read\-full\-status\fR
 Read Full Status is a sub\-command of the PRIN command. For each registration
@@ -162,7 +162,7 @@ same as \fI\-\-read\-full\-status\fR.
 .TP
 \fB\-G\fR, \fB\-\-register\fR
 Register is a sub\-command of the PROUT command. It has 3 different
-actions depending on associated parameters. a) add a new registration 
+actions depending on associated parameters. a) add a new registration
 with '\-\-param\-rk=0' and '\-\-param\-sark=<new_rk>'; b) Change an existing
 registration with '\-\-param\-rk=<old_rk>'
 and '\-\-param\-sark=<new_rk>'; or  c) Delete an existing registration
@@ -192,7 +192,7 @@ in the range 0 to ffff inclusive. Defaults to 0 .
 .TP
 \fB\-L\fR, \fB\-\-release\fR
 Release is a sub\-command of the PROUT command. It releases the
-current persistent reservation. The \fI\-\-prout\-type=TYPE\fR 
+current persistent reservation. The \fI\-\-prout\-type=TYPE\fR
 and \fI\-\-param\-rk=RK\fR options, matching the reservation, must also be
 specified.
 .TP
@@ -252,16 +252,16 @@ print out version string. Ignore all other parameters.
 output usage message. Ignore all other parameters.
 .SH NOTES
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
-a SCSI generic (sg) device. In the 2.6 series any SCSI device 
-name (e.g. /dev/sdc, /dev/st1m or /dev/sg3) can be specified. 
+a SCSI generic (sg) device. In the 2.6 series any SCSI device
+name (e.g. /dev/sdc, /dev/st1m or /dev/sg3) can be specified.
 For example "sg_persist \-\-read\-keys /dev/sda"
 will work in the 2.6 series kernels.
 .PP
-The only scope for PROUT commands supported in the current draft of 
+The only scope for PROUT commands supported in the current draft of
 SPC\-4 is "LU_SCOPE". Hence there seems to be no point in offering an
 option to set scope to another value.
 .PP
-Most errors with the PROUT sub\-commands (e.g. missing or 
+Most errors with the PROUT sub\-commands (e.g. missing or
 mismatched \fI\-\-prout\-type=TYPE\fR) will result in a RESERVATION
 CONFLICT status. This can be a bit confusing when you know there is
 only one (active) initiator: the "conflict" is with the SPC standard, not

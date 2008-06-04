@@ -154,7 +154,7 @@ int main(int argc, char * argv[])
                                       1, verbose);
     ret = res;
     if (0 == res) {
-        sn_len = (rmsn_buff[0] << 24) + (rmsn_buff[1] << 16) + 
+        sn_len = (rmsn_buff[0] << 24) + (rmsn_buff[1] << 16) +
                      (rmsn_buff[2] << 8) + rmsn_buff[3];
         if (! raw)
             printf("Reported serial number length = %d\n", sn_len);
@@ -184,7 +184,7 @@ int main(int argc, char * argv[])
             } else {
                 printf("Serial number:\n");
                 if (sn_len > 0)
-                    dStrHex((const char *)ucp + 4, sn_len, 0); 
+                    dStrHex((const char *)ucp + 4, sn_len, 0);
             }
         }
     }

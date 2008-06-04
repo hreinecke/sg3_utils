@@ -23,7 +23,7 @@
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   This program issues the SCSI PERSISTENT IN and OUT commands. 
+   This program issues the SCSI PERSISTENT IN and OUT commands.
 
 */
 
@@ -89,7 +89,7 @@ static const char * prin_sa_strs[] = {
     "[reserved 0x6]",
     "[reserved 0x7]",
 };
-static const int num_prin_sa_strs = sizeof(prin_sa_strs) / 
+static const int num_prin_sa_strs = sizeof(prin_sa_strs) /
                                     sizeof(prin_sa_strs[0]);
 
 static const char * prout_sa_strs[] = {
@@ -103,7 +103,7 @@ static const char * prout_sa_strs[] = {
     "Register and move",
     "[reserved 0x8]",
 };
-static const int num_prout_sa_strs = sizeof(prout_sa_strs) / 
+static const int num_prout_sa_strs = sizeof(prout_sa_strs) /
                                      sizeof(prout_sa_strs[0]);
 
 
@@ -189,7 +189,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
         switch (proto_id) {
         case TPROTO_FCP: /* Fibre channel */
             printf("%s  FCP-2 World Wide Name:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
@@ -198,7 +198,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
         case TPROTO_SPI: /* Parallel SCSI */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
                    leadin, ((ucp[2] << 8) | ucp[3]));
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
@@ -213,7 +213,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             break;
         case TPROTO_1394: /* IEEE 1394 */
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
@@ -221,7 +221,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             break;
         case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 16, 0);
@@ -248,7 +248,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                 ull |= ucp[4 + j];
             }
             printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             bump = 24;
@@ -340,10 +340,10 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
             }
         }
     } else {
-        pr_gen = ((pr_buff[0] << 24) | (pr_buff[1] << 16) | 
-                  (pr_buff[2] << 8) | pr_buff[3]); 
-        add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) | 
-                   (pr_buff[6] << 8) | pr_buff[7]); 
+        pr_gen = ((pr_buff[0] << 24) | (pr_buff[1] << 16) |
+                  (pr_buff[2] << 8) | pr_buff[3]);
+        add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) |
+                   (pr_buff[6] << 8) | pr_buff[7]);
         if (do_hex) {
             printf("  PR generation=0x%x, ", pr_gen);
             if (add_len <= 0)
@@ -417,7 +417,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                 else {
                     printf("      All target ports bit clear\n");
                     rel_pt_addr = ((ucp[18] << 8) | ucp[19]);
-                    printf("      Relative port address: 0x%x\n", 
+                    printf("      Relative port address: 0x%x\n",
                            rel_pt_addr);
                 }
                 if (ucp[12] & 0x1) {
@@ -439,7 +439,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
     return 0;
 }
 
-static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type, 
+static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
                       uint64_t param_rk, uint64_t param_sark,
                       int param_alltgpt, int param_aptpl,
                       unsigned char * transportidp, int transportid_len,
@@ -498,7 +498,7 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
     return 0;
 }
 
-static int prout_rmove_work(int sg_fd, unsigned int prout_type, 
+static int prout_rmove_work(int sg_fd, unsigned int prout_type,
                       uint64_t param_rk, uint64_t param_sark, int param_unreg,
                       int param_aptpl, unsigned int rel_target_port,
                       unsigned char * transportidp, int transportid_len,
@@ -719,7 +719,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AcCd:GHhiIkK:LMnoPQrRsS:T:UvVX:YZ", 
+        c = getopt_long(argc, argv, "AcCd:GHhiIkK:LMnoPQrRsS:T:UvVX:YZ",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -835,8 +835,8 @@ int main(int argc, char * argv[])
             return 0;
         case 'X':
             memset(transportid_arr, 0, sizeof(transportid_arr));
-            if (0 != build_transportid(optarg, transportid_arr, 
-                                       &transportid_arr_len, 
+            if (0 != build_transportid(optarg, transportid_arr,
+                                       &transportid_arr_len,
                                        &num_transportids,
                                        sizeof(transportid_arr))) {
                 fprintf(stderr, "bad argument to '--transport-id'\n");
@@ -957,7 +957,7 @@ int main(int argc, char * argv[])
             else
                 printf("  Peripheral device type: 0x%x\n", peri_type);
         } else {
-            printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n", 
+            printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n",
                    device_name);
             return SG_LIB_CAT_OTHER;
         }

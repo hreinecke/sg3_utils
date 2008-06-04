@@ -22,7 +22,7 @@
    *  the Free Software Foundation; either version 2, or (at your option)
    *  any later version.
 
-   This program issues the SCSI command READ LONG to a given SCSI device. 
+   This program issues the SCSI command READ LONG to a given SCSI device.
    It sends the command with the logical block address passed as the lba
    argument, and the transfer length set to the xfer_len argument. the
    buffer to be writen to the device filled with 0xff, this buffer includes

@@ -18,7 +18,7 @@ Copy data to and from any files. Specialized for "files" that are Linux SCSI
 generic (sg) devices, raw devices or other devices that support the SG_IO
 ioctl (which are only found in the lk 2.6 series). Similar syntax and
 semantics to
-.B dd(1) 
+.B dd(1)
 but does not perform any conversions.
 .PP
 The first group in the synopsis above are "standard" Unix
@@ -29,9 +29,9 @@ Both groups are defined below.
 .TP
 \fBblk_sgio\fR=0 | 1
 when set to 0, block devices (e.g. /dev/sda) are treated like normal
-files (i.e. 
+files (i.e.
 .B read(2)
-and 
+and
 .B write(2)
 are used for IO). When set to 1, block devices are assumed to accept the
 SG_IO ioctl and SCSI commands are issued for IO. This is only supported
@@ -65,10 +65,10 @@ have 2048 byte blocks). For this utility the maximum size of each individual
 IO operation is \fIBS\fR * \fIBPT\fR bytes.
 .TP
 \fBcdbsz\fR=6 | 10 | 12 | 16
-size of SCSI READ and/or WRITE commands issued on sg device 
+size of SCSI READ and/or WRITE commands issued on sg device
 names (or block devices when 'iflag=sgio' and/or 'oflag=sgio' is given).
 Default is 10 byte SCSI command blocks (unless calculations indicate
-that a 4 byte block number may be exceeded or \fIBPT\fR is greater than 
+that a 4 byte block number may be exceeded or \fIBPT\fR is greater than
 16 bits (65535), in which case it defaults to 16 byte SCSI commands).
 .TP
 \fBcoe\fR=0 | 1 | 2 | 3
@@ -86,7 +86,7 @@ the copy soon after unrecorded media is detected while still
 offering "continue on error" capability.
 .TP
 \fBcount\fR=\fICOUNT\fR
-copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the 
+copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the
 minimum (of \fIIFILE\fR and \fIOFILE\fR) number of blocks that sg devices
 report from SCSI READ CAPACITY commands or that block devices (or their
 partitions) report. Normal files are not probed for their size. If
@@ -134,7 +134,7 @@ write to \fIOFILE\fR instead of stdout. If \fIOFILE\fR is '\-' then writes
 to stdout.  If \fIOFILE\fR is /dev/null then no actual writes are performed.
 If \fIOFILE\fR is '.' (period) then it is treated the same way as
 /dev/null (this is a shorthand notation). If \fIOFILE\fR exists then it
-is _not_ truncated; it is overwritten from the start of \fIOFILE\fR 
+is _not_ truncated; it is overwritten from the start of \fIOFILE\fR
 unless 'oflag=append' or \fISEEK\fR is given.
 .TP
 \fBoflag\fR=\fIFLAGS\fR
@@ -209,7 +209,7 @@ error recovery mode page (the sdparm utility to access and possibly change
 these attributes)). Errors occurring on other files types will stop sg_dd.
 Error messages are sent to stderr. This flag is similar
  o 'conv=noerror,sync' in the
-.B dd(1) 
+.B dd(1)
 utility. See note about READ LONG below.
 .TP
 dio
@@ -319,7 +319,7 @@ SCSI adapter DMAs into kernel buffers and then the sg driver copies
 this data into user memory (write operations reverse this sequence).
 This is called "indirect IO" and there is a 'dio' option to
 select "direct IO" which will DMA directly into user memory. Due to some
-issues "direct IO" is disabled in the sg driver and needs a 
+issues "direct IO" is disabled in the sg driver and needs a
 configuration change to activate it. This is typically done
 with 'echo 1 > /proc/scsi/sg/allow_dio'.
 .PP

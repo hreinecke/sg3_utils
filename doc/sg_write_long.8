@@ -35,7 +35,7 @@ changed so that the ECC is able to correct the data) then care should
 be taken with the settings in the "read write error recovery" mode page.
 Specifically if the ARRE (for reads) and/or AWRE (for writes) are set
 then recovered errors will cause the lba to be reassigned (and the old
-location to be added to the grown defect list (PLIST)). This is not easily 
+location to be added to the grown defect list (PLIST)). This is not easily
 reversed and uses (one of the finite number of) the spare sectors set
 aside for this purpose. If in doubt it is probably safest to clear the
 ARRE and AWRE bits. These bits can be checked and modified with the
@@ -150,7 +150,7 @@ than the block subsystem.
 Finally we should restore sector 0x1234 to a non-corrupted state. A sector
 full of zeroes could be written with:
 .PP
-  sg_dd if=/dev/zero of=/dev/sda blk_sgio=1 seek=0x1234 bs=512 count=1    
+  sg_dd if=/dev/zero of=/dev/sda blk_sgio=1 seek=0x1234 bs=512 count=1
 .PP
 This will result in a sector (block) with 512 bytes of 0x0 without a
 MEDIUM ERROR since the ECC and associated data will be regenerated and

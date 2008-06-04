@@ -276,7 +276,7 @@ encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
           desc[2] = (tgtState[i].id >> 8) & 0x0f;
           desc[3] = tgtState[i].id & 0x0f;
      }
-} 
+}
 
 /* Read numbers (up to 32 bits in size) from command line (comma separated */
 /* list). Assumed decimal unless prefixed by '0x', '0X' or contains */
@@ -356,9 +356,9 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
             try_num = 0;
             switch (toupper(*lcp)) {
             case 'A':
-                if ('N' == toupper(*(lcp + 1))) 
+                if ('N' == toupper(*(lcp + 1)))
                     state_arr[k] = 1;
-                else if ('O' == toupper(*(lcp + 1))) 
+                else if ('O' == toupper(*(lcp + 1)))
                     state_arr[k] = 0;
                 else
                     try_num = 1;
@@ -598,7 +598,7 @@ main(int argc, char * argv[])
         ret = res;
         if (0 == res) {
             report_len = (reportTgtGrpBuff[0] << 24) +
-                         (reportTgtGrpBuff[1] << 16) + 
+                         (reportTgtGrpBuff[1] << 16) +
                          (reportTgtGrpBuff[2] << 8) +
                          reportTgtGrpBuff[3] + 4;
             if (report_len > (int)sizeof(reportTgtGrpBuff)) {
@@ -633,7 +633,7 @@ main(int argc, char * argv[])
                 tgtStatePtr->id = (ucp[2] << 8) + ucp[3];
                 tgtStatePtr->current = ucp[0] & 0x0f;
                 tgtStatePtr->valid = ucp[1];
-            
+
                 tgt_port_count = ucp[7];
 
                 tgtStatePtr++;

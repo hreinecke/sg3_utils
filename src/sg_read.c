@@ -19,7 +19,7 @@
 #include <sys/sysmacros.h>
 #include <sys/mman.h>
 #include <sys/time.h>
-#include <linux/major.h> 
+#include <linux/major.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -37,10 +37,10 @@
    This program reads data from the given SCSI device (typically a disk
    or cdrom) and discards that data. Its primary goal is to time
    multiple reads all starting from the same logical address. Its interface
-   is a subset of another member of this package: sg_dd which is a 
+   is a subset of another member of this package: sg_dd which is a
    "dd" variant. The input file can be a scsi generic device, a block device,
    a raw device or a seekable file. Streams such as stdin are not acceptable.
-   The block size ('bs') is assumed to be 512 if not given. 
+   The block size ('bs') is assumed to be 512 if not given.
 
    This version should compile with Linux sg drivers with version numbers
    >= 30000 . For mmap-ed IO the sg version number >= 30122 .
@@ -65,7 +65,7 @@ static const char * version_str = "1.18 20071226";
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikey value */
-#endif 
+#endif
 
 #define FT_OTHER 1              /* filetype other than sg or raw device */
 #define FT_SG 2                 /* filetype is sg char device */
@@ -374,7 +374,7 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
         return -1;
     }
     if (blocks > 0) {
-        if (diop && *diop && 
+        if (diop && *diop &&
             ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
             *diop = 0;      /* flag that dio not done (completely) */
         sum_of_resids += io_hdr.resid;
@@ -584,7 +584,7 @@ int main(int argc, char * argv[])
             if (verbose > 2) {
                 if (ioctl(infd, SG_GET_RESERVED_SIZE, &t) >= 0)
                     fprintf(stderr, "  SG_GET_RESERVED_SIZE yields: %d\n", t);
-            } 
+            }
             t = bs * bpt;
             if ((do_mmap) && (0 != (t % psz)))
                 t = ((t / psz) + 1) * psz;    /* round up to next pagesize */
@@ -698,12 +698,12 @@ int main(int argc, char * argv[])
                     buf_sz = MIN_RESERVED_SIZE;
                 blocks_per = (buf_sz + bs - 1) / bs;
                 blocks = blocks_per;
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Reducing read to %d blocks per loop\n", blocks_per);
                 res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
                                fua, dpo, &dio_tmp, do_mmap, no_dxfer);
             } else if (2 == res) {
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Unit attention, try again (r)\n");
                 res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
                                fua, dpo, &dio_tmp, do_mmap, no_dxfer);
@@ -798,7 +798,7 @@ int main(int argc, char * argv[])
                 b = 0.0;
                 c = 0.0;
             }
-    
+
             if (1 == do_time) {
                 fprintf(stderr, "Time for all %s commands was "
                         "%d.%06d secs", read_str, (int)res_tm.tv_sec,
@@ -815,7 +815,7 @@ int main(int argc, char * argv[])
                     fprintf(stderr, ", %.2f MB/sec\n", c / (a * 1000000.0));
                 else
                     fprintf(stderr, "\n");
-            } else { 
+            } else {
                 fprintf(stderr, "Time from start of %s command "
                         "#%d to end was %d.%06d secs", read_str, do_time,
                         (int)res_tm.tv_sec, (int)res_tm.tv_usec);
@@ -846,7 +846,7 @@ int main(int argc, char * argv[])
         int fd;
         char c;
 
-        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n", 
+        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
                 dio_incomplete);
         if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
@@ -858,7 +858,7 @@ int main(int argc, char * argv[])
         }
     }
     if (sum_of_resids)
-        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
+        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                 sum_of_resids);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

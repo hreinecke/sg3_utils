@@ -105,7 +105,7 @@ int scsi_pt_open_device(const char * device_name,
     for (k = 0; k < FREEBSD_MAXDEV; k++)
         if (! devicetable[k])
             break;
-  
+
     // If no free entry found, return error.  We have max allowed number
     // of "file descriptors" already allocated.
     if (k == FREEBSD_MAXDEV) {
