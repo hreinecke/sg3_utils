@@ -53,7 +53,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 14 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 15 [sorted numerically (from Annex D.8)] */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
@@ -71,6 +71,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x77, "SAM-3 ANSI INCITS 402-2005"},
     {0x80, "SAM-4 (no version claimed)"},
     {0x87, "SAM-4 T10/1683-D revision 13"},
+    {0x8b, "SAM-4 T10/1683-D revision 14"},
+    {0xa0, "SAM-5 (no version claimed)"},
     {0x120, "SPC (no version claimed)"},
     {0x13b, "SPC T10/0995-D revision 11a"},
     {0x13c, "SPC ANSI INCITS 301-1997"},
@@ -162,6 +164,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x3e0, "SES-2 (no version claimed)"},
     {0x3e1, "SES-2 T10/1559-D revision 16"},
     {0x3e7, "SES-2 T10/1559-D revision 19"},
+    {0x3eb, "SES-2 T10/1559-D revision 20"},
     {0x400, "SSC-3 (no version claimed)"},
     {0x403, "SSC-3 T10/1611-D revision 04a"},
     {0x420, "MMC-5 (no version claimed)"},
@@ -228,6 +231,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa07, "FCP-3 T10/1560-D revision 3f"},
     {0xa0f, "FCP-3 T10/1560-D revision 4"},
     {0xa11, "FCP-3 ANSI INCITS 416-2006"},
+    {0xa1c, "FCP-3 ISO/IEC 14776-223"},
     {0xa20, "ADT-2 (no version claimed)"},
     {0xa40, "FCP-4 (no version claimed)"},
     {0xaa0, "SPI (no version claimed)"},
@@ -311,6 +315,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xea3, "FC 10GFC ISO/IEC 14165-116"},
     {0xec0, "FC-SP-2 (no version claimed)"},
     {0xee0, "FC-FS-3 (no version claimed)"},
+    {0xf00, "FC-LS-2 (no version claimed)"},
     {0x12e0, "FC-DA (no version claimed)"},
     {0x12e2, "FC-DA T11/1513-DT revision 3.1"},
     {0x1300, "FC-Tape (no version claimed)"},
@@ -346,6 +351,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1728, "Universal Serial Bus Specification, Revision 1.1"},
     {0x1729, "Universal Serial Bus Specification, Revision 2.0"},
     {0x1730, "USB Mass Storage Class Bulk-Only Transport, Revision 1.0"},
+    {0x1740, "UAS (no version claimed)"},    /* USB attached SCSI */
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
     {0x1eab, "SAT T10/1711-D rev 9"},

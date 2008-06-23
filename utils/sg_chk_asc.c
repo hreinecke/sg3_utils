@@ -47,7 +47,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static char * version_str = "1.03 20080313";
+static char * version_str = "1.03 20080623";
 
 #define ME "sg_chk_asc: "
 
@@ -68,8 +68,9 @@ static void usage()
           "  where: --help|-h          print out usage message\n"
           "         --verbose|-v       increase verbosity\n"
           "         --version|-V       print version string and exit\n\n"
-          "Checks asc/ascq codes < www.t10.org/lists/asc-num.txt > against "
-          "sg_lib.c\n"
+          "Checks asc/ascq codes in <asc_ascq_file> against the sg3_utils "
+          "library.\nThe additional sense code (asc_ascq) can be found at\n"
+          "www.t10.org/lists/asc-num.txt .\n"
           );
 
 }

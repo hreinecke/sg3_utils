@@ -24,7 +24,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.31 20080327";    /* spc4r11 */
+static char * version_str = "0.32 20080623";    /* spc4r15 */
 
 // #define USE_LINUX_SG_IO_IF 1
 
@@ -888,7 +888,7 @@ int main(int argc, char * argv[])
         if (rsoc_buff[0] & 0x1)
             printf("    Wakeup\n");
         if (rsoc_buff[1] & 0x4)
-            printf("    Query unit attention\n");
+            printf("    Query asynchronous event\n");
         if (rsoc_buff[1] & 0x2)
             printf("    Query task set\n");
         if (rsoc_buff[1] & 0x1)
