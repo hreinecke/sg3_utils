@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.26 [20080604] [svn: r178]
+Changelog for sg3_utils-1.26 [20080623] [svn: r179]
   - sg_sat_phy_event: new utility; copied from examples
     directory and enhanced, rename original to sg__sat_phy_event
   - sg_ses: sync with ses2r19b, many nomenclature changes
@@ -14,7 +14,7 @@ Changelog for sg3_utils-1.26 [20080604] [svn: r178]
   - sg_vpd: add nominal form factor to block dev. char. VPD page
     - add --maxlen= option to set allocation length in cdb
   - sg_inq: add --maxlen= option that does same as --len=
-    - move version descriptors (spc4r14) to sg_inq_data.c file
+    - move version descriptors (spc4r15) to sg_inq_data.c file
   - sg_inq+sg_vpd: logic for "NAA-3 Locally assigned" identifier
     - update extended inquiry VPD page
   - sg_modes: add --maxlen= option to specify allocation length
@@ -26,11 +26,12 @@ Changelog for sg3_utils-1.26 [20080604] [svn: r178]
     read errors (with ILI and info field)
   - sg_dd, sgm_dd, sgp_dd, sginfo, sg_rbuf, sg_read: replace
     "%lld" and friends with PRI macros
+  - sg_opcodes: tmf name change in spc4r15 (async event)
   - sg_turs: add more to man page about '--progress' indication
   - sg_write_long: add examples section to man page
-  - '--raw' modify utilities that can send binary output to
-    call sg_set_binary_mode(). For MingGW port CR problem.
-  - sg_lib: update asc/ascq strings to spc4r14
+  - '--raw' option: modify utilities that can send binary output
+    to call sg_set_binary_mode(). For MingGW port CR problem.
+  - sg_lib: update asc/ascq and command name strings to spc4r15
     - split sg_lib into sg_lib_data.[hc] and sg_lib.[hc]
     - split sg_cmds_extra into sg_cmds_extra and sg_cmds_mmc
     - add osd2r03 service actions (all different from osd-r10)

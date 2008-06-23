@@ -33,7 +33,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.45 20080510";    /* spc-4 rev 14 */
+const char * sg_lib_version_str = "1.46 20080623";    /* spc-4 rev 15 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -277,6 +277,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xb, 0, "Write(32)"},
     {0xc, 0, "Write an verify(32)"},
     {0xd, 0, "Write same(32)"},
+    {0x1800, 0, "Receive credential"},
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},
     {0x8803, 0, "List (osd)"},
@@ -422,6 +423,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0B,0x03,"Warning - background self-test failed"},
     {0x0B,0x04,"Warning - background pre-scan detected medium error"},
     {0x0B,0x05,"Warning - background medium scan detected medium error"},
+    {0x0B,0x06,"Warning - non-volatile cache now volatile"},
+    {0x0B,0x07,"Warning - degraded power to non-volatile cache"},
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -782,6 +785,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x07,"Quota error"},
     {0x55,0x08,"Maximum number of supplemental decryption keys exceeded"},
     {0x55,0x09,"Medium auxiliary memory not accessible"},
+    {0x55,0x0a,"Data currently unavailable"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},

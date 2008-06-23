@@ -8,7 +8,7 @@ CC = gcc
 LD = gcc
 
 EXECS = hxascdmp
-# EXECS = hxascdmp sg_chk_asc
+EXTRA_EXECS = hxascdmp sg_chk_asc
 
 MAN_PGS = hxascdmp.1
 MAN_PREF = man1
@@ -25,7 +25,7 @@ depend dep:
 	done > .depend
 
 clean:
-	/bin/rm -f *.o $(EXECS) core .depend
+	/bin/rm -f *.o $(EXTRA_EXECS) core .depend
 
 hxascdmp: hxascdmp.o
 	$(LD) -o $@ $(LDFLAGS) $^
