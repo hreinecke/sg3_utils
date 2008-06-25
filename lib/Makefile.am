@@ -131,7 +131,7 @@ endif
 AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 # AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c99
 
-lib_LTLIBRARIES = libsgutils.la
+lib_LTLIBRARIES = libsgutils2.la
 
 libsgutils_la_LDFLAGS = -version-info 2:0:0
 
