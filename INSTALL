@@ -22,7 +22,7 @@ Step d) usually requires root permissions. Notes specific to supported
 architectures are given below. If the architecture supports shared libraries
 (in Unix/Linux) then the default './configure' generates a Makefile that will
 build executables that use a shared library. The name of that shared library
-starts with 'libsgutils'. To build without that shared library use this
+starts with 'libsgutils2'. To build without that shared library use this
 invocation instead of step b): './configure --disable-shared' .
 
 The default prefix for './configure' is "/usr/local". This means that by
@@ -141,4 +141,4 @@ extension and can be executed in a MSYS or "cmd" shell.
 
 
 Doug Gilbert
-18th May 2008
+25th June 2008
