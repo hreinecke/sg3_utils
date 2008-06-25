@@ -50,51 +50,51 @@ am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
 am__installdirs = "$(DESTDIR)$(libdir)"
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
-am__libsgutils_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
+am__libsgutils2_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
 	sg_cmds_basic.c sg_cmds_extra.c sg_cmds_mmc.c sg_pt_freebsd.c \
 	sg_pt_linux.c sg_io_linux.c sg_pt_osf1.c sg_pt_solaris.c \
 	sg_pt_win32.c
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@am_libsgutils_la_OBJECTS = sg_lib.lo \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@am_libsgutils2_la_OBJECTS = sg_lib.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_lib_data.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_cmds_basic.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_cmds_extra.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_cmds_mmc.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_pt_win32.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@am_libsgutils_la_OBJECTS = sg_lib.lo \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@am_libsgutils2_la_OBJECTS = sg_lib.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_lib_data.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_cmds_basic.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_cmds_extra.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_cmds_mmc.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_pt_win32.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@am_libsgutils_la_OBJECTS = sg_lib.lo \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@am_libsgutils2_la_OBJECTS = sg_lib.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_lib_data.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_cmds_basic.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_cmds_extra.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_cmds_mmc.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_pt_solaris.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@am_libsgutils_la_OBJECTS =  \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@am_libsgutils2_la_OBJECTS =  \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_lib.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_lib_data.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_cmds_basic.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_cmds_extra.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_cmds_mmc.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_pt_osf1.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am_libsgutils_la_OBJECTS = sg_lib.lo \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_lib_data.lo \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am_libsgutils2_la_OBJECTS =  \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_lib.lo sg_lib_data.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_cmds_basic.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_cmds_extra.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_cmds_mmc.lo sg_pt_linux.lo \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_io_linux.lo
-@OS_FREEBSD_TRUE@am_libsgutils_la_OBJECTS = sg_lib.lo sg_lib_data.lo \
+@OS_FREEBSD_TRUE@am_libsgutils2_la_OBJECTS = sg_lib.lo sg_lib_data.lo \
 @OS_FREEBSD_TRUE@	sg_cmds_basic.lo sg_cmds_extra.lo \
 @OS_FREEBSD_TRUE@	sg_cmds_mmc.lo sg_pt_freebsd.lo
-am__EXTRA_libsgutils_la_SOURCES_DIST = sg_pt_linux.c sg_io_linux.c \
+am__EXTRA_libsgutils2_la_SOURCES_DIST = sg_pt_linux.c sg_io_linux.c \
 	sg_linux_inc.h sg_pt_osf1.c sg_pt_solaris.c sg_pt_win32.c \
 	getopt_long.c sg_pt_freebsd.c
-libsgutils_la_OBJECTS = $(am_libsgutils_la_OBJECTS)
-libsgutils_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+libsgutils2_la_OBJECTS = $(am_libsgutils2_la_OBJECTS)
+libsgutils2_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(libsgutils_la_LDFLAGS) $(LDFLAGS) -o $@
+	$(libsgutils2_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -107,9 +107,9 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(libsgutils_la_SOURCES) $(EXTRA_libsgutils_la_SOURCES)
-DIST_SOURCES = $(am__libsgutils_la_SOURCES_DIST) \
-	$(am__EXTRA_libsgutils_la_SOURCES_DIST)
+SOURCES = $(libsgutils2_la_SOURCES) $(EXTRA_libsgutils2_la_SOURCES)
+DIST_SOURCES = $(am__libsgutils2_la_SOURCES_DIST) \
+	$(am__EXTRA_libsgutils2_la_SOURCES_DIST)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -223,7 +223,7 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-@OS_FREEBSD_TRUE@libsgutils_la_SOURCES = \
+@OS_FREEBSD_TRUE@libsgutils2_la_SOURCES = \
 @OS_FREEBSD_TRUE@	sg_lib.c \
 @OS_FREEBSD_TRUE@	sg_lib_data.c \
 @OS_FREEBSD_TRUE@	sg_cmds_basic.c \
@@ -231,7 +231,7 @@ top_srcdir = @top_srcdir@
 @OS_FREEBSD_TRUE@	sg_cmds_mmc.c \
 @OS_FREEBSD_TRUE@	sg_pt_freebsd.c
 
-@OS_LINUX_TRUE@libsgutils_la_SOURCES = \
+@OS_LINUX_TRUE@libsgutils2_la_SOURCES = \
 @OS_LINUX_TRUE@	sg_lib.c \
 @OS_LINUX_TRUE@	sg_lib_data.c \
 @OS_LINUX_TRUE@	sg_cmds_basic.c \
@@ -240,7 +240,7 @@ top_srcdir = @top_srcdir@
 @OS_LINUX_TRUE@	sg_pt_linux.c \
 @OS_LINUX_TRUE@	sg_io_linux.c
 
-@OS_OSF_TRUE@libsgutils_la_SOURCES = \
+@OS_OSF_TRUE@libsgutils2_la_SOURCES = \
 @OS_OSF_TRUE@	sg_lib.c \
 @OS_OSF_TRUE@	sg_lib_data.c \
 @OS_OSF_TRUE@	sg_cmds_basic.c \
@@ -248,7 +248,7 @@ top_srcdir = @top_srcdir@
 @OS_OSF_TRUE@	sg_cmds_mmc.c \
 @OS_OSF_TRUE@	sg_pt_osf1.c
 
-@OS_SOLARIS_TRUE@libsgutils_la_SOURCES = \
+@OS_SOLARIS_TRUE@libsgutils2_la_SOURCES = \
 @OS_SOLARIS_TRUE@	sg_lib.c \
 @OS_SOLARIS_TRUE@	sg_lib_data.c \
 @OS_SOLARIS_TRUE@	sg_cmds_basic.c \
@@ -256,7 +256,7 @@ top_srcdir = @top_srcdir@
 @OS_SOLARIS_TRUE@	sg_cmds_mmc.c \
 @OS_SOLARIS_TRUE@	sg_pt_solaris.c
 
-@OS_WIN32_CYGWIN_TRUE@libsgutils_la_SOURCES = \
+@OS_WIN32_CYGWIN_TRUE@libsgutils2_la_SOURCES = \
 @OS_WIN32_CYGWIN_TRUE@	sg_lib.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_lib_data.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_cmds_basic.c \
@@ -264,7 +264,7 @@ top_srcdir = @top_srcdir@
 @OS_WIN32_CYGWIN_TRUE@	sg_cmds_mmc.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_win32.c
 
-@OS_WIN32_MINGW_TRUE@libsgutils_la_SOURCES = \
+@OS_WIN32_MINGW_TRUE@libsgutils2_la_SOURCES = \
 @OS_WIN32_MINGW_TRUE@	sg_lib.c \
 @OS_WIN32_MINGW_TRUE@	sg_lib_data.c \
 @OS_WIN32_MINGW_TRUE@	sg_cmds_basic.c \
@@ -272,7 +272,7 @@ top_srcdir = @top_srcdir@
 @OS_WIN32_MINGW_TRUE@	sg_cmds_mmc.c \
 @OS_WIN32_MINGW_TRUE@	sg_pt_win32.c
 
-@OS_FREEBSD_TRUE@EXTRA_libsgutils_la_SOURCES = \
+@OS_FREEBSD_TRUE@EXTRA_libsgutils2_la_SOURCES = \
 @OS_FREEBSD_TRUE@	sg_pt_linux.c \
 @OS_FREEBSD_TRUE@	sg_io_linux.c \
 @OS_FREEBSD_TRUE@	sg_linux_inc.h \
@@ -281,14 +281,14 @@ top_srcdir = @top_srcdir@
 @OS_FREEBSD_TRUE@	sg_pt_win32.c \
 @OS_FREEBSD_TRUE@	getopt_long.c
 
-@OS_LINUX_TRUE@EXTRA_libsgutils_la_SOURCES = \
+@OS_LINUX_TRUE@EXTRA_libsgutils2_la_SOURCES = \
 @OS_LINUX_TRUE@	sg_pt_freebsd.c \
 @OS_LINUX_TRUE@	sg_pt_osf1.c \
 @OS_LINUX_TRUE@	sg_pt_solaris.c \
 @OS_LINUX_TRUE@	sg_pt_win32.c \
 @OS_LINUX_TRUE@	getopt_long.c
 
-@OS_OSF_TRUE@EXTRA_libsgutils_la_SOURCES = \
+@OS_OSF_TRUE@EXTRA_libsgutils2_la_SOURCES = \
 @OS_OSF_TRUE@	sg_pt_linux.c \
 @OS_OSF_TRUE@	sg_io_linux.c \
 @OS_OSF_TRUE@	sg_pt_freebsd.c \
@@ -296,7 +296,7 @@ top_srcdir = @top_srcdir@
 @OS_OSF_TRUE@	sg_pt_win32.c \
 @OS_OSF_TRUE@	getopt_long.c
 
-@OS_SOLARIS_TRUE@EXTRA_libsgutils_la_SOURCES = \
+@OS_SOLARIS_TRUE@EXTRA_libsgutils2_la_SOURCES = \
 @OS_SOLARIS_TRUE@	sg_pt_linux.c \
 @OS_SOLARIS_TRUE@	sg_io_linux.c \
 @OS_SOLARIS_TRUE@	sg_linux_inc.h \
@@ -305,7 +305,7 @@ top_srcdir = @top_srcdir@
 @OS_SOLARIS_TRUE@	sg_pt_win32.c \
 @OS_SOLARIS_TRUE@	getopt_long.c
 
-@OS_WIN32_CYGWIN_TRUE@EXTRA_libsgutils_la_SOURCES = \
+@OS_WIN32_CYGWIN_TRUE@EXTRA_libsgutils2_la_SOURCES = \
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_linux.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_io_linux.c \
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_freebsd.c \
@@ -313,7 +313,7 @@ top_srcdir = @top_srcdir@
 @OS_WIN32_CYGWIN_TRUE@	sg_pt_solaris.c \
 @OS_WIN32_CYGWIN_TRUE@	getopt_long.c
 
-@OS_WIN32_MINGW_TRUE@EXTRA_libsgutils_la_SOURCES = \
+@OS_WIN32_MINGW_TRUE@EXTRA_libsgutils2_la_SOURCES = \
 @OS_WIN32_MINGW_TRUE@	sg_pt_linux.c \
 @OS_WIN32_MINGW_TRUE@	sg_io_linux.c \
 @OS_WIN32_MINGW_TRUE@	sg_pt_freebsd.c \
@@ -323,10 +323,10 @@ top_srcdir = @top_srcdir@
 
 AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 # AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c99
-lib_LTLIBRARIES = libsgutils.la
-libsgutils_la_LDFLAGS = -version-info 2:0:0
-libsgutils_la_LIBADD = @GETOPT_O_FILES@ @os_libs@
-libsgutils_la_DEPENDENCIES = @GETOPT_O_FILES@
+lib_LTLIBRARIES = libsgutils2.la
+libsgutils2_la_LDFLAGS = -version-info 2:0:0
+libsgutils2_la_LIBADD = @GETOPT_O_FILES@ @os_libs@
+libsgutils2_la_DEPENDENCIES = @GETOPT_O_FILES@
 all: all-am
 
 .SUFFIXES:
@@ -387,8 +387,8 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-libsgutils.la: $(libsgutils_la_OBJECTS) $(libsgutils_la_DEPENDENCIES) 
-	$(libsgutils_la_LINK) -rpath $(libdir) $(libsgutils_la_OBJECTS) $(libsgutils_la_LIBADD) $(LIBS)
+libsgutils2.la: $(libsgutils2_la_OBJECTS) $(libsgutils2_la_DEPENDENCIES) 
+	$(libsgutils2_la_LINK) -rpath $(libdir) $(libsgutils2_la_OBJECTS) $(libsgutils2_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
