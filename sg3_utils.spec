@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.26
+Version: 1.27
 # Release: 1%{?dist}
 Release: 1
 License: GPL
@@ -79,6 +79,10 @@ fi
 %{_libdir}/*.la
 
 %changelog
+* Thu Jun 26 2008 - dgilbert at interlog dot com
+- xxxxxxxxxxxxxx
+  * sg3_utils-1.27
+
 * Wed Jun 25 2008 - dgilbert at interlog dot com
 - add sg_sat_phy_event, sync with drafts prior to this date
   * sg3_utils-1.26
