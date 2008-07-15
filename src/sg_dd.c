@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/time.h>
+#include <sys/file.h>
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
 
@@ -57,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.67 20080530";
+static char * version_str = "5.68 20080714";
 
 #define ME "sg_dd: "
 
@@ -91,6 +92,8 @@ static char * version_str = "5.67 20080530";
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikey value */
 #endif
+
+#define SG_LIB_FLOCK_ERR 90
 
 #define FT_OTHER 1              /* filetype is probably normal */
 #define FT_SG 2                 /* filetype is sg char device or supports
@@ -156,6 +159,7 @@ struct flags_t {
     int cdbsz;
     int retries;
     int sparse;
+    int flock;
 };
 
 static struct flags_t iflag;
@@ -319,7 +323,7 @@ usage()
            "    if          file or device to read from (def: stdin)\n"
            "    iflag       comma separated list from: [coe,dio,direct,"
            "dpo,dsync,excl,\n"
-           "                fua,null, sgio]\n"
+           "                flock,fua,null, sgio]\n"
            "    obs         output block size (if given must be same as "
            "'bs=')\n"
            "    odir        1->use O_DIRECT when opening block dev, "
@@ -330,7 +334,7 @@ usage()
            "                treated as /dev/null\n"
            "    oflag       comma separated list from: [append,coe,dio,"
            "direct,dpo,\n"
-           "                dsync,excl,fua,null,sgio,sparse]\n"
+           "                dsync,excl,flock,fua,null,sgio,sparse]\n"
            "    retries     retry sgio errors RETR times (def: 0)\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
@@ -1091,6 +1095,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->sgio = 1;
         else if (0 == strcmp(cp, "sparse"))
             ++fp->sparse;
+        else if (0 == strcmp(cp, "flock"))
+            ++fp->flock;
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
@@ -1098,6 +1104,259 @@ process_flags(const char * arg, struct flags_t * fp)
         cp = np;
     } while (cp);
     return 0;
+}
+
+/* Returns open input file descriptor (>= 0) or a negative value
+ * (-SG_LIB_FILE_ERROR or -SG_LIB_CAT_OTHER) if error.
+ */
+static int
+open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
+        int * in_typep, int verbose)
+{
+    int infd, flags, fl, t, verb, res;
+    char ebuff[EBUFF_SZ];
+    struct sg_simple_inquiry_resp sir;
+
+    verb = (verbose ? verbose - 1: 0);
+    *in_typep = dd_filetype(inf);
+    if (verbose)
+        fprintf(stderr, " >> Input file type: %s\n",
+                dd_filetype_str(*in_typep, ebuff));
+    if (FT_ERROR & *in_typep) {
+        fprintf(stderr, ME "unable access %s\n", inf);
+        goto file_err;
+    } else if ((FT_BLOCK & *in_typep) && ifp->sgio)
+        *in_typep |= FT_SG;
+
+    if (FT_ST & *in_typep) {
+        fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
+        goto file_err;
+    } else if (FT_SG & *in_typep) {
+        flags = O_NONBLOCK;
+        if (ifp->direct)
+            flags |= O_DIRECT;
+        if (ifp->excl)
+            flags |= O_EXCL;
+        if (ifp->dsync)
+            flags |= O_SYNC;
+        fl = O_RDONLY;
+        if ((infd = open(inf, fl | flags)) < 0) {
+            fl = O_RDWR;
+            if ((infd = open(inf, fl | flags)) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                         ME "could not open %s for sg reading", inf);
+                perror(ebuff);
+                goto file_err;
+            }
+        }
+        if (verbose)
+            fprintf(stderr, "        open input(sg_io), flags=0x%x\n",
+                    fl | flags);
+        if (sg_simple_inquiry(infd, &sir, 0, verb)) {
+            fprintf(stderr, "INQUIRY failed on %s\n", inf);
+            goto other_err;
+        }
+        ifp->pdt = sir.peripheral_type;
+        if (verbose)
+            fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
+                    inf, sir.vendor, sir.product, sir.revision, ifp->pdt);
+        if (! (FT_BLOCK & *in_typep)) {
+            t = blk_sz * bpt;
+            res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
+            if (res < 0)
+                perror(ME "SG_SET_RESERVED_SIZE error");
+            res = ioctl(infd, SG_GET_VERSION_NUM, &t);
+            if ((res < 0) || (t < 30000)) {
+                if (FT_BLOCK & *in_typep)
+                    fprintf(stderr, ME "SG_IO unsupported on this block"
+                                    " device\n");
+                else
+                    fprintf(stderr, ME "sg driver prior to 3.x.y\n");
+                goto file_err;
+            }
+        }
+    } else {
+        flags = O_RDONLY;
+        if (ifp->direct)
+            flags |= O_DIRECT;
+        if (ifp->excl)
+            flags |= O_EXCL;
+        if (ifp->dsync)
+            flags |= O_SYNC;
+        infd = open(inf, flags);
+        if (infd < 0) {
+            snprintf(ebuff, EBUFF_SZ,
+                     ME "could not open %s for reading", inf);
+            perror(ebuff);
+            goto file_err;
+        } else {
+            if (verbose)
+                fprintf(stderr, "        open input, flags=0x%x\n",
+                        flags);
+            if (skip > 0) {
+                off64_t offset = skip;
+
+                offset *= blk_sz;       /* could exceed 32 bits here! */
+                if (lseek64(infd, offset, SEEK_SET) < 0) {
+                    snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
+                             "required position on %s", inf);
+                    perror(ebuff);
+                    goto file_err;
+                }
+                if (verbose)
+                    fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
+                            "byte offset=0x%"PRIx64"\n",
+                            (uint64_t)offset);
+            }
+        }
+    }
+    if (ifp->flock) {
+        res = flock(infd, LOCK_EX | LOCK_NB);
+        if (res < 0) {
+            close(infd);
+            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+                     "failed", inf);
+            perror(ebuff);
+            return -SG_LIB_FLOCK_ERR;
+        }
+    }
+    return infd;
+
+file_err:
+    return -SG_LIB_FILE_ERROR;
+other_err:
+    return -SG_LIB_CAT_OTHER;
+}
+
+/* Returns open output file descriptor (>= 0), -1 for don't
+ * bother opening (e.g. /dev/null), or a more negative value
+ * (-SG_LIB_FILE_ERROR or -SG_LIB_CAT_OTHER) if error.
+ */
+static int
+open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
+        int * out_typep, int verbose)
+{
+    int outfd, flags, t, verb, res;
+    char ebuff[EBUFF_SZ];
+    struct sg_simple_inquiry_resp sir;
+
+    verb = (verbose ? verbose - 1: 0);
+    *out_typep = dd_filetype(outf);
+    if (verbose)
+        fprintf(stderr, " >> Output file type: %s\n",
+                dd_filetype_str(*out_typep, ebuff));
+
+    if ((FT_BLOCK & *out_typep) && ofp->sgio)
+        *out_typep |= FT_SG;
+
+    if (FT_ST & *out_typep) {
+        fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
+        goto file_err;
+    } else if (FT_SG & *out_typep) {
+        flags = O_RDWR | O_NONBLOCK;
+        if (ofp->direct)
+            flags |= O_DIRECT;
+        if (ofp->excl)
+            flags |= O_EXCL;
+        if (ofp->dsync)
+            flags |= O_SYNC;
+        if ((outfd = open(outf, flags)) < 0) {
+            snprintf(ebuff, EBUFF_SZ,
+                     ME "could not open %s for sg writing", outf);
+            perror(ebuff);
+            goto file_err;
+        }
+        if (verbose)
+            fprintf(stderr, "        open output(sg_io), flags=0x%x\n",
+                    flags);
+        if (sg_simple_inquiry(outfd, &sir, 0, verb)) {
+            fprintf(stderr, "INQUIRY failed on %s\n", outf);
+            goto other_err;
+        }
+        ofp->pdt = sir.peripheral_type;
+        if (verbose)
+            fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
+                    outf, sir.vendor, sir.product, sir.revision, ofp->pdt);
+        if (! (FT_BLOCK & *out_typep)) {
+            t = blk_sz * bpt;
+            res = ioctl(outfd, SG_SET_RESERVED_SIZE, &t);
+            if (res < 0)
+                perror(ME "SG_SET_RESERVED_SIZE error");
+            res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
+            if ((res < 0) || (t < 30000)) {
+                fprintf(stderr, ME "sg driver prior to 3.x.y\n");
+                goto file_err;
+            }
+        }
+    } else if (FT_DEV_NULL & *out_typep)
+        outfd = -1; /* don't bother opening */
+    else {
+        if (! (FT_RAW & *out_typep)) {
+            flags = O_WRONLY | O_CREAT;
+            if (ofp->direct)
+                flags |= O_DIRECT;
+            if (ofp->excl)
+                flags |= O_EXCL;
+            if (ofp->dsync)
+                flags |= O_SYNC;
+            if (ofp->append)
+                flags |= O_APPEND;
+            if ((outfd = open(outf, flags, 0666)) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                        ME "could not open %s for writing", outf);
+                perror(ebuff);
+                goto file_err;
+            }
+        } else {
+            flags = O_WRONLY;
+            if (ofp->direct)
+                flags |= O_DIRECT;
+            if (ofp->excl)
+                flags |= O_EXCL;
+            if (ofp->dsync)
+                flags |= O_SYNC;
+            if ((outfd = open(outf, flags)) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                        ME "could not open %s for raw writing", outf);
+                perror(ebuff);
+                goto file_err;
+            }
+        }
+        if (verbose)
+            fprintf(stderr, "        %s output, flags=0x%x\n",
+                    ((O_CREAT & flags) ? "create" : "open"), flags);
+        if (seek > 0) {
+            off64_t offset = seek;
+
+            offset *= blk_sz;       /* could exceed 32 bits here! */
+            if (lseek64(outfd, offset, SEEK_SET) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                    ME "couldn't seek to required position on %s", outf);
+                perror(ebuff);
+                goto file_err;
+            }
+            if (verbose)
+                fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
+                        "byte offset=0x%"PRIx64"\n",
+                        (uint64_t)offset);
+        }
+    }
+    if (ofp->flock) {
+        res = flock(outfd, LOCK_EX | LOCK_NB);
+        if (res < 0) {
+            close(outfd);
+            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+                     "failed", outf);
+            perror(ebuff);
+            return -SG_LIB_FLOCK_ERR;
+        }
+    }
+    return outfd;
+
+file_err:
+    return -SG_LIB_FILE_ERROR;
+other_err:
+    return -SG_LIB_CAT_OTHER;
 }
 
 
@@ -1120,9 +1379,8 @@ main(int argc, char * argv[])
     int dio_incomplete = 0;
     int cdbsz_given = 0;
     int do_sync = 0;
-    int verb = 0;
     int blocks = 0;
-    int res, k, t, buf_sz, dio_tmp, flags, fl, first;
+    int res, k, t, buf_sz, dio_tmp, first, blocks_per;
     int infd, outfd, retries_tmp, blks_read;
     unsigned char * wrkBuff;
     unsigned char * wrkPos;
@@ -1130,8 +1388,6 @@ main(int argc, char * argv[])
     int64_t out_num_sect = -1;
     int in_sect_sz, out_sect_sz;
     char ebuff[EBUFF_SZ];
-    int blocks_per;
-    struct sg_simple_inquiry_resp sir;
     int sparse_skip = 0;
     int penult_sparse_skip = 0;
     int penult_blocks = 0;
@@ -1255,10 +1511,9 @@ main(int argc, char * argv[])
             do_sync = sg_get_num(buf);
         else if (0 == strcmp(key, "time"))
             do_time = sg_get_num(buf);
-        else if (0 == strncmp(key, "verb", 4)) {
+        else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
-            verb = (verbose ? verbose - 1: 0);
-        } else if ((0 == strncmp(key, "--help", 7)) ||
+        else if ((0 == strncmp(key, "--help", 7)) ||
                    (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
@@ -1315,202 +1570,17 @@ main(int argc, char * argv[])
     iflag.pdt = -1;
     oflag.pdt = -1;
     if (inf[0] && ('-' != inf[0])) {
-        in_type = dd_filetype(inf);
-        if (verbose)
-            fprintf(stderr, " >> Input file type: %s\n",
-                    dd_filetype_str(in_type, ebuff));
-        if (FT_ERROR & in_type) {
-            fprintf(stderr, ME "unable access %s\n", inf);
-            return SG_LIB_FILE_ERROR;
-        } else if ((FT_BLOCK & in_type) && iflag.sgio)
-            in_type |= FT_SG;
-
-        if (FT_ST & in_type) {
-            fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
-            return SG_LIB_FILE_ERROR;
-        } else if (FT_SG & in_type) {
-            flags = O_NONBLOCK;
-            if (iflag.direct)
-                flags |= O_DIRECT;
-            if (iflag.excl)
-                flags |= O_EXCL;
-            if (iflag.dsync)
-                flags |= O_SYNC;
-            fl = O_RDONLY;
-            if ((infd = open(inf, fl | flags)) < 0) {
-                fl = O_RDWR;
-                if ((infd = open(inf, fl | flags)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                             ME "could not open %s for sg reading", inf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-            if (verbose)
-                fprintf(stderr, "        open input(sg_io), flags=0x%x\n",
-                        fl | flags);
-            if (sg_simple_inquiry(infd, &sir, 0, verb)) {
-                fprintf(stderr, "INQUIRY failed on %s\n", inf);
-                return SG_LIB_CAT_OTHER;
-            }
-            iflag.pdt = sir.peripheral_type;
-            if (verbose)
-                fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
-                        inf, sir.vendor, sir.product, sir.revision, iflag.pdt);
-            if (! (FT_BLOCK & in_type)) {
-                t = blk_sz * bpt;
-                res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
-                if (res < 0)
-                    perror(ME "SG_SET_RESERVED_SIZE error");
-                res = ioctl(infd, SG_GET_VERSION_NUM, &t);
-                if ((res < 0) || (t < 30000)) {
-                    if (FT_BLOCK & in_type)
-                        fprintf(stderr, ME "SG_IO unsupported on this block"
-                                        " device\n");
-                    else
-                        fprintf(stderr, ME "sg driver prior to 3.x.y\n");
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-        } else {
-            flags = O_RDONLY;
-            if (iflag.direct)
-                flags |= O_DIRECT;
-            if (iflag.excl)
-                flags |= O_EXCL;
-            if (iflag.dsync)
-                flags |= O_SYNC;
-            infd = open(inf, flags);
-            if (infd < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for reading", inf);
-                perror(ebuff);
-                return SG_LIB_FILE_ERROR;
-            } else {
-                if (verbose)
-                    fprintf(stderr, "        open input, flags=0x%x\n",
-                            flags);
-                if (skip > 0) {
-                    off64_t offset = skip;
-
-                    offset *= blk_sz;       /* could exceed 32 bits here! */
-                    if (lseek64(infd, offset, SEEK_SET) < 0) {
-                        snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
-                                 "required position on %s", inf);
-                        perror(ebuff);
-                        return SG_LIB_FILE_ERROR;
-                    }
-                    if (verbose)
-                        fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
-                                "byte offset=0x%"PRIx64"\n",
-                                (uint64_t)offset);
-                }
-            }
-        }
+        infd = open_if(inf, skip, bpt, &iflag, &in_type, verbose);
+        if (infd < 0)
+            return -infd;
     }
 
     if (outf[0] && ('-' != outf[0])) {
-        out_type = dd_filetype(outf);
-        if (verbose)
-            fprintf(stderr, " >> Output file type: %s\n",
-                    dd_filetype_str(out_type, ebuff));
-
-        if ((FT_BLOCK & out_type) && oflag.sgio)
-            out_type |= FT_SG;
-
-        if (FT_ST & out_type) {
-            fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
-            return SG_LIB_FILE_ERROR;
-        } else if (FT_SG & out_type) {
-            flags = O_RDWR | O_NONBLOCK;
-            if (oflag.direct)
-                flags |= O_DIRECT;
-            if (oflag.excl)
-                flags |= O_EXCL;
-            if (oflag.dsync)
-                flags |= O_SYNC;
-            if ((outfd = open(outf, flags)) < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for sg writing", outf);
-                perror(ebuff);
-                return SG_LIB_FILE_ERROR;
-            }
-            if (verbose)
-                fprintf(stderr, "        open output(sg_io), flags=0x%x\n",
-                        flags);
-            if (sg_simple_inquiry(outfd, &sir, 0, verb)) {
-                fprintf(stderr, "INQUIRY failed on %s\n", outf);
-                return SG_LIB_CAT_OTHER;
-            }
-            oflag.pdt = sir.peripheral_type;
-            if (verbose)
-                fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
-                        outf, sir.vendor, sir.product, sir.revision, oflag.pdt);
-            if (! (FT_BLOCK & out_type)) {
-                t = blk_sz * bpt;
-                res = ioctl(outfd, SG_SET_RESERVED_SIZE, &t);
-                if (res < 0)
-                    perror(ME "SG_SET_RESERVED_SIZE error");
-                res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
-                if ((res < 0) || (t < 30000)) {
-                    fprintf(stderr, ME "sg driver prior to 3.x.y\n");
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-        } else if (FT_DEV_NULL & out_type)
-            outfd = -1; /* don't bother opening */
-        else {
-            if (! (FT_RAW & out_type)) {
-                flags = O_WRONLY | O_CREAT;
-                if (oflag.direct)
-                    flags |= O_DIRECT;
-                if (oflag.excl)
-                    flags |= O_EXCL;
-                if (oflag.dsync)
-                    flags |= O_SYNC;
-                if (oflag.append)
-                    flags |= O_APPEND;
-                if ((outfd = open(outf, flags, 0666)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                            ME "could not open %s for writing", outf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-            } else {
-                flags = O_WRONLY;
-                if (oflag.direct)
-                    flags |= O_DIRECT;
-                if (oflag.excl)
-                    flags |= O_EXCL;
-                if (oflag.dsync)
-                    flags |= O_SYNC;
-                if ((outfd = open(outf, flags)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                            ME "could not open %s for raw writing", outf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-            if (verbose)
-                fprintf(stderr, "        %s output, flags=0x%x\n",
-                        ((O_CREAT & flags) ? "create" : "open"), flags);
-            if (seek > 0) {
-                off64_t offset = seek;
-
-                offset *= blk_sz;       /* could exceed 32 bits here! */
-                if (lseek64(outfd, offset, SEEK_SET) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                        ME "couldn't seek to required position on %s", outf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-                if (verbose)
-                    fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
-                            "byte offset=0x%"PRIx64"\n",
-                            (uint64_t)offset);
-            }
-        }
+        outfd = open_of(outf, seek, bpt, &oflag, &out_type, verbose);
+        if (outfd < -1)
+            return -outfd;
     }
+
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
         fprintf(stderr,
                 "Can't have both 'if' as stdin _and_ 'of' as stdout\n");

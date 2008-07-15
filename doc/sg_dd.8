@@ -1,4 +1,4 @@
-.TH SG_DD "8" "April 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_DD "8" "July 2008" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -243,6 +243,14 @@ excl
 causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 \fIOFILE\fR.
 .TP
+flock
+after opening the associated file (i.e. \fIIFILE\fR and/or \fIOFILE\fR)
+an attempt is made to get an advisory exclusive lock with the flock()
+system call is made. The flock arguments are "FLOCK_EX | FLOCK_NB" which
+will cause the lock to be taken if available else a "temporarily unavailable"
+error is generated. An exit status of 90 is produced in the latter case
+and no copy is done.
+.TP
 fua
 causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
 commands. This only has an effect with sg devices or block devices
@@ -411,6 +419,9 @@ the sg3_utils(8) man page. Since this utility works at a higher level
 than individual commands, and there are 'coe' and 'retries' flags,
 individual SCSI command failures do not necessary cause the process
 to exit.
+.PP
+An additional exit status of 90 is generated if the flock flag is given
+and some other process holds the advisory exclusive lock.
 .SH AUTHORS
 Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
