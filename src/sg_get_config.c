@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.35 20080510";    /* mmc6r01 */
+static char * version_str = "0.36 20080714";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -230,6 +230,7 @@ static struct val_desc_t feature_desc_arr[] = {
         {0x110, "VCPS"},
         {0x113, "SecurDisc"},
         {0x120, "BD CPS"},
+        {0x142, "OSSC"},
 };
 
 static const char *
@@ -873,6 +874,23 @@ decode_feature(int feature, unsigned char * ucp, int len)
                "SACs=%d\n", ((ucp[5] >> 4) & 0xf), (ucp[5] & 0xf),
                ucp[6] & 0x3);
         break;
+    case 0x142:    /* OSSC (Optical Security Subsystem Class) */
+        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               feature);
+        if (len < 8) {
+            printf("      additional length [%d] too short\n", len - 4);
+            break;
+        }
+        printf("    PSAU=%d, LOSPB=%d, ME=%d\n", !!(ucp[4] & 0x80),
+               !!(ucp[4] & 0x40), !!(ucp[4] & 0x1));
+        num = ucp[5];
+        printf("      Profile numbers:\n");
+        for (k = 6; (num > 0) && (k < len); --num, k += 2) {
+            printf("        %d\n", 
+                   ((unsigned int)ucp[k] << 8) + ucp[k + 1]);
+        }
+        break;
     default:
         printf("    Unknown feature [0x%x], version=%d persist=%d, "
                "current=%d\n", feature, ((ucp[2] >> 2) & 0xf),
@@ -886,7 +904,7 @@ static void
 decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
               int inner_hex)
 {
-    int k, curr_profile, extra, feature;
+    int k, curr_profile, extra_len, feature;
     unsigned char * ucp;
     char buff[128];
 
@@ -907,21 +925,21 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
     printf("Features%s:\n", (brief ? " (in brief)" : ""));
     ucp = resp + 8;
     len -= 8;
-    for (k = 0; k < len; k += extra, ucp += extra) {
-        extra = 4 + ucp[3];
+    for (k = 0; k < len; k += extra_len, ucp += extra_len) {
+        extra_len = 4 + ucp[3];
         feature = (ucp[0] << 8) + ucp[1];
         printf("  %s feature\n", get_feature_str(feature, buff));
         if (brief)
             continue;
         if (inner_hex) {
-            dStrHex((const char *)ucp, extra, 1);
+            dStrHex((const char *)ucp, extra_len, 1);
             continue;
         }
-        if (0 != (extra % 4))
+        if (0 != (extra_len % 4))
             printf("    additional length [%d] not a multiple of 4, ignore\n",
-                   extra - 4);
+                   extra_len - 4);
         else
-            decode_feature(feature, ucp, extra);
+            decode_feature(feature, ucp, extra_len);
     }
 }
 
