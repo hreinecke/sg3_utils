@@ -2,9 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20080714] [svn: r186]
+Changelog for sg3_utils-1.27 [20080715] [svn: r187]
   - sg_get_config: add OSSC feature [mmc6r02]
   - sg_dd: flock flag (does LOCK_EX|LOCK_NB)
+  - sg_map26: fix for lk 2.6.26 when CONFIG_SYSFS_DEPRECATED_V2
+    is not defined
 
 Changelog for sg3_utils-1.26 [20080625] [svn: r183]
   - sg_sat_phy_event: new utility; copied from examples

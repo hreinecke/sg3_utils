@@ -246,8 +246,8 @@ causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 flock
 after opening the associated file (i.e. \fIIFILE\fR and/or \fIOFILE\fR)
 an attempt is made to get an advisory exclusive lock with the flock()
-system call is made. The flock arguments are "FLOCK_EX | FLOCK_NB" which
-will cause the lock to be taken if available else a "temporarily unavailable"
+system call. The flock arguments are "FLOCK_EX | FLOCK_NB" which will
+cause the lock to be taken if available else a "temporarily unavailable"
 error is generated. An exit status of 90 is produced in the latter case
 and no copy is done.
 .TP
