@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.3.7 (2008-05-10)"
+#define SG_RAW_VERSION "0.3.8 (2008-07-18)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -348,6 +348,7 @@ main(int argc, char *argv[])
     int ret = 0;
     int res_cat;
     int slen;
+    int k;
     struct opts_t opts;
     int sg_fd = -1;
     struct sg_pt_base *ptvp = NULL;
@@ -380,6 +381,12 @@ main(int argc, char *argv[])
     if (ptvp == NULL) {
         fprintf(stderr, "out of memory\n");
         goto done;
+    }
+    if (opts.do_verbose) {
+        fprintf(stderr, "    cdb to send: ");
+        for (k = 0; k < opts.cdb_length; ++k)
+            fprintf(stderr, "%02x ", opts.cdb[k]);
+        fprintf(stderr, "\n");
     }
     set_scsi_pt_cdb(ptvp, opts.cdb, opts.cdb_length);
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
