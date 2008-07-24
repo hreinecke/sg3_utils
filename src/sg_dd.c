@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.68 20080714";
+static char * version_str = "5.69 20080724";
 
 #define ME "sg_dd: "
 
@@ -1139,9 +1139,9 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
             flags |= O_EXCL;
         if (ifp->dsync)
             flags |= O_SYNC;
-        fl = O_RDONLY;
+        fl = O_RDWR;
         if ((infd = open(inf, fl | flags)) < 0) {
-            fl = O_RDWR;
+            fl = O_RDONLY;
             if ((infd = open(inf, fl | flags)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for sg reading", inf);
