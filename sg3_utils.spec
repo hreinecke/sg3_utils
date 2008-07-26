@@ -46,7 +46,7 @@ developing applications.
 %setup -q
 
 %build
-./configure --prefix=%{_prefix} --mandir=%{_mandir}
+%configure
 
 %install
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
