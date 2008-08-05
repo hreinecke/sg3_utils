@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.29 20080218";
+static char * version_str = "1.30 20080805";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -528,6 +528,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0xc, 0x0, "Notch and partition (obsolete)"},
     {0xd, 0x0, "Power condition (obsolete, moved to 0x1a)"},
     {0x10, 0x0, "XOR control"},
+    {0x1a, 0xf1, "ATA Power condition"},
     {0x1c, 0x1, "Background control"},
 };
 
