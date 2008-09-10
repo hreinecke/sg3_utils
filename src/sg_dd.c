@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.69 20080724";
+static char * version_str = "5.70 20080909";
 
 #define ME "sg_dd: "
 
@@ -102,7 +102,8 @@ static char * version_str = "5.69 20080724";
 #define FT_DEV_NULL 8           /* either "/dev/null" or "." as filename */
 #define FT_ST 16                /* filetype is st char device (tape) */
 #define FT_BLOCK 32             /* filetype is block device */
-#define FT_ERROR 64             /* couldn't "stat" file */
+#define FT_FIFO 64              /* filetype is a fifo (name pipe) */
+#define FT_ERROR 128            /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
 
@@ -258,6 +259,8 @@ dd_filetype(const char * filename)
             return FT_ST;
     } else if (S_ISBLK(st.st_mode))
         return FT_BLOCK;
+    else if (S_ISFIFO(st.st_mode))
+        return FT_FIFO;
     return FT_OTHER;
 }
 
@@ -273,6 +276,8 @@ dd_filetype_str(int ft, char * buff)
         off += snprintf(buff + off, 32, "SCSI generic (sg) device ");
     if (FT_BLOCK & ft)
         off += snprintf(buff + off, 32, "block device ");
+    if (FT_FIFO & ft)
+        off += snprintf(buff + off, 32, "fifo (named pipe) ");
     if (FT_ST & ft)
         off += snprintf(buff + off, 32, "SCSI tape device ");
     if (FT_RAW & ft)
@@ -297,8 +302,8 @@ usage()
            "              [blk_sgio=0|1] [bpt=BPT] [cdbsz=6|10|12|16] "
            "[coe=0|1|2|3]\n"
            "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
-           "[retries=RETR] [sync=0|1]\n"
-           "              [time=0|1] [verbose=VERB]\n"
+           "[of2=OFILE2] [retries=RETR]\n"
+           "              [sync=0|1] [time=0|1] [verbose=VERB]\n"
            "  where:\n"
            "    blk_sgio    0->block device use normal I/O(def), 1->use "
            "SG_IO\n"
@@ -323,7 +328,7 @@ usage()
            "    if          file or device to read from (def: stdin)\n"
            "    iflag       comma separated list from: [coe,dio,direct,"
            "dpo,dsync,excl,\n"
-           "                flock,fua,null, sgio]\n"
+           "                flock,fua,null,sgio]\n"
            "    obs         output block size (if given must be same as "
            "'bs=')\n"
            "    odir        1->use O_DIRECT when opening block dev, "
@@ -332,6 +337,9 @@ usage()
            "OFILE of '.'\n");
     fprintf(stderr,
            "                treated as /dev/null\n"
+           "    of2         additional output file (def: /dev/null), "
+           "OFILE2 should be\n"
+           "                normal file or pipe\n"
            "    oflag       comma separated list from: [append,coe,dio,"
            "direct,dpo,\n"
            "                dsync,excl,flock,fua,null,sgio,sparse]\n"
@@ -623,7 +631,7 @@ sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
         else {
             fprintf(stderr, "Medium, hardware or blank check error but "
-                    "no lba of failure given\n");
+                    "no lba of failure in sense\n");
             return res;
         }
         break;
@@ -1375,13 +1383,14 @@ main(int argc, char * argv[])
     char inf[INOUTF_SZ];
     int in_type = FT_OTHER;
     char outf[INOUTF_SZ];
+    char out2f[INOUTF_SZ];
     int out_type = FT_OTHER;
     int dio_incomplete = 0;
     int cdbsz_given = 0;
     int do_sync = 0;
     int blocks = 0;
     int res, k, t, buf_sz, dio_tmp, first, blocks_per;
-    int infd, outfd, retries_tmp, blks_read;
+    int infd, outfd, out2fd, retries_tmp, blks_read;
     unsigned char * wrkBuff;
     unsigned char * wrkPos;
     int64_t in_num_sect = -1;
@@ -1395,6 +1404,7 @@ main(int argc, char * argv[])
 
     inf[0] = '\0';
     outf[0] = '\0';
+    out2f[0] = '\0';
     iflag.cdbsz = DEF_SCSI_CDBSZ;
     oflag.cdbsz = DEF_SCSI_CDBSZ;
     if (argc < 2) {
@@ -1446,6 +1456,11 @@ main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'coe_limit='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+        } else if (0 == strcmp(key, "conv")) {
+            if ((0 != strcmp(buf, "sparse")) || process_flags(buf, &oflag)) {
+                fprintf(stderr, ME "bad argument to 'conv='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else if (0 == strcmp(key, "count")) {
             dd_count = sg_get_llnum(buf);
             if (-1LL == dd_count) {
@@ -1483,6 +1498,12 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             } else
                 strncpy(outf, buf, INOUTF_SZ);
+        } else if (strcmp(key, "of2") == 0) {
+            if ('\0' != out2f[0]) {
+                fprintf(stderr, "Second OFILE2 argument??\n");
+                return SG_LIB_SYNTAX_ERROR;
+            } else
+                strncpy(out2f, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oflag)) {
                 fprintf(stderr, ME "bad argument to 'oflag='\n");
@@ -1580,6 +1601,17 @@ main(int argc, char * argv[])
         if (outfd < -1)
             return -outfd;
     }
+
+    if (out2f[0]) {
+        if ((out2fd = open(out2f, O_WRONLY | O_CREAT, 0666)) < 0) {
+            res = errno;
+            snprintf(ebuff, EBUFF_SZ,
+                     ME "could not open %s for writing", out2f);
+            perror(ebuff);
+            return res;
+        }
+    } else
+        out2fd = -1;
 
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
         fprintf(stderr,
@@ -1807,6 +1839,22 @@ main(int argc, char * argv[])
 
         if (0 == blocks)
             break;      /* nothing read so leave loop */
+
+        if (out2f[0]) {
+            while (((res = write(out2fd, wrkPos, blocks * blk_sz)) < 0)
+                   && (EINTR == errno))
+                ;
+            if (verbose > 2)
+                fprintf(stderr, "write to of2: count=%d, res=%d\n",
+                        blocks * blk_sz, res);
+            if (res < 0) {
+                snprintf(ebuff, EBUFF_SZ, ME "writing to of2, seek=%"PRId64" ",
+                         seek);
+                perror(ebuff);
+                ret = -1;
+                break;
+            }
+        }
 
         if ((oflag.sparse) && (dd_count > blocks) &&
             (! (FT_DEV_NULL & out_type))) {
