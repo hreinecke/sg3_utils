@@ -1,16 +1,18 @@
-.TH SG_DD "8" "July 2008" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_DD "8" "September 2008" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
 .SH SYNOPSIS
 .B sg_dd
-[\fIbs=BS\fR] [\fIcount=COUNT\fR] [\fIibs=BS\fR] [\fIif=IFILE\fR]
-[\fIiflag=FLAGS\fR] [\fIobs=BS\fR] [\fIof=OFILE\fR] [\fIoflag=FLAGS\fR]
-[\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR] [\fI\-\-version\fR]
+[\fIbs=BS\fR] [\fIconv=CONV\fR] [\fIcount=COUNT\fR] [\fIibs=BS\fR]
+[\fIif=IFILE\fR] [\fIiflag=FLAGS\fR] [\fIobs=BS\fR] [\fIof=OFILE\fR]
+[\fIoflag=FLAGS\fR] [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR]
+[\fI\-\-version\fR]
 .PP
 [\fIblk_sgio=\fR0|1] [\fIbpt=BPT\fR] [\fIcdbsz=\fR6|10|12|16]
 [\fIcoe=\fR0|1|2|3] [\fIcoe_limit=CL\fR] [\fIdio=\fR0|1] [\fIodir=\fR0|1]
-[\fIretries=RETR\fR] [\fIsync=\fR0|1] [\fItime=\fR0|1] [\fIverbose=VERB\fR]
+[\fIof2=OFILE2\fR] [\fIretries=RETR\fR] [\fIsync=\fR0|1] [\fItime=\fR0|1]
+[\fIverbose=VERB\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -19,7 +21,8 @@ generic (sg) devices, raw devices or other devices that support the SG_IO
 ioctl (which are only found in the lk 2.6 series). Similar syntax and
 semantics to
 .B dd(1)
-but does not perform any conversions.
+but only one type of "conversion" is supported. That optional conversion is
+sparse writing of the output file.
 .PP
 The first group in the synopsis above are "standard" Unix
 .B dd(1)
@@ -85,6 +88,12 @@ is 0 which is interpreted as no limit. This option is meant to stop
 the copy soon after unrecorded media is detected while still
 offering "continue on error" capability.
 .TP
+\fBconv\fR=\fBsparse\fR
+only one conversion is permitted: sparse writing of the \fIOFILE\fR.
+This option has the same action as 'oflag=sparse'. This alternate
+syntax was added for FreeBSD which uses this syntax in its dd command.
+See the FLAGS section below.
+.TP
 \fBcount\fR=\fICOUNT\fR
 copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the
 minimum (of \fIIFILE\fR and \fIOFILE\fR) number of blocks that sg devices
@@ -136,6 +145,14 @@ If \fIOFILE\fR is '.' (period) then it is treated the same way as
 /dev/null (this is a shorthand notation). If \fIOFILE\fR exists then it
 is _not_ truncated; it is overwritten from the start of \fIOFILE\fR
 unless 'oflag=append' or \fISEEK\fR is given.
+.TP
+\fBof2\fR=\fIOFILE2\fR
+write output to \fIOFILE2\fR. The default action is not to do this additional
+write (i.e. when this option is not given). \fIOFILE2\fR is assumed to be
+a normal file or a fifo (i.e. a named pipe). \fIOFILE2\fR is opened for writing,
+created if necessary, and closed at the end of the transfer. If \fIOFILE2\fR
+is a fifo (named pipe) then some other command should be consuming that
+data (e.g. 'md5sum OFILE2'), otherwise this utility will block.
 .TP
 \fBoflag\fR=\fIFLAGS\fR
 where \fIFLAGS\fR is a comma separated list of one or more flags outlined
@@ -407,6 +424,19 @@ this utility could be used:
 On completion this will output a line like:
 "time to transfer data was 18.779506 secs, 57.18 MB/sec". The "MB/sec"
 in this case is 1,000,000 bytes per second.
+.PP
+The 'of2=' option can be used to copy data and take a md5sum of it
+without needing to re-read the data:
+.PP
+  mkfifo fif
+.br
+  md5sum fif &
+.br
+  sg_dd if=/dev/sg3 iflag=coe of=sg3.img oflag=sparse of2=fif bs=512
+.PP
+This will image /dev/sg3 (e.g. an unmounted disk) and place the contents
+in the (sparse) file sg3.img . Without re-reading the data it will also
+perform a md5sum calculation on the image.
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and
 SIGPIPE output the number of remaining blocks to be transferred and
