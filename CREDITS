@@ -48,6 +48,9 @@ James Bottomley <jejb at parisc-linux dot org> co-author of blk512-linux
 Joe Krahn <krahn at niehs dot nih dot gov> help with int64_t cleanup
 	[20071219]
 
+Kai Makisara <Kai dot Makisara at kolumbus dot fi> help with tape
+        minor numbers in lk 2.6 plus earlier advice [20081008]
+
 Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
         Additions to sginfo and sg_map.
 
@@ -89,4 +92,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-19th December 2007
+9th October 2008
