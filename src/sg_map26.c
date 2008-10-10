@@ -61,7 +61,7 @@
 #endif
 #include "sg_lib.h"
 
-static char * version_str = "1.07 20080715";
+static char * version_str = "1.08 20081009";
 
 #define ME "sg_map26: "
 
@@ -104,6 +104,12 @@ static char * version_str = "1.07 20080715";
 #define SCSI_DISK14_MAJOR       134
 #define SCSI_DISK15_MAJOR       135
 #endif
+
+/* st minor decodes from Kai Makisara 20081008 */
+#define ST_NBR_MODE_BITS 2
+#define ST_MODE_SHIFT (7 - ST_NBR_MODE_BITS)
+#define TAPE_NR(minor) ( (((minor) & ~255) >> (ST_NBR_MODE_BITS + 1)) | \
+    ((minor) & ~(-1 << ST_MODE_SHIFT)) )
 
 static const char * sys_sg_dir = "/sys/class/scsi_generic/";
 static const char * sys_sd_dir = "/sys/block/";
@@ -812,7 +818,7 @@ map_st(const char * device_name, const char * device_dir, int ma, int mi,
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%sst%d", sys_st_dir,
-                 (mi & 0x1f));
+                 TAPE_NR(mi));
         if (3 == result) {
                 printf("%s\n", name);
                 return 0;
@@ -874,7 +880,7 @@ map_osst(const char * device_name, const char * device_dir, int ma, int mi,
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%sosst%d", sys_osst_dir,
-                 (mi & 0x1f));
+                 TAPE_NR(mi));
         if (3 == result) {
                 printf("%s\n", name);
                 return 0;

@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Tue Aug 05 2008 - dgilbert at interlog dot com
+* Thu Oct 09 2008 - dgilbert at interlog dot com
 - sg_dd: add flock support
   * sg3_utils-1.27
 
