@@ -79,8 +79,8 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Thu Oct 09 2008 - dgilbert at interlog dot com
-- sg_dd: add flock support
+* Thu Oct 23 2008 - dgilbert at interlog dot com
+- sg_dd: add flock, of2= and posix_fadvise support
   * sg3_utils-1.27
 
 * Wed Jun 25 2008 - dgilbert at interlog dot com

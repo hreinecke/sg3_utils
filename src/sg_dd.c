@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.70 20080909";
+static char * version_str = "5.71 20081023";
 
 #define ME "sg_dd: "
 
@@ -1373,6 +1373,7 @@ main(int argc, char * argv[])
 {
     int64_t skip = 0;
     int64_t seek = 0;
+    int64_t out2_off = 0;
     int ibs = 0;
     int obs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
@@ -1385,12 +1386,14 @@ main(int argc, char * argv[])
     char outf[INOUTF_SZ];
     char out2f[INOUTF_SZ];
     int out_type = FT_OTHER;
+    int out2_type = FT_OTHER;
     int dio_incomplete = 0;
     int cdbsz_given = 0;
     int do_sync = 0;
     int blocks = 0;
     int res, k, t, buf_sz, dio_tmp, first, blocks_per;
     int infd, outfd, out2fd, retries_tmp, blks_read;
+    int res2 = 0;
     unsigned char * wrkBuff;
     unsigned char * wrkPos;
     int64_t in_num_sect = -1;
@@ -1603,6 +1606,7 @@ main(int argc, char * argv[])
     }
 
     if (out2f[0]) {
+        out2_type = dd_filetype(out2f);
         if ((out2fd = open(out2f, O_WRONLY | O_CREAT, 0666)) < 0) {
             res = errno;
             snprintf(ebuff, EBUFF_SZ,
@@ -1834,6 +1838,17 @@ main(int argc, char * argv[])
                     in_partial++;
                 }
             }
+#ifdef HAVE_POSIX_FADVISE
+            if ((FT_OTHER == in_type) || (FT_BLOCK== in_type)) {
+                // res2 = posix_fadvise(infd, skip, res, POSIX_FADV_DONTNEED);
+                res2 = posix_fadvise(infd, 0, 0, POSIX_FADV_DONTNEED);
+                if (res2 < 0) {
+                    snprintf(ebuff, EBUFF_SZ, ME "posix_fadvise after read, "
+                             "skip=%"PRId64" ", skip);
+                    perror(ebuff);
+                }
+            }
+#endif
             in_full += blocks;
         }
 
@@ -1854,6 +1869,17 @@ main(int argc, char * argv[])
                 ret = -1;
                 break;
             }
+#ifdef HAVE_POSIX_FADVISE
+            if ((FT_OTHER == out2_type) || (FT_BLOCK== out2_type)) {
+                res2 = posix_fadvise(out2fd, 0, 0, POSIX_FADV_DONTNEED);
+                if (res2 < 0) {
+                    snprintf(ebuff, EBUFF_SZ, ME "posix_fadvise after of2 write, "
+                             "seek=%"PRId64" ", seek);
+                    perror(ebuff);
+                }
+            }
+#endif
+            out2_off += res;
         }
 
         if ((oflag.sparse) && (dd_count > blocks) &&
@@ -1984,8 +2010,19 @@ main(int argc, char * argv[])
                     out_partial++;
                 ret = -1;
                 break;
-            } else
+            } else {
                 out_full += blocks;
+#ifdef HAVE_POSIX_FADVISE
+                if ((FT_OTHER == out_type) || (FT_BLOCK== out_type)) {
+                    res2 = posix_fadvise(outfd, 0, 0, POSIX_FADV_DONTNEED);
+                    if (res2 < 0) {
+                        snprintf(ebuff, EBUFF_SZ, ME "posix_fadvise after write, "
+                                 "seek=%"PRId64" ", seek);
+                        perror(ebuff);
+                    }
+                }
+#endif
+            }
         }
         if (dd_count > 0)
             dd_count -= blocks;

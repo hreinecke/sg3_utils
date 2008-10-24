@@ -15,6 +15,7 @@ AC_HEADER_STDC
 AC_CHECK_FUNCS(getopt_long,
 	       GETOPT_O_FILES='',
 	       GETOPT_O_FILES='getopt_long.o')
+AC_CHECK_FUNCS(posix_fadvise)
 AC_SUBST(GETOPT_O_FILES)
 
 AC_CANONICAL_HOST
