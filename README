@@ -29,13 +29,13 @@ typically issue a sequence of SCSI READ and WRITE commands to copy data.
 Description
 ===========
 A web site supporting the sg3_utils package can be found at
-http://www.torque.net/sg/sg3_utils.html . That page has a table of released
+http://sg.danny.cz/sg/sg3_utils.html . That page has a table of released
 versions for download. The most recent release or beta of sg3_utils may
-be found on this page: http://www.torque.net/sg in the News section.
+be found on this page: http://sg.danny.cz/sg in the News section.
 
 The predecessor to this package was called sg_utils. It is described in
-http://www.torque.net/sg/uu_index.html and old versions can be downloaded
-from the Downloads section of http://www.torque.net/sg .
+http://sg.danny.cz/sg/uu_index.html and old versions can be downloaded
+from the Downloads section of http://sg.danny.cz/sg .
 
 In the Linux 2.4 kernel series these utilities need to use the SCSI generic
 (sg) driver to access SCSI devices. The name of this package (i.e. sg3_utils)
@@ -60,11 +60,11 @@ that the user may need to take into account.
 
 If you have problems or questions about them please contact the author.
 Documentation for the Linux sg device driver can be found at:
-http://www.torque.net/sg/p/sg_v3_ho.html . This is written in DocBook and the
+http://sg.danny.cz/sg/p/sg_v3_ho.html . This is written in DocBook and the
 original xml can be found in the same directory with the ".xml" extension.
 Postscript and pdf renderings are also in that directory. Older documentation
 for the sg version 3 driver can be found at:
-http://www.torque.net/sg/p/scsi_generic_v3.txt .
+http://sg.danny.cz/sg/p/scsi_generic_v3.txt .
 
 All utilities are either "GPL"-ed or have a FreeBSD license. The author's
 intention is that users may incorporate all or part of the code in their work
@@ -313,8 +313,8 @@ instead of ull variable in the above code example.
 
 Other SCSI and storage tools
 ============================
-See http://www.torque.net/sg/tools.html
+See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-23rd October 2008
+26th October 2008

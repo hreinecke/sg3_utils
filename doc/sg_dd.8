@@ -1,4 +1,4 @@
-.TH SG_DD "8" "September 2008" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_DD "8" "October 2008" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -287,8 +287,8 @@ grain control compared to the otherwise identical 'blk_sgio=1' option.
 sparse
 after each \fIBS\fR * \fIBPT\fR byte segment is read from the input,
 it is checked for being all zeros. If so, nothing is written to the output
-file unless this is the last segment of the transfer. This option is
-only active with oflag. It cannot be used when the output is not
+file unless this is the last segment of the transfer. This flag is only
+active with the oflag option. It cannot be used when the output is not
 seekable (e.g. stdout). It is ignored if the output file is /dev/null .
 Note that this utility does not remove the \fIOFILE\fR prior to starting
 to write to it. Hence it may be advantageous to manually remove the
@@ -462,7 +462,7 @@ Copyright \(co 2000\-2008 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-There is a web page discussing sg_dd at http://www.torque.net/sg/sg_dd.html
+There is a web page discussing sg_dd at http://sg.danny.cz/sg/sg_dd.html
 .PP
 A POSIX threads version of this utility called
 .B sgp_dd
