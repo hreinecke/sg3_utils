@@ -5,12 +5,12 @@ Version: 1.27
 Release: 1
 License: GPL
 Group: Utilities/System
-Source: ftp://www.torque.net/sg/p/sg3_utils-%{version}.tgz
-Url: http://www.torque.net/sg/sg3_utils.html
+Source: ftp://sg.danny.cz/sg/p/sg3_utils-%{version}.tgz
+Url: http://sg.danny.cz/sg/sg3_utils.html
 Provides: sg_utils
 BuildRequires: libtool
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-Packager: Douglas Gilbert <dougg@torque.net>
+Packager: Douglas Gilbert <dgilbert@interlog.com>
 
 %description
 Collection of Linux utilities for devices that use the SCSI command set.
@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Thu Oct 23 2008 - dgilbert at interlog dot com
+* Sun Oct 26 2008 - dgilbert at interlog dot com
 - sg_dd: add flock, of2= and posix_fadvise support
   * sg3_utils-1.27
 

@@ -61,7 +61,7 @@ Enclosure Services (SES) status pages and can send control pages. Each
 utility has a man page (placed in section 8). There is summary of the mapping
 between utility names and the SCSI commands they execute in the COVERAGE
 file. An overview of sg3_utils can be found at:
-http://www.torque.net/sg/sg3_utils.html .
+http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 
@@ -144,4 +144,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-14th May 2008
+26th October 2008
