@@ -1,6 +1,6 @@
-.TH SG_GET_CONFIG "8" "May 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_GET_CONFIG "8" "November 2008" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
-sg_get_config \- sends a SCSI GET CONFIGURATION command
+sg_get_config \- sends a SCSI GET CONFIGURATION command (MMC-4 +)
 .SH SYNOPSIS
 .B sg_get_config
 [\fI\-\-brief\fR] [\fI\-\-current\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
@@ -19,10 +19,10 @@ only in the sense that they use the "Multi\-Media command" set (MMC).
 MMC is a specialized SCSI command set whose definition can be found
 at http://www.t10.org .
 .PP
-This utility is based on the MMC\-4 and MMC\-5 draft standards. See
-section 5 on "Features and Profile for Multi_Media devices" for more
-information on specific feature parameters and profiles. The manufacturer's
-product manual may also be useful.
+This utility is based on the MMC\-4 and later draft standards. See section
+5 on "Features and Profile for Multi_Media devices" for more information on
+specific feature parameters and profiles. The manufacturer's product manual
+may also be useful.
 .PP
 Since modern DVD and BD writers support many features and profiles, the
 decoded output from this utility can be large. There are various ways to cut
