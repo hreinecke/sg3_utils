@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20081026] [svn: r196]
+Changelog for sg3_utils-1.27 [20081115] [svn: r198]
   - sg_map26: fix for lk 2.6.26 when CONFIG_SYSFS_DEPRECATED_V2
     is not defined
     - output cdb when verbose option given
@@ -12,6 +12,7 @@ Changelog for sg3_utils-1.27 [20081026] [svn: r196]
       read-write and if that fails try opening read-only
     - experiment with of2=OFILE2; add conv=sparse
     - use posix_fadvise() to defeat caching of normal+block files
+    - when new 'nocache' flag given
   - sg_get_config: add OSSC feature [mmc6r02]
   - sg_modes: add ATA power condition mode page
   - sg3_utils.spec: correction to configure call

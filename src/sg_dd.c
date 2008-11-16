@@ -1,4 +1,4 @@
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE     /* resolves u_char typedef in scsi/scsi.h [lk 2.4] */
 #endif
@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.71 20081023";
+static char * version_str = "5.72 20081115";
 
 #define ME "sg_dd: "
 
@@ -148,6 +148,7 @@ static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 struct flags_t {
     int append;
+    int cdbsz;
     int coe;
     int dio;
     int direct;
@@ -155,12 +156,12 @@ struct flags_t {
     int dsync;
     int excl;
     int fua;
+    int flock;
+    int nocache;
     int sgio;
     int pdt;
-    int cdbsz;
-    int retries;
     int sparse;
-    int flock;
+    int retries;
 };
 
 static struct flags_t iflag;
@@ -248,6 +249,7 @@ dd_filetype(const char * filename)
     if (stat(filename, &st) < 0)
         return FT_ERROR;
     if (S_ISCHR(st.st_mode)) {
+        /* major() and minor() defined in sys/sysmacros.h */
         if ((MEM_MAJOR == major(st.st_rdev)) &&
             (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
             return FT_DEV_NULL;
@@ -328,7 +330,7 @@ usage()
            "    if          file or device to read from (def: stdin)\n"
            "    iflag       comma separated list from: [coe,dio,direct,"
            "dpo,dsync,excl,\n"
-           "                flock,fua,null,sgio]\n"
+           "                flock,fua,nocache,null,sgio]\n"
            "    obs         output block size (if given must be same as "
            "'bs=')\n"
            "    odir        1->use O_DIRECT when opening block dev, "
@@ -342,7 +344,8 @@ usage()
            "                normal file or pipe\n"
            "    oflag       comma separated list from: [append,coe,dio,"
            "direct,dpo,\n"
-           "                dsync,excl,flock,fua,null,sgio,sparse]\n"
+           "                dsync,excl,flock,fua,nocache, null,sgio,"
+           "sparse]\n"
            "    retries     retry sgio errors RETR times (def: 0)\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
@@ -1092,11 +1095,13 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "dpo"))
             fp->dpo = 1;
         else if (0 == strcmp(cp, "dsync"))
-            fp->dsync = 1;
+            ++fp->dsync;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = 1;
         else if (0 == strcmp(cp, "fua"))
-            fp->fua = 1;
+            ++fp->fua;
+        else if (0 == strcmp(cp, "nocache"))
+            ++fp->nocache;
         else if (0 == strcmp(cp, "null"))
             ;
         else if (0 == strcmp(cp, "sgio"))
@@ -1216,6 +1221,16 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
                             "byte offset=0x%"PRIx64"\n",
                             (uint64_t)offset);
             }
+#ifdef HAVE_POSIX_FADVISE
+            if (ifp->nocache) {
+                int rt;
+
+                rt = posix_fadvise(infd, 0, 0, POSIX_FADV_SEQUENTIAL);
+                if (rt)
+                    fprintf(stderr, "open_if: posix_fadvise(SEQUENTIAL), "
+                            "err=%d\n", rt);
+            }
+#endif
         }
     }
     if (ifp->flock) {
@@ -1393,7 +1408,7 @@ main(int argc, char * argv[])
     int blocks = 0;
     int res, k, t, buf_sz, dio_tmp, first, blocks_per;
     int infd, outfd, out2fd, retries_tmp, blks_read;
-    int res2 = 0;
+    int bytes_read, bytes_of2, bytes_of;
     unsigned char * wrkBuff;
     unsigned char * wrkPos;
     int64_t in_num_sect = -1;
@@ -1746,7 +1761,8 @@ main(int argc, char * argv[])
 
     if (iflag.dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
         (FT_RAW & out_type)) {
-        size_t psz = getpagesize();
+        size_t psz = sysconf(_SC_PAGESIZE); /* was getpagesize() */
+
         wrkBuff = (unsigned char*)malloc(blk_sz * bpt + psz);
         if (0 == wrkBuff) {
             fprintf(stderr, "Not enough user memory for raw\n");
@@ -1778,6 +1794,9 @@ main(int argc, char * argv[])
 
     /* <<< main loop that does the copy >>> */
     while (dd_count > 0) {
+        bytes_read = 0;
+        bytes_of = 0;
+        bytes_of2 = 0;
         penult_sparse_skip = sparse_skip;
         penult_blocks = penult_sparse_skip ? blocks : 0;
         sparse_skip = 0;
@@ -1838,17 +1857,7 @@ main(int argc, char * argv[])
                     in_partial++;
                 }
             }
-#ifdef HAVE_POSIX_FADVISE
-            if ((FT_OTHER == in_type) || (FT_BLOCK== in_type)) {
-                // res2 = posix_fadvise(infd, skip, res, POSIX_FADV_DONTNEED);
-                res2 = posix_fadvise(infd, 0, 0, POSIX_FADV_DONTNEED);
-                if (res2 < 0) {
-                    snprintf(ebuff, EBUFF_SZ, ME "posix_fadvise after read, "
-                             "skip=%"PRId64" ", skip);
-                    perror(ebuff);
-                }
-            }
-#endif
+            bytes_read = res;
             in_full += blocks;
         }
 
@@ -1869,16 +1878,7 @@ main(int argc, char * argv[])
                 ret = -1;
                 break;
             }
-#ifdef HAVE_POSIX_FADVISE
-            if ((FT_OTHER == out2_type) || (FT_BLOCK== out2_type)) {
-                res2 = posix_fadvise(out2fd, 0, 0, POSIX_FADV_DONTNEED);
-                if (res2 < 0) {
-                    snprintf(ebuff, EBUFF_SZ, ME "posix_fadvise after of2 write, "
-                             "seek=%"PRId64" ", seek);
-                    perror(ebuff);
-                }
-            }
-#endif
+            bytes_of2 = res;
             out2_off += res;
         }
 
@@ -2012,18 +2012,37 @@ main(int argc, char * argv[])
                 break;
             } else {
                 out_full += blocks;
-#ifdef HAVE_POSIX_FADVISE
-                if ((FT_OTHER == out_type) || (FT_BLOCK== out_type)) {
-                    res2 = posix_fadvise(outfd, 0, 0, POSIX_FADV_DONTNEED);
-                    if (res2 < 0) {
-                        snprintf(ebuff, EBUFF_SZ, ME "posix_fadvise after write, "
-                                 "seek=%"PRId64" ", seek);
-                        perror(ebuff);
-                    }
-                }
-#endif
+                bytes_of = res;
             }
         }
+#ifdef HAVE_POSIX_FADVISE
+        {
+            int rt, in_valid, out2_valid, out_valid;
+
+            in_valid = ((FT_OTHER == in_type) || (FT_BLOCK == in_type));
+            out2_valid = ((FT_OTHER == out2_type) || (FT_BLOCK == out2_type));
+            out_valid = ((FT_OTHER == out_type) || (FT_BLOCK == out_type));
+            if (iflag.nocache && (bytes_read > 0) && in_valid) {
+                rt = posix_fadvise(infd, skip, res, POSIX_FADV_DONTNEED);
+                // rt = posix_fadvise(infd, 0, 0, POSIX_FADV_DONTNEED);
+                if (rt)         /* returns error as result */
+                    fprintf(stderr, "posix_fadvise on read, skip="
+                            "%"PRId64" ,err=%d\n", skip, rt);
+            }
+            if ((oflag.nocache & 2) && (bytes_of2 > 0) && out2_valid) {
+                rt = posix_fadvise(out2fd, 0, 0, POSIX_FADV_DONTNEED);
+                if (rt)
+                    fprintf(stderr, "posix_fadvise on of2, seek="
+                            "%"PRId64" ,err=%d\n", seek, rt);
+            }
+            if ((oflag.nocache & 1) && (bytes_of > 0) && out_valid) {
+                rt = posix_fadvise(outfd, 0, 0, POSIX_FADV_DONTNEED);
+                if (rt)
+                    fprintf(stderr, "posix_fadvise on output, seek="
+                            "%"PRId64" ,err=%d\n", seek, rt);
+            }
+        }
+#endif
         if (dd_count > 0)
             dd_count -= blocks;
         skip += blocks;
