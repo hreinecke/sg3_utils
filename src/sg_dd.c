@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.72 20081115";
+static char * version_str = "5.72 20081116";
 
 #define ME "sg_dd: "
 
@@ -2023,7 +2023,10 @@ main(int argc, char * argv[])
             out2_valid = ((FT_OTHER == out2_type) || (FT_BLOCK == out2_type));
             out_valid = ((FT_OTHER == out_type) || (FT_BLOCK == out_type));
             if (iflag.nocache && (bytes_read > 0) && in_valid) {
-                rt = posix_fadvise(infd, skip, res, POSIX_FADV_DONTNEED);
+                rt = posix_fadvise(infd, 0, (skip * blk_sz) + bytes_read,
+                                   POSIX_FADV_DONTNEED);
+                // rt = posix_fadvise(infd, (skip * blk_sz), bytes_read,
+                                   // POSIX_FADV_DONTNEED);
                 // rt = posix_fadvise(infd, 0, 0, POSIX_FADV_DONTNEED);
                 if (rt)         /* returns error as result */
                     fprintf(stderr, "posix_fadvise on read, skip="
