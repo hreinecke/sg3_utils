@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Sat Nov 15 2008 - dgilbert at interlog dot com
+* Tue Nov 25 2008 - dgilbert at interlog dot com
 - sg_dd: add flock, of2= and posix_fadvise support with nocache flag
   * sg3_utils-1.27
 
