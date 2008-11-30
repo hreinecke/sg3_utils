@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -90,6 +90,17 @@ struct sg_pt_base {
 int scsi_pt_open_device(const char * device_name,
                         int read_only,
                         int verbose)
+{
+    int oflags = 0 /* O_NONBLOCK*/ ;
+
+    oflags |= (read_only ? O_RDONLY : O_RDWR);
+    return scsi_pt_open_flags(device_name, oflags, verbose);
+}
+
+/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
+/* together. The 'flags' argument is ignored in OSF-1. */
+/* Returns >= 0 if successful, otherwise returns negated errno. */
+int scsi_pt_open_flags(const char * device_name, int flags, int verbose)
 {
     struct osf1_dev_channel *fdchan;
     int fd, k;

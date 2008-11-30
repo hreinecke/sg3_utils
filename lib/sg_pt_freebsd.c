@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.07 2007/4/3 */
+/* version 1.08 20081129 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,8 +92,21 @@ struct sg_pt_base {
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int scsi_pt_open_device(const char * device_name,
-                        int read_only __attribute__ ((unused)),
+                        int read_only,
                         int verbose)
+{
+    int oflags = 0 /* O_NONBLOCK*/ ;
+
+    oflags |= (read_only ? O_RDONLY : O_RDWR);
+    return scsi_pt_open_flags(device_name, oflags, verbose);
+}
+ 
+/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
+/* together. The 'flags' argument is ignored in FreeBSD. */
+/* Returns >= 0 if successful, otherwise returns negated errno. */
+int scsi_pt_open_flags(const char * device_name,
+                       int flags __attribute__ ((unused)),
+                              int verbose)
 {
     struct freebsd_dev_channel *fdchan;
     struct cam_device* cam_dev;

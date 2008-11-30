@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.03 2007/4/3 */
+/* version 1.08 20081129 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,22 +58,30 @@ struct sg_pt_base {
 };
 
 
-
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int scsi_pt_open_device(const char * device_name, int read_only,
                         int verbose)
 {
     int oflags = O_NONBLOCK;
-    int fd;
 
     oflags |= (read_only ? O_RDONLY : O_RDWR);
+    return scsi_pt_open_flags(device_name, oflags, verbose);
+}
+
+/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
+/* together. The 'flags' argument is advisory and may be ignored. */
+/* Returns >= 0 if successful, otherwise returns negated errno. */
+int scsi_pt_open_flags(const char * device_name, int flags, int verbose)
+{
+    int fd;
+
     if (verbose > 1) {
         if (NULL == sg_warnings_strm)
             sg_warnings_strm = stderr;
         fprintf(sg_warnings_strm, "open %s with flags=0x%x\n", device_name,
-                oflags);
+                flags);
     }
-    fd = open(device_name, oflags);
+    fd = open(device_name, flags);
     if (fd < 0)
         fd = -errno;
     return fd;

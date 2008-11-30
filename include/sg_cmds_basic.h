@@ -2,7 +2,7 @@
 #define SG_CMDS_BASIC_H
 
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -239,6 +239,11 @@ extern int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
    negated errno. Implementation calls scsi_pt_open_device(). */
 extern int sg_cmds_open_device(const char * device_name, int read_only,
                                int verbose);
+
+/* Returns file descriptor >= 0 if successful. If error in Unix returns
+   negated errno. Implementation calls scsi_pt_open_flags(). */
+extern int sg_cmds_open_flags(const char * device_name, int flags,
+                              int verbose);
 
 /* Returns 0 if successful. If error in Unix returns negated errno.
    Implementation calls scsi_pt_close_device(). */
