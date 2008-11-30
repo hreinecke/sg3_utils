@@ -45,7 +45,7 @@
 #include "sg_pt.h"
 
 
-static char * version_str = "1.43 20080327";
+static char * version_str = "1.44 20081129";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -106,6 +106,14 @@ int
 sg_cmds_open_device(const char * device_name, int read_only, int verbose)
 {
     return scsi_pt_open_device(device_name, read_only, verbose);
+}
+
+/* Returns file descriptor >= 0 if successful. If error in Unix returns
+   negated errno. */
+int
+sg_cmds_open_flags(const char * device_name, int flags, int verbose)
+{
+    return scsi_pt_open_flags(device_name, flags, verbose);
 }
 
 /* Returns 0 if successful. If error in Unix returns negated errno. */

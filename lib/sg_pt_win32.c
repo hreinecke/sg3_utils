@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.04 2007/04/3 */
+/* version 1.05 20081129 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,7 +88,20 @@ struct sg_pt_base {
     struct sg_pt_win32_scsi impl;
 };
 
-/* Returns >= 0 if successful. If error in Unix returns negated errno.
+
+/* Returns >= 0 if successful. If error in Unix returns negated errno. */
+int scsi_pt_open_device(const char * device_name, int read_only, int verbose)
+{
+    int oflags = 0 /* O_NONBLOCK*/ ;
+
+    oflags |= (read_only ? O_RDONLY : O_RDWR);
+    return scsi_pt_open_flags(device_name, oflags, verbose);
+}
+
+/*
+ * Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed
+ * together. The 'flags' argument is ignored in Windows.
+ * Returns >= 0 if successful, otherwise returns negated errno.
  * Optionally accept leading "\\.\". If given something of the form
  * "ScSi<num>:<bus>,<target>,<lun>" where the values in angle brackets
  * are integers, then will attempt to open "\\.\SCSI<num>:" and save the
@@ -97,9 +110,9 @@ struct sg_pt_base {
  * is a lot of keystrokes, "PD" is accepted and converted to the longer
  * form.
  */
-int scsi_pt_open_device(const char * device_name,
-                        int read_only __attribute__ ((unused)),
-                        int verbose)
+int scsi_pt_open_flags(const char * device_name,
+                       int flags __attribute__ ((unused)),
+                       int verbose)
 {
     int len, k, adapter_num, bus, target, lun, off, got_scsi_name;
     int index, num, got_pd_name, pd_num;

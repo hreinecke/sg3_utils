@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,6 +48,12 @@ struct sg_pt_base;
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 extern int scsi_pt_open_device(const char * device_name, int read_only,
                                int verbose);
+
+/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
+/* together. Returns >= 0 if successful, otherwise returns -1 or negated */
+/* errno. */
+extern int scsi_pt_open_flags(const char * device_name, int flags,
+                                     int verbose);
 
 /* Returns 0 if successful. If error in Unix returns negated errno. */
 extern int scsi_pt_close_device(int device_fd);

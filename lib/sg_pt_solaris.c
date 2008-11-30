@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007 Douglas Gilbert.
+ * Copyright (c) 2007-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.00 2007/5/3 */
+/* version 1.01 20081129 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,15 +62,26 @@ struct sg_pt_base {
 };
 
 
-
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
-int scsi_pt_open_device(const char * device_name, int read_only,
+int scsi_pt_open_device(const char * device_name,
+                        int read_only,
                         int verbose)
+{
+    int oflags = 0 /* O_NONBLOCK*/ ;
+
+    oflags |= (read_only ? O_RDONLY : O_RDWR);
+    return scsi_pt_open_flags(device_name, oflags, verbose);
+}
+
+/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
+/* together. The 'flags' argument is ignored in Solaris. */
+/* Returns >= 0 if successful, otherwise returns negated errno. */
+int scsi_pt_open_flags(const char * device_name, int flags_arg, int verbose)
 {
     int oflags = O_NONBLOCK | O_RDWR;
     int fd;
 
-    read_only = read_only;  /* ignore read_only, suppress warning */
+    flags_arg = flags_arg;  /* ignore flags argument, suppress warning */
     if (verbose > 1) {
         fprintf(stderr, "open %s with flags=0x%x\n", device_name, oflags);
     }
@@ -171,7 +182,7 @@ void set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
 {
     // struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
-    vp = vp;          		/* ignore and suppress warning */
+    vp = vp;                    /* ignore and suppress warning */
     pack_id = pack_id;          /* ignore and suppress warning */
 }
 
@@ -179,8 +190,8 @@ void set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag)
 {
     // struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
-    vp = vp;          		/* ignore and suppress warning */
-    tag = tag;          	/* ignore and suppress warning */
+    vp = vp;                    /* ignore and suppress warning */
+    tag = tag;                  /* ignore and suppress warning */
 }
 
 /* Note that task management function codes are transport specific */
@@ -222,10 +233,10 @@ int do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
 
     if (ioctl(fd, USCSICMD, &ptp->uscsi)) {
         ptp->os_err = errno;
-	if ((EIO == ptp->os_err) && ptp->uscsi.uscsi_status) {
-	    ptp->os_err = 0;
-	    return 0;
-	}
+        if ((EIO == ptp->os_err) && ptp->uscsi.uscsi_status) {
+            ptp->os_err = 0;
+            return 0;
+        }
         if (verbose)
             fprintf(stderr, "ioctl(USCSICMD) failed with os_err "
                     "(errno) = %d\n", ptp->os_err);
@@ -280,7 +291,7 @@ int get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
 {
     // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
-    vp = vp;          	/* ignore and suppress warning */
+    vp = vp;            /* ignore and suppress warning */
     return -1;          /* not available */
 }
 
@@ -288,7 +299,7 @@ int get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 {
     // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
-    vp = vp;          	/* ignore and suppress warning */
+    vp = vp;            /* ignore and suppress warning */
     return 0;
 }
 
@@ -304,7 +315,7 @@ char * get_scsi_pt_transport_err_str(const struct sg_pt_base * vp,
 {
     // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
-    vp = vp;          	/* ignore and suppress warning */
+    vp = vp;            /* ignore and suppress warning */
     if (max_b_len > 0)
         b[0] = '\0';
 
