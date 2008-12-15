@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.05 20081129 */
+/* version 1.06 20081215 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,7 +94,7 @@ int scsi_pt_open_device(const char * device_name, int read_only, int verbose)
 {
     int oflags = 0 /* O_NONBLOCK*/ ;
 
-    oflags |= (read_only ? O_RDONLY : O_RDWR);
+    oflags |= (read_only ? 0 : 0);	/* was ... ? O_RDONLY : O_RDWR) */
     return scsi_pt_open_flags(device_name, oflags, verbose);
 }
 
