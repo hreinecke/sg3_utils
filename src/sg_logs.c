@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.81 20080510";    /* SPC-4 revision 12 */
+static char * version_str = "0.82 20081225";    /* SPC-4 revision 17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1328,9 +1328,12 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
     }
 }
 
+/* from sas2r15 */
 static void
 show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
 {
+    unsigned int u;
+
     switch (peis) {
     case 0:
         printf("     No event\n");
@@ -1357,22 +1360,22 @@ show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
         printf("     Received address frame error count: %u\n", val);
         break;
     case 0x21:
-        printf("     Transmitted OPEN_REJECT abandon count: %u\n", val);
+        printf("     Transmitted abandon-class OPEN_REJECT count: %u\n", val);
         break;
     case 0x22:
-        printf("     Received OPEN_REJECT abandon count: %u\n", val);
+        printf("     Received abandon-class OPEN_REJECT count: %u\n", val);
         break;
     case 0x23:
-        printf("     Transmitted OPEN_REJECT retry count: %u\n", val);
+        printf("     Transmitted retry-class OPEN_REJECT count: %u\n", val);
         break;
     case 0x24:
-        printf("     Received OPEN_REJECT retry count: %u\n", val);
+        printf("     Received retry-class OPEN_REJECT count: %u\n", val);
         break;
     case 0x25:
-        printf("     Received AIP (PARTIAL) count: %u\n", val);
+        printf("     Received AIP (WATING ON PARTIAL) count: %u\n", val);
         break;
     case 0x26:
-        printf("     Received AIP (CONNECTION) count: %u\n", val);
+        printf("     Received AIP (WAITING ON CONNECTION) count: %u\n", val);
         break;
     case 0x27:
         printf("     Transmitted BREAK count: %u\n", val);
@@ -1393,10 +1396,20 @@ show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
                thresh_val & 0xff);
         break;
     case 0x2c:
-        printf("     Peak transmitted arbitration wait time (us to 32767): "
-               "%u\n", val & 0xffff);
-        printf("         Peak value detector threshold: %u\n",
-               thresh_val & 0xffff);
+        u = val & 0xffff;
+        if (u < 0x8000)
+            printf("     Peak transmitted arbitration wait time (us): "
+                   "%u\n", u);
+        else
+            printf("     Peak transmitted arbitration wait time (ms): "
+                   "%u\n", 33 + (u - 0x8000));
+        u = thresh_val & 0xffff;
+        if (u < 0x8000)
+            printf("         Peak value detector threshold (us): %u\n",
+                   u);
+        else
+            printf("         Peak value detector threshold (ms): %u\n",
+                   33 + (u - 0x8000));
         break;
     case 0x2d:
         printf("     Peak arbitration time (us): %u\n", val);

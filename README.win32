@@ -1,9 +1,13 @@
 Introduction
 ============
 The win32 port of sg3_utils contains those utilities that are _not_ specific
-to Linux. In some cases a utility could be ported but requires more work. An
-example is sg_dd which needs more work beyond the SCSI command pass through
-mechanism.
+to Linux. One utility for listing available devices, sg_scan, has a
+Windows-specific version for this port.
+
+The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
+Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+contains a utility with similar functionality to sg_dd and is available
+for Windows.
 
 Two build environments are caterered for: cygwin (see www.cygwin.com) and
 MinGW ("Minimalist GNU for Windows", see www.mingw.org). Both are based in
@@ -144,4 +148,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-26th October 2008
+20th December 2008
