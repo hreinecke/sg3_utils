@@ -1,9 +1,14 @@
 Introduction
 ============
 The FreeBSD port of sg3_utils contains those utilities that are _not_
-specific to Linux. In some cases a utility could be ported but
-requires more work. An example is sg_dd which needs more work
-beyond the SCSI command pass through mechanism.
+specific to Linux. In some cases the FreeBSD camcontrol command supplies
+similar functionality; for example 'sg_map' is similar to
+'camcontrol devlist'.
+
+The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
+Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+contains a utility with similar functionality to sg_dd and is available
+for FreeBSD.
 
 Supported Utilities
 ===================
@@ -15,8 +20,8 @@ Here is a list of utilities that have been ported:
     sg_logs
     sg_luns
     sg_modes
-    sg_persist
     sg_opcodes
+    sg_persist
     sg_prevent
     sg_raw
     sg_rdac
@@ -77,12 +82,15 @@ be used. These can be viewed with the "camcontrol devlist"
 command. To access ATAPI devices (e.g. ATAPI DVD drives) the
 kernel may need to be configured with the "atapicam" device.
 
+Disks is FreeBSD have names like '/dev/da0' while the corresponding
+pass-through device may be '/dev/pass0'.
+
 At the present time these utilities have been lightly tested on a
-FreeBSD version 6.2 system with some SCSI disks, a SCSI tape
+FreeBSD version 7.0 system with some SCSI disks, a SCSI tape
 drive and an ATAPI CD drive.
 
 See the FreeBSD section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-26th October 2008
+20th December 2008
