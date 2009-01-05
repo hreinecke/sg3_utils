@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20081227] [svn: r204]
+Changelog for sg3_utils-1.27 [20090104] [svn: r205]
   - sg_inq: sync version descriptors with spc4r17
   - sg_map26: fix for lk 2.6.26 when CONFIG_SYSFS_DEPRECATED_V2
     is not defined

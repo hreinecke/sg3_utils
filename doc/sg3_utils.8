@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "December 2008" "sg3_utils\-1.27" SG3_UTILS
+.TH SG3_UTILS "8" "January 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -24,8 +24,8 @@ A good overview of various SCSI standards can be seen in
 http://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
 of the diagram. SCSI commands in common with all device types can be found
 in SPC of which SPC\-4 is the latest major version. Block device specific
-commands (e.g.  as used by disks) are in SBC, those for tape drives in
-SSC and those for CD/DVD/HD_DVD/BD drives in MMC.
+commands (e.g. as used by disks) are in SBC, those for tape drives in SSC
+and those for CD/DVD/HD_DVD/BD drives in MMC.
 .PP
 There are two generations of command line option usage. The newer
 utilities (written since July 2004) use the getopt_long() function to parse
@@ -38,11 +38,10 @@ options can be elided, for example: '\-all' is equivalent to '\-a \-l \-l'.
 The \fIDEVICE\fR argument may appear after, between or prior to any options.
 .PP
 The older utilities, such as sg_inq, had individual command line processing
-code (often found at the top of the main() function) based on a single "\-"
-followed by one or more characters. If an argument is needed then it follows
-a "=" (e.g. '\-p=1f' in sg_modes with its older interface). Various options
-can be elided as long as it is not ambiguous (e.g. '\-vv' to increase the
-verbosity).
+code typically based on a single "\-" followed by one or more characters. If
+an argument is needed then it follows a "=" (e.g. '\-p=1f' in sg_modes with
+its older interface). Various options can be elided as long as it is not
+ambiguous (e.g. '\-vv' to increase the verbosity).
 .PP
 Over time the command line interface of these older utilities became messy
 and overloaded with options. So in sg3_utils version 1.23 the command line
@@ -54,7 +53,10 @@ variable or using '\-O' or '\-\-old' as the first command line option. The
 man pages of the older utilities documents the details.
 .PP
 Several sg3_utils utilities are based on the Unix dd command (e.g. sg_dd)
-and share dd's rather quirky command line interface.
+and permit copying data at the level of SCSI READ and WRITE commands. sg_dd
+is tightly bound to Linux and hence is not ported to other OSes. A more
+generic utility (than sg_dd) called ddpt in a package of the same name has
+been ported to other OSes.
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
@@ -186,7 +188,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 1999\-2008 Douglas Gilbert
+Copyright \(co 1999\-2009 Douglas Gilbert
 .br
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files
@@ -195,4 +197,4 @@ code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
 under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(sdparm)
+.B sdparm(sdparm), ddpt(ddpt)

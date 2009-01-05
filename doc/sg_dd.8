@@ -1,4 +1,4 @@
-.TH SG_DD "8" "December 2008" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_DD "8" "January 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -29,11 +29,11 @@ The first group in the synopsis above are "standard" Unix
 operands. The second group are extra options added by this utility.
 Both groups are defined below.
 .PP
-This utility is only supported on Linux whereas most other utilities in
-the sg3_utils package have been ported to other operating systems.
-A package called "ddpt" contains a utility of the same name. ddpt has
-been ported to other operating systems and is similar in functionality,
-but less Linux specific, to sg_dd.
+This utility is only supported on Linux whereas most other utilities in the
+sg3_utils package have been ported to other operating systems. A utility
+called "ddpt" has similar syntax and functionality to sg_dd. ddpt drops some
+Linux specific features while adding some other generic features. This allows
+ddpt to be ported to other operating systems.
 .SH OPTIONS
 .TP
 \fBblk_sgio\fR=0 | 1
@@ -463,7 +463,7 @@ Written by Doug Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2008 Douglas Gilbert
+Copyright \(co 2000\-2009 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

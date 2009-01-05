@@ -103,7 +103,7 @@ int scsi_pt_open_device(const char * device_name, int read_only, int verbose)
  * together. The 'flags' argument is ignored in Windows.
  * Returns >= 0 if successful, otherwise returns negated errno.
  * Optionally accept leading "\\.\". If given something of the form
- * "ScSi<num>:<bus>,<target>,<lun>" where the values in angle brackets
+ * "SCSI<num>:<bus>,<target>,<lun>" where the values in angle brackets
  * are integers, then will attempt to open "\\.\SCSI<num>:" and save the
  * other three values for the DeviceIoControl call. The trailing ".<lun>"
  * is optionally and if not given 0 is assumed. Since "PhysicalDrive"
