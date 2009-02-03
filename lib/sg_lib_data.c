@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008 Douglas Gilbert.
+ * Copyright (c) 2007-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.46 20080623";    /* spc-4 rev 15 */
+const char * sg_lib_version_str = "1.47 20090201";    /* spc-4 rev 15 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
