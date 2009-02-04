@@ -64,19 +64,26 @@ extern int scsi_pt_open_flags(const char * device_name, int flags,
 extern int scsi_pt_close_device(int device_fd);
 
 
-/* Create one struct sg_pt_base object per SCSI command issued */
+/* Creates an object that can be used to issue one or more SCSI commands
+ * (or task management functions). Returns NULL if problem.
+ * Once this object has been created it should be destroyed with
+ * destruct_scsi_pt_obj() when it is no longer needed. */
 extern struct sg_pt_base * construct_scsi_pt_obj(void);
 
-/* Only invoke once per objp */
+/* Clear state information held in *objp . This allows this object to be
+ * used to issue more than one SCSI command. */
+extern void clear_scsi_pt_obj(struct sg_pt_base * objp);
+
+/* Set the CDB (command descriptor block) */
 extern void set_scsi_pt_cdb(struct sg_pt_base * objp,
                             const unsigned char * cdb, int cdb_len);
-/* Only invoke once per objp. Zeroes given 'sense' buffer. */
+/* Set the sense buffer and the maximum length that it can handle */
 extern void set_scsi_pt_sense(struct sg_pt_base * objp, unsigned char * sense,
                               int max_sense_len);
-/* Invoke at most once per objp */
+/* Set a pointer and length to be used for data transferred from device */
 extern void set_scsi_pt_data_in(struct sg_pt_base * objp,   /* from device */
                                 unsigned char * dxferp, int dxfer_len);
-/* Invoke at most once per objp */
+/* Set a pointer and length to be used for data transferred to device */
 extern void set_scsi_pt_data_out(struct sg_pt_base * objp,    /* to device */
                                  const unsigned char * dxferp, int dxfer_len);
 /* The following "set_"s implementations may be dummies */

@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_freebsd version 1.09 20090203 */
+/* sg_pt_freebsd version 1.09 20090204 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,7 +131,7 @@ scsi_pt_open_flags(const char * device_name,
     fdchan = (struct freebsd_dev_channel *)
                 calloc(1,sizeof(struct freebsd_dev_channel));
     if (fdchan == NULL) {
-        // errno already set by call to malloc()
+        // errno already set by call to calloc()
         return -1;
     }
 
@@ -191,7 +191,7 @@ construct_scsi_pt_obj()
     struct sg_pt_freebsd_scsi * ptp;
 
     ptp = (struct sg_pt_freebsd_scsi *)
-                malloc(sizeof(struct sg_pt_freebsd_scsi));
+                calloc(1, sizeof(struct sg_pt_freebsd_scsi));
     if (ptp) {
         memset(ptp, 0, sizeof(struct sg_pt_freebsd_scsi));
         ptp->dxfer_dir = CAM_DIR_NONE;
@@ -208,6 +208,17 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
         if (ptp->ccb)
             cam_freeccb(ptp->ccb);
         free(ptp);
+    }
+}
+
+void
+clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+    if (ptp) {
+        memset(ptp, 0, sizeof(struct sg_pt_freebsd_scsi));
+        ptp->dxfer_dir = CAM_DIR_NONE;
     }
 }
 

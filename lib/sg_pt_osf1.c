@@ -209,6 +209,17 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 }
 
 void
+clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    if (ptp) {
+        bzero(ptp, sizeof(struct sg_pt_osf1_scsi));
+        ptp->dxfer_dir = CAM_DIR_NONE;
+    }
+}
+
+void
 set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
                 int cdb_len)
 {

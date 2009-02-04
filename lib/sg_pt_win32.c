@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_win32 version 1.07 20090203 */
+/* sg_pt_win32 version 1.07 20090204 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -246,6 +246,21 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 
     if (psp) {
         free(psp);
+    }
+}
+
+void
+clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_win32_scsi * psp = &vp->impl;
+
+    if (psp) {
+        memset(psp, 0, sizeof(struct sg_pt_win32_scsi));
+        psp->swb.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+        psp->swb.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
+        psp->swb.spt.SenseInfoOffset =
+                offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
+        psp->swb.spt.TimeOutValue = DEF_TIMEOUT;
     }
 }
 

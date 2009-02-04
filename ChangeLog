@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090203] [svn: r207]
+Changelog for sg3_utils-1.27 [20090204] [svn: r208]
   - sg_inq: sync version descriptors with spc4r17
   - sg_map26: fix for lk 2.6.26 when CONFIG_SYSFS_DEPRECATED_V2
     is not defined
@@ -19,7 +19,7 @@ Changelog for sg3_utils-1.27 [20090203] [svn: r207]
   - sg_logs: protocol specific (SAS) lpage sync to sas2r15
   - sg3_utils.spec: correction to configure call
   - sg_pt: add scsi_pt_open_device_flags() call to public interface
-    - add scsi_pt_version() call
+    - add scsi_pt_version() and clear_scsi_pt_obj() calls
     - clear os_err at start of do_scsi_pt()
   - sg_cmds: add sg_cmds_open_device_flags() call previous entry
   - autotools infrastructure: changes after upgrade to Ubuntu 8.10
