@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_solaris version 1.02 20090203 */
+/* sg_pt_solaris version 1.02 20090204 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,9 +109,8 @@ construct_scsi_pt_obj()
     struct sg_pt_solaris_scsi * ptp;
 
     ptp = (struct sg_pt_solaris_scsi *)
-          malloc(sizeof(struct sg_pt_solaris_scsi));
+          calloc(1, sizeof(struct sg_pt_solaris_scsi));
     if (ptp) {
-        memset(ptp, 0, sizeof(struct sg_pt_solaris_scsi));
         ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
         ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
         ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
@@ -126,6 +125,19 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 
     if (ptp)
         free(ptp);
+}
+
+void
+clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_solaris_scsi * ptp = &vp->impl;
+
+    if (ptp) {
+        memset(ptp, 0, sizeof(struct sg_pt_solaris_scsi));
+        ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
+        ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
+        ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
+    }
 }
 
 void

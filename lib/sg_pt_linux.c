@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_linux version 1.10 20090203 */
+/* sg_pt_linux version 1.10 20090204 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -107,9 +107,8 @@ construct_scsi_pt_obj()
     struct sg_pt_linux_scsi * ptp;
 
     ptp = (struct sg_pt_linux_scsi *)
-          malloc(sizeof(struct sg_pt_linux_scsi));
+          calloc(1, sizeof(struct sg_pt_linux_scsi));
     if (ptp) {
-        memset(ptp, 0, sizeof(struct sg_pt_linux_scsi));
         ptp->io_hdr.interface_id = 'S';
         ptp->io_hdr.dxfer_direction = SG_DXFER_NONE;
     }
@@ -123,6 +122,18 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 
     if (ptp)
         free(ptp);
+}
+
+void
+clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (ptp) {
+        memset(ptp, 0, sizeof(struct sg_pt_linux_scsi));
+        ptp->io_hdr.interface_id = 'S';
+        ptp->io_hdr.dxfer_direction = SG_DXFER_NONE;
+    }
 }
 
 void
