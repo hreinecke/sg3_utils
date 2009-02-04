@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008 Douglas Gilbert.
+ * Copyright (c) 2007-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.01 20081129 */
+/* sg_pt_solaris version 1.02 20090203 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,9 +63,8 @@ struct sg_pt_base {
 
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
-int scsi_pt_open_device(const char * device_name,
-                        int read_only,
-                        int verbose)
+int
+scsi_pt_open_device(const char * device_name, int read_only, int verbose)
 {
     int oflags = 0 /* O_NONBLOCK*/ ;
 
@@ -73,10 +72,11 @@ int scsi_pt_open_device(const char * device_name,
     return scsi_pt_open_flags(device_name, oflags, verbose);
 }
 
-/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
-/* together. The 'flags' argument is ignored in Solaris. */
-/* Returns >= 0 if successful, otherwise returns negated errno. */
-int scsi_pt_open_flags(const char * device_name, int flags_arg, int verbose)
+/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed
+ * together. The 'flags' argument is ignored in Solaris.
+ * Returns >= 0 if successful, otherwise returns negated errno. */
+int
+scsi_pt_open_flags(const char * device_name, int flags_arg, int verbose)
 {
     int oflags = O_NONBLOCK | O_RDWR;
     int fd;
@@ -92,7 +92,8 @@ int scsi_pt_open_flags(const char * device_name, int flags_arg, int verbose)
 }
 
 /* Returns 0 if successful. If error in Unix returns negated errno. */
-int scsi_pt_close_device(int device_fd)
+int
+scsi_pt_close_device(int device_fd)
 {
     int res;
 
@@ -102,8 +103,8 @@ int scsi_pt_close_device(int device_fd)
     return res;
 }
 
-
-struct sg_pt_base * construct_scsi_pt_obj()
+struct sg_pt_base *
+construct_scsi_pt_obj()
 {
     struct sg_pt_solaris_scsi * ptp;
 
@@ -118,7 +119,8 @@ struct sg_pt_base * construct_scsi_pt_obj()
     return (struct sg_pt_base *)ptp;
 }
 
-void destruct_scsi_pt_obj(struct sg_pt_base * vp)
+void
+destruct_scsi_pt_obj(struct sg_pt_base * vp)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -126,8 +128,9 @@ void destruct_scsi_pt_obj(struct sg_pt_base * vp)
         free(ptp);
 }
 
-void set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
-                     int cdb_len)
+void
+set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
+                int cdb_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -137,8 +140,9 @@ void set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
     ptp->uscsi.uscsi_cdblen = cdb_len;
 }
 
-void set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
-                       int max_sense_len)
+void
+set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
+                  int max_sense_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -150,8 +154,10 @@ void set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
     ptp->max_sense_len = max_sense_len;
 }
 
-void set_scsi_pt_data_in(struct sg_pt_base * vp,  /* from device */
-                         unsigned char * dxferp, int dxfer_len)
+/* from device */
+void
+set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
+                    int dxfer_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -164,8 +170,10 @@ void set_scsi_pt_data_in(struct sg_pt_base * vp,  /* from device */
     }
 }
 
-void set_scsi_pt_data_out(struct sg_pt_base * vp,   /* to device */
-                          const unsigned char * dxferp, int dxfer_len)
+/* to device */
+void
+set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
+                     int dxfer_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -178,7 +186,8 @@ void set_scsi_pt_data_out(struct sg_pt_base * vp,   /* to device */
     }
 }
 
-void set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
+void
+set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
 {
     // struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -186,7 +195,8 @@ void set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
     pack_id = pack_id;          /* ignore and suppress warning */
 }
 
-void set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag)
+void
+set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag)
 {
     // struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -195,7 +205,8 @@ void set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag)
 }
 
 /* Note that task management function codes are transport specific */
-void set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
+void
+set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -203,8 +214,8 @@ void set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
     tmf_code = tmf_code;        /* dummy to silence compiler */
 }
 
-void set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute,
-                           int priority)
+void
+set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -213,10 +224,15 @@ void set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute,
     priority = priority;        /* dummy to silence compiler */
 }
 
-int do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
+/* Executes SCSI command (or at least forwards it to lower layers).
+ * Clears os_err field prior to active call (whose result may set it
+ * again). */
+int
+do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
+    ptp->os_err = 0;
     if (ptp->in_err) {
         if (verbose)
             fprintf(stderr, "Replicated or unused set_scsi_pt... "
@@ -245,7 +261,8 @@ int do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     return 0;
 }
 
-int get_scsi_pt_result_category(const struct sg_pt_base * vp)
+int
+get_scsi_pt_result_category(const struct sg_pt_base * vp)
 {
     const struct sg_pt_solaris_scsi * ptp = &vp->impl;
     int scsi_st = ptp->uscsi.uscsi_status;
@@ -261,21 +278,24 @@ int get_scsi_pt_result_category(const struct sg_pt_base * vp)
         return SCSI_PT_RESULT_GOOD;
 }
 
-int get_scsi_pt_resid(const struct sg_pt_base * vp)
+int
+get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
     return ptp->uscsi.uscsi_resid;
 }
 
-int get_scsi_pt_status_response(const struct sg_pt_base * vp)
+int
+get_scsi_pt_status_response(const struct sg_pt_base * vp)
 {
     const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
     return ptp->uscsi.uscsi_status;
 }
 
-int get_scsi_pt_sense_len(const struct sg_pt_base * vp)
+int
+get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 {
     const struct sg_pt_solaris_scsi * ptp = &vp->impl;
     int res;
@@ -287,7 +307,8 @@ int get_scsi_pt_sense_len(const struct sg_pt_base * vp)
     return 0;
 }
 
-int get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
+int
+get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
 {
     // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -295,7 +316,8 @@ int get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
     return -1;          /* not available */
 }
 
-int get_scsi_pt_transport_err(const struct sg_pt_base * vp)
+int
+get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 {
     // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -303,15 +325,17 @@ int get_scsi_pt_transport_err(const struct sg_pt_base * vp)
     return 0;
 }
 
-int get_scsi_pt_os_err(const struct sg_pt_base * vp)
+int
+get_scsi_pt_os_err(const struct sg_pt_base * vp)
 {
     const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
     return ptp->os_err;
 }
 
-char * get_scsi_pt_transport_err_str(const struct sg_pt_base * vp,
-                                     int max_b_len, char * b)
+char *
+get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
+                              char * b)
 {
     // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
@@ -322,8 +346,8 @@ char * get_scsi_pt_transport_err_str(const struct sg_pt_base * vp,
     return b;
 }
 
-char * get_scsi_pt_os_err_str(const struct sg_pt_base * vp,
-                              int max_b_len, char * b)
+char *
+get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 {
     const struct sg_pt_solaris_scsi * ptp = &vp->impl;
     const char * cp;

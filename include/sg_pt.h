@@ -92,7 +92,8 @@ extern void set_scsi_pt_task_attr(struct sg_pt_base * objp, int attribute,
 #define SCSI_PT_DO_TIMEOUT 2
 /* If OS error prior to or during command submission then returns negated
  * error value (e.g. Unix '-errno'). This includes interrupted system calls
- * (e.g. by a signal) in which case -EINTR would be returned.
+ * (e.g. by a signal) in which case -EINTR would be returned. Note that
+ * system call errors also can be fetched with get_scsi_pt_os_err().
  * Return 0 if okay (i.e. at the very least: command sent). Positive
  * return values are errors (see SCSI_PT_DO_* defines). */
 extern int do_scsi_pt(struct sg_pt_base * objp, int fd, int timeout_secs,
