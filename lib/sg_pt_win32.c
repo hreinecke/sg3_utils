@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2008 Douglas Gilbert.
+ * Copyright (c) 2006-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,7 @@
  *
  */
 
-/* version 1.06 20081215 */
+/* sg_pt_win32 version 1.07 20090203 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,11 +90,12 @@ struct sg_pt_base {
 
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
-int scsi_pt_open_device(const char * device_name, int read_only, int verbose)
+int
+scsi_pt_open_device(const char * device_name, int read_only, int verbose)
 {
     int oflags = 0 /* O_NONBLOCK*/ ;
 
-    oflags |= (read_only ? 0 : 0);	/* was ... ? O_RDONLY : O_RDWR) */
+    oflags |= (read_only ? 0 : 0);      /* was ... ? O_RDONLY : O_RDWR) */
     return scsi_pt_open_flags(device_name, oflags, verbose);
 }
 
@@ -110,9 +111,10 @@ int scsi_pt_open_device(const char * device_name, int read_only, int verbose)
  * is a lot of keystrokes, "PD" is accepted and converted to the longer
  * form.
  */
-int scsi_pt_open_flags(const char * device_name,
-                       int flags __attribute__ ((unused)),
-                       int verbose)
+int
+scsi_pt_open_flags(const char * device_name,
+                   int flags __attribute__ ((unused)),
+                   int verbose)
 {
     int len, k, adapter_num, bus, target, lun, off, got_scsi_name;
     int index, num, got_pd_name, pd_num;
@@ -200,7 +202,8 @@ int scsi_pt_open_flags(const char * device_name,
 
 
 /* Returns 0 if successful. If error in Unix returns negated errno. */
-int scsi_pt_close_device(int device_fd)
+int
+scsi_pt_close_device(int device_fd)
 {
     struct sg_pt_handle * shp;
     int index;
@@ -219,7 +222,8 @@ int scsi_pt_close_device(int device_fd)
     return 0;
 }
 
-struct sg_pt_base * construct_scsi_pt_obj()
+struct sg_pt_base *
+construct_scsi_pt_obj()
 {
     struct sg_pt_win32_scsi * psp;
 
@@ -235,7 +239,8 @@ struct sg_pt_base * construct_scsi_pt_obj()
     return (struct sg_pt_base *)psp;
 }
 
-void destruct_scsi_pt_obj(struct sg_pt_base * vp)
+void
+destruct_scsi_pt_obj(struct sg_pt_base * vp)
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
@@ -244,8 +249,9 @@ void destruct_scsi_pt_obj(struct sg_pt_base * vp)
     }
 }
 
-void set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
-                     int cdb_len)
+void
+set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
+                int cdb_len)
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
@@ -259,8 +265,9 @@ void set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
     psp->swb.spt.CdbLength = cdb_len;
 }
 
-void set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
-                       int sense_len)
+void
+set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
+                  int sense_len)
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
@@ -271,8 +278,10 @@ void set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
     psp->sense_len = sense_len;
 }
 
-void set_scsi_pt_data_in(struct sg_pt_base * vp,             /* from device */
-                         unsigned char * dxferp, int dxfer_len)
+/* from device */
+void
+set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
+                    int dxfer_len)
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
@@ -285,8 +294,10 @@ void set_scsi_pt_data_in(struct sg_pt_base * vp,             /* from device */
     }
 }
 
-void set_scsi_pt_data_out(struct sg_pt_base * vp,            /* to device */
-                          const unsigned char * dxferp, int dxfer_len)
+/* to device */
+void
+set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
+                     int dxfer_len)
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
@@ -299,38 +310,44 @@ void set_scsi_pt_data_out(struct sg_pt_base * vp,            /* to device */
     }
 }
 
-void set_scsi_pt_packet_id(struct sg_pt_base * vp __attribute__ ((unused)),
-                           int pack_id __attribute__ ((unused)))
+void
+set_scsi_pt_packet_id(struct sg_pt_base * vp __attribute__ ((unused)),
+                      int pack_id __attribute__ ((unused)))
 {
 }
 
-void set_scsi_pt_tag(struct sg_pt_base * vp,
-                     uint64_t tag __attribute__ ((unused)))
-{
-    struct sg_pt_win32_scsi * psp = &vp->impl;
-
-    ++psp->in_err;
-}
-
-void set_scsi_pt_task_management(struct sg_pt_base * vp,
-                                 int tmf_code __attribute__ ((unused)))
+void
+set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag __attribute__ ((unused)))
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
     ++psp->in_err;
 }
 
-void set_scsi_pt_task_attr(struct sg_pt_base * vp,
-                           int attrib __attribute__ ((unused)),
-                           int priority __attribute__ ((unused)))
+void
+set_scsi_pt_task_management(struct sg_pt_base * vp,
+                            int tmf_code __attribute__ ((unused)))
 {
     struct sg_pt_win32_scsi * psp = &vp->impl;
 
     ++psp->in_err;
 }
 
-int do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs,
-               int verbose)
+void
+set_scsi_pt_task_attr(struct sg_pt_base * vp,
+                      int attrib __attribute__ ((unused)),
+                      int priority __attribute__ ((unused)))
+{
+    struct sg_pt_win32_scsi * psp = &vp->impl;
+
+    ++psp->in_err;
+}
+
+/* Executes SCSI command (or at least forwards it to lower layers).
+ * Clears os_err field prior to active call (whose result may set it
+ * again). */
+int
+do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
 {
     int index = device_fd - WIN32_FDOFFSET;
     struct sg_pt_win32_scsi * psp = &vp->impl;
@@ -340,6 +357,7 @@ int do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs,
 
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
+    psp->os_err = 0;
     if (psp->in_err) {
         if (verbose)
             fprintf(sg_warnings_strm, "Replicated or unused set_scsi_pt...\n");
@@ -452,7 +470,8 @@ int do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs,
     return 0;
 }
 
-int get_scsi_pt_result_category(const struct sg_pt_base * vp)
+int
+get_scsi_pt_result_category(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = &vp->impl;
 
@@ -469,21 +488,24 @@ int get_scsi_pt_result_category(const struct sg_pt_base * vp)
         return SCSI_PT_RESULT_GOOD;
 }
 
-int get_scsi_pt_resid(const struct sg_pt_base * vp)
+int
+get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = &vp->impl;
 
     return psp->resid;
 }
 
-int get_scsi_pt_status_response(const struct sg_pt_base * vp)
+int
+get_scsi_pt_status_response(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = &vp->impl;
 
     return psp->scsi_status;
 }
 
-int get_scsi_pt_sense_len(const struct sg_pt_base * vp)
+int
+get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = &vp->impl;
     int len;
@@ -492,21 +514,24 @@ int get_scsi_pt_sense_len(const struct sg_pt_base * vp)
     return (len > 0) ? len : 0;
 }
 
-int get_scsi_pt_duration_ms(const struct sg_pt_base * vp __attribute__ ((unused)))
+int
+get_scsi_pt_duration_ms(const struct sg_pt_base * vp __attribute__ ((unused)))
 {
     // const struct sg_pt_freebsd_scsi * psp = &vp->impl;
 
     return -1;
 }
 
-int get_scsi_pt_transport_err(const struct sg_pt_base * vp)
+int
+get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = &vp->impl;
 
     return psp->transport_err;
 }
 
-int get_scsi_pt_os_err(const struct sg_pt_base * vp)
+int
+get_scsi_pt_os_err(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = &vp->impl;
 
@@ -514,8 +539,9 @@ int get_scsi_pt_os_err(const struct sg_pt_base * vp)
 }
 
 
-char * get_scsi_pt_transport_err_str(const struct sg_pt_base * vp,
-                                     int max_b_len, char * b)
+char *
+get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
+                              char * b)
 {
     struct sg_pt_win32_scsi * psp = (struct sg_pt_win32_scsi *)&vp->impl;
     LPVOID lpMsgBuf;
@@ -549,8 +575,8 @@ char * get_scsi_pt_transport_err_str(const struct sg_pt_base * vp,
     return b;
 }
 
-char * get_scsi_pt_os_err_str(const struct sg_pt_base * vp,
-                              int max_b_len, char * b)
+char *
+get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 {
     const struct sg_pt_win32_scsi * psp = &vp->impl;
     const char * cp;
