@@ -7,7 +7,7 @@ similar functionality; for example 'sg_map' is similar to
 
 The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
 Linux idiosyncracies to be easily ported. A new package called 'ddpt'
-contains a utility with similar functionality to sg_dd and is available
+contains a utility with similar functionality to sg_dd and ddpt is available
 for FreeBSD.
 
 Supported Utilities
@@ -58,8 +58,9 @@ A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 
 See the INSTALL file (at the end) for instructions on how to build
-sg3_utils on FreeBSD. Some man pages have examples which use linux
-device names which hopefully will not confuse the FreeBSD users.
+sg3_utils on FreeBSD. If the "./configure ; make" sequence fails, try
+running "./autogen.sh" first. Some man pages have examples which use
+linux device names which hopefully will not confuse the FreeBSD users.
 
 
 Details
@@ -93,4 +94,4 @@ See the FreeBSD section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-20th December 2008
+5th February 2009
