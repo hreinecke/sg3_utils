@@ -1,4 +1,4 @@
-.TH SG_DD "8" "January 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_DD "8" "February 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -12,7 +12,7 @@ devices that understand the SCSI command set.
 [\fIblk_sgio=\fR0|1] [\fIbpt=BPT\fR] [\fIcdbsz=\fR6|10|12|16]
 [\fIcoe=\fR0|1|2|3] [\fIcoe_limit=CL\fR] [\fIdio=\fR0|1] [\fIodir=\fR0|1]
 [\fIof2=OFILE2\fR] [\fIretries=RETR\fR] [\fIsync=\fR0|1] [\fItime=\fR0|1]
-[\fIverbose=VERB\fR]
+[\fIverbose=VERB\fR] [\fI\-V\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -110,8 +110,8 @@ not explicitly given) then the derived count is scaled back so that the
 copy will not overrun the device. If the file name is a block device
 partition and \fICOUNT\fR is not given then the size of the partition
 rather than the size of the whole device is used. If \fICOUNT\fR is not
-given and cannot be derived then an error message is issued and no copy
-takes place.
+given (or \fIcount=-1\fR) and cannot be derived then an error message is
+issued and no copy takes place.
 .TP
 \fBdio\fR=0 | 1
 default is 0 which selects indirect (buffered) IO on sg devices. Value of 1
@@ -202,6 +202,9 @@ the 'blk_sgio=1' option is set.
 outputs usage message and exits.
 .TP
 \fB\-\-version\fR
+outputs version number information and exits.
+.TP
+\fB\-V\fR
 outputs version number information and exits.
 .SH FLAGS
 Here is a list of flags and their meanings:
