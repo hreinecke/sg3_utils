@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.72 20081116";
+static char * version_str = "5.73 20090205";
 
 #define ME "sg_dd: "
 
@@ -1480,11 +1480,13 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "count")) {
-            dd_count = sg_get_llnum(buf);
-            if (-1LL == dd_count) {
-                fprintf(stderr, ME "bad argument to 'count='\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            if (0 != strcmp("-1", buf)) {
+                dd_count = sg_get_llnum(buf);
+                if (-1LL == dd_count) {
+                    fprintf(stderr, ME "bad argument to 'count='\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }   /* treat 'count=-1' as calculate count (same as not given) */
         } else if (0 == strcmp(key, "dio")) {
             oflag.dio = sg_get_num(buf);
             iflag.dio = oflag.dio;
@@ -1556,7 +1558,8 @@ main(int argc, char * argv[])
                    (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--vers", 6)) {
+        } else if ((0 == strncmp(key, "--vers", 6)) ||
+                   (0 == strcmp(key, "-V"))) {
             fprintf(stderr, ME "%s\n", version_str);
             return 0;
         } else {

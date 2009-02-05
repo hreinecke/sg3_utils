@@ -61,7 +61,13 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "1.34 20071226 shared_mmap";
+/* #define SG_WANT_SHARED_MMAP_IO 1 */
+
+#ifdef SG_WANT_SHARED_MMAP_IO
+static char * version_str = "1.35 20080205 shared_mmap";
+#else
+static char * version_str = "1.35 20080205";
+#endif
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -88,11 +94,13 @@ static char * version_str = "1.34 20071226 shared_mmap";
 #define SAI_READ_CAPACITY_16  0x10
 #endif
 
+#ifdef SG_WANT_SHARED_MMAP_IO
 #ifndef SG_FLAG_SHARED_MMAP_IO
 #define SG_FLAG_SHARED_MMAP_IO 8
 #endif
 #ifndef SG_INFO_SHARED_MMAP_IO
 #define SG_INFO_SHARED_MMAP_IO 8
+#endif
 #endif
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -128,8 +136,10 @@ static int start_tm_valid = 0;
 static struct timeval start_tm;
 static int blk_sz = 0;
 
+#ifdef SG_WANT_SHARED_MMAP_IO
 static int shared_mm_req = 0;
 static int shared_mm_done = 0;
+#endif
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -141,11 +151,14 @@ struct flags_t {
     int dsync;
     int excl;
     int fua;
+#ifdef SG_WANT_SHARED_MMAP_IO
     int smmap;
+#endif
 };
 
 
-static void install_handler (int sig_num, void (*sig_handler) (int sig))
+static void
+install_handler(int sig_num, void (*sig_handler) (int sig))
 {
     struct sigaction sigact;
     sigaction (sig_num, NULL, &sigact);
@@ -158,7 +171,8 @@ static void install_handler (int sig_num, void (*sig_handler) (int sig))
     }
 }
 
-static void print_stats()
+static void
+print_stats()
 {
     if (0 != dd_count)
         fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
@@ -167,7 +181,8 @@ static void print_stats()
             out_partial);
 }
 
-static void calc_duration_throughput(int contin)
+static void
+calc_duration_throughput(int contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
@@ -193,7 +208,8 @@ static void calc_duration_throughput(int contin)
     }
 }
 
-static void interrupt_handler(int sig)
+static void
+interrupt_handler(int sig)
 {
     struct sigaction sigact;
 
@@ -208,7 +224,8 @@ static void interrupt_handler(int sig)
     kill (getpid (), sig);
 }
 
-static void siginfo_handler(int sig)
+static void
+siginfo_handler(int sig)
 {
     sig = sig;  /* dummy to stop -W warning messages */
     fprintf(stderr, "Progress report, continuing ...\n");
@@ -217,7 +234,8 @@ static void siginfo_handler(int sig)
         calc_duration_throughput(1);
 }
 
-int dd_filetype(const char * filename)
+static int
+dd_filetype(const char * filename)
 {
     struct stat st;
     size_t len = strlen(filename);
@@ -241,7 +259,8 @@ int dd_filetype(const char * filename)
     return FT_OTHER;
 }
 
-static char * dd_filetype_str(int ft, char * buff)
+static char *
+dd_filetype_str(int ft, char * buff)
 {
     int off = 0;
 
@@ -262,7 +281,8 @@ static char * dd_filetype_str(int ft, char * buff)
     return buff;
 }
 
-void usage()
+static void
+usage()
 {
    fprintf(stderr, "Usage: "
            "sgm_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
@@ -294,7 +314,11 @@ void usage()
            "                treated as /dev/null\n"
            "    oflag       comma separated list from: [append,dio,direct,"
            "dpo,dsync,\n"
+#ifdef SG_WANT_SHARED_MMAP_IO
            "                excl,fua,null,smmap]\n"
+#else
+           "                excl,fua,null]\n"
+#endif
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
@@ -310,7 +334,8 @@ void usage()
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
-int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
+static int
+scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -354,7 +379,8 @@ int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
 /* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
-int read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
+static int
+read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
 #ifdef BLKSSZGET
     if ((ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) && (*sect_sz > 0)) {
@@ -396,9 +422,9 @@ int read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 #endif
 }
 
-int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
-                      int64_t start_block, int write_true, int fua,
-                      int dpo)
+static int
+sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
+                  int64_t start_block, int write_true, int fua, int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
@@ -492,8 +518,9 @@ int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ILLEGAL_REQ,
  * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
  * -1 -> unrecoverable error */
-int sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
-            int bs, int cdbsz, int fua, int dpo, int do_mmap)
+static int
+sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
+        int bs, int cdbsz, int fua, int dpo, int do_mmap)
 {
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -582,9 +609,13 @@ int sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ILLEGAL_REQ,
  * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
  * -1 -> unrecoverable error */
-int sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
-             int bs, int cdbsz, int fua, int dpo, int do_mmap,
-             int mmap_shareable, int * diop)
+static int
+sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
+         int bs, int cdbsz, int fua, int dpo, int do_mmap,
+#ifdef SG_WANT_SHARED_MMAP_IO
+         int mmap_shareable,
+#endif
+         int * diop)
 {
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -603,16 +634,23 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     io_hdr.cmdp = wrCmd;
     io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
     io_hdr.dxfer_len = bs * blocks;
+#ifdef SG_WANT_SHARED_MMAP_IO
     if (mmap_shareable || (! do_mmap))
+#else
+    if (! do_mmap)
+#endif
         io_hdr.dxferp = buff;
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.pack_id = (int)to_block;
+#ifdef SG_WANT_SHARED_MMAP_IO
     if (mmap_shareable) {
         io_hdr.flags |= SG_FLAG_SHARED_MMAP_IO;
         ++shared_mm_req;
-    } else if (do_mmap)
+    } else
+#endif
+    /* nasty conditional split */ if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
     else if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
@@ -668,15 +706,18 @@ int sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
         sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         return res;
     }
+#ifdef SG_WANT_SHARED_MMAP_IO
     if ((mmap_shareable) && (SG_INFO_SHARED_MMAP_IO & io_hdr.info))
         ++shared_mm_done;
+#endif
     if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     return 0;
 }
 
-static int process_flags(const char * arg, struct flags_t * fp)
+static int
+process_flags(const char * arg, struct flags_t * fp)
 {
     char buff[256];
     char * cp;
@@ -709,8 +750,10 @@ static int process_flags(const char * arg, struct flags_t * fp)
             fp->fua = 1;
         else if (0 == strcmp(cp, "null"))
             ;
+#ifdef SG_WANT_SHARED_MMAP_IO
         else if (0 == strcmp(cp, "smmap"))
             fp->smmap = 1;
+#endif
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
@@ -726,7 +769,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
 #define EBUFF_SZ 512
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int64_t skip = 0;
     int64_t seek = 0;
@@ -763,7 +807,9 @@ int main(int argc, char * argv[])
     size_t psz = getpagesize();
     struct flags_t in_flags;
     struct flags_t out_flags;
+#ifdef SG_WANT_SHARED_MMAP_IO
     int mmap_shareable = 0;
+#endif
     int ret = 0;
 
     inf[0] = '\0';
@@ -800,11 +846,13 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key,"coe"))
             do_coe = sg_get_num(buf);   /* dummy, just accept + ignore */
         else if (0 == strcmp(key,"count")) {
-            dd_count = sg_get_llnum(buf);
-            if (-1LL == dd_count) {
-                fprintf(stderr, ME "bad argument to 'count'\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            if (0 != strcmp("-1", buf)) {
+                dd_count = sg_get_llnum(buf);
+                if (-1LL == dd_count) {
+                    fprintf(stderr, ME "bad argument to 'count'\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }   /* treat 'count=-1' as calculate count (same as not given) */
         } else if (0 == strcmp(key,"dio"))
             out_flags.dio = sg_get_num(buf);
         else if (0 == strcmp(key,"fua")) {
@@ -869,7 +917,8 @@ int main(int argc, char * argv[])
                  (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--vers", 6)) {
+        } else if ((0 == strncmp(key, "--vers", 6)) ||
+                   (0 == strcmp(key, "-V"))) {
             fprintf(stderr, ME ": %s\n", version_str);
             return 0;
         }
@@ -971,7 +1020,9 @@ int main(int argc, char * argv[])
                 perror(ebuff);
                 return SG_LIB_FILE_ERROR;
             }
+#ifdef SG_WANT_SHARED_MMAP_IO
             mmap_shareable = 1;
+#endif
         }
         else {
             flags = O_RDONLY;
@@ -1237,8 +1288,10 @@ int main(int argc, char * argv[])
 
     if (wrkMmap) {
         wrkPos = wrkMmap;
+#ifdef SG_WANT_SHARED_MMAP_IO
         if (! (mmap_shareable && out_flags.smmap &&  (FT_SG == out_type)))
             mmap_shareable = 0;
+#endif
     } else {
         if ((FT_RAW == in_type) || (FT_RAW == out_type)) {
             wrkBuff = (unsigned char *)malloc(blk_sz * bpt + psz);
@@ -1272,8 +1325,13 @@ int main(int argc, char * argv[])
     }
     req_count = dd_count;
 
+#ifdef SG_WANT_SHARED_MMAP_IO
     if (verbose && (dd_count > 0) && (0 == out_flags.dio) &&
         (FT_SG == in_type) && (FT_SG == out_type) && (! mmap_shareable))
+#else
+    if (verbose && (dd_count > 0) && (0 == out_flags.dio) &&
+        (FT_SG == in_type) && (FT_SG == out_type))
+#endif
         fprintf(stderr, "Since both 'if' and 'of' are sg devices, only do "
                 "mmap-ed transfers on 'if'\n");
 
@@ -1329,7 +1387,10 @@ int main(int argc, char * argv[])
 
             ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz, scsi_cdbsz_out,
                            out_flags.fua, out_flags.dpo, do_mmap,
-                           mmap_shareable, &dio_res);
+#ifdef SG_WANT_SHARED_MMAP_IO
+                           mmap_shareable,
+#endif
+                           &dio_res);
             if ((SG_LIB_CAT_UNIT_ATTENTION == ret) ||
                 (SG_LIB_CAT_ABORTED_COMMAND == ret)) {
                 fprintf(stderr, "Unit attention or aborted command, "
@@ -1337,7 +1398,11 @@ int main(int argc, char * argv[])
                 dio_res = out_flags.dio;
                 ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz,
                                scsi_cdbsz_out, out_flags.fua, out_flags.dpo,
-                               do_mmap, mmap_shareable, &dio_res);
+                               do_mmap,
+#ifdef SG_WANT_SHARED_MMAP_IO
+                               mmap_shareable,
+#endif
+                               &dio_res);
             }
             if (0 != ret) {
                 fprintf(stderr, "sg_write failed, seek=%"PRId64"\n", seek);
@@ -1412,9 +1477,11 @@ int main(int argc, char * argv[])
     if (num_dio_not_done)
         fprintf(stderr, ">> dio requested but _not_ done %d times\n",
                 num_dio_not_done);
+#ifdef SG_WANT_SHARED_MMAP_IO
     if ((verbose > 0) && out_flags.smmap && (shared_mm_req > 0)) {
         fprintf(stderr, ">> shared_mm_req=%d,  shared_mm_done=%d\n",
                 shared_mm_req, shared_mm_done);
     }
+#endif
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
