@@ -15,7 +15,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2008 D. Gilbert
+*  Copyright (C) 2000-2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.82 20081225";    /* SPC-4 revision 17 */
+static char * version_str = "0.82 20090205";    /* SPC-4 revision 17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1486,7 +1486,7 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
     if (optsp->do_name)
         printf("  num_phys=%d\n", nphys);
     else {
-        printf(" number of phys = %d", nphys);
+        printf("  number of phys = %d", nphys);
         if ((optsp->do_pcb) && (0 == optsp->do_name)) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
