@@ -19,6 +19,12 @@ man_MANS = \
 	sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 sg_test_rwbuf.8 sg_turs.8 \
 	sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
 
+distclean-local:
+	rm -f sg_scan.8
+
+sg_scan.8 : sg_scan.8.linux
+	cp -p sg_scan.8.linux sg_scan.8
+
 endif
 
 
@@ -36,6 +42,12 @@ man_MANS = \
 	sg_stpg.8 sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
 	sg_write_long.8 sg_wr_mode.8
 
+distclean-local:
+	rm -f sg_scan.8
+
+sg_scan.8 : sg_scan.8.win32
+	cp -p sg_scan.8.win32 sg_scan.8
+
 endif
 
 
@@ -52,6 +64,12 @@ man_MANS = \
 	sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 \
 	sg_stpg.8 sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
 	sg_write_long.8 sg_wr_mode.8
+
+distclean-local:
+	rm -f sg_scan.8
+
+sg_scan.8 : sg_scan.8.win32
+	cp -p sg_scan.8.win32 sg_scan.8
 
 endif
 

@@ -18,6 +18,12 @@ bin_PROGRAMS = \
 	sg_sync sg_test_rwbuf sg_turs sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_wr_mode
 
+distclean-local:
+	rm -f sg_scan.c
+
+sg_scan.c : sg_scan.c.linux
+	cp sg_scan.c.linux sg_scan.c
+
 endif
 
 
@@ -34,6 +40,12 @@ bin_PROGRAMS = \
 	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
 	sg_wr_mode
 
+distclean-local:
+	rm -f sg_scan.c
+
+sg_scan.c : sg_scan.c.win32
+	cp sg_scan.c.win32 sg_scan.c
+
 endif
 
 
@@ -49,6 +61,12 @@ bin_PROGRAMS = \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
 	sg_wr_mode
+
+distclean-local:
+	rm -f sg_scan.c
+
+sg_scan.c : sg_scan.c.win32
+	cp sg_scan.c.win32 sg_scan.c
 
 endif
 
