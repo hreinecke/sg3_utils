@@ -3,7 +3,7 @@
 #endif
 
 /*
- * Copyright (c) 2006 Douglas Gilbert.
+ * Copyright (c) 2006-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,6 +43,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <errno.h>
 
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
@@ -58,7 +59,7 @@
 #define INQUIRY_CMD 0x12
 #define INQUIRY_CMDLEN 6
 
-static char * version_str = "1.04 (win32) 20070101";
+static char * version_str = "1.05 (win32) 20090221";
 
 struct w_scsi_elem {
     char    in_use;
@@ -86,6 +87,7 @@ static struct w_scsi_elem * w_scsi_arr;
 
 static int next_unused_scsi_elem = 0;
 static int next_elem_after_scsi_adapter_valid = 0;
+static int verbose = 0;
 
 
 static struct option long_options[] = {
@@ -96,7 +98,9 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr,
             "Usage: sg_scan  [--help] [--letter=VL] [--verbose] "
@@ -110,7 +114,127 @@ static void usage()
             "Scan for SCSI and related device names\n");
 }
 
-static char * get_err_str(DWORD err, int max_b_len, char * b)
+
+
+// IOCTL_STORAGE_QUERY_PROPERTY
+
+#define FILE_DEVICE_MASS_STORAGE    0x0000002d
+#define IOCTL_STORAGE_BASE          FILE_DEVICE_MASS_STORAGE
+#define FILE_ANY_ACCESS             0
+
+// #define METHOD_BUFFERED             0
+
+#define IOCTL_STORAGE_QUERY_PROPERTY \
+    CTL_CODE(IOCTL_STORAGE_BASE, 0x0500, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+typedef enum _STORAGE_BUS_TYPE {
+    BusTypeUnknown      = 0x00,
+    BusTypeScsi         = 0x01,
+    BusTypeAtapi        = 0x02,
+    BusTypeAta          = 0x03,
+    BusType1394         = 0x04,
+    BusTypeSsa          = 0x05,
+    BusTypeFibre        = 0x06,
+    BusTypeUsb          = 0x07,
+    BusTypeRAID         = 0x08,
+    BusTypeiScsi        = 0x09,
+    BusTypeSas          = 0x0A,
+    BusTypeSata         = 0x0B,
+    BusTypeSd           = 0x0C,
+    BusTypeMmc          = 0x0D,
+    BusTypeMax          = 0x0E,
+    BusTypeMaxReserved  = 0x7F
+} STORAGE_BUS_TYPE, *PSTORAGE_BUS_TYPE;
+
+typedef struct _STORAGE_DEVICE_DESCRIPTOR {
+    ULONG Version;
+    ULONG Size;
+    UCHAR DeviceType;
+    UCHAR DeviceTypeModifier;
+    BOOLEAN RemovableMedia;
+    BOOLEAN CommandQueueing;
+    ULONG VendorIdOffset;
+    ULONG ProductIdOffset;
+    ULONG ProductRevisionOffset;
+    ULONG SerialNumberOffset;
+    STORAGE_BUS_TYPE BusType;
+    ULONG RawPropertiesLength;
+    UCHAR RawDeviceProperties[1];
+} STORAGE_DEVICE_DESCRIPTOR, *PSTORAGE_DEVICE_DESCRIPTOR;
+
+typedef enum _STORAGE_QUERY_TYPE {
+    PropertyStandardQuery = 0,
+    PropertyExistsQuery,
+    PropertyMaskQuery,
+    PropertyQueryMaxDefined
+} STORAGE_QUERY_TYPE, *PSTORAGE_QUERY_TYPE;
+
+typedef enum _STORAGE_PROPERTY_ID {
+    StorageDeviceProperty = 0,
+    StorageAdapterProperty,
+    StorageDeviceIdProperty,
+    StorageDeviceUniqueIdProperty,
+    StorageDeviceWriteCacheProperty,
+    StorageMiniportProperty,
+    StorageAccessAlignmentProperty
+} STORAGE_PROPERTY_ID, *PSTORAGE_PROPERTY_ID;
+
+typedef struct _STORAGE_PROPERTY_QUERY {
+    STORAGE_PROPERTY_ID PropertyId;
+    STORAGE_QUERY_TYPE QueryType;
+    UCHAR AdditionalParameters[1];
+} STORAGE_PROPERTY_QUERY, *PSTORAGE_PROPERTY_QUERY;
+
+
+/////////////////////////////////////////////////////////////////////////////
+
+union STORAGE_DEVICE_DESCRIPTOR_DATA {
+    STORAGE_DEVICE_DESCRIPTOR desc;
+    char raw[256];
+};
+
+// Get STORAGE_DEVICE_DESCRIPTOR_DATA for device.
+// (This works without admin rights)
+
+static int
+storage_query_property_ioctl(HANDLE hdevice,
+			     union STORAGE_DEVICE_DESCRIPTOR_DATA * data)
+{
+    DWORD num_out;
+    STORAGE_PROPERTY_QUERY query = {StorageDeviceProperty, PropertyStandardQuery, {0} };
+
+    memset(data, 0, sizeof(*data));
+    if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
+    			  &query, sizeof(query), data, sizeof(*data),
+			  &num_out, NULL)) {
+        if (verbose > 1)
+            fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY failed, "
+		    "Error=%ld\n", GetLastError());
+        return -ENOSYS;
+    }
+
+    if (verbose > 1) {
+        fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY returns:\n"
+                "    Vendor:   \"%s\"\n"
+                "    Product:  \"%s\"\n"
+                "    Revision: \"%s\"\n"
+                "    Removable: %s\n"
+                "    BusType:   0x%02x\n",
+         (data->desc.VendorIdOffset ?
+		 data->raw+data->desc.VendorIdOffset : ""),
+         (data->desc.ProductIdOffset ?
+		 data->raw+data->desc.ProductIdOffset : ""),
+         (data->desc.ProductRevisionOffset ?
+		 data->raw+data->desc.ProductRevisionOffset : ""),
+         (data->desc.RemovableMedia ? "Yes":"No"),
+	 data->desc.BusType);
+    }
+    return 0;
+}
+
+
+static char *
+get_err_str(DWORD err, int max_b_len, char * b)
 {
     LPVOID lpMsgBuf;
     int k, num, ch;
@@ -141,7 +265,8 @@ static char * get_err_str(DWORD err, int max_b_len, char * b)
     return b;
 }
 
-static int findElemIndex(UCHAR port_num, UCHAR bus, UCHAR target, UCHAR lun)
+static int
+findElemIndex(UCHAR port_num, UCHAR bus, UCHAR target, UCHAR lun)
 {
     int k;
     struct w_scsi_elem * sep;
@@ -159,9 +284,9 @@ static int findElemIndex(UCHAR port_num, UCHAR bus, UCHAR target, UCHAR lun)
     return -1;
 }
 
-static BOOL fetchInquiry(HANDLE fh, unsigned char * resp, int max_resp_len,
-                         SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER * afterCall,
-                         int verbose)
+static BOOL
+fetchInquiry(HANDLE fh, unsigned char * resp, int max_resp_len,
+             SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER * afterCall)
 {
     BOOL success;
     int len;
@@ -208,7 +333,8 @@ static BOOL fetchInquiry(HANDLE fh, unsigned char * resp, int max_resp_len,
     return success;
 }
 
-static int sg_do_wscan(char letter, int verbose)
+static int
+sg_do_wscan(char letter)
 {
     int k, j, m, hole_count, index, matched;
     DWORD err;
@@ -365,8 +491,7 @@ static int sg_do_wscan(char letter, int verbose)
                             get_err_str(err, sizeof(b), b));
                 }
             }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw,
-                             verbose)) {
+            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
                 if (sptdw.spt.ScsiStatus) {
                     if (verbose) {
                         fprintf(stderr, "%c: INQUIRY failed:  ", 'C' + k);
@@ -454,8 +579,7 @@ static int sg_do_wscan(char letter, int verbose)
                             "%s", k, err, get_err_str(err, sizeof(b), b));
                 }
             }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw,
-                             verbose)) {
+            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
                 if (sptdw.spt.ScsiStatus) {
                     if (verbose) {
                         fprintf(stderr, "PD%d: INQUIRY failed:  ", k);
@@ -551,8 +675,7 @@ static int sg_do_wscan(char letter, int verbose)
                             get_err_str(err, sizeof(b), b));
                 }
             }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw,
-                             verbose)) {
+            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
                 if (sptdw.spt.ScsiStatus) {
                     if (verbose) {
                         fprintf(stderr, "CDROM%d: INQUIRY failed:  ", k);
@@ -648,8 +771,7 @@ static int sg_do_wscan(char letter, int verbose)
                             get_err_str(err, sizeof(b), b));
                 }
             }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw,
-                             verbose)) {
+            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
                 if (sptdw.spt.ScsiStatus) {
                     if (verbose) {
                         fprintf(stderr, "TAPE%d: INQUIRY failed:  ", k);
@@ -738,10 +860,10 @@ static int sg_do_wscan(char letter, int verbose)
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int c, ret;
-    int verbose = 0;
     int vol_letter = 0;
 
     while (1) {
@@ -790,7 +912,7 @@ int main(int argc, char * argv[])
 
     w_scsi_arr = malloc(sizeof(struct w_scsi_elem) * MAX_SCSI_ELEMS);
 
-    ret = sg_do_wscan(vol_letter, verbose);
+    ret = sg_do_wscan(vol_letter);
 
     free(w_scsi_arr);
     return ret;
