@@ -198,19 +198,19 @@ union STORAGE_DEVICE_DESCRIPTOR_DATA {
 
 static int
 storage_query_property_ioctl(HANDLE hdevice,
-			     union STORAGE_DEVICE_DESCRIPTOR_DATA * data)
+                             union STORAGE_DEVICE_DESCRIPTOR_DATA * data)
 {
     DWORD num_out;
     STORAGE_PROPERTY_QUERY query = {StorageDeviceProperty, PropertyStandardQuery, {0} };
 
     memset(data, 0, sizeof(*data));
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
-    			  &query, sizeof(query), data, sizeof(*data),
-			  &num_out, NULL)) {
+                          &query, sizeof(query), data, sizeof(*data),
+                          &num_out, NULL)) {
 #if 0
         if (verbose > 1)
             fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY failed, "
-		    "Error=%ld\n", GetLastError());
+                    "Error=%ld\n", GetLastError());
 #endif
         return -ENOSYS;
     }
@@ -223,13 +223,13 @@ storage_query_property_ioctl(HANDLE hdevice,
                 "    Removable: %s\n"
                 "    BusType:   0x%02x\n",
          (data->desc.VendorIdOffset ?
-		 data->raw+data->desc.VendorIdOffset : ""),
+                 data->raw+data->desc.VendorIdOffset : ""),
          (data->desc.ProductIdOffset ?
-		 data->raw+data->desc.ProductIdOffset : ""),
+                 data->raw+data->desc.ProductIdOffset : ""),
          (data->desc.ProductRevisionOffset ?
-		 data->raw+data->desc.ProductRevisionOffset : ""),
+                 data->raw+data->desc.ProductRevisionOffset : ""),
          (data->desc.RemovableMedia ? "Yes":"No"),
-	 data->desc.BusType);
+         data->desc.BusType);
     }
     return 0;
 }
@@ -358,15 +358,15 @@ iter_scsi_adapters(void)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
 #if 0
-	    union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+            union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
 
-	    if (storage_query_property_ioctl(fh, &sdda) < 0) {
-		err = GetLastError();
+            if (storage_query_property_ioctl(fh, &sdda) < 0) {
+                err = GetLastError();
                 fprintf(stderr, "%s: IOCTL_STORAGE_QUERY_PROPERTY failed "
                         "err=%lu\n\t%s",
                         adapter_name, err, get_err_str(err, sizeof(b), b));
-	    }
-	    // fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+            }
+            // fprintf(stderr, "%s: failed\n", __FUNCTION__ );
 #endif
             hole_count = 0;
             success = DeviceIoControl(fh, IOCTL_SCSI_GET_INQUIRY_DATA,
@@ -468,10 +468,10 @@ iter_volumes(int letter)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
 #if 1
-	    union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+            union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
 
-	    if (storage_query_property_ioctl(fh, &sdda) < 0)
-		fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+            if (storage_query_property_ioctl(fh, &sdda) < 0)
+                fprintf(stderr, "%s: failed\n", __FUNCTION__ );
 #endif
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
                                        NULL, 0, inqDataBuff,
@@ -585,10 +585,10 @@ iter_pds(void)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
 #if 1
-	    union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+            union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
 
-	    if (storage_query_property_ioctl(fh, &sdda) < 0)
-		fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+            if (storage_query_property_ioctl(fh, &sdda) < 0)
+                fprintf(stderr, "%s: failed\n", __FUNCTION__ );
 #endif
             hole_count = 0;
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
@@ -914,19 +914,19 @@ sg_do_wscan(char letter)
     memset(w_scsi_arr, 0, sizeof(w_scsi_arr));
     k = iter_scsi_adapters();
     if (k)
-	return k;
+        return k;
     k = iter_volumes(letter);
     if (k)
-	return k;
+        return k;
     k = iter_pds();
     if (k)
-	return k;
+        return k;
     k = iter_cdroms();
     if (k)
-	return k;
+        return k;
     k = iter_tapes();
     if (k)
-	return k;
+        return k;
 
     for (k = 0; k < MAX_SCSI_ELEMS; ++k) {
         sep = w_scsi_arr + k;

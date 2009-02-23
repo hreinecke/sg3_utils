@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2008 Douglas Gilbert.
+ * Copyright (c) 2006-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.29 20080513";    /* spc4r14 */
+static char * version_str = "0.30 20090223";    /* spc4r18 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -74,6 +74,7 @@ extern const struct svpd_values_name_t *
 #define VPD_MODE_PG_POLICY 0x87
 #define VPD_SCSI_PORTS 0x88
 #define VPD_ATA_INFO 0x89
+#define VPD_POWER_CONDITION 0x8a
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
@@ -166,6 +167,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
     {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
     {VPD_OSD_INFO, 0, 0x11, 0, "oi", "OSD information"},
+    {VPD_POWER_CONDITION, 0, -1, 0, "po", "Power condition"},
     {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
      "information"},
     {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
@@ -1063,9 +1065,11 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            "SIMPSUP=%d\n", !!(buff[5] & 0x20), !!(buff[5] & 0x10),
            !!(buff[5] & 0x8), !!(buff[5] & 0x4), !!(buff[5] & 0x2),
            !!(buff[5] & 0x1));
-    printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
+    printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
-           !!(buff[6] & 0x1), !!(buff[7] & 0x1));
+           !!(buff[6] & 0x1));
+    printf("  P_I_I_SUP=%d LUICLR=%d CBCS=%d\n",
+           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
@@ -1148,6 +1152,35 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
         dStrHex((const char *)(buff + 60), 512, 0);
     else if (do_long)
         dWordHex((const unsigned short *)(buff + 60), 256, 0, is_be);
+}
+
+static void
+decode_power_condition(unsigned char * buff, int len, int do_hex)
+{
+    if (len < 18) {
+        fprintf(stderr, "Power condition VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    if (do_hex) {
+        dStrHex((const char *)buff, len, 0);
+        return;
+    }
+    printf("  Standby_y=%d Standby_z=%d Idle_c=%d Idle_b=%d Idle_a=%d\n",
+           !!(buff[4] & 0x2), !!(buff[4] & 0x1),
+           !!(buff[5] & 0x4), !!(buff[5] & 0x2), !!(buff[5] & 0x1));
+    printf("  Stopped condition recovery time (ms) %d\n",
+            (buff[6] << 8) + buff[7]);
+    printf("  Standby_z condition recovery time (ms) %d\n",
+            (buff[8] << 8) + buff[9]);
+    printf("  Standby_y condition recovery time (ms) %d\n",
+            (buff[10] << 8) + buff[11]);
+    printf("  Idle_a condition recovery time (ms) %d\n",
+            (buff[12] << 8) + buff[13]);
+    printf("  Idle_b condition recovery time (ms) %d\n",
+            (buff[14] << 8) + buff[15]);
+    printf("  Idle_c condition recovery time (ms) %d\n",
+            (buff[16] << 8) + buff[17]);
 }
 
 static void
@@ -1840,6 +1873,50 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                            (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_ata_info_vpd(rsp_buff, len, do_long, do_hex);
+            }
+            return 0;
+        }
+        break;
+    case VPD_POWER_CONDITION:          /* 0x8a */
+        if ((! do_raw) && (3 != do_hex) && (! do_quiet))
+            printf("Power condition VPD page:\n");
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
+        if (0 == res) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (num_vpd != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                if (verbose) {
+                    fprintf(stderr, "First 32 bytes of bad response\n");
+                        dStrHex((const char *)rsp_buff, 32, 0);
+                }
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching ATA info page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
+            }
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else {
+                pdt = rsp_buff[0] & 0x1f;
+                if (verbose || do_long)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rsp_buff[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(buff), buff));
+                decode_power_condition(rsp_buff, len, do_hex);
             }
             return 0;
         }

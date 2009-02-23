@@ -23,7 +23,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2008 D. Gilbert
+*  Copyright (C) 2000-2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.79 20081125";    /* spc-4 rev 17 */
+static char * version_str = "0.79 20090223";    /* SPC-4 rev 18 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -78,6 +78,7 @@ static char * version_str = "0.79 20081125";    /* spc-4 rev 17 */
 #define VPD_MODE_PG_POLICY  0x87
 #define VPD_SCSI_PORTS  0x88
 #define VPD_ATA_INFO  0x89
+#define VPD_POWER_CONDITION  0x8a
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS  0xb0
@@ -144,6 +145,7 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
     {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
+    {VPD_POWER_CONDITION, 0, -1, 0, "po", "Power condition"},
     {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
      "information"},
     {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
@@ -644,6 +646,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_MODE_PG_POLICY, 0, "Mode page policy"},
     {VPD_SCSI_PORTS, 0, "SCSI ports"},
     {VPD_ATA_INFO, 0, "ATA information"},
+    {VPD_POWER_CONDITION, 0, "Power condition"},
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
     {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
@@ -1260,9 +1263,11 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            "SIMPSUP=%d\n", !!(buff[5] & 0x20), !!(buff[5] & 0x10),
            !!(buff[5] & 0x8), !!(buff[5] & 0x4), !!(buff[5] & 0x2),
            !!(buff[5] & 0x1));
-    printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d LUICLR=%d\n",
+    printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
-           !!(buff[6] & 0x1), !!(buff[7] & 0x1));
+           !!(buff[6] & 0x1));
+    printf("  P_I_I_SUP=%d LUICLR=%d CBCS=%d\n",
+           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
@@ -1342,6 +1347,35 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
     else
         dWordHex((const unsigned short *)(buff + 60), 256, 0,
                  sg_is_big_endian());
+}
+
+static void
+decode_power_condition(unsigned char * buff, int len, int do_hex)
+{
+    if (len < 18) {
+        fprintf(stderr, "Power condition VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    if (do_hex) {
+        dStrHex((const char *)buff, len, 0);
+        return;
+    }
+    printf("  Standby_y=%d Standby_z=%d Idle_c=%d Idle_b=%d Idle_a=%d\n",
+           !!(buff[4] & 0x2), !!(buff[4] & 0x1),
+           !!(buff[5] & 0x4), !!(buff[5] & 0x2), !!(buff[5] & 0x1));
+    printf("  Stopped condition recovery time (ms) %d\n",
+            (buff[6] << 8) + buff[7]);
+    printf("  Standby_z condition recovery time (ms) %d\n",
+            (buff[8] << 8) + buff[9]);
+    printf("  Standby_y condition recovery time (ms) %d\n",
+            (buff[10] << 8) + buff[11]);
+    printf("  Idle_a condition recovery time (ms) %d\n",
+            (buff[12] << 8) + buff[13]);
+    printf("  Idle_b condition recovery time (ms) %d\n",
+            (buff[14] << 8) + buff[15]);
+    printf("  Idle_c condition recovery time (ms) %d\n",
+            (buff[16] << 8) + buff[17]);
 }
 
 static void
@@ -2232,6 +2266,33 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
                 dStrRaw((const char *)rsp_buff, len);
             else
                 decode_ata_info_vpd(rsp_buff, len, optsp->do_hex);
+        }
+        break;
+    case VPD_POWER_CONDITION:
+        if (!optsp->do_raw)
+            printf("VPD INQUIRY: Power condition page\n");
+        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_POWER_CONDITION, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
+        if (0 == res) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (VPD_POWER_CONDITION != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > MX_ALLOC_LEN) {
+                fprintf(stderr, "response length too long: %d > %d\n", len,
+                       MX_ALLOC_LEN);
+                return SG_LIB_CAT_MALFORMED;
+            } else if (len > DEF_ALLOC_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_POWER_CONDITION, rsp_buff,
+                                  len, 1, optsp->do_verbose))
+                    return SG_LIB_CAT_OTHER;
+            }
+            if (optsp->do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else
+                decode_power_condition(rsp_buff, len, optsp->do_hex);
         }
         break;
     case 0xb0:  /* could be BLOCK LIMITS but need to know pdt to find out */
