@@ -59,7 +59,7 @@
 #define INQUIRY_CMD 0x12
 #define INQUIRY_CMDLEN 6
 
-static char * version_str = "1.05 (win32) 20090221";
+static char * version_str = "1.06 (win32) 20090223";
 
 struct w_scsi_elem {
     char    in_use;
@@ -207,9 +207,11 @@ storage_query_property_ioctl(HANDLE hdevice,
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
     			  &query, sizeof(query), data, sizeof(*data),
 			  &num_out, NULL)) {
+#if 0
         if (verbose > 1)
             fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY failed, "
 		    "Error=%ld\n", GetLastError());
+#endif
         return -ENOSYS;
     }
 
@@ -334,30 +336,38 @@ fetchInquiry(HANDLE fh, unsigned char * resp, int max_resp_len,
 }
 
 static int
-sg_do_wscan(char letter)
+iter_scsi_adapters(void)
 {
-    int k, j, m, hole_count, index, matched;
-    DWORD err;
+    int k, j, m;
+    int hole_count = 0;
     HANDLE fh;
     ULONG dummy;
-    BOOL success;
+    DWORD err;
     BYTE bus;
-    PSCSI_ADAPTER_BUS_INFO  ai;
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
-    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
+    BOOL success;
     char adapter_name[64];
     char inqDataBuff[2048];
-    char b[256];
+    PSCSI_ADAPTER_BUS_INFO  ai;
     struct w_scsi_elem * sep;
+    char b[256];
 
-    memset(w_scsi_arr, 0, sizeof(w_scsi_arr));
-    hole_count = 0;
     for (k = 0; k < MAX_ADAPTER_NUM; ++k) {
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\SCSI%d:", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
+#if 0
+	    union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+
+	    if (storage_query_property_ioctl(fh, &sdda) < 0) {
+		err = GetLastError();
+                fprintf(stderr, "%s: IOCTL_STORAGE_QUERY_PROPERTY failed "
+                        "err=%lu\n\t%s",
+                        adapter_name, err, get_err_str(err, sizeof(b), b));
+	    }
+	    // fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+#endif
             hole_count = 0;
             success = DeviceIoControl(fh, IOCTL_SCSI_GET_INQUIRY_DATA,
                                       NULL, 0, inqDataBuff, sizeof(inqDataBuff),
@@ -431,6 +441,23 @@ sg_do_wscan(char letter)
                 break;
         }
     }
+    return 0;
+}
+
+static int
+iter_volumes(int letter)
+{
+    int k, m, index, matched;
+    HANDLE fh;
+    ULONG dummy;
+    DWORD err;
+    BOOL success;
+    char adapter_name[64];
+    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
+    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
+    char inqDataBuff[2048];
+    struct w_scsi_elem * sep;
+    char b[256];
 
     for (k = 0; k < 24; ++k) {
         matched = 0;
@@ -440,6 +467,12 @@ sg_do_wscan(char letter)
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
+#if 1
+	    union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+
+	    if (storage_query_property_ioctl(fh, &sdda) < 0)
+		fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+#endif
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
                                        NULL, 0, inqDataBuff,
                                        sizeof(inqDataBuff), &dummy, FALSE);
@@ -523,8 +556,25 @@ sg_do_wscan(char letter)
             CloseHandle(fh);
         }
     }
+    return 0;
+}
 
-    hole_count = 0;
+static int
+iter_pds(void)
+{
+    int k, m, index, matched;
+    int hole_count = 0;
+    HANDLE fh;
+    ULONG dummy;
+    DWORD err;
+    BOOL success;
+    char adapter_name[64];
+    char inqDataBuff[2048];
+    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
+    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
+    struct w_scsi_elem * sep;
+    char b[256];
+
     for (k = 0; k < MAX_PHYSICALDRIVE_NUM; ++k) {
         matched = 0;
         sep = NULL;
@@ -534,6 +584,12 @@ sg_do_wscan(char letter)
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
+#if 1
+	    union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+
+	    if (storage_query_property_ioctl(fh, &sdda) < 0)
+		fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+#endif
             hole_count = 0;
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
                                        NULL, 0, inqDataBuff,
@@ -619,8 +675,25 @@ sg_do_wscan(char letter)
                 break;
         }
     }
+    return 0;
+}
 
-    hole_count = 0;
+static int
+iter_cdroms()
+{
+    int k, m, index, matched;
+    int hole_count = 0;
+    HANDLE fh;
+    ULONG dummy;
+    DWORD err;
+    BOOL success;
+    char adapter_name[64];
+    char inqDataBuff[2048];
+    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
+    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
+    struct w_scsi_elem * sep;
+    char b[256];
+
     for (k = 0; k < MAX_CDROM_NUM; ++k) {
         matched = 0;
         sep = NULL;
@@ -715,8 +788,25 @@ sg_do_wscan(char letter)
                 break;
         }
     }
+    return 0;
+}
 
-    hole_count = 0;
+static int
+iter_tapes()
+{
+    int k, m, index, matched;
+    int hole_count = 0;
+    HANDLE fh;
+    ULONG dummy;
+    DWORD err;
+    BOOL success;
+    char adapter_name[64];
+    char inqDataBuff[2048];
+    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
+    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
+    struct w_scsi_elem * sep;
+    char b[256];
+
     for (k = 0; k < MAX_TAPE_NUM; ++k) {
         matched = 0;
         sep = NULL;
@@ -811,6 +901,32 @@ sg_do_wscan(char letter)
                 break;
         }
     }
+    return 0;
+}
+
+static int
+sg_do_wscan(char letter)
+{
+    int k, j;
+    char b[256];
+    struct w_scsi_elem * sep;
+
+    memset(w_scsi_arr, 0, sizeof(w_scsi_arr));
+    k = iter_scsi_adapters();
+    if (k)
+	return k;
+    k = iter_volumes(letter);
+    if (k)
+	return k;
+    k = iter_pds();
+    if (k)
+	return k;
+    k = iter_cdroms();
+    if (k)
+	return k;
+    k = iter_tapes();
+    if (k)
+	return k;
 
     for (k = 0; k < MAX_SCSI_ELEMS; ++k) {
         sep = w_scsi_arr + k;
