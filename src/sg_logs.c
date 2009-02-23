@@ -25,7 +25,8 @@
 
 */
 
-static char * version_str = "0.82 20090205";    /* SPC-4 revision 17 */
+static char * version_str = "0.83 20090223";    /* SPC-4 revision 18 */
+/* TODO: define Power Condition transition log page */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -45,6 +46,7 @@ static char * version_str = "0.82 20090205";    /* SPC-4 revision 17 */
 #define SELF_TEST_LPAGE 0x10
 #define PORT_SPECIFIC_LPAGE 0x18
 #define GSP_LPAGE 0x19
+#define PCT_LPAGE 0x1a
 #define TAPE_ALERT_LPAGE 0x2e
 #define IE_LPAGE 0x2f
 #define NOT_SUBPG_LOG 0x0
@@ -149,6 +151,7 @@ usage()
            "output\n");
     printf("    --ppc|-Q        set the Parameter Pointer Control (PPC) bit "
            "(def: 0)\n"
+           "                    the PPC bit made obsolete in SPC-4 rev 18\n"
            "    --raw|-r        output response in binary to stdout\n"
            "    --reset|-R      reset log parameters (takes PC and SP into "
            "account)\n"
@@ -316,7 +319,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         case 'q':
             ++optsp->do_pcb;
             break;
-        case 'Q':
+        case 'Q':       /* N.B. PPC bit obsoleted in SPC-4 rev 18 */
             ++optsp->do_ppc;
             break;
         case 'r':
@@ -656,6 +659,9 @@ show_page_name(int pg_code, int subpg_code,
         case PORT_SPECIFIC_LPAGE: printf("%sProtocol specific port", b); break;
         case GSP_LPAGE:
             printf("%sGeneral statistics and performance", b);
+            break;
+        case PCT_LPAGE:
+            printf("%sPower condition transition", b);
             break;
         case IE_LPAGE: printf("%sInformational exceptions (SMART)", b); break;
         default : done = 0; break;

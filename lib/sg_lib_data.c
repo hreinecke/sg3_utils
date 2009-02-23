@@ -33,7 +33,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.47 20090201";    /* spc-4 rev 15 */
+const char * sg_lib_version_str = "1.47 20090223";    /* spc-4 rev 18 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -110,14 +110,15 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x3f, 0, "Write long(10)"},
     {0x40, 0, "Change definition"},     /* obsolete in SPC-4 r11 */
     {0x41, 0, "Write same(10)"},
-    {0x42, 0, "Read sub-channel"},
-    {0x43, 0, "Read TOC/PMA/ATIP"},
+    {0x42, 0, "Unmap"},                 /* added SPC-4 rev 18 */
+    {0x42, PDT_MMC, "Read sub-channel"},
+    {0x43, PDT_MMC, "Read TOC/PMA/ATIP"},
     {0x44, 0, "Report density support"},
-    {0x45, 0, "Play audio(10)"},
-    {0x46, 0, "Get configuration"},
-    {0x47, 0, "Play audio msf"},
-    {0x4a, 0, "Get event status notification"},
-    {0x4b, 0, "Pause/resume"},
+    {0x45, PDT_MMC, "Play audio(10)"},
+    {0x46, PDT_MMC, "Get configuration"},
+    {0x47, PDT_MMC, "Play audio msf"},
+    {0x4a, PDT_MMC, "Get event status notification"},
+    {0x4b, PDT_MMC, "Pause/resume"},
     {0x4c, 0, "Log select"},
     {0x4d, 0, "Log sense"},
     {0x4e, 0, "Stop play/scan"},
@@ -403,6 +404,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
                 "notify (enable spinup) required"},
     {0x04,0x12,"Logical unit not ready, offline"},
     {0x04,0x13,"Logical unit not ready, SA creation in progress"},
+    {0x04,0x14,"Logical unit not ready, space allocation in progress"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -425,6 +427,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0B,0x05,"Warning - background medium scan detected medium error"},
     {0x0B,0x06,"Warning - non-volatile cache now volatile"},
     {0x0B,0x07,"Warning - degraded power to non-volatile cache"},
+    {0x0B,0x08,"Warning - power loss expected"},
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -577,6 +580,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x27,0x04,"Persistent write protect"},
     {0x27,0x05,"Permanent write protect"},
     {0x27,0x06,"Conditional write protect"},
+    {0x27,0x07,"Space allocation failed write protect"},
     {0x28,0x00,"Not ready to ready change, medium may have changed"},
     {0x28,0x01,"Import or export element accessed"},
     {0x28,0x02,"Format-layer may have changed"},
@@ -888,6 +892,12 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x5E,0x02,"Standby condition activated by timer"},
     {0x5E,0x03,"Idle condition activated by command"},
     {0x5E,0x04,"Standby condition activated by command"},
+    {0x5E,0x05,"Idle_b condition activated by timer"},
+    {0x5E,0x06,"Idle_b condition activated by command"},
+    {0x5E,0x07,"Idle_c condition activated by timer"},
+    {0x5E,0x08,"Idle_c condition activated by command"},
+    {0x5E,0x09,"Standby_y condition activated by timer"},
+    {0x5E,0x0a,"Standby_y condition activated by command"},
     {0x5E,0x41,"Power state change to active"},
     {0x5E,0x42,"Power state change to idle"},
     {0x5E,0x43,"Power state change to standby"},

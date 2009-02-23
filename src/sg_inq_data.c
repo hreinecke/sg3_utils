@@ -23,7 +23,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2008 D. Gilbert
+*  Copyright (C) 2000-2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -53,7 +53,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 15 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 18 [sorted numerically (from Annex D.8)] */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
@@ -174,6 +174,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x434, "MMC-5 ANSI INCITS 430-2007"},
     {0x440, "OSD-2 (no version claimed)"},
     {0x444, "OSD-2 T10/1729-D revision 4"},
+    {0x446, "OSD-2 T10/1729-D revision 5"},
     {0x460, "SPC-4 (no version claimed)"},
     {0x461, "SPC-4 T10/1713-D revision 16"},
     {0x480, "SMC-3 (no version claimed)"},
@@ -185,6 +186,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x500, "ADC-3 (no version claimed)"},
     {0x520, "SSC-4 (no version claimed)"},
     {0x560, "OSD-3 (no version claimed)"},
+    {0x580, "SES-3 (no version claimed)"},
     {0x820, "SSA-TL2 (no version claimed)"},
     {0x83b, "SSA-TL2 T10/1147-D revision 05b"},
     {0x83c, "SSA-TL2 ANSI INCITS 308-1998"},
