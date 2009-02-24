@@ -25,8 +25,8 @@
 
 */
 
-static char * version_str = "0.83 20090223";    /* SPC-4 revision 18 */
-/* TODO: define Power Condition transition log page */
+static char * version_str = "0.83 20090224";    /* SPC-4 revision 18 */
+/* TODO: check changes to Start-stop cycle counter log page in spc4r18 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -985,6 +985,62 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
             else
                 printf("  Vendor specific [0x%x]", pc);
             break;
+        }
+        k = pl - 4;
+        xp = ucp + 4;
+        if (k > (int)sizeof(ull)) {
+            xp += (k - sizeof(ull));
+            k = sizeof(ull);
+        }
+        ull = 0;
+        for (j = 0; j < k; ++j) {
+            if (j > 0)
+                ull <<= 8;
+            ull |= xp[j];
+        }
+        printf(" = %" PRIu64 "", ull);
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static void
+show_power_condition_transitions_page(unsigned char * resp, int len,
+                                      int show_pcb)
+{
+    int k, j, num, pl, pc, pcb;
+    unsigned char * ucp;
+    unsigned char * xp;
+    uint64_t ull;
+    char pcb_str[PCB_STR_LEN];
+
+    printf("Power condition transitions page\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        switch (pc) {
+        case 0:
+            printf("  Accumulated transitions to active"); break;
+        case 1:
+            printf("  Accumulated transitions to idle_a"); break;
+        case 2:
+            printf("  Accumulated transitions to idle_b"); break;
+        case 3:
+            printf("  Accumulated transitions to idle_c"); break;
+        case 8:
+            printf("  Accumulated transitions to standby_z"); break;
+        case 9:
+            printf("  Accumulated transitions to standby_y"); break;
+        default:
+            printf("  Reserved [0x%x]", pc);
         }
         k = pl - 4;
         xp = ucp + 4;
@@ -3055,6 +3111,9 @@ show_ascii_page(unsigned char * resp, int len,
         break;
     case GSP_LPAGE: /* defined for subpages 0 to 31 inclusive */
         done = show_stats_perform_page(resp, len, optsp);
+        break;
+    case PCT_LPAGE:
+        show_power_condition_transitions_page(resp, len, optsp->do_pcb);
         break;
     case TAPE_ALERT_LPAGE:
         {
