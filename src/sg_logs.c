@@ -26,7 +26,6 @@
 */
 
 static char * version_str = "0.83 20090224";    /* SPC-4 revision 18 */
-/* TODO: check changes to Start-stop cycle counter log page in spc4r18 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1315,6 +1314,26 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
                     printf("  Accumulated start-stop cycles = -1");
                 else
                     printf("  Accumulated start-stop cycles = %u", n);
+            }
+            break;
+        case 5:
+            if (extra > 7) {
+                n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+                if (0xffffffff == n)
+                    printf("  Specified load-unload count over device lifetime "
+                           "= -1");
+                else
+                    printf("  Specified load-unload count over device lifetime "
+                           "= %u", n);
+            }
+            break;
+        case 6:
+            if (extra > 7) {
+                n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+                if (0xffffffff == n)
+                    printf("  Accumulated load-unload cycles = -1");
+                else
+                    printf("  Accumulated load-unload cycles = %u", n);
             }
             break;
         default:
