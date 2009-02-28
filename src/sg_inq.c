@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.79 20090223";    /* SPC-4 rev 18 */
+static char * version_str = "0.80 20090228";    /* SPC-4 rev 18 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1417,6 +1417,14 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                     buff[19];
                 printf("  Maximum prefetch, xdread, xdwrite transfer length: %u "
                        "blocks\n", u);
+            }
+            if (len > 27) {     /* added in sbc3r18 */
+                u = ((unsigned int)buff[20] << 24) | (buff[21] << 16) |
+                    (buff[22] << 8) | buff[23];
+                printf("  Maximum unmap LBA count: %u\n", u);
+                u = ((unsigned int)buff[24] << 24) | (buff[25] << 16) |
+                    (buff[26] << 8) | buff[27];
+                printf("  Maximum unmap block descriptor count: %u\n", u);
             }
             break;
         case PDT_TAPE: case PDT_MCHANGER:
