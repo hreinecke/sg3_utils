@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -63,11 +63,10 @@ extern int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-extern int sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req,
-                             int longlist, int fmtdata, int cmplist,
-                             int dlist_format, int timeout_secs,
-                             void * paramp, int param_len, int noisy,
-                             int verbose);
+extern int sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist,
+                             int fmtdata, int cmplist, int dlist_format,
+                             int timeout_secs, void * paramp, int param_len,
+                             int noisy, int verbose);
 
 /* Invokes a SCSI PERSISTENT RESERVE IN command (SPC). Returns 0
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
