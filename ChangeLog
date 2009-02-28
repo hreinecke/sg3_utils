@@ -2,10 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090228] [svn: r221]
+Changelog for sg3_utils-1.27 [20090228] [svn: r222]
   - sg_inq: sync version descriptors with spc4r18
     - add power condition VPD page
+    - expand block limits VPD page (sbc3r18)
   - sg_vpd: add power condition VPD page
+    - expand block limits VPD page (sbc3r18)
   - sg_map26: fix for lk 2.6.26 when CONFIG_SYSFS_DEPRECATED_V2
     is not defined
     - output cdb when verbose option given
@@ -25,6 +27,7 @@ Changelog for sg3_utils-1.27 [20090228] [svn: r221]
     - power condition transitions lpage (added in spc4r18)
     - extra parameters for start-stop cycle counter lpage
   - sg_format: add '--fmtpinfo=' and '--pie=' options (sbc3r18)
+  - sg_readcap: more protection + thin provisioning (sbc3r18)
   - sg3_utils.spec: correction to configure call
   - sg_pt: add scsi_pt_open_device_flags() call to public interface
     - add scsi_pt_version() and clear_scsi_pt_obj() calls
