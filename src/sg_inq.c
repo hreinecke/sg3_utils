@@ -888,7 +888,7 @@ static void
 decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
 {
     int u, j, m, id_len, p_id, c_set, piv, assoc, id_type, i_len;
-    int off, ci_off, c_id, d_id, naa, vsi;
+    int off, ci_off, c_id, d_id, naa, vsi, k;
     uint64_t vsei;
     uint64_t id_ext;
     const unsigned char * ucp;
@@ -930,7 +930,17 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         }
         switch (id_type) {
         case 0: /* vendor specific */
-            dStrHex((const char *)ip, i_len, 0);
+            k = 0;
+            if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+                for (k = 0; (k < i_len) && isprint(ip[k]); ++k)
+                    ;
+                if (k >= i_len)
+                    k = 1;
+            }
+            if (k)
+                printf("      vendor specific: %.*s\n", i_len, ip);
+            else
+                dStrHex((const char *)ip, i_len, 0);
             break;
         case 1: /* T10 vendor identification */
             printf("      vendor id: %.8s\n", ip);

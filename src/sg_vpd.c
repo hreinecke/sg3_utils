@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.30 20090223";    /* spc4r18 */
+static char * version_str = "0.31 20090227";    /* spc4r18 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -669,7 +669,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                int quiet)
 {
     int m, p_id, c_set, piv, assoc, desig_type, i_len;
-    int ci_off, c_id, d_id, naa, vsi, printed, off, u;
+    int ci_off, c_id, d_id, naa, vsi, printed, off, u, k;
     uint64_t vsei;
     uint64_t id_ext;
     const unsigned char * ucp;
@@ -710,7 +710,17 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
         /* printf("    associated with the %s\n", assoc_arr[assoc]); */
         switch (desig_type) {
         case 0: /* vendor specific */
-            dStrHex((const char *)ip, i_len, 0);
+            k = 0;
+            if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+                for (k = 0; (k < i_len) && isprint(ip[k]); ++k)
+                    ;
+                if (k >= i_len)
+                    k = 1;
+            }
+            if (k)
+                printf("      vendor specific: %.*s\n", i_len, ip);
+            else
+                dStrHex((const char *)ip, i_len, 0);
             break;
         case 1: /* T10 vendor identification */
             printf("      vendor id: %.8s\n", ip);

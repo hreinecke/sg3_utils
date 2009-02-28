@@ -16,7 +16,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2008 D. Gilbert
+*  Copyright (C) 1999 - 2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.82 20080222";
+static char * version_str = "3.83 20090228";
 
 #define ME "sg_readcap: "
 
@@ -483,8 +483,11 @@ int main(int argc, char * argv[])
                 goto good;
             }
             printf("Read Capacity results:\n");
-            printf("   Protection: prot_en=%d, p_type=%d\n",
-                   !!(resp_buff[12] & 0x1), ((resp_buff[12] >> 1) & 0x7));
+            printf("   Protection: prot_en=%d, p_type=%d, p_i_exponent=%d\n",
+                   !!(resp_buff[12] & 0x1), ((resp_buff[12] >> 1) & 0x7),
+                   ((resp_buff[13] >> 4) & 0xf));
+            printf("   Thin provisioning: tpe=%d, tprz=%d\n",
+                   !!(resp_buff[14] & 0x80), !!(resp_buff[14] & 0x40));
             if (opts.do_pmi)
                 printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
                        "before delay=0x%" PRIx64 "\n", opts.llba,

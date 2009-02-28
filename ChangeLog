@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090224] [svn: r219]
+Changelog for sg3_utils-1.27 [20090228] [svn: r221]
   - sg_inq: sync version descriptors with spc4r18
     - add power condition VPD page
   - sg_vpd: add power condition VPD page
@@ -24,11 +24,14 @@ Changelog for sg3_utils-1.27 [20090224] [svn: r219]
   - sg_logs: protocol specific (SAS) lpage sync to sas2r15
     - power condition transitions lpage (added in spc4r18)
     - extra parameters for start-stop cycle counter lpage
+  - sg_format: add '--fmtpinfo=' and '--pie=' options (sbc3r18)
   - sg3_utils.spec: correction to configure call
   - sg_pt: add scsi_pt_open_device_flags() call to public interface
     - add scsi_pt_version() and clear_scsi_pt_obj() calls
     - clear os_err at start of do_scsi_pt()
   - sg_cmds: add sg_cmds_open_device_flags() call previous entry
+  - sg_cmds_extra: sg_ll_format_unit: remove rto_req argument,
+    the expanded fmtpinfo argument subsumes it.
   - clearer split between Linux and Windows only code and doc
   - autotools infrastructure: changes after upgrade to Ubuntu 8.10
   - autotools infrastructure: revert back to Debian 4.0

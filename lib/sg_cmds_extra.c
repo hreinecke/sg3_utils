@@ -674,8 +674,8 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int
-sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
-                  int fmtdata, int cmplst, int dlist_format, int timeout_secs,
+sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
+                  int cmplst, int dlist_format, int timeout_secs,
                   void * paramp, int param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat, tmout;
@@ -685,9 +685,7 @@ sg_ll_format_unit(int sg_fd, int fmtpinfo, int rto_req, int longlist,
     struct sg_pt_base * ptvp;
 
     if (fmtpinfo)
-        fuCmdBlk[1] |= 0x80;
-    if (rto_req)
-        fuCmdBlk[1] |= 0x40;
+        fuCmdBlk[1] |= (fmtpinfo << 6);
     if (longlist)
         fuCmdBlk[1] |= 0x20;
     if (fmtdata)
