@@ -66,6 +66,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_vpd$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_long$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_wr_mode$(EXEEXT)
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_get_config$(EXEEXT) \
@@ -101,6 +102,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_vpd$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_long$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_wr_mode$(EXEEXT)
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_get_config$(EXEEXT) \
@@ -135,6 +137,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_vpd$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_long$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_wr_mode$(EXEEXT)
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_get_config$(EXEEXT) \
@@ -169,6 +172,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_vpd$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_long$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_wr_mode$(EXEEXT)
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@bin_PROGRAMS = sg_dd$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_emc_trespass$(EXEEXT) \
@@ -215,6 +219,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_vpd$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_long$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_wr_mode$(EXEEXT)
 @OS_FREEBSD_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_get_config$(EXEEXT) sg_ident$(EXEEXT) \
@@ -234,7 +239,8 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@	sg_sync$(EXEEXT) sg_turs$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_verify$(EXEEXT) sg_vpd$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_write_long$(EXEEXT) sg_wr_mode$(EXEEXT)
+@OS_FREEBSD_TRUE@	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_wr_mode$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -376,6 +382,9 @@ sg_write_buffer_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_write_long_OBJECTS = sg_write_long.$(OBJEXT)
 sg_write_long_OBJECTS = $(am_sg_write_long_OBJECTS)
 sg_write_long_DEPENDENCIES = ../lib/libsgutils2.la
+am_sg_write_same_OBJECTS = sg_write_same.$(OBJEXT)
+sg_write_same_OBJECTS = $(am_sg_write_same_OBJECTS)
+sg_write_same_DEPENDENCIES = ../lib/libsgutils2.la
 am_sginfo_OBJECTS = sginfo.$(OBJEXT)
 sginfo_OBJECTS = $(am_sginfo_OBJECTS)
 sginfo_DEPENDENCIES = ../lib/libsgutils2.la
@@ -414,8 +423,8 @@ SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
 	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
 	$(sg_turs_SOURCES) $(sg_verify_SOURCES) $(sg_vpd_SOURCES) \
 	$(sg_wr_mode_SOURCES) $(sg_write_buffer_SOURCES) \
-	$(sg_write_long_SOURCES) $(sginfo_SOURCES) $(sgm_dd_SOURCES) \
-	$(sgp_dd_SOURCES)
+	$(sg_write_long_SOURCES) $(sg_write_same_SOURCES) \
+	$(sginfo_SOURCES) $(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
 DIST_SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
 	$(sg_format_SOURCES) $(sg_get_config_SOURCES) \
 	$(sg_ident_SOURCES) $(sg_inq_SOURCES) $(sg_logs_SOURCES) \
@@ -433,8 +442,8 @@ DIST_SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
 	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
 	$(sg_turs_SOURCES) $(sg_verify_SOURCES) $(sg_vpd_SOURCES) \
 	$(sg_wr_mode_SOURCES) $(sg_write_buffer_SOURCES) \
-	$(sg_write_long_SOURCES) $(sginfo_SOURCES) $(sgm_dd_SOURCES) \
-	$(sgp_dd_SOURCES)
+	$(sg_write_long_SOURCES) $(sg_write_same_SOURCES) \
+	$(sginfo_SOURCES) $(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -637,6 +646,8 @@ sg_write_buffer_SOURCES = sg_write_buffer.c
 sg_write_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_write_long_SOURCES = sg_write_long.c
 sg_write_long_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_write_same_SOURCES = sg_write_same.c
+sg_write_same_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_wr_mode_SOURCES = sg_wr_mode.c
 sg_wr_mode_LDADD = ../lib/libsgutils2.la @os_libs@
 all: all-am
@@ -829,6 +840,9 @@ sg_write_buffer$(EXEEXT): $(sg_write_buffer_OBJECTS) $(sg_write_buffer_DEPENDENC
 sg_write_long$(EXEEXT): $(sg_write_long_OBJECTS) $(sg_write_long_DEPENDENCIES) 
 	@rm -f sg_write_long$(EXEEXT)
 	$(LINK) $(sg_write_long_OBJECTS) $(sg_write_long_LDADD) $(LIBS)
+sg_write_same$(EXEEXT): $(sg_write_same_OBJECTS) $(sg_write_same_DEPENDENCIES) 
+	@rm -f sg_write_same$(EXEEXT)
+	$(LINK) $(sg_write_same_OBJECTS) $(sg_write_same_LDADD) $(LIBS)
 sginfo$(EXEEXT): $(sginfo_OBJECTS) $(sginfo_DEPENDENCIES) 
 	@rm -f sginfo$(EXEEXT)
 	$(LINK) $(sginfo_OBJECTS) $(sginfo_LDADD) $(LIBS)
@@ -890,6 +904,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_wr_mode.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_buffer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_long.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_same.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sginfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sgm_dd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sgp_dd.Po@am__quote@
