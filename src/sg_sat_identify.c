@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2008 Douglas Gilbert.
+ * Copyright (c) 2006-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,7 +40,6 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
-#include "sg_pt.h"
 
 /* This program uses a ATA PASS-THROUGH SCSI command to package
    an ATA IDENTIFY (PACKAGE) DEVICE command. See http://www.t10.org
@@ -64,7 +63,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.06 20080513";
+static char * version_str = "1.06 20090303";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},

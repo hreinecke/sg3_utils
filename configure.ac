@@ -12,6 +12,9 @@ AC_PROG_LIBTOOL
 
 # check for headers
 AC_HEADER_STDC
+AC_CHECK_HEADERS(linux/bsg.h)
+
+# check for functions
 AC_CHECK_FUNCS(getopt_long,
 	       GETOPT_O_FILES='',
 	       GETOPT_O_FILES='getopt_long.o')

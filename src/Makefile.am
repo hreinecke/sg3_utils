@@ -16,7 +16,7 @@ bin_PROGRAMS = \
 	sg_reset sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_test_rwbuf sg_turs sg_verify sg_vpd sg_write_buffer \
-	sg_write_long sg_wr_mode
+	sg_write_long sg_write_same sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -38,7 +38,7 @@ bin_PROGRAMS = \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_wr_mode
+	sg_write_same sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -60,7 +60,7 @@ bin_PROGRAMS = \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_wr_mode
+	sg_write_same sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -82,7 +82,7 @@ bin_PROGRAMS = \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_wr_mode
+	sg_write_same sg_wr_mode
 
 endif
 
@@ -98,7 +98,7 @@ bin_PROGRAMS = \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_wr_mode
+	sg_write_same sg_wr_mode
 
 endif
 
@@ -114,7 +114,7 @@ bin_PROGRAMS = \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_wr_mode
+	sg_write_same sg_wr_mode
 
 endif
 
@@ -256,6 +256,9 @@ sg_write_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_write_long_SOURCES = sg_write_long.c
 sg_write_long_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_write_same_SOURCES = sg_write_same.c
+sg_write_same_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_wr_mode_SOURCES = sg_wr_mode.c
 sg_wr_mode_LDADD = ../lib/libsgutils2.la @os_libs@
