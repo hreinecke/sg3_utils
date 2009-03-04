@@ -17,7 +17,8 @@ man_MANS = \
 	sg_reset.8 sg_rmsn.8 sg_rtpg.8 sg_safte.8 sg_sat_identify.8 \
 	sg_sat_phy_event.8 sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 \
 	sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 sg_test_rwbuf.8 sg_turs.8 \
-	sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_wr_mode.8
+	sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
+	sg_write_same.8 sg_wr_mode.8
 
 distclean-local:
 	rm -f sg_scan.8
@@ -40,7 +41,7 @@ man_MANS = \
 	sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 	sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 \
 	sg_stpg.8 sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-	sg_write_long.8 sg_wr_mode.8
+	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 distclean-local:
 	rm -f sg_scan.8
@@ -63,7 +64,7 @@ man_MANS = \
 	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 	sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 \
 	sg_stpg.8 sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-	sg_write_long.8 sg_wr_mode.8
+	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 distclean-local:
 	rm -f sg_scan.8
@@ -86,7 +87,7 @@ man_MANS = \
 	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 	sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 \
 	sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-	sg_write_long.8 sg_wr_mode.8
+	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 endif
 
@@ -103,7 +104,7 @@ man_MANS = \
 	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 	sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 \
 	sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-	sg_write_long.8 sg_wr_mode.8
+	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 endif
 
@@ -120,7 +121,7 @@ man_MANS = \
 	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 	sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 \
 	sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-	sg_write_long.8 sg_wr_mode.8
+	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 endif
 

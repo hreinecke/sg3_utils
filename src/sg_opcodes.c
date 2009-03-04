@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2008 D. Gilbert
+ *  Copyright (C) 2004-2009 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,39 +24,17 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.32 20080623";    /* spc4r15 */
+#include "sg_pt.h"
 
-// #define USE_LINUX_SG_IO_IF 1
+static char * version_str = "0.33 20090303";    /* spc4r18 */
 
 /* Notes:
- *  - this file has both Linux specific pass through code using the
- *    SG_IO ioctl and a more generic sg_pt mechanism that is portable
- *    to other OSes. The code is conditionally compiled depending
- *    on the USE_LINUX_SG_IO_IF define and whether the Makefile
- *    indicates the OS is Linux.
- *    N.B. Various Makefiles are set assuming this is not defined.
- *
  *  - since support for the SCSI REPORT SUPPORTED OPERATION CODES and
  *    REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS is uncommon, dummy
  *    response code is provided. Uncomment the '#define TEST_CODE'
  *    line for test mode.
  */
 
-#if defined(USE_LINUX_SG_IO_IF) && defined(SG3_UTILS_LINUX)
-  #define USE_SG_IO
-#endif
-
-#ifdef USE_SG_IO
-  #include <sys/ioctl.h>
-  #include <sys/types.h>
-  #include <sys/stat.h>
-
-  #include "sg_io_linux.h"
-  #define EBUFF_SZ 256
-  static char ebuff[EBUFF_SZ];
-#else
-  #include "sg_pt.h"
-#endif
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
@@ -190,7 +168,9 @@ struct opts_t {
     int opt_new;
 };
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr,
             "Usage:  sg_opcodes [--alpha] [--help] [--hex] [--opcode=OP] "
@@ -220,7 +200,8 @@ static void usage()
             "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command\n");
 }
 
-static void usage_old()
+static void
+usage_old()
 {
     fprintf(stderr,
             "Usage:  sg_opcodes [-a] [-H] [-o=OP] [-r] [-R] [-s=SA]"
@@ -244,7 +225,8 @@ static void usage_old()
             "TASK MANAGEMENT\nFUNCTIONS) command\n");
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n;
 
@@ -332,7 +314,8 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, n, num;
     const char * cp;
@@ -419,7 +402,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -439,7 +423,8 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
     return res;
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -448,7 +433,8 @@ static void dStrRaw(const char* str, int len)
 }
 
 /* returns -1 when left < right, 0 when left == right, else returns 1 */
-static int opcode_num_compare(const void * left, const void * right)
+static int
+opcode_num_compare(const void * left, const void * right)
 {
     const unsigned char * ll = *(unsigned char **)left;
     const unsigned char * rr = *(unsigned char **)right;
@@ -478,7 +464,8 @@ static int opcode_num_compare(const void * left, const void * right)
 }
 
 /* returns -1 when left < right, 0 when left == right, else returns 1 */
-static int opcode_alpha_compare(const void * left, const void * right)
+static int
+opcode_alpha_compare(const void * left, const void * right)
 {
     const unsigned char * ll = *(unsigned char **)left;
     const unsigned char * rr = *(unsigned char **)right;
@@ -507,8 +494,9 @@ static int opcode_alpha_compare(const void * left, const void * right)
     return strncmp(l_name_buff, r_name_buff, NAME_BUFF_SZ);
 }
 
-static void list_all_codes(unsigned char * rsoc_buff, int rsoc_len,
-                           int unsorted, int alpha, int rctd)
+static void
+list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
+               int alpha, int rctd)
 {
     int k, j, cd_len, serv_act, len;
     unsigned int to;
@@ -595,8 +583,8 @@ static void list_all_codes(unsigned char * rsoc_buff, int rsoc_len,
     }
 }
 
-static void decode_cmd_to_descriptor(unsigned char * dp, int max_b_len,
-                                     char * b)
+static void
+decode_cmd_to_descriptor(unsigned char * dp, int max_b_len, char * b)
 {
     int len;
     unsigned int to;
@@ -627,8 +615,9 @@ static void decode_cmd_to_descriptor(unsigned char * dp, int max_b_len,
     return;
 }
 
-static void list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
-                     int do_opcode, int do_servact)
+static void
+list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts, int do_opcode,
+         int do_servact)
 {
     int k;
     char name_buff[NAME_BUFF_SZ];
@@ -682,7 +671,8 @@ static void list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, cd_len, res, len;
     unsigned char rsoc_buff[MX_ALLOC_LEN];
@@ -739,21 +729,12 @@ int main(int argc, char * argv[])
     op_name = opts.do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
 
-#ifdef USE_SG_IO
-    if ((sg_fd = open(opts.device_name, O_RDONLY | O_NONBLOCK)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, "sg_opcodes: error opening file (ro): %s",
-                 opts.device_name);
-        perror(ebuff);
-        return SG_LIB_FILE_ERROR;
-    }
-#else
     if ((sg_fd = scsi_pt_open_device(opts.device_name, 1 /* RO */,
                                      opts.do_verbose)) < 0) {
         fprintf(stderr, "sg_opcodes: error opening file (ro): %s: %s\n",
                 opts.device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-#endif
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.do_verbose)) {
         peri_type = inq_resp.peripheral_type;
         if (0 == opts.do_raw) {
@@ -770,15 +751,11 @@ int main(int argc, char * argv[])
                 "INQUIRY\n", opts.device_name);
         return SG_LIB_CAT_OTHER;
     }
-#ifdef USE_SG_IO
-    close(sg_fd);
-#else
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));
         return SG_LIB_FILE_ERROR;
     }
-#endif
 
 #ifndef TEST_CODE
     if (5 == peri_type) {
@@ -788,21 +765,12 @@ int main(int argc, char * argv[])
     }
 #endif
 
-#ifdef USE_SG_IO
-    if ((sg_fd = open(opts.device_name, O_RDWR | O_NONBLOCK)) < 0) {
-        snprintf(ebuff, EBUFF_SZ, "sg_opcodes: error opening file: %s (rw)",
-                 opts.device_name);
-        perror(ebuff);
-        return SG_LIB_FILE_ERROR;
-    }
-#else
     if ((sg_fd = scsi_pt_open_device(opts.device_name, 0 /* RW */,
                                      opts.do_verbose)) < 0) {
         fprintf(stderr, "sg_opcodes: error opening file (rw): %s: %s\n",
                 opts.device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-#endif
     if (opts.do_opcode >= 0)
         rep_opts = ((opts.do_servact >= 0) ? 2 : 1);
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
@@ -927,156 +895,13 @@ int main(int argc, char * argv[])
     res = 0;
 
 err_out:
-#ifdef USE_SG_IO
-    close(sg_fd);
-#else
     sg_cmds_close_device(sg_fd);
-#endif
     return res;
 }
 
-
-#ifdef USE_SG_IO
-/* Report Supported Operation Codes */
-/* Returns 0 when successful */
-static int do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode,
-                   int rq_servact, void * resp, int mx_resp_len, int noisy,
-                   int verbose)
-{
-    int res, k;
-    unsigned char rsocCmdBlk[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
-                                              0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    if (rctd)
-        rsocCmdBlk[2] |= 0x80;
-    if (rep_opts)
-        rsocCmdBlk[2] |= (rep_opts & 0x7);
-    if (rq_opcode > 0)
-        rsocCmdBlk[3] = (rq_opcode & 0xff);
-    if (rq_servact > 0) {
-        rsocCmdBlk[4] = (unsigned char)((rq_servact >> 8) & 0xff);
-        rsocCmdBlk[5] = (unsigned char)(rq_servact & 0xff);
-
-    }
-    rsocCmdBlk[6] = (unsigned char)((mx_resp_len >> 24) & 0xff);
-    rsocCmdBlk[7] = (unsigned char)((mx_resp_len >> 16) & 0xff);
-    rsocCmdBlk[8] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    rsocCmdBlk[9] = (unsigned char)(mx_resp_len & 0xff);
-
-    if (verbose) {
-        fprintf(stderr, "    Report Supported Operation Codes cmd: ");
-        for (k = 0; k < RSOC_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", rsocCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rsocCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rsocCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (rsoc) error");
-        return -1;
-    }
-    if (verbose > 2)
-        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Report supported operation codes", &io_hdr,
-                        verbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    default:
-        if (noisy | verbose) {
-            char ebuff[EBUFF_SZ];
-
-            if (0 == rep_opts)
-                snprintf(ebuff, EBUFF_SZ, "RSOC error, rep_opts=0 (all) ");
-            else if (1 == rep_opts)
-                snprintf(ebuff, EBUFF_SZ, "RSOC error, rq_opcode=0x%x ",
-                         rq_opcode);
-            else
-                snprintf(ebuff, EBUFF_SZ, "RSOC error, rq_opcode=0x%x, "
-                         "rq_sa=0x%x ", rq_opcode, rq_servact);
-            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
-        }
-        return res;
-    }
-}
-
-/* Report Supported Task Management Function */
-/* Returns 0 when successful */
-static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
-                    int verbose)
-{
-    int res, k;
-    unsigned char rstmfCmdBlk[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
-                                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_io_hdr io_hdr;
-
-    rstmfCmdBlk[6] = (unsigned char)((mx_resp_len >> 24) & 0xff);
-    rstmfCmdBlk[7] = (unsigned char)((mx_resp_len >> 16) & 0xff);
-    rstmfCmdBlk[8] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    rstmfCmdBlk[9] = (unsigned char)(mx_resp_len & 0xff);
-
-    if (verbose) {
-        fprintf(stderr, "    Report Supported Task Management Functions "
-                "cmd: ");
-        for (k = 0; k < RSTMF_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", rstmfCmdBlk[k]);
-        fprintf(stderr, "\n");
-    }
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
-    io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rstmfCmdBlk);
-    io_hdr.mx_sb_len = sizeof(sense_b);
-    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    io_hdr.dxfer_len = mx_resp_len;
-    io_hdr.dxferp = resp;
-    io_hdr.cmdp = rstmfCmdBlk;
-    io_hdr.sbp = sense_b;
-    io_hdr.timeout = DEF_TIMEOUT;
-
-    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
-        perror("SG_IO (rstmf) error");
-        return -1;
-    }
-    if (verbose > 2)
-        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
-    res = sg_err_category3(&io_hdr);
-    switch (res) {
-    case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("Report supported task management fns", &io_hdr,
-                        verbose > 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
-        return 0;
-    default:
-        if (noisy | verbose) {
-            char ebuff[EBUFF_SZ];
-            snprintf(ebuff, EBUFF_SZ, "RSTMF error ");
-            sg_chk_n_print3(ebuff, &io_hdr, verbose > 1);
-        }
-        return res;
-    }
-}
-
-#else /* use generic pass through code instead */
-
-static int do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode,
-                   int rq_servact, void * resp, int mx_resp_len, int noisy,
-                   int verbose)
+static int
+do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
+        void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rsocCmdBlk[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
@@ -1145,8 +970,8 @@ static int do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode,
     return ret;
 }
 
-static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
-                    int verbose)
+static int
+do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rstmfCmdBlk[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
@@ -1204,5 +1029,3 @@ static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
-
-#endif
