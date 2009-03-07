@@ -66,5 +66,9 @@ AM_CONDITIONAL(OS_SOLARIS, [echo $host_os | grep '^solaris' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 
+AC_ARG_ENABLE([no-linux-bsg],
+  AC_HELP_STRING([--enable-no-linux-bsg], [ignore linux bsg (sgv4) if present]),
+  AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [ignore linux bsg], )
+)
 
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile)
