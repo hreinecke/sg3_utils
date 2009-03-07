@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090301] [svn: r223]
+Changelog for sg3_utils-1.27 [20090306] [svn: r223]
   - sg_inq: sync version descriptors with spc4r18
     - add power condition VPD page
     - expand block limits VPD page (sbc3r18)
@@ -36,8 +36,8 @@ Changelog for sg3_utils-1.27 [20090301] [svn: r223]
   - sg_cmds_extra: sg_ll_format_unit: remove rto_req argument,
     the expanded fmtpinfo argument subsumes it.
   - clearer split between Linux and Windows only code and doc
-  - autotools infrastructure: changes after upgrade to Ubuntu 8.10
-  - autotools infrastructure: revert back to Debian 4.0
+  - automake tools: changes after upgrade to Ubuntu 8.10
+  - automake tools: Ubuntu 8.10 libtool ugly -> Debian 5.0
 
 Changelog for sg3_utils-1.26 [20080625] [svn: r183]
   - sg_sat_phy_event: new utility; copied from examples
