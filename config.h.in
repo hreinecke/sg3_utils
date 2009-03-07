@@ -12,6 +12,9 @@
 /* Define to 1 if you have the <linux/bsg.h> header file. */
 #undef HAVE_LINUX_BSG_H
 
+/* Define to 1 if you have the <linux/types.h> header file. */
+#undef HAVE_LINUX_TYPES_H
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 

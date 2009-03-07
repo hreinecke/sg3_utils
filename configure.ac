@@ -12,7 +12,12 @@ AC_PROG_LIBTOOL
 
 # check for headers
 AC_HEADER_STDC
-AC_CHECK_HEADERS(linux/bsg.h)
+AC_CHECK_HEADERS([linux/types.h linux/bsg.h], [], [],
+     [[#ifdef HAVE_LINUX_TYPES_H
+     # include <linux/types.h>
+     #endif
+     ]])
+
 
 # check for functions
 AC_CHECK_FUNCS(getopt_long,
