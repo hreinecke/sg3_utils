@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_linux version 1.11 20090307 */
+/* sg_pt_linux version 1.11 20090308 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -509,10 +509,13 @@ find_bsg_major(int verbose)
 	} else
 	    break;
     }
-    if ((NULL == cp) && (verbose > 3)) {
+    if (verbose > 3) {
         if (NULL == sg_warnings_strm)
             sg_warnings_strm = stderr;
-        fprintf(sg_warnings_strm, "found no bsg char device in %s\n",
+    	if (cp)
+            fprintf(sg_warnings_strm, "found bsg_major=%d\n", bsg_major);
+	else
+            fprintf(sg_warnings_strm, "found no bsg char device in %s\n",
 		proc_devices);
     }
     fclose(fp);
@@ -541,7 +544,6 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
 	bsg_major_checked = 1;
 	find_bsg_major(verbose);
     }
-
     if (verbose > 1) {
         if (NULL == sg_warnings_strm)
             sg_warnings_strm = stderr;
@@ -586,6 +588,17 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 
     if (ptp)
         free(ptp);
+}
+
+void
+clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (ptp) {
+        memset(ptp, 0, sizeof(struct sg_pt_linux_scsi));
+        ptp->io_hdr.guard = 'Q';
+    }
 }
 
 void
@@ -722,14 +735,6 @@ get_scsi_pt_transport_err(const struct sg_pt_base * vp)
     return ptp->io_hdr.transport_status;
 }
 
-int
-get_scsi_pt_os_err(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return ptp->os_err;
-}
-
 /* Combine driver and transport (called "host" in linux kernel) statuses */
 char *
 get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
@@ -796,6 +801,14 @@ get_scsi_pt_result_category(const struct sg_pt_base * vp)
         return SCSI_PT_RESULT_GOOD;
 }
 
+int
+get_scsi_pt_os_err(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return ptp->os_err;
+}
+
 char *
 get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 {
@@ -807,6 +820,124 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
     if ((int)strlen(cp) >= max_b_len)
         b[max_b_len - 1] = '\0';
     return b;
+}
+
+/* Executes SCSI command using sg v3 interface */
+static int
+do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
+	      int verbose)
+{
+    struct sg_io_hdr v3_hdr;
+
+    memset(&v3_hdr, 0, sizeof(v3_hdr));
+    /* convert v4 to v3 header */
+    v3_hdr.interface_id = 'S';
+    v3_hdr.dxfer_direction = SG_DXFER_NONE;
+    v3_hdr.cmdp = (void *)(long)ptp->io_hdr.request;
+    v3_hdr.cmd_len = (unsigned char)ptp->io_hdr.request_len;
+    if (ptp->io_hdr.din_xfer_len > 0) {
+        if (ptp->io_hdr.dout_xfer_len > 0) {
+            if (verbose)
+                fprintf(sg_warnings_strm, "sgv3 doesn't support bidi\n");
+            return SCSI_PT_DO_BAD_PARAMS;
+	}
+        v3_hdr.dxferp = (void *)(long)ptp->io_hdr.din_xferp;
+        v3_hdr.dxfer_len = (unsigned int)ptp->io_hdr.din_xfer_len;
+	v3_hdr.dxfer_direction =  SG_DXFER_FROM_DEV;
+    } else if (ptp->io_hdr.dout_xfer_len > 0) {
+        v3_hdr.dxferp = (void *)(long)ptp->io_hdr.dout_xferp;
+        v3_hdr.dxfer_len = (unsigned int)ptp->io_hdr.dout_xfer_len;
+	v3_hdr.dxfer_direction =  SG_DXFER_TO_DEV;
+    }
+    if (ptp->io_hdr.response && (ptp->io_hdr.response_len > 0)) {
+        v3_hdr.sbp = (void *)(long)ptp->io_hdr.response;
+        v3_hdr.mx_sb_len = (unsigned char)ptp->io_hdr.request_len;
+    }
+    v3_hdr.pack_id = (int)ptp->io_hdr.spare_in;
+
+    if (NULL == v3_hdr.cmdp) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "No SCSI command (cdb) given\n");
+        return SCSI_PT_DO_BAD_PARAMS;
+    }
+    /* io_hdr.timeout is in milliseconds */
+    v3_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) : DEF_TIMEOUT);
+    if (v3_hdr.sbp && (v3_hdr.sb_len_wr > 0))
+        memset(v3_hdr.sbp, 0, v3_hdr.sb_len_wr);
+    if (ioctl(fd, SG_IO, &v3_hdr) < 0) {
+        ptp->os_err = errno;
+        if (verbose)
+            fprintf(sg_warnings_strm, "ioctl(SG_IO v3) failed with os_err "
+                    "(errno) = %d\n", ptp->os_err);
+        return -ptp->os_err;
+    }
+    ptp->io_hdr.device_status = (__u32)v3_hdr.status;
+    ptp->io_hdr.driver_status = (__u32)v3_hdr.driver_status;
+    ptp->io_hdr.transport_status = (__u32)v3_hdr.host_status;
+    ptp->io_hdr.duration = (__u32)v3_hdr.duration;
+    ptp->io_hdr.din_resid = (__s32)v3_hdr.resid;
+    return 0;
+}
+
+/* Executes SCSI command (or at least forwards it to lower layers).
+ * Clears os_err field prior to active call (whose result may set it
+ * again). */
+int
+do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+    void * p;
+
+    if (! bsg_major_checked) {
+        bsg_major_checked = 1;
+        find_bsg_major(verbose);
+    }
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    ptp->os_err = 0;
+    if (ptp->in_err) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "Replicated or unused set_scsi_pt... "
+                    "functions\n");
+        return SCSI_PT_DO_BAD_PARAMS;
+    }
+    if (bsg_major <= 0)
+	return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+    else {
+	struct stat a_stat;
+
+	if (fstat(fd, &a_stat) < 0) {
+            ptp->os_err = errno;
+            if (verbose)
+                fprintf(sg_warnings_strm, "fstat() failed with os_err "
+                        "(errno) = %d\n", ptp->os_err);
+            return -ptp->os_err;
+	}
+	if (! S_ISCHR(a_stat.st_mode) ||
+	    (bsg_major != (int)major(a_stat.st_rdev)))
+	    return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+    }
+
+    if (! ptp->io_hdr.request) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "No SCSI command (cdb) given (v4)\n");
+        return SCSI_PT_DO_BAD_PARAMS;
+    }
+    /* io_hdr.timeout is in milliseconds */
+    ptp->io_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) :
+                                             DEF_TIMEOUT);
+    if (ptp->io_hdr.response && (ptp->io_hdr.max_response_len > 0)) {
+	p = (void *)(long)ptp->io_hdr.response;
+        memset(p, 0, ptp->io_hdr.max_response_len);
+    }
+    if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
+        ptp->os_err = errno;
+        if (verbose)
+            fprintf(sg_warnings_strm, "ioctl(SG_IO v4) failed with os_err "
+                    "(errno) = %d\n", ptp->os_err);
+        return -ptp->os_err;
+    }
+    return 0;
 }
 
 #endif

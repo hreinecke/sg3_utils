@@ -32,7 +32,7 @@
 #include "sg_pt.h"
 
 
-static const char * scsi_pt_version_str = "2.03 20090204";
+static const char * scsi_pt_version_str = "2.04 20090308";
 
 const char *
 scsi_pt_version()
