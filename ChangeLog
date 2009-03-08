@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090306] [svn: r223]
+Changelog for sg3_utils-1.27 [20090308] [svn: r230]
   - sg_inq: sync version descriptors with spc4r18
     - add power condition VPD page
     - expand block limits VPD page (sbc3r18)
@@ -32,6 +32,8 @@ Changelog for sg3_utils-1.27 [20090306] [svn: r223]
   - sg_pt: add scsi_pt_open_device_flags() call to public interface
     - add scsi_pt_version() and clear_scsi_pt_obj() calls
     - clear os_err at start of do_scsi_pt()
+    - add linux bsg support via runtime detection
+    os_err at start of do_scsi_pt()
   - sg_cmds: add sg_cmds_open_device_flags() call previous entry
   - sg_cmds_extra: sg_ll_format_unit: remove rto_req argument,
     the expanded fmtpinfo argument subsumes it.

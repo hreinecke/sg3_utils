@@ -462,7 +462,7 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs (60 seconds) */
 
 struct sg_pt_linux_scsi {
-    struct sg_io_v4 io_hdr;	/* use v4 header as it is more general */
+    struct sg_io_v4 io_hdr;     /* use v4 header as it is more general */
     int in_err;
     int os_err;
     unsigned char tmf_request[4];
@@ -490,33 +490,33 @@ find_bsg_major(int verbose)
     if (NULL == (fp = fopen(proc_devices, "r"))) {
         if (NULL == sg_warnings_strm)
             sg_warnings_strm = stderr;
-	if (verbose)
+        if (verbose)
             fprintf(sg_warnings_strm, "fopen %s failed: %s\n", proc_devices,
-		    strerror(errno));
+                    strerror(errno));
         return;
     }
     while ((cp = fgets(b, sizeof(b), fp))) {
-	if ((1 == sscanf(b, "%s", a)) &&
-	    (0 == memcmp(a, "Character", 9)))
-	    break;
+        if ((1 == sscanf(b, "%s", a)) &&
+            (0 == memcmp(a, "Character", 9)))
+            break;
     }
     while (cp && (cp = fgets(b, sizeof(b), fp))) {
-	if (2 == sscanf(b, "%d %s", &n, a)) {
-	    if (0 == strcmp("bsg", a)) {
-		bsg_major = n;
-	 	break;
-	    }
-	} else
-	    break;
+        if (2 == sscanf(b, "%d %s", &n, a)) {
+            if (0 == strcmp("bsg", a)) {
+                bsg_major = n;
+                break;
+            }
+        } else
+            break;
     }
     if (verbose > 3) {
         if (NULL == sg_warnings_strm)
             sg_warnings_strm = stderr;
-    	if (cp)
+        if (cp)
             fprintf(sg_warnings_strm, "found bsg_major=%d\n", bsg_major);
-	else
+        else
             fprintf(sg_warnings_strm, "found no bsg char device in %s\n",
-		proc_devices);
+                proc_devices);
     }
     fclose(fp);
 }
@@ -541,8 +541,8 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
     int fd;
 
     if (! bsg_major_checked) {
-	bsg_major_checked = 1;
-	find_bsg_major(verbose);
+        bsg_major_checked = 1;
+        find_bsg_major(verbose);
     }
     if (verbose > 1) {
         if (NULL == sg_warnings_strm)
@@ -679,8 +679,8 @@ set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    ptp->io_hdr.subprotocol = 1;	/* SCSI task management function */
-    ptp->tmf_request[0] = (unsigned char)tmf_code;	/* assume it fits */
+    ptp->io_hdr.subprotocol = 1;        /* SCSI task management function */
+    ptp->tmf_request[0] = (unsigned char)tmf_code;      /* assume it fits */
     ptp->io_hdr.request = (__u64)(long)(&(ptp->tmf_request[0]));
     ptp->io_hdr.request_len = 1;
 }
@@ -825,7 +825,7 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 /* Executes SCSI command using sg v3 interface */
 static int
 do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
-	      int verbose)
+              int verbose)
 {
     struct sg_io_hdr v3_hdr;
 
@@ -840,14 +840,14 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
             if (verbose)
                 fprintf(sg_warnings_strm, "sgv3 doesn't support bidi\n");
             return SCSI_PT_DO_BAD_PARAMS;
-	}
+        }
         v3_hdr.dxferp = (void *)(long)ptp->io_hdr.din_xferp;
         v3_hdr.dxfer_len = (unsigned int)ptp->io_hdr.din_xfer_len;
-	v3_hdr.dxfer_direction =  SG_DXFER_FROM_DEV;
+        v3_hdr.dxfer_direction =  SG_DXFER_FROM_DEV;
     } else if (ptp->io_hdr.dout_xfer_len > 0) {
         v3_hdr.dxferp = (void *)(long)ptp->io_hdr.dout_xferp;
         v3_hdr.dxfer_len = (unsigned int)ptp->io_hdr.dout_xfer_len;
-	v3_hdr.dxfer_direction =  SG_DXFER_TO_DEV;
+        v3_hdr.dxfer_direction =  SG_DXFER_TO_DEV;
     }
     if (ptp->io_hdr.response && (ptp->io_hdr.response_len > 0)) {
         v3_hdr.sbp = (void *)(long)ptp->io_hdr.response;
@@ -902,20 +902,20 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (bsg_major <= 0)
-	return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+        return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
     else {
-	struct stat a_stat;
+        struct stat a_stat;
 
-	if (fstat(fd, &a_stat) < 0) {
+        if (fstat(fd, &a_stat) < 0) {
             ptp->os_err = errno;
             if (verbose)
                 fprintf(sg_warnings_strm, "fstat() failed with os_err "
                         "(errno) = %d\n", ptp->os_err);
             return -ptp->os_err;
-	}
-	if (! S_ISCHR(a_stat.st_mode) ||
-	    (bsg_major != (int)major(a_stat.st_rdev)))
-	    return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+        }
+        if (! S_ISCHR(a_stat.st_mode) ||
+            (bsg_major != (int)major(a_stat.st_rdev)))
+            return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
     }
 
     if (! ptp->io_hdr.request) {
@@ -927,7 +927,7 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     ptp->io_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) :
                                              DEF_TIMEOUT);
     if (ptp->io_hdr.response && (ptp->io_hdr.max_response_len > 0)) {
-	p = (void *)(long)ptp->io_hdr.response;
+        p = (void *)(long)ptp->io_hdr.response;
         memset(p, 0, ptp->io_hdr.max_response_len);
     }
     if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
