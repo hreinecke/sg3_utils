@@ -44,7 +44,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.90 20090303";
+static char * version_str = "0.90 20090306";
 
 
 #define MAX_XFER_LEN 10000
@@ -57,6 +57,7 @@ static char * version_str = "0.90 20090303";
 static struct option long_options[] = {
         {"16", no_argument, 0, 'S'},
         {"32", no_argument, 0, 'T'},
+        {"grpnum", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'i'},
         {"lba", required_argument, 0, 'l'},
@@ -70,6 +71,7 @@ static struct option long_options[] = {
         {"xfer_len", required_argument, 0, 'x'},
         {0, 0, 0, 0},
 };
+
 
 static void usage()
 {
