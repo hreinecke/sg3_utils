@@ -2,83 +2,98 @@
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
-.B sg_write_xxxxxxx
-[\fI\-\-16\fR] [\fI\-\-cor_dis\fR] [\fI\-\-help\fR] [\fI\-\-in=IF\fR]
-[\fI\-\-lba=LBA\fR] [\fI\-\-pblock\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-wr_uncor\fR] [\fI\-\-xfer_len=BTL\fR]
-\fIDEVICE\fR
+.B sg_write_same
+[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR]
+[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-lbdata\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-pbdata\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-unmap\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR]
+[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
+Send the SCSI WRITE SAME (10, 16 or 32 byte) command to \fIDEVICE\fR. This
+command writes the given block \fINUM\fR times to consecutive blocks on
+the \fIDEVICE\fR starting at logical block address \fILBA\fR.
 .PP
-xxxxxxxx
+The length of the block to be written multiple times is obtained from
+the \fILEN\fR argument, the length of the given input file \fIIF\fR,
+or by calling READ CAPACITY(16) on \fIDEVICE\fR. The contents of the
+block to be written are obtained from the input file \fIIF\fR or
+zeroes are used. If READ CAPACITY(16) is called (which implies \fIIF\fR
+was not given) and the PROT_EN bit is set then the last 8 bytes are
+set to 0xff.
 .PP
-To be written.
-.PP
-Send the SCSI WRITE LONG (10 or 16 byte) command to \fIDEVICE\fR. The buffer
-to be written to the \fIDEVICE\fR is filled with
-.B 0xff
-bytes or read from the \fIIF\fR file. This buffer includes the logical
-data (e.g. 512 bytes) and the ECC bytes.
-.PP
-This utility can be used to generate a MEDIUM ERROR at a specific logical
-block address. This can be useful for testing error handling. Prior to
-such a test, the
-.B sg_dd
-utility could be used to copy the original contents of the logical
-block address to some safe location. After the test the
-.B sg_dd
-utility could be used to write back the original contents of the
-logical block address. An alternate strategy would be to read the "long"
-contents of the logical block address with
-.B sg_read_long
-utility prior to testing and restore it with this utility after testing.
+By default WRITE SAME(10) is sent unless \fILBA\fR (plus \fINUM\fR)
+exceeds 32 bits, \fINUM\fR exceeds 65535 or \fI\-\-unmap\fR is given.
+In these cases WRITE SAME(16) is sent.
 .PP
 .B Take care:
-If recoverable errors are being injected (e.g. only one or a few bits
-changed so that the ECC is able to correct the data) then care should
-be taken with the settings in the "read write error recovery" mode page.
-Specifically if the ARRE (for reads) and/or AWRE (for writes) are set
-then recovered errors will cause the lba to be reassigned (and the old
-location to be added to the grown defect list (PLIST)). This is not easily
-reversed and uses (one of the finite number of) the spare sectors set
-aside for this purpose. If in doubt it is probably safest to clear the
-ARRE and AWRE bits. These bits can be checked and modified with the
-sdparm utility.  For example: "sdparm \-c AWRE,ARRE /dev/sda" will clear
-the bits until the disk is power cycled.
+The WRITE SAME(10, 16 and 32) commands interpret a \fINUM\fR of zero
+as write to the end of \fIDEVICE\fR. This utility defaults \fINUM\fR to
+1 . The WRITE SAME commands have no IMMED bit so if \fINUM\fR is
+large (or zero) then an invocation of this utility could take a long
+time, potentially as long as a FORMAT UNIT command. In such situations
+the command timeout value \fITO\fR will most likely need to be increased
+from its default value of 60 seconds.
+.PP
+This utility is based SBC\-3 draft revision 18 found at http://www.t10.org .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-S\fR, \fB\-\-16\fR
-send a SCSI WRITE LONG (16) command to \fIDEVICE\fR. The default action (in
-the absence of this option) is to send a SCSI WRITE LONG (10) command.
+send a SCSI WRITE SAME (16) command to \fIDEVICE\fR. The default action (in
+the absence of this option and the \fI\-\-32\fR option) is to send a SCSI
+WRITE SAME (10) command.
 .TP
-\fB\-c\fR, \fB\-\-cor_dis\fR
-sets the correction disabled (i.e 'COR_DIS') bit. This inhibits various
-other mechanisms such as automatic block reallocation, error recovery
-and various informational exception conditions being triggered.
-This bit is relatively new in SBC\-3 .
+\fB\-T\fR, \fB\-\-32\fR
+send a SCSI WRITE SAME (32) command to \fIDEVICE\fR. The default action (in
+the absence of this option and the \fI\-\-16\fR option) is to send a SCSI
+WRITE SAME (10) command.
+.TP
+\fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
+sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
+\fIGN\fR should be a value between 0 and 31.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
 \fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
-read data (binary) from file named \fIIF\fR and use it for the SCSI WRITE
-LONG command. If \fIIF\fR is "\-" then stdin is read. If this option is
-not given then 0xff bytes are used as fill.
+read data (binary) from file named \fIIF\fR and use it as the data out
+buffer for the SCSI WRITE SAME command. The length of the data out buffer
+is \fI\-\-xferlen=LEN\fR or, if that is not given, the length of the \fIIF\fR
+file. If \fIIF\fR is "\-" then stdin is read. If this option is not given
+then 0x00 bytes are used as fill with the length of the data out buffer
+obtained from \fI\-\-xferlen=LEN\fR or by calling READ CAPACITY(16). If the
+response to READ CAPACITY(16) has the PROT_EN bit set then data out buffer
+size is modified accordingly with the last 8 bytes set to 0xff.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
-where \fILBA\fR is the logical block address of the sector to overwrite.
+where \fILBA\fR is the logical block address to start the WRITE SAME command.
 Defaults to lba 0 which is a dangerous block to overwrite on a disk that is
 in use. Assumed to be in decimal unless prefixed with '0x' or has a
-traling 'h'. If \fILBA\fR is larger than can fit in 32 bits then the
-\fI\-\-16\fR option should be used.
+trailing 'h'.
 .TP
-\fB\-p\fR, \fB\-\-pblock\fR
-sets the physical block (i.e 'PBLOCK') bit. This instructs \fIDEVICE\fR
-to use the given data (unless \fI\-\-wr_uncor\fR is also given) to write
-to the physical block specified by \fILBA\fR. The default action
-is to write to the logical block corresponding to the given lba.
-This bit is relatively new in SBC\-3 .
+\fB\-L\fR, \fB\-\-lbdata\fR
+sets the LBDATA bit in the WRITE SAME cdb.
+.TP
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
+where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write the
+data out buffer to. The default value for \fINUM\fR is 1. The value corresponds
+to the 'Number of logical blocks' field in the WRITE SAME cdb. Note that a
+value of 0 in \fINUM\fR is interpreted as write the data out buffer on every
+block starting at \fILBA\fR to the end of the \fIDEVICE\fR.
+.TP
+\fB\-P\fR, \fB\-\-pbdata\fR
+sets the PBDATA bit in the WRITE SAME cdb.
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
+where \fITO\fR is the command timeout value in seconds. The default value is
+60 seconds. If \fINUM\fR is large (or zero) a WRITE SAME command may require
+considerably more time than 60 seconds to complete.
+.TP
+\fB\-U\fR, \fB\-\-unmap\fR
+sets the UNMAP bit in the WRITE SAME(16 and 32) cdb. When this option is
+given the default command becomes WRITE SAME(16) since the WRITE SAME(10)
+command does not offer this bit (in SBC\-3 draft revision 18).
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the degree of verbosity (debug messages).
@@ -86,24 +101,19 @@ increase the degree of verbosity (debug messages).
 \fB\-V\fR, \fB\-\-version\fR
 output version string then exit.
 .TP
-\fB\-w\fR, \fB\-\-wr_uncor\fR
-sets the "write uncorrected" (i.e 'WR_UNCOR') bit. This instructs the
-\fIDEVICE\fR to flag the given lba (or the physical block that contains it
-if \fI\-\-pblock\fR is also given) as having an unrecoverable error
-associated with it. Note: no data is transferred to \fIDEVICE\fR,
-other than the command (i.e. the cdb). In the absence of this option, the
-default action is to use the provided data or 0xff
-bytes (\fI\-\-xfer_len=BTL\fR in length) and write it to \fIDEVICE\fR.
-This bit is relatively new in SBC\-3 .
+\fB\-w\fR, \fB\-\-wrprotect\fR=\fIWPR\fR
+sets the "Write protect" field in the WRITE SAME cdb to \fIWPR\fR. The
+default value is zero. \fIWPR\fR should be a value between 0 and 7.
 .TP
-\fB\-x\fR, \fB\-\-xfer_len\fR=\fIBTL\fR
-where \fIBTL\fR is the byte transfer length (default to 520). If the
-given value (or the default) does not match the "long" block size of the
-device, nothing is written to \fIDEVICE\fR and the appropriate xfer_len value
-may be deduced from the error response which is printed (to stderr).
+\fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
+where \fILEN\fR is the data out buffer length. Defaults to the length of
+the \fIIF\fR file or, if that is not given, then the READ CAPACITY(16)
+command is called on the \fIDEVICE\fR and the 'Logical block length in
+bytes' and the PROT_EN bit in the response are used to determine the
+data out buffer length.
 .SH NOTES
-The \fILBA\fR and \fIBTL\fR (transfer length) arguments may be followed by
-the following multiplicative suffixes:
+The \fILBA\fR, \fILEN\fR and \fINUM\fR arguments may be followed by the
+following multiplicative suffixes:
 c C *1; w W *2; b B *512; k K KiB *1,024; KB *1,000; m M MiB *1,048,576;
 MB *1,000,000; g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix
 of the form "x<n>" multiplies the leading number by <n>.
@@ -111,65 +121,11 @@ of the form "x<n>" multiplies the leading number by <n>.
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or with a trailing "h" or "H"). When hex numbers are
 given, multipliers cannot be used.
-.PP
-The 10 byte SCSI WRITE LONG command limits the logical block address
-to a 32 bit quantity. For larger LBAs use the \fI\-\-16\fR option for the
-SCSI WRITE LONG (16) command.
-.SH EXAMPLES
-This section outlines setting up a block with corrupted data, checking the
-error condition, then restoring useful contents to that sector.
-.PP
-First, if the data in a sector is important, save it with the sg_read_long
-utility:
-.PP
-  sg_read_long \-\-lba=0x1234 \-\-out=0x1234_1.img \-x \fIBTL\fR /dev/sda
-.PP
-This utility may need to be executed several time in order to determine
-what the correct value for \fIBTL\fR is.
-Next use this utility to "corrupt" that sector. That might be done with:
-.PP
-  sg_write_long \-\-lba=0x1234 \-x \fIBTL\fR /dev/sda
-.PP
-This will write a sector (and ECC data) of 0xff bytes. Some disks may
-reject this (at least one of the author's does). Another approach is
-to copy the 0x1234_1.img file (to 0x1234_2.img in this example) and
-change some values with a hex editor. Then write the changed image with:
-.PP
-  sg_write_long \-\-lba=0x1234 \-\-in=0x1234_2.img \-x \fIBTL\fR /dev/sda
-.PP
-Yet another approach is to use the \fI\-\-wr_uncor\fR option, if supported:
-.PP
-  sg_write_long \-\-lba=0x1234 \-\-wr_uncor /dev/sda
-.PP
-Next we use the sg_dd utility to check that the sector is corrupted. Here is an
-example:
-.PP
-  sg_dd if=/dev/sda blk_sgio=1 skip=0x1234 of=. bs=512 count=1 verbose=4
-.PP
-Notice that the "blk_sgio=1" option is given. This is to make sure that
-the sector is read (and no others) and the error is fully reported.
-The "blk_sgio=1" option causes the SG_IO ioctl to be used by sg_dd rather
-than the block subsystem.
-.PP
-Finally we should restore sector 0x1234 to a non-corrupted state. A sector
-full of zeroes could be written with:
-.PP
-  sg_dd if=/dev/zero of=/dev/sda blk_sgio=1 seek=0x1234 bs=512 count=1
-.PP
-This will result in a sector (block) with 512 bytes of 0x0 without a
-MEDIUM ERROR since the ECC and associated data will be regenerated and
-thus well formed. The 'blk_sgio=1' option is even more important in this
-case as it may stop the block subsystem doing a read before write (since
-the read will most likely fail).
-Another approach is to write back the original contents:
-.PP
-  sg_write_long \-\-lba=0x1234 \-\-in=0x1234_1.img \-x \fIBTL\fR /dev/sda
-.PP
 .SH EXIT STATUS
-The exit status of sg_write_long is 0 when it is successful. Otherwise see
+The exit status of sg_write_same is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH AUTHORS
-Written by Saeed Bishara. Further work by Douglas Gilbert.
+Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
