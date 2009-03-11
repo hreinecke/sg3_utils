@@ -42,6 +42,7 @@ Here is a list of utilities that have been ported:
     sg_wr_mode
     sg_write_buffer
     sg_write_long
+    sg_write_same
 
 Most utility names are indicative of the main SCSI command
 that they execute.  Some utilities are slightly higher level, for
@@ -79,4 +80,4 @@ See the Solaris section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-26th October 2008
+11th March 2009
