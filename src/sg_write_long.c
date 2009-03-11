@@ -16,7 +16,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2008 D. Gilbert
+   *  Copyright (C) 2004-2009 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.16 20080327";
+static char * version_str = "1.16 20090309";
 
 
 #define MAX_XFER_LEN 10000
@@ -56,7 +56,10 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+
+static void
+usage()
 {
   fprintf(stderr, "Usage: "
           "sg_write_long [--16] [--cor_dis] [--help] [--in=IF] "
@@ -86,7 +89,8 @@ static void usage()
           );
 }
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c, infd, offset;
     unsigned char * writeLongBuff = NULL;
@@ -151,7 +155,7 @@ int main(int argc, char * argv[])
             break;
         case 'x':
             xfer_len = sg_get_num(optarg);
-           if (-1 == xfer_len) {
+            if (-1 == xfer_len) {
                 fprintf(stderr, "bad argument to '--xfer_len'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

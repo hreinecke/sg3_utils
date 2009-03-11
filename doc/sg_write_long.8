@@ -1,4 +1,4 @@
-.TH SG_WRITE_LONG "8" "December 2007" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_WRITE_LONG "8" "March 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_write_long \- send the SCSI WRITE LONG command
 .SH SYNOPSIS
@@ -66,7 +66,7 @@ not given then 0xff bytes are used as fill.
 where \fILBA\fR is the logical block address of the sector to overwrite.
 Defaults to lba 0 which is a dangerous block to overwrite on a disk that is
 in use. Assumed to be in decimal unless prefixed with '0x' or has a
-traling 'h'. If \fILBA\fR is larger than can fit in 32 bits then the
+trailing 'h'. If \fILBA\fR is larger than can fit in 32 bits then the
 \fI\-\-16\fR option should be used.
 .TP
 \fB\-p\fR, \fB\-\-pblock\fR
@@ -169,7 +169,7 @@ Written by Saeed Bishara. Further work by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2007 Douglas Gilbert
+Copyright \(co 2004\-2009 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
