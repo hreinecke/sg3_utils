@@ -62,8 +62,11 @@ WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
 WRITE(16)           sg_dd, sgm_dd, sgp_dd
 WRITE BUFFER        sg_test_rwbuf, sg_write_buffer, ++
-WRITE LONG (10)     sg_write_long, ++
-WRITE LONG (16)     sg_write_long, ++
+WRITE LONG(10)      sg_write_long, ++
+WRITE LONG(16)      sg_write_long, ++
+WRITE SAME(10)      sg_write_same
+WRITE SAME(16)      sg_write_same
+WRITE SAME(32)      sg_write_same
 <most commands>     sg_raw
 
 
@@ -88,4 +91,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Doug Gilbert
-18th February 2008
+11th March 2009

@@ -48,7 +48,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.90 20090310";
+static char * version_str = "0.90 20090311";
 
 
 #define ME "sg_write_same: "
@@ -305,6 +305,9 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, res, c, infd, prot_en, got_stdin, act_cdb_len, vb;
+    int num_given = 0;
+    int lba_given = 0;
+    int if_given = 0;
     int64_t ll;
     uint32_t block_size;
     const char * device_name = NULL;
@@ -342,6 +345,7 @@ main(int argc, char * argv[])
             return 0;
         case 'i':
             strncpy(opts.ifilename, optarg, sizeof(opts.ifilename));
+            if_given = 1;
             break;
         case 'l':
             ll = sg_get_llnum(optarg);
@@ -350,6 +354,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             opts.lba = (uint64_t)ll;
+            lba_given = 1;
             break;
         case 'L':
             ++opts.lbdata;
@@ -360,6 +365,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "bad argument to '--num'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            num_given = 1;
             break;
         case 'P':
             ++opts.pbdata;
@@ -425,6 +431,12 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     vb = opts.verbose;
+
+    if ((! if_given) && (! lba_given) && (! num_given)) {
+        fprintf(stderr, "As a precaution require one of '--in=', '--lba=' "
+                "or '--num=' to be given\n");
+        return SG_LIB_SYNTAX_ERROR;
+    }
 
     memset(&a_stat, 0, sizeof(a_stat));
     if (opts.ifilename[0]) {

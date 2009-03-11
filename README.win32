@@ -58,6 +58,7 @@ Here is a list of utilities that have been ported:
     sg_wr_mode
     sg_write_buffer
     sg_write_long
+    sg_write_same
 
 Most utility names are indicative of the main SCSI command that they execute.
 Some utilities are slightly higher level, for example sg_ses fetches SCSI
@@ -148,4 +149,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-20th December 2008
+11th March 2009

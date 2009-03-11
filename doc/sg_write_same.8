@@ -35,6 +35,12 @@ time, potentially as long as a FORMAT UNIT command. In such situations
 the command timeout value \fITO\fR will most likely need to be increased
 from its default value of 60 seconds.
 .PP
+As a precaution against an accidental 'sg_write_same /dev/sda' (for example)
+overwriting LBA 0 on /dev/sda with zeroes, at least one of the
+\fI\-\-in=IF\fR, \fI\-\-lba=LBA\fR or \fI\-\-num=NUM\fR options must be
+given. Obviously this utility can destroy a lot of user data so check the
+options carefully.
+.PP
 This utility is based SBC\-3 draft revision 18 found at http://www.t10.org .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.

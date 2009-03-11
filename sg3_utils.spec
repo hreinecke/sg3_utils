@@ -79,8 +79,8 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Sun Mar 08 2009 - dgilbert at interlog dot com
-- sg_dd: add flock, of2= and posix_fadvise support with nocache flag
+* Wed Mar 11 2009 - dgilbert at interlog dot com
+- add sg_write_same; sg_dd work and split; spc4r18 sync
   * sg3_utils-1.27
 
 * Wed Jun 25 2008 - dgilbert at interlog dot com
