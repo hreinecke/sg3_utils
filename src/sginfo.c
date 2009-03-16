@@ -110,12 +110,19 @@
  *    20051218  improve disk defect list handling
  */
 
+
+/*
+ * N.B. This utility is in maintenance mode only. This means that serious
+ * bugs will be fixed but no new features or mode page changes will be
+ * added. Please use the sdparm utility.     D. Gilbert 20090316
+ */
+
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.27 [20080115]";
+static const char * version_str = "2.28 [20090316]";
 
 #include <stdio.h>
 #include <string.h>
@@ -142,6 +149,7 @@ static const char * version_str = "2.27 [20080115]";
 static int glob_fd;
 static char *device_name;
 
+#define MAX_SG_DEVS 2048
 #define MAX_RESP6_SIZE 252
 #define MAX_RESP10_SIZE (4*1024)
 #define MAX_BUFFER_SIZE MAX_RESP10_SIZE
@@ -3278,9 +3286,8 @@ static void make_dev_name(char * fname, int k, int do_numeric)
     }
 }
 
-#define MAX_SG_DEVS 1024
 
-static Sg_map sg_map_arr[MAX_SG_DEVS];
+static Sg_map sg_map_arr[MAX_SG_DEVS + 1];
 
 #define MAX_HOLES 4
 

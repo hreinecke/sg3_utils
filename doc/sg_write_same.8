@@ -99,7 +99,8 @@ considerably more time than 60 seconds to complete.
 \fB\-U\fR, \fB\-\-unmap\fR
 sets the UNMAP bit in the WRITE SAME(16 and 32) cdb. When this option is
 given the default command becomes WRITE SAME(16) since the WRITE SAME(10)
-command does not offer this bit (in SBC\-3 draft revision 18).
+command does not offer this bit (in SBC\-3 draft revision 18). See UNMAP
+section below.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the degree of verbosity (debug messages).
@@ -117,6 +118,33 @@ the \fIIF\fR file or, if that is not given, then the READ CAPACITY(16)
 command is called on the \fIDEVICE\fR and the 'Logical block length in
 bytes' and the PROT_EN bit in the response are used to determine the
 data out buffer length.
+.SH UNMAP
+Thin provisioning is the sophisticated term used in SBC\-3 revision 18
+for the ability to mark blocks as unused. It is closely related to the
+ATA DATA SET MANAGEMENT command with the "Trim" bit set. For large
+storage arrays, it is a way to provision less physical storage than the
+READ CAPACITY command reports is available, potentially allocating more
+physical storage when WRITE commands require it. For flash memory it is
+a way of potentially saving power (and perhaps access time) when it is
+known large sections (or almost all) of the flash memory is not in use.
+.PP
+Support for thin provisioning is indicated by the TPE bit being set in
+the READ CAPACITY(16) command response. That implies at least one of
+the UNMAP, WRITE SAME(16) or WRITE SAME(32) commands is implemented. If
+the UNMAP command is implemented then the "Maximum unmap LBA count"
+and "Maximum unmap block descriptor count" fields in the Block Limits
+VPD page should both be greater than zero.
+.PP
+In the cases of WRITE SAME(16) and WRITE SAME(32) when the Unmap bit is
+set in the cdb then the data out buffer is also sent. Additionally the
+data section of that data out buffer needs to be full off 0x0 bytes
+while the data protection block, 8 bytes at the end if present, needs to
+be set to 0xff bytes. If these conditions are not met then the Unmap
+bit is ignored and the data out buffer is written to the \fIDEVICE\fR as
+if the Unmap bit was zero. In the absence of the \fI\-\-in=IF\fR option,
+this utility will attempt build a data out buffer that meets the
+requirements for the Unmap bit in the cdb to be acted on by the
+\fIDEVICE\fR. 
 .SH NOTES
 The \fILBA\fR, \fILEN\fR and \fINUM\fR arguments may be followed by the
 following multiplicative suffixes:

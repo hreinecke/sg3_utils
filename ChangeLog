@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090311] [svn: r232]
+Changelog for sg3_utils-1.27 [20090316] [svn: r233]
   - sg_write_same: new utility: 10, 16 and 32 byte cdb variants
   - sg_inq: sync version descriptors with spc4r18
     - add power condition VPD page
@@ -29,6 +29,8 @@ Changelog for sg3_utils-1.27 [20090311] [svn: r232]
     - extra parameters for start-stop cycle counter lpage
   - sg_format: add '--fmtpinfo=' and '--pie=' options (sbc3r18)
   - sg_readcap: more protection + thin provisioning (sbc3r18)
+  - sg_persist: code clean up
+  - sginfo: fix crash when 1024 sg device nodes (or more)
   - sg3_utils.spec: correction to configure call
   - sg_pt: add scsi_pt_open_device_flags() call
     - add scsi_pt_version() and clear_scsi_pt_obj() calls
