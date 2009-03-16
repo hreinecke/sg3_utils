@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_PERSIST "8" "March 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
@@ -36,7 +36,7 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing. The relevant sections of the
 SCSI Primary Commands document (i.e. SPC\-4 whose most recent draft is
-revision 9 dated 17th February 2007) are sections 5.6 (titled "Reservation"),
+revision 18 dated 18 February 2009) are sections 5.7 (titled "Reservations"),
 6.13 (for the PRIN command) and 6.14 (for the PROUT command). To safeguard
 against accidental use, the \fI\-\-out\fR option must be given when a
 PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
@@ -211,7 +211,7 @@ a transportID is required for the PROUT 'register and move' sub\-command
 and is optional for the PROUT 'register' and 'register and ignore
 existing key' sub\-commands. The latter two sub\-commands can take multiple
 transportIDs in a list but only one is supported with this option
-variant (use the following option variant that reads stdin if multiple
+variant (use the \fI\-\-transport\-id=\-\fR variant if multiple
 transportIDs are required). \fIH,H...\fR is a comma separated list of hex
 bytes which represent the transportID. The list of hex numbers will be
 padded out with zeros to 24 bytes which is the minimum length of a
@@ -222,7 +222,7 @@ padded with zeros so its length is a multiple of 4.
 a transportID is required for the PROUT 'register and move' sub\-command
 and is optional for the PROUT 'register' and 'register and ignore
 existing key' sub\-commands. The latter two sub\-commands can take multiple
-transportIDs in a list. The argument is '\-' which indicates
+transportIDs in a list. The option argument of '\-' indicates that
 stdin should be read for the transportID(s). Empty lines are ignored.
 Everything from and including a "#" on a line is ignored.
 Leading spaces and tabs are ignored. All numbers
@@ -267,8 +267,8 @@ CONFLICT status. This can be a bit confusing when you know there is
 only one (active) initiator: the "conflict" is with the SPC standard, not
 another initiator.
 .PP
-TransportIDs are defined in SPC\-4 and their structures vary depending
-on the underlying transport.
+TransportIDs are defined in SPC\-4 and their structures differ depending
+on the transport.
 .SH EXAMPLES
 .PP
 Due to defaults the simplest example executes the 'read keys' sub\-command
@@ -332,7 +332,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2008 Douglas Gilbert
+Copyright \(co 2004\-2009 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
