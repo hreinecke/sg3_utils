@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.28 [20090316]";
+static const char * version_str = "2.29 [20090317]";
 
 #include <stdio.h>
 #include <string.h>
@@ -3371,10 +3371,11 @@ static void show_devices(int raw)
         sg_map_arr[j].channel, sg_map_arr[j].target_id, sg_map_arr[j].lun,
         sg_map_arr[j].dev_name);
 #endif
-        ++j;
         printf("%s ", dev_name);
         close(fd);
-    };
+        if (++j >= MAX_SG_DEVS)
+            break;
+    }
     closedir(dir_ptr);
 
     printf("\n"); /* <<<<<<<<<<<<<<<<<<<<< */
