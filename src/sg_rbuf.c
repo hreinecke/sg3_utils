@@ -25,18 +25,17 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
-   device driver.
-*  Copyright (C) 1999-2007 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program uses the SCSI command READ BUFFER on the given
-   device, first to find out how big it is and then to read that
-   buffer (data mode, buffer id 0).
-*/
+/* A utility program originally written for the Linux OS SCSI subsystem.
+ *  Copyright (C) 1999-2009 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ * This program uses the SCSI command READ BUFFER on the given
+ * device, first to find out how big it is and then to read that
+ * buffer (data mode, buffer id 0).
+ */
 
 
 #define RB_MODE_DESC 3

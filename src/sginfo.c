@@ -149,7 +149,7 @@ static const char * version_str = "2.29 [20090317]";
 static int glob_fd;
 static char *device_name;
 
-#define MAX_SG_DEVS 2048
+#define MAX_SG_DEVS 8192
 #define MAX_RESP6_SIZE 252
 #define MAX_RESP10_SIZE (4*1024)
 #define MAX_BUFFER_SIZE MAX_RESP10_SIZE

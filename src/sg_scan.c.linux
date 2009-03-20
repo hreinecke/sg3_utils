@@ -24,31 +24,30 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
-   device driver.
-*  Copyright (C) 1999 - 2009 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program scans the "sg" device space (ie actual + simulated SCSI
-   generic devices). Optionally sg_scan can be given other device names
-   to scan (in place of the sg devices).
-   Options: -a   alpha scan: scan /dev/sga,b,c, ....
-            -i   do SCSI inquiry on device (implies -w)
-            -n   numeric scan: scan /dev/sg0,1,2, ....
-            -V   output version string and exit
-            -w   open writable (new driver opens readable unless -i)
-            -x   extra information output
-
-   By default this program will look for /dev/sg0 first (i.e. numeric scan)
-
-   Note: This program is written to work under both the original and
-   the new sg driver.
-
-   F. Jansen - modification to extend beyond 26 sg devices.
-*/
+/* A utility program originally written for the Linux OS SCSI subsystem.
+ *  Copyright (C) 1999 - 2009 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ * This program scans the "sg" device space (ie actual + simulated SCSI
+ * generic devices). Optionally sg_scan can be given other device names
+ * to scan (in place of the sg devices).
+ * Options: -a   alpha scan: scan /dev/sga,b,c, ....
+ *          -i   do SCSI inquiry on device (implies -w)
+ *          -n   numeric scan: scan /dev/sg0,1,2, ....
+ *          -V   output version string and exit
+ *          -w   open writable (new driver opens readable unless -i)
+ *          -x   extra information output
+ *
+ * By default this program will look for /dev/sg0 first (i.e. numeric scan)
+ *
+ * Note: This program is written to work under both the original and
+ * the new sg driver.
+ *
+ * F. Jansen - modification to extend beyond 26 sg devices.
+ */
 
 static char * version_str = "4.09 20070714";
 
@@ -62,7 +61,7 @@ static char * version_str = "4.09 20070714";
 
 #define EBUFF_SZ 256
 #define FNAME_SZ 64
-#define PRESENT_ARRAY_SIZE 4096
+#define PRESENT_ARRAY_SIZE 8192
 
 static const char * sysfs_sg_dir = "/sys/class/scsi_generic";
 static int * gen_index_arr;
@@ -193,9 +192,8 @@ int main(int argc, char * argv[])
     const char * cp;
     struct stat a_stat;
 
-    if ((gen_index_arr = (int *)malloc(max_file_args * sizeof(int))))
-        memset(gen_index_arr, 0, max_file_args * sizeof(int));
-    else {
+    if (NULL == (gen_index_arr = 
+                 (int *)calloc(max_file_args + 1, sizeof(int)))) {
         printf(ME "Out of memory\n");
         return SG_LIB_CAT_OTHER;
     }
