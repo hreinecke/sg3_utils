@@ -48,6 +48,8 @@
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
 
+static char * version_str = "1.06 (win32) 20090319";
+
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
 #define MAX_PHYSICALDRIVE_NUM 512
@@ -59,7 +61,6 @@
 #define INQUIRY_CMD 0x12
 #define INQUIRY_CMDLEN 6
 
-static char * version_str = "1.06 (win32) 20090223";
 
 struct w_scsi_elem {
     char    in_use;
@@ -161,6 +162,17 @@ typedef struct _STORAGE_DEVICE_DESCRIPTOR {
     ULONG RawPropertiesLength;
     UCHAR RawDeviceProperties[1];
 } STORAGE_DEVICE_DESCRIPTOR, *PSTORAGE_DEVICE_DESCRIPTOR;
+
+typedef struct _STORAGE_DEVICE_UNIQUE_IDENTIFIER {
+  ULONG  Version;
+  ULONG  Size;
+  ULONG  StorageDeviceIdOffset;
+  ULONG  StorageDeviceOffset;
+  ULONG  DriveLayoutSignatureOffset;
+} STORAGE_DEVICE_UNIQUE_IDENTIFIER, *PSTORAGE_DEVICE_UNIQUE_IDENTIFIER;
+
+// Use CompareStorageDuids(PSTORAGE_DEVICE_UNIQUE_IDENTIFIER duid1, duid2)
+// to test for equality
 
 typedef enum _STORAGE_QUERY_TYPE {
     PropertyStandardQuery = 0,
