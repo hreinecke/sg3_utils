@@ -205,47 +205,13 @@ union STORAGE_DEVICE_DESCRIPTOR_DATA {
     char raw[256];
 };
 
+union STORAGE_DEVICE_UID_DATA {
+    STORAGE_DEVICE_UNIQUE_IDENTIFIER desc;
+    char raw[512];
+};
+
 // Get STORAGE_DEVICE_DESCRIPTOR_DATA for device.
 // (This works without admin rights)
-
-static int
-storage_query_property_ioctl(HANDLE hdevice,
-                             union STORAGE_DEVICE_DESCRIPTOR_DATA * data)
-{
-    DWORD num_out;
-    STORAGE_PROPERTY_QUERY query = {StorageDeviceProperty, PropertyStandardQuery, {0} };
-
-    memset(data, 0, sizeof(*data));
-    if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
-                          &query, sizeof(query), data, sizeof(*data),
-                          &num_out, NULL)) {
-#if 0
-        if (verbose > 1)
-            fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY failed, "
-                    "Error=%ld\n", GetLastError());
-#endif
-        return -ENOSYS;
-    }
-
-    if (verbose > 1) {
-        fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY returns:\n"
-                "    Vendor:   \"%s\"\n"
-                "    Product:  \"%s\"\n"
-                "    Revision: \"%s\"\n"
-                "    Removable: %s\n"
-                "    BusType:   0x%02x\n",
-         (data->desc.VendorIdOffset ?
-                 data->raw+data->desc.VendorIdOffset : ""),
-         (data->desc.ProductIdOffset ?
-                 data->raw+data->desc.ProductIdOffset : ""),
-         (data->desc.ProductRevisionOffset ?
-                 data->raw+data->desc.ProductRevisionOffset : ""),
-         (data->desc.RemovableMedia ? "Yes":"No"),
-         data->desc.BusType);
-    }
-    return 0;
-}
-
 
 static char *
 get_err_str(DWORD err, int max_b_len, char * b)
@@ -278,6 +244,73 @@ get_err_str(DWORD err, int max_b_len, char * b)
     }
     return b;
 }
+
+static int
+query_dev_property_ioctl(HANDLE hdevice,
+                             union STORAGE_DEVICE_DESCRIPTOR_DATA * data)
+{
+    DWORD num_out;
+    STORAGE_PROPERTY_QUERY query = {StorageDeviceProperty, PropertyStandardQuery, {0} };
+
+    memset(data, 0, sizeof(*data));
+    if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
+                          &query, sizeof(query), data, sizeof(*data),
+                          &num_out, NULL)) {
+#if 0
+        if (verbose > 1)
+            fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) failed, "
+                    "Error=%ld\n", GetLastError());
+#endif
+        return -ENOSYS;
+    }
+
+    if (verbose > 1) {
+        fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) returns:\n"
+                "    Vendor:   \"%s\"\n"
+                "    Product:  \"%s\"\n"
+                "    Revision: \"%s\"\n"
+                "    Removable: %s\n"
+                "    BusType:   0x%02x\n",
+         (data->desc.VendorIdOffset ?
+                 data->raw+data->desc.VendorIdOffset : ""),
+         (data->desc.ProductIdOffset ?
+                 data->raw+data->desc.ProductIdOffset : ""),
+         (data->desc.ProductRevisionOffset ?
+                 data->raw+data->desc.ProductRevisionOffset : ""),
+         (data->desc.RemovableMedia ? "Yes":"No"),
+         data->desc.BusType);
+    }
+    fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) num_out=%ld\n",
+	    num_out);
+    return 0;
+}
+
+static int
+query_dev_uid_ioctl(HANDLE hdevice,
+                    union STORAGE_DEVICE_UID_DATA * data)
+{
+    DWORD num_out, err;
+    char b[256];
+    STORAGE_PROPERTY_QUERY query = {StorageDeviceUniqueIdProperty,
+				    PropertyStandardQuery, {0} };
+
+    memset(data, 0, sizeof(*data));
+    if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
+                          &query, sizeof(query), data, sizeof(*data),
+                          &num_out, NULL)) {
+#if 1
+	err = GetLastError();
+        if (verbose > 0)
+            fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevUid) failed, "
+                    "Error=%ld %s\n", err, get_err_str(err, sizeof(b), b));
+#endif
+        return -ENOSYS;
+    }
+    fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevUid) num_out=%ld\n",
+	    num_out);
+    return 0;
+}
+
 
 static int
 findElemIndex(UCHAR port_num, UCHAR bus, UCHAR target, UCHAR lun)
@@ -371,10 +404,17 @@ iter_scsi_adapters(void)
         if (fh != INVALID_HANDLE_VALUE) {
 #if 0
             union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+            union STORAGE_DEVICE_UID_DATA uidd;
 
-            if (storage_query_property_ioctl(fh, &sdda) < 0) {
+            if (query_dev_property_ioctl(fh, &sdda) < 0) {
                 err = GetLastError();
-                fprintf(stderr, "%s: IOCTL_STORAGE_QUERY_PROPERTY failed "
+                fprintf(stderr, "%s: query_dev_property_ioctl failed "
+                        "err=%lu\n\t%s",
+                        adapter_name, err, get_err_str(err, sizeof(b), b));
+            }
+            if (query_dev_uid_ioctl(fh, &uidd) < 0) {
+                err = GetLastError();
+                fprintf(stderr, "%s: query_dev_uid_ioctl failed "
                         "err=%lu\n\t%s",
                         adapter_name, err, get_err_str(err, sizeof(b), b));
             }
@@ -481,9 +521,12 @@ iter_volumes(int letter)
         if (fh != INVALID_HANDLE_VALUE) {
 #if 1
             union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+            union STORAGE_DEVICE_UID_DATA uidd;
 
-            if (storage_query_property_ioctl(fh, &sdda) < 0)
-                fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+            if (query_dev_property_ioctl(fh, &sdda) < 0)
+                fprintf(stderr, "%s: query_dev_property_ioctl failed\n", __FUNCTION__ );
+            if (query_dev_uid_ioctl(fh, &uidd) < 0)
+                fprintf(stderr, "%s: query_dev_uid_ioctl failed\n", __FUNCTION__ );
 #endif
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
                                        NULL, 0, inqDataBuff,
@@ -598,9 +641,12 @@ iter_pds(void)
         if (fh != INVALID_HANDLE_VALUE) {
 #if 1
             union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
+            union STORAGE_DEVICE_UID_DATA uidd;
 
-            if (storage_query_property_ioctl(fh, &sdda) < 0)
-                fprintf(stderr, "%s: failed\n", __FUNCTION__ );
+            if (query_dev_property_ioctl(fh, &sdda) < 0)
+                fprintf(stderr, "%s: query_dev_property_ioctl failed\n", __FUNCTION__ );
+            if (query_dev_uid_ioctl(fh, &uidd) < 0)
+                fprintf(stderr, "%s: query_dev_uid_ioctl failed\n", __FUNCTION__ );
 #endif
             hole_count = 0;
             success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
