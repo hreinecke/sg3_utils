@@ -170,7 +170,7 @@ Has no action unless \fI\-\-format\fR is given.
 \fB\-q\fR, \fB\-\-pie\fR=\fIPIE\fR
 sets the "Protection Interval Exponent" field in the parameter block
 associated with a FORMAT UNIT command to \fIPIE\fR. The default value is 0.
-This field first appeared in SBC\-3 revison 18. Has no action unless
+This field first appeared in SBC\-3 revision 18. Has no action unless
 \fI\-\-format\fR is given.
 .TP
 \fB\-r\fR, \fB\-\-resize\fR
@@ -358,6 +358,10 @@ are accessible. The remaining blocks remain unaltered.
 Now resize the disk back to its normal (maximum) block count:
 .PP
    sg_format \-\-resize \-\-count=\-1 /dev/sdm
+.PP
+Format with type 1 protection:
+.PP
+   sg_format \-\-format \-\-fmtpinfo=3 \-\-pfu /dev/sdm
 .PP
 .SH EXIT STATUS
 The exit status of sg_format is 0 when it is successful. Otherwise see

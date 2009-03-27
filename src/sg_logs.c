@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.83 20090224";    /* SPC-4 revision 18 */
+static char * version_str = "0.84 20090327";    /* SPC-4 revision 18 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1542,8 +1542,8 @@ show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
 }
 
 static void
-show_sas_rel_target_port(unsigned char * ucp, int param_len,
-                         const struct opts_t * optsp)
+show_sas_port_param(unsigned char * ucp, int param_len,
+                    const struct opts_t * optsp)
 {
     int j, m, n, nphys, pcb, t, sz, spld_len;
     unsigned char * vcp;
@@ -1720,7 +1720,8 @@ show_sas_rel_target_port(unsigned char * ucp, int param_len,
                        xcp[11];
                 show_sas_phy_event_info(peis, ui, pvdt);
             }
-        }
+        } else if (optsp->do_verbose)
+           printf("    <<No phy event descriptors>>\n");
     }
 }
 
@@ -1736,14 +1737,11 @@ show_protocol_specific_page(unsigned char * resp, int len,
         printf("log_page=0x%x\n", PORT_SPECIFIC_LPAGE);
     for (k = 0, ucp = resp + 4; k < num; ) {
         param_len = ucp[3] + 4;
-        /* each phy has a 48 byte descriptor but since param_len is
-           an 8 bit quantity then only the first 5 phys (of, for example,
-           a 8 phy wide link) can be represented */
         if (6 != (0xf & ucp[4]))
-            return 0;   /* only decode SAS log page [sas2r05a] */
+            return 0;   /* only decode SAS log page */
         if ((0 == k) && (0 == optsp->do_name))
-            printf("SAS Protocol Specific page\n");
-        show_sas_rel_target_port(ucp, param_len, optsp);
+            printf("Protocol Specific port log page for SAS SSP\n");
+        show_sas_port_param(ucp, param_len, optsp);
         k += param_len;
         ucp += param_len;
     }

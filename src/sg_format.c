@@ -45,7 +45,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.17 20090310";
+static char * version_str = "1.17 20090324";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -529,7 +529,7 @@ main(int argc, char **argv)
         if (verbose)
                 printf("      PROTECT=%d\n", !!(inq_out.byte_5 & 1));
         if (inq_out.byte_5 & 1)
-                printf("      << supports 'protection information'>>\n");
+                printf("      << supports protection information>>\n");
 
         if ((0 != inq_out.peripheral_type) &&
             (0xe != inq_out.peripheral_type)) {
