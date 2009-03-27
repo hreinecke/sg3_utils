@@ -10,7 +10,7 @@ Architecture: any
 Depends: ${shlibs:Depends}
 Conflicts: sg-utils, cdwrite
 Replaces: sg-utils
-Description: Collection of Linux utilities for devices that use the
+Description: collection of Linux utilities for devices that use the
  SCSI command set. See the README, ChangeLog and COVERAGE files.
  .
  Requires the linux kernel 2.4 series or later. In the 2.4 series
@@ -63,6 +63,7 @@ Description: Collection of Linux utilities for devices that use the
      * sg_vpd - utility for decoding VPD pages
      * sg_write_buffer - WRITE BUFFER, may be used to load firmware
      * sg_write_long - write a "long" block to the given device
+     * sg_write_same - write a block to one or more consecutive LBAs
      * sg_wr_mode - low level utility to change mode pages
  .
  It also includes source code for some example programs that demonstrate
@@ -74,7 +75,7 @@ Depends: ${shlibs:Depends}
 Conflicts: libsgutils-1-0
 Architecture: any
 Recommends: sg3-utils
-Description: Utilities for working with generic SCSI devices (shared libraries)
+Description: utilities for working with generic SCSI devices (shared libraries)
  This package contains the shared libraries that allow other programs to use it.
 
 Package: libsgutils2-dev
@@ -82,7 +83,7 @@ Section: devel
 Architecture: any
 Depends: libsgutils2, ${shlibs:Depends}
 Recommends: sg3-utils
-Description: Utilities for working with generic SCSI devices (developer files)
+Description: utilities for working with generic SCSI devices (developer files)
  This package contains the <scsi/sg_cmds.h> , <scsi/sg_cmds_basic.h> ,
  <scsi/sg_cmds_extra.h> , <scsi/sg_lib.h> , <scsi/sg_linux_inc.h> and
  <scsi/sg_io_linux.h> header files, the /usr/lib/libsgutils.a static library
