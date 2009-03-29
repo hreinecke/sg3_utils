@@ -154,10 +154,10 @@ typedef struct _STORAGE_DEVICE_DESCRIPTOR {
     UCHAR DeviceTypeModifier;
     BOOLEAN RemovableMedia;
     BOOLEAN CommandQueueing;
-    ULONG VendorIdOffset;
-    ULONG ProductIdOffset;
-    ULONG ProductRevisionOffset;
-    ULONG SerialNumberOffset;
+    ULONG VendorIdOffset;       /* 0 if not available */
+    ULONG ProductIdOffset;      /* 0 if not available */
+    ULONG ProductRevisionOffset;/* 0 if not available */
+    ULONG SerialNumberOffset;   /* -1 if not available ?? */
     STORAGE_BUS_TYPE BusType;
     ULONG RawPropertiesLength;
     UCHAR RawDeviceProperties[1];
@@ -281,7 +281,7 @@ query_dev_property_ioctl(HANDLE hdevice,
          data->desc.BusType);
     }
     fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) num_out=%ld\n",
-	    num_out);
+            num_out);
     return 0;
 }
 
@@ -292,14 +292,14 @@ query_dev_uid_ioctl(HANDLE hdevice,
     DWORD num_out, err;
     char b[256];
     STORAGE_PROPERTY_QUERY query = {StorageDeviceUniqueIdProperty,
-				    PropertyStandardQuery, {0} };
+                                    PropertyStandardQuery, {0} };
 
     memset(data, 0, sizeof(*data));
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
                           &query, sizeof(query), data, sizeof(*data),
                           &num_out, NULL)) {
 #if 1
-	err = GetLastError();
+        err = GetLastError();
         if (verbose > 0)
             fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevUid) failed, "
                     "Error=%ld %s\n", err, get_err_str(err, sizeof(b), b));
@@ -307,7 +307,7 @@ query_dev_uid_ioctl(HANDLE hdevice,
         return -ENOSYS;
     }
     fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevUid) num_out=%ld\n",
-	    num_out);
+            num_out);
     return 0;
 }
 

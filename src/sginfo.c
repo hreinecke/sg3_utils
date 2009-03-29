@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.29 [20090317]";
+static const char * version_str = "2.29 [20090329]";
 
 #include <stdio.h>
 #include <string.h>
@@ -3238,7 +3238,7 @@ static int do_serial_number()
         return status;
     }
     if (trace_cmd > 1) {
-        printf("  inquiry (evpd page 0x80) response:\n");
+        printf("  inquiry (vpd page 0x80) response:\n");
         dump(cbuffer, pagelen);
     }
 

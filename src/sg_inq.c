@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.80 20090228";    /* SPC-4 rev 18 */
+static char * version_str = "0.81 20090329";    /* SPC-4 rev 18 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2025,7 +2025,7 @@ process_cmddt(int sg_fd, const struct opts_t * optsp)
 
 /* Returns 0 if successful */
 static int
-process_evpd(int sg_fd, const struct opts_t * optsp)
+process_vpd(int sg_fd, const struct opts_t * optsp)
 {
     int res, len, num, k, peri_type, vpd;
     const char * cp;
@@ -2522,7 +2522,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         break;
     default:
         printf(" Only hex output supported\n");
-        return process_evpd(sg_fd, optsp);
+        return process_vpd(sg_fd, optsp);
     }
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -2707,7 +2707,7 @@ main(int argc, char * argv[])
             if (ret)
                 goto err_out;
         } else {
-            ret = process_evpd(sg_fd, &opts);
+            ret = process_vpd(sg_fd, &opts);
             if (ret)
                 goto err_out;
         }
