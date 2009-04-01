@@ -48,7 +48,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.90 20090311";
+static char * version_str = "0.91 20090331";
 
 
 #define ME "sg_write_same: "
@@ -304,10 +304,11 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, infd, prot_en, got_stdin, act_cdb_len, vb;
+    int sg_fd, res, c, infd, prot_en, act_cdb_len, vb;
     int num_given = 0;
     int lba_given = 0;
     int if_given = 0;
+    int got_stdin = 0;
     int64_t ll;
     uint32_t block_size;
     const char * device_name = NULL;
@@ -440,23 +441,18 @@ main(int argc, char * argv[])
 
     memset(&a_stat, 0, sizeof(a_stat));
     if (opts.ifilename[0]) {
-        if (stat(opts.ifilename, &a_stat) < 0) {
-            if (vb) {
-                fprintf(stderr, "unable to stat(%s): %s\n", opts.ifilename,
-                        safe_strerror(errno));
-                return SG_LIB_SYNTAX_ERROR;
+        got_stdin = (0 == strcmp(opts.ifilename, "-")) ? 1 : 0;
+        if (! got_stdin) {
+            if (stat(opts.ifilename, &a_stat) < 0) {
+                if (vb)
+                    fprintf(stderr, "unable to stat(%s): %s\n",
+                            opts.ifilename, safe_strerror(errno));
+                return SG_LIB_FILE_ERROR;
             }
-            memset(&a_stat, 0, sizeof(a_stat));
+            if (opts.xfer_len <= 0)
+                opts.xfer_len = (int)a_stat.st_size;
         }
     }
-    if (opts.xfer_len > 0) {
-        if ((a_stat.st_size > 0) && (opts.xfer_len > (int)a_stat.st_size)) {
-            fprintf(stderr, "confused, '--xferlen=' greater than length "
-                    "(%d) of file %s\n", (int)a_stat.st_size, opts.ifilename);
-            return SG_LIB_SYNTAX_ERROR;
-        }
-    } else
-        opts.xfer_len = (int)a_stat.st_size;
     
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
     if (sg_fd < 0) {
@@ -494,13 +490,12 @@ main(int argc, char * argv[])
     }
     wBuff = (unsigned char*)calloc(opts.xfer_len, 1);
     if (NULL == wBuff) {
-        fprintf(stderr, "unable to allocated %d bytes of memory with "
+        fprintf(stderr, "unable to allocate %d bytes of memory with "
                 "calloc()\n", opts.xfer_len);
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
     }
     if (opts.ifilename[0]) {
-        got_stdin = (0 == strcmp(opts.ifilename, "-")) ? 1 : 0;
         if (got_stdin)
             infd = 0;
         else {
@@ -508,6 +503,7 @@ main(int argc, char * argv[])
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for reading", opts.ifilename);
                 perror(ebuff);
+                ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
         }
@@ -518,12 +514,13 @@ main(int argc, char * argv[])
             perror(ebuff);
             if (! got_stdin)
                 close(infd);
+            ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
         if (res < opts.xfer_len) {
             fprintf(stderr, "tried to read %d bytes from %s, got %d "
                     "bytes\n", opts.xfer_len, opts.ifilename, res);
-            fprintf(stderr, "pad with 0x00 bytes and continue\n");
+            fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
         }
         if (! got_stdin)
             close(infd);

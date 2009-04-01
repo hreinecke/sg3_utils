@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "January 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG3_UTILS "8" "March 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -183,6 +183,58 @@ to stderr.
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit. Each utility has its own version
 number and date of last code change.
+.SH NUMERIC ARGUMENTS
+Many utilities have command line options that take numeric arguments. These
+numeric arguments can be large values (e.g. a logical block address (LBA) on
+a disk) and can be inconvenient to enter in the default decimal
+representation. So various other representations are permitted.
+.PP
+Multiplicative suffixes are accepted. They are one, two or three letter
+strings appended directly after the number to which they apply:
+.PP
+   c C         *1
+.br
+   w W         *2
+.br
+   b B         *512
+.br
+   k K KiB     *1024
+.br
+   KB          *1000
+.br
+   m M MiB     *1048576
+.br
+   MB          *1000000
+.br
+   g G GiB     *(2^30)
+.br
+   GB          *(10^9)
+.br
+   t T TiB     *(2^40)
+.br
+   TB          *(10^12)
+.br
+   p P PiB     *(2^50)
+.br
+   PB          *(10^15)
+.PP
+An example is "2k" for 2048. The large tera and peta suffixes are only
+available for numeric arguments that might require 64 bits to represent
+internally.
+.PP
+A suffix of the form "x<n>" multiplies the leading number by <n>. An
+example is "2x33" for "66". The leading number cannot be "0" (zero) as
+that would be interpreted as a hexadecimal number (see below).
+.PP
+These multiplicative suffixes are compatible with GNU's dd command (since
+2002) which claims compliance with SI and with IEC 60027\-2.
+.PP
+Alternatively numerical arguments can be given in hexadecimal. There are
+two syntaxes. The number can be preceded by either "0x" or "0X" as found
+in the C programming language. The second hexadecimal representation is a
+trailing "h" or "H" as found in (storage) standards. When hex numbers are
+given, multipliers cannot be used. For example the decimal value "256" can
+be given as "0x100" or "100h".
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
