@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Fri Mar 27 2009 - dgilbert at interlog dot com
+* Tue Mar 31 2009 - dgilbert at interlog dot com
 - add sg_write_same; sg_dd split; spc4r18 sync
   * sg3_utils-1.27
 
