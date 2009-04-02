@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090331] [svn: r240]
+Changelog for sg3_utils-1.27 [20090401] [svn: r242]
   - sg_write_same: new utility: 10, 16 and 32 byte cdb variants
   - sg_inq: sync version descriptors with spc4r18
     - add power condition VPD page
@@ -30,7 +30,14 @@ Changelog for sg3_utils-1.27 [20090331] [svn: r240]
   - sg_format: add '--fmtpinfo=' and '--pie=' options (sbc3r18)
   - sg_readcap: more protection + thin provisioning (sbc3r18)
   - sg_persist: code clean up
+    - allow '--transport-id=' argument to use space as separator
   - sginfo: fix crash when 1024 sg device nodes (or more)
+  - sg_ses: allow '--data=' argument to use space as separator
+  - sg_senddiag: allow '--raw=' argument to use space as separator
+  - sg_reassign: allow '--address=' argument to use space as
+    separator
+  - sg_wr_mode: allow '--contents=' and '--mask=' arguments to
+    use space as separator
   - sg3_utils.spec: correction to configure call
   - sg_pt: add scsi_pt_open_device_flags() call
     - add scsi_pt_version() and clear_scsi_pt_obj() calls
@@ -40,8 +47,8 @@ Changelog for sg3_utils-1.27 [20090331] [svn: r240]
   - sg_cmds_extra: sg_ll_format_unit: remove rto_req argument,
     the expanded fmtpinfo argument subsumes it.
   - clearer split between Linux and Windows only code and doc
-  - automake tools: changes after upgrade to Ubuntu 8.10
-  - automake tools: Ubuntu 8.10 libtool ugly -> Debian 5.0
+  - automake tools: change to what Ubuntu 8.10 provides
+    - Ubuntu 8.10 libtool problems -> Debian 4.0
 
 Changelog for sg3_utils-1.26 [20080625] [svn: r183]
   - sg_sat_phy_event: new utility; copied from examples

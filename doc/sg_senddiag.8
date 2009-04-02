@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "October 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_SENDDIAG "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -67,9 +67,10 @@ bit is set (as required by SPC\-3).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR=\fIH,H...\fR
 string of comma separated hex numbers each of which should resolve to
-a byte value (i.e. 0 to ff inclusive). This sequence forms a diagnostic
-page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly likely
-the \fI\-\-pf\fR option should also be given.
+a byte value (i.e. 0 to ff inclusive). A (single) space separated string
+of hex bytes is also allowed but the list needs to be in quotes. This
+sequence forms a diagnostic page to be sent with the SCSI SEND DIAGNOSTIC
+command. Mostly likely the \fI\-\-pf\fR option should also be given.
 .TP
 \fB\-r\fR, \fB\-\-raw=\-\fR
 reads sequence of bytes from stdin. The sequence may be comma, space, tab
@@ -244,7 +245,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003\-2007 Douglas Gilbert
+Copyright \(co 2003\-2009 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

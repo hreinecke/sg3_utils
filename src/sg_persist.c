@@ -16,7 +16,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
+/* A utility program originally written for the Linux OS SCSI subsystem.
 *  Copyright (C) 2004-2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.34 20090313";
+static char * version_str = "0.36 20090402";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -581,11 +581,11 @@ prout_rmove_work(int sg_fd, const struct opts_t * optsp)
     return 0;
 }
 
-/* Build transportid byte array from ASCII hexadecimal number which are
- * comma separated. Direct form can only contain one transport ID. In
- * the indirect form (when '-'==*inp) there can be multiple transport IDs,
- * all assumed to contain the same number of bytes each. Fuller description
- * in manpage of sg_persist(8). Returns 0 if successful, else 1 .
+/* Build transportid byte array from ASCII hexadecimal number which are comma
+ * (or (single) space) separated. Direct form can only contain one transport
+ * ID. In the indirect form (when '-'==*inp) there can be multiple transport
+ * IDs, all assumed to contain the same number of bytes each. Fuller
+ * description in manpage of sg_persist(8). Returns 0 if successful, else 1 .
  * N.B. Contains transport ID related special handling (e.g. rounds up to
  * 24 bytes)
  */
@@ -597,6 +597,7 @@ build_transportid(const char * inp, struct opts_t * optsp)
     const char * lcp;
     unsigned char * tid_arr;
     char * cp;
+    char * c2p;
 
     tid_arr = optsp->transportid_arr;
     lcp = inp;
@@ -677,7 +678,7 @@ build_transportid(const char * inp, struct opts_t * optsp)
         optsp->transportid_arr_len = off;
         optsp->num_transportids = num;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "build_transportid: error at pos %d\n",
                     k + 1);
@@ -692,8 +693,13 @@ build_transportid(const char * inp, struct opts_t * optsp)
                 }
                 tid_arr[k] = h;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "build_transportid: error at pos %d\n",
