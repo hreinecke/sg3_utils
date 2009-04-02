@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.43 20080514";    /* ses2r19b */
+static char * version_str = "1.44 20090401";    /* ses2r19b */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1492,6 +1492,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
     unsigned int h;
     const char * lcp;
     char * cp;
+    char * c2p;
     char line[512];
 
     if ((NULL == inp) || (NULL == arr) || (NULL == arr_len))
@@ -1554,7 +1555,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
         }
         *arr_len = off;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "read_hex: error at pos %d\n",
                     k + 1);
@@ -1569,8 +1570,13 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                 }
                 arr[k] = h;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "read_hex: error at pos %d\n",
@@ -1976,7 +1982,9 @@ main(int argc, char * argv[])
             break;
         default:
             fprintf(stderr, "Setting SES control page 0x%x not supported "
-                    "yet\n", page_code);
+                    "by this utility\n", page_code);
+            fprintf(stderr, "That can be done with the sg_senddiag utility "
+                    "with its '--raw=' option\n");
             ret = SG_LIB_SYNTAX_ERROR;
             break;
         }

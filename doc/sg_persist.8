@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "March 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_PERSIST "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
@@ -213,10 +213,11 @@ existing key' sub\-commands. The latter two sub\-commands can take multiple
 transportIDs in a list but only one is supported with this option
 variant (use the \fI\-\-transport\-id=\-\fR variant if multiple
 transportIDs are required). \fIH,H...\fR is a comma separated list of hex
-bytes which represent the transportID. The list of hex numbers will be
-padded out with zeros to 24 bytes which is the minimum length of a
-transportID. A transportID longer than 24 bytes (e.g. for iSCSI) is
-padded with zeros so its length is a multiple of 4.
+bytes which represent the transportID. A (single) space separated list
+of hex bytes is also allowed but the list needs to be in quotes. The list
+of hex numbers will be padded out with zeros to 24 bytes which is the
+minimum length of a transportID. A transportID longer than 24 bytes (e.g.
+for iSCSI) is padded with zeros so its length is a multiple of 4.
 .TP
 \fB\-X\fR, \fB\-\-transport\-id=\-\fR
 a transportID is required for the PROUT 'register and move' sub\-command

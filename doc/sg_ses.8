@@ -1,4 +1,4 @@
-.TH SG_SES "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_SES "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -39,10 +39,11 @@ The Enclosure control, String Out, Threshold Out, Array control (obsolete
 in SES\-2) and Subenclosure String Out diagnostic pages can be set currently.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
-permits a string of comma separated (ASCII) hex digits to be
-specified (limit 512). This allows the parameters to a control diagnostic
-page to be specified. The string given should not include the first 4
-bytes (i.e. page code and length). See next entry for using stdin.
+permits a string of comma separated (ASCII) hex bytes to be specified (limit
+512). A (single) space separated string of hex bytes is also allowed but
+the list needs to be in quotes. This allows the parameters to a control
+diagnostic page to be specified. The string given should not include the
+first 4 bytes (i.e. page code and length). See next entry for using stdin.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\-
 reads a data string from stdin. Spaces, tabs and line feeds additionally
@@ -148,7 +149,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2007 Douglas Gilbert
+Copyright \(co 2004\-2009 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
