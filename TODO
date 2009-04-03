@@ -1,0 +1,4 @@
+Some suggestions and shortcomings:
+
+  - Win32 version of sg_scan doesn't work well in Vista. Rework scanning
+    logic [20090402]
