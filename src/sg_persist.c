@@ -60,11 +60,13 @@ struct opts_t {
     unsigned char transportid_arr[MX_ALLOC_LEN];
     int transportid_arr_len;
     int num_transportids;
+    unsigned int alloc_len;
     int verbose;
 };
 
 
 static struct option long_options[] = {
+    {"alloc-length", 1, 0, 'l'},
     {"clear", 0, 0, 'C'},
     {"device", 1, 0, 'd'},
     {"help", 0, 0, 'h'},
@@ -146,6 +148,10 @@ usage()
     fprintf(stderr,
             "Usage: sg_persist [OPTIONS] [DEVICE]\n"
             "  where OPTIONS include:\n"
+            "    --alloc-length=LEN|-l LEN    allocation length hex value "
+            "(used with\n"
+            "                                 PR In only) (default: 8192 "
+            "(2000 in hex))\n"
             "    --clear|-C                 PR Out: Clear\n"
             "    --device=DEVICE|-d DEVICE    query or change DEVICE\n"
             "    --help|-h                  output this usage message\n"
@@ -308,7 +314,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
 
     memset(pr_buff, 0, sizeof(pr_buff));
     res = sg_ll_persistent_reserve_in(sg_fd, optsp->prin_sa, pr_buff,
-                                      sizeof(pr_buff), 1, optsp->verbose);
+                                      optsp->alloc_len, 1, optsp->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "PR in: command not supported\n");
@@ -744,10 +750,11 @@ main(int argc, char * argv[])
     opts.prin_sa = -1;
     opts.prout_sa = -1;
     opts.inquiry = 1;
+    opts.alloc_len = MX_ALLOC_LEN;
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AcCd:GHhiIkK:LMnoPQrRsS:T:UvVX:YZ",
+        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQrRsS:T:UvVX:YZ",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -795,6 +802,16 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
+            break;
+        case 'l':
+            if (1 != sscanf(optarg, "%x", &opts.alloc_len)) {
+                fprintf(stderr, "bad argument to '--alloc-length'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            } else if (MX_ALLOC_LEN < opts.alloc_len) {
+                fprintf(stderr, "'--alloc-length' argument exceeds maximum"
+                        " value(%d)\n", MX_ALLOC_LEN);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'L':
             opts.prout_sa = PROUT_REL_SA;

@@ -62,6 +62,13 @@ Arguments to long options are mandatory for short options as well.
 The following options are sorted in alphabetical order, based on their
 long option name.
 .TP
+\fB\-l\fR, \fB\-\-alloc-length\fR=\fILEN\fR
+specify the allocation length of the PRIN command. \fILEN\fR is a hex value.
+By default this value is set to the size of the data\-in buffer (8192).
+This parameter is of use for verification that response to PRIN commands
+with various allocation lengths is per section 4.3.5.6 of SPC\-4 revision 18.
+Valid \fILEN\fR values are 0\-8192.
+.TP
 \fB\-C\fR, \fB\-\-clear\fR
 Clear is a sub\-command of the PROUT command. It releases the
 persistent reservation (if any) and clears all registrations from the
