@@ -48,7 +48,7 @@
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
 
-static char * version_str = "1.06 (win32) 20090329";
+static char * version_str = "1.07 (win32) 20090407";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
@@ -156,44 +156,28 @@ union STORAGE_DEVICE_UID_DATA {
     char raw[512];
 };
 
-struct storage_dev_elem {
-    char    in_use;
-    char    scsi_adapter_valid;
-    UCHAR   port_num;           /* <n> in '\\.\SCSI<n>:' adapter name */
-    UCHAR   bus;                /* also known as pathId */
-    UCHAR   target;
-    UCHAR   lun;
-    UCHAR   device_claimed;     /* class driver claimed this lu */
-    UCHAR   dubious_scsi;       /* set if inq_resp[4] is zero */
-    char    pdt;                /* peripheral device type (see SPC-4) */
-    char    volume_valid;
-    char    volume_multiple;    /* multiple partitions mapping to volumes */
-    UCHAR   volume_letter;      /* lowest 'C:' through to 'Z:' */
-    char    physicaldrive_valid;
-    char    cdrom_valid;
-    char    tape_valid;
-    int     physicaldrive_num;
-    int     cdrom_num;
-    int     tape_num;
-    int inq_resp_len;
+struct storage_elem {
+    char    name[32];
+    char    volume_letters[32];
     int qp_descriptor_valid;
     int qp_uid_valid;
-    unsigned char inq_resp[SCSI2_INQ_RESP_LEN];
     union STORAGE_DEVICE_DESCRIPTOR_DATA qp_descriptor;
     union STORAGE_DEVICE_UID_DATA qp_uid;
 };
 
-static struct storage_dev_elem * storage_dev_arr;
 
-static int next_unused_scsi_elem = 0;
-static int next_elem_after_scsi_adapter_valid = 0;
+static struct storage_elem * storage_arr;
+static int next_unused_elem = 0;
+
 static int verbose = 0;
 
 
 static struct option long_options[] = {
+        {"bus", 0, 0, 'b'},
         {"help", 0, 0, 'h'},
         {"letter", 1, 0, '1'},
         {"verbose", 0, 0, 'v'},
+        {"scsi", 0, 0, 's'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
 };
@@ -203,15 +187,17 @@ static void
 usage()
 {
     fprintf(stderr,
-            "Usage: sg_scan  [--help] [--letter=VL] [--verbose] "
-            "[--version]\n");
+            "Usage: sg_scan  [--bus] [--help] [--letter=VL] [--scsi] "
+	    "[--verbose] [--version]\n");
     fprintf(stderr,
+            "       --bus|-b        output bus type\n"
             "       --help|-h       output this usage message then exit\n"
             "       --letter=VL|-l VL    volume letter (e.g. 'F' for F:) "
             "to find\n"
+            "       --scsi|-s       show SCSI adapter (tuple) scan\n"
             "       --verbose|-v    increase verbosity\n"
             "       --version|-V    print version string and exit\n\n"
-            "Scan for SCSI and related device names\n");
+            "Scan for storage and related device names\n");
 }
 
 
@@ -247,6 +233,46 @@ get_err_str(DWORD err, int max_b_len, char * b)
     return b;
 }
 
+static const char *
+get_bus_type(int bt)
+{
+    switch (bt)
+    {
+    case BusTypeUnknown:
+	return "Unkno";
+    case BusTypeScsi:
+	return "Scsi ";
+    case BusTypeAtapi:
+	return "Atapi";
+    case BusTypeAta:
+	return "Ata  ";
+    case BusType1394:
+	return "1394 ";
+    case BusTypeSsa:
+	return "Ssa  ";
+    case BusTypeFibre:
+	return "Fibre";
+    case BusTypeUsb:
+	return "Usb  ";
+    case BusTypeRAID:
+	return "RAID ";
+    case BusTypeiScsi:
+	return "iScsi";
+    case BusTypeSas:
+	return "Sas  ";
+    case BusTypeSata:
+	return "Sata ";
+    case BusTypeSd:
+	return "Sd   ";
+    case BusTypeMmc:
+	return "Mmc  ";
+    case BusTypeMax:
+	return "Max  ";
+    default:
+	return "_unkn";
+    }
+}
+
 static int
 query_dev_property(HANDLE hdevice,
                    union STORAGE_DEVICE_DESCRIPTOR_DATA * data)
@@ -258,31 +284,10 @@ query_dev_property(HANDLE hdevice,
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
                           &query, sizeof(query), data, sizeof(*data),
                           &num_out, NULL)) {
-#if 0
-        if (verbose > 1)
-            fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) failed, "
-                    "Error=%ld\n", GetLastError());
-#endif
         return -ENOSYS;
     }
 
-    if (verbose > 1) {
-        fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) returns:\n"
-                "    Vendor:   \"%s\"\n"
-                "    Product:  \"%s\"\n"
-                "    Revision: \"%s\"\n"
-                "    Removable: %s\n"
-                "    BusType:   0x%02x\n",
-         (data->desc.VendorIdOffset ?
-                 data->raw+data->desc.VendorIdOffset : ""),
-         (data->desc.ProductIdOffset ?
-                 data->raw+data->desc.ProductIdOffset : ""),
-         (data->desc.ProductRevisionOffset ?
-                 data->raw+data->desc.ProductRevisionOffset : ""),
-         (data->desc.RemovableMedia ? "Yes":"No"),
-         data->desc.BusType);
-    }
-    if (verbose > 2)
+    if (verbose > 3)
         fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) num_out=%ld\n",
                 num_out);
     return 0;
@@ -301,12 +306,10 @@ query_dev_uid(HANDLE hdevice,
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
                           &query, sizeof(query), data, sizeof(*data),
                           &num_out, NULL)) {
-#if 1
         err = GetLastError();
-        if (verbose > 0)
+        if (verbose > 2)
             fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevUid) failed, "
                     "Error=%ld %s\n", err, get_err_str(err, sizeof(b), b));
-#endif
         return -ENOSYS;
     }
     if (verbose > 2)
@@ -315,79 +318,36 @@ query_dev_uid(HANDLE hdevice,
     return 0;
 }
 
-
 static int
-findElemIndex(UCHAR port_num, UCHAR bus, UCHAR target, UCHAR lun)
+check_devices(const struct storage_elem * sep)
 {
-    int k;
-    struct storage_dev_elem * sep;
+    int k, j;
+    struct storage_elem * sarr = storage_arr;
 
-    for (k = 0; k < next_unused_scsi_elem; ++k) {
-        sep = storage_dev_arr + k;
-        if ((port_num == sep->port_num) && (bus == sep->bus) &&
-            (target == sep->target) && (lun == sep->lun))
-            return k;
-#if 0
-        if (port_num < sep->port_num)
-            break;      /* assume port_num sorted ascending */
-#endif
+    for (k = 0; k < MAX_SCSI_ELEMS; ++k, ++sarr) {
+	if ('\0' == sarr->name[0])
+	    continue;
+	if (sep->qp_descriptor_valid && sarr->qp_descriptor_valid) {
+	    if (0 == memcmp(&sep->qp_descriptor, &sarr->qp_descriptor,
+			    sizeof(sep->qp_descriptor))) {
+		for (j = 0; j < (int)sizeof(sep->volume_letters); ++j) {
+		    if ('\0' == sarr->volume_letters[j]) {
+			sarr->volume_letters[j] = sep->name[0];
+			break;
+		    }
+		}
+		return 1;
+	    }
+	}
+	// should do uid check here (probably first)
     }
-    return -1;
-}
-
-static BOOL
-fetchInquiry(HANDLE fh, unsigned char * resp, int max_resp_len,
-             SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER * afterCall)
-{
-    BOOL success;
-    int len;
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
-    ULONG dummy;        /* also acts to align next array */
-    BYTE inqResp[SCSI2_INQ_RESP_LEN];
-    unsigned char inqCdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0,
-                                            SCSI2_INQ_RESP_LEN, 0};
-    DWORD err;
-    char b[256];
-
-    memset(&sptdw, 0, sizeof(sptdw));
-    memset(inqResp, 0, sizeof(inqResp));
-    sptdw.spt.Length = sizeof (SCSI_PASS_THROUGH_DIRECT);
-    sptdw.spt.CdbLength = sizeof(inqCdb);
-    sptdw.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
-    sptdw.spt.DataIn = SCSI_IOCTL_DATA_IN;
-    sptdw.spt.DataTransferLength = SCSI2_INQ_RESP_LEN;
-    sptdw.spt.TimeOutValue = DEF_TIMEOUT;
-    sptdw.spt.DataBuffer = inqResp;
-    sptdw.spt.SenseInfoOffset =
-                offsetof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER, ucSenseBuf);
-    memcpy(sptdw.spt.Cdb, inqCdb, sizeof(inqCdb));
-
-    success = DeviceIoControl(fh, IOCTL_SCSI_PASS_THROUGH_DIRECT,
-                              &sptdw, sizeof(sptdw),
-                              &sptdw, sizeof(sptdw),
-                              &dummy, NULL);
-    if (! success) {
-        if (verbose) {
-            err = GetLastError();
-            fprintf(stderr, "fetchInquiry: DeviceIoControl for INQUIRY, "
-                    "err=%lu\n\t%s", err, get_err_str(err, sizeof(b), b));
-        }
-        return success;
-    }
-    if (afterCall)
-        memcpy(afterCall, &sptdw, sizeof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER));
-    if (resp) {
-        len = (SCSI2_INQ_RESP_LEN > max_resp_len) ?
-              max_resp_len : SCSI2_INQ_RESP_LEN;
-        memcpy(resp, inqResp, len);
-    }
-    return success;
+    return 0;
 }
 
 static int
-iter_scsi_adapters(void)
+enum_scsi_adapters(void)
 {
-    int k, j, m;
+    int k, j;
     int hole_count = 0;
     HANDLE fh;
     ULONG dummy;
@@ -397,7 +357,6 @@ iter_scsi_adapters(void)
     char adapter_name[64];
     char inqDataBuff[2048];
     PSCSI_ADAPTER_BUS_INFO  ai;
-    struct storage_dev_elem * sep;
     char b[256];
 
     for (k = 0; k < MAX_ADAPTER_NUM; ++k) {
@@ -406,24 +365,6 @@ iter_scsi_adapters(void)
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
-#if 0
-            union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
-            union STORAGE_DEVICE_UID_DATA uidd;
-
-            if (query_dev_property(fh, &sdda) < 0) {
-                err = GetLastError();
-                fprintf(stderr, "%s: query_dev_property failed "
-                        "err=%lu\n\t%s",
-                        adapter_name, err, get_err_str(err, sizeof(b), b));
-            }
-            if (query_dev_uid(fh, &uidd) < 0) {
-                err = GetLastError();
-                fprintf(stderr, "%s: query_dev_uid failed "
-                        "err=%lu\n\t%s",
-                        adapter_name, err, get_err_str(err, sizeof(b), b));
-            }
-            // fprintf(stderr, "%s: failed\n", __FUNCTION__ );
-#endif
             hole_count = 0;
             success = DeviceIoControl(fh, IOCTL_SCSI_GET_INQUIRY_DATA,
                                       NULL, 0, inqDataBuff, sizeof(inqDataBuff),
@@ -431,7 +372,7 @@ iter_scsi_adapters(void)
             if (success) {
                 PSCSI_BUS_DATA pbd;
                 PSCSI_INQUIRY_DATA pid;
-                int num_lus, off, len;
+                int num_lus, off;
 
                 ai = (PSCSI_ADAPTER_BUS_INFO)inqDataBuff;
                 for (bus = 0; bus < ai->NumberOfBusses; bus++) {
@@ -444,41 +385,15 @@ iter_scsi_adapters(void)
                                     (int)sizeof(SCSI_INQUIRY_DATA))))
                             break;
                         pid = (PSCSI_INQUIRY_DATA)(inqDataBuff + off);
-                        m = next_unused_scsi_elem++;
-                        if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                            fprintf(stderr, "Too many scsi devices (more "
-                                    "than %d)\n", MAX_SCSI_ELEMS);
-                            return SG_LIB_CAT_OTHER;
-                        }
-                        next_elem_after_scsi_adapter_valid =
-                                        next_unused_scsi_elem;
-                        sep = storage_dev_arr + m;
-                        sep->in_use = 1;
-                        sep->scsi_adapter_valid = 1;
-                        sep->port_num = k;
-                        sep->bus = pid->PathId;
-                        sep->target = pid->TargetId;
-                        sep->lun = pid->Lun;
-                        sep->device_claimed = pid->DeviceClaimed;
-                        len = pid->InquiryDataLength;
-                        len = (len > SCSI2_INQ_RESP_LEN) ?
-                              SCSI2_INQ_RESP_LEN : len;
-                        memcpy(sep->inq_resp, pid->InquiryData, len);
-			sep->inq_resp_len = len;
-                        sep->pdt = sep->inq_resp[0] & 0x3f;
-                        if (0 == sep->inq_resp[4])
-                            sep->dubious_scsi = 1;
-
-                        if (verbose > 1) {
-                            fprintf(stderr, "%s: PathId=%d TargetId=%d "
-                                    "Lun=%d ", adapter_name, pid->PathId,
-                                    pid->TargetId, pid->Lun);
-                            fprintf(stderr, "  DeviceClaimed=%d, dubious=%d\n",
-                                    pid->DeviceClaimed, sep->dubious_scsi);
-			    if (verbose > 2)
-                                dStrHex((const char *)(pid->InquiryData),
-                                        pid->InquiryDataLength, 0);
-                        }
+            		snprintf(b, sizeof(b) - 1, "SCSI%d:%d,%d,%d ", k,
+                     		 pid->PathId, pid->TargetId, pid->Lun);
+			printf("%-14s", b);
+            		snprintf(b, sizeof(b) - 1, "claimed=%d pdt=%xh %s ",
+				 pid->DeviceClaimed, pid->InquiryData[0] % 0x3f,
+				 ((0 == pid->InquiryData[4]) ? "dubious" : ""));
+			printf("%-26s", b);
+			printf("%.8s  %.16s  %.4s\n", pid->InquiryData + 8,
+			       pid->InquiryData + 16, pid->InquiryData + 32);
                         off = pid->NextInquiryDataOffset;
                     }
                 }
@@ -503,120 +418,34 @@ iter_scsi_adapters(void)
 }
 
 static int
-iter_volumes(int letter)
+enum_volumes(char letter)
 {
-    int k, m, index, matched;
+    int k;
     HANDLE fh;
-    ULONG dummy;
-    DWORD err;
-    BOOL success;
     char adapter_name[64];
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
-    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
-    char inqDataBuff[2048];
-    struct storage_dev_elem * sep;
-    char b[256];
+    struct storage_elem tmp_se;
 
+    if (verbose > 2)
+        fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < 24; ++k) {
-        matched = 0;
-        sep = NULL;
+	memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\%c:", 'C' + k);
+	tmp_se.name[0] = 'C' + k;
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
-#if 1
-            union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
-            union STORAGE_DEVICE_UID_DATA uidd;
-
-            if (query_dev_property(fh, &sdda) < 0)
+            if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
-            if (query_dev_uid(fh, &uidd) < 0)
-                fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
-#endif
-	    memset(inqDataBuff, 0, sizeof(inqDataBuff));
-            success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff,
-                                       sizeof(inqDataBuff), &dummy, FALSE);
-            if (success) {
-                PSCSI_ADDRESS pa;
-
-                pa = (PSCSI_ADDRESS)inqDataBuff;
-fprintf(stderr, "[%c] scsi_address: Length=%lu ioctl_ret_length=%lu\n", 'C' + k, pa->Length, dummy);
-                index = findElemIndex(pa->PortNumber, pa->PathId,
-                                      pa->TargetId, pa->Lun);
-                if (index >= 0) {
-                    sep = storage_dev_arr + index;
-                    matched = 1;
-                } else {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->port_num = pa->PortNumber;
-                    sep->bus = pa->PathId;
-                    sep->target = pa->TargetId;
-                    sep->lun = pa->Lun;
-                    sep->device_claimed = 1;
-                }
-                if (sep->volume_valid) {
-                    sep->volume_multiple = 1;
-                    if (('C' + k) == letter)
-                        sep->volume_letter = letter;
-                } else {
-                    sep->volume_valid = 1;
-                    sep->volume_letter = 'C' + k;
-                }
-                if (verbose > 1)
-                    fprintf(stderr, "%c: PortNum=%d PathId=%d TargetId=%d "
-                            "Lun=%d  index=%d\n", 'C' + k, pa->PortNumber,
-                            pa->PathId, pa->TargetId, pa->Lun, index);
-                if (matched) {
-                    CloseHandle(fh);
-                    continue;
-                }
-            } else {
-                if (verbose > 1) {
-                    err = GetLastError();
-                    fprintf(stderr, "%c: IOCTL_SCSI_GET_ADDRESS err=%lu\n\t"
-                            "%s", 'C' + k, err,
-                            get_err_str(err, sizeof(b), b));
-                }
-            }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
-                if (sptdw.spt.ScsiStatus) {
-                    if (verbose) {
-                        fprintf(stderr, "%c: INQUIRY failed:  ", 'C' + k);
-                        sg_print_scsi_status(sptdw.spt.ScsiStatus);
-                        sg_print_sense("    ", sptdw.ucSenseBuf,
-                                       sizeof(sptdw.ucSenseBuf), 0);
-                    }
-                    CloseHandle(fh);
-                    continue;
-                }
-                if (NULL == sep) {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->device_claimed = 1;
-                    sep->volume_valid = 1;
-                    sep->volume_letter = 'C' + k;
-                }
-                memcpy(sep->inq_resp, inqResp, sizeof(sep->inq_resp));
-		sep->inq_resp_len = sizeof(sep->inq_resp);
-                sep->pdt = sep->inq_resp[0] & 0x3f;
-                if (0 == sep->inq_resp[4])
-                    sep->dubious_scsi = 1;
-            }
+	    else
+		tmp_se.qp_descriptor_valid = 1;
+            if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
+                if (verbose > 2)
+		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+	    } else
+		tmp_se.qp_uid_valid = 1;
+	    if (('\0' == letter) || (letter == tmp_se.name[0]))
+                check_devices(&tmp_se);
             CloseHandle(fh);
         }
     }
@@ -624,122 +453,38 @@ fprintf(stderr, "[%c] scsi_address: Length=%lu ioctl_ret_length=%lu\n", 'C' + k,
 }
 
 static int
-iter_pds(void)
+enum_pds(void)
 {
-    int k, m, index, matched;
+    int k;
     int hole_count = 0;
     HANDLE fh;
-    ULONG dummy;
     DWORD err;
-    BOOL success;
     char adapter_name[64];
-    char inqDataBuff[2048];
-    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
-    struct storage_dev_elem * sep;
     char b[256];
+    struct storage_elem tmp_se;
 
     if (verbose > 2)
         fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < MAX_PHYSICALDRIVE_NUM; ++k) {
-        matched = 0;
-        sep = NULL;
+	memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name),
                  "\\\\.\\PhysicalDrive%d", k);
+	snprintf(tmp_se.name, sizeof(tmp_se.name), "PD%d", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
-#if 1
-            union STORAGE_DEVICE_DESCRIPTOR_DATA sdda;
-            union STORAGE_DEVICE_UID_DATA uidd;
-
-            if (query_dev_property(fh, &sdda) < 0)
+            if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
-            if (query_dev_uid(fh, &uidd) < 0)
-                fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
-#endif
+	    else
+		tmp_se.qp_descriptor_valid = 1;
+            if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
+                if (verbose > 2)
+		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+	    } else
+		tmp_se.qp_uid_valid = 1;
             hole_count = 0;
-	    memset(&inqDataBuff, 0, sizeof(inqDataBuff));
-            success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff,
-                                       sizeof(inqDataBuff), &dummy, FALSE);
-            if (success) {
-                PSCSI_ADDRESS pa;
-
-                pa = (PSCSI_ADDRESS)inqDataBuff;
-                index = findElemIndex(pa->PortNumber, pa->PathId,
-                                      pa->TargetId, pa->Lun);
-                if (index >= 0) {
-                    sep = storage_dev_arr + index;
-                    matched = 1;
-                } else {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->port_num = pa->PortNumber;
-                    sep->bus = pa->PathId;
-                    sep->target = pa->TargetId;
-                    sep->lun = pa->Lun;
-                    sep->device_claimed = 1;
-                }
-                sep->physicaldrive_valid = 1;
-                sep->physicaldrive_num = k;
-                if (verbose > 1) {
-                    fprintf(stderr, "PD%d: PortNum=%d PathId=%d TargetId=%d "
-                            "Lun=%d  index=%d\n", k, pa->PortNumber,
-                            pa->PathId, pa->TargetId, pa->Lun, index);
-// xxxx
-                    fprintf(stderr, "    %s\n", adapter_name);
-		    if(verbose > 2)
-		        dStrHex((const char *)(&sdda), 64, 0);
-		}
-                if (matched) {
-                    CloseHandle(fh);
-                    continue;
-                }
-            } else {
-                if (verbose > 1) {
-                    err = GetLastError();
-                    fprintf(stderr, "PD%d: IOCTL_SCSI_GET_ADDRESS err=%lu\n\t"
-                            "%s", k, err, get_err_str(err, sizeof(b), b));
-                }
-            }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
-                if (sptdw.spt.ScsiStatus) {
-                    if (verbose) {
-                        fprintf(stderr, "PD%d: INQUIRY failed:  ", k);
-                        sg_print_scsi_status(sptdw.spt.ScsiStatus);
-                        sg_print_sense("    ", sptdw.ucSenseBuf,
-                                       sizeof(sptdw.ucSenseBuf), 0);
-                    }
-                    CloseHandle(fh);
-                    continue;
-                }
-                if (NULL == sep) {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->device_claimed = 1;
-                    sep->physicaldrive_valid = 1;
-                    sep->physicaldrive_num = k;
-                }
-                memcpy(sep->inq_resp, inqResp, sizeof(sep->inq_resp));
-		sep->inq_resp_len = sizeof(sep->inq_resp);
-                sep->pdt = sep->inq_resp[0] & 0x3f;
-                if (0 == sep->inq_resp[4])
-                    sep->dubious_scsi = 1;
-            }
+	    memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
         } else {
             if (verbose > 3) {
@@ -755,105 +500,37 @@ iter_pds(void)
 }
 
 static int
-iter_cdroms()
+enum_cdroms(void)
 {
-    int k, m, index, matched;
+    int k;
     int hole_count = 0;
     HANDLE fh;
-    ULONG dummy;
     DWORD err;
-    BOOL success;
     char adapter_name[64];
-    char inqDataBuff[2048];
-    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
-    struct storage_dev_elem * sep;
     char b[256];
+    struct storage_elem tmp_se;
 
+    if (verbose > 2)
+        fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < MAX_CDROM_NUM; ++k) {
-        matched = 0;
-        sep = NULL;
+	memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\CDROM%d", k);
+	snprintf(tmp_se.name, sizeof(tmp_se.name), "CDROM%d", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
+            if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
+                fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
+	    else
+		tmp_se.qp_descriptor_valid = 1;
+            if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
+                if (verbose > 2)
+		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+	    } else
+		tmp_se.qp_uid_valid = 1;
             hole_count = 0;
-            success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff,
-                                       sizeof(inqDataBuff), &dummy, FALSE);
-            if (success) {
-                PSCSI_ADDRESS pa;
-
-                pa = (PSCSI_ADDRESS)inqDataBuff;
-                index = findElemIndex(pa->PortNumber, pa->PathId,
-                                      pa->TargetId, pa->Lun);
-                if (index >= 0) {
-                    sep = storage_dev_arr + index;
-                    matched = 1;
-                } else {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->port_num = pa->PortNumber;
-                    sep->bus = pa->PathId;
-                    sep->target = pa->TargetId;
-                    sep->lun = pa->Lun;
-                    sep->device_claimed = 1;
-                }
-                sep->cdrom_valid = 1;
-                sep->cdrom_num = k;
-                if (verbose > 1)
-                    fprintf(stderr, "CDROM%d: PortNum=%d PathId=%d TargetId=%d "
-                            "Lun=%d  index=%d\n", k, pa->PortNumber,
-                            pa->PathId, pa->TargetId, pa->Lun, index);
-                if (matched) {
-                    CloseHandle(fh);
-                    continue;
-                }
-            } else {
-                if (verbose > 1) {
-                    err = GetLastError();
-                    fprintf(stderr, "CDROM%d: IOCTL_SCSI_GET_ADDRESS "
-                            "err=%lu\n\t%s", k, err,
-                            get_err_str(err, sizeof(b), b));
-                }
-            }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
-                if (sptdw.spt.ScsiStatus) {
-                    if (verbose) {
-                        fprintf(stderr, "CDROM%d: INQUIRY failed:  ", k);
-                        sg_print_scsi_status(sptdw.spt.ScsiStatus);
-                        sg_print_sense("    ", sptdw.ucSenseBuf,
-                                       sizeof(sptdw.ucSenseBuf), 0);
-                    }
-                    CloseHandle(fh);
-                    continue;
-                }
-                if (NULL == sep) {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->device_claimed = 1;
-                    sep->cdrom_valid = 1;
-                    sep->cdrom_num = k;
-                }
-                memcpy(sep->inq_resp, inqResp, sizeof(sep->inq_resp));
-		sep->inq_resp_len = sizeof(sep->inq_resp);
-                sep->pdt = sep->inq_resp[0] & 0x3f;
-                if (0 == sep->inq_resp[4])
-                    sep->dubious_scsi = 1;
-            }
+	    memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
         } else {
             if (verbose > 3) {
@@ -869,105 +546,37 @@ iter_cdroms()
 }
 
 static int
-iter_tapes()
+enum_tapes(void)
 {
-    int k, m, index, matched;
+    int k;
     int hole_count = 0;
     HANDLE fh;
-    ULONG dummy;
     DWORD err;
-    BOOL success;
     char adapter_name[64];
-    char inqDataBuff[2048];
-    unsigned char inqResp[SCSI2_INQ_RESP_LEN];
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER sptdw;
-    struct storage_dev_elem * sep;
     char b[256];
+    struct storage_elem tmp_se;
 
+    if (verbose > 2)
+        fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < MAX_TAPE_NUM; ++k) {
-        matched = 0;
-        sep = NULL;
+	memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\TAPE%d", k);
+	snprintf(tmp_se.name, sizeof(tmp_se.name), "TAPE%d", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
+            if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
+                fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
+	    else
+		tmp_se.qp_descriptor_valid = 1;
+            if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
+                if (verbose > 2)
+		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+	    } else
+		tmp_se.qp_uid_valid = 1;
             hole_count = 0;
-            success  = DeviceIoControl(fh, IOCTL_SCSI_GET_ADDRESS,
-                                       NULL, 0, inqDataBuff,
-                                       sizeof(inqDataBuff), &dummy, FALSE);
-            if (success) {
-                PSCSI_ADDRESS pa;
-
-                pa = (PSCSI_ADDRESS)inqDataBuff;
-                index = findElemIndex(pa->PortNumber, pa->PathId,
-                                      pa->TargetId, pa->Lun);
-                if (index >= 0) {
-                    sep = storage_dev_arr + index;
-                    matched = 1;
-                } else {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->port_num = pa->PortNumber;
-                    sep->bus = pa->PathId;
-                    sep->target = pa->TargetId;
-                    sep->lun = pa->Lun;
-                    sep->device_claimed = 1;
-                }
-                sep->tape_valid = 1;
-                sep->tape_num = k;
-                if (verbose > 1)
-                    fprintf(stderr, "TAPE%d: PortNum=%d PathId=%d TargetId=%d "
-                            "Lun=%d  index=%d\n", k, pa->PortNumber,
-                            pa->PathId, pa->TargetId, pa->Lun, index);
-                if (matched) {
-                    CloseHandle(fh);
-                    continue;
-                }
-            } else {
-                if (verbose > 1) {
-                    err = GetLastError();
-                    fprintf(stderr, "TAPE%d: IOCTL_SCSI_GET_ADDRESS "
-                            "err=%lu\n\t%s", k, err,
-                            get_err_str(err, sizeof(b), b));
-                }
-            }
-            if (fetchInquiry(fh, inqResp, sizeof(inqResp), &sptdw)) {
-                if (sptdw.spt.ScsiStatus) {
-                    if (verbose) {
-                        fprintf(stderr, "TAPE%d: INQUIRY failed:  ", k);
-                        sg_print_scsi_status(sptdw.spt.ScsiStatus);
-                        sg_print_sense("    ", sptdw.ucSenseBuf,
-                                       sizeof(sptdw.ucSenseBuf), 0);
-                    }
-                    CloseHandle(fh);
-                    continue;
-                }
-                if (NULL == sep) {
-                    m = next_unused_scsi_elem++;
-                    if (next_unused_scsi_elem > MAX_SCSI_ELEMS) {
-                        fprintf(stderr, "Too many scsi devices (more "
-                                "than %d)\n", MAX_SCSI_ELEMS);
-                        return SG_LIB_CAT_OTHER;
-                    }
-                    sep = storage_dev_arr + m;
-                    sep->in_use = 1;
-                    sep->device_claimed = 1;
-                    sep->tape_valid = 1;
-                    sep->tape_num = k;
-                }
-                memcpy(sep->inq_resp, inqResp, sizeof(sep->inq_resp));
-		sep->inq_resp_len = sizeof(sep->inq_resp);
-                sep->pdt = sep->inq_resp[0] & 0x3f;
-                if (0 == sep->inq_resp[4])
-                    sep->dubious_scsi = 1;
-            }
+	    memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
         } else {
             if (verbose > 3) {
@@ -983,72 +592,63 @@ iter_tapes()
 }
 
 static int
-sg_do_wscan(char letter)
+sg_do_wscan(char letter, int show_bt, int scsi_scan)
 {
-    int k, j;
-    char b[256];
-    struct storage_dev_elem * sep;
+    int k, j, n;
+    struct storage_elem * sp;
 
-    memset(storage_dev_arr, 0, sizeof(storage_dev_arr));
-    k = iter_scsi_adapters();
+    k = enum_pds();
     if (k)
         return k;
-    k = iter_volumes(letter);
+    k = enum_cdroms();
     if (k)
         return k;
-    k = iter_pds();
+    k = enum_tapes();
     if (k)
         return k;
-    k = iter_cdroms();
-    if (k)
-        return k;
-    k = iter_tapes();
+    k = enum_volumes(letter);
     if (k)
         return k;
 
     for (k = 0; k < MAX_SCSI_ELEMS; ++k) {
-        sep = storage_dev_arr + k;
-        if (0 == sep->in_use)
-            break;
-        if (sep->scsi_adapter_valid) {
-            snprintf(b, sizeof(b), "SCSI%d:%d,%d,%d ", sep->port_num,
-                     sep->bus, sep->target, sep->lun);
-            printf("%-18s", b);
-        } else
-            printf("                  ");
-        if (sep->volume_valid)
-            printf("%c: %c  ", sep->volume_letter,
-                   (sep->volume_multiple ? '+' : ' '));
-        else
-            printf("      ");
-        if (sep->physicaldrive_valid) {
-            snprintf(b, sizeof(b), "PD%d ", sep->physicaldrive_num);
-            printf("%-9s", b);
-        } else if (sep->cdrom_valid) {
-            snprintf(b, sizeof(b), "CDROM%d ", sep->cdrom_num);
-            printf("%-9s", b);
-        } else if (sep->tape_valid) {
-            snprintf(b, sizeof(b), "TAPE%d ", sep->tape_num);
-            printf("%-9s", b);
-        } else
+        sp = storage_arr + k;
+	if ('\0' == sp->name[0])
+	    continue;
+        printf("%-8s  ", sp->name);
+	n = strlen(sp->volume_letters);
+	if (0 == n)
             printf("         ");
-
-        memcpy(b, sep->inq_resp + 8, SCSI2_INQ_RESP_LEN - 8);
-        for (j = 0; j < 28; ++j) {
-            if ((b[j] < 0x20) || (b[j] > 0x7e))
-                b[j] = ' ';
-        }
-        b[28] = '\0';
-        printf("%-30s", b);
-        if (sep->dubious_scsi)
-            printf("*     ");
-        else if ((! sep->physicaldrive_valid) && (! sep->cdrom_valid) &&
-                 (! sep->tape_valid))
-            printf("pdt=%-2d", sep->pdt);
-        else
-            printf("      ");
-
+	else if (1 == n)
+            printf("[%s]      ", sp->volume_letters);
+	else if (2 == n)
+            printf("[%s]     ", sp->volume_letters);
+	else if (3 == n)
+            printf("[%s]    ", sp->volume_letters);
+	else if (4 == n)
+            printf("[%s]   ", sp->volume_letters);
+	else
+            printf("[%4s+]  ", sp->volume_letters);
+	if (sp->qp_descriptor_valid) {
+	    if (show_bt)
+		printf("<%s>  ", get_bus_type(sp->qp_descriptor.desc.BusType));
+	    j = sp->qp_descriptor.desc.VendorIdOffset;
+	    if (j > 0)
+        	printf("%s  ", sp->qp_descriptor.raw + j);
+	    j = sp->qp_descriptor.desc.ProductIdOffset;
+	    if (j > 0)
+        	printf("%s  ", sp->qp_descriptor.raw + j);
+	    j = sp->qp_descriptor.desc.ProductRevisionOffset;
+	    if (j > 0)
+        	printf("%s  ", sp->qp_descriptor.raw + j);
+	    j = sp->qp_descriptor.desc.SerialNumberOffset;
+	    if (j > 0)
+        	printf("%s", sp->qp_descriptor.raw + j);
+	}
         printf("\n");
+    }
+    if (scsi_scan) {
+	printf("\n");
+        enum_scsi_adapters();
     }
     return 0;
 }
@@ -1059,16 +659,21 @@ main(int argc, char * argv[])
 {
     int c, ret;
     int vol_letter = 0;
+    int show_bt = 0;
+    int scsi_scan = 0;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHl:vV", long_options,
+        c = getopt_long(argc, argv, "bhHl:svV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'b':
+            ++show_bt;
+            break;
         case 'h':
         case '?':
             usage();
@@ -1081,6 +686,9 @@ main(int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 's':
+            ++scsi_scan;
             break;
         case 'v':
             ++verbose;
@@ -1104,10 +712,10 @@ main(int argc, char * argv[])
         }
     }
 
-    storage_dev_arr = malloc(sizeof(struct storage_dev_elem) * MAX_SCSI_ELEMS);
+    storage_arr = calloc(sizeof(struct storage_elem) * MAX_SCSI_ELEMS, 1);
 
-    ret = sg_do_wscan(vol_letter);
+    ret = sg_do_wscan(vol_letter, show_bt, scsi_scan);
 
-    free(storage_dev_arr);
+    free(storage_arr);
     return ret;
 }
