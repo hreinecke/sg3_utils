@@ -79,7 +79,8 @@ found.
 \fB\-s\fR, \fB\-\-scsi\fR
 do a SCSI adapter based scan after the normal storage device based scan.
 There is a blank line between the normal scan and the SCSI adapter based
-scan.
+scan. If this option is given twice then only the SCSI adapter based scan
+is done.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.

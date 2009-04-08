@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "March 2007" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_WRITE_SAME "8" "April 2007" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -135,18 +135,21 @@ the READ CAPACITY(16) command response. That implies at least one of
 the UNMAP, WRITE SAME(16) or WRITE SAME(32) commands is implemented. If
 the UNMAP command is implemented then the "Maximum unmap LBA count"
 and "Maximum unmap block descriptor count" fields in the Block Limits
-VPD page should both be greater than zero.
+VPD page should both be greater than zero. The READ CAPACITY(16) command
+response also contains a TPRZ bit which if set means that if unmapped
+blocks are read then zeroes will be returned for the data (and if
+protection information is active, 0xff bytes are returned for that).
 .PP
 In the cases of WRITE SAME(16) and WRITE SAME(32) when the Unmap bit is
 set in the cdb then the data out buffer is also sent. Additionally the
-data section of that data out buffer needs to be full off 0x0 bytes
-while the data protection block, 8 bytes at the end if present, needs to
-be set to 0xff bytes. If these conditions are not met then the Unmap
-bit is ignored and the data out buffer is written to the \fIDEVICE\fR as
-if the Unmap bit was zero. In the absence of the \fI\-\-in=IF\fR option,
-this utility will attempt build a data out buffer that meets the
-requirements for the Unmap bit in the cdb to be acted on by the
-\fIDEVICE\fR. 
+data section of that data out buffer should be full of 0x0 bytes while
+the data protection block, 8 bytes at the end if present, should be set
+to 0xff bytes. If these conditions are not met and the TPRZ bit is set
+then the Unmap bit is ignored and the data out buffer is written to
+the \fIDEVICE\fR as if the Unmap bit was zero. In the absence of the
+\fI\-\-in=IF\fR option, this utility will attempt build a data out
+buffer that meets the requirements for the Unmap bit in the cdb to be
+acted on by the \fIDEVICE\fR. 
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
