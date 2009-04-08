@@ -50,7 +50,7 @@
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
 
-static char * version_str = "1.07 (win32) 20090407";
+static char * version_str = "1.08 (win32) 20090408";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
@@ -170,7 +170,7 @@ static int verbose = 0;
 static struct option long_options[] = {
         {"bus", 0, 0, 'b'},
         {"help", 0, 0, 'h'},
-        {"letter", 1, 0, '1'},
+        {"letter", 1, 0, 'l'},
         {"verbose", 0, 0, 'v'},
         {"scsi", 0, 0, 's'},
         {"version", 0, 0, 'V'},
@@ -598,60 +598,64 @@ sg_do_wscan(char letter, int show_bt, int scsi_scan)
     int k, j, n;
     struct storage_elem * sp;
 
-    k = enum_pds();
-    if (k)
-        return k;
-    k = enum_cdroms();
-    if (k)
-        return k;
-    k = enum_tapes();
-    if (k)
-        return k;
-    k = enum_volumes(letter);
-    if (k)
-        return k;
+    if (scsi_scan < 2) {
+        k = enum_pds();
+        if (k)
+            return k;
+        k = enum_cdroms();
+        if (k)
+            return k;
+        k = enum_tapes();
+        if (k)
+            return k;
+        k = enum_volumes(letter);
+        if (k)
+            return k;
 
-    for (k = 0; k < next_unused_elem; ++k) {
-        sp = storage_arr + k;
-        if ('\0' == sp->name[0])
-            continue;
-        printf("%-7s ", sp->name);
-        n = strlen(sp->volume_letters);
-        if (0 == n)
-            printf("        ");
-        else if (1 == n)
-            printf("[%s]     ", sp->volume_letters);
-        else if (2 == n)
-            printf("[%s]    ", sp->volume_letters);
-        else if (3 == n)
-            printf("[%s]   ", sp->volume_letters);
-        else if (4 == n)
-            printf("[%s]  ", sp->volume_letters);
-        else
-            printf("[%4s+] ", sp->volume_letters);
-        if (sp->qp_descriptor_valid) {
-            if (show_bt)
-                printf("<%s>  ", get_bus_type(sp->qp_descriptor.desc.BusType));
-            j = sp->qp_descriptor.desc.VendorIdOffset;
-            if (j > 0)
-                printf("%s  ", sp->qp_descriptor.raw + j);
-            j = sp->qp_descriptor.desc.ProductIdOffset;
-            if (j > 0)
-                printf("%s  ", sp->qp_descriptor.raw + j);
-            j = sp->qp_descriptor.desc.ProductRevisionOffset;
-            if (j > 0)
-                printf("%s  ", sp->qp_descriptor.raw + j);
-            j = sp->qp_descriptor.desc.SerialNumberOffset;
-            if (j > 0)
-                printf("%s", sp->qp_descriptor.raw + j);
-            printf("\n");
-            if (verbose > 2)
-                dStrHex(sp->qp_descriptor.raw, 144, 0);
-        } else
-            printf("\n");
+        for (k = 0; k < next_unused_elem; ++k) {
+            sp = storage_arr + k;
+            if ('\0' == sp->name[0])
+                continue;
+            printf("%-7s ", sp->name);
+            n = strlen(sp->volume_letters);
+            if (0 == n)
+                printf("        ");
+            else if (1 == n)
+                printf("[%s]     ", sp->volume_letters);
+            else if (2 == n)
+                printf("[%s]    ", sp->volume_letters);
+            else if (3 == n)
+                printf("[%s]   ", sp->volume_letters);
+            else if (4 == n)
+                printf("[%s]  ", sp->volume_letters);
+            else
+                printf("[%4s+] ", sp->volume_letters);
+            if (sp->qp_descriptor_valid) {
+                if (show_bt)
+                    printf("<%s>  ", get_bus_type(sp->qp_descriptor.desc.BusType));
+                j = sp->qp_descriptor.desc.VendorIdOffset;
+                if (j > 0)
+                    printf("%s  ", sp->qp_descriptor.raw + j);
+                j = sp->qp_descriptor.desc.ProductIdOffset;
+                if (j > 0)
+                    printf("%s  ", sp->qp_descriptor.raw + j);
+                j = sp->qp_descriptor.desc.ProductRevisionOffset;
+                if (j > 0)
+                    printf("%s  ", sp->qp_descriptor.raw + j);
+                j = sp->qp_descriptor.desc.SerialNumberOffset;
+                if (j > 0)
+                    printf("%s", sp->qp_descriptor.raw + j);
+                printf("\n");
+                if (verbose > 2)
+                    dStrHex(sp->qp_descriptor.raw, 144, 0);
+            } else
+                printf("\n");
+        }
     }
+
     if (scsi_scan) {
-        printf("\n");
+        if (scsi_scan < 2)
+            printf("\n");
         enum_scsi_adapters();
     }
     return 0;
