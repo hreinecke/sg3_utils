@@ -32,8 +32,10 @@
  */
 
 /*
- * This utility shows the relationship between various SCSI device naming
- * schemes in Windows OSes (Windows 200, 2003 and XP) as seen by
+ * This utility shows the relationship between various device names and
+ * volumes in Windows OSes (Windows 2000, 2003, XP and Vista). There is
+ * an optional scsi adapter scan.
+ as seen by
  * The SCSI Pass Through (SPT) interface. N.B. ASPI32 is not used.
  */
 
@@ -56,12 +58,6 @@ static char * version_str = "1.07 (win32) 20090407";
 #define MAX_CDROM_NUM 512
 #define MAX_TAPE_NUM 512
 #define MAX_HOLE_COUNT 8
-#define SCSI2_INQ_RESP_LEN 36
-#define DEF_TIMEOUT 20
-#define INQUIRY_CMD 0x12
-#define INQUIRY_CMDLEN 6
-
-
 
 // IOCTL_STORAGE_QUERY_PROPERTY
 
@@ -73,6 +69,7 @@ static char * version_str = "1.07 (win32) 20090407";
 
 #define IOCTL_STORAGE_QUERY_PROPERTY \
     CTL_CODE(IOCTL_STORAGE_BASE, 0x0500, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
 
 typedef enum _STORAGE_BUS_TYPE {
     BusTypeUnknown      = 0x00,
@@ -110,11 +107,11 @@ typedef struct _STORAGE_DEVICE_DESCRIPTOR {
 } STORAGE_DEVICE_DESCRIPTOR, *PSTORAGE_DEVICE_DESCRIPTOR;
 
 typedef struct _STORAGE_DEVICE_UNIQUE_IDENTIFIER {
-  ULONG  Version;
-  ULONG  Size;
-  ULONG  StorageDeviceIdOffset;
-  ULONG  StorageDeviceOffset;
-  ULONG  DriveLayoutSignatureOffset;
+    ULONG  Version;
+    ULONG  Size;
+    ULONG  StorageDeviceIdOffset;
+    ULONG  StorageDeviceOffset;
+    ULONG  DriveLayoutSignatureOffset;
 } STORAGE_DEVICE_UNIQUE_IDENTIFIER, *PSTORAGE_DEVICE_UNIQUE_IDENTIFIER;
 
 // Use CompareStorageDuids(PSTORAGE_DEVICE_UNIQUE_IDENTIFIER duid1, duid2)
@@ -168,9 +165,7 @@ struct storage_elem {
 
 static struct storage_elem * storage_arr;
 static int next_unused_elem = 0;
-
 static int verbose = 0;
-
 
 static struct option long_options[] = {
         {"bus", 0, 0, 'b'},
@@ -188,18 +183,17 @@ usage()
 {
     fprintf(stderr,
             "Usage: sg_scan  [--bus] [--help] [--letter=VL] [--scsi] "
-	    "[--verbose] [--version]\n");
+            "[--verbose] [--version]\n");
     fprintf(stderr,
             "       --bus|-b        output bus type\n"
             "       --help|-h       output this usage message then exit\n"
             "       --letter=VL|-l VL    volume letter (e.g. 'F' for F:) "
-            "to find\n"
+            "to match\n"
             "       --scsi|-s       show SCSI adapter (tuple) scan\n"
             "       --verbose|-v    increase verbosity\n"
             "       --version|-V    print version string and exit\n\n"
             "Scan for storage and related device names\n");
 }
-
 
 static char *
 get_err_str(DWORD err, int max_b_len, char * b)
@@ -239,37 +233,37 @@ get_bus_type(int bt)
     switch (bt)
     {
     case BusTypeUnknown:
-	return "Unkno";
+        return "Unkno";
     case BusTypeScsi:
-	return "Scsi ";
+        return "Scsi ";
     case BusTypeAtapi:
-	return "Atapi";
+        return "Atapi";
     case BusTypeAta:
-	return "Ata  ";
+        return "Ata  ";
     case BusType1394:
-	return "1394 ";
+        return "1394 ";
     case BusTypeSsa:
-	return "Ssa  ";
+        return "Ssa  ";
     case BusTypeFibre:
-	return "Fibre";
+        return "Fibre";
     case BusTypeUsb:
-	return "Usb  ";
+        return "Usb  ";
     case BusTypeRAID:
-	return "RAID ";
+        return "RAID ";
     case BusTypeiScsi:
-	return "iScsi";
+        return "iScsi";
     case BusTypeSas:
-	return "Sas  ";
+        return "Sas  ";
     case BusTypeSata:
-	return "Sata ";
+        return "Sata ";
     case BusTypeSd:
-	return "Sd   ";
+        return "Sd   ";
     case BusTypeMmc:
-	return "Mmc  ";
+        return "Mmc  ";
     case BusTypeMax:
-	return "Max  ";
+        return "Max  ";
     default:
-	return "_unkn";
+        return "_unkn";
     }
 }
 
@@ -277,13 +271,19 @@ static int
 query_dev_property(HANDLE hdevice,
                    union STORAGE_DEVICE_DESCRIPTOR_DATA * data)
 {
-    DWORD num_out;
+    DWORD num_out, err;
+    char b[256];
     STORAGE_PROPERTY_QUERY query = {StorageDeviceProperty, PropertyStandardQuery, {0} };
 
     memset(data, 0, sizeof(*data));
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
                           &query, sizeof(query), data, sizeof(*data),
                           &num_out, NULL)) {
+        if (verbose > 2) {
+            err = GetLastError();
+            fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(Devprop) failed, "
+                    "Error=%ld %s\n", err, get_err_str(err, sizeof(b), b));
+        }
         return -ENOSYS;
     }
 
@@ -306,13 +306,14 @@ query_dev_uid(HANDLE hdevice,
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
                           &query, sizeof(query), data, sizeof(*data),
                           &num_out, NULL)) {
-        err = GetLastError();
-        if (verbose > 2)
+        if (verbose > 2) {
+            err = GetLastError();
             fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevUid) failed, "
                     "Error=%ld %s\n", err, get_err_str(err, sizeof(b), b));
+        }
         return -ENOSYS;
     }
-    if (verbose > 2)
+    if (verbose > 3)
         fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevUid) num_out=%ld\n",
                 num_out);
     return 0;
@@ -324,22 +325,22 @@ check_devices(const struct storage_elem * sep)
     int k, j;
     struct storage_elem * sarr = storage_arr;
 
-    for (k = 0; k < MAX_SCSI_ELEMS; ++k, ++sarr) {
-	if ('\0' == sarr->name[0])
-	    continue;
-	if (sep->qp_descriptor_valid && sarr->qp_descriptor_valid) {
-	    if (0 == memcmp(&sep->qp_descriptor, &sarr->qp_descriptor,
-			    sizeof(sep->qp_descriptor))) {
-		for (j = 0; j < (int)sizeof(sep->volume_letters); ++j) {
-		    if ('\0' == sarr->volume_letters[j]) {
-			sarr->volume_letters[j] = sep->name[0];
-			break;
-		    }
-		}
-		return 1;
-	    }
-	}
-	// should do uid check here (probably first)
+    for (k = 0; k < next_unused_elem; ++k, ++sarr) {
+        if ('\0' == sarr->name[0])
+            continue;
+        if (sep->qp_descriptor_valid && sarr->qp_descriptor_valid) {
+            if (0 == memcmp(&sep->qp_descriptor, &sarr->qp_descriptor,
+                            sizeof(sep->qp_descriptor))) {
+                for (j = 0; j < (int)sizeof(sep->volume_letters); ++j) {
+                    if ('\0' == sarr->volume_letters[j]) {
+                        sarr->volume_letters[j] = sep->name[0];
+                        break;
+                    }
+                }
+                return 1;
+            }
+        }
+        // should do uid check here (probably before descriptor compare)
     }
     return 0;
 }
@@ -385,15 +386,15 @@ enum_scsi_adapters(void)
                                     (int)sizeof(SCSI_INQUIRY_DATA))))
                             break;
                         pid = (PSCSI_INQUIRY_DATA)(inqDataBuff + off);
-            		snprintf(b, sizeof(b) - 1, "SCSI%d:%d,%d,%d ", k,
-                     		 pid->PathId, pid->TargetId, pid->Lun);
-			printf("%-14s", b);
-            		snprintf(b, sizeof(b) - 1, "claimed=%d pdt=%xh %s ",
-				 pid->DeviceClaimed, pid->InquiryData[0] % 0x3f,
-				 ((0 == pid->InquiryData[4]) ? "dubious" : ""));
-			printf("%-26s", b);
-			printf("%.8s  %.16s  %.4s\n", pid->InquiryData + 8,
-			       pid->InquiryData + 16, pid->InquiryData + 32);
+                        snprintf(b, sizeof(b) - 1, "SCSI%d:%d,%d,%d ", k,
+                                 pid->PathId, pid->TargetId, pid->Lun);
+                        printf("%-14s", b);
+                        snprintf(b, sizeof(b) - 1, "claimed=%d pdt=%xh %s ",
+                                 pid->DeviceClaimed, pid->InquiryData[0] % 0x3f,
+                                 ((0 == pid->InquiryData[4]) ? "dubious" : ""));
+                        printf("%-26s", b);
+                        printf("%.8s  %.16s  %.4s\n", pid->InquiryData + 8,
+                               pid->InquiryData + 16, pid->InquiryData + 32);
                         off = pid->NextInquiryDataOffset;
                     }
                 }
@@ -428,23 +429,23 @@ enum_volumes(char letter)
     if (verbose > 2)
         fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < 24; ++k) {
-	memset(&tmp_se, 0, sizeof(tmp_se));
+        memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\%c:", 'C' + k);
-	tmp_se.name[0] = 'C' + k;
+        tmp_se.name[0] = 'C' + k;
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
-	    else
-		tmp_se.qp_descriptor_valid = 1;
+            else
+                tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
-	    } else
-		tmp_se.qp_uid_valid = 1;
-	    if (('\0' == letter) || (letter == tmp_se.name[0]))
+                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+            } else
+                tmp_se.qp_uid_valid = 1;
+            if (('\0' == letter) || (letter == tmp_se.name[0]))
                 check_devices(&tmp_se);
             CloseHandle(fh);
         }
@@ -466,25 +467,25 @@ enum_pds(void)
     if (verbose > 2)
         fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < MAX_PHYSICALDRIVE_NUM; ++k) {
-	memset(&tmp_se, 0, sizeof(tmp_se));
+        memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name),
                  "\\\\.\\PhysicalDrive%d", k);
-	snprintf(tmp_se.name, sizeof(tmp_se.name), "PD%d", k);
+        snprintf(tmp_se.name, sizeof(tmp_se.name), "PD%d", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
-	    else
-		tmp_se.qp_descriptor_valid = 1;
+            else
+                tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
-	    } else
-		tmp_se.qp_uid_valid = 1;
+                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+            } else
+                tmp_se.qp_uid_valid = 1;
             hole_count = 0;
-	    memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
+            memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
         } else {
             if (verbose > 3) {
@@ -513,24 +514,24 @@ enum_cdroms(void)
     if (verbose > 2)
         fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < MAX_CDROM_NUM; ++k) {
-	memset(&tmp_se, 0, sizeof(tmp_se));
+        memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\CDROM%d", k);
-	snprintf(tmp_se.name, sizeof(tmp_se.name), "CDROM%d", k);
+        snprintf(tmp_se.name, sizeof(tmp_se.name), "CDROM%d", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
-	    else
-		tmp_se.qp_descriptor_valid = 1;
+            else
+                tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
-	    } else
-		tmp_se.qp_uid_valid = 1;
+                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+            } else
+                tmp_se.qp_uid_valid = 1;
             hole_count = 0;
-	    memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
+            memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
         } else {
             if (verbose > 3) {
@@ -559,24 +560,24 @@ enum_tapes(void)
     if (verbose > 2)
         fprintf(stderr, "%s: enter\n", __FUNCTION__ );
     for (k = 0; k < MAX_TAPE_NUM; ++k) {
-	memset(&tmp_se, 0, sizeof(tmp_se));
+        memset(&tmp_se, 0, sizeof(tmp_se));
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\TAPE%d", k);
-	snprintf(tmp_se.name, sizeof(tmp_se.name), "TAPE%d", k);
+        snprintf(tmp_se.name, sizeof(tmp_se.name), "TAPE%d", k);
         fh = CreateFile(adapter_name, GENERIC_READ | GENERIC_WRITE,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
-	    else
-		tmp_se.qp_descriptor_valid = 1;
+            else
+                tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-		    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
-	    } else
-		tmp_se.qp_uid_valid = 1;
+                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+            } else
+                tmp_se.qp_uid_valid = 1;
             hole_count = 0;
-	    memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
+            memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
         } else {
             if (verbose > 3) {
@@ -610,44 +611,47 @@ sg_do_wscan(char letter, int show_bt, int scsi_scan)
     if (k)
         return k;
 
-    for (k = 0; k < MAX_SCSI_ELEMS; ++k) {
+    for (k = 0; k < next_unused_elem; ++k) {
         sp = storage_arr + k;
-	if ('\0' == sp->name[0])
-	    continue;
-        printf("%-8s  ", sp->name);
-	n = strlen(sp->volume_letters);
-	if (0 == n)
-            printf("         ");
-	else if (1 == n)
-            printf("[%s]      ", sp->volume_letters);
-	else if (2 == n)
+        if ('\0' == sp->name[0])
+            continue;
+        printf("%-7s ", sp->name);
+        n = strlen(sp->volume_letters);
+        if (0 == n)
+            printf("        ");
+        else if (1 == n)
             printf("[%s]     ", sp->volume_letters);
-	else if (3 == n)
+        else if (2 == n)
             printf("[%s]    ", sp->volume_letters);
-	else if (4 == n)
+        else if (3 == n)
             printf("[%s]   ", sp->volume_letters);
-	else
-            printf("[%4s+]  ", sp->volume_letters);
-	if (sp->qp_descriptor_valid) {
-	    if (show_bt)
-		printf("<%s>  ", get_bus_type(sp->qp_descriptor.desc.BusType));
-	    j = sp->qp_descriptor.desc.VendorIdOffset;
-	    if (j > 0)
-        	printf("%s  ", sp->qp_descriptor.raw + j);
-	    j = sp->qp_descriptor.desc.ProductIdOffset;
-	    if (j > 0)
-        	printf("%s  ", sp->qp_descriptor.raw + j);
-	    j = sp->qp_descriptor.desc.ProductRevisionOffset;
-	    if (j > 0)
-        	printf("%s  ", sp->qp_descriptor.raw + j);
-	    j = sp->qp_descriptor.desc.SerialNumberOffset;
-	    if (j > 0)
-        	printf("%s", sp->qp_descriptor.raw + j);
-	}
-        printf("\n");
+        else if (4 == n)
+            printf("[%s]  ", sp->volume_letters);
+        else
+            printf("[%4s+] ", sp->volume_letters);
+        if (sp->qp_descriptor_valid) {
+            if (show_bt)
+                printf("<%s>  ", get_bus_type(sp->qp_descriptor.desc.BusType));
+            j = sp->qp_descriptor.desc.VendorIdOffset;
+            if (j > 0)
+                printf("%s  ", sp->qp_descriptor.raw + j);
+            j = sp->qp_descriptor.desc.ProductIdOffset;
+            if (j > 0)
+                printf("%s  ", sp->qp_descriptor.raw + j);
+            j = sp->qp_descriptor.desc.ProductRevisionOffset;
+            if (j > 0)
+                printf("%s  ", sp->qp_descriptor.raw + j);
+            j = sp->qp_descriptor.desc.SerialNumberOffset;
+            if (j > 0)
+                printf("%s", sp->qp_descriptor.raw + j);
+            printf("\n");
+            if (verbose > 2)
+                dStrHex(sp->qp_descriptor.raw, 144, 0);
+        } else
+            printf("\n");
     }
     if (scsi_scan) {
-	printf("\n");
+        printf("\n");
         enum_scsi_adapters();
     }
     return 0;
@@ -713,9 +717,7 @@ main(int argc, char * argv[])
     }
 
     storage_arr = calloc(sizeof(struct storage_elem) * MAX_SCSI_ELEMS, 1);
-
     ret = sg_do_wscan(vol_letter, show_bt, scsi_scan);
-
     free(storage_arr);
     return ret;
 }
