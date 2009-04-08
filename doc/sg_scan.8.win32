@@ -1,18 +1,21 @@
-.TH SG_SCAN "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_SCAN "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
-sg_scan \- scan scsi devices, volume names, physical drives,
-cdrom/dvd drives and tapes and show relationships
+sg_scan \- scan storage devices and map to volume names
 .SH SYNOPSIS
 .B sg_scan
-[\fI\-\-help\fR] [\fI\-\-letter=VL\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR]
+[\fI\-\-bus\fR]  [\fI\-\-help\fR] [\fI\-\-letter=VL\fR] [\fI\-\-scsi\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-The purpose of this utility is to show which device names the other
-utilities in this package will accept. It scans SCSI and various related
-device types often finding multiple device names. It then attempts to place
-all the device names for a device on a single line.
+This utility scans for physical drives (a.k.a. "hard drives"), cd/dvd drives
+and tape drives and maps them to the corresponding volumes. There may be
+many, one or no corresponding volumes. There is one line output per device
+with identification strings to the right.
+.PP
+There is an optional SCSI adapter scan which may find additional storage
+devices other than the ones listed above. An example is a SCSI Enclosure
+Services (SES) device typically found in disk arrays. 
 .PP
 Storage and related devices can have several device names in Windows.
 Probably the most common in the volume name (e.g. "D:"). There is also
@@ -21,61 +24,62 @@ them: "PhysicalDrive<n>", "CDROM<n>" and "TAPE<n>". <n> is an integer
 starting at 0 allocated in ascending order as devices are discovered (and
 sometimes rediscovered).
 .PP
-Then there is a lower level device name which starts with a SCSI (pseudo)
-adapter name of the form "SCSI<n>:". To this is added sub\-addressing
-in the form of a "bus" number, a "target" identifier and a lun (logical
-unit number). The "bus" number is also known as a "PathId". These
-components are combined by the utility to make a device name of the
+Some storage devices have a SCSI lower level device name which starts
+with a SCSI (pseudo) adapter name of the form "SCSI<n>:". To this is added
+sub\-addressing in the form of a "bus" number, a "target" identifier and
+a "lun" (logical unit number). The "bus" number is also known as a "PathId".
+These components are combined by the utility to make a device name of the
 form: "SCSI<n>:<bus>,<target>,<lun>". This utility allows the
-trailing ",<lun>" to be omitted in which case a lun of zero is assumed.
-This lower level device name cannot often be used directly since
-Windows blocks attempts to use it if a class driver has "claimed" the
-device. There are SCSI device types (e.g. processor type) for which
-there is no class driver. At least two transports: USB and IEEE 1394
-do not have a "scsi" device names of this form.
+trailing ",<lun>" to be omitted in which case a lun of zero is assumed. This
+lower level device name cannot often be used directly since Windows blocks
+attempts to use it if a class driver has "claimed" the device. There are
+SCSI device types (e.g. Automation/Drive interface type) for which there is
+no class driver. At least two transports ("bus types" in Windows jargin"):
+USB and IEEE 1394 do not have a "scsi" device names of this form.
 .PP
 In keeping with DOS file system conventions, the various device names
 can be given in upper, lower or mixed case. Since "PhysicalDrive<n>" is
-tedious to write, a shortened form of "PD<n>" is permitted by this
-utility.
+tedious to write, a shortened form of "PD<n>" is permitted by all
+utilities in this package.
 .PP
 A single device (e.g. a disk) can have many device names! For
-example: "PDO" can also be "C:", "D:" and "SCSI0:0,1,0". The
-two volume names reflect that the disk has two "Windows" partitions
-on it.
+example: "PDO" can also be "C:", "D:" and "SCSI0:0,1,0". The two volume names
+reflect that the disk has two partitions on it. Disk partitions that are
+not recognised by Windows are not usually given a volume name. However
+Vista does show a volume name for a disk which has no partitions recognised
+by it and when selected invites the user to format it (which is rather
+unfriendly to other OSes).
 .PP
-So this utility tries to scan the SCSI and related devices, generating one
-line (sometimes more) of output for each device found. First appears
-the "scsi" device name or blanks if there is none. Next follows the volume
-letter (if any) optionally followed by a "+" to indicate more volume letters
-map to this device. Next is one of the class device names or blanks followed
-by a concatenation of the INQUIRY response strings. Windows often
-manufactures INQUIRY response strings for non\-SCSI devices (e.g. a parallel
-ATA disk at "C:") and doesn't quite obey the SCSI\-2 rules for an INQUIRY
-response. If this utility sees that it places a "*" after the INQUIRY
-response strings.
-.PP
-In some cases this utility is unable to distinguish that various
-device names represent the same device (e.g. USB and IEEE 1394
-devices). Rather than guess, they appear as two lines (not always adjacent).
-An educated guess could be made but could be tricked, for example,
-by two USB sticks with the same model and manufacturer.
+The scanning logic and output of this command changed significantly in
+sg3_utils version 1.27 . The SCSI adapter based scanned is now an
+optional extra.
 .PP
 For more information see the NOTES section below.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-bus\fR
+show the bus type (or transport) by which the device is attached to the
+operating systems. Two or more transports may be involved. For example,
+a SATA disk may be in the external enclosure connected to the computer via
+USB in which case the bus type is USB.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options
 then exits.
 .TP
 \fB\-l\fR, \fB\-\-letter\fR=\fIVL\fR
-normally when a device a multiple volume names (e.g. a disk with two
-partitions recognized by Windows) then the lowest letter volume name in
-alphabetical order is output, followed by a "+". Hence subsequent matching
-volume letters are not shown. If the user is interested in a particular
-volume name then its letter can be given as the \fIVL\fR argument and if
-found it will be output rather than the lowest volume name.
+normally a device that has multiple volume names has up to four listed. If
+there are more than that a "+" is added after the fourth. When this option
+is given the \fIVL\fR argument is assumed to be a volume name (i.e. 'C'
+to 'Z') and if found in the scan, only that volume name appears in the
+output. If there are novolume names in the output then \fIVL\fR was not
+found.
+.TP
+\fB\-s\fR, \fB\-\-scsi\fR
+do a SCSI adapter based scan after the normal storage device based scan.
+There is a blank line between the normal scan and the SCSI adapter based
+scan.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.
@@ -83,37 +87,76 @@ increases the level or verbosity.
 \fB\-V\fR, \fB\-\-version\fR
 print out version string
 .SH NOTES
-This utility uses the SCSI Pass Through (direct) [SPT] interface rather
-than Adaptec's ASPI32. ASPI32 requires a dll not distributed with
-Windows. Using the SPT interface requires that a user has administrative
-rights. This utility does not support Windows 95, 98 and ME (and
-earlier Windows operating systems). The target Windows operating systems
-are currently Windows 2000, 2003 and XP (and their variants).
+This utility does not support Windows 95, 98 and ME (and earlier Windows
+operating systems). The target Windows operating systems are currently
+Windows 2000, 2003, XP and Vista (and their variants).
 .PP
-If no class device name is found then "pdt=<num>" is placed at the end
-of the line. This is the SCSI "peripheral device type" (see SPC\-4 at
-http://www.t10.org). Some values are: 0 \-> disks, 1 \-> tapes, 3 \->
-processor, 5 \-> cd/dvds, 8 \-> medium changers, 13 \-> SES devices.
+When the \fI\-\-scsi\fR option is given the SCSI adapter tuple is followed
+by a list of two or three fields. First is "claimed=0|1" indicating whether
+a class driver has claimed the device. The next field is "pdt=<num>"
+where <num> is the "peripheral device type" as defined in the SCSI INQUIRY
+command (see SPC\-4 at http://www.t10.org). The <num> has a trailing "h" to
+indicate that it is hexadecimal. Sometimes a third field with the
+word "dubious" appears. This flags that what is supposed to be a SCSI
+INQUIRY command response has a badly formed "additional length" field.
+Thus the corresponding device is unlikely to be a native SCSI device.
 .PP
-The DOS device names given the the CreateFile() call all start with a "\\.\"
-string. That can be given but if not will be supplied automatically. For
-the SCSI lower level interface the adapter name (e.g. "SCSI2:") is given
-to the CreateFile() call and the sub\-addressing (i.e. bus, target and lun)
-is given to each SCSI pass through command.
+The DOS device names given the the CreateFile() call all start with
+a "\\\\.\\" string. That can be given but if not will be supplied
+automatically.
 .PP
 Scanning devices that are hot unplugged and replugged often can be
 problematic, especially with the class device names. Each time a device is
 removed and re\-added it gets a larger class device name (e.g. "PD3"
 becomes "PD4" leaving "PD3" unused). This utility stops scanning class
-devices after it find 8 consecutive "holes". If this turns out to be a
-problem then adjustments will be made.
+devices after it find 8 consecutive "holes".
+.SH EXAMPLES
+The following examples are from a laptop with an internal drive (SATA), a
+CD/DVD drive and a USB attached SATA disk. The latter disk has two volumes
+recognised by Windows.
+.PP
+  # sg_scan
+.br
+PD0     [C]     FUJITSU   MHY2160BH         0000  
+.br
+PD1     [DF]    WD        2500BEV External  1.05  WD-WXE90     
+.br
+CDROM0  [E]     MATSHITA DVD/CDRW UJDA775  CB03
+.PP
+Now request bus types as well. BTW That is a SATA disk holding volume C:
+and there is a "Sata" bus type.
+.PP
+  # sg_scan -b
+.br
+PD0     [C]     <Ata  >  FUJITSU   MHY2160BH         0000  
+.br
+PD1     [DF]    <Usb  >  WD        2500BEV External  1.05  WD-WXE90
+.br
+CDROM0  [E]     <Atapi>  MATSHITA DVD/CDRW UJDA775  CB03
+.PP
+Now request a SCSI adapter scan as well.
+.PP
+  # sg_scan -b -s
+.br
+PD0     [C]     <Ata  >  FUJITSU   MHY2160BH         0000  
+.br
+PD1     [DF]    <Usb  >  WD        2500BEV External  1.05  WD-WXE90     
+.br
+CDROM0  [E]     <Atapi>  MATSHITA DVD/CDRW UJDA775  CB03  
+.br
+   
+.br
+SCSI0:0,0,0   claimed=1 pdt=0h  FUJITSU   MHY2160BH         0000
+.br
+SCSI1:0,0,0   claimed=1 pdt=5h  MATSHITA  DVD/CDRW UJDA775  CB03
+.PP
 .SH EXIT STATUS
 The exit status of sg_scan is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2006 Douglas Gilbert
+Copyright \(co 2006-2009 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
