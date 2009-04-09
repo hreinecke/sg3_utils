@@ -35,8 +35,6 @@
  * This utility shows the relationship between various device names and
  * volumes in Windows OSes (Windows 2000, 2003, XP and Vista). There is
  * an optional scsi adapter scan.
- as seen by
- * The SCSI Pass Through (SPT) interface. N.B. ASPI32 is not used.
  */
 
 #include <stdio.h>
@@ -721,7 +719,12 @@ main(int argc, char * argv[])
     }
 
     storage_arr = calloc(sizeof(struct storage_elem) * MAX_SCSI_ELEMS, 1);
-    ret = sg_do_wscan(vol_letter, show_bt, scsi_scan);
-    free(storage_arr);
+    if (storage_arr) {
+        ret = sg_do_wscan(vol_letter, show_bt, scsi_scan);
+        free(storage_arr);
+    } else {
+        fprintf(stderr, "Failed to allocate storage_arr on heap\n");
+        ret = SG_LIB_SYNTAX_ERROR;
+    }
     return ret;
 }

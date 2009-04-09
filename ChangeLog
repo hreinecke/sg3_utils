@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.27 [20090408] [svn: r246]
+Changelog for sg3_utils-1.27 [20090408] [svn: r247]
   - sg_write_same: new utility: 10, 16 and 32 byte cdb variants
   - sg_inq: sync version descriptors with spc4r18
     - add power condition VPD page
