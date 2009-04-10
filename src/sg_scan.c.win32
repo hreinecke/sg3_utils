@@ -48,7 +48,7 @@
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
 
-static char * version_str = "1.08 (win32) 20090408";
+static char * version_str = "1.08 (win32) 20090409";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
@@ -386,7 +386,7 @@ enum_scsi_adapters(void)
                         pid = (PSCSI_INQUIRY_DATA)(inqDataBuff + off);
                         snprintf(b, sizeof(b) - 1, "SCSI%d:%d,%d,%d ", k,
                                  pid->PathId, pid->TargetId, pid->Lun);
-                        printf("%-14s", b);
+                        printf("%-15s", b);
                         snprintf(b, sizeof(b) - 1, "claimed=%d pdt=%xh %s ",
                                  pid->DeviceClaimed, pid->InquiryData[0] % 0x3f,
                                  ((0 == pid->InquiryData[4]) ? "dubious" : ""));
