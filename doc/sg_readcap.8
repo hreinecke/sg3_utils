@@ -1,11 +1,11 @@
-.TH SG_READCAP "8" "February 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_READCAP "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_readcap \- sends a SCSI READ CAPACITY command
 .SH SYNOPSIS
 .B sg_readcap
-[\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR]
-[\fI\-\-long\fR] [\fI\-\-pmi\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-16\fR] [\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-lba=LBA\fR] [\fI\-\-long\fR] [\fI\-\-pmi\fR] [\fI\-\-raw\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_readcap
 [\fI\-16\fR] [\fI\-b\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-lba=LBA\fR]
@@ -67,6 +67,10 @@ action is to use the 10 byte cdb variant which limits the maximum
 block address to (2**32 \- 2). When a 10 byte cdb READ CAPACITY command
 is used on a device whose size is too large then a last block address
 of 0xffffffff is returned (if the device complies with SBC\-2).
+.TP
+\fB\-\-16\fR
+Use the 16 byte cdb variant of the READ CAPACITY command. See the '--long'
+option.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.

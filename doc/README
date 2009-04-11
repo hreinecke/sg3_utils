@@ -19,5 +19,12 @@ http://sg.danny.cz/sg/tools.html
     - overview of around 25 storage and SCSI tools
 
 
+There are two versions of sg_scan: one for Linux and the other for Windows.
+They have different man pages: sg_scan.8.linux and sg_scan.8.win32 with
+the Makefile logic (rule in Makefile.am) copying the appropriate one to
+sg_scan.8 . sg_scan is not supported for other ports. In FreeBSD
+'camcontrol devlist' list SCSI related devices.
+
+
 Doug Gilbert
-26th October 2008
+10th April 2009

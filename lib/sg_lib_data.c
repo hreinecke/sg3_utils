@@ -33,7 +33,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "1.47 20090224";    /* spc-4 rev 18 */
+const char * sg_lib_version_str = "1.48 20090410";    /* spc-4 rev 18 + */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -526,6 +526,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x1C,0x01,"Primary defect list not found"},
     {0x1C,0x02,"Grown defect list not found"},
     {0x1D,0x00,"Miscompare during verify operation"},
+    {0x1D,0x01,"Miscompare verify of unmapped lba"},
     {0x1E,0x00,"Recovered id with ECC correction"},
     {0x1F,0x00,"Partial defect list transfer"},
     {0x20,0x00,"Invalid command operation code"},

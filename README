@@ -6,14 +6,14 @@ This package contains low level utilities for devices that use a SCSI
 command set. Apart from SCSI parallel interface (SPI) devices, the SCSI
 command set is used by ATAPI devices (CD/DVDs and tapes), USB mass storage
 devices, Fibre Channel disks, IEEE 1394 storage devices (that use the
-"SBP" protocol), SAS and iSCSI.
+"SBP" protocol), SAS, iSCSI and FCoE (and others).
 
 This package originally targeted the Linux SCSI subsystem. Since most
 operating systems contain a SCSI command pass-through mechanism, many
 utilities within this package have been ported. This README mainly
 concentrates on Linux: see the README.freebsd file for the FreeBSD port,
 README.solaris for the Solaris port, the README.tru64 file for the Tru64
-(OSF) port and README.win32 for the Windows port (of which there are two).
+(OSF) port and README.win32 for the Windows ports (of which there are two).
 
 Most utilities within the sg3_utils package work at the SCSI command level.
 For example the sg_inq utility issues a SCSI INQUIRY command and decodes the
@@ -28,7 +28,7 @@ typically issue a sequence of SCSI READ and WRITE commands to copy data.
 These utilities are relatively tightly bound to Linux and are not ported to
 other Operating Systems. A new utility called ddpt (in a package of the same
 name) is more generic while still allowing a copy to be done in terms of
-SCSI READ and WRITE commands. ddpt has been ported to other Operating Systems.
+SCSI READ and WRITE commands. ddpt has been ported to other OSes.
 
 Description
 ===========
@@ -55,6 +55,16 @@ issues the requested SCSI command and waits for the response (or a timeout)
 before the ioctl returns to the user space program that invoked it). The
 SG_IO ioctl is now supported in other parts of the Linux kernel in the 2.6
 series.
+
+In sg3_utils version 1.27 support has been added for the Linux bsg driver
+which use the sg version 4 interface. There seems no point in renaming
+this package sg4_utils. The existing utilities just silently support either.
+Cuurently the source build must be able to see the /usr/include/linux/bsg.h
+file. Then at run time the /proc/devices pseudo file needs to have an entry
+for the bsg driver (appeared around lk 2.6.28). With this in place each
+utility at run time checks the device it has been given and if it is a char
+device whose major number matches the bsg entry in /proc/devices then the
+sg v4 interface is used. Otherwise the sg v3 interface is used.
 
 Utilities that wish to use the asynchronous SCSI command interface (i.e. via
 a write() read() sequence) or issue special "commands" (e.g. bus and device
@@ -98,7 +108,7 @@ significantly. The build scripts provided in the 'ib subdirectory builds
 libsgutils<num>.so The rest of the source code files have been relocated to
 the src subdirectory.  See the INSTALL file for more information.
 
-All the utilities in the src subdirectory have "man" pages that are now
+All the utilities in the src subdirectory have "man" pages that are
 placed in the doc subdirectory. There is also a sg3_utils (8) man page that
 summarizes common facilities including exit statuses. Additional
 information (including each utility's version number) can be found towards
@@ -111,9 +121,10 @@ The sg driver in Linux can be seen as having 3 distinct versions:
    v3   lk >= 2.4      additional sg_io_hdr interface structure [2001/1/4]
    v3   lk >= 2.6      same interface as found in lk 2.4 [2.6.0: 2003/12/18]
 
-This package is targeted at "v3" only. Another package called "sg_utils"
-is targeted at "v2" and to a lesser extent "v1". The "sg_utils" package has
-a subset of the utilities found in this package.
+and the bsg driver supports the sg v4 interface and was added around 
+lk 2.6.28 . This package is targeted at "v3" and "v4". Another package called
+"sg_utils" is targeted at "v2" and to a lesser extent "v1". The "sg_utils"
+package has a subset of the utilities found in this package.
 
 In Linux some sg driver ioctls (notably SG_IO) are defined for many block
 devices in lk 2.6 series. In practice this means all SCSI block devices,
@@ -124,19 +135,21 @@ the utilities in this package. SATA disks that use the libata kernel library
 commands and thus are supported. Support for the SG_IO as been added to the
 scsi tape driver (st) in lk 2.6.6 .
 
-In Linux no utilities in the src subdirectory use the sg driver's
-older "sg_header" interface; instead they use the newer "sg_io_hdr" interface.
-The "sg_io_hdr" interface can be accessed two ways:
-  - using the SG_IO ioctl [for synchronous access]
-  - using a write()/read() sequence that convey instances of "sg_io_hdr"
+In the src directory the bulk of the utilities are written in relatively
+clean POSIX compliant C code with Linux specific system calls and structures
+removed and placed in linux specific files in the lib directory. A small
+number of utilities in the src directory do contain Linux specific logic
+and are not ported to other OSes (e.g. sg_dd). One utility, sg_scan, has
+two separate implementations, one for Linux (sg_scan.c.linux) and one for
+Windows (sg_scan.c.win32). The src-lib directory split approach allows
+FreeBSD, Solaris, Tru64 and Windows specific code to be isolated to a few
+files in the lib directory whose interfaces match those of the Linux
+specific code.
 
-All utilities in the 'src' subdirectory that issue SCSI commands use the
-Linux SG_IO ioctl except for sgp_dd. This is due to the asynchronous nature
-of sgp_dd. Note that sgp_dd does _not_ support the "blk_sgio" switch found
-in sg_dd. This is important since block devices often identify themselves
-(programmatically) as sg devices in lk 2.6 and it would cause serious damage
-to do a write() of the sg driver's "sg_io_hdr" meta data (i.e. disk
-corruption).
+Darwin is not supported because the Apple folks do not want to give their
+users a pass-through SCSI interface. The author has read about creative
+hackers using a VM containing a real OS to circumvent the Apple restriction.
+
 
 Warning
 =======
@@ -144,7 +157,8 @@ Many devices use SCSI command sets over transport protocols not normally
 associated with SCSI (as defined at http://www.t10.org ). Some of these
 devices react poorly (e.g. lock up) when sent SCSI commands that they don't
 support. Even sending a supported SCSI command with a field set to an
-unexpected value can cause problems.
+unexpected value can cause problems. [The author is talking about billions
+of USB devices with horrible SCSI implementations.]
 
 For example, all "SCSI" devices must support the INQUIRY command which the
 SCSI-2 standard says should request a 36 byte response. However later SCSI
@@ -212,7 +226,7 @@ Unix od command. There is also code to sg_chk_asc.c which checks a given
 text file (typically a copy of http://www.t10.org/lists/asc-num.txt ) and
 checks it against the asc/ascq text strings held in sg_lib_data.c .
 
-The 'doc' subdirectory contains a README.doc file containing the urls of
+The 'doc' subdirectory contains a README file containing the urls of
 various related documents.
 
 The 'scripts' subdirectory contains some bourne (bash) shell scripts that
@@ -224,7 +238,7 @@ messages.
 Notes for utilities without man pages
 =====================================
 These utils are found in the 'examples' subdirectory.
-
+
 The "scsi_inquiry" program shows the use of the SCSI_IOCTL_SEND_COMMAND
 ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the 
 SCSI sub system mid level and so is common to all sd, sr, st and sg devices. 
@@ -321,4 +335,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-7th April 2009
+10th April 2009
