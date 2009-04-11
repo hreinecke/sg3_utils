@@ -83,7 +83,8 @@ scan. If this option is given twice then only the SCSI adapter based scan
 is done.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
-increases the level or verbosity.
+increases the level or verbosity. Can be used multiple times to display
+more of the internal data, both in normal and error processing.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print out version string

@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.83 20090228";
+static char * version_str = "3.84 20090410";
 
 #define ME "sg_readcap: "
 
@@ -41,6 +41,7 @@ static struct option long_options[] = {
         {"hex", 0, 0, 'H'},
         {"lba", 1, 0, 'L'},
         {"long", 0, 0, 'l'},
+        {"16", 0, 0, 'l'},
         {"new", 0, 0, 'N'},
         {"old", 0, 0, 'O'},
         {"pmi", 0, 0, 'p'},
@@ -68,8 +69,8 @@ struct opts_t {
 static void usage()
 {
     fprintf(stderr, "Usage: sg_readcap [--brief] [--help] [--hex] "
-            "[--lba=LBA] [--long] [--pmi]\n"
-            "                  [--raw] [--verbose] [--version] "
+            "[--lba=LBA] [--long] [--16]\n"
+            "                  [--pmi] [--raw] [--verbose] [--version] "
             "DEVICE\n"
             "  where:\n"
             "    --brief|-b      brief, two hex numbers: number of blocks "
@@ -82,6 +83,8 @@ static void usage()
             "valid with '--pmi']\n"
             "    --long|-l       use READ CAPACITY (16) cdb (def: use "
             "10 byte cdb)\n"
+            "    --16            use READ CAPACITY (16) cdb (same as "
+            "--long)\n"
             "    --pmi|-p        partial medium indicator (without this "
             "option shows\n"
             "                    total disk capacity)\n"
