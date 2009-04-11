@@ -11,7 +11,8 @@ sg_scan \- scan storage devices and map to volume names
 This utility scans for physical drives (a.k.a. "hard drives"), cd/dvd drives
 and tape drives and maps them to the corresponding volumes. There may be
 many, one or no corresponding volumes. There is one line output per device
-with identification strings to the right.
+with identification strings to the right. Its purpose is to list the
+storage device names that can be used by other utilities in this package.
 .PP
 There is an optional SCSI adapter scan which may find additional storage
 devices other than the ones listed above. An example is a SCSI Enclosure
