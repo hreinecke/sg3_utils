@@ -31,7 +31,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.16 20090309";
+static char * version_str = "1.17 20090420";
 
 
 #define MAX_XFER_LEN 10000
@@ -214,15 +214,18 @@ main(int argc, char * argv[])
         memset(rawp, 0xff, MAX_XFER_LEN);
         if (file_name[0]) {
             got_stdin = (0 == strcmp(file_name, "-")) ? 1 : 0;
-            if (got_stdin)
-                infd = 0;
-            else {
+            if (got_stdin) {
+                infd = STDIN_FILENO;
+                if (sg_set_binary_mode(STDIN_FILENO) < 0)
+                    perror("sg_set_binary_mode");
+            } else {
                 if ((infd = open(file_name, O_RDONLY)) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
                              ME "could not open %s for reading", file_name);
                     perror(ebuff);
                     goto err_out;
-                }
+                } else if (sg_set_binary_mode(infd) < 0)
+                    perror("sg_set_binary_mode");
             }
             res = read(infd, writeLongBuff, xfer_len);
             if (res < 0) {

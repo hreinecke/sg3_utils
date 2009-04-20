@@ -48,7 +48,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.91 20090331";
+static char * version_str = "0.92 20090420";
 
 
 #define ME "sg_write_same: "
@@ -496,16 +496,19 @@ main(int argc, char * argv[])
         goto err_out;
     }
     if (opts.ifilename[0]) {
-        if (got_stdin)
-            infd = 0;
-        else {
+        if (got_stdin) {
+            infd = STDIN_FILENO;
+	    if (sg_set_binary_mode(STDIN_FILENO) < 0)
+                perror("sg_set_binary_mode");
+        } else {
             if ((infd = open(opts.ifilename, O_RDONLY)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for reading", opts.ifilename);
                 perror(ebuff);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
-            }
+            } else if (sg_set_binary_mode(infd) < 0)
+                perror("sg_set_binary_mode");
         }
         res = read(infd, wBuff, opts.xfer_len);
         if (res < 0) {

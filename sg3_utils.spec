@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Mon Apr 13 2009 - dgilbert at interlog dot com
+* Mon Apr 20 2009 - dgilbert at interlog dot com
 - xxxxxxxxxxxxxxx
   * sg3_utils-1.28
 
