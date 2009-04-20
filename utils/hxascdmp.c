@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
 
 static int bytes_per_line = DEF_BYTES_PER_LINE;
 
-static const char * version_str = "1.10 20080321";
+static const char * version_str = "1.11 20090420";
 
 #define CHARS_PER_HEX_BYTE 3
 #define BINARY_START_COL 6
@@ -227,6 +227,7 @@ main(int argc, const char ** argv)
                 fprintf(stderr, "Couldn't open file: %s\n", argv[k]);
                 ret = 1;
             } else {
+                sg_set_binary_mode(inFile);
                 start = 0;
                 printf("%shex dump of file: %s\n",
                        (doHex ? "" : "ASCII "), argv[k]);

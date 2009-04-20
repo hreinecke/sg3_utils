@@ -1,4 +1,4 @@
-.TH HXASCDMP "1" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH HXASCDMP "1" "April 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
 hxascdmp \- hexadecimal ASCII dump
 .SH SYNOPSIS
@@ -41,6 +41,8 @@ end of each line).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.SH NOTES
+In Windows the given file (or files) are set to binary mode.
 .SH EXIT STATUS
 The exit status of hxascdmp is 0 when it is successful. If any of the
 given \fIFILE\fR names cannot be opened then the exit status is 1.
@@ -79,7 +81,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2008 Douglas Gilbert
+Copyright \(co 2004\-2009 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
