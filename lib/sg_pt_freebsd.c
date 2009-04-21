@@ -50,6 +50,10 @@
 #include "sg_pt.h"
 #include "sg_lib.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 
 #define FREEBSD_MAXDEV 64
 #define FREEBSD_FDOFFSET 16;

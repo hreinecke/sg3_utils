@@ -32,8 +32,12 @@
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-const char * sg_lib_version_str = "1.48 20090410";    /* spc-4 rev 18 + */
+
+const char * sg_lib_version_str = "1.49 20090420";    /* spc-4 rev 18 + */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
