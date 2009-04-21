@@ -44,8 +44,12 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-static char * version_str = "1.45 20090228";
+
+static char * version_str = "1.45 20090420";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */

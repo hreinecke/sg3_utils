@@ -40,6 +40,10 @@
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 /* Use the Microsoft SCSI Pass Through (SPT) interface. It has two
  * variants: "SPT" where data is double buffered; and "SPTD" where data
  * pointers to the user space are passed to the OS. Only Windows

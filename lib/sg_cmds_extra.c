@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2008 Douglas Gilbert.
+ * Copyright (c) 1999-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,10 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2008 Douglas Gilbert.
+ * Copyright (c) 1999-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,6 +70,10 @@
 
 #include "sg_lib.h"
 #include "sg_lib_data.h"
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
