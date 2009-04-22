@@ -1578,6 +1578,10 @@ sg_lib_version()
 /* Non Unix OSes distinguish between text and binary files.
    Set text mode on fd. Does nothing in Unix. Returns negative number on
    failure. */
+
+#include <unistd.h>
+#include <fcntl.h>
+
 int
 sg_set_text_mode(int fd)
 {
