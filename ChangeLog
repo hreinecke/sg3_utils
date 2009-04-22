@@ -2,9 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090420] [svn: r256]
+Changelog for sg3_utils-1.28 [20090422] [svn: r257]
   - sg_libs: sg_set_binary_mode() inactive because config.h not
     included
+    - change SG3_UTILS_* constants to SG_LIB_*
   - utils/hxascdmp: in Windows set binary mode on read files
   - sg_write_buffer,sg_write_long,sg_write_same: in Windows set
     binary mode on read files

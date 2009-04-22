@@ -39,14 +39,14 @@
 
 static int bytes_per_line = DEF_BYTES_PER_LINE;
 
-static const char * version_str = "1.11 20090420";
+static const char * version_str = "1.12 20090422";
 
 #define CHARS_PER_HEX_BYTE 3
 #define BINARY_START_COL 6
 #define MAX_LINE_LENGTH 257
 
 
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
 /* Non Unix OSes distinguish between text and binary files.
    Set text mode on fd. Does nothing in Unix. Returns negative number on
    failure. */

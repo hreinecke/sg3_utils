@@ -1574,7 +1574,7 @@ sg_lib_version()
 }
 
 
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
 /* Non Unix OSes distinguish between text and binary files.
    Set text mode on fd. Does nothing in Unix. Returns negative number on
    failure. */
