@@ -11,7 +11,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.81 20090329";    /* SPC-4 rev 18 */
+static char * version_str = "0.82 20090422";    /* SPC-4 rev 18 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -109,7 +109,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
 static void decode_transport_id(const char * leadin, unsigned char * ucp,
                                 int len);
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
 static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
                             int do_verbose);
 #endif
@@ -160,7 +160,7 @@ static struct svpd_values_name_t vpd_pg[] = {
 };
 
 static struct option long_options[] = {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         {"ata", 0, 0, 'a'},
 #endif
         {"cmddt", 0, 0, 'c'},
@@ -205,7 +205,7 @@ struct opts_t {
 static void
 usage()
 {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
     fprintf(stderr,
             "Usage: sg_inq [--ata] [--cmddt] [--descriptors] [--extended] "
             "[--help] [--hex]\n"
@@ -257,7 +257,7 @@ usage()
 static void
 usage_old()
 {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
     fprintf(stderr,
             "Usage:  sg_inq [-a] [-A] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
             "[-i]\n"
@@ -326,7 +326,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         c = getopt_long(argc, argv, "acdeEhHil:m:NOp:rvVx", long_options,
                         &option_index);
 #else
@@ -337,7 +337,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
 
         switch (c) {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         case 'a':
             ++optsp->do_ata;
             break;
@@ -450,7 +450,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     ++optsp->do_vpd;
                     ++optsp->num_pages;
                     break;
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
                 case 'A':
                     ++optsp->do_ata;
                     break;
@@ -1877,7 +1877,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             }
         }
     } else if (res < 0) { /* could be an ATA device */
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         /* Try an ATA Identify Device command */
         res = try_ata_identify(sg_fd, optsp->do_hex, optsp->do_raw,
                                optsp->do_verbose);
@@ -2676,7 +2676,7 @@ main(int argc, char * argv[])
     }
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
     if (opts.do_ata) {
         res = try_ata_identify(sg_fd, opts.do_hex, opts.do_raw,
                                opts.do_verbose);
@@ -2724,7 +2724,7 @@ err_out:
 }
 
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
 /* Following code permits ATA IDENTIFY commands to be performed on
    ATA non "Packet Interface" devices (e.g. ATA disks).
    GPL-ed code borrowed from smartmontools (smartmontools.sf.net).

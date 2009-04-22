@@ -24,7 +24,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.35 20090401";
+static char * version_str = "0.35 20090422";
 
 #define ME "sg_senddiag: "
 
@@ -683,7 +683,7 @@ int main(int argc, char * argv[])
                 int secs;
 
                 secs = (rsp_buff[18] << 8) + rsp_buff[19];
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
                 printf("Expected extended self-test duration=%d seconds "
                        "(%g minutes)\n", secs, secs / 60.0);
 #else

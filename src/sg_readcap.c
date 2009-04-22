@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.84 20090410";
+static char * version_str = "3.84 20090422";
 
 #define ME "sg_readcap: "
 
@@ -426,7 +426,7 @@ int main(int argc, char * argv[])
                     sz_gb = ((double)(last_blk_addr + 1) * block_size) /
                             (double)(1000000000L);
                     printf("Hence:\n");
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
                     printf("   Device size: %" PRIu64 " bytes, %g MiB, %g "
                            "GB\n", total_sz, sz_mb, sz_gb);
 #else
@@ -514,7 +514,7 @@ int main(int argc, char * argv[])
                 sz_gb = ((double)(llast_blk_addr + 1) * block_size) /
                         (double)(1000000000L);
                 printf("Hence:\n");
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
                 printf("   Device size: %" PRIu64 " bytes, %g MiB, %g GB\n",
                        total_sz, sz_mb, sz_gb);
 #else

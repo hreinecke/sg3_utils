@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.84 20090327";    /* SPC-4 revision 18 */
+static char * version_str = "0.84 20090422";    /* SPC-4 revision 18 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2259,7 +2259,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
             j = (ucp[10] << 8) + ucp[11];
             printf("    Number of background scans performed: %d\n", j);
             j = (ucp[12] << 8) + ucp[13];
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
             printf("    Background medium scan progress: %g%%\n",
                    (double)(j * 100.0 / 65536.0));
 #else
