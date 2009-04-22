@@ -2,25 +2,11 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <getopt.h>
-#define __STDC_FORMAT_MACROS 1
-#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#ifdef SG3_UTILS_LINUX
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <linux/hdreg.h>
-#endif
 
-#include "sg_lib.h"
-#include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
 *  Copyright (C) 2000-2009 D. Gilbert

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static char * version_str = "1.21 20080510";
+static char * version_str = "1.21 20090422";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -140,7 +140,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
     struct timeval start_tm, end_tm;
 #endif
 
@@ -293,7 +293,7 @@ main(int argc, char * argv[])
         goto finish;
     }
 
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
     if (do_time) {
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
@@ -349,7 +349,7 @@ main(int argc, char * argv[])
             }
         }
     }
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
     if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
         double a, b;

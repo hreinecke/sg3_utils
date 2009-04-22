@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2008 Douglas Gilbert.
+ * Copyright (c) 2006-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
 #include <time.h>
 #endif
 
@@ -447,7 +447,7 @@ static void
 decode_rdac_vpd_c8(unsigned char * buff, int len)
 {
     int i;
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
     time_t tstamp;
 #endif
     char *c;
@@ -475,7 +475,7 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
     }
 
     printf("  Volume Unique Identifier: %s\n", uuid);
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
     tstamp = (buff[24] << 24) + (buff[25] << 16) + (buff[26] << 8) + buff[27];
     printf("    Creation Number: %d, Timestamp: %s",
            (buff[22] << 8) + buff[23], ctime(&tstamp));

@@ -9,7 +9,7 @@
 #include "config.h"
 #endif
 
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
 #include <sys/time.h>
 #endif
 
@@ -21,7 +21,7 @@
    data transfer (and no REQUEST SENSE command iff the unit is ready)
    then this can be used for timing per SCSI command overheads.
 
- * Copyright (C) 2000-2007 D. Gilbert
+ * Copyright (C) 2000-2009 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 
  */
 
-static char * version_str = "3.26 20070714";
+static char * version_str = "3.27 20090422";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -269,7 +269,7 @@ int main(int argc, char * argv[])
     int num_errs = 0;
     int reported = 0;
     int ret = 0;
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
     struct timeval start_tm, end_tm;
 #endif
     struct opts_t opts;
@@ -318,7 +318,7 @@ int main(int argc, char * argv[])
             printf("Completed %d Test Unit Ready commands\n",
                    ((k < opts.do_number) ? k + 1 : k));
     } else {
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
         if (opts.do_time) {
             start_tm.tv_sec = 0;
             start_tm.tv_usec = 0;
@@ -337,7 +337,7 @@ int main(int argc, char * argv[])
                 }
             }
         }
-#ifndef SG3_UTILS_MINGW
+#ifndef SG_LIB_MINGW
         if ((opts.do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
             struct timeval res_tm;
             double a, b;
