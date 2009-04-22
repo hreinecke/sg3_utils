@@ -139,8 +139,8 @@ names are listed in brackets, if there are more a "+" is added after the
 fourth.
 
 Several utilities have conditional compilation sections based on
-the SG3_UTILS_MINGW define. For those who want to try native C compilers
-on Windows setting the SG3_UTILS_MINGW define may help.
+the SG_LIB_MINGW define. For those who want to try native C compilers
+on Windows setting the SG_LIB_MINGW define may help.
 
 Build environments
 ==================
@@ -163,4 +163,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-10th April 2009
+22nd April 2009

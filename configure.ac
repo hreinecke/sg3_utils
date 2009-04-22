@@ -28,33 +28,33 @@ AC_SUBST(GETOPT_O_FILES)
 
 AC_CANONICAL_HOST
 
-AC_DEFINE_UNQUOTED(SG3_UTILS_BUILD_HOST, "${host}", [sg3_utils Build Host])
+AC_DEFINE_UNQUOTED(SG_LIB_BUILD_HOST, "${host}", [sg3_utils Build Host])
 
 case "${host}" in
         *-*-linux-gnu*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_LINUX, 1, [sg3_utils on linux])
+		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-linux*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_LINUX, 1, [sg3_utils on linux])
+		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-freebsd*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_FREEBSD, 1, [sg3_utils on FreeBSD])
+		AC_DEFINE_UNQUOTED(SG_LIB_FREEBSD, 1, [sg3_utils on FreeBSD])
                 AC_SUBST([os_libs], ['-lcam']);;
         *-*-solaris*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_SOLARIS, 1, [sg3_utils on Solaris])
+		AC_DEFINE_UNQUOTED(SG_LIB_SOLARIS, 1, [sg3_utils on Solaris])
                 AC_SUBST([os_libs], ['']);;
         *-*-osf*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_OSF1, 1, [sg3_utils on Tru64 UNIX])
+		AC_DEFINE_UNQUOTED(SG_LIB_OSF1, 1, [sg3_utils on Tru64 UNIX])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-cygwin*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_WIN32, 1, [sg3_utils on Win32])
+		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-mingw*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_WIN32, 1, [sg3_utils on Win32])
-		AC_DEFINE_UNQUOTED(SG3_UTILS_MINGW, 1, [also MinGW environment])
+		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
+		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
                 AC_SUBST([os_libs], ['']) ;;
         *)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_LINUX, 1, [assume sg3_utils on linux])
+		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [assume sg3_utils on linux])
                 AC_SUBST([os_libs], ['']) ;;
 esac
 

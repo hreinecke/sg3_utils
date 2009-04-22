@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2007 Douglas Gilbert.
+ * Copyright (c) 1999-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,12 +38,12 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
 
 #include "sg_io_linux.h"
 
 
-/* Version 1.02 20081031 */
+/* Version 1.03 20090422 */
 
 
 void
