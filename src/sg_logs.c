@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.84 20090422";    /* SPC-4 revision 18 */
+static char * version_str = "0.85 20090507";    /* SPC-4 revision 19 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -44,12 +44,15 @@ static char * version_str = "0.84 20090422";    /* SPC-4 revision 18 */
 #define APP_CLIENT_LPAGE 0xf
 #define SELF_TEST_LPAGE 0x10
 #define PORT_SPECIFIC_LPAGE 0x18
-#define GSP_LPAGE 0x19
+#define STATS_LPAGE 0x19
 #define PCT_LPAGE 0x1a
 #define TAPE_ALERT_LPAGE 0x2e
 #define IE_LPAGE 0x2f
 #define NOT_SUBPG_LOG 0x0
 #define ALL_SUBPG_LOG 0xff
+#define LOW_GRP_STATS_SUBPG 0x1
+#define HIGH_GRP_STATS_SUBPG 0x1f
+#define CACHE_STATS_SUBPG 0x20
 
 #define PCB_STR_LEN 128
 
@@ -656,14 +659,18 @@ show_page_name(int pg_code, int subpg_code,
         case APP_CLIENT_LPAGE: printf("%sApplication client", b); break;
         case SELF_TEST_LPAGE: printf("%sSelf-test results", b); break;
         case PORT_SPECIFIC_LPAGE: printf("%sProtocol specific port", b); break;
-        case GSP_LPAGE:
+        case STATS_LPAGE:
             printf("%sGeneral statistics and performance", b);
             break;
         case PCT_LPAGE:
             printf("%sPower condition transition", b);
             break;
-        case IE_LPAGE: printf("%sInformational exceptions (SMART)", b); break;
-        default : done = 0; break;
+        case IE_LPAGE:
+            printf("%sInformational exceptions (SMART)", b);
+            break;
+        default:
+            done = 0;
+            break;
         }
         if (done) {
             if (ALL_SUBPG_LOG == subpg_code)
@@ -673,9 +680,17 @@ show_page_name(int pg_code, int subpg_code,
             return;
         }
     }
-    if ((GSP_LPAGE == pg_code) && (subpg_code > 0) && (subpg_code < 32)) {
-        printf("%sGroup statistics and performance (%d)\n", b, subpg_code);
-        return;
+
+    /* There are not many log subpages currently */
+    if (STATS_LPAGE == pg_code) {
+        if ((subpg_code >= LOW_GRP_STATS_SUBPG) &&
+            (subpg_code <= HIGH_GRP_STATS_SUBPG)) {
+            printf("%sGroup statistics and performance (%d)\n", b, subpg_code);
+            return;
+        } else if (subpg_code == CACHE_STATS_SUBPG) {
+            printf("%sCache memory statistics\n", b);
+            return;
+        }
     }
     if (subpg_code > 0) {
         printf("%s??\n", b);
@@ -1748,6 +1763,7 @@ show_protocol_specific_page(unsigned char * resp, int len,
     return 1;
 }
 
+/* Returns 1 if processed page, 0 otherwise */
 static int
 show_stats_perform_page(unsigned char * resp, int len,
                         const struct opts_t * optsp)
@@ -1765,7 +1781,7 @@ show_stats_perform_page(unsigned char * resp, int len,
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
     if (nam) {
-        printf("log_page=0x%x\n", GSP_LPAGE);
+        printf("log_page=0x%x\n", STATS_LPAGE);
         if (subpg_code > 0)
             printf("log_subpage=0x%x\n", subpg_code);
     }
@@ -1843,15 +1859,15 @@ show_stats_perform_page(unsigned char * resp, int len,
                                 "intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
                 break;
-            case 3:     /* Time interval log parameter */
+            case 3:     /* Time interval log parameter for general stats */
                 ccp = nam ? "parameter_code=3" : "Time interval log "
-                        "parameter";
+                        "parameter for general stats";
                 printf("%s\n", ccp);
                 for (n = 0, ull = ucp[4]; n < 4; ++n) {
                     ull <<= 8; ull |= ucp[4 + n];
                 }
-                ccp = nam ? "time_interval_exp=" : "time interval "
-                                "exponent = ";
+                ccp = nam ? "time_interval_neg_exp=" : "time interval "
+                                "negative exponent = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
                 for (n = 0, ull = ucp[8]; n < 4; ++n) {
                     ull <<= 8; ull |= ucp[8 + n];
@@ -1911,6 +1927,23 @@ show_stats_perform_page(unsigned char * resp, int len,
                 }
                 ccp = nam ? "write_fua_nv_proc_intervals="
                           : "write FUA_NV command processing intervals = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                break;
+            case 6:     /* Time interval log parameter for cache stats */
+                ccp = nam ? "parameter_code=6" : "Time interval log "
+                        "parameter for cache stats";
+                printf("%s\n", ccp);
+                for (n = 0, ull = ucp[4]; n < 4; ++n) {
+                    ull <<= 8; ull |= ucp[4 + n];
+                }
+                ccp = nam ? "time_interval_neg_exp=" : "time interval "
+                                "negative exponent = ";
+                printf("  %s%" PRIu64 "\n", ccp, ull);
+                for (n = 0, ull = ucp[8]; n < 4; ++n) {
+                    ull <<= 8; ull |= ucp[8 + n];
+                }
+                ccp = nam ? "time_interval_int=" : "time interval "
+                                "integer = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
                 break;
             default:
@@ -2051,6 +2084,139 @@ show_stats_perform_page(unsigned char * resp, int len,
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
                 printf("    <%s>\n", pcb_str);
             }
+        }
+    }
+    return 1;
+}
+
+/* Returns 1 if processed page, 0 otherwise */
+static int
+show_cache_stats_page(unsigned char * resp, int len,
+                      const struct opts_t * optsp)
+{
+    int k, num, n, pc, spf, subpg_code, extra;
+    int pcb, nam;
+    unsigned char * ucp;
+    const char * ccp;
+    uint64_t ull;
+    char pcb_str[PCB_STR_LEN];
+
+    nam = optsp->do_name;
+    num = len - 4;
+    ucp = resp + 4;
+    if (num < 4) {
+        printf("badly formed Cache memory statistics log page\n");
+        return 0;
+    }
+    spf = !!(resp[0] & 0x40);
+    subpg_code = spf ? resp[1] : 0;
+    if (nam) {
+        printf("log_page=0x%x\n", STATS_LPAGE);
+        if (subpg_code > 0)
+            printf("log_subpage=0x%x\n", subpg_code);
+    } else
+        printf("Cache memory statistics log page\n");
+
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        if (k < 3) {
+            printf("short Cache memory statistics log page\n");
+            return 0;
+        }
+        if (8 != ucp[3]) {
+            printf("Cache memory statistics log page parameter length not "
+                   "8\n");
+            return 0;
+        }
+        extra = ucp[3] + 4;
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        switch (pc) {
+        case 1:     /* Read cache memory hits log parameter */
+            ccp = nam ? "parameter_code=1" :
+                        "Read cache memory hits log parameter";
+            printf("%s\n", ccp);
+            for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            ccp = nam ? "read_cache_memory_hits=" :
+                        "read cache memory hits = ";
+            printf("  %s%" PRIu64 "\n", ccp, ull);
+            break;
+        case 2:     /* Reads to cache memory log parameter */
+            ccp = nam ? "parameter_code=2" :
+                        "Reads to cache memory log parameter";
+            printf("%s\n", ccp);
+            for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            ccp = nam ? "reads_to_cache_memory=" :
+                        "reads to cache memory = ";
+            printf("  %s%" PRIu64 "\n", ccp, ull);
+            break;
+        case 3:     /* Write cache memory hits log parameter */
+            ccp = nam ? "parameter_code=3" :
+                        "Write cache memory hits log parameter";
+            printf("%s\n", ccp);
+            for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            ccp = nam ? "write_cache_memory_hits=" :
+                        "write cache memory hits = ";
+            printf("  %s%" PRIu64 "\n", ccp, ull);
+            break;
+        case 4:     /* Writes from cache memory log parameter */
+            ccp = nam ? "parameter_code=4" :
+                        "Writes from cache memory log parameter";
+            printf("%s\n", ccp);
+            for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            ccp = nam ? "writes_from_cache_memory=" :
+                        "writes from cache memory = ";
+            printf("  %s%" PRIu64 "\n", ccp, ull);
+            break;
+        case 5:     /* Time from last hard reset log parameter */
+            ccp = nam ? "parameter_code=5" :
+                        "Time from last hard reset log parameter";
+            printf("%s\n", ccp);
+            for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            ccp = nam ? "time_from_last_hard_reset=" :
+                        "time from last hard reset = ";
+            printf("  %s%" PRIu64 "\n", ccp, ull);
+            break;
+        case 6:     /* Time interval log parameter for cache stats */
+            ccp = nam ? "parameter_code=6" :
+                        "Time interval log parameter";
+            printf("%s\n", ccp);
+            for (n = 0, ull = ucp[4]; n < 4; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            ccp = nam ? "time_interval_neg_exp=" : "time interval "
+                            "negative exponent = ";
+            printf("  %s%" PRIu64 "\n", ccp, ull);
+            for (n = 0, ull = ucp[8]; n < 4; ++n) {
+                ull <<= 8; ull |= ucp[8 + n];
+            }
+            ccp = nam ? "time_interval_int=" : "time interval "
+                            "integer = ";
+            printf("  %s%" PRIu64 "\n", ccp, ull);
+            break;
+        default:
+            if (nam) {
+                printf("parameter_code=%d\n", pc);
+                printf("  unknown=1\n");
+            } else
+                fprintf(stderr, "show_performance...  unknown parameter "
+                        "code %d\n", pc);
+            if (optsp->do_verbose)
+                dStrHex((const char *)ucp, extra, 1);
+            break;
+        }
+        if ((optsp->do_pcb) && (0 == optsp->do_name)) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("    <%s>\n", pcb_str);
         }
     }
     return 1;
@@ -3126,8 +3292,13 @@ show_ascii_page(unsigned char * resp, int len,
     case PORT_SPECIFIC_LPAGE:
         done = show_protocol_specific_page(resp, len, optsp);
         break;
-    case GSP_LPAGE: /* defined for subpages 0 to 31 inclusive */
-        done = show_stats_perform_page(resp, len, optsp);
+    case STATS_LPAGE: /* defined for subpages 0 to 32 inclusive */
+        if (subpg_code <= HIGH_GRP_STATS_SUBPG)
+            done = show_stats_perform_page(resp, len, optsp);
+        else if (subpg_code == CACHE_STATS_SUBPG)
+            done = show_cache_stats_page(resp, len, optsp);
+        else
+            done = 0;
         break;
     case PCT_LPAGE:
         show_power_condition_transitions_page(resp, len, optsp->do_pcb);

@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_linux version 1.11 20090308 */
+/* sg_pt_linux version 1.12 20090507 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -312,8 +312,8 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     /* io_hdr.timeout is in milliseconds */
     ptp->io_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) :
                                              DEF_TIMEOUT);
-    if (ptp->io_hdr.sbp && (ptp->io_hdr.sb_len_wr > 0))
-        memset(ptp->io_hdr.sbp, 0, ptp->io_hdr.sb_len_wr);
+    if (ptp->io_hdr.sbp && (ptp->io_hdr.mx_sb_len > 0))
+        memset(ptp->io_hdr.sbp, 0, ptp->io_hdr.mx_sb_len);
     if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
         ptp->os_err = errno;
         if (verbose)
@@ -849,9 +849,9 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
         v3_hdr.dxfer_len = (unsigned int)ptp->io_hdr.dout_xfer_len;
         v3_hdr.dxfer_direction =  SG_DXFER_TO_DEV;
     }
-    if (ptp->io_hdr.response && (ptp->io_hdr.response_len > 0)) {
+    if (ptp->io_hdr.response && (ptp->io_hdr.max_response_len > 0)) {
         v3_hdr.sbp = (void *)(long)ptp->io_hdr.response;
-        v3_hdr.mx_sb_len = (unsigned char)ptp->io_hdr.request_len;
+        v3_hdr.mx_sb_len = (unsigned char)ptp->io_hdr.max_response_len;
     }
     v3_hdr.pack_id = (int)ptp->io_hdr.spare_in;
 
@@ -860,10 +860,9 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
             fprintf(sg_warnings_strm, "No SCSI command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
-    /* io_hdr.timeout is in milliseconds */
+    /* io_hdr.timeout is in milliseconds, if greater than zero */
     v3_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) : DEF_TIMEOUT);
-    if (v3_hdr.sbp && (v3_hdr.sb_len_wr > 0))
-        memset(v3_hdr.sbp, 0, v3_hdr.sb_len_wr);
+    /* Finally do the v3 SG_IO ioctl */
     if (ioctl(fd, SG_IO, &v3_hdr) < 0) {
         ptp->os_err = errno;
         if (verbose)
@@ -874,8 +873,10 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
     ptp->io_hdr.device_status = (__u32)v3_hdr.status;
     ptp->io_hdr.driver_status = (__u32)v3_hdr.driver_status;
     ptp->io_hdr.transport_status = (__u32)v3_hdr.host_status;
+    ptp->io_hdr.response_len = (__u32)v3_hdr.sb_len_wr;
     ptp->io_hdr.duration = (__u32)v3_hdr.duration;
     ptp->io_hdr.din_resid = (__s32)v3_hdr.resid;
+    /* v3_hdr.info not passed back since no mapping defined (yet) */
     return 0;
 }
 

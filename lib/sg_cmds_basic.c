@@ -195,6 +195,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
             break;
         }
         if (verbose || n) {
+fprintf(stderr, "sg_cmds_process_resp: slen=%d\n", slen);
             sg_get_sense_str(leadin, sense_b, slen, (verbose > 1),
                              sizeof(b), b);
             fprintf(sg_warnings_strm, "%s", b);

@@ -37,7 +37,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.50 20090422";    /* spc-4 rev 18 + */
+const char * sg_lib_version_str = "1.50 20090422";    /* spc-4 rev 19 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -408,8 +408,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
                 "notify (enable spinup) required"},
     {0x04,0x12,"Logical unit not ready, offline"},
     {0x04,0x13,"Logical unit not ready, SA creation in progress"},
-        /* Would "... in progress" read better in the following: */
-    {0x04,0x14,"Logical unit not ready, space allocation in process"},
+    {0x04,0x14,"Logical unit not ready, space allocation in progress"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
