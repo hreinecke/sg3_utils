@@ -101,7 +101,12 @@ static const char * linux_driver_suggests[] = {
 
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 #if defined(IGNORE_LINUX_BSG) || ! defined(HAVE_LINUX_BSG_H)
-/* sgv3 via SG_IO ioctl on a sg node or other node that accepts that ioctl */
+/*
+ * sg(v3) via SG_IO ioctl on a sg node or other node that accepts that ioctl.
+ * Decision has been made at compile time because either:
+ *   a) no /usr/include/linux/bsg.h header file was found, or
+ *   b) the builder gave the '--enable-no-linux-bsg' option to ./configure
+ */
 
 
 struct sg_pt_linux_scsi {
@@ -452,14 +457,29 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 
 
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#else /* allow for run selection of sg v3 or v4 (via bsg) */
+#else /* allow for runtime selection of sg v3 or v4 (via bsg) */
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+/*
+ * So bsg is an option. Thus we make a runtime decision. If all the following
+ * are true we use sg v4 which is only currently supported on bsg device
+ * nodes:
+ *   a) there is a bsg entry in the /proc/devices file
+ *   b) the device node given to scsi_pt_open() is a char device
+ *   c) the char major number of the device node given to scsi_pt_open()
+ *      matches the char major number of the bsg entry in /proc/devices
+ * Otherwise the sg v3 interface is used.
+ *
+ * Note that in either case we prepare the data in a sg v4 structure. If
+ * the runtime tests indicate that the v3 interface is needed then
+ * do_scsi_pt_v3() transfers the input data into a v3 structure and
+ * then the output data is transferred back into a sg v4 structure.
+ * That implementation detail could change in the future.
+ */
 
 
 #include <linux/types.h>
 #include <linux/bsg.h>
 
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs (60 seconds) */
 
 struct sg_pt_linux_scsi {
     struct sg_io_v4 io_hdr;     /* use v4 header as it is more general */
