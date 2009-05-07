@@ -79,8 +79,8 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Wed Apr 22 2009 - dgilbert at interlog dot com
-- xxxxxxxxxxxxxxx
+* Thu May 07 2009 - dgilbert at interlog dot com
+- sg_logs: cache memory statistics log page
   * sg3_utils-1.28
 
 * Sat Apr 11 2009 - dgilbert at interlog dot com

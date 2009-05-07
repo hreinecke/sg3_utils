@@ -2,10 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090422] [svn: r259]
+Changelog for sg3_utils-1.28 [20090507] [svn: r260]
+  - sg_logs: add cache memory statistics log (sub)page
   - sg_lib: sg_set_binary_mode() inactive because config.h not
     included
     - change SG3_UTILS_* constants to SG_LIB_*
+    - sync with spc4r19
+  - sg_pt_linux: sense buffer got lost when sg v3 used when
+    /usr/include/linux/bsg.h visible
   - utils/hxascdmp: in Windows set binary mode on read files
   - sg_write_buffer,sg_write_long,sg_write_same: in Windows set
     binary mode on read files
