@@ -39,7 +39,7 @@
 
 static int bytes_per_line = DEF_BYTES_PER_LINE;
 
-static const char * version_str = "1.12 20090422";
+static const char * version_str = "1.13 20090510";
 
 #define CHARS_PER_HEX_BYTE 3
 #define BINARY_START_COL 6
@@ -210,7 +210,7 @@ main(int argc, const char ** argv)
     int num = 8192;
     long start = 0;
     int res, k, u;
-    int inFile = 0;     /* stdin */
+    int inFile = STDIN_FILENO;
     int doHelp = 0;
     int doHex = 0;
     int hasFilename = 0;
@@ -277,6 +277,7 @@ main(int argc, const char ** argv)
             printf("\n");
         }
     } else {
+	sg_set_binary_mode(inFile);
         while ((res = read(inFile, buff, num)) > 0) {
             if (doHex)
                 dStrHexOnly(buff, res, start);
