@@ -89,3 +89,6 @@
 
 /* Version number of package */
 #undef VERSION
+
+/* allow large buffers, aligned? */
+#undef WIN32_SPT_DIRECT

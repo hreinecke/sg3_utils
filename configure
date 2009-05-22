@@ -19737,6 +19737,11 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_WIN32 1
 _ACEOF
 
+
+cat >>confdefs.h <<_ACEOF
+#define WIN32_SPT_DIRECT 1
+_ACEOF
+
                 os_libs=''
  ;;
         *-*-mingw*)
@@ -19748,6 +19753,11 @@ _ACEOF
 
 cat >>confdefs.h <<_ACEOF
 #define SG_LIB_MINGW 1
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define WIN32_SPT_DIRECT 1
 _ACEOF
 
                 os_libs=''
