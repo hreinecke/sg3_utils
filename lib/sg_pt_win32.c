@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_win32 version 1.07 20090204 */
+/* sg_pt_win32 version 1.08 20090522 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,10 +49,20 @@
  * pointers to the user space are passed to the OS. Only Windows
  * 2000, 2003 and XP are supported (i.e. not 95,98 or ME).
  * Currently there is no ASPI interface which relies on a dll
- * from adpatec.
+ * from adaptec.
  * This code uses cygwin facilities and is built in a cygwin
  * shell. It can be run in a normal DOS shell if the cygwin1.dll
  * file is put in an appropriate place.
+ *
+ * N.B. MSDN says that the "SPT" interface (i.e. double buffered)
+ * should be used for small amounts of data (it says "< 16 KB").
+ * The direct variant (i.e. IOCTL_SCSI_PASS_THROUGH_DIRECT) should
+ * be used for larger amounts of data but the buffer needs to be
+ * "cache aligned". Is that 16 byte alignment or greater?
+ *
+ * This code will default to indirect (i.e. double buffered) access
+ * unless the WIN32_SPT_DIRECT preprocessor constant is defined in
+ * config.h .
  */
 
 #define DEF_TIMEOUT 60       /* 60 seconds */
@@ -71,7 +81,7 @@ struct sg_pt_handle {
 struct sg_pt_handle handle_arr[MAX_OPEN_SIMULT];
 
 struct sg_pt_win32_scsi {
-#ifdef SPTD
+#ifdef WIN32_SPT_DIRECT
     SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb;
 #else
     SCSI_PASS_THROUGH_WITH_BUFFERS swb;
@@ -402,7 +412,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         psp->os_err = ENODEV;
         return -psp->os_err;
     }
-#ifdef SPTD
+#ifdef WIN32_SPT_DIRECT
     psp->swb.spt.Length = sizeof (SCSI_PASS_THROUGH_DIRECT);
 #else
     if (psp->dxfer_len > (int)sizeof(psp->swb.ucDataBuf)) {
@@ -432,7 +442,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
                 "DataTransferLength=%lu\n",
                 (int)psp->swb.spt.CdbLength, (int)psp->swb.spt.SenseInfoLength,
                 (int)psp->swb.spt.DataIn, psp->swb.spt.DataTransferLength);
-#ifdef SPTD
+#ifdef WIN32_SPT_DIRECT
         fprintf(stderr, "    TimeOutValue=%lu SenseInfoOffset=%lu\n",
                 psp->swb.spt.TimeOutValue, psp->swb.spt.SenseInfoOffset);
 #else
@@ -441,7 +451,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
                 psp->swb.spt.DataBufferOffset, psp->swb.spt.SenseInfoOffset);
 #endif
     }
-#ifdef SPTD
+#ifdef WIN32_SPT_DIRECT
     psp->swb.spt.DataBuffer = psp->dxferp;
     status = DeviceIoControl(shp->fh, IOCTL_SCSI_PASS_THROUGH_DIRECT,
                             &psp->swb,
@@ -469,7 +479,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         psp->os_err = EIO;
         return 0;       /* let app find transport error */
     }
-#ifndef SPTD
+#ifndef WIN32_SPT_DIRECT
     if ((psp->dxfer_len > 0) && (SCSI_IOCTL_DATA_IN == psp->swb.spt.DataIn))
         memcpy(psp->dxferp, psp->swb.ucDataBuf, psp->dxfer_len);
 #endif
