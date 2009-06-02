@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.85 20090507";    /* SPC-4 revision 19 */
+static char * version_str = "0.86 20090602";    /* SPC-4 revision 20 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2245,8 +2245,8 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
             dStrHex((const char *)ucp, pl, 0);
             break;
         case 1: printf("  Grown defects during certification"); break;
-        case 2: printf("  Total blocks relocated during format"); break;
-        case 3: printf("  Total new blocks relocated"); break;
+        case 2: printf("  Total blocks reassigned during format"); break;
+        case 3: printf("  Total new blocks reassigned"); break;
         case 4: printf("  Power on minutes since format"); break;
         default:
             printf("  Unknown Format status code = 0x%x\n", pc);
@@ -2364,14 +2364,15 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
 
 static const char * bms_status[] = {
     "no background scans active",
-    "background scan is active",
+    "background medium scan is active",
     "background pre-scan is active",
     "background scan halted due to fatal error",
     "background scan halted due to a vendor specific pattern of error",
     "background scan halted due to medium formatted without P-List",
     "background scan halted - vendor specific cause",
     "background scan halted due to temperature out of range",
-    "background scan halted until BM interval timer expires", /* 8 */
+    "background scan enabled, none active (waiting for BMS interval timer "
+        "to expire)", /* 8 */
 };
 
 static const char * reassign_status[] = {

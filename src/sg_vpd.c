@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.32 20090228";    /* spc4r18 + sbc3r18 */
+static char * version_str = "0.33 20090530";    /* spc4r20 + sbc3r19 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1299,7 +1299,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-        case 0: case 4: case 7:
+        case 0: case 4: case 7: /* Block limits */
             if (len < 16) {
                 fprintf(stderr, "Block limits VPD page length too "
                         "short=%d\n", len);
@@ -1326,6 +1326,16 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                 u = ((unsigned int)buff[24] << 24) | (buff[25] << 16) |
                     (buff[26] << 8) | buff[27];
                 printf("  Maximum unmap block descriptor count: %u\n", u);
+            }
+            if (len > 35) {     /* added in sbc3r19 */
+                u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
+                    (buff[30] << 8) | buff[31];
+                printf("  Optimal unmap granularity: %u\n", u);
+                printf("  Unmap granularity alignment valid: %u\n",
+                       !!(buff[32] & 0x80));
+                u = ((unsigned int)(buff[32] & 0x7f) << 24) | (buff[33] << 16) |
+                    (buff[34] << 8) | buff[35];
+                printf("  Unmap granularity alignment: %u\n", u);
             }
             break;
         case 1: case 8:

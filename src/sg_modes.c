@@ -13,7 +13,7 @@
 #include "sg_cmds_basic.h"
 
 /*
-*  Copyright (C) 2000-2008 D. Gilbert
+*  Copyright (C) 2000-2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.30 20080805";
+static char * version_str = "1.31 20090530";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -577,7 +577,7 @@ static struct page_code_desc pc_desc_rbc[] = {
     {0x6, 0x0, "RBC device parameters"},
 };
 
-static struct page_code_desc pc_desc_adt[] = {
+static struct page_code_desc pc_desc_adc[] = {
     /* {0xe, 0x0, "ADC device configuration"}, */
     {0xe, 0x1, "Target device"},
     {0xe, 0x2, "DT device primary port"},
@@ -618,8 +618,8 @@ mode_page_cs_table(int scsi_ptype, int * size)
             *size = sizeof(pc_desc_rbc) / sizeof(pc_desc_rbc[0]);
             return &pc_desc_rbc[0];
         case PDT_ADC:       /* automation device/interface */
-            *size = sizeof(pc_desc_adt) / sizeof(pc_desc_adt[0]);
-            return &pc_desc_adt[0];
+            *size = sizeof(pc_desc_adc) / sizeof(pc_desc_adc[0]);
+            return &pc_desc_adc[0];
     }
     *size = 0;
     return NULL;
@@ -647,7 +647,7 @@ static struct page_code_desc pc_desc_t_sas[] = {
     {0x19, 0x3, "SAS-2 phy"},
 };
 
-static struct page_code_desc pc_desc_t_adt[] = {
+static struct page_code_desc pc_desc_t_adc[] = {
     {0xe, 0x1, "Target device"},
     {0xe, 0x2, "DT device primary port"},
     {0xe, 0x3, "Logical unit"},
@@ -670,8 +670,8 @@ mode_page_transp_table(int t_proto, int * size)
             *size = sizeof(pc_desc_t_sas) / sizeof(pc_desc_t_sas[0]);
             return &pc_desc_t_sas[0];
         case TPROTO_ADT:
-            *size = sizeof(pc_desc_t_adt) / sizeof(pc_desc_t_adt[0]);
-            return &pc_desc_t_adt[0];
+            *size = sizeof(pc_desc_t_adc) / sizeof(pc_desc_t_adc[0]);
+            return &pc_desc_t_adc[0];
     }
     *size = 0;
     return NULL;

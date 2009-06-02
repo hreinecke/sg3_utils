@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.82 20090422";    /* SPC-4 rev 18 */
+static char * version_str = "0.83 20090530";    /* SPC-4 rev 20 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1425,6 +1425,16 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                 u = ((unsigned int)buff[24] << 24) | (buff[25] << 16) |
                     (buff[26] << 8) | buff[27];
                 printf("  Maximum unmap block descriptor count: %u\n", u);
+            }
+            if (len > 35) {     /* added in sbc3r19 */
+                u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
+                    (buff[30] << 8) | buff[31];
+                printf("  Optimal unmap granularity: %u\n", u);
+                printf("  Unmap granularity alignment valid: %u\n",
+                       !!(buff[32] & 0x80));
+                u = ((unsigned int)(buff[32] & 0x7f) << 24) |
+                    (buff[33] << 16) | (buff[34] << 8) | buff[35];
+                printf("  Unmap granularity alignment: %u\n", u);
             }
             break;
         case PDT_TAPE: case PDT_MCHANGER:
