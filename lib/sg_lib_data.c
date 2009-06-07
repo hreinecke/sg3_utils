@@ -37,7 +37,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.50 20090422";    /* spc-4 rev 19 */
+const char * sg_lib_version_str = "1.51 20090607";    /* spc-4 rev 20 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -265,6 +265,26 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
     {0x11, 0, "Write long(16)"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
+    {0x0, 0, "Persistent reserve in, read keys"},
+    {0x1, 0, "Persistent reserve in, read reservation"},
+    {0x2, 0, "Persistent reserve in, report capabilities"},
+    {0x3, 0, "Persistent reserve in, read full status"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
+    {0x0, 0, "Persistent reserve out, register"},
+    {0x0, 1, "Persistent reserve out, reserve"},
+    {0x0, 2, "Persistent reserve out, release"},
+    {0x0, 3, "Persistent reserve out, clear"},
+    {0x0, 4, "Persistent reserve out, preempt"},
+    {0x0, 5, "Persistent reserve out, preempt and abort"},
+    {0x0, 6, "Persistent reserve out, register and ignore existing key"},
+    {0x0, 7, "Persistent reserve out, register and move"},
     {0xffff, 0, NULL},
 };
 

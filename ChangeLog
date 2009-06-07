@@ -2,11 +2,15 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090530] [svn: r266]
+Changelog for sg3_utils-1.28 [20090607] [svn: r267]
   - sg_logs: add cache memory statistics log (sub)page
   - sg_vpd, sg_inq: extend Block limits VPD page (sbc3r19)
+  - sg_opcodes: allow --opcode= option to take OP and SA
+    values (comma seperated)
+    - tweak format, remove test code
   - sg_lib: sg_set_binary_mode() needs config.h included
     - change SG3_UTILS_* constants to SG_LIB_*
+    - decode service actions within persistent reserve in/out
     - sync with spc4r20
   - sg_pt_linux: fix check condition but empty sense buffer; occurred
     when sg v3 node used and /usr/include/linux/bsg.h visible

@@ -992,6 +992,22 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
             snprintf(buff, buff_len, "Service action out(16)=0x%x",
                      service_action);
         break;
+    case SG_PERSISTENT_RESERVE_IN:
+        vnp = get_value_name(sg_lib_pr_in_arr, service_action, peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Persistent reserve in, service "
+                     "action=0x%x", service_action);
+        break;
+    case SG_PERSISTENT_RESERVE_OUT:
+        vnp = get_value_name(sg_lib_pr_out_arr, service_action, peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Persistent reserve out, service "
+                     "action=0x%x", service_action);
+        break;
     default:
         sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
         break;
