@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.31 20090530";
+static char * version_str = "1.31 20090604";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -644,7 +644,7 @@ static struct page_code_desc pc_desc_t_sas[] = {
     {0x19, 0x0, "Protocol specific port (SAS)"},
     {0x19, 0x1, "Phy control and discover (SAS)"},
     {0x19, 0x2, "Shared port control (SAS)"},
-    {0x19, 0x3, "SAS-2 phy"},
+    {0x19, 0x3, "Enhanced phy control (SAS)"},
 };
 
 static struct page_code_desc pc_desc_t_adc[] = {

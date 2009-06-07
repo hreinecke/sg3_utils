@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.86 20090602";    /* SPC-4 revision 20 */
+static char * version_str = "0.86 20090607";    /* SPC-4 revision 20 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -813,7 +813,10 @@ show_page_name(int pg_code, int subpg_code,
     }
     if (done)
         return;
-    printf("%s??\n", b);
+    if (pg_code >= 0x30)
+        printf("%s[unknown vendor specific page code]", b);
+    else
+        printf("%s??\n", b);
 }
 
 static void
@@ -3354,7 +3357,7 @@ show_ascii_page(unsigned char * resp, int len,
                resp[0] & 0x3f);
         if (len > 128) {
             dStrHex((const char *)resp, 64, 1);
-            printf(" .....  [truncated after 64 of %d bytes (use '-h' to "
+            printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
                    "see the rest)]\n", len);
         }
         else
