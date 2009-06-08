@@ -278,13 +278,13 @@ struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
 
 struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
     {0x0, 0, "Persistent reserve out, register"},
-    {0x0, 1, "Persistent reserve out, reserve"},
-    {0x0, 2, "Persistent reserve out, release"},
-    {0x0, 3, "Persistent reserve out, clear"},
-    {0x0, 4, "Persistent reserve out, preempt"},
-    {0x0, 5, "Persistent reserve out, preempt and abort"},
-    {0x0, 6, "Persistent reserve out, register and ignore existing key"},
-    {0x0, 7, "Persistent reserve out, register and move"},
+    {0x1, 0, "Persistent reserve out, reserve"},
+    {0x2, 0, "Persistent reserve out, release"},
+    {0x3, 0, "Persistent reserve out, clear"},
+    {0x4, 0, "Persistent reserve out, preempt"},
+    {0x5, 0, "Persistent reserve out, preempt and abort"},
+    {0x6, 0, "Persistent reserve out, register and ignore existing key"},
+    {0x7, 0, "Persistent reserve out, register and move"},
     {0xffff, 0, NULL},
 };
 

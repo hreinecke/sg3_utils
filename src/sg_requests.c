@@ -47,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static char * version_str = "1.21 20090422";
+static char * version_str = "1.22 20090607";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -266,17 +266,6 @@ main(int argc, char * argv[])
                 dStrHex((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
-#if 1
-{
-    static int p1 = 0x22;
-
-    requestSenseBuff[15] = 0x80;
-    if (k > 0)
-        p1 += 0x08;
-    requestSenseBuff[16] = p1;
-    requestSenseBuff[17] = 0x0;
-}
-#endif
             sg_get_sense_progress_fld(requestSenseBuff, resp_len,
                                       &progress);
             if (progress < 0) {

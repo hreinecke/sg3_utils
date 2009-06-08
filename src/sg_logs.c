@@ -814,7 +814,7 @@ show_page_name(int pg_code, int subpg_code,
     if (done)
         return;
     if (pg_code >= 0x30)
-        printf("%s[unknown vendor specific page code]", b);
+        printf("%s[unknown vendor specific page code]\n", b);
     else
         printf("%s??\n", b);
 }
@@ -1722,6 +1722,10 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             unsigned int pvdt;
 
             num_ped = vcp[51];
+            if (optsp->do_verbose > 1)
+                printf("    <<Phy event descriptors: %d, spld_len: %d, "
+                       "calc_ped: %d>>\n", num_ped, spld_len,
+                       (spld_len - 52) / 12);
             if (num_ped > 0) {
                 if (optsp->do_name) {
                    printf("      phy_event_desc_num=%d\n", num_ped);
@@ -2438,8 +2442,8 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
 #endif
             j = (ucp[14] << 8) + ucp[15];
             if (0 == j)
-                printf("    Number of background medium scans performed: "
-                       "not reported [0]\n");
+                printf("    Number of background medium scans performed: 0 "
+                       "[not reported]\n");
             else
                 printf("    Number of background medium scans performed: "
                        "%d\n", j);
