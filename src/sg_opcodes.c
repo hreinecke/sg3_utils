@@ -112,8 +112,9 @@ usage()
             "                     (decimal, prefix with '0x' for hex)\n"
             "    --tmf|-t        output list of supported task management "
             "functions\n"
-            "    --unsorted|-u    output list of operation codes as is "
-            "(unsorted)\n"
+            "    --unsorted|-u    output list of operation codes as is\n"
+            "                     (def: sort by opcode (then service "
+            "action))\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print vesrion string then exit\n\n"
             "Performs a SCSI REPORT SUPPORTED OPERATION CODES or REPORT "
@@ -188,8 +189,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 optsp->do_opcode = n;
-                n = sg_get_num(cp);
-                if (n < 0) {
+                n = sg_get_num(cp + 1);
+                if ((n < 0) || (n > 0xffff)) {
                     fprintf(stderr, "bad SA argument to '--opcode'\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
@@ -215,8 +216,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_rctd;
             break;
         case 's':
-           n = sg_get_num(optarg);
-           if (n < 0) {
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 0xffff)) {
                 fprintf(stderr, "bad argument to '--sa'\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
@@ -674,32 +675,34 @@ main(int argc, char * argv[])
     op_name = opts.do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
 
-    if ((sg_fd = scsi_pt_open_device(opts.device_name, 1 /* RO */,
-                                     opts.do_verbose)) < 0) {
-        fprintf(stderr, "sg_opcodes: error opening file (ro): %s: %s\n",
-                opts.device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
-    }
-    if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.do_verbose)) {
-        peri_type = inq_resp.peripheral_type;
-        if (0 == opts.do_raw) {
-            printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
-                   inq_resp.revision);
-            cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
-            if (strlen(cp) > 0)
-                printf("  Peripheral device type: %s\n", cp);
-            else
-                printf("  Peripheral device type: 0x%x\n", peri_type);
+    if (opts.do_opcode < 0) {
+        if ((sg_fd = scsi_pt_open_device(opts.device_name, 1 /* RO */,
+                                         opts.do_verbose)) < 0) {
+            fprintf(stderr, "sg_opcodes: error opening file (ro): %s: %s\n",
+                    opts.device_name, safe_strerror(-sg_fd));
+            return SG_LIB_FILE_ERROR;
         }
-    } else {
-        fprintf(stderr, "sg_opcodes: %s doesn't respond to a SCSI "
-                "INQUIRY\n", opts.device_name);
-        return SG_LIB_CAT_OTHER;
-    }
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
-        return SG_LIB_FILE_ERROR;
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.do_verbose)) {
+            peri_type = inq_resp.peripheral_type;
+            if (0 == opts.do_raw) {
+                printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
+                       inq_resp.product, inq_resp.revision);
+                cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
+                if (strlen(cp) > 0)
+                    printf("  Peripheral device type: %s\n", cp);
+                else
+                    printf("  Peripheral device type: 0x%x\n", peri_type);
+            }
+        } else {
+            fprintf(stderr, "sg_opcodes: %s doesn't respond to a SCSI "
+                    "INQUIRY\n", opts.device_name);
+            return SG_LIB_CAT_OTHER;
+        }
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = scsi_pt_open_device(opts.device_name, 0 /* RW */,
