@@ -26,11 +26,11 @@
 
 #include "sg_pt.h"
 
-static char * version_str = "0.34 20090607";    /* spc4r20 */
+static char * version_str = "0.34 20090610";    /* spc4r20 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
+#define DEF_TIMEOUT_SECS 60
 
 #define SG_MAINTENANCE_IN 0xa3
 #define RSOC_SA     0xc
@@ -116,7 +116,7 @@ usage()
             "                     (def: sort by opcode (then service "
             "action))\n"
             "    --verbose|-v    increase verbosity\n"
-            "    --version|-V    print vesrion string then exit\n\n"
+            "    --version|-V    print version string then exit\n\n"
             "Performs a SCSI REPORT SUPPORTED OPERATION CODES or REPORT "
             "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command\n");
 }
@@ -856,7 +856,7 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
     set_scsi_pt_cdb(ptvp, rsocCmdBlk, sizeof(rsocCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, "Report Supported Operation Codes", res,
                                mx_resp_len, sense_b, noisy, verbose,
                                &sense_cat);
@@ -916,7 +916,7 @@ do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy, int verbose)
     set_scsi_pt_cdb(ptvp, rstmfCmdBlk, sizeof(rstmfCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, "Report Supported Task management "
                                "functions", res, mx_resp_len, sense_b, noisy,
                                 verbose, &sense_cat);

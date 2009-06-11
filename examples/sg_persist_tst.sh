@@ -1,9 +1,9 @@
 #!/bin/sh
 # This script is meant as an example of using the sg_persist utility
 # in the sg3_utils package. This script works as expected on the
-# author's Fujitsu MAM3184 and a Seagate ST373455 disk.
+# author's Fujitsu MAM3184, Seagate ST373455 and ST9146803SS disks.
 #
-#  Version 1.5 20070314
+#  Version 1.6 20090608
 
 # N.B. make sure the device name is correct for your environment.
 
@@ -40,7 +40,7 @@ echo ""
 sleep 1
 
 echo ">>> check if any keys are registered:"
-sg_persist -k $1
+sg_persist --no-inquiry --read-keys $1
 sleep 1
 
 echo
@@ -50,7 +50,7 @@ sleep 1
 
 echo
 echo ">>> now key 123abc should be registered:"
-sg_persist -n -k $1
+sg_persist -n --read-keys $1
 sleep 1
 
 echo
@@ -61,6 +61,11 @@ sleep 1
 echo
 echo ">>> check if the device is reserved (it should be now):"
 sg_persist -n --read-reservation $1
+sleep 1
+
+echo
+echo ">>> try to 'read full status' (may not be supported):"
+sg_persist -n --read-full-status $1
 sleep 1
 
 echo

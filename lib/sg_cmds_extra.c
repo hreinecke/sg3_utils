@@ -83,12 +83,14 @@
 #define SERVICE_ACTION_IN_12_CMDLEN 12
 #define READ_LONG10_CMD 0x3e
 #define READ_LONG10_CMDLEN 10
+#define UNMAP_CMD 0x42
+#define UNMAP_CMDLEN 10
+#define VERIFY10_CMD 0x2f
+#define VERIFY10_CMDLEN 10
 #define WRITE_LONG10_CMD 0x3f
 #define WRITE_LONG10_CMDLEN 10
 #define WRITE_BUFFER_CMD 0x3b
 #define WRITE_BUFFER_CMDLEN 10
-#define VERIFY10_CMD 0x2f
-#define VERIFY10_CMDLEN 10
 
 #define READ_LONG_16_SA 0x11
 #define READ_MEDIA_SERIAL_NUM_SA 0x1
@@ -1761,6 +1763,72 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     } else
         ret = 0;
 
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI UNMAP command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> command not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+int
+sg_ll_unmap(int sg_fd, int group_num, int timeout_secs, void * paramp,
+            int param_len, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat, tmout;
+    unsigned char uCmdBlk[UNMAP_CMDLEN] =
+                         {UNMAP_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
+    uCmdBlk[7] = group_num & 0x1f;
+    uCmdBlk[7] = (param_len >> 8) & 0xff;
+    uCmdBlk[8] = param_len & 0xff;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    unmap cdb: ");
+        for (k = 0; k < UNMAP_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", uCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_strm, "    unmap parameter list:\n");
+            dStrHex((const char *)paramp, param_len, -1);
+        }
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "unmap: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, uCmdBlk, sizeof(uCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
+    ret = sg_cmds_process_resp(ptvp, "unmap", res, 0,
+                               sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }

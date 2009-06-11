@@ -54,7 +54,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.12 20090401";
+static char * version_str = "1.12 20090611";
 
 #define ME "sg_reassign: "
 
@@ -108,7 +108,7 @@ usage()
           "    --longlist=0|1\n"
           "       -l 0|1           use 4 byte list length when 1, safe to "
           "ignore\n"
-          "                        which default to 2 byte list length\n"
+          "                        (def: 0 (2 byte list length))\n"
           "    --primary|-p        fetch primary defect list length, "
           "don't reassign\n"
           "    --verbose|-v        increase verbosity\n"
@@ -117,7 +117,7 @@ usage()
           );
 }
 
-/* Trying to decode multipliers as sg_get_llnum() [in sg_libs does] would
+/* Trying to decode multipliers as sg_get_llnum() [in sg_libs] does would
  * only confuse things here, so use this local trimmed version */
 int64_t
 get_llnum(const char * buf)
@@ -125,19 +125,16 @@ get_llnum(const char * buf)
     int res, len;
     int64_t num;
     uint64_t unum;
-    const char * commap;
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1LL;
-    len = strlen(buf);
-    commap = strchr(buf + 1, ',');
+    len = strspn(buf, "0123456789aAbBcCdDeEfFhHxX");
+    if (0 == len)
+        return -1LL;
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%" SCNx64 "", &unum);
         num = unum;
-    } else if (commap && ('H' == toupper(*(commap - 1)))) {
-        res = sscanf(buf, "%" SCNx64 "", &unum);
-        num = unum;
-    } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
+    } else if ('H' == toupper(buf[len - 1])) {
         res = sscanf(buf, "%" SCNx64 "", &unum);
         num = unum;
     } else
@@ -230,7 +227,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
         }
         *lba_arr_len = off;
     } else {        /* list of numbers (default decimal) on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX, ");
         if (in_len != k) {
             fprintf(stderr, "build_lba_arr: error at pos %d\n", k + 1);
             return 1;

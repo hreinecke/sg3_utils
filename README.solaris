@@ -37,6 +37,7 @@ Here is a list of utilities that have been ported:
     sg_stpg
     sg_sync
     sg_turs
+    sg_unmap
     sg_verify
     sg_vpd
     sg_wr_mode
@@ -80,4 +81,4 @@ See the Solaris section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-11th March 2009
+11th June 2009

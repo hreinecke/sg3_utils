@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "May 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_WRITE_SAME "8" "June 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -150,6 +150,11 @@ the \fIDEVICE\fR as if the Unmap bit was zero. In the absence of the
 \fI\-\-in=IF\fR option, this utility will attempt build a data out
 buffer that meets the requirements for the Unmap bit in the cdb to be
 acted on by the \fIDEVICE\fR. 
+.PP
+Logical blocks may also be unmapped by the SCSI UNMAP and FORMAT UNIT
+commands (see the sg_unmap and sg_format utilities). Support for
+thin provisioning is indicated by the TPE bit in the response to the
+SCSI READ CAPACITY (16) command (see the sg_readcap utility).
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
@@ -167,4 +172,4 @@ Copyright \(co 2009 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_readcap
+.B sg_format,sg_readcap,sg_unmap(sg3_utils)
