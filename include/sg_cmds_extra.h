@@ -243,6 +243,13 @@ extern int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                               uint64_t llba, void * data_out, int xfer_len,
                               int * offsetp, int noisy, int verbose);
 
+/* Invokes a SCSI UNMAP (SBC-3) command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> command not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+extern int sg_ll_unmap(int sg_fd, int group_num, int timeout_secs,
+                       void * paramp, int param_len, int noisy, int verbose);
+
 #ifdef __cplusplus
 }
 #endif

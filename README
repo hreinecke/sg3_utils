@@ -180,8 +180,9 @@ subdirectory of the sg3_utils package:
     sg_read, sg_readcap, sg_read_buffer, sg_read_long, sg_reassign,
     sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_safte, sg_sat_identify,
     sg_sat_phy_event, sg_sat_set_features, sg_scan, sg_senddiag, sg_ses,
-    sg_start, sg_stpg, sg_sync, sg_test_rwbuff, sg_turs, sg_verify, sg_vpd,
-    sg_write_buffer, sg_write_long, sg_write_same, sg_wr_mode
+    sg_start, sg_stpg, sg_sync, sg_test_rwbuff, sg_turs, sg_unmap,
+    sg_verify, sg_vpd, sg_write_buffer, sg_write_long, sg_write_same,
+    sg_wr_mode
 
 Each of the above utilities depends on header files found in the 'include'
 subdirectory and library code found in the 'lib' subdirectory. Associated
@@ -314,7 +315,9 @@ The more recent utilities that use "getopt_long" only are:
     sg_prevent sg_raw sg_read_buffer sg_read_long sg_reassign sg_requests
     sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event
     sg_sat_set_features sg_scan(w) sg_ses sg_stpg sg_sync sg_test_rwbuf
-    sg_verify sg_vpd sg_write_buffer sg_write_long sg_write_same sg_wr_mode
+    sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long sg_write_same
+    sg_wr_mode
+
 
 Dangerous code
 ==============
@@ -335,4 +338,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-7th June 2009
+11th June 2009

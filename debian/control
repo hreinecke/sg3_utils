@@ -59,6 +59,7 @@ Description: collection of Linux utilities for devices that use the
      * sg_sync - issues a SYNCHRONIZE CACHE command
      * sg_test_rwbuf - tests the SCSI host adapter
      * sg_turs - execute a TEST UNIT READY command on the given device
+     * sg_unmap - issues UNMAP to unmap one or more logical blocks
      * sg_verify - issues VERIFY command on SCSI disks
      * sg_vpd - utility for decoding VPD pages
      * sg_write_buffer - WRITE BUFFER, may be used to load firmware

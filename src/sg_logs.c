@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.86 20090607";    /* SPC-4 revision 20 */
+static char * version_str = "0.87 20090608";    /* SPC-4 revision 20 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -3492,12 +3492,17 @@ main(int argc, char * argv[])
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
                 fprintf(stderr, "log_select: device not ready\n");
+            else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                fprintf(stderr, "log_select: field in cdb illegal\n");
             else if (SG_LIB_CAT_INVALID_OP == k)
                 fprintf(stderr, "log_select: not supported\n");
             else if (SG_LIB_CAT_UNIT_ATTENTION == k)
                 fprintf(stderr, "log_select: unit attention\n");
             else if (SG_LIB_CAT_ABORTED_COMMAND == k)
                 fprintf(stderr, "log_select: aborted command\n");
+            else
+                fprintf(stderr, "log_select: failed (%d), try '-v' for more "
+                        "information\n", k);
         }
         return (k >= 0) ?  k : SG_LIB_CAT_OTHER;
     }
@@ -3601,6 +3606,9 @@ main(int argc, char * argv[])
                 fprintf(stderr, "log_sense: unit attention\n");
             else if (SG_LIB_CAT_ABORTED_COMMAND == res)
                 fprintf(stderr, "log_sense: aborted command\n");
+            else
+                fprintf(stderr, "log_sense: failed, try '-v' for more "
+                        "information\n");
         }
     }
     sg_cmds_close_device(sg_fd);

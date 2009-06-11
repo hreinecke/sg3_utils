@@ -2,7 +2,8 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090607] [svn: r268]
+Changelog for sg3_utils-1.28 [20090608] [svn: r273]
+  - sg_unmap: new utility for thin provisioning
   - sg_logs: add cache memory statistics log (sub)page
   - sg_vpd, sg_inq: extend Block limits VPD page (sbc3r19)
   - sg_opcodes: allow --opcode= option to take OP and SA
@@ -16,6 +17,7 @@ Changelog for sg3_utils-1.28 [20090607] [svn: r268]
   - sg_pt_linux: fix check condition but empty sense buffer; occurred
     when sg v3 node used and /usr/include/linux/bsg.h visible
   - utils/hxascdmp: in Windows set binary mode on read files
+  - examples/sg_persist_tst.sh: add PRIN read full status command
   - sg_write_buffer,sg_write_long,sg_write_same: in Windows set
     binary mode on read files
   - sg_pt_win32: define WIN32_SPT_DIRECT (was SPTD) via config.h
