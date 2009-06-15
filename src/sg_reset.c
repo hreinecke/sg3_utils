@@ -26,7 +26,7 @@
 
 #define ME "sg_reset: "
 
-static char * version_str = "0.55 20090317";
+static char * version_str = "0.56 20090615";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -39,6 +39,9 @@ static char * version_str = "0.55 20090317";
 #define SG_SCSI_RESET_HOST 3
 #endif
 
+#ifndef SG_SCSI_RESET_TARGET
+#define SG_SCSI_RESET_TARGET 4
+#endif
 
 
 int main(int argc, char * argv[])
@@ -47,6 +50,7 @@ int main(int argc, char * argv[])
     int do_device_reset = 0;
     int do_bus_reset = 0;
     int do_host_reset = 0;
+    int do_target_reset = 0;
     char * file_name = 0;
 
     for (k = 1; k < argc; ++k) {
@@ -56,6 +60,8 @@ int main(int argc, char * argv[])
             do_bus_reset = 1;
         else if (0 == strcmp("-h", argv[k]))
             do_host_reset = 1;
+        else if (0 == strcmp("-t", argv[k]))
+            do_target_reset = 1;
         else if (0 == strcmp("-V", argv[k])) {
             fprintf(stderr, "Version string: %s\n", version_str);
             exit(0);
@@ -68,10 +74,11 @@ int main(int argc, char * argv[])
     }
     if (0 == file_name) {
         printf(
-        "Usage: sg_reset  [-b] [-d] [-h] [-V] DEVICE\n");
+        "Usage: sg_reset  [-b] [-d] [-h] [-t] [-V] DEVICE\n");
         printf("  where: -b       attempt a SCSI bus reset\n");
         printf("         -d       attempt a SCSI device reset\n");
         printf("         -h       attempt a host adapter reset\n");
+        printf("         -t       attempt a SCSI target reset\n");
         printf("         -V       print version string then exit\n\n");
         printf("   {if no switch given then check if reset underway}\n");
         printf("To reset use '-d' first, if that is unsuccessful, "
@@ -90,6 +97,10 @@ int main(int argc, char * argv[])
     if (do_device_reset) {
         printf(ME "starting device reset\n");
         k = SG_SCSI_RESET_DEVICE;
+    }
+    else if (do_target_reset) {
+        printf(ME "starting target reset\n");
+        k = SG_SCSI_RESET_TARGET;
     }
     else if (do_bus_reset) {
         printf(ME "starting bus reset\n");
@@ -121,6 +132,8 @@ int main(int argc, char * argv[])
         printf(ME "did nothing, device is normal mode\n");
     else if (SG_SCSI_RESET_DEVICE == k)
         printf(ME "completed device reset\n");
+    else if (SG_SCSI_RESET_TARGET == k)
+        printf(ME "completed target reset\n");
     else if (SG_SCSI_RESET_BUS == k)
         printf(ME "completed bus reset\n");
     else if (SG_SCSI_RESET_HOST == k)

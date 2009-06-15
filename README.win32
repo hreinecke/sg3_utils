@@ -35,6 +35,7 @@ Here is a list of utilities that have been ported:
     sg_prevent
     sg_raw
     sg_rdac
+    sg_read_block_limits
     sg_read_buffer
     sg_read_long
     sg_readcap
@@ -164,4 +165,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-11th June 2009
+15th June 2009

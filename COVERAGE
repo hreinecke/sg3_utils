@@ -34,6 +34,7 @@ READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
+READ BLOCK LIMITS   sg_read_block_limits, ++
 READ BUFFER         sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
@@ -56,7 +57,7 @@ SET TARGET PORT GROUPS       sg_stpg, ++
 START STOP          sg_start, ++
 SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
 TEST UNIT READY     sg_turs, sg_format, ++
-UNMAP               sg_unmap ++
+UNMAP               sg_unmap, ++
 VERIFY(10)          sg_verify, ++
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
@@ -92,4 +93,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Doug Gilbert
-11th June 2009
+15th June 2009

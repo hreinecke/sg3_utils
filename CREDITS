@@ -6,6 +6,10 @@ Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
         written by Joerg Schilling). isosize is now found in the util-linux
         package and in the archive directory of this package.
 
+Brian Bunker <Brian dot Bunker at netapp dot com> contributed
+        sg_read_block_limits and the target reset addition to sg_reset
+	[20090615]
+
 Christophe Varoqui <christophe dot varoqui at free dot fr> original sg_rtpg
         [20041229]
 
@@ -93,4 +97,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-2nd April 2009
+15th June 2009

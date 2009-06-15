@@ -69,6 +69,8 @@
 #define PERSISTENT_RESERVE_IN_CMDLEN 10
 #define PERSISTENT_RESERVE_OUT_CMD 0x5f
 #define PERSISTENT_RESERVE_OUT_CMDLEN 10
+#define READ_BLOCK_LIMITS_CMD 0x5
+#define READ_BLOCK_LIMITS_CMDLEN 6
 #define READ_BUFFER_CMD 0x3c
 #define READ_BUFFER_CMDLEN 10
 #define READ_DEFECT10_CMD     0x37
@@ -1832,3 +1834,63 @@ sg_ll_unmap(int sg_fd, int group_num, int timeout_secs, void * paramp,
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
+
+/* Invokes a SCSI READ BLOCK LIMITS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Read block limits not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
+ * SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
+int
+sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
+                        int noisy, int verbose)
+{
+    int k, ret, res, sense_cat;
+    unsigned char rlCmdBlk[READ_BLOCK_LIMITS_CMDLEN] = 
+      {READ_BLOCK_LIMITS_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    read block limits cdb: ");
+        for (k = 0; k < READ_BLOCK_LIMITS_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", rlCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "read block limits: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, rlCmdBlk, sizeof(rlCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "read block limits", res, mx_resp_len,
+                               sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+        case SG_LIB_CAT_NOT_READY:      /* shouldn't happen ?? */
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+

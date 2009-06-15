@@ -1,5 +1,4 @@
 
-
 if OS_LINUX
 
 libsgutils2_la_SOURCES = \
