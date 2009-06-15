@@ -39,6 +39,7 @@ Description: collection of Linux utilities for devices that use the
      * sg_rbuf - tests SCSI bus speed
      * sg_rdac - vendor specific for RDAC hardware
      * sg_read - reads multiple blocks, useful for timing
+     * sg_read_block_limits - READ BLOCK LIMITS (SSC)
      * sg_read_buffer - READ BUFFER
      * sg_read_long - read a "long" block from the given device
      * sg_readcap - prints the output of a READ CAPACITY command

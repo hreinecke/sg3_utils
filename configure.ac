@@ -18,7 +18,6 @@ AC_CHECK_HEADERS([linux/types.h linux/bsg.h], [], [],
      #endif
      ]])
 
-
 # check for functions
 AC_CHECK_FUNCS(getopt_long,
 	       GETOPT_O_FILES='',

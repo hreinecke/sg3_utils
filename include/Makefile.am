@@ -1,6 +1,7 @@
 
 scsiincludedir      = $(includedir)/scsi
 
+
 if OS_LINUX
 
 scsiinclude_HEADERS = \

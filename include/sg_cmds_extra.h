@@ -85,6 +85,13 @@ extern int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact,
                                         void * paramp, int param_len,
                                         int noisy, int verbose);
 
+/* Invokes a SCSI READ BLOCK LIMITS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> READ BLOCK LIMITS not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
+extern int sg_ll_read_block_limits(int sg_fd, void * resp,
+                                   int mx_resp_len, int noisy, int verbose);
+
 /* Invokes a SCSI READ BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
@@ -195,6 +202,13 @@ extern int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
 extern int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
                              int param_len, int noisy, int verbose);
 
+/* Invokes a SCSI UNMAP (SBC-3) command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> command not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+extern int sg_ll_unmap(int sg_fd, int group_num, int timeout_secs,
+                       void * paramp, int param_len, int noisy, int verbose);
+
 /* Invokes a SCSI VERIFY (10) command (SBC and MMC).
  * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.
  * Returns of 0 -> success,
@@ -242,13 +256,6 @@ extern int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
 extern int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                               uint64_t llba, void * data_out, int xfer_len,
                               int * offsetp, int noisy, int verbose);
-
-/* Invokes a SCSI UNMAP (SBC-3) command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> command not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
-extern int sg_ll_unmap(int sg_fd, int group_num, int timeout_secs,
-                       void * paramp, int param_len, int noisy, int verbose);
 
 #ifdef __cplusplus
 }
