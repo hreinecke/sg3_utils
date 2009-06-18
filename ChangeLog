@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090615] [svn: r277]
+Changelog for sg3_utils-1.28 [20090617] [svn: r278]
   - sg_unmap: new utility for thin provisioning
     - add examples/sg_unmap_example.txt
   - sg_read_block_limits: new utility for tape drives
@@ -13,6 +13,7 @@ Changelog for sg3_utils-1.28 [20090615] [svn: r277]
     - tweak print format, remove test code
   - sg_requests: remove test code in progress calculation
   - sg_reset: add target reset option
+  - sg_luns: reduce default maxlen to 8192 (for FreeBSD)
   - sg_lib: sg_set_binary_mode() needs config.h included
     - change SG3_UTILS_* constants to SG_LIB_*
     - decode service actions within persistent reserve in/out

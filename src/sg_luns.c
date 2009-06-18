@@ -48,10 +48,10 @@
  * This program issues the SCSI REPORT LUNS command to the given SCSI device.
  */
 
-static char * version_str = "1.14 20090615";
+static char * version_str = "1.15 20090617";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
-#define DEF_RLUNS_BUFF_LEN MAX_RLUNS_BUFF_LEN
+#define DEF_RLUNS_BUFF_LEN (1024 * 8)
 
 static unsigned char reportLunsBuff[MAX_RLUNS_BUFF_LEN];
 
