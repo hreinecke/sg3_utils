@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.44 20090422";    /* ses2r19b */
+static char * version_str = "1.45 20090617";    /* ses2r19b */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -193,7 +193,7 @@ static struct diag_page_code dpc_arr[] = {
         {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
         {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
         {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
-        {0x3f, "Protocol specific SAS (SAS-1)"},
+        {0x3f, "Protocol specific (SAS transport)"},
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
 };
@@ -214,7 +214,7 @@ static struct diag_page_code in_dpc_arr[] = {
         {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
         {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
         {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
-        {0x3f, "Protocol specific SAS (SAS-1)"},
+        {0x3f, "Protocol specific (SAS transport)"},
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
 };
