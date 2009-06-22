@@ -24,7 +24,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.35 20090422";
+static char * version_str = "0.36 20090617";
 
 #define ME "sg_senddiag: "
 
@@ -530,7 +530,7 @@ static struct page_code_desc pc_desc_arr[] = {
         {0xd, "Supported SES diagnostic pages (SES-2)"},
         {0xe, "Download microcode diagnostic pages (SES-2)"},
         {0xf, "Subenclosure nickname diagnostic pages (SES-2)"},
-        {0x3f, "Protocol specific SAS (SAS-1)"},
+        {0x3f, "Protocol specific (SAS transport)"},
         {0x40, "Translate address (direct access)"},
         {0x41, "Device status (direct access)"},
 };

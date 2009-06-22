@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Mon Jun 15 2009 - dgilbert at interlog dot com
+* Mon Jun 22 2009 - dgilbert at interlog dot com
 - add sg_unmap, sg_read_block_limits; sg_logs: cache memory stats lpage
   * sg3_utils-1.28
 
