@@ -40,6 +40,7 @@ struct sg_version_descriptor {
 };
 
 /* table from SPC-4 revision 20 [sorted numerically (from Annex D.8)] */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
