@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2009 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.2 20070926";
+static char * version_str = "1.2 20090717";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -209,7 +209,7 @@ decode_tpgs_state(const int st)
         printf(" (transitioning between states)");
         break;
     default:
-        printf(" (unknown: 0x%x)", st);
+        printf(" (unknown: %#x)", st);
         break;
     }
 }
@@ -225,12 +225,12 @@ transition_tpgs_states(struct tgtgrp *tgtState, int numgrp, int portgroup,
                break;
      }
      if (i == numgrp) {
-          printf("Portgroup 0x%02x does not exist\n", portgroup);
+          printf("Portgroup %#02x does not exist\n", portgroup);
           return 1;
      }
 
      if (!( (1 << newstate) & tgtState[i].valid )) {
-          printf("Portgroup 0x%02x: Invalid state 0x%x\n",
+          printf("Portgroup %#02x: Invalid state %#x\n",
                  portgroup, newstate);
           return 1;
      }
@@ -257,10 +257,10 @@ transition_tpgs_states(struct tgtgrp *tgtState, int numgrp, int portgroup,
      }
      printf("New target port groups:\n");
      for (i = 0; i < numgrp; i++) {
-            printf("  target port group id : 0x%x\n",
+            printf("  target port group id : %#x\n",
                    tgtState[i].id);
             printf("    target port group asymmetric access state : ");
-            printf("0x%02x\n", tgtState[i].current);
+            printf("%#02x\n", tgtState[i].current);
      }
      return 0;
 }
@@ -478,7 +478,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "Version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -586,7 +586,7 @@ main(int argc, char * argv[])
                     return SG_LIB_CAT_OTHER;
             }
             decode_target_port(rsp_buff + 4, report_len - 4, &relport, &portgroup);
-            printf("Device is at port Group 0x%02x, relative port 0x%02x\n",
+            printf("Device is at port Group %#02x, relative port %#02x\n",
                    portgroup, relport);
         }
 
@@ -625,10 +625,10 @@ main(int argc, char * argv[])
             for (k = 4, ucp = reportTgtGrpBuff + 4, numgrp = 0; k < report_len;
                  k += off, ucp += off, numgrp ++) {
 
-                printf("  target port group id : 0x%x , Pref=%d\n",
+                printf("  target port group id : %#x , Pref=%d\n",
                        (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));
                 printf("    target port group asymmetric access state : ");
-                printf("0x%02x", ucp[0] & 0x0f);
+                printf("%#02x", ucp[0] & 0x0f);
                 printf("\n");
                 tgtStatePtr->id = (ucp[2] << 8) + ucp[3];
                 tgtStatePtr->current = ucp[0] & 0x0f;
@@ -656,7 +656,7 @@ main(int argc, char * argv[])
         if (0 != res)
              goto err_out;
 
-        printf("Port group 0x%02x: Set asymmetric access state to", portgroup);
+        printf("Port group %#02x: Set asymmetric access state to", portgroup);
         decode_tpgs_state(state);
         printf("\n");
 

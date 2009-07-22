@@ -16,7 +16,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2008 D. Gilbert
+   *  Copyright (C) 2004-2009 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.16 20080510";
+static char * version_str = "1.16 20090717";
 
 #define MAX_XFER_LEN 10000
 
@@ -196,7 +196,7 @@ main(int argc, char * argv[])
             }
             break;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -242,7 +242,7 @@ main(int argc, char * argv[])
     memset(rawp, 0x0, MAX_XFER_LEN);
 
     fprintf(stderr, ME "issue read long (%s) to device %s\n    xfer_len=%d "
-            "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 "), correct=%d\n",
+            "(%#x), lba=%" PRIu64 " (%#" PRIx64 "), correct=%d\n",
             (do_16 ? "16" : "10"), device_name, xfer_len, xfer_len, llba,
             llba, correct);
 

@@ -46,7 +46,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.10 20090401";
+static char * version_str = "1.10 20090717";
 
 #define ME "sg_wr_mode: "
 
@@ -396,7 +396,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -529,8 +529,8 @@ int main(int argc, char * argv[])
                 goto err_out;
             }
             if (pg_code != (read_in[0] & 0x3f)) {
-                fprintf(stderr, "contents page_code=0x%x but reference "
-                        "page_code=0x%x\n", (read_in[0] & 0x3f), pg_code);
+                fprintf(stderr, "contents page_code=%#x but reference "
+                        "page_code=%#x\n", (read_in[0] & 0x3f), pg_code);
                 goto err_out;
             }
             if ((read_in[0] & 0x40) != (ref_md[off] & 0x40)) {
@@ -539,8 +539,8 @@ int main(int argc, char * argv[])
                 goto err_out;
             }
             if ((read_in[0] & 0x40) && (read_in[1] != sub_pg_code)) {
-                fprintf(stderr, "contents subpage_code=0x%x but reference "
-                        "sub_page_code=0x%x\n", read_in[1], sub_pg_code);
+                fprintf(stderr, "contents subpage_code=%#x but reference "
+                        "sub_page_code=%#x\n", read_in[1], sub_pg_code);
                 goto err_out;
             }
         } else

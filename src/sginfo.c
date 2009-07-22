@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.29 [20090329]";
+static const char * version_str = "2.29 [20090717]";
 
 #include <stdio.h>
 #include <string.h>
@@ -433,7 +433,7 @@ static int do_scsi_io(struct scsi_cmnd_io * sio)
         if (trace_cmd) {
             char ebuff[EBUFF_SZ];
 
-            snprintf(ebuff, EBUFF_SZ, "do_scsi_io: opcode=0x%x", sio->cmnd[0]);
+            snprintf(ebuff, EBUFF_SZ, "do_scsi_io: opcode=%#x", sio->cmnd[0]);
             sg_chk_n_print3(ebuff, &io_hdr, 1);
         }
         if (sg_normalize_sense(&io_hdr, &ssh)) {
@@ -555,11 +555,11 @@ static char * get_page_name(struct mpage_info * mpi)
     if ((NULL == mpf) || (NULL == mpf->name)) {
         if (mpi->subpage)
             snprintf(unkn_page_str, sizeof(unkn_page_str),
-                     "page number=0x%x, subpage number=0x%x",
+                     "page number=%#x, subpage number=%#x",
                      mpi->page, mpi->subpage);
         else
             snprintf(unkn_page_str, sizeof(unkn_page_str),
-                     "page number=0x%x", mpi->page);
+                     "page number=%#x", mpi->page);
         return unkn_page_str;
     }
     return mpf->name;
@@ -694,7 +694,7 @@ static void hexfield(unsigned char * pageaddr, int nbytes, char * text)
     } else if (x_interface)
         printf("%d ", getnbyte(pageaddr, nbytes));
     else
-        printf("%-35s0x%x\n", text, getnbyte(pageaddr, nbytes));
+        printf("%-35s%#x\n", text, getnbyte(pageaddr, nbytes));
 }
 
 static void hexdatafield(unsigned char * pageaddr, int nbytes, char * text)
@@ -806,11 +806,11 @@ static int get_mode_page6(struct mpage_info * mpi, int dbd,
     status = do_scsi_io(&sci);
     if (status) {
         if (mpi->subpage)
-            fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_6]\n", get_page_name(mpi), mpi->page,
+            fprintf(stdout, ">>> Unable to read %s mode page %#x, subpage "
+                    "%#x [mode_sense_6]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
-            fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
+            fprintf(stdout, ">>> Unable to read %s mode page (%#x) "
                     "[mode_sense_6]\n", get_page_name(mpi), mpi->page);
         return status;
     }
@@ -835,11 +835,11 @@ static int get_mode_page6(struct mpage_info * mpi, int dbd,
     status = do_scsi_io(&sci);
     if (status) {
         if (mpi->subpage)
-            fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_6]\n", get_page_name(mpi), mpi->page,
+            fprintf(stdout, ">>> Unable to read %s mode page %#x, subpage "
+                    "%#x [mode_sense_6]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
-            fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
+            fprintf(stdout, ">>> Unable to read %s mode page (%#x) "
                     "[mode_sense_6]\n", get_page_name(mpi), mpi->page);
     } else if (trace_cmd > 1) {
         off = modePageOffset(resp, mpi->resp_len, 1);
@@ -880,11 +880,11 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
     status = do_scsi_io(&sci);
     if (status) {
         if (mpi->subpage)
-            fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_10]\n", get_page_name(mpi), mpi->page,
+            fprintf(stdout, ">>> Unable to read %s mode page %#x, subpage "
+                    "%#x [mode_sense_10]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
-            fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
+            fprintf(stdout, ">>> Unable to read %s mode page (%#x) "
                     "[mode_sense_10]\n", get_page_name(mpi), mpi->page);
             return status;
     }
@@ -910,11 +910,11 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
     status = do_scsi_io(&sci);
     if (status) {
         if (mpi->subpage)
-            fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_10]\n", get_page_name(mpi), mpi->page,
+            fprintf(stdout, ">>> Unable to read %s mode page %#x, subpage "
+                    "%#x [mode_sense_10]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
-            fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
+            fprintf(stdout, ">>> Unable to read %s mode page (%#x) "
                     "[mode_sense_10]\n", get_page_name(mpi), mpi->page);
     } else if (trace_cmd > 1) {
         off = modePageOffset(resp, mpi->resp_len, 0);
@@ -994,11 +994,11 @@ static int put_mode_page6(struct mpage_info * mpi,
     status = do_scsi_io(&sci);
     if (status) {
         if (mpi->subpage)
-            fprintf(stdout, ">>> Unable to store %s mode page 0x%x,"
-                    " subpage 0x%x [msel_6]\n", get_page_name(mpi),
+            fprintf(stdout, ">>> Unable to store %s mode page %#x,"
+                    " subpage %#x [msel_6]\n", get_page_name(mpi),
                     mpi->page, mpi->subpage);
         else
-            fprintf(stdout, ">>> Unable to store %s mode page 0x%x [msel_6]\n",
+            fprintf(stdout, ">>> Unable to store %s mode page %#x [msel_6]\n",
                     get_page_name(mpi), mpi->page);
     }
     return status;
@@ -1052,11 +1052,11 @@ static int put_mode_page10(struct mpage_info * mpi,
     status = do_scsi_io(&sci);
     if (status) {
         if (mpi->subpage)
-            fprintf(stdout, ">>> Unable to store %s mode page 0x%x,"
-                    " subpage 0x%x [msel_10]\n", get_page_name(mpi),
+            fprintf(stdout, ">>> Unable to store %s mode page %#x,"
+                    " subpage %#x [msel_10]\n", get_page_name(mpi),
                     mpi->page, mpi->subpage);
         else
-            fprintf(stdout, ">>> Unable to store %s mode page 0x%x "
+            fprintf(stdout, ">>> Unable to store %s mode page %#x "
                     "[msel_10]\n", get_page_name(mpi), mpi->page);
     }
     return status;
@@ -1084,7 +1084,7 @@ int setup_mode_page(struct mpage_info * mpi, int nparam,
     }
     offset = modePageOffset(buff, mpi->resp_len, mode6byte);
     if (offset < 0) {
-        fprintf(stdout, "mode page=0x%x has bad page format\n", mpi->page);
+        fprintf(stdout, "mode page=%#x has bad page format\n", mpi->page);
         fprintf(stdout, "   perhaps '-z' switch may help\n");
         return -1;
     }
@@ -1145,7 +1145,7 @@ static int disk_geometry(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------------------\n");
     };
     intfield(pagestart + 2, 3, "Number of cylinders");
@@ -1177,7 +1177,7 @@ static int common_disconnect_reconnect(struct mpage_info * mpi,
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("------------------------------------\n");
     };
     intfield(pagestart + 2, 1, "Buffer full ratio");
@@ -1211,7 +1211,7 @@ static int common_control(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------\n");
     }
     bitfield(pagestart + 2, "TST", 0x7, 5);
@@ -1254,7 +1254,7 @@ static int common_control_extension(struct mpage_info * mpi, const char * prefix
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", get_page_name(mpi), mpi->page,
+        printf("%s mode subpage (%#x,%#x)\n", get_page_name(mpi), mpi->page,
                mpi->subpage);
         printf("--------------------------------------------\n");
     }
@@ -1282,7 +1282,7 @@ static int common_informational(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------------------------\n");
     }
     bitfield(pagestart + 2, "PERF", 1, 7);
@@ -1314,7 +1314,7 @@ static int disk_error_recovery(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------------------------\n");
     }
     bitfield(pagestart + 2, "AWRE", 1, 7);
@@ -1350,7 +1350,7 @@ static int cdvd_error_recovery(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("------------------------------------------------\n");
     }
     bitfield(pagestart + 2, "AWRE", 1, 7);
@@ -1382,7 +1382,7 @@ static int cdvd_mrw(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("------------------------------------------------\n");
     }
     bitfield(pagestart + 3, "LBA space", 1, 0);
@@ -1408,7 +1408,7 @@ static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------------------\n");
     };
     bitfield(pagestart + 2, "Notched Drive", 1, 7);
@@ -1430,7 +1430,7 @@ static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
         if (1 == mpi->page_control)     /* modifiable */
             printf("0");
         else
-            printf("0x%8.8x%8.8x", getnbyte(pagestart + 16, 4),
+            printf("%#8.8x%8.8x", getnbyte(pagestart + 16, 4),
                    getnbyte(pagestart + 20, 4));
 #endif
     };
@@ -1799,7 +1799,7 @@ static int disk_cache(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------\n");
     };
     bitfield(pagestart + 2, "Initiator Control", 1, 7);
@@ -1842,7 +1842,7 @@ static int disk_format(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------------\n");
     };
     intfield(pagestart + 2, 2, "Tracks per Zone");
@@ -1879,7 +1879,7 @@ static int disk_verify_error_recovery(struct mpage_info * mpi,
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-------------------------------------\n");
     }
     bitfield(pagestart + 2, "EER", 1, 3);
@@ -1921,7 +1921,7 @@ static int peripheral_device_page(struct mpage_info * mpi,
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("---------------------------------\n");
     };
 
@@ -1981,7 +1981,7 @@ static int common_power_condition(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("--------------------------------\n");
     }
     bitfield(pagestart + 3, "Idle", 1, 1);
@@ -2008,7 +2008,7 @@ static int disk_xor_control(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("--------------------------------\n");
     }
     bitfield(pagestart + 2, "XORDS", 1, 1);
@@ -2036,7 +2036,7 @@ static int disk_background(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", get_page_name(mpi), mpi->page,
+        printf("%s mode subpage (%#x,%#x)\n", get_page_name(mpi), mpi->page,
                mpi->subpage);
         printf("--------------------------------------------\n");
     }
@@ -2064,7 +2064,7 @@ static int optical_memory(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("--------------------------------\n");
     }
     bitfield(pagestart + 2, "RUBR", 1, 0);
@@ -2088,7 +2088,7 @@ static int cdvd_write_param(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("--------------------------------\n");
     }
     bitfield(pagestart + 2, "BUFE", 1, 6);
@@ -2131,7 +2131,7 @@ static int cdvd_audio_control(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("--------------------------------\n");
     }
     bitfield(pagestart + 2, "IMMED", 1, 2);
@@ -2164,7 +2164,7 @@ static int cdvd_timeout(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------------------\n");
     }
     bitfield(pagestart + 4, "G3Enable", 1, 3);
@@ -2193,7 +2193,7 @@ static int cdvd_device_param(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("------------------------------------\n");
     }
     bitfield(pagestart + 3, "Inactivity timer multiplier", 0xf, 0);
@@ -2222,7 +2222,7 @@ static int cdvd_feature(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("----------------------------------------------\n");
     }
     intfield(pagestart + 2, 2, "DVD feature set");
@@ -2257,7 +2257,7 @@ static int cdvd_mm_capab(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("----------------------------------------------------\n");
     }
     bitfield(pagestart + 2, "DVD-RAM read", 1, 5);
@@ -2329,7 +2329,7 @@ static int cdvd_cache(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("-----------------------\n");
     };
     bitfield(pagestart + 2, "Write Cache Enabled", 1, 2);
@@ -2353,7 +2353,7 @@ static int tape_data_compression(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("----------------------------------------------------\n");
     }
     bitfield(pagestart + 2, "DCE", 1, 7);
@@ -2382,7 +2382,7 @@ static int tape_dev_config(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("----------------------------------------------------\n");
     }
     bitfield(pagestart + 2, "CAF", 1, 5);
@@ -2439,7 +2439,7 @@ static int tape_medium_part1(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("----------------------------------------------------\n");
     }
     intfield(pagestart + 2, 1, "Maximum additional partitions");
@@ -2486,7 +2486,7 @@ static int tape_medium_part2_4(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("----------------------------------------------------\n");
     }
     intfield(pagestart + 2, 2, "Partition size");
@@ -2513,7 +2513,7 @@ static int ses_services_manag(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", get_page_name(mpi), mpi->page);
+        printf("%s mode page (%#x)\n", get_page_name(mpi), mpi->page);
         printf("----------------------------------------------------\n");
     }
     bitfield(pagestart + 5, "ENBLTC", 1, 0);
@@ -2538,7 +2538,7 @@ static int fcp_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", "Fibre Channel logical unit",
+        printf("%s mode page (%#x)\n", "Fibre Channel logical unit",
                mpi->page);
         printf("----------------------------------------------------\n");
     }
@@ -2563,7 +2563,7 @@ static int sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", "SAS logical unit", mpi->page);
+        printf("%s mode page (%#x)\n", "SAS logical unit", mpi->page);
         printf("----------------------------------------------------\n");
     }
     bitfield(pagestart + 2, "Transport Layer Retries", 1, 4);
@@ -2602,7 +2602,7 @@ static int fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", "Fibre Channel port control",
+        printf("%s mode page (%#x)\n", "Fibre Channel port control",
                mpi->page);
         printf("----------------------------------------------------\n");
     }
@@ -2636,7 +2636,7 @@ static int spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", "SPI-4 port control", mpi->page);
+        printf("%s mode page (%#x)\n", "SPI-4 port control", mpi->page);
         printf("-----------------------------------\n");
     }
     intfield(pagestart + 4, 2, "Synchronous transfer time-out");
@@ -2661,7 +2661,7 @@ static int sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", "SAS SSP port control", mpi->page);
+        printf("%s mode page (%#x)\n", "SAS SSP port control", mpi->page);
         printf("-------------------------------------\n");
     }
     bitfield(pagestart + 2, "Ready LED meaning", 0x1, 4);
@@ -2704,7 +2704,7 @@ static int spi4_margin_control(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", "SPI-4 Margin control",
+        printf("%s mode subpage (%#x,%#x)\n", "SPI-4 Margin control",
                mpi->page, mpi->subpage);
         printf("--------------------------------------------\n");
     }
@@ -2745,7 +2745,7 @@ static int sas_phy_control_discover(struct mpage_info * mpi,
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", "SAS Phy Control and "
+        printf("%s mode subpage (%#x,%#x)\n", "SAS Phy Control and "
                "Discover", mpi->page, mpi->subpage);
         printf("--------------------------------------------\n");
     }
@@ -2804,7 +2804,7 @@ static int spi4_training_config(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", "training configuration",
+        printf("%s mode subpage (%#x,%#x)\n", "training configuration",
                mpi->page, mpi->subpage);
         printf("----------------------------------------------------------\n");
     }
@@ -2856,7 +2856,7 @@ static int sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", "SAS SSP shared protocol "
+        printf("%s mode subpage (%#x,%#x)\n", "SAS SSP shared protocol "
                "specific port", mpi->page, mpi->subpage);
         printf("-----------------------------------------------------\n");
     }
@@ -2897,7 +2897,7 @@ static int spi4_negotiated(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", get_page_name(mpi), mpi->page,
+        printf("%s mode subpage (%#x,%#x)\n", get_page_name(mpi), mpi->page,
                mpi->subpage);
         printf("--------------------------------------------\n");
     }
@@ -2928,7 +2928,7 @@ static int spi4_report_xfer(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", get_page_name(mpi), mpi->page,
+        printf("%s mode subpage (%#x,%#x)\n", get_page_name(mpi), mpi->page,
                mpi->subpage);
         printf("--------------------------------------------\n");
     }
@@ -2956,18 +2956,18 @@ static void print_hex_page(struct mpage_info * mpi, const char * prefix,
         pg_name = get_page_name(mpi);
         if (mpi->subpage) {
             if (pg_name && (unkn_page_str != pg_name))
-                printf("mode page: 0x%02x  subpage: 0x%02x   [%s]\n",
+                printf("mode page: %#02x  subpage: %#02x   [%s]\n",
                        mpi->page, mpi->subpage, pg_name);
             else
-                printf("mode page: 0x%02x  subpage: 0x%02x\n", mpi->page,
+                printf("mode page: %#02x  subpage: %#02x\n", mpi->page,
                    mpi->subpage);
             printf("------------------------------\n");
         } else {
             if (pg_name && (unkn_page_str != pg_name))
-                printf("mode page: 0x%02x   [%s]\n", mpi->page,
+                printf("mode page: %#02x   [%s]\n", mpi->page,
                        pg_name);
             else
-                printf("mode page: 0x%02x\n", mpi->page);
+                printf("mode page: %#02x\n", mpi->page);
             printf("---------------\n");
         }
     }
@@ -2975,7 +2975,7 @@ static void print_hex_page(struct mpage_info * mpi, const char * prefix,
     {
         char nm[8];
 
-        snprintf(nm, sizeof(nm), "0x%02x", k);
+        snprintf(nm, sizeof(nm), "%#02x", k);
         hexdatafield(pagestart + k, 1, nm);
     }
     printf("\n");
@@ -3004,7 +3004,7 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
     } else {
         offset = modePageOffset(cbuffer2, mpi->resp_len, mode6byte);
         if (offset < 0) {
-            fprintf(stdout, "mode page=0x%x has bad page format\n",
+            fprintf(stdout, "mode page=%#x has bad page format\n",
                     mpi->page);
             fprintf(stdout, "   perhaps '-z' switch may help\n");
             return -1;
@@ -3038,11 +3038,11 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
             mpf->func) {
             if (multiple && x_interface && !replace) {
                 if (local_mp_i.subpage)
-                    snprintf(prefix, sizeof(prefix), "sginfo -t 0x%x,0x%x"
+                    snprintf(prefix, sizeof(prefix), "sginfo -t %#x,%#x"
                              " -XR %s ", local_mp_i.page, local_mp_i.subpage,
                              device_name);
                 else
-                    snprintf(prefix, sizeof(prefix), "sginfo -t 0x%x -XR %s ",
+                    snprintf(prefix, sizeof(prefix), "sginfo -t %#x -XR %s ",
                              local_mp_i.page, device_name);
             }
             res = mpf->func(&local_mp_i, prefix);
@@ -3057,11 +3057,11 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
             else {
                 if (multiple && x_interface && !replace) {
                     if (local_mp_i.subpage)
-                        snprintf(prefix, sizeof(prefix), "sginfo -u 0x%x,0x%x"
+                        snprintf(prefix, sizeof(prefix), "sginfo -u %#x,%#x"
                                  " -XR %s ", local_mp_i.page, local_mp_i.subpage,
                                  device_name);
                     else
-                        snprintf(prefix, sizeof(prefix), "sginfo -u 0x%x -XR "
+                        snprintf(prefix, sizeof(prefix), "sginfo -u %#x -XR "
                                  "%s ", local_mp_i.page, device_name);
                 }
                 print_hex_page(&local_mp_i, prefix, pagestart, off, len);
@@ -3785,7 +3785,7 @@ int main(int argc, char *argv[])
             usage("Unknown option");
             break;
         default:
-            fprintf(stdout, "Unknown option '-%c' (ascii 0x%02x)\n", c, c);
+            fprintf(stdout, "Unknown option '-%c' (ascii %#02x)\n", c, c);
             usage("bad option");
         }
     }

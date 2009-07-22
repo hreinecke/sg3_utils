@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2008 Douglas Gilbert.
+ * Copyright (c) 2005-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.08 20080513";
+static char * version_str = "1.08 20090717";
 
 #define ME "sg_rmsn: "
 
@@ -110,7 +110,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

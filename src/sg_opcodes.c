@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static char * version_str = "0.34 20090610";    /* spc4r20 */
+static char * version_str = "0.34 20090717";    /* spc4r20 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -237,7 +237,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [%#x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -572,9 +572,9 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts, int do_opcode,
     int v = 0;
 
 
-    printf("\n  Opcode=0x%.2x", do_opcode);
+    printf("\n  Opcode=%#.2x", do_opcode);
     if (rep_opts > 1)
-        printf("  Service_action=0x%.4x", do_servact);
+        printf("  Service_action=%#.4x", do_servact);
     printf("\n");
     sg_get_opcode_sa_name(((do_opcode > 0) ? do_opcode : 0),
                           ((do_servact > 0) ? do_servact : 0),
@@ -596,7 +596,7 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts, int do_opcode,
         v = 1;
         break;
     default:
-        snprintf(name_buff, NAME_BUFF_SZ, "support reserved [0x%x]",
+        snprintf(name_buff, NAME_BUFF_SZ, "support reserved [%#x]",
                  rsoc_buff[1] & 7);
         cp = name_buff;
         break;
@@ -691,7 +691,7 @@ main(int argc, char * argv[])
                 if (strlen(cp) > 0)
                     printf("  Peripheral device type: %s\n", cp);
                 else
-                    printf("  Peripheral device type: 0x%x\n", peri_type);
+                    printf("  Peripheral device type: %#x\n", peri_type);
             }
         } else {
             fprintf(stderr, "sg_opcodes: %s doesn't respond to a SCSI "

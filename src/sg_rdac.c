@@ -212,7 +212,7 @@ static void print_rdac_mode( unsigned char *ptr )
                 printf("alternate controller present; ");
                 break;
         default:
-                printf("(Unknown controller status 0x%x); ",
+                printf("(Unknown controller status %#x); ",
                        rdac_ptr->current_mode_msb);
                 break;
         }
@@ -227,7 +227,7 @@ static void print_rdac_mode( unsigned char *ptr )
                 printf("Dual active mode\n");
                 break;
         default:
-                printf("(Unknown mode 0x%x)\n",
+                printf("(Unknown mode %#x)\n",
                        rdac_ptr->current_mode_lsb);
         }
 
@@ -243,7 +243,7 @@ static void print_rdac_mode( unsigned char *ptr )
                 printf("active/active mode; ");
                 break;
         default:
-                printf("(Unknown status 0x%x); ",
+                printf("(Unknown status %#x); ",
                        rdac_ptr->alternate_mode_msb);
                 break;
         }
@@ -261,11 +261,11 @@ static void print_rdac_mode( unsigned char *ptr )
                 printf("held in reset\n");
                 break;
         default:
-                printf("(Unknown mode 0x%x)\n",
+                printf("(Unknown mode %#x)\n",
                        rdac_ptr->alternate_mode_lsb);
         }
         printf("  Quiescence timeout: %d\n", rdac_ptr->quiescence);
-        printf("  RDAC option 0x%x\n", rdac_ptr->options);
+        printf("  RDAC option %#x\n", rdac_ptr->options);
         printf ("  LUN Table:\n");
         for (k = 0; k < 32; k += 8) {
                 printf("    %x:",k / 8);

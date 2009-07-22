@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@
 
 */
 
-static char * version_str = "0.36 20080714";    /* mmc6r02 */
+static char * version_str = "0.37 20090716";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -165,7 +165,7 @@ get_profile_str(int profile_num, char * buff)
             return buff;
         }
     }
-    snprintf(buff, 64, "0x%x", profile_num);
+    snprintf(buff, 64, "%#x", profile_num);
     return buff;
 }
 
@@ -245,7 +245,7 @@ get_feature_str(int feature_num, char * buff)
             return buff;
         }
     }
-    snprintf(buff, 64, "0x%x", feature_num);
+    snprintf(buff, 64, "%#x", feature_num);
     return buff;
 }
 
@@ -268,7 +268,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
     cp = "";
     switch (feature) {
     case 0:     /* Profile list */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
                feature);
         printf("    available profiles [more recent typically higher "
@@ -280,7 +280,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         break;
     case 1:     /* Core */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
                feature);
         if (len < 8) {
@@ -300,7 +300,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         case 8: cp = "USB (both 1 and 2)"; break;
         case 0xffff: cp = "vendor unique"; break;
         default:
-            snprintf(buff, sizeof(buff), "[0x%x]", num);
+            snprintf(buff, sizeof(buff), "[%#x]", num);
             cp = buff;
             break;
         }
@@ -311,7 +311,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("\n");
         break;
     case 2:     /* Morphing */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
                feature);
         if (len < 8) {
@@ -322,7 +322,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 1));
         break;
     case 3:     /* Removable medium */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
                feature);
         if (len < 8) {
@@ -338,7 +338,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
             break;
         case 5: cp = "Embedded changer using a magazine"; break;
         default:
-            snprintf(buff, sizeof(buff), "[0x%x]", num);
+            snprintf(buff, sizeof(buff), "[%#x]", num);
             cp = buff;
             break;
         }
@@ -348,7 +348,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x1));
         break;
     case 4:     /* Write protect */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -359,7 +359,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
     case 0x10:     /* Random readable */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 12) {
@@ -367,7 +367,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
             break;
         }
         num = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
-        printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
+        printf("      Logical block size=%#x, blocking=%#x, PP=%d\n",
                num, ((ucp[8] << 8) + ucp[9]), !!(ucp[10] & 0x1));
         break;
     case 0x1d:     /* Multi-read */
@@ -381,12 +381,12 @@ decode_feature(int feature, unsigned char * ucp, int len)
     case 0x109:    /* Media serial number */
     case 0x110:    /* VCPS */
     case 0x113:    /* SecurDisc */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         break;
     case 0x1e:     /* CD read */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -397,7 +397,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
     case 0x1f:     /* DVD read */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 7)
@@ -405,7 +405,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                    !!(ucp[4] & 0x1), !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
         break;
     case 0x20:     /* Random writable */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 16) {
@@ -414,19 +414,19 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         num = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
         n = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
-        printf("      Last lba=0x%x, Logical block size=0x%x, blocking=0x%x,"
+        printf("      Last lba=%#x, Logical block size=%#x, blocking=%#x,"
                " PP=%d\n", num, n, ((ucp[12] << 8) + ucp[13]),
                !!(ucp[14] & 0x1));
         break;
     case 0x21:     /* Incremental streaming writable */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      Data block types supported=0x%x, TRIO=%d, ARSV=%d, "
+        printf("      Data block types supported=%#x, TRIO=%d, ARSV=%d, "
                "BUF=%d\n", ((ucp[4] << 8) + ucp[5]), !!(ucp[6] & 0x4),
                !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
         num = ucp[7];
@@ -436,7 +436,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         break;
     /* case 0x22:     Sector erasable -> see 0x1d entry */
     case 0x23:     /* Formattable */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 4)
@@ -447,14 +447,14 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("      BD-R: RRM=%d\n", !!(ucp[8] & 0x1));
         break;
     case 0x24:     /* Hardware defect management */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 4)
             printf("      SSA=%d\n", !!(ucp[4] & 0x80));
         break;
     case 0x25:     /* Write once */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 12) {
@@ -462,13 +462,13 @@ decode_feature(int feature, unsigned char * ucp, int len)
             break;
         }
         num = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
-        printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
+        printf("      Logical block size=%#x, blocking=%#x, PP=%d\n",
                num, ((ucp[8] << 8) + ucp[9]), !!(ucp[10] & 0x1));
         break;
     /* case 0x26:     Restricted overwrite -> see 0x1d entry */
     /* case 0x27:     CDRW CAV write -> see 0x1d entry */
     case 0x28:     /* MRW  (Mount Rainier reWriteable) */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 4)
@@ -476,19 +476,19 @@ decode_feature(int feature, unsigned char * ucp, int len)
                    !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
     case 0x29:     /* Enhanced defect reporting */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      DRT-DM=%d, number of DBI cache zones=0x%x, number of "
-               "entries=0x%x\n", !!(ucp[4] & 0x1), ucp[5],
+        printf("      DRT-DM=%d, number of DBI cache zones=%#x, number of "
+               "entries=%#x\n", !!(ucp[4] & 0x1), ucp[5],
                ((ucp[6] << 8) + ucp[7]));
         break;
     case 0x2a:     /* DVD+RW */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -499,7 +499,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x1), !!(ucp[5] & 0x2), !!(ucp[5] & 0x1));
         break;
     case 0x2b:     /* DVD+R */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -509,7 +509,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      Write=%d\n", !!(ucp[4] & 0x1));
         break;
     case 0x2c:     /* Rigid restricted overwrite */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -521,7 +521,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x1));
         break;
     case 0x2d:     /* CD Track at once */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -535,7 +535,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x2), !!(ucp[4] & 0x1), (ucp[6] << 8) + ucp[7]);
         break;
     case 0x2e:     /* CD mastering (session at once) */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -547,11 +547,11 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x8));
         printf("      Test write=%d, CD-RW=%d, R-W=%d\n",
                !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
-        printf("      Maximum cue sheet length=0x%x\n",
+        printf("      Maximum cue sheet length=%#x\n",
                (ucp[5] << 16) + (ucp[6] << 8) + ucp[7]);
         break;
     case 0x2f:     /* DVD-R/-RW write */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -563,7 +563,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x2));
         break;
     case 0x33:     /* Layer jump recording */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -576,7 +576,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("        %d\n", ucp[8 + k]);
         break;
     case 0x34:     /* Layer jump rigid restricted overwrite */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -588,18 +588,18 @@ decode_feature(int feature, unsigned char * ucp, int len)
         break;
     /* case 0x35:     Stop long operation -> see 0x1d entry */
     case 0x37:     /* CD-RW media write support */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      CD-RW media sub-type support (bitmask)=0x%x\n", ucp[5]);
+        printf("      CD-RW media sub-type support (bitmask)=%#x\n", ucp[5]);
         break;
     /* case 0x38:     BD-R pseudo-overwrite (POW) -> see 0x1d entry */
     case 0x3a:     /* DVD+RW dual layer */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -610,7 +610,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x1), !!(ucp[5] & 0x2), !!(ucp[5] & 0x1));
         break;
     case 0x3b:     /* DVD+R dual layer */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -620,7 +620,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      write=%d\n", !!(ucp[4] & 0x1));
         break;
     case 0x40:     /* BD Read */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 32) {
@@ -628,26 +628,26 @@ decode_feature(int feature, unsigned char * ucp, int len)
             break;
         }
         printf("      Bitmaps for BD-RE read support:\n");
-        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[8] << 8) + ucp[9],
+        printf("        Class 0=%#x, Class 1=%#x, Class 2=%#x, "
+               "Class 3=%#x\n", (ucp[8] << 8) + ucp[9],
                (ucp[10] << 8) + ucp[11],
                (ucp[12] << 8) + ucp[13],
                (ucp[14] << 8) + ucp[15]);
         printf("      Bitmaps for BD-R read support:\n");
-        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[16] << 8) + ucp[17],
+        printf("        Class 0=%#x, Class 1=%#x, Class 2=%#x, "
+               "Class 3=%#x\n", (ucp[16] << 8) + ucp[17],
                (ucp[18] << 8) + ucp[19],
                (ucp[20] << 8) + ucp[21],
                (ucp[22] << 8) + ucp[23]);
         printf("      Bitmaps for BD-ROM read support:\n");
-        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[24] << 8) + ucp[25],
+        printf("        Class 0=%#x, Class 1=%#x, Class 2=%#x, "
+               "Class 3=%#x\n", (ucp[24] << 8) + ucp[25],
                (ucp[26] << 8) + ucp[27],
                (ucp[28] << 8) + ucp[29],
                (ucp[30] << 8) + ucp[31]);
         break;
     case 0x41:     /* BD Write */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 32) {
@@ -656,27 +656,27 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      SVNR=%d\n", !!(ucp[4] & 0x1));
         printf("      Bitmaps for BD-RE write support:\n");
-        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[8] << 8) + ucp[9],
+        printf("        Class 0=%#x, Class 1=%#x, Class 2=%#x, "
+               "Class 3=%#x\n", (ucp[8] << 8) + ucp[9],
                (ucp[10] << 8) + ucp[11],
                (ucp[12] << 8) + ucp[13],
                (ucp[14] << 8) + ucp[15]);
         printf("      Bitmaps for BD-R write support:\n");
-        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[16] << 8) + ucp[17],
+        printf("        Class 0=%#x, Class 1=%#x, Class 2=%#x, "
+               "Class 3=%#x\n", (ucp[16] << 8) + ucp[17],
                (ucp[18] << 8) + ucp[19],
                (ucp[20] << 8) + ucp[21],
                (ucp[22] << 8) + ucp[23]);
         printf("      Bitmaps for BD-ROM write support:\n");
-        printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[24] << 8) + ucp[25],
+        printf("        Class 0=%#x, Class 1=%#x, Class 2=%#x, "
+               "Class 3=%#x\n", (ucp[24] << 8) + ucp[25],
                (ucp[26] << 8) + ucp[27],
                (ucp[28] << 8) + ucp[29],
                (ucp[30] << 8) + ucp[31]);
         break;
     /* case 0x42:     TSR (timely safe recording) -> see 0x1d entry */
     case 0x50:     /* HD DVD Read */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -687,7 +687,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[6] & 0x1));
         break;
     case 0x51:     /* HD DVD Write */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -698,7 +698,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[6] & 0x1));
         break;
     case 0x52:     /* HD DVD-RW fragment recording */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -708,7 +708,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      BGP=%d\n", !!(ucp[4] & 0x1));
         break;
     case 0x80:     /* Hybrid disc */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -719,7 +719,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         break;
     /* case 0x100:    Power management -> see 0x1d entry */
     case 0x101:    /* SMART */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -729,7 +729,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      PP=%d\n", !!(ucp[4] & 0x1));
         break;
     case 0x102:    /* Embedded changer */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -740,7 +740,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x10), !!(ucp[4] & 0x4), (ucp[7] & 0x1f));
         break;
     case 0x103:    /* CD audio external play (obsolete) */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -752,7 +752,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                (ucp[6] << 8) + ucp[7]);
         break;
     case 0x104:    /* Firmware upgrade */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 4) {
@@ -763,7 +763,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("      M5=%d\n", !!(ucp[4] & 0x1));
         break;
     case 0x105:    /* Timeout */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len > 7) {
@@ -772,7 +772,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         break;
     case 0x106:    /* DVD CSS */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -782,7 +782,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      CSS version=%d\n", ucp[7]);
         break;
     case 0x107:    /* Real time streaming */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -794,7 +794,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         break;
     case 0x108:    /* Drive serial number */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         num = len - 4;
@@ -806,17 +806,17 @@ decode_feature(int feature, unsigned char * ucp, int len)
         break;
     /* case 0x109:    Media serial number -> see 0x1d entry */
     case 0x10a:    /* Disc control blocks */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         printf("      Disc control blocks:\n");
         for (k = 4; k < len; k += 4) {
-            printf("        0x%x\n", ((unsigned int)ucp[k] << 24) +
+            printf("        %#x\n", ((unsigned int)ucp[k] << 24) +
                    (ucp[k + 1] << 16) + (ucp[k + 2] << 8) + ucp[k + 3]);
         }
         break;
     case 0x10b:    /* DVD CPRM */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -826,7 +826,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      CPRM version=%d\n", ucp[7]);
         break;
     case 0x10c:    /* firmware information */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 20) {
@@ -837,7 +837,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                ucp + 6, ucp + 8, ucp + 10, ucp + 12, ucp + 14, ucp + 16);
         break;
     case 0x10d:    /* AACS */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -850,7 +850,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                (ucp[6] & 0xf), ucp[7]);
         break;
     case 0x10e:    /* DVD CSS managed recording */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -863,7 +863,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
     /* case 0x110:    VCPS -> see 0x1d entry */
     /* case 0x113:    SecurDisc -> see 0x1d entry */
     case 0x120:    /* BD CPS */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -875,7 +875,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                ucp[6] & 0x3);
         break;
     case 0x142:    /* OSSC (Optical Security Subsystem Class) */
-        printf("    version=%d, persist=%d, current=%d [0x%x]\n",
+        printf("    version=%d, persist=%d, current=%d [%#x]\n",
                ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
                feature);
         if (len < 8) {
@@ -892,7 +892,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         break;
     default:
-        printf("    Unknown feature [0x%x], version=%d persist=%d, "
+        printf("    Unknown feature [%#x], version=%d persist=%d, "
                "current=%d\n", feature, ((ucp[2] >> 2) & 0xf),
                !!(ucp[2] & 0x2), !!(ucp[2] & 0x1));
         dStrHex((const char *)ucp, len, 1);
@@ -951,13 +951,13 @@ list_known(int brief)
     num = sizeof(feature_desc_arr) / sizeof(feature_desc_arr[0]);
     printf("Known features:\n");
     for (k = 0; k < num; ++k)
-        printf("  %s [0x%x]\n", feature_desc_arr[k].desc,
+        printf("  %s [%#x]\n", feature_desc_arr[k].desc,
                feature_desc_arr[k].val);
     if (! brief) {
         printf("Known profiles:\n");
         num = sizeof(profile_desc_arr) / sizeof(profile_desc_arr[0]);
         for (k = 0; k < num; ++k)
-            printf("  %s [0x%x]\n", profile_desc_arr[k].desc,
+            printf("  %s [%#x]\n", profile_desc_arr[k].desc,
                    profile_desc_arr[k].val);
     }
 }
@@ -1034,7 +1034,7 @@ main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -1077,7 +1077,7 @@ main(int argc, char * argv[])
             if (strlen(cp) > 0)
                 printf("  Peripheral device type: %s\n", cp);
             else
-                printf("  Peripheral device type: 0x%x\n", peri_type);
+                printf("  Peripheral device type: %#x\n", peri_type);
         }
     } else {
         fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",

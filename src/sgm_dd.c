@@ -33,7 +33,7 @@
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2007 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2009 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -64,9 +64,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static char * version_str = "1.35 20080205 shared_mmap";
+static char * version_str = "1.35 20090717 shared_mmap";
 #else
-static char * version_str = "1.35 20080205";
+static char * version_str = "1.35 20090717";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -372,7 +372,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
                    (rcBuff[6] << 8) | rcBuff[7];
     }
     if (verbose)
-        fprintf(stderr, "      number of blocks=%"PRId64" [0x%"PRIx64"], block "
+        fprintf(stderr, "      number of blocks=%"PRId64" [%#"PRIx64"], block "
                 "size=%d\n", *num_sect, *num_sect, *sect_sz);
     return 0;
 }
@@ -397,7 +397,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         }
         *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
         if (verbose)
-            fprintf(stderr, "      [bgs64] number of blocks=%"PRId64" [0x%"PRIx64"], "
+            fprintf(stderr, "      [bgs64] number of blocks=%"PRId64" [%#"PRIx64"], "
                     "block size=%d\n", *num_sect, *num_sect, *sect_sz);
  #else
         unsigned long ul;
@@ -408,7 +408,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         }
         *num_sect = (int64_t)ul;
         if (verbose)
-            fprintf(stderr, "      [bgs] number of blocks=%"PRId64" [0x%"PRIx64"], "
+            fprintf(stderr, "      [bgs] number of blocks=%"PRId64" [%#"PRIx64"], "
                     " block size=%d\n", *num_sect, *num_sect, *sect_sz);
  #endif
     }
@@ -1050,7 +1050,7 @@ main(int argc, char * argv[])
                 }
                 if (verbose)
                     fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
-                            "byte offset=0x%"PRIx64"\n",
+                            "byte offset=%#"PRIx64"\n",
                             (uint64_t)offset);
             }
         }
@@ -1149,7 +1149,7 @@ main(int argc, char * argv[])
                 }
                 if (verbose)
                     fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
-                            "byte offset=0x%"PRIx64"\n",
+                            "byte offset=%#"PRIx64"\n",
                             (uint64_t)offset);
             }
         }

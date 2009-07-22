@@ -45,7 +45,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.17 20090324";
+static char * version_str = "1.17 20090717";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -521,7 +521,7 @@ main(int argc, char **argv)
                 ret = SG_LIB_CAT_OTHER;
                 goto out;
         }
-        printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
+        printf("    %.8s  %.16s  %.4s   peripheral_type: %s [%#x]\n",
                inq_out.vendor, inq_out.product, inq_out.revision,
                sg_get_pdt_str(inq_out.peripheral_type, sizeof(pdt_name),
                               pdt_name),
@@ -634,9 +634,9 @@ main(int argc, char **argv)
                                 prob = 1;
                 } else if (bd_len != 8)
                         prob = 1;
-                printf("  Number of blocks=%" PRIu64 " [0x%" PRIx64 "]\n",
+                printf("  Number of blocks=%" PRIu64 " [%#" PRIx64 "]\n",
                        ull, ull);
-                printf("  Block size=%d [0x%x]\n", bd_blk_len, bd_blk_len);
+                printf("  Block size=%d [%#x]\n", bd_blk_len, bd_blk_len);
         } else {
                 printf("  No block descriptors present\n");
                 prob = 1;

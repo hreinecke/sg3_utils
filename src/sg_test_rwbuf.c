@@ -172,7 +172,7 @@ int do_checksum (int *buf, int len, int quiet)
         }
         else {
                 if (verbose > 1)
-                        printf("Checksum value: 0x%x\n", sum);
+                        printf("Checksum value: %#x\n", sum);
                 return 0;
         }
 }

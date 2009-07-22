@@ -68,7 +68,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.03 20090303";
+static char * version_str = "1.03 20090717";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -294,11 +294,11 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
         }
         if (0x72 != (sense_buffer[0] & 0x7f)) {
             fprintf(stderr, "expected descriptor sense format, response "
-                    "code=0x%x\n", sense_buffer[0]);
+                    "code=%#x\n", sense_buffer[0]);
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
-        fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
+        fprintf(stderr, "Unexpected SCSI status=%#x\n", res);
         return SG_LIB_CAT_MALFORMED;
     } else {
         fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
@@ -396,7 +396,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "version: %s\n", version_str);
             exit(0);
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [%#x]\n", c, c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -459,7 +459,7 @@ int main(int argc, char * argv[])
             if (cp)
                 printf("  %s: %" PRIu64 "\n", cp, ull);
             else
-                printf("  id=0x%x, vendor=%d, data_len=%d, "
+                printf("  id=%#x, vendor=%d, data_len=%d, "
                        "val=%" PRIu64 "\n", id, vendor, len, ull);
         }
     }

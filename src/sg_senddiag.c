@@ -24,7 +24,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.36 20090617";
+static char * version_str = "0.36 20090717";
 
 #define ME "sg_senddiag: "
 
@@ -196,7 +196,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [%#x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -558,7 +558,7 @@ static void list_page_codes()
 
     printf("Page_Code  Description\n");
     for (k = 0; k < num; ++k, ++pcdp)
-        printf(" 0x%02x      %s\n", pcdp->page_code,
+        printf(" %#02x      %s\n", pcdp->page_code,
                (pcdp->desc ? pcdp->desc : "<unknown>"));
 }
 
@@ -711,7 +711,7 @@ int main(int argc, char * argv[])
                 else {
                     for (k = 0; k < (rsp_len - 4); ++k) {
                         cp = find_page_code_desc(rsp_buff[k + 4]);
-                        printf("  0x%02x  %s\n", rsp_buff[k + 4],
+                        printf("  %#02x  %s\n", rsp_buff[k + 4],
                                (cp ? cp : "<unknown>"));
                     }
                 }
