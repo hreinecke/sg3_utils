@@ -12,7 +12,7 @@
 #include "sg_cmds_basic.h"
 
 /*
- *  Copyright (C) 1999-2008 D. Gilbert
+ *  Copyright (C) 1999-2009 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.57 20080325";  /* sbc3r14; mmc6r01a */
+static char * version_str = "0.57 20090717";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},
@@ -238,7 +238,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [%#x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();

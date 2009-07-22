@@ -54,7 +54,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.12 20090611";
+static char * version_str = "1.12 20090717";
 
 #define ME "sg_reassign: "
 
@@ -339,7 +339,7 @@ main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -426,7 +426,7 @@ main(int argc, char * argv[])
             if (verbose) {
                 fprintf(stderr, "  Would have reassigned these blocks:\n");
                 for (j = 0; j < addr_arr_len; ++j)
-                    printf("    0x%" PRIx64 "\n", addr_arr[j]);
+                    printf("    %#" PRIx64 "\n", addr_arr[j]);
             }
             return 0;
         }

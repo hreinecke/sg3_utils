@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.84 20090422";
+static char * version_str = "3.84 20090717";
 
 #define ME "sg_readcap: "
 
@@ -193,7 +193,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [%#x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -404,15 +404,15 @@ int main(int argc, char * argv[])
                 block_size = ((resp_buff[4] << 24) | (resp_buff[5] << 16) |
                              (resp_buff[6] << 8) | resp_buff[7]);
                 if (opts.do_brief) {
-                    printf("0x%x 0x%x\n", last_blk_addr + 1, block_size);
+                    printf("%#x %#x\n", last_blk_addr + 1, block_size);
                     goto good;
                 }
                 printf("Read Capacity results:\n");
                 if (opts.do_pmi)
-                    printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
-                           "before delay=0x%x\n", opts.llba, last_blk_addr);
+                    printf("   PMI mode: given lba=%#" PRIx64 ", last lba "
+                           "before delay=%#x\n", opts.llba, last_blk_addr);
                 else
-                    printf("   Last logical block address=%u (0x%x), Number "
+                    printf("   Last logical block address=%u (%#x), Number "
                            "of blocks=%u\n", last_blk_addr, last_blk_addr,
                            last_blk_addr + 1);
                 printf("   Logical block length=%u bytes\n", block_size);
@@ -482,7 +482,7 @@ int main(int argc, char * argv[])
             block_size = ((resp_buff[8] << 24) | (resp_buff[9] << 16) |
                           (resp_buff[10] << 8) | resp_buff[11]);
             if (opts.do_brief) {
-                printf("0x%" PRIx64 " 0x%x\n", llast_blk_addr + 1, block_size);
+                printf("%#" PRIx64 " %#x\n", llast_blk_addr + 1, block_size);
                 goto good;
             }
             printf("Read Capacity results:\n");
@@ -492,11 +492,11 @@ int main(int argc, char * argv[])
             printf("   Thin provisioning: tpe=%d, tprz=%d\n",
                    !!(resp_buff[14] & 0x80), !!(resp_buff[14] & 0x40));
             if (opts.do_pmi)
-                printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
-                       "before delay=0x%" PRIx64 "\n", opts.llba,
+                printf("   PMI mode: given lba=%#" PRIx64 ", last lba "
+                       "before delay=%#" PRIx64 "\n", opts.llba,
                        llast_blk_addr);
             else
-                printf("   Last logical block address=%" PRIu64 " (0x%"
+                printf("   Last logical block address=%" PRIu64 " (%#"
                        PRIx64 "), Number of logical blocks=%" PRIu64 "\n",
                        llast_blk_addr, llast_blk_addr, llast_blk_addr + 1);
             printf("   Logical block length=%u bytes\n", block_size);

@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.33 20090530";    /* spc4r20 + sbc3r19 */
+static char * version_str = "0.33 20090717";    /* spc4r20 + sbc3r19 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -257,7 +257,7 @@ enumerate_vpds(int standard, int vendor)
     if (standard) {
         for (vnp = standard_vpd_pg; vnp->acron; ++vnp) {
             if (vnp->name && (0 == vnp->vendor))
-                printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
+                printf("  %-10s %#02x      %s\n", vnp->acron, vnp->value,
                        vnp->name);
         }
     }
@@ -409,9 +409,9 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
         if (do_hex > 1)
             dStrHex((const char *)ucp, 4, 1);
         else {
-            printf("  Policy page code: 0x%x", (ucp[0] & 0x3f));
+            printf("  Policy page code: %#x", (ucp[0] & 0x3f));
             if (ucp[1])
-                printf(",  subpage code: 0x%x\n", ucp[1]);
+                printf(",  subpage code: %#x\n", ucp[1]);
             else
                 printf("\n");
             printf("    MLUS=%d,  Policy: %s\n", !!(ucp[2] & 0x80),
@@ -556,14 +556,14 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
             }
             naa = (ip[0] >> 4) & 0xff;
             if ((naa < 2) || (naa > 6) || (4 == naa)) {
-                fprintf(stderr, "      << unexpected NAA [0x%x]>>\n", naa);
+                fprintf(stderr, "      << unexpected NAA [%#x]>>\n", naa);
                 dStrHex((const char *)ip, i_len, 0);
                 break;
             }
             if (2 == naa) {             /* NAA IEEE extended */
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 2 identifier "
-                            "length: 0x%x>>\n", i_len);
+                            "length: %#x>>\n", i_len);
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
@@ -575,7 +575,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 /* NAA=3 Locally assigned; NAA=5 IEEE Registered */
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 3 or 5 "
-                            "identifier length: 0x%x>>\n", i_len);
+                            "identifier length: %#x>>\n", i_len);
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
@@ -588,7 +588,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                     printf("0x");
                     for (m = 0; m < 8; ++m)
                         printf("%02x", (unsigned int)ip[m]);
-                    printf(",0x%x\n", rtp);
+                    printf(",%#x\n", rtp);
                     rtp = 0;
                 } else {
                     if (sas_tport_addr[0]) {
@@ -602,7 +602,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
             } else if (6 == naa) {      /* NAA IEEE registered extended */
                 if (16 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 6 identifier "
-                            "length: 0x%x>>\n", i_len);
+                            "length: %#x>>\n", i_len);
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
@@ -620,7 +620,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 printf("0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)sas_tport_addr[m]);
-                printf(",0x%x\n", rtp);
+                printf(",%#x\n", rtp);
                 memset(sas_tport_addr, 0, sizeof(sas_tport_addr));
                 rtp = 0;
             }
@@ -756,7 +756,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                         id_ext <<= 8;
                     id_ext |= ip[m];
                 }
-                printf("      Identifier extension: 0x%" PRIx64 "\n", id_ext);
+                printf("      Identifier extension: %#" PRIx64 "\n", id_ext);
             } else if ((8 != i_len) && (12 != i_len)) {
                 fprintf(stderr, "      << can only decode 8, 12 and 16 "
                         "byte ids>>\n");
@@ -765,19 +765,19 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
             }
             c_id = ((ip[ci_off] << 16) | (ip[ci_off + 1] << 8) |
                     ip[ci_off + 2]);
-            printf("      IEEE Company_id: 0x%x\n", c_id);
+            printf("      IEEE Company_id: %#x\n", c_id);
             vsei = 0;
             for (m = 0; m < 5; ++m) {
                 if (m > 0)
                     vsei <<= 8;
                 vsei |= ip[ci_off + 3 + m];
             }
-            printf("      Vendor Specific Extension Identifier: 0x%" PRIx64
+            printf("      Vendor Specific Extension Identifier: %#" PRIx64
                    "\n", vsei);
             if (12 == i_len) {
                 d_id = ((ip[8] << 24) | (ip[9] << 16) | (ip[10] << 8) |
                         ip[11]);
-                printf("      Directory ID: 0x%x\n", d_id);
+                printf("      Directory ID: %#x\n", d_id);
             }
             break;
         case 3: /* NAA */
@@ -789,14 +789,14 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
             }
             naa = (ip[0] >> 4) & 0xff;
             if (! ((2 == naa) || (5 == naa) || (6 == naa))) {
-                fprintf(stderr, "      << unexpected NAA [0x%x]>>\n", naa);
+                fprintf(stderr, "      << unexpected NAA [%#x]>>\n", naa);
                 dStrHex((const char *)ip, i_len, 0);
                 break;
             }
             if (2 == naa) {
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 2 identifier "
-                            "length: 0x%x>>\n", i_len);
+                            "length: %#x>>\n", i_len);
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
@@ -805,9 +805,9 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                 vsi = ((ip[5] << 16) | (ip[6] << 8) | ip[7]);
                 if (long_out) {
                     printf("      NAA 2, vendor specific identifier A: "
-                           "0x%x\n", d_id);
-                    printf("      IEEE Company_id: 0x%x\n", c_id);
-                    printf("      vendor specific identifier B: 0x%x\n", vsi);
+                           "%#x\n", d_id);
+                    printf("      IEEE Company_id: %#x\n", c_id);
+                    printf("      vendor specific identifier B: %#x\n", vsi);
                     printf("      [0x");
                     for (m = 0; m < 8; ++m)
                         printf("%02x", (unsigned int)ip[m]);
@@ -820,7 +820,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
             } else if (5 == naa) {
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 5 identifier "
-                            "length: 0x%x>>\n", i_len);
+                            "length: %#x>>\n", i_len);
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
@@ -832,8 +832,8 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                     vsei |= ip[3 + m];
                 }
                 if (long_out) {
-                    printf("      NAA 5, IEEE Company_id: 0x%x\n", c_id);
-                    printf("      Vendor Specific Identifier: 0x%" PRIx64
+                    printf("      NAA 5, IEEE Company_id: %#x\n", c_id);
+                    printf("      Vendor Specific Identifier: %#" PRIx64
                            "\n", vsei);
                     printf("      [0x");
                     for (m = 0; m < 8; ++m)
@@ -848,7 +848,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
             } else if (6 == naa) {
                 if (16 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 6 identifier "
-                            "length: 0x%x>>\n", i_len);
+                            "length: %#x>>\n", i_len);
                     dStrHex((const char *)ip, i_len, 0);
                     break;
                 }
@@ -860,8 +860,8 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                     vsei |= ip[3 + m];
                 }
                 if (long_out) {
-                    printf("      NAA 6, IEEE Company_id: 0x%x\n", c_id);
-                    printf("      Vendor Specific Identifier: 0x%" PRIx64
+                    printf("      NAA 6, IEEE Company_id: %#x\n", c_id);
+                    printf("      Vendor Specific Identifier: %#" PRIx64
                            "\n", vsei);
                     vsei = 0;
                     for (m = 0; m < 8; ++m) {
@@ -870,7 +870,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                         vsei |= ip[8 + m];
                     }
                     printf("      Vendor Specific Identifier Extension: "
-                           "0x%" PRIx64 "\n", vsei);
+                           "%#" PRIx64 "\n", vsei);
                     printf("      [0x");
                     for (m = 0; m < 16; ++m)
                         printf("%02x", (unsigned int)ip[m]);
@@ -891,7 +891,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                 break;
             }
             d_id = ((ip[2] << 8) | ip[3]);
-            printf("      Relative target port: 0x%x\n", d_id);
+            printf("      Relative target port: %#x\n", d_id);
             break;
         case 5: /* (primary) Target port group */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
@@ -901,7 +901,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                 break;
             }
             d_id = ((ip[2] << 8) | ip[3]);
-            printf("      Target port group: 0x%x\n", d_id);
+            printf("      Target port group: %#x\n", d_id);
             break;
         case 6: /* Logical unit group */
             if ((1 != c_set) || (0 != assoc) || (4 != i_len)) {
@@ -911,7 +911,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                 break;
             }
             d_id = ((ip[2] << 8) | ip[3]);
-            printf("      Logical unit group: 0x%x\n", d_id);
+            printf("      Logical unit group: %#x\n", d_id);
             break;
         case 7: /* MD5 logical unit identifier */
             if ((1 != c_set) || (0 != assoc)) {
@@ -976,13 +976,13 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             bump = 24;
             break;
         case TPROTO_SPI:        /* Scsi Parallel Interface */
-            printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
+            printf("%s  Parallel SCSI initiator SCSI address: %#x\n",
                    leadin, ((ucp[2] << 8) | ucp[3]));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
+                   "%#x\n", leadin, ((ucp[6] << 8) | ucp[7]));
             bump = 24;
             break;
         case TPROTO_SSA:
@@ -1027,7 +1027,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                     ull <<= 8;
                 ull |= ucp[4 + j];
             }
-            printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
+            printf("%s  SAS address: %#" PRIx64 "\n", leadin, ull);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
@@ -1047,7 +1047,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             break;
         case TPROTO_NONE:
         default:
-            fprintf(stderr, "%s  unknown protocol id=0x%x  "
+            fprintf(stderr, "%s  unknown protocol id=%#x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
@@ -1154,7 +1154,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
         if (do_long)
             printf("  ATA command IDENTIFY %sDEVICE response in hex:\n", cp);
     } else if (do_long)
-        printf("  ATA command 0x%x got following response:\n",
+        printf("  ATA command %#x got following response:\n",
                (unsigned int)buff[56]);
     if (len < 572)
         return;
@@ -1343,7 +1343,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             break;
         case 0x11:
         default:
-            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+            printf("  Unable to decode pdt=%#x, in hex:\n", pdt);
             dStrHex((const char *)buff, len, 0);
             break;
     }
@@ -1371,7 +1371,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             else if (1 == u)
                 printf("  Non-rotating medium (e.g. solid state)\n");
             else if ((u < 0x401) || (0xffff == u))
-                printf("  Reserved [0x%x]\n", u);
+                printf("  Reserved [%#x]\n", u);
             else
                 printf("  Nominal rotation rate: %d rpm\n", u);
             u = buff[7] & 0xf;
@@ -1406,7 +1406,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                    len - 4, buff + 4);
             break;
         default:
-            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+            printf("  Unable to decode pdt=%#x, in hex:\n", pdt);
             dStrHex((const char *)buff, len, 0);
             break;
     }
@@ -1426,10 +1426,10 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
         printf("Only hex output supported\n");
     if (!do_raw) {
         if (subvalue)
-            printf("VPD page code=0x%.2x, subvalue=0x%.2x:\n", num_vpd,
+            printf("VPD page code=%#.2x, subvalue=%#.2x:\n", num_vpd,
                    subvalue);
         else
-            printf("VPD page code=0x%.2x:\n", num_vpd);
+            printf("VPD page code=%#.2x:\n", num_vpd);
     }
     if (0 == alloc_len)
         alloc_len = DEF_ALLOC_LEN;
@@ -1451,7 +1451,7 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len, 1,
                                     verbose);
                 if (res) {
-                    fprintf(stderr, "fetching VPD page (2) code=0x%.2x "
+                    fprintf(stderr, "fetching VPD page (2) code=%#.2x "
                             " (alloc_len=%d) failed\n", num_vpd, len);
                     return res;
                 }
@@ -1468,7 +1468,7 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
         return 0;
     } else {
         fprintf(stderr,
-                "fetching VPD page code=0x%.2x: failed\n", num_vpd);
+                "fetching VPD page code=%#.2x: failed\n", num_vpd);
         return res;
     }
 }
@@ -1538,7 +1538,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                     if (vnp)
                         printf("  %s [%s]\n", vnp->name, vnp->acron);
                     else
-                        printf("  0x%x\n", rsp_buff[4 + k]);
+                        printf("  %#x\n", rsp_buff[4 + k]);
                 }
             }
             return 0;
@@ -2055,7 +2055,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                     printf("OSD information VPD page (OSD):\n");
                     break;
                 default:
-                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb0, pdt);
+                    printf("VPD page=%#x, pdt=%#x:\n", 0xb0, pdt);
                     break;
                 }
             }
@@ -2120,7 +2120,7 @@ svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
                            "(ADC):\n");
                     break;
                 default:
-                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb1, pdt);
+                    printf("VPD page=%#x, pdt=%#x:\n", 0xb1, pdt);
                     break;
                 }
             }
@@ -2245,7 +2245,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

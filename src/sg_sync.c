@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
  * (e.g. disks).
  */
 
-static char * version_str = "1.08 20070919";
+static char * version_str = "1.08 20090717";
 
 
 #define ME "sg_sync: "
@@ -150,7 +150,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

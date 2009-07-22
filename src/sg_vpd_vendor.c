@@ -156,7 +156,7 @@ svpd_enumerate_vendor()
                 printf("\nVendor specific VPD pages:\n");
                 seen = 1;
             }
-            printf("  %-10s 0x%02x,%d      %s\n", vnp->acron,
+            printf("  %-10s %#02x,%d      %s\n", vnp->acron,
                    vnp->value, vnp->subvalue, vnp->name);
         }
     }
@@ -577,7 +577,7 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
     if (vnp && vnp->name)
         strcpy(name, vnp->name);
     else
-        snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x", num_vpd);
+        snprintf(name, sizeof(name) - 1, "Vendor VPD page=%#x", num_vpd);
     if (0 == alloc_len)
         alloc_len = DEF_ALLOC_LEN;
     switch(num_vpd) {

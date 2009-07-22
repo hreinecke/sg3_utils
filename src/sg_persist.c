@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.36 20090402";
+static char * version_str = "0.36 20090717";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -223,13 +223,13 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             bump = 24;
             break;
         case TPROTO_SPI: /* Parallel SCSI */
-            printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
+            printf("%s  Parallel SCSI initiator SCSI address: %#x\n",
                    leadin, ((ucp[2] << 8) | ucp[3]));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
+                   "%#x\n", leadin, ((ucp[6] << 8) | ucp[7]));
             bump = 24;
             break;
         case TPROTO_SSA:
@@ -274,7 +274,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                     ull <<= 8;
                 ull |= ucp[4 + j];
             }
-            printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
+            printf("%s  SAS address: %#" PRIx64 "\n", leadin, ull);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
@@ -294,7 +294,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             break;
         case TPROTO_NONE:
         default:
-            fprintf(stderr, "%s  unknown protocol id=0x%x  "
+            fprintf(stderr, "%s  unknown protocol id=%#x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
             bump = 24;
@@ -373,7 +373,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
         add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) |
                    (pr_buff[6] << 8) | pr_buff[7]);
         if (optsp->hex) {
-            printf("  PR generation=0x%x, ", pr_gen);
+            printf("  PR generation=%#x, ", pr_gen);
             if (add_len <= 0)
                 printf("Additional length=%d\n", add_len);
             if (add_len > ((int)sizeof(pr_buff) - 8)) {
@@ -385,7 +385,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                 dStrHex((const char *)(pr_buff + 8), add_len, 1);
             }
         } else if (PRIN_RKEY_SA == optsp->prin_sa) {
-            printf("  PR generation=0x%x, ", pr_gen);
+            printf("  PR generation=%#x, ", pr_gen);
             num = add_len / 8;
             if (num > 0) {
                 if (1 == num)
@@ -400,12 +400,12 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                             ull <<= 8;
                         ull |= ucp[j];
                     }
-                    printf("    0x%" PRIx64 "\n", ull);
+                    printf("    %#" PRIx64 "\n", ull);
                 }
             } else
                 printf("there are NO registered reservation keys\n");
         } else if (PRIN_RRES_SA == optsp->prin_sa) {
-            printf("  PR generation=0x%x, ", pr_gen);
+            printf("  PR generation=%#x, ", pr_gen);
             num = add_len / 16;
             if (num > 0) {
                 printf("Reservation follows:\n");
@@ -416,7 +416,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                         ull <<= 8;
                     ull |= ucp[j];
                 }
-                printf("    Key=0x%" PRIx64 "\n", ull);
+                printf("    Key=%#" PRIx64 "\n", ull);
                 j = ((ucp[13] >> 4) & 0xf);
                 if (0 == j)
                     printf("    scope: LU_SCOPE, ");
@@ -427,7 +427,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
             } else
                 printf("there is NO reservation held\n");
         } else if (PRIN_RFSTAT_SA == optsp->prin_sa) {
-            printf("  PR generation=0x%x\n", pr_gen);
+            printf("  PR generation=%#x\n", pr_gen);
             ucp = pr_buff + 8;
             for (k = 0; k < add_len; k += num, ucp += num) {
                 add_desc_len = ((ucp[20] << 24) | (ucp[21] << 16) |
@@ -439,13 +439,13 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                         ull <<= 8;
                     ull |= ucp[j];
                 }
-                printf("    Key=0x%" PRIx64 "\n", ull);
+                printf("    Key=%#" PRIx64 "\n", ull);
                 if (ucp[12] & 0x2)
                     printf("      All target ports bit set\n");
                 else {
                     printf("      All target ports bit clear\n");
                     rel_pt_addr = ((ucp[18] << 8) | ucp[19]);
-                    printf("      Relative port address: 0x%x\n",
+                    printf("      Relative port address: %#x\n",
                            rel_pt_addr);
                 }
                 if (ucp[12] & 0x1) {
@@ -523,7 +523,7 @@ prout_work(int sg_fd, const struct opts_t * optsp)
         if (optsp->prout_sa < num_prout_sa_strs)
             strncpy(buff, prout_sa_strs[optsp->prout_sa], sizeof(buff));
         else
-            snprintf(buff, sizeof(buff), "service action=0x%x",
+            snprintf(buff, sizeof(buff), "service action=%#x",
                      optsp->prout_sa);
         fprintf(stderr, "PR out: command (%s) successful\n", buff);
     }
@@ -898,7 +898,7 @@ main(int argc, char * argv[])
             return 0;
         default:
             fprintf(stderr, "unrecognised switch "
-                                "code 0x%x ??\n", c);
+                                "code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -999,7 +999,7 @@ main(int argc, char * argv[])
             if (strlen(cp) > 0)
                 printf("  Peripheral device type: %s\n", cp);
             else
-                printf("  Peripheral device type: 0x%x\n", peri_type);
+                printf("  Peripheral device type: %#x\n", peri_type);
         } else {
             printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n",
                    device_name);

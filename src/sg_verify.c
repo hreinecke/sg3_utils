@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.12 20080327";
+static char * version_str = "1.12 20090717";
 
 #define ME "sg_verify: "
 
@@ -166,7 +166,7 @@ main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -231,11 +231,11 @@ main(int argc, char * argv[])
                 break;
             case SG_LIB_CAT_ILLEGAL_REQ:
                 fprintf(stderr, "bad field in Verify(10) cdb, near "
-                        "lba=0x%" PRIx64 "\n", lba);
+                        "lba=%#" PRIx64 "\n", lba);
                 break;
             case SG_LIB_CAT_MEDIUM_HARD:
                 fprintf(stderr, "medium or hardware error near "
-                        "lba=0x%" PRIx64 "\n", lba);
+                        "lba=%#" PRIx64 "\n", lba);
                 break;
             case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
                 fprintf(stderr, "medium or hardware error, reported "
@@ -243,7 +243,7 @@ main(int argc, char * argv[])
                 break;
             default:
                 fprintf(stderr, "Verify(10) failed near lba=%" PRIu64
-                        " [0x%" PRIx64 "]\n", lba, lba);
+                        " [%#" PRIx64 "]\n", lba, lba);
                 break;
             }
             break;
@@ -251,8 +251,8 @@ main(int argc, char * argv[])
     }
 
     if (verbose && (0 == ret) && (orig_count > 1))
-        fprintf(stderr, "Verified %" PRId64 " [0x%" PRIx64 "] blocks from "
-                "lba %" PRIu64 " [0x%" PRIx64 "]\n    without error\n",
+        fprintf(stderr, "Verified %" PRId64 " [%#" PRIx64 "] blocks from "
+                "lba %" PRIu64 " [%#" PRIx64 "]\n    without error\n",
                 orig_count, (uint64_t)orig_count, orig_lba, orig_lba);
 
     res = sg_cmds_close_device(sg_fd);

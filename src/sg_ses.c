@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.45 20090617";    /* ses2r19b */
+static char * version_str = "1.45 20090717";    /* ses2r19b */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -312,7 +312,7 @@ get_element_type_desc(int elem_type_code, int b_len, char * b)
     if (elem_desc)
         snprintf(b, b_len - 1, "%s", elem_desc);
     else
-        snprintf(b, b_len - 1, "unknown element type code=0x%x", elem_type_code);
+        snprintf(b, b_len - 1, "unknown element type code=%#x", elem_type_code);
     return b;
 }
 #endif
@@ -355,7 +355,7 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     printf("  enclosure descriptor list\n");
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += el) {
@@ -392,7 +392,7 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
             printf("    Element type: %s, subenclosure id: %d\n",
                    cp, ucp[2]);
         else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
+            printf("    Element type: [%#x], subenclosure id: %d\n",
                    ucp[0], ucp[2]);
         printf("      number of possible elements: %d\n", ucp[1]);
         if (ucp[3] > 0) {
@@ -435,10 +435,10 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                 printf("Enclosure busy, try again later\n");
             else if (0x8 == resp[0])
                 printf("Enclosure only supports Short Enclosure status: "
-                       "0x%x\n", resp[1]);
+                       "%#x\n", resp[1]);
             else
-                printf("Invalid response, wanted page code: 0x%x but got "
-                       "0x%x\n", 1, resp[0]);
+                printf("Invalid response, wanted page code: %#x but got "
+                       "%#x\n", 1, resp[0]);
             return -1;
         }
         if (resp_len < 4)
@@ -530,22 +530,22 @@ find_sas_connector_type(int conn_type, char * buff, int buff_len)
         break;
     default:
         if (conn_type < 0x10)
-            snprintf(buff, buff_len, "unknown external connector type: 0x%x",
+            snprintf(buff, buff_len, "unknown external connector type: %#x",
                      conn_type);
         else if (conn_type < 0x20)
             snprintf(buff, buff_len, "unknown internal wide connector type: "
-                     "0x%x", conn_type);
+                     "%#x", conn_type);
         else if (conn_type < 0x30)
             snprintf(buff, buff_len, "unknown internal connector to end "
-                     "device, type: 0x%x", conn_type);
+                     "device, type: %#x", conn_type);
         else if (conn_type < 0x70)
-            snprintf(buff, buff_len, "reserved connector type: 0x%x",
+            snprintf(buff, buff_len, "reserved connector type: %#x",
                      conn_type);
         else if (conn_type < 0x80)
-            snprintf(buff, buff_len, "vendor specific connector type: 0x%x",
+            snprintf(buff, buff_len, "vendor specific connector type: %#x",
                      conn_type);
         else    /* conn_type is a 7 bit field, so this is impossible */
-            snprintf(buff, buff_len, "unexpected connector type: 0x%x",
+            snprintf(buff, buff_len, "unexpected connector type: %#x",
                      conn_type);
         break;
     }
@@ -683,7 +683,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
     case NV_CACHE_ETC:     /* Non volatile cache */
         res = (statp[2] << 8) + statp[3];
         printf("%sIdent=%d, Fail=%d, Size multiplier=%d, Non volatile cache "
-               "size=0x%x\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
+               "size=%#x\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                (statp[1] & 0x3), res);
         printf("%sHence non volatile cache size: %d %s\n", pad, res,
                nv_cache_unit[statp[1] & 0x3]);
@@ -732,7 +732,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
     case DISPLAY_ETC:   /* Display (ses2r15) */
         if ((! filter) || (0xc0 & statp[1]))
             printf("%sIdent=%d, Fail=%d, Display mode status=%d, Display "
-                   "character status=0x%x\n", pad, !!(statp[1] & 0x80),
+                   "character status=%#x\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), (statp[1] & 0x3),
                    ((statp[2] << 8) & statp[3]));
         break;
@@ -818,7 +818,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                    !!(statp[2] & 0x1), !!(statp[3] & 0x1));
         break;
     case SIMPLE_SUBENC_ETC:   /* Simple subenclosure */
-        printf("%sIdent=%d, Fail=%d, Short enclosure status: 0x%x\n", pad,
+        printf("%sIdent=%d, Fail=%d, Short enclosure status: %#x\n", pad,
                !!(statp[1] & 0x80), !!(statp[1] & 0x40), statp[3]);
         break;
     case ARRAY_DEV_ETC:   /* Array device */
@@ -857,7 +857,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
         break;
     case SAS_CONNECTOR_ETC:
         printf("%sIdent=%d, %s, Connector physical "
-               "link=0x%x\n", pad, !!(statp[1] & 0x80),
+               "link=%#x\n", pad, !!(statp[1] & 0x80),
                find_sas_connector_type((statp[1] & 0x7f), buff, sizeof(buff)),
                statp[2]);
         printf("%sFail=%d\n", pad, !!(statp[3] & 0x40));
@@ -891,7 +891,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
         goto truncated;
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     if (ref_gen_code != gen_code) {
         fprintf(stderr, "  <<state of enclosure changed, please try "
                 "again>>\n");
@@ -907,7 +907,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: %s, subenclosure id: %d\n",
                    cp, tdhp[k].se_id);
         else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
+            printf("    Element type: [%#x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
         if (inner_hex)
             printf("      Overall status(hex): %02x %02x %02x %02x\n", ucp[0],
@@ -1037,7 +1037,7 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
         goto truncated;
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     if (ref_gen_code != gen_code) {
         fprintf(stderr, "  <<state of enclosure changed, please try "
                 "again>>\n");
@@ -1053,7 +1053,7 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: %s, subenclosure id: %d\n",
                    cp, tdhp[k].se_id);
         else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
+            printf("    Element type: [%#x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
         ses_threshold_helper("      ", ucp, tdhp[k].etype, -1, inner_hex,
                              verbose);
@@ -1087,7 +1087,7 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
         goto truncated;
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     if (ref_gen_code != gen_code) {
         fprintf(stderr, "  <<state of enclosure changed, please try "
                 "again>>\n");
@@ -1103,7 +1103,7 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: %s, subenclosure id: %d\n",
                    cp, tdhp[k].se_id);
         else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
+            printf("    Element type: [%#x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
         desc_len = (ucp[2] << 8) + ucp[3] + 4;
         if (desc_len > 4)
@@ -1160,7 +1160,7 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
         per_ucp = ucp + 14 + eip_offset;
         for (j = 0; j < ports; ++j, per_ucp += 16) {
             printf("      port index: %d, port loop position: %d, port "
-                   "bypass reason: 0x%x\n", j, per_ucp[0], per_ucp[1]);
+                   "bypass reason: %#x\n", j, per_ucp[0], per_ucp[1]);
             printf("        requested hard address: %d, n_port "
                    "identifier: %02x%02x%02x\n", per_ucp[4], per_ucp[5],
                    per_ucp[6], per_ucp[7]);
@@ -1204,7 +1204,7 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
                 printf("\n        SAS address: 0x");
                 for (m = 0; m < 8; ++m)
                     printf("%02x", per_ucp[12 + m]);
-                printf("\n        phy identifier: 0x%x\n", per_ucp[20]);
+                printf("\n        phy identifier: %#x\n", per_ucp[20]);
             }
         } else if (1 == desc_type) {
             phys = ucp[2 + eip_offset];
@@ -1232,7 +1232,7 @@ ses_additional_elem_each(const unsigned char * ucp, int len, int elem_num,
                 per_ucp = ucp + 6 + eip_offset;
                 for (j = 0; j < phys; ++j, per_ucp += 12) {
                     printf("      phy index: %d\n", j);
-                    printf("        phy identifier: 0x%x\n", per_ucp[0]);
+                    printf("        phy identifier: %#x\n", per_ucp[0]);
                     if (0xff == per_ucp[2])
                         printf("        no attached connector");
                     else
@@ -1280,7 +1280,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     last_ucp = resp + resp_len - 1;
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     if (ref_gen_code != gen_code) {
         fprintf(stderr, "  <<state of enclosure changed, please try "
                 "again>>\n");
@@ -1304,12 +1304,12 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: %s, subenclosure id: %d\n",
                    cp, tdhp[k].se_id);
         else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
+            printf("    Element type: [%#x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
         for (j = 0; j < tdhp[k].num_elements; ++j, ucp += desc_len) {
             invalid = !!(ucp[0] & 0x80);
             if (ucp[0] & 0x10)  /* eip=1 */
-                printf("      element index: %d [0x%x]\n", ucp[3], ucp[3]);
+                printf("      element index: %d [%#x]\n", ucp[3], ucp[3]);
             desc_len = ucp[1] + 2;
             if (inner_hex)
                 dStrHex((const char *)ucp + 4, desc_len, 0);
@@ -1342,7 +1342,7 @@ ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += el) {
         if ((ucp + 3) > last_ucp)
@@ -1377,7 +1377,7 @@ ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += el) {
         if ((ucp + 3) > last_ucp)
@@ -1412,15 +1412,15 @@ ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     ucp = resp + 8;
     el = 40;
     for (k = 0; k < num_subs; ++k, ucp += el) {
         if ((ucp + el - 1) > last_ucp)
             goto truncated;
         printf("   subenclosure identifier: %d\n", ucp[1]);
-        printf("   nickname status: 0x%x\n", ucp[2]);
-        printf("   nickname additional status: 0x%x\n", ucp[3]);
+        printf("   nickname status: %#x\n", ucp[2]);
+        printf("   nickname additional status: %#x\n", ucp[3]);
         printf("   nickname language code: %.2s\n", ucp + 6);
         printf("   nickname: %s\n", ucp + 8);
     }
@@ -1443,7 +1443,7 @@ ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
         if (code < prev)
             break;      /* assume to be padding at end */
         cp = find_diag_page_desc(code);
-        printf("  %s [0x%x]\n", (cp ? cp : "<unknown>"), code);
+        printf("  %s [%#x]\n", (cp ? cp : "<unknown>"), code);
     }
 }
 
@@ -1464,17 +1464,17 @@ ses_download_code_sdg(const unsigned char * resp, int resp_len)
             num_subs - 1);
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  generation code: %#x\n", gen_code);
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += 16) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
         printf("   subenclosure identifier: %d\n", ucp[1]);
-        printf("     download microcode status: 0x%x [additional status: "
-               "0x%x]\n", ucp[2], ucp[3]);
+        printf("     download microcode status: %#x [additional status: "
+               "%#x]\n", ucp[2], ucp[3]);
         printf("     download microcode maximum size: %d bytes\n",
                (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7]);
-        printf("     download microcode expected buffer id: 0x%x\n", ucp[11]);
+        printf("     download microcode expected buffer id: %#x\n", ucp[11]);
         printf("     download microcode expected buffer id offset: %d\n",
                (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15]);
     }
@@ -1617,10 +1617,10 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                     dStrHex((const char *)rsp_buff, rsp_len, 0);
             } else if (0x8 == rsp_buff[0]) {
                 fprintf(stderr, "Enclosure only supports Short Enclosure "
-                        "status: 0x%x\n", rsp_buff[1]);
+                        "status: %#x\n", rsp_buff[1]);
             } else {
-                fprintf(stderr, "Invalid response, wanted page code: 0x%x "
-                        "but got 0x%x\n", page_code, rsp_buff[0]);
+                fprintf(stderr, "Invalid response, wanted page code: %#x "
+                        "but got %#x\n", page_code, rsp_buff[0]);
                 dStrHex((const char *)rsp_buff, rsp_len, 0);
             }
         } else if (do_raw) {
@@ -1636,7 +1636,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 printf("Response in hex from diagnostic page: %s\n", cp);
             else
                 printf("Response in hex from unknown diagnostic page "
-                       "[0x%x]\n", page_code);
+                       "[%#x]\n", page_code);
             dStrHex((const char *)rsp_buff, rsp_len, 0);
         } else {
             switch (page_code) {
@@ -1689,11 +1689,11 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 break;
             case DPC_SHORT_ENC_STATUS:
                 printf("Short enclosure status diagnostic page, "
-                       "status=0x%x\n", rsp_buff[1]);
+                       "status=%#x\n", rsp_buff[1]);
                 break;
             case DPC_ENC_BUSY:
                 printf("Enclosure busy diagnostic page, "
-                       "busy=%d [vendor specific=0x%x]\n",
+                       "busy=%d [vendor specific=%#x]\n",
                        rsp_buff[1] & 1, (rsp_buff[1] >> 1) & 0xff);
                 break;
             case DPC_ADD_ELEM_STATUS:
@@ -1732,7 +1732,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                     cp);
         else
             fprintf(stderr, "Attempt to fetch status diagnostic page "
-                    "[0x%x] failed\n", page_code);
+                    "[%#x] failed\n", page_code);
         switch (res) {
         case SG_LIB_CAT_NOT_READY:
             fprintf(stderr, "    device no ready\n");
@@ -1846,7 +1846,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            fprintf(stderr, "unrecognised option code %#x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -1873,12 +1873,12 @@ main(int argc, char * argv[])
 
         printf("Known diagnostic pages (followed by page code):\n");
         for (k = 0; k < num; ++k, ++pcdp)
-            printf("    %s  [0x%x]\n", pcdp->desc, pcdp->page_code);
+            printf("    %s  [%#x]\n", pcdp->desc, pcdp->page_code);
         printf("\nKnown SES element type names (followed by element type "
                "code):\n");
         num = sizeof(element_type_arr) / sizeof(element_type_arr[0]);
         for (k = 0; k < num; ++k, ++etp)
-            printf("    %s  [0x%x]\n", etp->desc, etp->elem_type_code);
+            printf("    %s  [%#x]\n", etp->desc, etp->elem_type_code);
         return 0;
     }
     if (do_control && do_status) {
@@ -1935,7 +1935,7 @@ main(int argc, char * argv[])
         data_arr[3] = arr_len & 0xff;
         switch (page_code) {
         case 0x2:       /* Enclosure control diagnostic page */
-            printf("Sending Enclosure control [0x%x] page, with page "
+            printf("Sending Enclosure control [%#x] page, with page "
                    "length=%d bytes\n", page_code, arr_len);
             ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
             if (ret) {
@@ -1944,7 +1944,7 @@ main(int argc, char * argv[])
             }
             break;
         case 0x4:       /* String Out diagnostic page */
-            printf("Sending String Out [0x%x] page, with page length=%d "
+            printf("Sending String Out [%#x] page, with page length=%d "
                    "bytes\n", page_code, arr_len);
             ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
             if (ret) {
@@ -1953,7 +1953,7 @@ main(int argc, char * argv[])
             }
             break;
         case 0x5:       /* Threshold Out diagnostic page */
-            printf("Sending Threshold Out [0x%x] page, with page length=%d "
+            printf("Sending Threshold Out [%#x] page, with page length=%d "
                    "bytes\n", page_code, arr_len);
             ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
             if (ret) {
@@ -1962,7 +1962,7 @@ main(int argc, char * argv[])
             }
             break;
         case 0x6:       /* Array control diagnostic page (obsolete) */
-            printf("Sending Array control [0x%x] page, with page "
+            printf("Sending Array control [%#x] page, with page "
                    "length=%d bytes\n", page_code, arr_len);
             ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
             if (ret) {
@@ -1971,7 +1971,7 @@ main(int argc, char * argv[])
             }
             break;
         case 0xc:       /* Subenclosure String Out diagnostic page */
-            printf("Sending Subenclosure String Out [0x%x] page, with page "
+            printf("Sending Subenclosure String Out [%#x] page, with page "
                    "length=%d bytes\n", page_code, arr_len);
             ret = do_senddiag(sg_fd, 1, data_arr, arr_len + 4, 1, verbose);
             if (ret) {
@@ -1981,7 +1981,7 @@ main(int argc, char * argv[])
             }
             break;
         default:
-            fprintf(stderr, "Setting SES control page 0x%x not supported "
+            fprintf(stderr, "Setting SES control page %#x not supported "
                     "by this utility\n", page_code);
             fprintf(stderr, "That can be done with the sg_senddiag utility "
                     "with its '--raw=' option\n");
