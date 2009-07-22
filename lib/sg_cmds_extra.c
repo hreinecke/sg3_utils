@@ -1054,7 +1054,7 @@ sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                        fprintf(sg_warnings_strm, "  info field: %#" PRIx64
                                 ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }
@@ -1153,7 +1153,7 @@ sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                        fprintf(sg_warnings_strm, "  info field: %#" PRIx64
                                 ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }
@@ -1250,7 +1250,7 @@ sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                        fprintf(sg_warnings_strm, "  info field: %#" PRIx64
                                 ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }
@@ -1353,7 +1353,7 @@ sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                     ret = SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO;
                 } else {
                     if (verbose > 1)
-                        fprintf(sg_warnings_strm, "  info field: 0x%" PRIx64
+                        fprintf(sg_warnings_strm, "  info field: %#" PRIx64
                                 ",  valid: %d, ili: %d\n", ull, valid, ili);
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                 }

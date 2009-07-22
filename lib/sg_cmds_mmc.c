@@ -145,14 +145,14 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     }
     gcCmdBlk[1] = (rt & 0x3);
     if ((starting < 0) || (starting > 0xffff)) {
-        fprintf(sg_warnings_strm, "Bad starting field number: 0x%x\n",
+        fprintf(sg_warnings_strm, "Bad starting field number: %#x\n",
                 starting);
         return -1;
     }
     gcCmdBlk[2] = (unsigned char)((starting >> 8) & 0xff);
     gcCmdBlk[3] = (unsigned char)(starting & 0xff);
     if ((mx_resp_len < 0) || (mx_resp_len > 0xffff)) {
-        fprintf(sg_warnings_strm, "Bad mx_resp_len: 0x%x\n", starting);
+        fprintf(sg_warnings_strm, "Bad mx_resp_len: %#x\n", starting);
         return -1;
     }
     gcCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
@@ -242,13 +242,13 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
     gpCmdBlk[4] = (unsigned char)((starting_lba >> 8) & 0xff);
     gpCmdBlk[3] = (unsigned char)(starting_lba & 0xff);
     if ((max_num_desc < 0) || (max_num_desc > 0xffff)) {
-        fprintf(sg_warnings_strm, "Bad max_num_desc: 0x%x\n", max_num_desc);
+        fprintf(sg_warnings_strm, "Bad max_num_desc: %#x\n", max_num_desc);
         return -1;
     }
     gpCmdBlk[8] = (unsigned char)((max_num_desc >> 8) & 0xff);
     gpCmdBlk[9] = (unsigned char)(max_num_desc & 0xff);
     if ((ttype < 0) || (ttype > 0xff)) {
-        fprintf(sg_warnings_strm, "Bad type: 0x%x\n", ttype);
+        fprintf(sg_warnings_strm, "Bad type: %#x\n", ttype);
         return -1;
     }
     gpCmdBlk[10] = (unsigned char)ttype;

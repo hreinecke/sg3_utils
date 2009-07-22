@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_linux version 1.12 20090507 */
+/* sg_pt_linux version 1.12 20090716 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -141,7 +141,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
     if (verbose > 1) {
         if (NULL == sg_warnings_strm)
             sg_warnings_strm = stderr;
-        fprintf(sg_warnings_strm, "open %s with flags=0x%x\n", device_name,
+        fprintf(sg_warnings_strm, "open %s with flags=%#x\n", device_name,
                 flags);
     }
     fd = open(device_name, flags);
@@ -417,9 +417,9 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     n = 0;
     if (hs) {
         if ((hs < 0) || (hs >= LINUX_HOST_BYTES_SZ))
-            n = snprintf(cp, m, "Host_status=0x%02x is invalid\n", hs);
+            n = snprintf(cp, m, "Host_status=%#02x is invalid\n", hs);
         else
-            n = snprintf(cp, m, "Host_status=0x%02x [%s]\n", hs,
+            n = snprintf(cp, m, "Host_status=%#02x [%s]\n", hs,
                          linux_host_bytes[hs]);
     }
     m -= n;
@@ -434,7 +434,7 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     sugg = (ds & SG_LIB_SUGGEST_MASK) >> 4;
     if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
         sugg_cp = linux_driver_suggests[sugg];
-    n = snprintf(cp, m, "Driver_status=0x%02x [%s, %s]\n", ds, driv_cp,
+    n = snprintf(cp, m, "Driver_status=%#02x [%s, %s]\n", ds, driv_cp,
                  sugg_cp);
     m -= n;
     if (m < 1)
@@ -567,7 +567,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
     if (verbose > 1) {
         if (NULL == sg_warnings_strm)
             sg_warnings_strm = stderr;
-        fprintf(sg_warnings_strm, "open %s with flags=0x%x\n", device_name,
+        fprintf(sg_warnings_strm, "open %s with flags=%#x\n", device_name,
                 flags);
     }
     fd = open(device_name, flags);
@@ -773,9 +773,9 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     n = 0;
     if (hs) {
         if ((hs < 0) || (hs >= LINUX_HOST_BYTES_SZ))
-            n = snprintf(cp, m, "Host_status=0x%02x is invalid\n", hs);
+            n = snprintf(cp, m, "Host_status=%#02x is invalid\n", hs);
         else
-            n = snprintf(cp, m, "Host_status=0x%02x [%s]\n", hs,
+            n = snprintf(cp, m, "Host_status=%#02x [%s]\n", hs,
                          linux_host_bytes[hs]);
     }
     m -= n;
@@ -790,7 +790,7 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     sugg = (ds & SG_LIB_SUGGEST_MASK) >> 4;
     if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
         sugg_cp = linux_driver_suggests[sugg];
-    n = snprintf(cp, m, "Driver_status=0x%02x [%s, %s]\n", ds, driv_cp,
+    n = snprintf(cp, m, "Driver_status=%#02x [%s, %s]\n", ds, driv_cp,
                  sugg_cp);
     m -= n;
     if (m < 1)

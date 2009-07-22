@@ -179,7 +179,7 @@ sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
     if ((sense_key >= 0) && (sense_key < 16))
          snprintf(buff, buff_len, "%s", sg_lib_sense_key_desc[sense_key]);
     else
-         snprintf(buff, buff_len, "invalid value: 0x%x", sense_key);
+         snprintf(buff, buff_len, "invalid value: %#x", sense_key);
     return buff;
 }
 
@@ -466,7 +466,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     processed = 0;
                     break;
                 }
-                n += sprintf(b + n, "    0x%02x%02x\n", descp[5],
+                n += sprintf(b + n, "    %#02x%02x\n", descp[5],
                         descp[6]);
                 break;
             case SPC_SK_NO_SENSE:
@@ -502,7 +502,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                              !!(descp[4] & 0x1));
                 break;
             default:
-                n += sprintf(b + n, " Sense_key: 0x%x unexpected\n",
+                n += sprintf(b + n, " Sense_key: %#x unexpected\n",
                         sense_key);
                 processed = 0;
                 break;
@@ -511,7 +511,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
         case 3:
             n += sprintf(b + n, "Field replaceable unit\n");
             if (add_len >= 2)
-                n += sprintf(b + n, "    code=0x%x\n", descp[3]);
+                n += sprintf(b + n, "    code=%#x\n", descp[3]);
             else
                 processed = 0;
             break;
@@ -556,23 +556,23 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
 
                 extended = descp[2] & 1;
                 sector_count = descp[5] + (extended ? (descp[4] << 8) : 0);
-                n += sprintf(b + n, "    extended=%d  error=0x%x "
-                        " sector_count=0x%x\n", extended, descp[3],
+                n += sprintf(b + n, "    extended=%d  error=%#x "
+                        " sector_count=%#x\n", extended, descp[3],
                         sector_count);
                 if (extended)
-                    n += sprintf(b + n, "    lba=0x%02x%02x%02x%02x%02x%02x\n",
+                    n += sprintf(b + n, "    lba=%#02x%02x%02x%02x%02x%02x\n",
                                  descp[10], descp[8], descp[6],
                                  descp[11], descp[9], descp[7]);
                 else
-                    n += sprintf(b + n, "    lba=0x%02x%02x%02x\n",
+                    n += sprintf(b + n, "    lba=%#02x%02x%02x\n",
                                  descp[11], descp[9], descp[7]);
-                n += sprintf(b + n, "    device=0x%x  status=0x%x\n",
+                n += sprintf(b + n, "    device=%#x  status=%#x\n",
                         descp[12], descp[13]);
             } else
                 processed = 0;
             break;
         default:
-            n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
+            n += sprintf(b + n, "Unknown or vendor specific [%#x]\n",
                     descp[0]);
             processed = 0;
             break;
@@ -657,7 +657,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             break;
         default:
             snprintf(error_buff, sizeof(error_buff),
-                     "Unknown response code: 0x%x", ssh.response_code);
+                     "Unknown response code: %#x", ssh.response_code);
             error = error_buff;
             break;
         }
@@ -691,10 +691,10 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                         (sense_buffer[4] << 16) | (sense_buffer[5] << 8) |
                         sense_buffer[6]);
                 if (valid)
-                    r += sprintf(b + r, "  Info fld=0x%x [%u] ", info,
+                    r += sprintf(b + r, "  Info fld=%#x [%u] ", info,
                                  info);
                 else if (info > 0)
-                    r += sprintf(b + r, "  Valid=0, Info fld=0x%x [%u] ",
+                    r += sprintf(b + r, "  Valid=0, Info fld=%#x [%u] ",
                                  info, info);
             } else
                 info = 0;
@@ -738,7 +738,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 case SPC_SK_MEDIUM_ERROR:
                 case SPC_SK_RECOVERED_ERROR:
                     r += sprintf(b + r, "  Actual retry count: "
-                                 "0x%02x%02x\n", sense_buffer[16],
+                                 "%#02x%02x\n", sense_buffer[16],
                                  sense_buffer[17]);
                     break;
                 case SPC_SK_COPY_ABORTED:
@@ -759,7 +759,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                                  !!(sense_buffer[15] & 0x1));
                     break;
                 default:
-                    r += sprintf(b + r, "  Sense_key: 0x%x unexpected\n",
+                    r += sprintf(b + r, "  Sense_key: %#x unexpected\n",
                                  ssh.sense_key);
                     break;
                 }
@@ -789,7 +789,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                      ((sense_buffer[0] >> 4) & 0x7),
                      (sense_buffer[0] & 0xf));
         if (sense_buffer[0] & 0x80)
-            r += sprintf(b + r, "  lba=0x%x\n",
+            r += sprintf(b + r, "  lba=%#x\n",
                          ((sense_buffer[1] & 0x1f) << 16) +
                          (sense_buffer[2] << 8) + sense_buffer[3]);
         n += snprintf(buff + n, buff_len - n, "%s\n", b);
@@ -941,7 +941,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Variable length service action=0x%x",
+            snprintf(buff, buff_len, "Variable length service action=%#x",
                      service_action);
         break;
     case SG_MAINTENANCE_IN:
@@ -949,7 +949,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Maintenance in service action=0x%x",
+            snprintf(buff, buff_len, "Maintenance in service action=%#x",
                      service_action);
         break;
     case SG_MAINTENANCE_OUT:
@@ -957,7 +957,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Maintenance out service action=0x%x",
+            snprintf(buff, buff_len, "Maintenance out service action=%#x",
                      service_action);
         break;
     case SG_SERVICE_ACTION_IN_12:
@@ -965,7 +965,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Service action in(12)=0x%x",
+            snprintf(buff, buff_len, "Service action in(12)=%#x",
                      service_action);
         break;
     case SG_SERVICE_ACTION_OUT_12:
@@ -973,7 +973,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Service action out(12)=0x%x",
+            snprintf(buff, buff_len, "Service action out(12)=%#x",
                      service_action);
         break;
     case SG_SERVICE_ACTION_IN_16:
@@ -981,7 +981,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Service action in(16)=0x%x",
+            snprintf(buff, buff_len, "Service action in(16)=%#x",
                      service_action);
         break;
     case SG_SERVICE_ACTION_OUT_16:
@@ -989,7 +989,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Service action out(16)=0x%x",
+            snprintf(buff, buff_len, "Service action out(16)=%#x",
                      service_action);
         break;
     case SG_PERSISTENT_RESERVE_IN:
@@ -998,7 +998,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
             strncpy(buff, vnp->name, buff_len);
         else
             snprintf(buff, buff_len, "Persistent reserve in, service "
-                     "action=0x%x", service_action);
+                     "action=%#x", service_action);
         break;
     case SG_PERSISTENT_RESERVE_OUT:
         vnp = get_value_name(sg_lib_pr_out_arr, service_action, peri_type);
@@ -1006,7 +1006,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
             strncpy(buff, vnp->name, buff_len);
         else
             snprintf(buff, buff_len, "Persistent reserve out, service "
-                     "action=0x%x", service_action);
+                     "action=%#x", service_action);
         break;
     default:
         sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
@@ -1038,17 +1038,17 @@ sg_get_opcode_name(unsigned char cmd_byte0, int peri_type, int buff_len,
         if (vnp)
             strncpy(buff, vnp->name, buff_len);
         else
-            snprintf(buff, buff_len, "Opcode=0x%x", (int)cmd_byte0);
+            snprintf(buff, buff_len, "Opcode=%#x", (int)cmd_byte0);
         break;
     case 3:
-        snprintf(buff, buff_len, "Reserved [0x%x]", (int)cmd_byte0);
+        snprintf(buff, buff_len, "Reserved [%#x]", (int)cmd_byte0);
         break;
     case 6:
     case 7:
-        snprintf(buff, buff_len, "Vendor specific [0x%x]", (int)cmd_byte0);
+        snprintf(buff, buff_len, "Vendor specific [%#x]", (int)cmd_byte0);
         break;
     default:
-        snprintf(buff, buff_len, "Opcode=0x%x", (int)cmd_byte0);
+        snprintf(buff, buff_len, "Opcode=%#x", (int)cmd_byte0);
         break;
     }
 }

@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_solaris version 1.02 20090204 */
+/* sg_pt_solaris version 1.02 20090716 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +87,7 @@ scsi_pt_open_flags(const char * device_name, int flags_arg, int verbose)
 
     flags_arg = flags_arg;  /* ignore flags argument, suppress warning */
     if (verbose > 1) {
-        fprintf(stderr, "open %s with flags=0x%x\n", device_name, oflags);
+        fprintf(stderr, "open %s with flags=%#x\n", device_name, oflags);
     }
     fd = open(device_name, oflags);
     if (fd < 0)
