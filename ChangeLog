@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090622] [svn: r279]
+Changelog for sg3_utils-1.28 [20090722] [svn: r282]
   - sg_unmap: new utility for thin provisioning
     - add examples/sg_unmap_example.txt
   - sg_read_block_limits: new utility for tape drives
@@ -26,6 +26,8 @@ Changelog for sg3_utils-1.28 [20090622] [svn: r279]
     binary mode on read files
   - sg_pt_win32: define WIN32_SPT_DIRECT (was SPTD) via config.h
     has been using indirect accidentally since version 1.26
+  - change most "0x%x" printf format strings to "%#x"
+  - debian: incorporate patch from debian sid
 
 Changelog for sg3_utils-1.27 [20090411] [svn: r250]
   - sg_write_same: new utility: 10, 16 and 32 byte cdb variants

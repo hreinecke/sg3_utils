@@ -43,7 +43,7 @@
 #include "sg_io_linux.h"
 
 
-/* Version 1.03 20090422 */
+/* Version 1.03 20090716 */
 
 
 void
@@ -69,7 +69,7 @@ sg_print_host_status(int host_status)
 {
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
-    fprintf(sg_warnings_strm, "Host_status=0x%02x ", host_status);
+    fprintf(sg_warnings_strm, "Host_status=%#02x ", host_status);
     if ((host_status < 0) || (host_status >= LINUX_HOST_BYTES_SZ))
         fprintf(sg_warnings_strm, "is invalid ");
     else
@@ -110,7 +110,7 @@ sg_print_driver_status(int driver_status)
         sugg_cp = linux_driver_suggests[sugg];
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
-    fprintf(sg_warnings_strm, "Driver_status=0x%02x", driver_status);
+    fprintf(sg_warnings_strm, "Driver_status=%#02x", driver_status);
     fprintf(sg_warnings_strm, " [%s, %s] ", driv_cp, sugg_cp);
 }
 
