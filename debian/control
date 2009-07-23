@@ -11,6 +11,14 @@ Depends: ${shlibs:Depends}
 Conflicts: sg-utils, cdwrite
 Replaces: sg-utils
 Description: utilities for devices using the SCSI command set.
+ Most OSes have SCSI pass-through interfaces that enable user space programs
+ to send SCSI commands to a device and fetch the response. With SCSI to ATA
+ Translation (SAT) many ATA disks now can process SCSI commands. Typically
+ each utility in this package implements one SCSI command. See the draft
+ standards at www.t10.org for SCSI command definitions plus SAT. ATA
+ commands are defined in the draft standards at www.t13.org . For a mapping
+ between supported SCSI and ATA commands and utility names in this package
+ see the COVERAGE file.
 
 Package: libsgutils2-2
 Section: libs
@@ -20,6 +28,7 @@ Conflicts: libsgutils2
 Replaces: libsgutils2
 Suggests: sg3-utils
 Description: utilities for devices using the SCSI command set (shared libraries)
+ Shared library used by the utilities in the sg3-utils package.
 
 Package: libsgutils2-dev
 Section: libdevel
@@ -28,4 +37,6 @@ Depends: libsgutils2-2 (= ${binary:Version}), ${shlibs:Depends}, ${kfreebsd:Depe
 Conflicts: libsgutils1-dev
 Suggests: sg3-utils
 Description: utilities for devices using the SCSI command set (developer files)
+ Developer files (i.e. headers and a static library) which are associated with
+ the utilities in the sg3-utils package.
 
