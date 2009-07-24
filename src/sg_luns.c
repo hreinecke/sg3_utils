@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2009 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  * This program issues the SCSI REPORT LUNS command to the given SCSI device.
  */
 
-static char * version_str = "1.15 20090717";
+static char * version_str = "1.15 20090617";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -178,7 +178,7 @@ decode_lun(const char * leadin, unsigned char * lunp)
             } else if ((1 == len) && (2 == e_a_method)) {
                 x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
                 printf("%sExtended flat space logical unit addressing: "
-                       "value=%#x\n", l_leadin, x);
+                       "value=0x%x\n", l_leadin, x);
             } else if ((3 == len) && (0xf == e_a_method))
                 printf("%sLogical unit _not_ specified addressing\n",
                        l_leadin);
@@ -187,7 +187,7 @@ decode_lun(const char * leadin, unsigned char * lunp)
                     if (1 == len)
                         x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
                     printf("%sExtended logical unit addressing: length=%d, "
-                           "e.a. method=%d, value=%#x\n", l_leadin, len,
+                           "e.a. method=%d, value=0x%x\n", l_leadin, len,
                            e_a_method, x);
                 } else {
                     ull = 0;
@@ -198,7 +198,7 @@ decode_lun(const char * leadin, unsigned char * lunp)
                         ull |= lunp[1 + j];
                     }
                     printf("%sExtended logical unit addressing: length=%d, "
-                           "e. a. method=%d, value=%#" PRIx64 "\n",
+                           "e. a. method=%d, value=0x%" PRIx64 "\n",
                            l_leadin, len, e_a_method, ull);
                 }
             }
@@ -286,7 +286,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

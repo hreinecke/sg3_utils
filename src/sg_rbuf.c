@@ -52,7 +52,7 @@
 #endif
 
 
-static char * version_str = "4.88 20090717";
+static char * version_str = "4.88 20071226";
 
 static struct option long_options[] = {
         {"buffer", 1, 0, 'b'},
@@ -192,7 +192,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [%#x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage_for(optsp);

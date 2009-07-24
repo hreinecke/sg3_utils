@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2009 Douglas Gilbert.
+ * Copyright (c) 2006-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static char * version_str = "1.03 20080716";
+static char * version_str = "1.03 20080623";
 
 #define ME "sg_chk_asc: "
 
@@ -109,7 +109,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised switch code %#x ??\n", c);
+            fprintf(stderr, "unrecognised switch code 0x%x ??\n", c);
             usage();
             return 1;
         }

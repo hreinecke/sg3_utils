@@ -31,7 +31,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.17 20090717";
+static char * version_str = "1.17 20090420";
 
 
 #define MAX_XFER_LEN 10000
@@ -161,7 +161,7 @@ main(int argc, char * argv[])
             }
             break;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -247,7 +247,7 @@ main(int argc, char * argv[])
     }
     if (verbose)
         fprintf(stderr, ME "issue write long to device %s\n\t\txfer_len= %d "
-                "(%#x), lba=%" PRIu64 " (%#" PRIx64 ")\n    cor_dis=%d, "
+                "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 ")\n    cor_dis=%d, "
                 "wr_uncor=%d, pblock=%d\n", device_name, xfer_len, xfer_len,
                 llba, llba, cor_dis, wr_uncor, pblock);
 

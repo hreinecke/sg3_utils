@@ -28,7 +28,7 @@
 #include "sg_io_linux.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2009 D. Gilbert
+*  Copyright (C) 2001 - 2007 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -47,7 +47,7 @@
 
 */
 
-static const char * version_str = "1.18 20090717";
+static const char * version_str = "1.18 20071226";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -578,7 +578,7 @@ int main(int argc, char * argv[])
             }
         }
         if (verbose)
-            fprintf(stderr, "Opened %s for SG_IO with flags=%#x\n", inf,
+            fprintf(stderr, "Opened %s for SG_IO with flags=0x%x\n", inf,
                     flags);
         if ((dd_count > 0) && (! (FT_BLOCK & in_type))) {
             if (verbose > 2) {
@@ -623,7 +623,7 @@ int main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
         }
         if (verbose)
-            fprintf(stderr, "Opened %s for Unix reads with flags=%#x\n",
+            fprintf(stderr, "Opened %s for Unix reads with flags=0x%x\n",
                     inf, flags);
         if (skip > 0) {
             off64_t offset = skip;

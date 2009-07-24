@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2009 Douglas Gilbert.
+ * Copyright (c) 2005-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,7 @@
 #endif
 #include "sg_lib.h"
 
-static char * version_str = "1.08 20090717";
+static char * version_str = "1.08 20081009";
 
 #define ME "sg_map26: "
 
@@ -1123,7 +1123,7 @@ main(int argc, char * argv[])
                         fprintf(stderr, ME "version: %s\n", version_str);
                         return 0;
                 default:
-                        fprintf(stderr, "unrecognised option code %#x ??\n",
+                        fprintf(stderr, "unrecognised option code 0x%x ??\n",
                                 c);
                         usage();
                         return SG_LIB_SYNTAX_ERROR;

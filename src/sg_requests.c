@@ -47,7 +47,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static char * version_str = "1.22 20090717";
+static char * version_str = "1.22 20090607";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -197,7 +197,7 @@ main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

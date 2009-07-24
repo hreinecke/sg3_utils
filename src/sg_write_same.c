@@ -48,7 +48,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.93 20090717";
+static char * version_str = "0.93 20090610";
 
 
 #define ME "sg_write_same: "
@@ -285,7 +285,7 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 if (valid)
                     fprintf(stderr, "Medium or hardware error starting at "
-                            "lba=%"PRIu64" [%#"PRIx64"]\n", ull, ull);
+                            "lba=%"PRIu64" [0x%"PRIx64"]\n", ull, ull);
             }
             ret = sense_cat;
             break;
@@ -408,7 +408,7 @@ main(int argc, char * argv[])
             }
             break;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

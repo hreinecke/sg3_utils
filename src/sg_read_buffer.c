@@ -126,7 +126,7 @@ print_modes(void)
     fprintf(stderr, "The modes parameter argument can be numeric "
                 "(hex or decimal)\nor symbolic:\n");
     for (k = 0; k < NUM_MODES; k++) {
-        fprintf(stderr, " %2d (%#02x)  %-16s%s\n", modes[k].mode,
+        fprintf(stderr, " %2d (0x%02x)  %-16s%s\n", modes[k].mode,
                 modes[k].mode, modes[k].mode_string, modes[k].comment);
     }
 }
@@ -226,7 +226,7 @@ main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -320,13 +320,13 @@ main(int argc, char * argv[])
                 k = (resp[1] << 16) | (resp[2] << 8) | resp[3];
                 printf("OFFSET BOUNDARY: %d, Buffer offset alignment: %d-byte\n",
                        resp[0], (1 << resp[0]));
-                printf("BUFFER CAPACITY: %d (%#x)\n", k, k);
+                printf("BUFFER CAPACITY: %d (0x%x)\n", k, k);
                 break;
             case MODE_ECHO_BDESC:
                 k = ((resp[2] & 0x1F) << 8) | resp[3];
 
                 printf("EBOS:%d\n", resp[0] & 1 ? 1 : 0);
-                printf("Echo buffer capacity: %d (%#x)\n", k, k);
+                printf("Echo buffer capacity: %d (0x%x)\n", k, k);
                 break;
             default:
                 dStrHex((const char *)resp, rb_len, 1);

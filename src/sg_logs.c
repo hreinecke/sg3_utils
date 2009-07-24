@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.87 20090721";    /* SPC-4 revision 20 */
+static char * version_str = "0.87 20090608";    /* SPC-4 revision 20 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -38,7 +38,6 @@ static char * version_str = "0.87 20090721";    /* SPC-4 revision 20 */
 #define VERIFY_ERR_LPAGE 0x5
 #define NON_MEDIUM_LPAGE 0x6
 #define LAST_N_ERR_LPAGE 0x7
-#define FORMAT_STATUS_LPAGE 0x8
 #define LAST_N_DEFERRED_LPAGE 0xb
 #define TEMPERATURE_LPAGE 0xd
 #define START_STOP_LPAGE 0xe
@@ -351,7 +350,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [%#x]\n", c, c);
+            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -634,9 +633,9 @@ show_page_name(int pg_code, int subpg_code,
     memset(b, 0, sizeof(b));
     /* first process log pages that do not depend on peripheral type */
     if (NOT_SUBPG_LOG == subpg_code)
-        snprintf(b, sizeof(b) - 1, "    %#02x        ", pg_code);
+        snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
     else
-        snprintf(b, sizeof(b) - 1, "    %#02x,%#02x   ", pg_code,
+        snprintf(b, sizeof(b) - 1, "    0x%02x,0x%02x   ", pg_code,
                  subpg_code);
     done = 1;
     if ((NOT_SUBPG_LOG == subpg_code) || (ALL_SUBPG_LOG == subpg_code)) {
@@ -704,7 +703,7 @@ show_page_name(int pg_code, int subpg_code,
         /* disk (direct access) type devices */
         {
             switch (pg_code) {
-            case FORMAT_STATUS_LPAGE:
+            case 0x8:
                 printf("%sFormat status (sbc-2)\n", b);
                 break;
             case 0x15:
@@ -832,12 +831,12 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
     if (pcb & 0x10)
         n += sprintf(buff + n, "tmc=%d ", ((pcb & 0xc) >> 2));
 #if 1
-    n += sprintf(buff + n, "format+linking=%d  [%#.2x]", pcb & 3,
+    n += sprintf(buff + n, "format+linking=%d  [0x%.2x]", pcb & 3,
                  pcb);
 #else
     if (pcb & 0x1)
         n += sprintf(buff + n, "lbin=%d ", ((pcb & 0x2) >> 1));
-    n += sprintf(buff + n, "lp=%d  [%#.2x]", pcb & 0x1, pcb);
+    n += sprintf(buff + n, "lp=%d  [0x%.2x]", pcb & 0x1, pcb);
 #endif
     if (outp && (n < maxoutlen)) {
         memcpy(outp, buff, n);
@@ -871,14 +870,14 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
             case 1 : printf("per command"); break;
             case 2 : printf("per failed reconnect"); break;
             case 3 : printf("per unit of time"); break;
-            default: printf("reserved [%#x]", count_basis); break;
+            default: printf("reserved [0x%x]", count_basis); break;
             }
             printf(", Cause: ");
             switch (cause) {
             case 0 : printf("undefined"); break;
             case 1 : printf("bus busy"); break;
             case 2 : printf("transfer rate too slow"); break;
-            default: printf("reserved [%#x]", cause); break;
+            default: printf("reserved [0x%x]", cause); break;
             }
             printf(", Type: ");
             if (ucp[1] & 1)
@@ -934,7 +933,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
         printf("Verify error counter page\n");
         break;
     default:
-        printf("expecting error counter page, got page = %#x\n", resp[0]);
+        printf("expecting error counter page, got page = 0x%x\n", resp[0]);
         return;
     }
     num = len - 4;
@@ -953,7 +952,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
         case 6: printf("  Total uncorrected errors"); break;
         case 0x8009: printf("  Track following errors [Hitachi]"); break;
         case 0x8015: printf("  Positioning errors [Hitachi]"); break;
-        default: printf("  Reserved or vendor specific [%#x]", pc); break;
+        default: printf("  Reserved or vendor specific [0x%x]", pc); break;
         }
         k = pl - 4;
         xp = ucp + 4;
@@ -999,9 +998,9 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
             printf("  Non-medium error count"); break;
         default:
             if (pc <= 0x7fff)
-                printf("  Reserved [%#x]", pc);
+                printf("  Reserved [0x%x]", pc);
             else
-                printf("  Vendor specific [%#x]", pc);
+                printf("  Vendor specific [0x%x]", pc);
             break;
         }
         k = pl - 4;
@@ -1058,7 +1057,7 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
         case 9:
             printf("  Accumulated transitions to standby_y"); break;
         default:
-            printf("  Reserved [%#x]", pc);
+            printf("  Reserved [0x%x]", pc);
         }
         k = pl - 4;
         xp = ucp + 4;
@@ -1183,7 +1182,7 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
 
     num = len - 4;
     if (num < 0x190) {
-        printf("short self-test results page [length %#x rather than "
+        printf("short self-test results page [length 0x%x rather than "
                "0x190 bytes]\n", num);
         return;
     }
@@ -1207,9 +1206,9 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
         ull <<= 8; ull |= ucp[13]; ull <<= 8; ull |= ucp[14];
         ull <<= 8; ull |= ucp[15];
         if ((0xffffffffffffffffULL != ull) && (res > 0) && ( res < 0xf))
-            printf("    address of first error = %#" PRIx64 "\n", ull);
+            printf("    address of first error = 0x%" PRIx64 "\n", ull);
         if (ucp[16] & 0xf)
-            printf("    sense key = %#x, asc = %#x, asq = %#x",
+            printf("    sense key = 0x%x, asc = 0x%x, asq = 0x%x",
                    ucp[16] & 0xf, ucp[17], ucp[18]);
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
@@ -1259,7 +1258,7 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
             }
 
         } else if (show_unknown) {
-            printf("  unknown parameter code = %#x, contents in hex:\n", pc);
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
         } else
             continue;
@@ -1356,7 +1355,7 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
             }
             break;
         default:
-            printf("  unknown parameter code = %#x, contents in hex:\n", pc);
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
@@ -1395,7 +1394,7 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
         if (0 == pc) {
             if (extra > 5) {
                 if (full) {
-                    printf("  IE asc = %#x, ascq = %#x", ucp[4], ucp[5]);
+                    printf("  IE asc = 0x%x, ascq = 0x%x", ucp[4], ucp[5]);
                     if (ucp[4]) {
                         if(sg_get_asc_ascq_str(ucp[4], ucp[5], sizeof(b), b))
                             printf("\n    [%s]", b);
@@ -1417,7 +1416,7 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
                 }
             }
         } else if (full) {
-            printf("  parameter code = %#x, contents in hex:\n", pc);
+            printf("  parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
         }
         if (show_pcb) {
@@ -1608,14 +1607,14 @@ show_sas_port_param(unsigned char * ucp, int param_len,
         if (optsp->do_name) {
             t = ((0x70 & vcp[4]) >> 4);
             printf("      att_dev_type=%d\n", t);
-            printf("      att_iport_mask=%#x\n", vcp[6]);
+            printf("      att_iport_mask=0x%x\n", vcp[6]);
             printf("      att_phy_id=%d\n", vcp[24]);
-            printf("      att_reason=%#x\n", (vcp[4] & 0xf));
+            printf("      att_reason=0x%x\n", (vcp[4] & 0xf));
             for (n = 0, ull = vcp[16]; n < 8; ++n) {
                 ull <<= 8; ull |= vcp[16 + n];
             }
-            printf("      att_sas_addr=%#" PRIx64 "\n", ull);
-            printf("      att_tport_mask=%#x\n", vcp[7]);
+            printf("      att_sas_addr=0x%" PRIx64 "\n", ull);
+            printf("      att_tport_mask=0x%x\n", vcp[7]);
             ui = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
             printf("      inv_dwords=%u\n", ui);
             ui = (vcp[40] << 24) | (vcp[41] << 16) | (vcp[42] << 8) | vcp[43];
@@ -1625,11 +1624,11 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("      phy_reset_probs=%u\n", ui);
             ui = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
             printf("      running_disparity=%u\n", ui);
-            printf("      reason=%#x\n", (vcp[5] & 0xf0) >> 4);
+            printf("      reason=0x%x\n", (vcp[5] & 0xf0) >> 4);
             for (n = 0, ull = vcp[8]; n < 8; ++n) {
                 ull <<= 8; ull |= vcp[8 + n];
             }
-            printf("      sas_addr=%#" PRIx64 "\n", ull);
+            printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
             switch (t) {
@@ -1654,7 +1653,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             case 8: snprintf(s, sz, "phy test function stopped"); break;
             case 9: snprintf(s, sz, "expander device reduced functionality");
                  break;
-            default: snprintf(s, sz, "reserved [%#x]", t); break;
+            default: snprintf(s, sz, "reserved [0x%x]", t); break;
             }
             printf("    attached reason: %s\n", s);
             t = (vcp[5] & 0xf0) >> 4;
@@ -1671,7 +1670,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             case 8: snprintf(s, sz, "phy test function stopped"); break;
             case 9: snprintf(s, sz, "expander device reduced functionality");
                  break;
-            default: snprintf(s, sz, "reserved [%#x]", t); break;
+            default: snprintf(s, sz, "reserved [0x%x]", t); break;
             }
             printf("    reason: %s\n", s);
             t = (0xf & vcp[5]);
@@ -1702,11 +1701,11 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             for (n = 0, ull = vcp[8]; n < 8; ++n) {
                 ull <<= 8; ull |= vcp[8 + n];
             }
-            printf("    SAS address = %#" PRIx64 "\n", ull);
+            printf("    SAS address = 0x%" PRIx64 "\n", ull);
             for (n = 0, ull = vcp[16]; n < 8; ++n) {
                 ull <<= 8; ull |= vcp[16 + n];
             }
-            printf("    attached SAS address = %#" PRIx64 "\n", ull);
+            printf("    attached SAS address = 0x%" PRIx64 "\n", ull);
             printf("    attached phy identifier = %d\n", vcp[24]);
             ui = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
             printf("    Invalid DWORD count = %u\n", ui);
@@ -1757,7 +1756,7 @@ show_protocol_specific_page(unsigned char * resp, int len,
 
     num = len - 4;
     if (optsp->do_name)
-        printf("log_page=%#x\n", PORT_SPECIFIC_LPAGE);
+        printf("log_page=0x%x\n", PORT_SPECIFIC_LPAGE);
     for (k = 0, ucp = resp + 4; k < num; ) {
         param_len = ucp[3] + 4;
         if (6 != (0xf & ucp[4]))
@@ -1789,9 +1788,9 @@ show_stats_perform_page(unsigned char * resp, int len,
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
     if (nam) {
-        printf("log_page=%#x\n", STATS_LPAGE);
+        printf("log_page=0x%x\n", STATS_LPAGE);
         if (subpg_code > 0)
-            printf("log_subpage=%#x\n", subpg_code);
+            printf("log_subpage=0x%x\n", subpg_code);
     }
     if (subpg_code > 31)
         return 0;
@@ -2119,9 +2118,9 @@ show_cache_stats_page(unsigned char * resp, int len,
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
     if (nam) {
-        printf("log_page=%#x\n", STATS_LPAGE);
+        printf("log_page=0x%x\n", STATS_LPAGE);
         if (subpg_code > 0)
-            printf("log_subpage=%#x\n", subpg_code);
+            printf("log_subpage=0x%x\n", subpg_code);
     } else
         printf("Cache memory statistics log page\n");
 
@@ -2257,7 +2256,7 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
         case 3: printf("  Total new blocks reassigned"); break;
         case 4: printf("  Power on minutes since format"); break;
         default:
-            printf("  Unknown Format status code = %#x\n", pc);
+            printf("  Unknown Format status code = 0x%x\n", pc);
             counter = 0;
             dStrHex((const char *)ucp, pl, 0);
             break;
@@ -2357,7 +2356,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
                 printf("<unexpected parameter length=%d>\n", ucp[4]);
             break;
         default:
-            printf("  Unknown Format status code = %#x\n", pc);
+            printf("  Unknown Format status code = 0x%x\n", pc);
             dStrHex((const char *)ucp, pl, 0);
             break;
         }
@@ -2430,7 +2429,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
             if (j < (int)(sizeof(bms_status) / sizeof(bms_status[0])))
                 printf("%s\n", bms_status[j]);
             else
-                printf("unknown [%#x] background scan status value\n", j);
+                printf("unknown [0x%x] background scan status value\n", j);
             j = (ucp[10] << 8) + ucp[11];
             printf("    Number of background scans performed: %d\n", j);
             j = (ucp[12] << 8) + ucp[13];
@@ -2468,8 +2467,8 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
                 (int)(sizeof(reassign_status) / sizeof(reassign_status[0])))
                 printf("    %s\n", reassign_status[j]);
             else
-                printf("    Reassign status: reserved [%#x]\n", j);
-            printf("    sense key: %s  [sk,asc,ascq: %#x,%#x,%#x]\n",
+                printf("    Reassign status: reserved [0x%x]\n", j);
+            printf("    sense key: %s  [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
                    sg_get_sense_key_str(ucp[8] & 0xf, sizeof(str), str),
                    ucp[8] & 0xf, ucp[9], ucp[10]);
             printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
@@ -2477,7 +2476,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
             if (verbose) {
                 printf("    vendor bytes [11 -> 15]: ");
                 for (m = 0; m < 5; ++m)
-                    printf("%#02x ", ucp[11 + m]);
+                    printf("0x%02x ", ucp[11 + m]);
                 printf("\n");
             }
             printf("    LBA (associated with medium error): 0x");
@@ -2584,10 +2583,10 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
             break;
         default:
             if (pc >= 0x8000)
-                printf("  Vendor specific parameter [%#x] value: %" PRIu64
+                printf("  Vendor specific parameter [0x%x] value: %" PRIu64
                        "\n", pc, ull);
             else
-                printf("  Reserved parameter [%#x] value: %" PRIu64 "\n",
+                printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n",
                        pc, ull);
             break;
         }
@@ -2678,7 +2677,7 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
                        "eject occurred: %" PRIu64 "\n", ull);
                 break;
             default:
-                printf("  Reserved parameter [%#x] value: %" PRIu64 "\n",
+                printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n",
                        pc, ull);
                 break;
             }
@@ -2690,7 +2689,7 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
                 dStrHex((const char *)ucp, pl, 0);
                 break;
             default:
-                printf("  Reserved parameter [%#x], dump in hex:\n", pc);
+                printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
                 dStrHex((const char *)ucp, pl, 0);
                 break;
             }
@@ -2825,7 +2824,7 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
                    "recovered errors: %" PRIu64 "\n", ull);
             break;
         default:
-            printf("  Reserved parameter [%#x] value: %" PRIu64 "\n",
+            printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n",
                    pc, ull);
             break;
         }
@@ -2893,11 +2892,11 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
         pl = ucp[3] + 4;
         printf("  Parameter code: %d\n", pc);
         printf("    Repeat: %d\n", !!(ucp[5] & 0x80));
-        printf("    Sense key: %#x\n", ucp[5] & 0xf);
-        printf("    Additional sense code: %#x\n", ucp[6]);
-        printf("    Additional sense code qualifier: %#x\n", ucp[7]);
+        printf("    Sense key: 0x%x\n", ucp[5] & 0xf);
+        printf("    Additional sense code: 0x%x\n", ucp[6]);
+        printf("    Additional sense code qualifier: 0x%x\n", ucp[7]);
         v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
-        printf("    Vendor specific code qualifier: %#x\n", v);
+        printf("    Vendor specific code qualifier: 0x%x\n", v);
         v = (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15];
         printf("    Product revision level: %u\n", v);
         v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
@@ -2914,27 +2913,27 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
         printf("    Number of determined volume identifiers: %u\n", v);
         v = (ucp[40] << 24) + (ucp[41] << 16) + (ucp[42] << 8) + ucp[43];
         printf("    Number of unreadable volume identifiers: %u\n", v);
-        printf("    Operation code: %#x\n", ucp[44]);
-        printf("    Service action: %#x\n", ucp[45] & 0xf);
-        printf("    Media changer error type: %#x\n", ucp[46]);
+        printf("    Operation code: 0x%x\n", ucp[44]);
+        printf("    Service action: 0x%x\n", ucp[45] & 0xf);
+        printf("    Media changer error type: 0x%x\n", ucp[46]);
         printf("    MTAV: %d\n", !!(ucp[47] & 0x8));
         printf("    IAV: %d\n", !!(ucp[47] & 0x4));
         printf("    LSAV: %d\n", !!(ucp[47] & 0x2));
         printf("    DAV: %d\n", !!(ucp[47] & 0x1));
         v = (ucp[48] << 8) + ucp[49];
-        printf("    Medium transport address: %#x\n", v);
+        printf("    Medium transport address: 0x%x\n", v);
         v = (ucp[50] << 8) + ucp[51];
-        printf("    Intial address: %#x\n", v);
+        printf("    Intial address: 0x%x\n", v);
         v = (ucp[52] << 8) + ucp[53];
-        printf("    Last successful address: %#x\n", v);
+        printf("    Last successful address: 0x%x\n", v);
         v = (ucp[54] << 8) + ucp[55];
-        printf("    Destination address: %#x\n", v);
+        printf("    Destination address: 0x%x\n", v);
         if (pl > 91) {
             printf("    Volume tag information:\n");
             dStrHex((const char *)(ucp + 56), 36, 0);
         }
         if (pl > 99) {
-            printf("    Timestamp origin: %#x\n", ucp[92] & 0xf);
+            printf("    Timestamp origin: 0x%x\n", ucp[92] & 0xf);
             printf("    Timestamp:\n");
             dStrHex((const char *)(ucp + 94), 6, 1);
         }
@@ -3035,7 +3034,7 @@ show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
                            sizeof(tape_alert_strs[0])))
                 printf("  %s: %d\n", tape_alert_strs[pc], flag);
             else
-                printf("  Reserved parameter code %#x, flag: %d\n", pc,
+                printf("  Reserved parameter code 0x%x, flag: %d\n", pc,
                        flag);
         }
         if (show_pcb) {
@@ -3071,7 +3070,7 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
                        "<= segment size"); break;
         case 4: printf("  Number of read and write commands whose size "
                        "> segment size"); break;
-        default: printf("  Unknown Seagate parameter code = %#x", pc); break;
+        default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
         k = pl - 4;
         xp = ucp + 4;
@@ -3119,7 +3118,7 @@ show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
             break;
         default:
             valid = 0;
-            printf("  Unknown Seagate/Hitachi parameter code = %#x", pc);
+            printf("  Unknown Seagate/Hitachi parameter code = 0x%x", pc);
             break;
         }
         if (valid) {
@@ -3168,7 +3167,7 @@ show_ascii_page(unsigned char * resp, int len,
     subpg_code = spf ? resp[1] : 0;
 
     if ((ALL_PAGE_LPAGE != pg_code ) && (ALL_SUBPG_LOG == subpg_code)) {
-        printf("Supported subpages for log page=%#x\n", pg_code);
+        printf("Supported subpages for log page=0x%x\n", pg_code);
         for (k = 0; k < num; k += 2)
             show_page_name((int)resp[4 + k], (int)resp[4 + k + 1],
                            inq_dat);
@@ -3202,7 +3201,7 @@ show_ascii_page(unsigned char * resp, int len,
     case LAST_N_ERR_LPAGE:
         show_last_n_error_page(resp, len, optsp->do_pcb);
         break;
-    case FORMAT_STATUS_LPAGE:
+    case 0x8:
         {
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
@@ -3358,7 +3357,7 @@ show_ascii_page(unsigned char * resp, int len,
         break;
     }
     if (! done) {
-        printf("No ascii information for page = %#x, here is hex:\n",
+        printf("No ascii information for page = 0x%x, here is hex:\n",
                resp[0] & 0x3f);
         if (len > 128) {
             dStrHex((const char *)resp, 64, 1);
@@ -3535,11 +3534,11 @@ main(int argc, char * argv[])
         else if (pg_len > 1) {
             if (opts.do_hex) {
                 if (rsp_buff[0] & 0x40)
-                    printf("Log page code=%#x,%#x, DS=%d, SPF=1, "
-                           "page_len=%#x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
+                    printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, "
+                           "page_len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
                            !!(rsp_buff[0] & 0x80), pg_len);
                 else
-                    printf("Log page code=%#x, DS=%d, SPF=0, page_len=%#x\n",
+                    printf("Log page code=0x%x, DS=%d, SPF=0, page_len=0x%x\n",
                            rsp_buff[0] & 0x3f, !!(rsp_buff[0] & 0x80), pg_len);
                 dStrHex((const char *)rsp_buff, pg_len + 4, 1);
             }
@@ -3584,25 +3583,25 @@ main(int argc, char * argv[])
                     dStrHex((const char *)rsp_buff, pg_len + 4, 1);
                 else if (opts.do_hex) {
                     if (rsp_buff[0] & 0x40)
-                        printf("Log page code=%#x,%#x, DS=%d, SPF=1, page_"
-                               "len=%#x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
+                        printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"
+                               "len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
                                !!(rsp_buff[0] & 0x80), pg_len);
                     else
-                        printf("Log page code=%#x, DS=%d, SPF=0, page_len="
-                               "%#x\n", rsp_buff[0] & 0x3f,
+                        printf("Log page code=0x%x, DS=%d, SPF=0, page_len="
+                               "0x%x\n", rsp_buff[0] & 0x3f,
                                !!(rsp_buff[0] & 0x80), pg_len);
                     dStrHex((const char *)rsp_buff, pg_len + 4, 1);
                 }
                 else
                     show_ascii_page(rsp_buff, pg_len + 4, &inq_out, &opts);
             } else if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "log_sense: page=%#x,%#x not supported\n",
+                fprintf(stderr, "log_sense: page=0x%x,0x%x not supported\n",
                         opts.pg_code, opts.subpg_code);
             else if (SG_LIB_CAT_NOT_READY == res)
                 fprintf(stderr, "log_sense: device not ready\n");
             else if (SG_LIB_CAT_ILLEGAL_REQ == res)
                 fprintf(stderr, "log_sense: field in cdb illegal "
-                        "[page=%#x,%#x]\n", opts.pg_code, opts.subpg_code);
+                        "[page=0x%x,0x%x]\n", opts.pg_code, opts.subpg_code);
             else if (SG_LIB_CAT_UNIT_ATTENTION == res)
                 fprintf(stderr, "log_sense: unit attention\n");
             else if (SG_LIB_CAT_ABORTED_COMMAND == res)

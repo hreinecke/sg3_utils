@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2009 Douglas Gilbert.
+ * Copyright (c) 2006-2007 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,7 @@
 
 #define DEF_TIMEOUT 20
 
-static char * version_str = "1.04 20090717";
+static char * version_str = "1.04 20070918";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -236,11 +236,11 @@ static int do_set_features(int sg_fd, int feature, int count, int lba,
         }
         if (0x72 != (sense_buffer[0] & 0x7f)) {
             fprintf(stderr, "expected descriptor sense format, response "
-                    "code=%#x\n", sense_buffer[0]);
+                    "code=0x%x\n", sense_buffer[0]);
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
-        fprintf(stderr, "Unexpected SCSI status=%#x\n", res);
+        fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
         return SG_LIB_CAT_MALFORMED;
     } else {
         fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
@@ -325,7 +325,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
