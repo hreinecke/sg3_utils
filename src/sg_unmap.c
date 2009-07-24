@@ -51,7 +51,7 @@
  * logical blocks.
  */
 
-static char * version_str = "1.00 20090717";
+static char * version_str = "1.00 20090611";
 
 #define ME "sg_unmap: "
 
@@ -410,7 +410,7 @@ main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2009 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2008 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.13 20090717";
+static char * version_str = "1.13 20080513";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -208,7 +208,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "Version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -284,10 +284,10 @@ int main(int argc, char * argv[])
         for (k = 4, ucp = reportTgtGrpBuff + 4; k < report_len;
              k += off, ucp += off) {
 
-            printf("  target port group id : %#x , Pref=%d\n",
+            printf("  target port group id : 0x%x , Pref=%d\n",
                    (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));
             printf("    target port group asymmetric access state : ");
-            printf("%#02x", ucp[0] & 0x0f);
+            printf("0x%02x", ucp[0] & 0x0f);
             if (decode)
                 decode_tpgs_state(ucp[0] & 0x0f);
             printf("\n");
@@ -300,13 +300,13 @@ int main(int argc, char * argv[])
             printf("AO_SUP : %d\n", !!(ucp[1] & 0x01));
 
             printf("    status code : ");
-            printf("%#02x", ucp[5]);
+            printf("0x%02x", ucp[5]);
             if (decode)
                 decode_status(ucp[5]);
             printf("\n");
 
             printf("    vendor unique status : ");
-            printf("%#02x\n", ucp[6]);
+            printf("0x%02x\n", ucp[6]);
 
             printf("    target port count : ");
             tgt_port_count = ucp[7];
@@ -315,7 +315,7 @@ int main(int argc, char * argv[])
             for (j = 0; j < tgt_port_count * 4; j += 4) {
                 if (0 == j)
                     printf("    Relative target port ids:\n");
-                printf("      %#02x\n",
+                printf("      0x%02x\n",
                        (ucp[8 + j + 2] << 8) + ucp[8 + j + 3]);
             }
             off = 8 + j;

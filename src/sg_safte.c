@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2009 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2008 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static char * version_str = "0.24 20090717";
+static char * version_str = "0.24 20080513";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -594,7 +594,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "Version string: %s\n", version_str);
                 exit(0);
             default:
-                fprintf(stderr, "unrecognised option code %#x ??\n", c);
+                fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
@@ -642,7 +642,7 @@ main(int argc, char * argv[])
             if (strlen(cp) > 0)
                 printf("  Peripheral device type: %s\n", cp);
             else
-                printf("  Peripheral device type: %#x\n", peri_type);
+                printf("  Peripheral device type: 0x%x\n", peri_type);
         } else {
             fprintf(stderr, "sg_safte: %s doesn't respond to a SCSI "
                     "INQUIRY\n", device_name);

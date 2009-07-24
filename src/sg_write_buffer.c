@@ -46,7 +46,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static char * version_str = "1.06 20090917";    /* spc4r08 */
+static char * version_str = "1.06 20090420";    /* spc4r08 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -150,7 +150,7 @@ static void print_modes(void)
     fprintf(stderr, "The modes parameter argument can be numeric "
                 "(hex or decimal)\nor symbolic:\n");
     for (k = 0; k < NUM_MODES; k++) {
-        fprintf(stderr, " %2d (%#02x)  %-16s%s\n", modes[k].mode,
+        fprintf(stderr, " %2d (0x%02x)  %-16s%s\n", modes[k].mode,
                 modes[k].mode, modes[k].mode_string, modes[k].comment);
     }
 }
@@ -251,7 +251,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }

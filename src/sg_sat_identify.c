@@ -63,7 +63,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.06 20090917";
+static char * version_str = "1.06 20090303";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -235,11 +235,11 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         }
         if (0x72 != (sense_buffer[0] & 0x7f)) {
             fprintf(stderr, "expected descriptor sense format, response "
-                    "code=%#x\n", sense_buffer[0]);
+                    "code=0x%x\n", sense_buffer[0]);
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
-        fprintf(stderr, "Unexpected SCSI status=%#x\n", res);
+        fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
         return SG_LIB_CAT_MALFORMED;
     } else {
         fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
@@ -337,7 +337,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code %#x ??\n", c);
+            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
