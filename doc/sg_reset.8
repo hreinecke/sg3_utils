@@ -1,4 +1,4 @@
-.TH SG_RESET "8" "June 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_RESET "8" "July 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
 sg_reset \- sends SCSI device, target, bus or host reset; or checks reset state
 .SH SYNOPSIS
@@ -44,7 +44,7 @@ attempt a host adapter reset. This would normally be tried if both
 device reset (i.e. option \fI\-d\fR) and bus reset (i.e. option \fI\-b\fR)
 were not successful.
 .TP
-\fB\-d\fR
+\fB\-t\fR
 attempt a SCSI target reset. This assumes the linux scsi mid level
 error handler is not already in the process of resetting the target that
 contains the given \fIDEVICE\fR.
@@ -52,7 +52,7 @@ contains the given \fIDEVICE\fR.
 \fB\-V\fR
 prints the version string then exits.
 .SH NOTES
-The error recovery code within the linux kernel when faced with SCSI commands
+The error recovery code within the linux kernel when faced with a SCSI command
 timing out and no response from the device (LU), first tries a device reset
 and if that is not successful tries a target reset. If that is not successful
 it tries a bus reset. If that is not successful it tries a host reset. Users
@@ -62,26 +62,30 @@ order is also recommended (i.e. first start with the smallest
 hammer). The above is a generalization and exact details will vary depending
 on the transport and the low level driver concerned.
 .PP
-SAM\-4 defines a hard reset (which includes a device power on and a transport
-reset), a logical unit reset and a I_T nexus reset. A LU reset and an I_T
-nexus reset can be requested via task management function (and support for LU
-reset is mandatory). In Linux the SCSI subsystem leaves it up to the low level
-drivers as to whether a "device reset" is only for the addressed LU or all
-the LUs in the device that contains the addressed LU (i.e.  a target reset).
-The additional of the target reset (i.e. option \fI\-t\fR) should give more
-control in this area. The "bus reset" is a transport reset and may be a dummy
-operation, depending on the transport. A "host reset" attempts to
-re\-initialize the HBA that the request passes through en route to the
-\fIDEVICE\fR. Obviously a "host reset" and a "bus reset" can cause collateral
-damage.
+SAM\-4 defines a hard reset, a logical unit reset and a I_T nexus reset. A
+hard reset is defined to be a power on condition, a microcode change or a
+transport reset event. A LU reset and an I_T nexus reset can be requested
+via task management function (and support for LU reset is mandatory). In
+Linux the SCSI subsystem leaves it up to the low level drivers as to whether
+a "device reset" is only for the addressed LU or all the LUs in the device
+that contains the addressed LU (i.e. a target reset). The additional of the
+target reset (i.e. option \fI\-t\fR) should give more control in this area.
+The "bus reset" is a transport reset and may be a dummy operation, depending
+on the transport. A "host reset" attempts to re\-initialize the HBA that the
+request passes through en route to the \fIDEVICE\fR. Note that a "host reset"
+and a "bus reset" may cause collateral damage.
 .PP
-This utility does not allow individual SCSI commands (or tasks
-as they are called in SAM\-4) to be aborted. SAM\-4 defines
-ABORT TASK and ABORT TASK SET task management functions for that.
+This utility does not allow individual SCSI commands (or tasks as they are
+called in SAM\-4) to be aborted. SAM\-4 defines ABORT TASK and ABORT TASK
+SET task management functions for that.
+.PP
+Prior to SAM\-3 there was a TARGET RESET task management function. Several
+transports still support that function and many associated linux low level
+drivers map the \fI\-t\fR option to it.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH COPYRIGHT
-Copyright \(co 1999\-2006 Douglas Gilbert
+Copyright \(co 1999\-2009 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

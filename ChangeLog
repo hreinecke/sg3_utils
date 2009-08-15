@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090724] [svn: r284]
+Changelog for sg3_utils-1.28 [20090815] [svn: r285]
   - sg_unmap: new utility for thin provisioning
     - add examples/sg_unmap_example.txt
   - sg_read_block_limits: new utility for tape drives
@@ -14,18 +14,21 @@ Changelog for sg3_utils-1.28 [20090724] [svn: r284]
   - sg_requests: remove test code in progress calculation
   - sg_reset: add target reset option
   - sg_luns: reduce default maxlen to 8192 (for FreeBSD)
+  - sg_raw: extend max cdb length from 16 to 256 bytes
   - sg_lib: sg_set_binary_mode() needs config.h included
     - change SG3_UTILS_* constants to SG_LIB_*
     - decode service actions within persistent reserve in/out
     - sync with spc4r20
   - sg_pt_linux: fix check condition but empty sense buffer; occurred
     when sg v3 node used and /usr/include/linux/bsg.h visible
+  - scripts/sas_disk_blink: moved from the package to sdparm
   - utils/hxascdmp: in Windows set binary mode on read files
   - examples/sg_persist_tst.sh: add PRIN read full status command
-  - sg_write_buffer,sg_write_long,sg_write_same: in Windows set
-    binary mode on read files
+  - sg_raw,sg_write_buffer,sg_write_long,sg_write_same: in Windows
+    set binary mode on read files
   - sg_pt_win32: define WIN32_SPT_DIRECT (was SPTD) via config.h
     has been using indirect accidentally since version 1.26
+    - sg_raw: (Windows) removes 8KB/16KB limit on IO
   - debian: incorporate patch from debian sid
 
 Changelog for sg3_utils-1.27 [20090411] [svn: r250]

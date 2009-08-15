@@ -550,7 +550,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             processed = 0;
             break;
         case 9:
-            n += sprintf(b + n, "ATA Return\n");
+            n += sprintf(b + n, "ATA Status Return\n");
             if (add_len >= 12) {
                 int extended, sector_count;
 

@@ -25,11 +25,11 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.3.8 (2008-07-18)"
+#define SG_RAW_VERSION "0.3.9 (2009-08-15)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
-#define MAX_SCSI_CDBSZ 16
+#define MAX_SCSI_CDBSZ 256
 #define MAX_SCSI_DXLEN (64 * 1024)
 
 static struct option long_options[] = {
@@ -102,7 +102,7 @@ usage()
             "  -v, --verbose          Increase verbosity\n"
             "  -V, --version          Show version information and exit\n"
             "\n"
-            "Between 6 and 16 command bytes (two hex digits each) can be\n"
+            "Between 6 and 256 command bytes (two hex digits each) can be\n"
             "specified and will be sent to DEVICE.\n"
             "\n"
             "Example: Perform INQUIRY on /dev/sg0:\n"
@@ -120,34 +120,13 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
             break;
 
         switch (c) {
-        case 'r':
-            optsp->do_datain = 1;
-            n = sg_get_num(optarg);
-            if (n < 0 || n > MAX_SCSI_DXLEN) {
-                fprintf(stderr, "Invalid argument to '--request'\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            optsp->datain_len = n;
-            break;
-        case 'o':
-            if (optsp->datain_file) {
-                fprintf(stderr, "Too many '--outfile=' options\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            optsp->datain_file = optarg;
-            break;
         case 'b':
             optsp->datain_binary = 1;
             break;
-        case 's':
-            optsp->do_dataout = 1;
-            n = sg_get_num(optarg);
-            if (n < 0 || n > MAX_SCSI_DXLEN) {
-                fprintf(stderr, "Invalid argument to '--send'\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            optsp->dataout_len = n;
-            break;
+        case 'h':
+        case '?':
+            optsp->do_help = 1;
+            return 0;
         case 'i':
             if (optsp->dataout_file) {
                 fprintf(stderr, "Too many '--infile=' options\n");
@@ -163,6 +142,34 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
             }
             optsp->dataout_offset = n;
             break;
+        case 'n':
+            optsp->no_sense = 1;
+            break;
+        case 'o':
+            if (optsp->datain_file) {
+                fprintf(stderr, "Too many '--outfile=' options\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            optsp->datain_file = optarg;
+            break;
+        case 'r':
+            optsp->do_datain = 1;
+            n = sg_get_num(optarg);
+            if (n < 0 || n > MAX_SCSI_DXLEN) {
+                fprintf(stderr, "Invalid argument to '--request'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            optsp->datain_len = n;
+            break;
+        case 's':
+            optsp->do_dataout = 1;
+            n = sg_get_num(optarg);
+            if (n < 0 || n > MAX_SCSI_DXLEN) {
+                fprintf(stderr, "Invalid argument to '--send'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            optsp->dataout_len = n;
+            break;
         case 't':
             n = sg_get_num(optarg);
             if (n < 0) {
@@ -171,16 +178,9 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
             }
             optsp->timeout = n;
             break;
-        case 'n':
-            optsp->no_sense = 1;
-            break;
         case 'v':
             ++optsp->do_verbose;
             break;
-        case 'h':
-        case '?':
-            optsp->do_help = 1;
-            return 0;
         case 'V':
             optsp->do_version = 1;
             return 0;
@@ -274,6 +274,10 @@ fetch_dataout(struct opts_t *optsp)
     } else {
         fd = STDIN_FILENO;
     }
+    if (sg_set_binary_mode(fd) < 0) {
+        perror("sg_set_binary_mode");
+        goto bail;
+    }
 
     if (optsp->dataout_offset > 0) {
         if (skip(fd, optsp->dataout_offset) != 0) {
@@ -337,7 +341,7 @@ write_dataout(const char *filename, unsigned char *buf, int len)
     ret = 0;
 
 bail:
-    if (fd >= 0)
+    if (fd >= 0 && fd != STDOUT_FILENO)
         close(fd);
     return ret;
 }
