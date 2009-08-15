@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.87 20090608";    /* SPC-4 revision 20 */
+static char * version_str = "0.88 20090811";    /* SPC-4 revision 20 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -708,6 +708,9 @@ show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x15:
                 printf("%sBackground scan results (sbc-3)\n", b);
+                break;
+            case 0x16:
+                printf("%sATA pass-through results (sat-2)\n", b);
                 break;
             case 0x17:
                 printf("%sNon-volatile cache (sbc-2)\n", b);

@@ -26,7 +26,7 @@
 #1c,22,33,44,55,66,77,88,99
 #a b    ,        c d e f
 
-# 'report and move' requires one (and only one) transprtID.
+# 'report and move' requires one (and only one) transportID.
 # 'register' and 'register and ignore existing key' can optionally take
 # one or more transportIDs.
 

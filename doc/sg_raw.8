@@ -1,16 +1,15 @@
-.TH SG_RAW "8" "May 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_RAW "8" "August 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
-sg_raw \- sends an arbitrary SCSI command (with an optional data phase) to a
-device
+sg_raw \- sends an arbitrary SCSI command to a device
 .SH SYNOPSIS
 .B sg_raw [\fIOPTIONS\fR] \fIDEVICE\fR CDB0 CDB1 ...
 .SH DESCRIPTION
-This utility sends an arbitrary SCSI command (between 6 and 16 bytes) to
-the \fIDEVICE\fR. For the optional data phase, data can either be
-read from a file and sent to the \fIDEVICE\fR or received from
+This utility sends an arbitrary SCSI command (between 6 and 256 bytes) to
+the \fIDEVICE\fR. There may be no associated data transfer; or data may be
+read from a file and sent to the \fIDEVICE\fR; or data may be received from
 the \fIDEVICE\fR and then displayed or written to a file.
 .PP
-The SCSI command may be between 6 and 16 bytes long. Each command byte is
+The SCSI command may be between 6 and 256 bytes long. Each command byte is
 specified in plain hex format (00..FF) without a prefix or suffix. See
 EXAMPLES section below.
 .PP
@@ -63,6 +62,16 @@ Increase level of verbosity. Can be used multiple times.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 Display version and license information and exit.
+.SH NOTES
+The sg_inq utility can be used to send an INQUIRY command to a device
+to determine its peripheral device type (e.g. '1' for a streaming
+device (tape drive)) which determines which SCSI command sets a device
+should support (e.g. SPC and SSC). The sg_vpd utility probes the Vital
+Product Pages of a devices which may contain useful information.
+.PP
+The ability to send more than a 16 byte CDB (in some cases 12 byte CDB)
+may be restricted by the pass-through interface, the low level driver
+or the transport. Bidirectional data commands are no yet supported.
 .SH EXAMPLES
 .TP
 sg_raw /dev/scd0 1b 00 00 00 02 00
@@ -91,10 +100,10 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2008 Ingo van Lil
+Copyright \(co 2001\-2009 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_opcodes sg_vpd(sg3_utils), hdparm(hdparm), sgdiag(scsirastools)
+.B sg_inq sg_vpd(sg3_utils), plscsi
 
