@@ -49,7 +49,7 @@ install: build
 	$(MAKE) -e install DESTDIR=$(CURDIR)/debian/tmp PREFIX=/usr
 
 	dh_install --autodest --sourcedir=debian/tmp
-	cp scripts/scsi* scripts/sas* debian/sg3-utils/usr/bin
+	cp scripts/scsi* debian/sg3-utils/usr/bin
 
 	dh_installman
 
