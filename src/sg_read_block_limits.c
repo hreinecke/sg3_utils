@@ -35,7 +35,6 @@
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
-#include <netinet/in.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -51,7 +50,7 @@
  * SCSI device.
  */
 
-static char * version_str = "1.0 20090615";
+static char * version_str = "1.01 20090816";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
@@ -67,10 +66,6 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-typedef struct block_size_entry {
-    uint32_t max_block_size;
-    uint16_t min_block_size;
-} block_size;
 
 static void
 usage()
@@ -108,7 +103,8 @@ main(int argc, char * argv[])
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
-    block_size *pstruct;
+    uint32_t max_block_size;
+    uint16_t min_block_size;
 
     while (1) {
         int option_index = 0;
@@ -181,25 +177,25 @@ main(int argc, char * argv[])
         goto the_end;
       }
 
-      pstruct = (block_size *)readBlkLmtBuff;
-      k = ntohs(pstruct->min_block_size) / 1024;
+      max_block_size = (readBlkLmtBuff[0] << 24) +
+		       (readBlkLmtBuff[1] << 16) +
+		       (readBlkLmtBuff[2] << 8) + readBlkLmtBuff[3];
+      min_block_size = (readBlkLmtBuff[4] << 8) + readBlkLmtBuff[5];
+      k = min_block_size / 1024;
       fprintf(stderr, "Read Block Limits results:\n");
       fprintf(stderr, "\tMinimum block size: %d byte(s)",
-              ntohs(pstruct->min_block_size));
-      if (k != 0) {
+              (int)min_block_size);
+      if (k != 0)
         fprintf(stderr, ", %d KB", k);
-      }
       fprintf(stderr, "\n");
-      k = ntohl(pstruct->max_block_size) / 1024;
-      m = ntohl(pstruct->max_block_size) / 1048576;
+      k = max_block_size / 1024;
+      m = max_block_size / 1048576;
       fprintf(stderr, "\tMaximum block size: %d byte(s)",
-              ntohl(pstruct->max_block_size));
-      if (k != 0) {
+              max_block_size);
+      if (k != 0)
         fprintf(stderr, ", %d KB", k);
-      }
-      if (m != 0) {
+      if (m != 0)
         fprintf(stderr, ", %d MB", m);
-      }
       fprintf(stderr, "\n");
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Read block limits not supported\n");
