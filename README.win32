@@ -76,6 +76,32 @@ See the INSTALL file (towards the end) for instructions on how to build
 sg3_utils on Windows operating systems. Some man pages have examples which
 use linux device names which hopefully will not confuse Windows users.
 
+Two pass-through variants
+=========================
+The sg_pt_win32.c file uses the Windows SCSI Pass Through interface.
+That is often shortened to SPT or SPTI. There are two DeviceIoControl()
+ioctl variants provided: IOCTL_SCSI_PASS_THROUGH and
+IOCTL_SCSI_PASS_THROUGH_DIRECT. The former involves double handling of
+data (and perhaps an upper limit on the data length associated with
+one SCSI command; MS documentation mentions 16 KB). The "direct"
+variant passes a pointer from the user space and to be faster looks
+and more versatile.
+
+However the "direct" variant has potentially (unquantified) alignment
+requirements and may not be (well) implemented by the hardware driver.
+In practice some users have reported errors (e.g. 1117: a non-descript
+IO error) when the direct variant is used.
+
+Hence the non-direct variant is the default. The default size limit
+on the data buffer is set at 16 KB but if the user asks for more
+the data buffer will be extended. The OS or the hardware drivers
+may reject the extended data buffer but we tried.
+
+The package can be built using the direct variant with:
+   ./configure --enable-win32-spt-direct
+rather than:
+   ./configure
+prior to the 'make' call.
 
 Details
 =======
@@ -90,11 +116,11 @@ operating system:
   - sg_pt_osf1.c  [Tru64]
   - sg_pt_win32.c
 
-The sg_pt_win32.c file uses the Windows SCSI Pass Through (SPT) mechanism.
-It does not currently use the ASPI32 interface which requires a dll from
-Adaptec. The sg_scan utility is a special version for Windows and it attempts
-to show the various available storage device names, one per line. Here is an
-example of sg_scan's output:
+The ASPI32 interface which requires a dll from Adaptec ia not supported.
+
+The sg_scan utility is a special version for Windows and it attempts to show
+the various available storage device names, one per line. Here is an example
+of sg_scan's output:
 
 # sg_scan
 PD0     [C]     FUJITSU   MHY2160BH         0000
@@ -165,4 +191,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-15th June 2009
+18th August 2009
