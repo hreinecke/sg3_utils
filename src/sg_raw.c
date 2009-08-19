@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2008 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2009 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.3.9 (2009-08-15)"
+#define SG_RAW_VERSION "0.4.0 (2009-08-17)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -226,6 +226,30 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
     return 0;
 }
 
+/* Allocate aligned memory (heap) starting on page boundary */
+static unsigned char *
+my_memalign(int length, unsigned char ** wrkBuffp)
+{
+    unsigned char * wrkBuff;
+    size_t psz;
+
+#ifdef SG_LIB_MINGW
+    psz = getpagesize();
+#else
+    psz = sysconf(_SC_PAGESIZE); /* was getpagesize() */
+#endif
+    wrkBuff = (unsigned char*)calloc(length + psz, 1);
+    if (NULL == wrkBuff) {
+        if (wrkBuffp)
+            *wrkBuffp = NULL;
+        return NULL;
+    } else if (wrkBuffp)
+        *wrkBuffp = wrkBuff;
+    // posix_memalign() could be a better way to do this
+    return (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
+                             (~(psz - 1)));
+}
+
 static int
 skip(int fd, off_t offset)
 {
@@ -261,6 +285,7 @@ static unsigned char *
 fetch_dataout(struct opts_t *optsp)
 {
     unsigned char *buf = NULL;
+    unsigned char *wrkBuf = NULL;
     int fd, len;
     int ok = 0;
 
@@ -285,7 +310,7 @@ fetch_dataout(struct opts_t *optsp)
         }
     }
 
-    buf = (unsigned char *)malloc(optsp->dataout_len);
+    buf = my_memalign(optsp->dataout_len, &wrkBuf);
     if (buf == NULL) {
         perror("malloc");
         goto bail;
@@ -306,7 +331,8 @@ bail:
     if (fd >= 0 && fd != STDIN_FILENO)
         close(fd);
     if (!ok) {
-        free(buf);
+        if (wrkBuf)
+            free(wrkBuf);
         return NULL;
     }
     return buf;
@@ -358,6 +384,7 @@ main(int argc, char *argv[])
     struct sg_pt_base *ptvp = NULL;
     unsigned char sense_buffer[32];
     unsigned char *dxfer_buffer = NULL;
+    unsigned char *wrkBuf = NULL;
 
     memset(&opts, 0, sizeof(opts));
     opts.timeout = DEFAULT_TIMEOUT;
@@ -403,7 +430,7 @@ main(int argc, char *argv[])
         }
         set_scsi_pt_data_out(ptvp, dxfer_buffer, opts.dataout_len);
     } else if (opts.do_datain) {
-        dxfer_buffer = (unsigned char *)malloc(opts.datain_len);
+        dxfer_buffer = my_memalign(opts.datain_len, &wrkBuf);
         if (dxfer_buffer == NULL) {
             perror("malloc");
             ret = SG_LIB_CAT_OTHER;
@@ -472,9 +499,11 @@ main(int argc, char *argv[])
     }
 
 done:
-    free(dxfer_buffer);
-    if (ptvp) destruct_scsi_pt_obj(ptvp);
-    if (sg_fd >= 0) scsi_pt_close_device(sg_fd);
+    if (wrkBuf)
+        free(wrkBuf);
+    if (ptvp)
+        destruct_scsi_pt_obj(ptvp);
+    if (sg_fd >= 0)
+        scsi_pt_close_device(sg_fd);
     return ret;
 }
-

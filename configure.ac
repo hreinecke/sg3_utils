@@ -47,12 +47,10 @@ case "${host}" in
                 AC_SUBST([os_libs], ['']) ;;
         *-*-cygwin*)
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
-		AC_DEFINE_UNQUOTED(WIN32_SPT_DIRECT, 1, [allow large buffers, aligned?])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-mingw*)
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
 		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
-		AC_DEFINE_UNQUOTED(WIN32_SPT_DIRECT, 1, [allow large buffers, aligned?])
                 AC_SUBST([os_libs], ['']) ;;
         *)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [assume sg3_utils on linux])
@@ -70,6 +68,11 @@ AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 AC_ARG_ENABLE([no-linux-bsg],
   AC_HELP_STRING([--enable-no-linux-bsg], [ignore linux bsg (sgv4) if present]),
   AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [ignore linux bsg], )
+)
+
+AC_ARG_ENABLE([win32-spt-direct],
+  AC_HELP_STRING([--enable-win32-spt-direct], [enable Win32 SPT Direct]),
+  AC_DEFINE_UNQUOTED(WIN32_SPT_DIRECT, 1, [enable Win32 SPT Direct], )
 )
 
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile)
