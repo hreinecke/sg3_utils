@@ -2,12 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090818] [svn: r289]
+Changelog for sg3_utils-1.28 [20090824] [svn: r290]
   - sg_unmap: new utility for thin provisioning
     - add examples/sg_unmap_example.txt
   - sg_read_block_limits: new utility for tape drives
   - sg_logs: add cache memory statistics log (sub)page
   - sg_vpd, sg_inq: extend Block limits VPD page (sbc3r19)
+  - sg_persist: add transport specific transportID format
+    - allow transportIDs to be read from named file
   - sg_opcodes: allow --opcode= option to take OP and SA
     values (comma seperated)
     - tweak print format, remove test code
@@ -17,6 +19,7 @@ Changelog for sg3_utils-1.28 [20090818] [svn: r289]
   - sg_raw: extend max cdb length from 16 to 256 bytes
     - align heap allocs to page boundaries
   - sg_lib: sg_set_binary_mode() needs config.h included
+    - add progress indication sense data descriptor (0xa)
     - change SG3_UTILS_* constants to SG_LIB_*
     - decode service actions within persistent reserve in/out
     - sync with spc4r20

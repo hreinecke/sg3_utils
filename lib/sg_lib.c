@@ -571,6 +571,18 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             } else
                 processed = 0;
             break;
+        case 0xa:       /* Added in SPC-4 rev 17 */
+            n += sprintf(b + n, "Progress indication\n");
+            if (add_len < 6) {
+                processed = 0;
+                n += sprintf(b + n, " field too short\n");
+                break;
+            }
+            progress = (descp[6] << 8) + descp[7];
+            n += sprintf(b + n, "    %d %%", (progress * 100) / 0x10000);
+            n += sprintf(b + n, " [sense_key=0x%x asc,ascq=0x%x,0x%x]\n",
+                         descp[2], descp[3], descp[4]);
+            break;
         default:
             n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
                     descp[0]);

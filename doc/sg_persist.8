@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_PERSIST "8" "August 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
@@ -36,7 +36,7 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing. The relevant sections of the
 SCSI Primary Commands document (i.e. SPC\-4 whose most recent draft is
-revision 18 dated 18 February 2009) are sections 5.7 (titled "Reservations"),
+revision 20 dated 22 May 2009) are sections 5.7 (titled "Reservations"),
 6.13 (for the PRIN command) and 6.14 (for the PROUT command). To safeguard
 against accidental use, the \fI\-\-out\fR option must be given when a
 PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
@@ -213,32 +213,16 @@ Reserve is a sub\-command of the PROUT command. It creates a new
 persistent reservation (if permitted). The \fI\-\-prout\-type=TYPE\fR
 and \fI\-\-param\-rk=RK\fR options must also be specified.
 .TP
-\fB\-X\fR, \fB\-\-transport\-id\fR=\fIH,H...\fR
-a transportID is required for the PROUT 'register and move' sub\-command
-and is optional for the PROUT 'register' and 'register and ignore
-existing key' sub\-commands. The latter two sub\-commands can take multiple
-transportIDs in a list but only one is supported with this option
-variant (use the \fI\-\-transport\-id=\-\fR variant if multiple
-transportIDs are required). \fIH,H...\fR is a comma separated list of hex
-bytes which represent the transportID. A (single) space separated list
-of hex bytes is also allowed but the list needs to be in quotes. The list
-of hex numbers will be padded out with zeros to 24 bytes which is the
-minimum length of a transportID. A transportID longer than 24 bytes (e.g.
-for iSCSI) is padded with zeros so its length is a multiple of 4.
-.TP
-\fB\-X\fR, \fB\-\-transport\-id=\-\fR
-a transportID is required for the PROUT 'register and move' sub\-command
-and is optional for the PROUT 'register' and 'register and ignore
-existing key' sub\-commands. The latter two sub\-commands can take multiple
-transportIDs in a list. The option argument of '\-' indicates that
-stdin should be read for the transportID(s). Empty lines are ignored.
-Everything from and including a "#" on a line is ignored.
-Leading spaces and tabs are ignored. All numbers
-are assumed to be hexadecimal and can be separated by space, comma or
-tab. There can be one transportID per line. TranportIDs will be padded
-out with zeros to 24 bytes which is the minimum length of a
-transportID. A transportID longer than 24 bytes (e.g. for iSCSI) is
-padded with zeros so its length is a multiple of 4.
+\fB\-X\fR, \fB\-\-transport\-id\fR=\fITIDS\fR
+The \fITIDS\fR argument can take one of several forms. It can be a
+comma (or single space) separated list of ASCII hex bytes representing
+a single TransportID as defined in SPC\-4. They are usually 24 bytes
+long apart from in iSCSI. The \fITIDS\fR argument may be a transport
+specific form (e.g. "sas,5000c50005b32001"). The \fITIDS\fR argument
+may be "-" in which case one or more TransportIDs can be read from stdin.
+The \fITIDS\fR argument may be of the form "file=<name>" in which case
+one or more TransportIDs can be read from a file called <name>. See
+the "TRANSPORT IDs" section below for more information.
 .TP
 \fB\-U\fR, \fB\-\-unreg\fR
 optional when the PROUT register and move sub\-command is invoked. If given
@@ -258,11 +242,69 @@ print out version string. Ignore all other parameters.
 .TP
 \fB\-?\fR
 output usage message. Ignore all other parameters.
+.SH TRANSPORT IDs
+TransportIDs are used in persistent reservations to identify initiators.
+The format of a TransportID differs depending on the type of transport
+being used. Their format is described in SPC\-4 (in draft revision
+20 see section 7.5.4).
+.PP
+A TransportID is required for the PROUT 'register and move' sub\-command and
+the PROUT 'register' sub\-command can have zero, one or more TransportIDs.
+.PP
+When the \fI\-\-transport\-id=TIDS\fR option is given then the \fITIDS\fR
+argument may be a comma (or single space) separated list of ASCII hex bytes
+that represent a single TransportID as defined in SPC\-4. Alternatively the
+\fITIDS\fR argument may be a transport specific string starting with
+either "fcp,", "spi,", "sbp,", "srp,", "iqn", or "sas,". The "iqn" form is
+an iSCSI qualified name. Apart from "iqn" the other transport specific
+leadin string may be given in upper case (e.g. "FCP,").
+.PP
+The "fcp," form should be followed by 16 ASCII hex digits that represent an
+initiator's N_PORT_NAME. The "spi," form should be followed
+by "<scsi_address>,<relative_target_port_identifier>" (both decimal numbers).
+The "sbp," form should be followed by 16 ASCII hex digits that represent an
+initiator's EUI-64 name. The "srp," form should be followed by 32 ASCII hex
+digits that represent an initiator port identifier. The "sas," form should be
+followed by 16 ASCII hex digits that represent an initiator's port SAS
+address. 
+.PP
+There are two iSCSI qualified name forms. The shorter form contains the
+iSCSI name of the initiator
+port (e.g. "iqn.5886.com.acme.diskarrays-sn-a8675309"). The longer form adds
+the initiator session id (ISID in hex) separated by ",i,0x".
+For example "iqn.5886.com.acme.diskarrays-sn-a8675309,i,0x1234567890ab".
+On the command line to stop punctuation in an iSCSI name being (mis)-
+interpreted by the shell, putting the option argument containing the iSCSI
+name in double quotes is advised. iSCSI names are encoded in UTF-8 so if
+non (7 bit) ASCII characters appear in the iSCSI name on the command line,
+there will be difficulties if they are not encoded in UTF-8. The locale can
+be changed temporarily by prefixing the command line invocation of
+sg_persist with "LANG=en_US.utf-8" for example.
+.PP
+Alternatively the \fITIDS\fR argument may specify a file (or pipe) from which
+one or more TransportIDs may be read. If the \fITIDS\fR argument is "-"
+then stdin (standard input) is read. If the \fITIDS\fR argument is of the
+form "file=<name>" than a file called <name> is read.
+A valid SPC\-4 TransportID is built from the transport specific string
+outlined in the previous paragraphs. The parsing of the data read is
+realtively simple. Empty lines are ignored. Everything from and including
+a "#" on a line is ignored. Leading spaces and tabs are ignored. There
+can be one transportID per line. The transportID can either be a comma,
+space or tab separated list of ASCII hex bytes that represent a
+TransportID as defined in SPC\-4. Padding with zero bytes to a minimum
+length of 24 bytes is performed if necessary. The transportID may also
+be transport specific string type discussed above.
+.PP
+In SPC\-3 the SPEC_I_PT bit set to one and TransportIDs were allowed for
+the PROUT register and ignore existing key sub\-command. In SPC\-4 that
+is disallowed yielding a CHECK CONDITION status with and ILLEGAL REQUEST
+sense key and an additional sense code set to INVALID FIELD IN PARAMETER
+LIST.
 .SH NOTES
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series any SCSI device
 name (e.g. /dev/sdc, /dev/st1m or /dev/sg3) can be specified.
-For example "sg_persist \-\-read\-keys /dev/sda"
+For example "sg_persist \-\-read\-keys /dev/sdb"
 will work in the 2.6 series kernels.
 .PP
 The only scope for PROUT commands supported in the current draft of
@@ -275,29 +317,33 @@ CONFLICT status. This can be a bit confusing when you know there is
 only one (active) initiator: the "conflict" is with the SPC standard, not
 another initiator.
 .PP
-TransportIDs are defined in SPC\-4 and their structures differ depending
-on the transport.
+Some recent disks accept some PRIN and PROUT sub\-commands when the
+media is stopped. One exception was setting the APTPL flag (with
+the \fI\-\-param\-aptpl\fR option) during a key register operation,
+it complained if the disk one stopped. The error indicated it wanted
+the disk spun up and when that happened, the registration was
+successful.
 .SH EXAMPLES
 .PP
 Due to defaults the simplest example executes the 'read keys' sub\-command
 of the PRIN command:
 .PP
-   sg_persist /dev/sda
+   sg_persist /dev/sdb
 .PP
 This is the same as the following (long\-winded) command:
 .PP
-   sg_persist \-\-in \-\-read\-keys \-\-device=/dev/sda
+   sg_persist \-\-in \-\-read\-keys \-\-device=/dev/sdb
 .PP
 To read the current reservation either the '\-\-read\-reservation' form or
 the shorter '\-r' can be used:
 .PP
-   sg_persist \-r /dev/sda
+   sg_persist \-r /dev/sdb
 .PP
 To
 .B register
 the new reservation key 0x123abc the following could be used:
 .PP
-   sg_persist \-\-out \-\-register \-\-param\-sark=123abc /dev/sda
+   sg_persist \-\-out \-\-register \-\-param\-sark=123abc /dev/sdb
 .PP
 Given the above registration succeeds, to
 .B reserve
@@ -306,7 +352,7 @@ could be used:
 .PP
    sg_persist \-\-out \-\-reserve \-\-param\-rk=123abc
 .br
-              \-\-prout\-type=1 /dev/sda
+              \-\-prout\-type=1 /dev/sdb
 .PP
 To
 .B release
@@ -316,7 +362,7 @@ reservation):
 .PP
    sg_persist \-\-out \-\-release \-\-param\-rk=123abc
 .br
-              \-\-prout\-type=1 /dev/sda
+              \-\-prout\-type=1 /dev/sdb
 .PP
 Finally to
 .B unregister
@@ -324,14 +370,15 @@ a reservation key (and not effect other
 registrations which is what '\-\-clear' would do) the command
 is a little surprising:
 .PP
-   sg_persist \-\-out \-\-register \-\-param\-rk=123abc /dev/sda
+   sg_persist \-\-out \-\-register \-\-param\-rk=123abc /dev/sdb
 .PP
 Now have a close look at the difference between the register and
 unregister examples above.
 .PP
 An example file that is suitably formatted to pass transportIDs via
-the '\-\-transport\-id=\-' option can be found in the examples sub\-directory
-of the sg3_utils package. That file is called 'transport_ids.txt'.
+a '\-\-transport\-id=file=transport_ids.txt' option can be found in the
+examples sub\-directory of the sg3_utils package. There is also a
+simple test script called sg_persist_tst.sh in the same directory.
 .SH EXIT STATUS
 The exit status of sg_persist is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -345,4 +392,4 @@ Copyright \(co 2004\-2009 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B scsires(internet), examples/sg_persist_tst.sh(sg3_utils tarball)
+.B scsires(internet)
