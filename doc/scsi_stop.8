@@ -1,0 +1,41 @@
+.TH SCSI_STOP "8" "August 2009" "sg3_utils\-1.28" SG3_UTILS
+.SH NAME
+scsi_stop \- stop (spin down) one or more SCSI disks
+.SH SYNOPSIS
+.B scsi_stop
+[\fI\-\-help\fR] [\fI\-\-verbose\fR] [\fI\-\-wait\fR]
+\fIDEVICE\fR [\fIDEVICE\fR]*
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This bourne shell script calls the sg_start utility on each given
+\fIDEVICE\fR. The purpose is to spin down (stop) each given \fIDEVICE\fR.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level or verbosity.
+.TP
+\fB\-w\fR, \fB\-\-wait\fR
+wait for the spin down (stop) on each given \fIDEVICE\fR to complete.
+The default action is to do each stop in immediate mode.
+.SH NOTES
+The sg_start utility calls the SCSI START STOP UNIT command and can
+either start (spin up) or stop (spin down) a SCSI disk depending
+on the given command line options.
+.SH EXIT STATUS
+The exit status of this script is 0 when it is successful. Otherwise the
+exit status is that of the last sg_start utility called. See
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by D. Gilbert
+.SH COPYRIGHT
+Copyright \(co 2009 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_start (sg3_utils)

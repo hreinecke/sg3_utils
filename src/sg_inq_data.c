@@ -39,7 +39,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 20 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 21 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -172,6 +172,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x4a0, "ADC-2 (no version claimed)"},
     {0x4a7, "ADC-2 T10/1741-D revision 7"},
     {0x4aa, "ADC-2 T10/1741-D revision 8"},
+    {0x4ac, "ADC-2 ANSI INCITS 441-2008"},
     {0x4c0, "SBC-3 (no version claimed)"},
     {0x4e0, "MMC-6 (no version claimed)"},
     {0x4e3, "MMC-6 T10/1836-D revision 2b"},
@@ -305,8 +306,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xde4, "FC-PI-2 ANSI INCITS 404-2006"},
     {0xe00, "FC-FS-2 (no version claimed)"},
     {0xe02, "FC-FS-2 ANSI INCITS 242-2007"},
-    {0xe04, "FC-FS-2 ANSI INCITS 242-2007 with AM1 ANSI INCITS 242/AM1-2007"},
+    {0xe03, "FC-FS-2 ANSI INCITS 242-2007 with AM1 ANSI INCITS 242/AM1-2007"},
     {0xe20, "FC-LS (no version claimed)"},
+    {0xe21, "FC-LS T11/1620-D revision 1.62"},
     {0xe29, "FC-LS ANSI INCITS 433-2007"},
     {0xe40, "FC-SP (no version claimed)"},
     {0xe42, "FC-SP T11/1570-D revision 1.6"},
@@ -322,6 +324,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xea6, "FC 10GFC ANSI INCITS 364-2003 with AM1 ANSI INCITS 364/AM1-2007"},
     {0xec0, "FC-SP-2 (no version claimed)"},
     {0xee0, "FC-FS-3 (no version claimed)"},
+    {0xee2, "FC-FS-3 T11/1861-D revision 0.9"},
     {0xf00, "FC-LS-2 (no version claimed)"},
     {0xf20, "FC-PI-5 (no version claimed)"},
     {0x12c0, "FC-DA-2 (no version claimed)"},
@@ -358,10 +361,12 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1622, "ATA/ATAPI-8 ATA-AST Serial transport (no version claimed)"},
     {0x1623, "ATA/ATAPI-8 ATA-ACS ATA/ATAPI command set (no version "
              "claimed)"},
+    {0x1628, "ATA/ATAPI-8 ATA-AAM ANSI INCITS 451-2008"},
     {0x1728, "Universal Serial Bus Specification, Revision 1.1"},
     {0x1729, "Universal Serial Bus Specification, Revision 2.0"},
     {0x1730, "USB Mass Storage Class Bulk-Only Transport, Revision 1.0"},
     {0x1740, "UAS (no version claimed)"},    /* USB attached SCSI */
+    {0x1743, "UAS T10/2095-D revision 02"},
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
     {0x1eab, "SAT T10/1711-D rev 9"},

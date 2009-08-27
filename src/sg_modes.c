@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.31 20090604";
+static char * version_str = "1.32 20090826";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -530,6 +530,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x10, 0x0, "XOR control"},
     {0x1a, 0xf1, "ATA Power condition"},
     {0x1c, 0x1, "Background control"},
+    {0x1c, 0x2, "Thin provisioning"},
 };
 
 static struct page_code_desc pc_desc_tape[] = {

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.28 [20090824] [svn: r290]
+Changelog for sg3_utils-1.28 [20090827] [svn: r291]
   - sg_unmap: new utility for thin provisioning
     - add examples/sg_unmap_example.txt
   - sg_read_block_limits: new utility for tape drives
@@ -22,7 +22,7 @@ Changelog for sg3_utils-1.28 [20090824] [svn: r290]
     - add progress indication sense data descriptor (0xa)
     - change SG3_UTILS_* constants to SG_LIB_*
     - decode service actions within persistent reserve in/out
-    - sync with spc4r20
+    - sync with spc4r21
   - sg_pt_linux: fix check condition but empty sense buffer; occurred
     when sg v3 node used and /usr/include/linux/bsg.h visible
   - scripts/sas_disk_blink: moved from this package to sdparm

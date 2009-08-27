@@ -26,11 +26,11 @@ information. Following is a usage summary with a one line description:
         - fetch capacity/size information for each <device>
    scsi_ready [-h] [-v] <device>+
         - check the media ready status on each <device>
-   scsi_satl [-h] [-L] [-q] <device>
+   scsi_satl [-h] [-L] [-q] [-v] <device>
         - check <device> for SCSI to ATA Translation Layer (SATL)
-   scsi_start [-h] [-v] <device>+
+   scsi_start [-h] [-v] [-w] <device>+
         - start media (i.e. spin up) in each <device>
-   scsi_stop [-h] [-v] <device>+
+   scsi_stop [-h] [-v] [-w] <device>+
         - stop media (i.e. spin down) in each <device>
    scsi_temperature [-h] [-v] <device>+
         - check temperature in each <device>
@@ -43,4 +43,4 @@ script. Since it depends on the sdparm utility it has been moved to
 the sdparm package in its scripts directory.
 
 Douglas Gilbert
-15th August 2009
+25th August 2009

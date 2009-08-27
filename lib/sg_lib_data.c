@@ -37,7 +37,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.53 20090824";    /* spc-4 rev 20+ */
+const char * sg_lib_version_str = "1.54 20090826";    /* spc-4 rev 21 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -692,6 +692,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x38,0x02,"Esn - power management class event"},
     {0x38,0x04,"Esn - media class event"},
     {0x38,0x06,"Esn - device busy class event"},
+    {0x38,0x07,"Thin provisioning soft threshold reached"},
     {0x39,0x00,"Saving parameters not supported"},
     {0x3A,0x00,"Medium not present"},
     {0x3A,0x01,"Medium not present - tray closed"},
@@ -785,6 +786,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x4B,0x04,"Nak received"},
     {0x4B,0x05,"Data offset error"},
     {0x4B,0x06,"Initiator response timeout"},
+    {0x4B,0x07,"Connection lost"},
     {0x4C,0x00,"Logical unit failed self-configuration"},
     /*
      * ASC 0x4D overridden by an "additional2" array entry
