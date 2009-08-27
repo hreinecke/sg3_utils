@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.84 20090612";    /* SPC-4 rev 20 */
+static char * version_str = "0.85 20090826";    /* SPC-4 rev 21 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -725,7 +725,8 @@ static const char * network_service_type_arr[] =
     "status",
     "logging",
     "code download",
-    "reserved[0x6]", "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
+    "administrative configuration service",
+    "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
     "reserved[0xa]", "reserved[0xb]", "reserved[0xc]", "reserved[0xd]",
     "reserved[0xe]", "reserved[0xf]", "reserved[0x10]", "reserved[0x11]",
     "reserved[0x12]", "reserved[0x13]", "reserved[0x14]", "reserved[0x15]",

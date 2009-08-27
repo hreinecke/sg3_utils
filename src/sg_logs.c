@@ -25,12 +25,12 @@
 
 */
 
-static char * version_str = "0.88 20090811";    /* SPC-4 revision 20 */
+static char * version_str = "0.89 20090827";    /* SPC-4 revision 21 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
 
-#define ALL_PAGE_LPAGE 0x0
+#define SUPP_PAGES_LPAGE 0x0
 #define BUFF_OVER_UNDER_LPAGE 0x1
 #define WRITE_ERR_LPAGE 0x2
 #define READ_ERR_LPAGE 0x3
@@ -48,8 +48,8 @@ static char * version_str = "0.88 20090811";    /* SPC-4 revision 20 */
 #define PCT_LPAGE 0x1a
 #define TAPE_ALERT_LPAGE 0x2e
 #define IE_LPAGE 0x2f
-#define NOT_SUBPG_LOG 0x0
-#define ALL_SUBPG_LOG 0xff
+#define NOT_SPG_SUBPG 0x0
+#define SUPP_SPGS_SUBPG 0xff
 #define LOW_GRP_STATS_SUBPG 0x1
 #define HIGH_GRP_STATS_SUBPG 0x1f
 #define CACHE_STATS_SUBPG 0x20
@@ -632,15 +632,15 @@ show_page_name(int pg_code, int subpg_code,
 
     memset(b, 0, sizeof(b));
     /* first process log pages that do not depend on peripheral type */
-    if (NOT_SUBPG_LOG == subpg_code)
+    if (NOT_SPG_SUBPG == subpg_code)
         snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
     else
         snprintf(b, sizeof(b) - 1, "    0x%02x,0x%02x   ", pg_code,
                  subpg_code);
     done = 1;
-    if ((NOT_SUBPG_LOG == subpg_code) || (ALL_SUBPG_LOG == subpg_code)) {
+    if ((NOT_SPG_SUBPG == subpg_code) || (SUPP_SPGS_SUBPG == subpg_code)) {
         switch (pg_code) {
-        case ALL_PAGE_LPAGE: printf("%sSupported log pages", b); break;
+        case SUPP_PAGES_LPAGE: printf("%sSupported log pages", b); break;
         case BUFF_OVER_UNDER_LPAGE:
             printf("%sBuffer over-run/under-run", b);
             break;
@@ -673,7 +673,7 @@ show_page_name(int pg_code, int subpg_code,
             break;
         }
         if (done) {
-            if (ALL_SUBPG_LOG == subpg_code)
+            if (SUPP_SPGS_SUBPG == subpg_code)
                 printf(" and subpages\n");
             else
                 printf("\n");
@@ -705,6 +705,9 @@ show_page_name(int pg_code, int subpg_code,
             switch (pg_code) {
             case 0x8:
                 printf("%sFormat status (sbc-2)\n", b);
+                break;
+            case 0xc:
+                printf("%sThin provisioning (sbc-3)\n", b);
                 break;
             case 0x15:
                 printf("%sBackground scan results (sbc-3)\n", b);
@@ -3169,7 +3172,7 @@ show_ascii_page(unsigned char * resp, int len,
     pg_code = resp[0] & 0x3f;
     subpg_code = spf ? resp[1] : 0;
 
-    if ((ALL_PAGE_LPAGE != pg_code ) && (ALL_SUBPG_LOG == subpg_code)) {
+    if ((SUPP_PAGES_LPAGE != pg_code ) && (SUPP_SPGS_SUBPG == subpg_code)) {
         printf("Supported subpages for log page=0x%x\n", pg_code);
         for (k = 0; k < num; k += 2)
             show_page_name((int)resp[4 + k], (int)resp[4 + k + 1],
@@ -3177,7 +3180,7 @@ show_ascii_page(unsigned char * resp, int len,
         return;
     }
     switch (pg_code) {
-    case ALL_PAGE_LPAGE:
+    case SUPP_PAGES_LPAGE:
         if (spf) {
             printf("Supported log pages and subpages:\n");
             for (k = 0; k < num; k += 2)
@@ -3380,7 +3383,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
     int res = 0;
 
     optsp->pg_code = TEMPERATURE_LPAGE;
-    optsp->subpg_code = NOT_SUBPG_LOG;
+    optsp->subpg_code = NOT_SPG_SUBPG;
     res = do_logs(sg_fd, resp, max_len, 0, optsp);
     if (0 == res) {
         len = (resp[2] << 8) + resp[3] + 4;
@@ -3458,9 +3461,9 @@ main(int argc, char * argv[])
         }
     }
     if (opts.do_list || opts.do_all) {
-        opts.pg_code = ALL_PAGE_LPAGE;
+        opts.pg_code = SUPP_PAGES_LPAGE;
         if ((opts.do_list > 1) || (opts.do_all > 1))
-            opts.subpg_code = ALL_SUBPG_LOG;
+            opts.subpg_code = SUPP_SPGS_SUBPG;
     }
     if (opts.do_transport) {
         if ((opts.pg_code > 0) || (opts.subpg_code > 0) ||
@@ -3570,7 +3573,7 @@ main(int argc, char * argv[])
             if (spf)
                 opts.subpg_code = parr[++k];
             else
-                opts.subpg_code = NOT_SUBPG_LOG;
+                opts.subpg_code = NOT_SPG_SUBPG;
 
             res = do_logs(sg_fd, rsp_buff, resp_len, 1, &opts);
             if (0 == res) {

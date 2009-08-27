@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.33 20090530";    /* spc4r20 + sbc3r19 */
+static char * version_str = "0.34 20090826";    /* spc4r21 + sbc3r19 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -84,6 +84,8 @@ extern const struct svpd_values_name_t *
 #define VPD_MAN_ASS_SN 0xb1     /* SSC-3, ADC-2 */
 #define VPD_SECURITY_TOKEN 0xb1 /* OSD */
 #define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
+#define VPD_THIN_PROVISIONING 0xb2   /* SBC-3 */
+#define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
 
 /* Device identification VPD page associations */
 #define VPD_ASSOC_LU 0
@@ -145,6 +147,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_ATA_INFO, 0, -1, 0, "ai", "ATA information (SAT)"},
     {VPD_ASCII_OP_DEF, 0, -1, 0, "aod",
      "ASCII implemented operating definition (obs)"},
+    {VPD_AUTOMATION_DEV_SN, 0, 1, 0, "adsn", "Automation device serial "
+     "number (SSC)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
     {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc", "Block device characteristics "
      "(SBC)"},
@@ -179,6 +183,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SECURITY_TOKEN, 0, 0x11, 0, "st", "Security token (OSD)"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, 0, "tas", "TapeAlert supported flags (SSC)"},
+    {VPD_THIN_PROVISIONING, 0, 0, 0, "thp", "Thin provisioning (SBC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
 
@@ -327,7 +332,8 @@ static const char * network_service_type_arr[] =
     "status",
     "logging",
     "code download",
-    "reserved[0x6]", "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
+    "administrative configuration service",
+    "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
     "reserved[0xa]", "reserved[0xb]", "reserved[0xc]", "reserved[0xd]",
     "reserved[0xe]", "reserved[0xf]", "reserved[0x10]", "reserved[0x11]",
     "reserved[0x12]", "reserved[0x13]", "reserved[0x14]", "reserved[0x15]",

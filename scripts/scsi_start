@@ -5,22 +5,26 @@
 #  Spin up the given SCSI disk(s).
 #
 #  SCSI disks (or disks that understand SCSI commands)
-#  are assumed. The immediate bit is set so the command
-#  should return immediately. The disk however will take
-#  10 seconds or more to spin up.
+#  are assumed. By default, the immediate bit is set so the
+#  command should return immediately. The disk however will
+#  take 10 seconds or more to spin up. The '-w' option
+#  causes each start to wait until the disk reports that it
+#  has started.
 #
 #  This script assumes the sg3_utils package is installed.
 #
 ###############################################
 
 verbose=""
+immediate="-i"
 
 usage()
 {
-  echo "Usage: scsi_start [-h] [-v] <device>+"
+  echo "Usage: scsi_start [-h] [-v] [-w] <device>+"
   echo "  where:"
   echo "    -h, --help           print usage message"
   echo "    -v, --verbose        more verbose output"
+  echo "    -w, --wait           wait for each start to complete"
   echo ""
   echo "Send SCSI START STOP UNIT command to start each <device>"
 }
@@ -37,6 +41,7 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   case "$opt" in
     h|-help) usage ; exit 0 ;;
     v|-verbose) verbose="-v" ;;
+    w|-wait) immediate="" ;;
     *) echo "Unknown option: -$opt " ; exit 1 ;;
   esac
   shift
@@ -45,6 +50,6 @@ done
 
 for i
 do
-	echo "sg_start -i 1 $verbose $i"
-        sg_start -i 1 $verbose $i
+	echo "sg_start $immediate 1 $verbose $i"
+        sg_start $immediate 1 $verbose $i
 done
