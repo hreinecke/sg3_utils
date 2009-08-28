@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.34 20090826";    /* spc4r21 + sbc3r19 */
+static char * version_str = "0.35 20090827";    /* spc4r21 + sbc3r19 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -146,7 +146,7 @@ static struct option long_options[] = {
 static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_ATA_INFO, 0, -1, 0, "ai", "ATA information (SAT)"},
     {VPD_ASCII_OP_DEF, 0, -1, 0, "aod",
-     "ASCII implemented operating definition (obs)"},
+     "ASCII implemented operating definition (obsolete)"},
     {VPD_AUTOMATION_DEV_SN, 0, 1, 0, "adsn", "Automation device serial "
      "number (SSC)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
@@ -163,7 +163,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
      "identification, target device only"},
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
     {VPD_IMP_OP_DEF, 0, -1, 0, "iod",
-     "Implemented operating definition (obs)"},
+     "Implemented operating definition (obsolete)"},
     {VPD_MAN_ASS_SN, 0, 1, 0, "mas",
      "Manufacturer assigned serial number (SSC)"},
     {VPD_MAN_ASS_SN, 0, 0x12, 0, "masa",
@@ -1469,8 +1469,12 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
         }
         if (do_raw)
             dStrRaw((const char *)rsp_buff, len);
-        else
-            dStrHex((const char *)rsp_buff, len, (do_long ? 0 : 1));
+        else {
+            if (VPD_ASCII_OP_DEF == num_vpd)
+                dStrHex((const char *)rsp_buff, len, 0);
+            else
+                dStrHex((const char *)rsp_buff, len, (do_long ? 0 : 1));
+        }
         return 0;
     } else {
         fprintf(stderr,
@@ -1481,9 +1485,8 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
 
 /* Returns 0 if successful, else see sg_ll_inquiry() */
 static int
-svpd_decode_standard(int sg_fd, int num_vpd, int subvalue, int maxlen,
-                     int do_hex, int do_raw, int do_long, int do_quiet,
-                     int verbose)
+svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
+                int do_raw, int do_long, int do_quiet, int verbose)
 {
     int len, pdt, num, k;
     char buff[48];
@@ -2340,8 +2343,8 @@ main(int argc, char * argv[])
     }
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
-    res = svpd_decode_standard(sg_fd, num_vpd, subvalue, maxlen, do_hex,
-                               do_raw, do_long, do_quiet, do_verbose);
+    res = svpd_decode_t10(sg_fd, num_vpd, subvalue, maxlen, do_hex, do_raw,
+                          do_long, do_quiet, do_verbose);
     if (SG_LIB_SYNTAX_ERROR == res) {
         res = svpd_decode_vendor(sg_fd, num_vpd, subvalue, maxlen, do_hex,
                                  do_raw, do_long, do_quiet, do_verbose);
