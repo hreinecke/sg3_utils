@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.37 20090824";
+static char * version_str = "0.37 20090903";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -873,7 +873,8 @@ bad:
 static int
 build_transportid(const char * inp, struct opts_t * optsp)
 {
-    int in_len, k;
+    int in_len;
+    int k = 0;
     unsigned int h;
     const char * lcp;
     unsigned char * tid_arr = optsp->transportid_arr;
