@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2009 Douglas Gilbert.
+ * Copyright (c) 2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,7 +51,7 @@
  * logical blocks.
  */
 
-static char * version_str = "1.00 20090611";
+static char * version_str = "1.00 20090906";
 
 #define ME "sg_unmap: "
 

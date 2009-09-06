@@ -2,11 +2,11 @@
 # This is an example of the contents of a file that can be given to sg_unmap
 # For example, assume the /dev/sdc is a scratch disk (e.g. one made by the
 # scsi_debug kernel module) then:
-#    sg_unmap --in=sg_map_example.txt /dev/sdc
+#    sg_unmap --in=sg_unmap_example.txt /dev/sdc
 
-0x12345678,1	# unmap LBA 0x12345678
+0x12345677,1	# unmap LBA 0x12345677
 0x12345678 2	# unmap LBA 0x12345678 and 0x12345679
-0x12345678 3333	# unmap 3333 blocks starting at LBA 0x12345678
+0x12340000 3333	# unmap 3333 blocks starting at LBA 0x12340000
 
 0X5a5a5a5a5a	0  # unmaps 0 blocks (i.e. does nothing)
 
@@ -21,9 +21,9 @@
 # open /dev/sg2 with flags=0x802
 #     unmap cdb: 42 00 00 00 00 00 00 00 58 00 
 #     unmap parameter list:
-#         00 56 00 50 00 00 00 00  00 00 00 00 12 34 56 78    
+#         00 56 00 50 00 00 00 00  00 00 00 00 12 34 56 77    
 #         00 00 00 01 00 00 00 00  00 00 00 00 12 34 56 78    
-#         00 00 00 02 00 00 00 00  00 00 00 00 12 34 56 78    
+#         00 00 00 02 00 00 00 00  00 00 00 00 12 34 00 00    
 #         00 00 0d 05 00 00 00 00  00 00 00 5a 5a 5a 5a 5a    
 #         00 00 00 00 00 00 00 00  00 00 00 00 00 a5 a5 a5    
 #         00 00 00 07 00 00 00 00
