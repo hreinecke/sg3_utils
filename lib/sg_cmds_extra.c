@@ -94,6 +94,7 @@
 #define WRITE_BUFFER_CMD 0x3b
 #define WRITE_BUFFER_CMDLEN 10
 
+#define GET_LBA_STATUS_SA 0x12
 #define READ_LONG_16_SA 0x11
 #define READ_MEDIA_SERIAL_NUM_SA 0x1
 #define REPORT_IDENTIFYING_INFORMATION_SA 0x5
@@ -102,6 +103,80 @@
 #define SET_TGT_PRT_GRP_SA 0xa
 #define WRITE_LONG_16_SA 0x11
 
+
+/* Invokes a SCSI GET LBA STATUS command (SBC). Returns 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> GET LBA STATUS not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
+int
+sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
+                     int alloc_len, int noisy, int verbose)
+{
+    int k, res, sense_cat, ret;
+    unsigned char getLbaStatCmd[SERVICE_ACTION_IN_16_CMDLEN];
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    memset(getLbaStatCmd, 0, sizeof(getLbaStatCmd));
+    getLbaStatCmd[0] = SERVICE_ACTION_IN_16_CMD;
+    getLbaStatCmd[1] = GET_LBA_STATUS_SA;
+
+    getLbaStatCmd[2] = (start_llba >> 56) & 0xff;
+    getLbaStatCmd[3] = (start_llba >> 48) & 0xff;
+    getLbaStatCmd[4] = (start_llba >> 40) & 0xff;
+    getLbaStatCmd[5] = (start_llba >> 32) & 0xff;
+    getLbaStatCmd[6] = (start_llba >> 24) & 0xff;
+    getLbaStatCmd[7] = (start_llba >> 16) & 0xff;
+    getLbaStatCmd[8] = (start_llba >> 8) & 0xff;
+    getLbaStatCmd[9] = start_llba & 0xff;
+    getLbaStatCmd[10] = (alloc_len >> 24) & 0xff;
+    getLbaStatCmd[11] = (alloc_len >> 16) & 0xff;
+    getLbaStatCmd[12] = (alloc_len >> 8) & 0xff;
+    getLbaStatCmd[13] = alloc_len & 0xff;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Get LBA status cmd: ");
+        for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", getLbaStatCmd[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "get LBA status: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, getLbaStatCmd, sizeof(getLbaStatCmd));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, alloc_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "get LBA status", res, alloc_len,
+                               sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
 
 /* Invokes a SCSI REPORT TARGET PORT GROUPS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not supported,

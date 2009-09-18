@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.89 20090827";    /* SPC-4 revision 21 */
+static char * version_str = "0.91 20090918";    /* SPC-4 revision 21 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -39,6 +39,7 @@ static char * version_str = "0.89 20090827";    /* SPC-4 revision 21 */
 #define NON_MEDIUM_LPAGE 0x6
 #define LAST_N_ERR_LPAGE 0x7
 #define LAST_N_DEFERRED_LPAGE 0xb
+#define THIN_PROV_LPAGE 0xc
 #define TEMPERATURE_LPAGE 0xd
 #define START_STOP_LPAGE 0xe
 #define APP_CLIENT_LPAGE 0xf
@@ -706,7 +707,7 @@ show_page_name(int pg_code, int subpg_code,
             case 0x8:
                 printf("%sFormat status (sbc-2)\n", b);
                 break;
-            case 0xc:
+            case THIN_PROV_LPAGE:       /* 0xc */
                 printf("%sThin provisioning (sbc-3)\n", b);
                 break;
             case 0x15:
@@ -2455,7 +2456,17 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
                        "%d\n", j);
             break;
         default:
-            printf("  Medium scan parameter # %d\n", pc);
+            if (pc > 0x800) {
+                if ((pc >= 0x8000) && (pc <= 0xafff))
+                    printf("  Medium scan parameter # %d [0x%x], vendor "
+                           "specific\n", pc, pc);
+                else
+                    printf("  Medium scan parameter # %d [0x%x], "
+                           "reserved\n", pc, pc);
+                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                break;
+            } else
+                printf("  Medium scan parameter # %d [0x%x]\n", pc, pc);
             if ((pl < 24) || (num < 24)) {
                 if (num < 24)
                     fprintf(stderr, "    truncated by response length, "

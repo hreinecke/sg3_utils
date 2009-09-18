@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.85 20090826";    /* SPC-4 rev 21 */
+static char * version_str = "0.86 20090916";    /* SPC-4 rev 21 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -81,9 +81,10 @@ static char * version_str = "0.85 20090826";    /* SPC-4 rev 21 */
 #define VPD_POWER_CONDITION  0x8a
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
-#define VPD_BLOCK_LIMITS  0xb0
-#define VPD_BLOCK_DEV_CHARS  0xb1
-#define VPD_UPR_EMC  0xc0
+#define VPD_BLOCK_LIMITS 0xb0
+#define VPD_BLOCK_DEV_CHARS 0xb1
+#define VPD_THIN_PROVISIONING 0xb2
+#define VPD_UPR_EMC 0xc0
 #define VPD_RDAC_VERS 0xc2
 #define VPD_RDAC_VAC 0xc9
 
@@ -155,6 +156,7 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (IBM)"},
     {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (IBM)"},
+    {VPD_THIN_PROVISIONING, 0, 0, 0, "thp", "Thin provisioning (SBC)"},
     {VPD_UPR_EMC, 0, -1, 1, "upr", "Unit path report (EMC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
@@ -649,6 +651,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_POWER_CONDITION, 0, "Power condition"},
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
+    {VPD_THIN_PROVISIONING, 0, "Thin provisioning (sbc3)"},
     {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
     {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},
     {0xb0, PDT_OSD, "OSD information (osd)"},
@@ -869,7 +872,7 @@ static const char * code_set_arr[] =
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
-static const char * id_type_arr[] =
+static const char * desig_type_arr[] =
 {
     "vendor specific [0x0]",
     "T10 vendor identification",
@@ -888,7 +891,7 @@ static const char * id_type_arr[] =
 static void
 decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
 {
-    int u, j, m, id_len, p_id, c_set, piv, assoc, id_type, i_len;
+    int u, j, m, id_len, p_id, c_set, piv, assoc, desig_type, i_len;
     int off, ci_off, c_id, d_id, naa, vsi, k;
     uint64_t vsei;
     uint64_t id_ext;
@@ -915,12 +918,12 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         c_set = (ucp[0] & 0xf);
         piv = ((ucp[1] & 0x80) ? 1 : 0);
         assoc = ((ucp[1] >> 4) & 0x3);
-        id_type = (ucp[1] & 0xf);
+        desig_type = (ucp[1] & 0xf);
         if (piv && ((1 == assoc) || (2 == assoc)))
             printf("    transport: %s\n",
                    sg_get_trans_proto_str(p_id, sizeof(b), b));
-        printf("    id_type: %s,  code_set: %s\n", id_type_arr[id_type],
-               code_set_arr[c_set]);
+        printf("    designator_type: %s,  code_set: %s\n",
+               desig_type_arr[desig_type], code_set_arr[c_set]);
         printf("    associated with the %s\n", assoc_arr[assoc]);
         if (do_hex) {
             printf("    designator header(hex): %.2x %.2x %.2x %.2x\n",
@@ -929,7 +932,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
             dStrHex((const char *)ip, i_len, 0);
             continue;
         }
-        switch (id_type) {
+        switch (desig_type) {
         case 0: /* vendor specific */
             k = 0;
             if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
@@ -2532,7 +2535,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         }
         break;
     default:
-        printf(" Only hex output supported\n");
+        printf(" Only hex output supported. sg_vpd decodes more pages.\n");
         return process_vpd(sg_fd, optsp);
     }
     if (res) {
