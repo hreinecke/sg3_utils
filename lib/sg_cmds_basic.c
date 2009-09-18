@@ -49,7 +49,7 @@
 #endif
 
 
-static char * version_str = "1.47 20090615";
+static char * version_str = "1.48 20090918";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
