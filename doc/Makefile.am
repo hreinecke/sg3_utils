@@ -9,7 +9,8 @@ if OS_LINUX
 
 man_MANS = \
 	sg3_utils.8 \
-	sg_dd.8 sg_emc_trespass.8 sg_format.8 sg_get_config.8 sg_ident.8 \
+	sg_dd.8 sg_emc_trespass.8 sg_format.8 sg_get_config.8 \
+	sg_get_lba_status.8 sg_ident.8 \
 	sginfo.8 sg_inq.8 sg_logs.8 sg_luns.8 sg_map26.8 sg_map.8 \
 	sgm_dd.8 sg_modes.8 sg_opcodes.8 sgp_dd.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rbuf.8 sg_rdac.8 sg_read.8 sg_readcap.8 \
@@ -33,7 +34,7 @@ if OS_WIN32_MINGW
 
 man_MANS = \
 	sg3_utils.8 \
-	sg_format.8 sg_get_config.8 sg_ident.8 \
+	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
 	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
@@ -56,7 +57,7 @@ if OS_WIN32_CYGWIN
 
 man_MANS = \
 	sg3_utils.8 \
-	sg_format.8 sg_get_config.8 sg_ident.8 \
+	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
 	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
@@ -79,7 +80,7 @@ if OS_FREEBSD
 
 man_MANS = \
 	sg3_utils.8 \
-	sg_format.8 sg_get_config.8 sg_ident.8 \
+	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
 	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
@@ -96,7 +97,7 @@ if OS_SOLARIS
 
 man_MANS = \
 	sg3_utils.8 \
-	sg_format.8 sg_get_config.8 sg_ident.8 \
+	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
 	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
@@ -113,7 +114,7 @@ if OS_OSF
 
 man_MANS = \
 	sg3_utils.8 \
-	sg_format.8 sg_get_config.8 sg_ident.8 \
+	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
 	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
