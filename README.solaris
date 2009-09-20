@@ -10,6 +10,7 @@ Supported Utilities
 Here is a list of utilities that have been ported:
     sg_format
     sg_get_config
+    sg_get_lba_status
     sg_ident
     sg_inq          [dropped ATA IDENTIFY DEVICE capability]
     sg_logs
@@ -82,4 +83,4 @@ See the Solaris section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-15th June 2009
+20th September 2009

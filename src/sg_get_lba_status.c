@@ -59,11 +59,11 @@ static unsigned char * glbasBuffp = glbasBuff;
 
 
 static struct option long_options[] = {
+        {"brief", no_argument, 0, 'b'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"lba", required_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
-        {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
@@ -74,26 +74,29 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-            "sg_get_lba_status    [--help] [--hex] [--lba=LBA] [--maxlen=LEN] "
-            "[--quiet]\n"
-            "                     [--raw] [--verbose] [--version] DEVICE\n"
+            "sg_get_lba_status  [--brief] [--help] [--hex] [--lba=LBA]\n"
+            "                          [--maxlen=LEN] [--raw] [--verbose] "
+            "[--version]\n"
+            "                          DEVICE\n"
             "  where:\n"
-            "    --help|-h           print out usage message\n"
-            "    --hex|-H            output in hexadecimal\n"
+            "    --brief|-b        a descriptor per line: "
+            "<lba_hex blocks_hex p_status>\n"
+            "                      use twice ('-bb') for given LBA "
+            "provisioning status\n"
+            "    --help|-h         print out usage message\n"
+            "    --hex|-H          output in hexadecimal\n"
             "    --lba=LBA|-l LBA    starting LBA (logical block address) "
             "(def: 0)\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
             DEF_GLBAS_BUFF_LEN );
-    fprintf(stderr, "    --quiet|-q         output 1 if LBA mapped, 0 "
-            "if unmapped\n"
-            "    --raw|-r            output in binary\n"
-            "    --verbose|-v        increase verbosity\n"
-            "    --version|-V        print version string and exit\n\n"
+    fprintf(stderr,
+            "    --raw|-r          output in binary\n"
+            "    --verbose|-v      increase verbosity\n"
+            "    --version|-V      print version string and exit\n\n"
             "Performs a SCSI GET LBA STATUS command (SBC-3)\n"
             );
-
 }
 
 static void
@@ -142,13 +145,13 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, k, j, res, c, rlen, num_descs;
+    int do_brief = 0;
     int do_hex = 0;
     int64_t ll;
     uint64_t lba = 0;
-    uint64_t d_lba;
-    uint32_t d_blocks;
+    uint64_t d_lba = 0;
+    uint32_t d_blocks = 0;
     int maxlen = DEF_GLBAS_BUFF_LEN;
-    int do_quiet = 0;
     int do_raw = 0;
     int verbose = 0;
     const char * device_name = NULL;
@@ -158,12 +161,15 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHl:m:qrvV", long_options,
+        c = getopt_long(argc, argv, "bhHl:m:rvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'b':
+            ++do_brief;
+            break;
         case 'h':
         case '?':
             usage();
@@ -186,9 +192,6 @@ main(int argc, char * argv[])
                         "less\n", MAX_GLBAS_BUFF_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            break;
-        case 'q':
-            ++do_quiet;
             break;
         case 'r':
             ++do_raw;
@@ -251,12 +254,18 @@ main(int argc, char * argv[])
                                verbose);
     ret = res;
     if (0 == res) {
+        if (maxlen >= 4)
+            rlen = (glbasBuffp[0] << 24) + (glbasBuffp[1] << 16) +
+                   (glbasBuffp[2] << 8) + glbasBuffp[3] + 4;
+        else
+            rlen = maxlen;
+        k = (rlen > maxlen) ? maxlen : rlen;
         if (do_raw) {
-            dStrRaw((const char *)glbasBuffp, maxlen);
+            dStrRaw((const char *)glbasBuffp, k);
             goto the_end;
         }
         if (do_hex) {
-            dStrHex((const char *)glbasBuffp, maxlen, 1);
+            dStrHex((const char *)glbasBuffp, k, 1);
             goto the_end;
         }
         if (maxlen < 4) {
@@ -265,8 +274,6 @@ main(int argc, char * argv[])
                         " less than 4\n");
             goto the_end;
         }
-        rlen = (glbasBuffp[0] << 24) + (glbasBuffp[1] << 16) +
-               (glbasBuffp[2] << 8) + glbasBuffp[3] + 4;
         if ((verbose > 1) || (verbose && (rlen > maxlen))) {
             fprintf(stderr, "response length %d bytes\n", rlen);
             if (rlen > maxlen)
@@ -276,7 +283,7 @@ main(int argc, char * argv[])
         if (rlen > maxlen)
             rlen = maxlen;
         
-        if (do_quiet) {
+        if (do_brief > 1) {
             if (rlen < 24) {
                 fprintf(stderr, "Need maxlen and response length to "
                         " be at least 24, have %d bytes\n", rlen);
@@ -291,11 +298,12 @@ main(int argc, char * argv[])
                 goto the_end;
             }
             if ((lba < d_lba) || (lba >= (d_lba + d_blocks))) {
-                fprintf(stderr, "given LBA not range of first descriptor\n"
-                        "descriptor LBA: 0x");
+                fprintf(stderr, "given LBA not in range of first "
+                        "descriptor:\n" "  descriptor LBA: 0x");
                 for (j = 0; j < 8; ++j)
                     fprintf(stderr, "%02x", glbasBuffp[8 + j]);
-                fprintf(stderr, "  blocks: 0x%x\n", d_blocks);
+                fprintf(stderr, "  blocks: 0x%x  p_status: %d\n", d_blocks,
+                        res);
                 ret = SG_LIB_CAT_OTHER;
                 goto the_end;
             }
@@ -316,10 +324,22 @@ main(int argc, char * argv[])
             if ((res < 0) || (res > 15))
                 fprintf(stderr, "descriptor %d: bad LBA status descriptor "
                         "returned %d\n", k + 1, res);
-            printf("descriptor LBA: 0x");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", ucp[j]);
-            printf("  blocks: %d\n", d_blocks);
+            if (do_brief) {
+                printf("0x");
+                for (j = 0; j < 8; ++j)
+                    printf("%02x", ucp[j]);
+                printf("  0x%x  %d\n", d_blocks, res);
+            } else {
+                printf("descriptor LBA: 0x");
+                for (j = 0; j < 8; ++j)
+                    printf("%02x", ucp[j]);
+                printf("  blocks: %d", d_blocks);
+                if ((0 == res) || (1 == res))
+                    printf("  %s\n",
+                           ((0x1 & ucp[12]) ? "unmapped" : "mapped"));
+                else
+                    printf("  Provisioning status: %d\n", res);
+            }
         }
         if ((num_descs * 16) + 8 < rlen)
             fprintf(stderr, "incomplete trailing LBA status descriptors "

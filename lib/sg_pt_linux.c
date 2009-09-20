@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -479,6 +480,10 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 
 #include <linux/types.h>
 #include <linux/bsg.h>
+
+#ifdef HAVE_LINUX_KDEV_T_H
+#include <linux/kdev_t.h>
+#endif
 
 
 struct sg_pt_linux_scsi {
@@ -934,9 +939,15 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
                         "(errno) = %d\n", ptp->os_err);
             return -ptp->os_err;
         }
+#ifdef HAVE_LINUX_KDEV_T_H
+        if (! S_ISCHR(a_stat.st_mode) ||
+            (bsg_major != (int)MAJOR(a_stat.st_rdev)))
+            return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+#else
         if (! S_ISCHR(a_stat.st_mode) ||
             (bsg_major != (int)major(a_stat.st_rdev)))
             return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+#endif
     }
 
     if (! ptp->io_hdr.request) {

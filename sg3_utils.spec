@@ -80,7 +80,7 @@ fi
 
 %changelog
 * Sun Sep 06 2009 - dgilbert at interlog dot com
-- add sg_unmap, sg_read_block_limits
+- add sg_get_lba_status, sg_unmap, sg_read_block_limits
   * sg3_utils-1.28
 
 * Sat Apr 11 2009 - dgilbert at interlog dot com
