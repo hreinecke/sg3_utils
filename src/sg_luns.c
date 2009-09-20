@@ -48,7 +48,7 @@
  * This program issues the SCSI REPORT LUNS command to the given SCSI device.
  */
 
-static char * version_str = "1.15 20090617";
+static char * version_str = "1.15 20090920";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -97,7 +97,6 @@ usage()
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI REPORT LUNS command\n"
             );
-
 }
 
 /* Decoded according to SAM-4 rev 4. Note that one draft: BCC rev 0,
