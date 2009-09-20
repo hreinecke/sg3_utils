@@ -85,7 +85,7 @@ usage()
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
-            DEF_RLUNS_BUFF_LEN );
+            DEF_GLBAS_BUFF_LEN );
     fprintf(stderr, "    --quiet|-q         output 1 if LBA mapped, 0 "
             "if unmapped\n"
             "    --raw|-r            output in binary\n"
@@ -141,7 +141,7 @@ decode_lba_status_desc(const unsigned char * ucp, uint64_t * slbap,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, j, res, c, num_descs;
+    int sg_fd, k, j, res, c, rlen, num_descs;
     int do_hex = 0;
     int64_t ll;
     uint64_t lba = 0;
@@ -225,9 +225,9 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (maxlen > DEF_GLBAS_BUFF_LEN) {
-        glbasBuffp = (unsigned char *)calloc(max_len, 1);
+        glbasBuffp = (unsigned char *)calloc(maxlen, 1);
         if (NULL == glbasBuffp) {
-            fprintf(stderr, "unable to allocate %d bytes on heap\n");
+            fprintf(stderr, "unable to allocate %d bytes on heap\n", maxlen);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -271,7 +271,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "response length %d bytes\n", rlen);
             if (rlen > maxlen)
                 fprintf(stderr, "  ... which is greater than maxlen "
-                        "(allocation length %d), truncation\n", rlen, maxlen);
+                        "(allocation length %d), truncation\n", maxlen);
         }
         if (rlen > maxlen)
             rlen = maxlen;
