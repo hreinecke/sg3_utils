@@ -4,6 +4,7 @@
 # Script to test compliance of SCSI commands on a SCSI to ATA
 # Translation (SAT) Layer (SATL). This script was compiled using
 # sat-r09.pdf found at www.t10.org .
+# The scripts still seems to be valid for sat2r09.pdf .
 # The vintage is SPC-3 and SPC-4 (see www.t10.org).
 #
 # Coverage:
@@ -22,9 +23,9 @@
 #                        device, if packet device add "-p" option
 #
 # This script uses utilities from sg3_utils package (version
-# 1.22 or later) and sdparm (version 0.99 or later)
+# 1.22 or later)
 #
-# Douglas Gilbert 20090815
+# Douglas Gilbert 20090930
 
 
 log=0

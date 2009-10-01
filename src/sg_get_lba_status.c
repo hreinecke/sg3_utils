@@ -49,7 +49,7 @@
  * This program issues the SCSI GET LBA STATUS command to the given SCSI device.
  */
 
-static char * version_str = "1.00 20090920";
+static char * version_str = "1.01 20090930";
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
@@ -256,7 +256,7 @@ main(int argc, char * argv[])
     if (0 == res) {
         if (maxlen >= 4)
             rlen = (glbasBuffp[0] << 24) + (glbasBuffp[1] << 16) +
-                   (glbasBuffp[2] << 8) + glbasBuffp[3] + 4;
+                   (glbasBuffp[2] << 8) + glbasBuffp[3] + 8;
         else
             rlen = maxlen;
         k = (rlen > maxlen) ? maxlen : rlen;

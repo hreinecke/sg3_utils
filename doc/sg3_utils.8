@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "August 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG3_UTILS "8" "October 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -236,7 +236,24 @@ trailing "h" or "H" as found in (storage) standards. When hex numbers are
 given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
 .SH SCRIPTS, EXAMPLES and UTILS
-xxxxxxxxxxxxx
+There are several bourne shell scripts in the 'scripts' subdirectory that
+invoke compiled utilities (e.g. sg_readcap). The scripts start with 'scsi_'
+rather than 'sg_'. One purpose of these scripts is to call the same
+utility (e.g. sg_readcap) on multiple disks. Most of the basic compiled
+utilities only allow one device as an argument. Some distributions
+install these scripts in a visible directory (e.g. /usr/src/bin). Some of
+these scripts have man page entries. See the README file in the 'scripts'
+subdirectory.
+.PP
+There is some example C code plus examples of complex invocations in
+the 'examples' subdirectory. There is also a README file. The example C
+may be a simpler example of how to use a SCSI pass-through in Linux
+than the main utilities (found in the 'src' subdirectory). This is due
+to the fewer abstraction layers (e.g. they don't worry the MinGW in
+Windows may open a file in text rather than binary mode).
+.PP
+Some utilities that the author has found useful have been placed in
+the 'utils' subdirectory.
 .SH WEB SITE
 There is a web page discussing this package at 
 http://sg.danny.cz/sg/sg3_utils.html .
