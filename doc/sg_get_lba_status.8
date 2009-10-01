@@ -10,15 +10,15 @@ sg_get_lba_status \- send the SCSI GET LBA STATUS command
 .\" Add any additional description here
 .PP
 Send the SCSI GET LBA STATUS command to the \fIDEVICE\fR and outputs the
-response. This command was introduced in (draft) SBC-3 revision 20 and
+response. This command was introduced in (draft) SBC\-3 revision 20 and
 devices that support thin provisioning should support this command.
 .PP
 The default action is to decode the response into one LBA status descriptor
 per line output to stdout. The descriptor LBA is output in hex (prefixed
-by '0x' and the number of blocks is output in decimal followed by the
+by '0x') and the number of blocks is output in decimal followed by the
 provisioning status in decimal. The provisioning status can be in the
 range 0 to 15 of which only 0 (mapped) and 1 (unmapped) are used currently.
-The amount of output can be reduced by the '--brief' option.
+The amount of output can be reduced by the \fI\-\-brief\fR option.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -27,11 +27,11 @@ when use once then one LBA status descriptor per line is output to stdout.
 Each line has this
 format: "0x<descriptor_LBA>  0x<blocks> <provisioning_status>". So the
 descriptor LBA and blocks are output in hex and the provisioning status
-in decimal. When used twice (e.g. '-bb' or '--brief --brief') the
+in decimal. When used twice (e.g. '\-bb' or '\-\-brief \-\-brief') the
 the provisioning status of the given \fILBA\fR (or LBA 0 if the
 \fI\-\-lba\fR option is not given) is output to stdout. A check is made
 that the given \fILBA\fR lies on the range of the first returned LBA
-status descriptor (as it should according to SBC-3 revision 20) and
+status descriptor (as it should according to SBC\-3 revision 20) and
 warnings are sent to stderr if it doesn't.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -49,7 +49,7 @@ following blocks that it will return provisioning status for.
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
 the cdb's "allocation length" field. If not given then 24 is used. 24 is
 enough space for the response header and one LBA status descriptor.
-\fILEN\fR should be 8 plus a multiple of 16 (i.e. either 24, 40, 56, etc).
+\fILEN\fR should be 8 plus a multiple of 16 (e.g. 24, 40, and 56 are suitable).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary (to stdout).

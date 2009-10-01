@@ -1,0 +1,51 @@
+.TH SCSI_READCAP "8" "October 2009" "sg3_utils\-1.28" SG3_UTILS
+.SH NAME
+scsi_readcap \- do SCSI READ CAPACITY command on disks
+.SH SYNOPSIS
+.B scsi_readcap
+[\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-long\fR] [\fI\-\-verbose\fR]
+\fIDEVICE\fR [\fIDEVICE\fR]*
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This bourne shell script calls the sg_readcap utility on each given
+\fIDEVICE\fR. This will send a SCSI READ CAPACITY command to each
+\fIDEVICE\fR.
+.PP
+The default action of this script is to send the 10 byte cdb READ
+CAPACITY(10) command to each \fIDEVICE\fR. If a response indicates
+the number of blocks is greater than or equal to '2**32 \- 1' then
+the READ CAPACITY(16) is sent and its response is output.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-brief\fR
+shortens the output to two hexadecimal numbers, both prefixed by '0x'.
+The first number is the number of blocks available and the second is
+the size of each blocks in bytes (e.g. '0x12a19eb0 0x200'). If an error
+is detected '0x0 0x0' is output and the script continues if there are
+more \fIDEVICE\fRs.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-l\fR, \fB\-\-long\fR
+the default is to send the READ CAPACITY(10) command (i.e. the 10 byte
+cdb variant). When this option is given the READ CAPACITY(16) command
+is sent. The latter command yields more information in its response.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level or verbosity.
+.SH EXIT STATUS
+The exit status of this script is 0 when it is successful. Otherwise the
+exit status is that of the last sg_readcap utility called. See
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by D. Gilbert
+.SH COPYRIGHT
+Copyright \(co 2009 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_readcap (sg3_utils)

@@ -1,4 +1,4 @@
-.TH SG_READCAP "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_READCAP "8" "September 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
 sg_readcap \- sends a SCSI READ CAPACITY command
 .SH SYNOPSIS
@@ -22,8 +22,8 @@ blocks is thus one plus the block address of the last block (as blocks
 are counted origin zero (i.e. starting at block zero)). This is the source
 of many "off by one" errors.
 .PP
-The READ CAPACITY(16) response shows additional information not found in the
-READ CAPACITY(10) response. This includes protection and thin provisioning
+The READ CAPACITY(16) response provides additional information not found in
+the READ CAPACITY(10) response. This includes protection and thin provisioning
 information, plus the number of logical blocks per physical block. So even
 though the media size may not exceed what READ CAPACITY(10) can show, it may
 still be useful to examine the response to READ CAPACITY(16). Sadly there
@@ -33,6 +33,12 @@ the READ CAPACITY(16) command is sent to them.
 Device capacity is the product of the number of blocks by the block size.
 This utility outputs this figure in bytes, MiB (1048576 bytes per MiB)
 and GB (1000000000 bytes per GB).
+.PP
+If sg_readcap is called without the \fI\-\-long\fR option then the 10 byte
+cdb version (i.e. READ CAPACITY (10)) is sent to the \fIDEVICE\fR. If the
+number of blocks in the response is reported as
+0xffffffff (i.e. (2**32 \- 1) ) and the \fI\-\-hex\fR option has not been
+given, then READ CAPACITY (16) is called and its response is output.
 .PP
 This utility supports two command line syntaxes, the preferred one is
 shown first in the synopsis and explained in this section. A later section
@@ -44,7 +50,7 @@ Arguments to long options are mandatory for short options as well.
 outputs two hex numbers (prefixed with '0x' and space separated)
 to stdout. The first number is the maximum number of blocks on the
 device (which is one plus the lba of the last accessible block). The
-second number is the size of each block. If the operation fails
+second number is the size in bytes of each block. If the operation fails
 then "0x0 0x0" is written to stdout.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -90,12 +96,6 @@ increase level of verbosity. Can be used multiple times.
 \fB\-V\fR, \fB\-\-version\fR
 outputs version string then exits.
 .SH NOTES
-If sg_readcap is called without the \fI\-\-long\fR option then the 10 byte
-cdb version (i.e. READ CAPACITY (10)) is sent to the \fIDEVICE\fR. If the
-number of blocks in the response is reported as
-0xffffffff (i.e. (2**32 \- 1) ) and the \fI\-\-hex\fR option has not been
-given, then READ CAPACITY (16) is called and its response is output.
-.PP
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
 generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
 and DVD drives) can also be specified. For example "sg_readcap /dev/sda"
