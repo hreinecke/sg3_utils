@@ -169,10 +169,13 @@ More generic build information can be found in the INSTALL file.
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
 this: 'rpmbuild -ba sg3_utils.spec' in a rpmbuild tree SPECS directory.
+
 The 'build_debian.sh' script should build several "deb" packages and place
 them in the parent directory. In debian based systems doing
 a 'apt-get install build-essential' is one way to get most of build
-environment needed if it has not already been loaded. 
+environment needed if it has not already been loaded. There are now some
+problems with this script and the superseded Debian 4.0 ("etch"). See
+debian/README.debian4 for a workaround.
 
 Warning
 =======
@@ -361,4 +364,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-1st October 2009
+2nd October 2009

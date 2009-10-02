@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Thu Oct 01 2009 - dgilbert at interlog dot com
+* Fri Oct 02 2009 - dgilbert at interlog dot com
 - add sg_get_lba_status, sg_unmap, sg_read_block_limits
   * sg3_utils-1.28
 

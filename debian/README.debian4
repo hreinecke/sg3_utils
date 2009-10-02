@@ -1,0 +1,14 @@
+For whatever reason Debian build scripts (e.g. debhelper and dbclean)
+seem to have changed in such a way to be Debian 4.0 ("etch") unfriendly.
+
+So when the ./build_debian.sh script is called on a Debian 4.0 system,
+it fails saying the debhelper is too old. That can be fixed by editing
+the 'control' file, changing this line:
+    Build-Depends: debhelper (>> 7), libtool, libcam-dev [kfreebsd-i386 kfreebsd-amd64]
+to:
+    Build-Depends: debhelper, libtool, libcam-dev [kfreebsd-i386 kfreebsd-amd64]
+
+The script then dies in dbclean and the hack to get around that is to
+edit the 'compat' file. It contains "7" which needs to be changed to
+"4".
+
