@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# If this script fails on a Debian 4.0 ("etch") system then read
+# the debian/README.debian4 file.
+
 echo "chmod +x debian/rules"
 chmod +x debian/rules
 
