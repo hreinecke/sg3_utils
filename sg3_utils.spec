@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.28
+Version: 1.29
 # Release: 1%{?dist}
 Release: 1
 License: GPL
