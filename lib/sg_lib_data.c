@@ -37,7 +37,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.54 20090826";    /* spc-4 rev 21 */
+const char * sg_lib_version_str = "1.55 20091005";    /* spc-4 rev 22 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -430,6 +430,11 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x12,"Logical unit not ready, offline"},
     {0x04,0x13,"Logical unit not ready, SA creation in progress"},
     {0x04,0x14,"Logical unit not ready, space allocation in progress"},
+    {0x04,0x15,"Logical unit not ready, robotics disabled"},
+    {0x04,0x16,"Logical unit not ready, configuration required"},
+    {0x04,0x17,"Logical unit not ready, calibration required"},
+    {0x04,0x18,"Logical unit not ready, a door is open"},
+    {0x04,0x19,"Logical unit not ready, operating in sequential mode"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -673,6 +678,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x30,0x10,"Medium not formatted"},
     {0x30,0x11,"Incompatible volume type"},
     {0x30,0x12,"Incompatible volume qualifier"},
+    {0x30,0x13,"Cleaning volume expired"},
     {0x31,0x00,"Medium format corrupted"},
     {0x31,0x01,"Format command failed"},
     {0x31,0x02,"Zoned formatting failed due to spare linking"},
@@ -818,6 +824,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x08,"Maximum number of supplemental decryption keys exceeded"},
     {0x55,0x09,"Medium auxiliary memory not accessible"},
     {0x55,0x0a,"Data currently unavailable"},
+    {0x55,0x0b,"Insufficient power for operation"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
