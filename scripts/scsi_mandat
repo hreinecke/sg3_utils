@@ -17,11 +17,12 @@
 # This script uses utilities frim sg3_utils package (version
 # 1.21 or later) and sdparm (version 0.99 or later)
 #
-# Douglas Gilbert 20070317
+# Douglas Gilbert 20091005
 
 
 log=0
 quiet=0
+verbose=""
 
 file_err=0
 inv_opcode=0
@@ -44,6 +45,7 @@ usage()
   echo "  where:  -h    print usage message"
   echo "          -L, --log        append stderr to 'scsi_mandat.err'"
   echo "          -q    suppress some output"
+  echo "          -v    increase verbosity of output"
   echo ""
   echo "Check <device> for manadatory SCSI command support"
 }
@@ -64,6 +66,9 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     h|-help) usage ; exit 0 ;;
     L|-log) let log=$log+1 ;;
     q|-quiet) let quiet=$quiet+1 ;;
+    v|-verbose) verbose="-v" ;;
+    vv) verbose="-vv" ;;
+    vvv) verbose="-vvv" ;;
     *) echo "Unknown option: -$opt " ; exit 1 ;;
   esac
   shift
@@ -74,14 +79,24 @@ for command in "sg_inq" "sg_luns" "sg_turs" "sg_requests" "sg_vpd" \
                 "sg_vpd -i" "sg_senddiag -t"
 do
   if [ $quiet -eq 0 ]
-    then echo "$command" $1
+    then echo "$command" $verbose $1
   fi
 
-  if [ $log -eq 0 ]
+  if [ $verbose ]
   then
-    $command $1 > /dev/null 2>> /dev/null
+    if [ $log -eq 0 ]
+    then
+      $command $verbose $1
+    else
+      $command $verbose $1 >> scsi_mandat.err 2>> scsi_mandat.err
+    fi
   else
-    $command $1 > /dev/null 2>> scsi_mandat.err
+    if [ $log -eq 0 ]
+    then
+      $command $1 > /dev/null 2>> /dev/null
+    else
+      $command $1 > /dev/null 2>> scsi_mandat.err
+    fi
   fi
   res=$?
   case "$res" in

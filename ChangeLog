@@ -2,8 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.29 [20091005] [svn: r319]
+Changelog for sg3_utils-1.29 [20091015] [svn: r320]
   - sg_lib: update asc/ascq list to spc4r22
+  - sg_inq_data: update version descriptor list to spc4r22
+  - sg_vpd: block device characteristics page: fix form factor
 
 Changelog for sg3_utils-1.28 [20091002] [svn: r315]
   - sg_unmap: new utility for thin provisioning

@@ -39,7 +39,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 21 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 22 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -157,6 +157,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x3f0, "SES-2 ANSI INCITS 448-2008"},
     {0x400, "SSC-3 (no version claimed)"},
     {0x403, "SSC-3 T10/1611-D revision 04a"},
+    {0x407, "SSC-3 T10/1611-D revision 05"},
     {0x420, "MMC-5 (no version claimed)"},
     {0x42f, "MMC-5 T10/1675-D revision 03"},
     {0x431, "MMC-5 T10/1675-D revision 03b"},
@@ -281,6 +282,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc27, "SAS-2 T10/1760-D revision 15"},
     {0xc28, "SAS-2 T10/1760-D revision 16"},
     {0xc40, "SAS-2.1 (no version claimed)"},
+    {0xc48, "SAS-2.1 T10/2125-D revision 04"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
     {0xd3c, "FC-PH ANSI INCITS 230-1994 with Amnd 1 ANSI INCITS "
@@ -372,9 +374,12 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1eab, "SAT T10/1711-D rev 9"},
     {0x1ead, "SAT ANSI INCITS 431-2007"},
     {0x1ec0, "SAT-2 (no version claimed)"},
-    {0x1ec4, "SAT-2 T10/1826-D revision 6"},
+    {0x1ec4, "SAT-2 T10/1826-D revision 06"},
+    {0x1ec8, "SAT-2 T10/1826-D revision 09"},
     {0x1ee0, "SAT-3 (no version claimed)"},
     {0x20a0, "SPL (no version claimed)"},
+    {0xffc0, "IEEE 1667 (no version claimed)"},
+    {0xffc1, "IEEE 1667-2006"},
     {0xffff, NULL},
 };
 
