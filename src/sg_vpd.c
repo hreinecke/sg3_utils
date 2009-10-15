@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.36 20090916";    /* spc4r21 + sbc3r20 */
+static char * version_str = "0.37 20091015";    /* spc4r21 + sbc3r20 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -198,8 +198,8 @@ usage()
             "               [--version] DEVICE\n");
     fprintf(stderr,
             "  where:\n"
-            "    --enumerate|-e    enumerate known VPD pages names then "
-            "exit\n"
+            "    --enumerate|-e    enumerate known VPD pages names (ignore "
+            "DEVICE)\n"
             "    --help|-h       output this usage message then exit\n"
             "    --hex|-H        output page in ASCII hexadecimal\n"
             "    --ident|-i      output device identification VPD page, "
@@ -1394,9 +1394,9 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             else
                 printf("  Nominal rotation rate: %d rpm\n", u);
             u = buff[7] & 0xf;
+            printf("  Nominal form factor");
             switch (u)
             {
-            printf("  Nominal form factor");
             case 0:
                 printf(" not reported\n");
                 break;
