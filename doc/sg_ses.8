@@ -1,4 +1,4 @@
-.TH SG_SES "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_SES "8" "January 2010" "sg3_utils\-1.29" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -21,6 +21,11 @@ the EncServ bit set in its INQUIRY response.
 If no options are given (only the \fIDEVICE\fR argument) then all
 diagnostic pages supported by the device (including SES pages)
 are listed.
+.PP
+The most recent reference for this utility is the draft SCSI Enclosure
+Services 3 document T10/2149-D Revision 2 at http://ww.t10.org . Existing
+standards for SES and SES\-2 are ANSI INCITS 305\-1998 and ANSI INCITS
+448\-2008 respectively.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -149,7 +154,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2009 Douglas Gilbert
+Copyright \(co 2004\-2010 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
