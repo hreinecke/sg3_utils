@@ -12,7 +12,7 @@
 #include "sg_cmds_basic.h"
 
 /*
- *  Copyright (C) 1999-2008 D. Gilbert
+ *  Copyright (C) 1999-2010 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -44,6 +44,7 @@ static struct option long_options[] = {
         {"new", 0, 0, 'N'},
         {"old", 0, 0, 'O'},
         {"pc", 1, 0, 'p'},
+        {"readonly", 0, 0, 'r'},
         {"start", 0, 0, 's'},
         {"stop", 0, 0, 'S'},
         {"verbose", 0, 0, 'v'},
@@ -60,6 +61,7 @@ struct opts_t {
     int do_loej;
     int do_mod;
     int do_noflush;
+    int do_readonly;
     int do_pc;
     int do_start;
     int do_stop;
@@ -72,88 +74,93 @@ struct opts_t {
 static void
 usage()
 {
-        fprintf(stderr, "Usage: sg_start [--eject] [--fl=FL] [--help] "
-                "[--immed] [--load] [--loej]\n"
-                "                [--mod=PC_MOD] [--noflush] [--pc=PC] "
-                "[--start] [--stop]\n"
-                "                [--verbose] [--version] DEVICE\n"
-                "  where:\n"
-                "    --eject|-e      stop unit then eject the medium\n"
-                "    --fl=FL|-f FL    format layer number (mmc5)\n"
-                "    --help|-h       print usage message then exit\n"
-                "    --immed|-i      device should return control after "
-                "receiving cdb,\n"
-                "                    default action is to wait until action "
-                "is complete\n"
-                "    --load|-l       load medium then start the unit\n"
-                "    --loej|-L       load or eject, corresponds to LOEJ bit "
-                "in cdb;\n"
-                "                    load when START bit also set, else "
-                "eject\n"
-                "    --mod=PC_MOD|-m PC_MOD    power condition modifier "
-                "(def: 0) (sbc)\n"
-                "    --noflush|-n    no flush prior to operation that limits "
-                "access (sbc)\n"
-                "    --load|-l       load medium then start the unit\n"
-                "    --pc=PC|-p PC    power condition: 0 (default) -> no "
-                "power condition,\n"
-                "                    1 -> active, 2 -> idle, 3 -> standby, "
-                "5 -> sleep (mmc)\n"
-                "    --start|-s      start unit, corresponds to START bit "
-                "in cdb,\n"
-                "                    default (START=1) if no other options "
-                "given\n"
-                "    --stop|-S       stop unit (e.g. spin down disk)\n"
-                "    --verbose|-v    increase verbosity\n"
-                "    --version|-V    print version string then exit\n\n"
-                "    Example: 'sg_start --stop /dev/sdb'    stops unit\n"
-                "             'sg_start --eject /dev/scd0'  stops unit and "
-                "ejects medium\n\n"
-                "Performs a SCSI START STOP UNIT command\n"
-                );
+    fprintf(stderr, "Usage: sg_start [--eject] [--fl=FL] [--help] "
+            "[--immed] [--load] [--loej]\n"
+            "                [--mod=PC_MOD] [--noflush] [--pc=PC] "
+            "[--readonly]\n"
+            "                [--start] [--stop] [--verbose] "
+            "[--version] DEVICE\n"
+            "  where:\n"
+            "    --eject|-e      stop unit then eject the medium\n"
+            "    --fl=FL|-f FL    format layer number (mmc5)\n"
+            "    --help|-h       print usage message then exit\n"
+            "    --immed|-i      device should return control after "
+            "receiving cdb,\n"
+            "                    default action is to wait until action "
+            "is complete\n"
+            "    --load|-l       load medium then start the unit\n"
+            "    --loej|-L       load or eject, corresponds to LOEJ bit "
+            "in cdb;\n"
+            "                    load when START bit also set, else "
+            "eject\n"
+            "    --mod=PC_MOD|-m PC_MOD    power condition modifier "
+            "(def: 0) (sbc)\n"
+            "    --noflush|-n    no flush prior to operation that limits "
+            "access (sbc)\n"
+            "    --load|-l       load medium then start the unit\n"
+            "    --pc=PC|-p PC    power condition: 0 (default) -> no "
+            "power condition,\n"
+            "                    1 -> active, 2 -> idle, 3 -> standby, "
+            "5 -> sleep (mmc)\n"
+            "    --readonly|-r    open DEVICE read-only (def: read-write)\n"
+            "                     recommended if DEVICE is ATA disk\n"
+            "    --start|-s      start unit, corresponds to START bit "
+            "in cdb,\n"
+            "                    default (START=1) if no other options "
+            "given\n"
+            "    --stop|-S       stop unit (e.g. spin down disk)\n"
+            "    --verbose|-v    increase verbosity\n"
+            "    --version|-V    print version string then exit\n\n"
+            "    Example: 'sg_start --stop /dev/sdb'    stops unit\n"
+            "             'sg_start --eject /dev/scd0'  stops unit and "
+            "ejects medium\n\n"
+            "Performs a SCSI START STOP UNIT command\n"
+            );
 }
 
 static void
 usage_old()
 {
-        fprintf(stderr, "Usage:  sg_start [0] [1] [--eject] [--fl=FL] "
-                "[-i] [--imm=0|1]\n"
-                "                 [--load] [--loej] [--mod=PC_MOD] "
-                "[--noflush] [--pc=PC]\n"
-                "                 [--start] [--stop] [-v] [-V]\n"
-                "                 DEVICE\n"
-                "  where:\n"
-                "    0          stop unit (e.g. spin down a disk or a "
-                "cd/dvd)\n"
-                "    1          start unit (e.g. spin up a disk or a "
-                "cd/dvd)\n"
-                "    --eject    stop then eject the medium\n"
-                "    --fl=FL    format layer number (mmc5)\n"
-                "    -i         return immediately (same as '--imm=1')\n"
-                "    --imm=0|1  0->await completion(def), 1->return "
-                "immediately\n"
-                "    --load     load then start the medium\n"
-                "    --loej     load the medium if '-start' option is "
-                "also given\n"
-                "               or stop unit and eject\n"
-                "    --mod=PC_MOD    power condition modifier "
-                "(def: 0) (sbc)\n"
-                "    --noflush    no flush prior to operation that limits "
-                "access (sbc)\n"
-                "    --pc=PC    power condition (in hex, default 0 -> no "
-                "power condition)\n"
-                "               1 -> active, 2 -> idle, 3 -> standby, "
-                "5 -> sleep (mmc)\n"
-                "    --start    start unit (same as '1'), default "
-                "action\n"
-                "    --stop     stop unit (same as '0')\n"
-                "    -v         verbose (print out SCSI commands)\n"
-                "    -V         print version string then exit\n\n"
-                "    Example: 'sg_start --stop /dev/sdb'    stops unit\n"
-                "             'sg_start --eject /dev/scd0'  stops unit and "
-                "ejects medium\n\n"
-                "Performs a SCSI START STOP UNIT command\n"
-                );
+    fprintf(stderr, "Usage:  sg_start [0] [1] [--eject] [--fl=FL] "
+            "[-i] [--imm=0|1]\n"
+            "                 [--load] [--loej] [--mod=PC_MOD] "
+            "[--noflush] [--pc=PC]\n"
+            "                 [--readonly] [--start] [--stop] [-v] [-V]\n"
+            "                 DEVICE\n"
+            "  where:\n"
+            "    0          stop unit (e.g. spin down a disk or a "
+            "cd/dvd)\n"
+            "    1          start unit (e.g. spin up a disk or a "
+            "cd/dvd)\n"
+            "    --eject    stop then eject the medium\n"
+            "    --fl=FL    format layer number (mmc5)\n"
+            "    -i         return immediately (same as '--imm=1')\n"
+            "    --imm=0|1  0->await completion(def), 1->return "
+            "immediately\n"
+            "    --load     load then start the medium\n"
+            "    --loej     load the medium if '-start' option is "
+            "also given\n"
+            "               or stop unit and eject\n"
+            "    --mod=PC_MOD    power condition modifier "
+            "(def: 0) (sbc)\n"
+            "    --noflush    no flush prior to operation that limits "
+            "access (sbc)\n"
+            "    --pc=PC    power condition (in hex, default 0 -> no "
+            "power condition)\n"
+            "               1 -> active, 2 -> idle, 3 -> standby, "
+            "5 -> sleep (mmc)\n"
+            "    --readonly|-r    open DEVICE read-only (def: read-write)\n"
+            "                     recommended if DEVICE is ATA disk\n"
+            "    --start    start unit (same as '1'), default "
+            "action\n"
+            "    --stop     stop unit (same as '0')\n"
+            "    -v         verbose (print out SCSI commands)\n"
+            "    -V         print version string then exit\n\n"
+            "    Example: 'sg_start --stop /dev/sdb'    stops unit\n"
+            "             'sg_start --eject /dev/scd0'  stops unit and "
+            "ejects medium\n\n"
+            "Performs a SCSI START STOP UNIT command\n"
+            );
 }
 
 static int
@@ -164,7 +171,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ef:hilLm:nNOp:sSvV", long_options,
+        c = getopt_long(argc, argv, "ef:hilLm:nNOp:rsSvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -224,6 +231,9 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             optsp->do_pc = n;
+            break;
+        case 'r':
+            ++optsp->do_readonly;
             break;
         case 's':
             ++optsp->do_start;
@@ -293,6 +303,9 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                         optsp->do_immed = 1;
                     else
                         jmp_out = 1;
+                    break;
+                case 'r':
+                    ++optsp->do_readonly;
                     break;
                 case 'v':
                     ++optsp->do_verbose;
@@ -508,7 +521,8 @@ main(int argc, char * argv[])
         }
     }
 
-    fd = sg_cmds_open_device(opts.device_name, 0 /* rw */, opts.do_verbose);
+    fd = sg_cmds_open_device(opts.device_name,  opts.do_readonly /* rw */,
+                             opts.do_verbose);
     if (fd < 0) {
         fprintf(stderr, "Error trying to open %s: %s\n",
                 opts.device_name, safe_strerror(-fd));

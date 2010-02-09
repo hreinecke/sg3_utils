@@ -552,14 +552,14 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
         case 9:
             n += sprintf(b + n, "ATA Status Return\n");
             if (add_len >= 12) {
-                int extended, sector_count;
+                int extend, sector_count;
 
-                extended = descp[2] & 1;
-                sector_count = descp[5] + (extended ? (descp[4] << 8) : 0);
-                n += sprintf(b + n, "    extended=%d  error=0x%x "
-                        " sector_count=0x%x\n", extended, descp[3],
+                extend = descp[2] & 1;
+                sector_count = descp[5] + (extend ? (descp[4] << 8) : 0);
+                n += sprintf(b + n, "    extend=%d  error=0x%x "
+                        " sector_count=0x%x\n", extend, descp[3],
                         sector_count);
-                if (extended)
+                if (extend)
                     n += sprintf(b + n, "    lba=0x%02x%02x%02x%02x%02x%02x\n",
                                  descp[10], descp[8], descp[6],
                                  descp[11], descp[9], descp[7]);
