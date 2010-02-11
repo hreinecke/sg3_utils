@@ -15,7 +15,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2009 D. Gilbert
+*  Copyright (C) 2000-2010 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.92 20091205";    /* SPC-4 revision 21 */
+static char * version_str = "0.93 20100211";    /* SPC-4 revision 23 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -759,6 +759,9 @@ show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x16:
                 printf("%sTape diagnostic (ssc-3)\n", b);
+                break;
+            case 0x17:
+                printf("%sVolume statistics (ssc-3)\n", b);
                 break;
             case 0x2d:
                 printf("%sCurrent service information (ssc-3)\n", b);
