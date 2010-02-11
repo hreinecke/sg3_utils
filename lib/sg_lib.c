@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2009 Douglas Gilbert.
+ * Copyright (c) 1999-2010 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

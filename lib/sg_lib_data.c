@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 Douglas Gilbert.
+ * Copyright (c) 2007-2010 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.56 20100131";    /* spc-4 rev 22 */
+const char * sg_lib_version_str = "1.56 20100210";    /* spc-4 rev 23 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -157,6 +157,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x86, 0, "Access control in"},
     {0x87, 0, "Access control out"},
     {0x88, 0, "Read(16)"},
+    {0x89, 0, "Compare and write"},
     {0x8a, 0, "Write(16)"},
     {0x8b, 0, "Orwrite(16)"},
     {0x8c, 0, "Read attribute"},
@@ -570,6 +571,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x20,0x09,"Access denied - invalid LU identifier"},
     {0x20,0x0A,"Access denied - invalid proxy token"},
     {0x20,0x0B,"Access denied - ACL LUN conflict"},
+    {0x20,0x0C,"Illegal command when not in append-only mode"},
     {0x21,0x00,"Logical block address out of range"},
     {0x21,0x01,"Invalid element address"},
     {0x21,0x02,"Invalid address for write"},

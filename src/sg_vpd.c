@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2009 Douglas Gilbert.
+ * Copyright (c) 2006-2010 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.37 20091015";    /* spc4r21 + sbc3r20 */
+static char * version_str = "0.38 20100211";    /* spc4r23 + sbc3r21 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -75,6 +75,7 @@ extern const struct svpd_values_name_t *
 #define VPD_SCSI_PORTS 0x88
 #define VPD_ATA_INFO 0x89
 #define VPD_POWER_CONDITION 0x8a
+#define VPD_DEVICE_CONSTITUENTS 0x8b
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
@@ -152,6 +153,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
     {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc", "Block device characteristics "
      "(SBC)"},
+    {VPD_DEVICE_CONSTITUENTS, 0, 1, 0, "dc", "Device constituents"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
      "but designators ordered as found"},
@@ -1087,9 +1089,9 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
         dStrHex((const char *)buff, len, 0);
         return;
     }
-    printf("  SPT=%d GRD_CHK=%d APP_CHK=%d REF_CHK=%d\n",
-           ((buff[4] >> 3) & 0x7), !!(buff[4] & 0x4), !!(buff[4] & 0x2),
-           !!(buff[4] & 0x1));
+    printf("  ACTIVATE_MICROCODE=%d SPT=%d GRD_CHK=%d APP_CHK=%d "
+           "REF_CHK=%d\n", ((buff[4] >> 6) & 0x3), ((buff[4] >> 3) & 0x7),
+           !!(buff[4] & 0x4), !!(buff[4] & 0x2), !!(buff[4] & 0x1));
     printf("  UASK_SUP=%d GROUP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d "
            "SIMPSUP=%d\n", !!(buff[5] & 0x20), !!(buff[5] & 0x10),
            !!(buff[5] & 0x8), !!(buff[5] & 0x4), !!(buff[5] & 0x2),
@@ -1097,8 +1099,9 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
            !!(buff[6] & 0x1));
-    printf("  P_I_I_SUP=%d LUICLR=%d CBCS=%d\n",
-           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x1));
+    printf("  P_I_I_SUP=%d LUICLR=%d R_SUP=%d CBCS=%d\n",
+           !!(buff[7] & 0x10), !!(buff[7] & 0x1),
+           !!(buff[8] & 0x10), !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
