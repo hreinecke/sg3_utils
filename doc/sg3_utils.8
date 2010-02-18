@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "October 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG3_UTILS "8" "February 2010" "sg3_utils\-1.29" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -26,6 +26,19 @@ of the diagram. SCSI commands in common with all device types can be found
 in SPC of which SPC\-4 is the latest major version. Block device specific
 commands (e.g. as used by disks) are in SBC, those for tape drives in SSC
 and those for CD/DVD/HD_DVD/BD drives in MMC.
+.PP
+It is becoming more common to control ATA disks with the SCSI command set.
+This involves the translation of SCSI commands to their corresponding
+ATA equivalents (and that is an imperfect mapping in some cases). The
+relevant standard is called SCSI to ATA Translation (SAT and SAT\-2
+are now standards at INCITS(ANSI) and ISO while SAT\-3 is at the draft
+stage). The logic to perform the command translation is often called
+a SAT Layer or SATL and may be within an operating system, in host bus
+adapter firmware or in an external device (e.g. associated with a SAS
+expander). See http://www.t10.org for more information.
+.PP
+There is some support for SCSI tape devices but not for their basic
+commands. The reader is referred to the "mt" utility.
 .PP
 There are two generations of command line option usage. The newer
 utilities (written since July 2004) use the getopt_long() function to parse
@@ -263,7 +276,7 @@ CREDITS file and individual source files (in the 'src' directory).
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 1999\-2009 Douglas Gilbert
+Copyright \(co 1999\-2010 Douglas Gilbert
 .br
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files
@@ -272,4 +285,4 @@ code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
 under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(sdparm), ddpt(ddpt)
+.B sdparm(sdparm), ddpt(ddpt), mt(1)
