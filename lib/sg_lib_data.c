@@ -37,7 +37,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.56 20100210";    /* spc-4 rev 23 */
+const char * sg_lib_version_str = "1.57 20100218";    /* spc-4 rev 23 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -1064,7 +1064,7 @@ const char * sg_lib_sense_key_desc[] = {
     "Volume Overflow",          /* Medium full with data to be written */
     "Miscompare",               /* Source data and data on the medium
                                    do not agree */
-    "Key=15"                    /* Reserved */
+    "Completed"                 /* may occur for successful cmd (spc4r23) */
 };
 
 const char * sg_lib_pdt_strs[] = {
@@ -1097,13 +1097,13 @@ const char * sg_lib_pdt_strs[] = {
 const char * sg_lib_transport_proto_strs[] =
 {
     "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-4)",
+    "Parallel SCSI (SPI-5)",
     "SSA (SSA-S3P)",
     "IEEE 1394 (SBP-3)",
     "Remote Direct Memory Access (RDMA)",
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface (ADT)",
+    "Automation/Drive Interface (ADT-2)",
     "ATA Packet Interface (ATA/ATAPI-7)",
     "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"

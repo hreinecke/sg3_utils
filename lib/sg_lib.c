@@ -583,6 +583,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             n += sprintf(b + n, " [sense_key=0x%x asc,ascq=0x%x,0x%x]\n",
                          descp[2], descp[3], descp[4]);
             break;
+        case 0xb:       /* Added in SPC-4 rev 23 */
+            n += sprintf(b + n, "User data segment referral\n");
+            processed = 0;
+            break;
         default:
             n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
                     descp[0]);
