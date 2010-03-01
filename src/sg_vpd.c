@@ -52,7 +52,7 @@
 
 */
 
-static char * version_str = "0.38 20100211";    /* spc4r23 + sbc3r21 */
+static char * version_str = "0.39 20100228";    /* spc4r23 + sbc3r21 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -87,6 +87,7 @@ extern const struct svpd_values_name_t *
 #define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
 #define VPD_THIN_PROVISIONING 0xb2   /* SBC-3 */
 #define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
+#define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
 
 /* Device identification VPD page associations */
 #define VPD_ASSOC_LU 0
@@ -163,6 +164,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
      "identification, target port only"},
     {VPD_DEVICE_ID, VPD_DI_SEL_TARGET, -1, 0, "di_target", "Device "
      "identification, target device only"},
+    {VPD_DTDE_ADDRESS, 0, 1, 0, "dtde",
+     "Data transfer device element address (SSC)"},
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
     {VPD_IMP_OP_DEF, 0, -1, 0, "iod",
      "Implemented operating definition (obsolete)"},
@@ -1603,6 +1606,8 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
     const struct svpd_values_name_t * vnp;
     int res = 0;
     int alloc_len = maxlen;
+    char obuff[DEF_ALLOC_LEN];
+
 
     if (0 == alloc_len)
         alloc_len = (VPD_ATA_INFO == num_vpd) ?
@@ -1699,8 +1704,6 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             else if (do_hex)
                 dStrHex((const char *)rsp_buff, len, 0);
             else {
-                char obuff[DEF_ALLOC_LEN];
-
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
@@ -2025,7 +2028,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         }
         break;
     case VPD_POWER_CONDITION:          /* 0x8a */
-        if ((! do_raw) && (3 != do_hex) && (! do_quiet))
+        if ((! do_raw) && (! do_quiet))
             printf("Power condition VPD page:\n");
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
@@ -2338,6 +2341,103 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             return 0;
         } else if (! do_raw)
             printf("VPD page=0xb2\n");
+        break;
+    case VPD_AUTOMATION_DEV_SN: /* 0xb3 */
+        if ((! do_raw) && (! do_quiet))
+            printf("Automation device serial number (SSC):\n");
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
+        if (0 == res) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (num_vpd != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                if (verbose) {
+                    fprintf(stderr, "First 32 bytes of bad response\n");
+                        dStrHex((const char *)rsp_buff, 32, 0);
+                }
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching Automation device serial "
+                                "number page (alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
+            }
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else {
+                pdt = rsp_buff[0] & 0x1f;
+                if (verbose || do_long)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rsp_buff[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(buff), buff));
+                memset(obuff, 0, sizeof(obuff));
+                len -= 4;
+                if (len >= (int)sizeof(obuff))
+                    len = sizeof(obuff) - 1;
+                memcpy(obuff, rsp_buff + 4, len);
+                printf("  Automation device serial number: %s\n", obuff);
+            }
+            return 0;
+        }
+        break;
+    case VPD_DTDE_ADDRESS:      /* 0xb4 */
+        if ((! do_raw) && (! do_quiet))
+            printf("Data transfer device element address (SSC):\n");
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
+        if (0 == res) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (num_vpd != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                if (verbose) {
+                    fprintf(stderr, "First 32 bytes of bad response\n");
+                        dStrHex((const char *)rsp_buff, 32, 0);
+                }
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching Data transfer device "
+                                "element address page (alloc_len=%d) "
+                                "failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
+            }
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else {
+                pdt = rsp_buff[0] & 0x1f;
+                if (verbose || do_long)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rsp_buff[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(buff), buff));
+                printf("  Data transfer device element address: 0x");
+                for (k = 4; k < len; ++k)
+                    printf("%02x", (unsigned int)rsp_buff[k]);
+                printf("\n");
+            }
+            return 0;
+        }
         break;
     default:
         return SG_LIB_SYNTAX_ERROR;

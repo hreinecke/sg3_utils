@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.93 20100211";    /* SPC-4 revision 23 */
+static char * version_str = "0.94 20100226";    /* SPC-4 revision 23 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -761,13 +761,22 @@ show_page_name(int pg_code, int subpg_code,
                 printf("%sTape diagnostic (ssc-3)\n", b);
                 break;
             case 0x17:
-                printf("%sVolume statistics (ssc-3)\n", b);
+                printf("%sVolume statistics (ssc-4)\n", b);
                 break;
             case 0x2d:
                 printf("%sCurrent service information (ssc-3)\n", b);
                 break;
             case TAPE_ALERT_LPAGE:
                 printf("%sTapeAlert (ssc-2)\n", b);
+                break;
+            case 0x30:
+                printf("%sTape usage log (IBM specific)\n", b);
+                break;
+            case 0x31:
+                printf("%sTape capacity log (IBM specific)\n", b);
+                break;
+            case 0x32:
+                printf("%sData compression log (IBM specific)\n", b);
                 break;
             default:
                 done = 0;
@@ -1093,6 +1102,229 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
             printf("\n");
         num -= pl;
         ucp += pl;
+    }
+}
+
+static void
+show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
+{
+    int k, num, extra, pc, pcb;
+    unsigned int n;
+    uint64_t ull;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    if (num < 4) {
+        printf("badly formed tape usage log page\n");
+        return;
+    }
+    printf("Tape usage log page\n");
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        extra = ucp[3] + 4;
+        ull = n = 0;
+        switch (ucp[3]) {
+        case 2:
+            n = (ucp[4] << 8) | ucp[5];
+            break;
+        case 4:
+            n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+            break;
+        case 8:
+            for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            break;
+        }
+        switch (pc) {
+        case 0x01:
+            if (extra == 8)
+                printf("  Thread count: %u", n);
+            break;
+        case 0x02:
+            if (extra == 12)
+                printf("  Total data sets written: %" PRIu64, ull);
+            break;
+        case 0x03:
+            if (extra == 8)
+                printf("  Total write retries: %u", n);
+            break;
+        case 0x04:
+            if (extra == 6)
+                printf("  Total unrecovered write errors: %u", n);
+            break;
+        case 0x05:
+            if (extra == 6)
+                printf("  Total suspended writes: %u", n);
+            break;
+        case 0x06:
+            if (extra == 6)
+                printf("  Total fatal suspended writes: %u", n);
+            break;
+        case 0x07:
+            if (extra == 12)
+                printf("  Total data sets read: %" PRIu64, ull);
+            break;
+        case 0x08:
+            if (extra == 8)
+                printf("  Total read retries: %u", n);
+            break;
+        case 0x09:
+            if (extra == 6)
+                printf("  Total unrecovered read errors: %u", n);
+            break;
+        case 0x0a:
+            if (extra == 6)
+                printf("  Total suspended reads: %u", n);
+            break;
+        case 0x0b:
+            if (extra == 6)
+                printf("  Total fatal suspended reads: %u", n);
+            break;
+        default:
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+    }
+}
+
+static void
+show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
+{
+    int k, num, extra, pc, pcb;
+    unsigned int n;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    if (num < 4) {
+        printf("badly formed tape capacity log page\n");
+        return;
+    }
+    printf("Tape capacity log page\n");
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        extra = ucp[3] + 4;
+        if (extra != 8)
+            continue;
+        n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+        switch (pc) {
+        case 0x01:
+            printf("  Main partition remaining capacity (in MiB): %u", n);
+            break;
+        case 0x02:
+            printf("  Alternate partition remaining capacity (in MiB): %u", n);
+            break;
+        case 0x03:
+            printf("  Main partition maximum capacity (in MiB): %u", n);
+            break;
+        case 0x04:
+            printf("  Alternate partition maximum capacity (in MiB): %u", n);
+            break;
+        default:
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+    }
+}
+
+static void
+show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
+{
+    int k, num, extra, pc, pcb;
+    unsigned int n;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    if (num < 4) {
+        printf("badly formed data compression log page\n");
+        return;
+    }
+    printf("Data compression log page\n");
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        extra = ucp[3] + 4;
+        switch (ucp[3]) {
+        case 2:
+            n = (ucp[4] << 8) | ucp[5];
+            break;
+        case 4:
+            n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+            break;
+        default:
+            n = 0;
+        }
+        switch (pc) {
+        case 0x00:
+            if (extra == 6)
+                printf("  Read compression ratio x100: %u", n);
+            break;
+        case 0x01:
+            if (extra == 6)
+                printf("  Write compression ratio x100: %u", n);
+            break;
+        case 0x02:
+            if (extra == 8)
+                printf("  Megabytes transferred to server: %u", n);
+            break;
+        case 0x03:
+            if (extra == 8)
+                printf("  Bytes transferred to server: %u", n);
+            break;
+        case 0x04:
+            if (extra == 8)
+                printf("  Megabytes read from tape: %u", n);
+            break;
+        case 0x05:
+            if (extra == 8)
+                printf("  Bytes read from tape: %u", n);
+            break;
+        case 0x06:
+            if (extra == 8)
+                printf("  Megabytes transferred from server: %u", n);
+            break;
+        case 0x07:
+            if (extra == 8)
+                printf("  Bytes transferred from server: %u", n);
+            break;
+        case 0x08:
+            if (extra == 8)
+                printf("  Megabytes written to tape: %u", n);
+            break;
+        case 0x09:
+            if (extra == 8)
+                printf("  Bytes written to tape: %u", n);
+            break;
+        default:
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
     }
 }
 
@@ -3434,6 +3666,15 @@ show_ascii_page(unsigned char * resp, int len,
                 break;
             }
         }
+        break;
+    case 0x30:
+        show_tape_usage_log_page(resp, len, optsp->do_pcb);
+        break;
+    case 0x31:
+        show_tape_capacity_log_page(resp, len, optsp->do_pcb);
+        break;
+    case 0x32:
+        show_data_compression_log_page(resp, len, optsp->do_pcb);
         break;
     case IE_LPAGE:
         show_ie_page(resp, len, optsp->do_pcb, 1);

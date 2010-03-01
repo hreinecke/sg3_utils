@@ -13,7 +13,7 @@
 #include "sg_cmds_basic.h"
 
 /*
-*  Copyright (C) 2000-2009 D. Gilbert
+*  Copyright (C) 2000-2010 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.32 20090826";
+static char * version_str = "1.33 20100228";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -534,6 +534,8 @@ static struct page_code_desc pc_desc_disk[] = {
 };
 
 static struct page_code_desc pc_desc_tape[] = {
+    {0x1, 0x0, "Read-Write error recovery"},
+    {0xa, 0xf0, "Control data protection"},
     {0xf, 0x0, "Data Compression"},
     {0x10, 0x0, "Device configuration"},
     {0x10, 0x1, "Device configuration extension"},
