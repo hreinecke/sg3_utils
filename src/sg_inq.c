@@ -23,7 +23,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2009 D. Gilbert
+*  Copyright (C) 2000-2010 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.86 20090916";    /* SPC-4 rev 21 */
+static char * version_str = "0.87 20100228";    /* SPC-4 rev 23 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
