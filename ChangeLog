@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.29 [20100228] [svn: r328]
+Changelog for sg3_utils-1.29 [20100312] [svn: r329]
   - sg_rtpg: new logical block dependent state and bit (spc4r23)
   - sg_start: add '--readonly' option for ATA disks
   - sg_lib: update asc/ascq list to spc4r22
@@ -16,6 +16,8 @@ Changelog for sg3_utils-1.29 [20100228] [svn: r328]
   - sg_modes: new page names from ssc4r01
   - sg_ses: sync with ses3r02 (SAS-2.1 connector types)
   - add AM_MAINTAINER_MODE to configure.ac to lessen build issues
+  - add BSD_LICENSE file to this and lib directory, refer to them
+    from source and header files. Some source has GPL license
 
 Changelog for sg3_utils-1.28 [20091002] [svn: r315]
   - sg_unmap: new utility for thin provisioning

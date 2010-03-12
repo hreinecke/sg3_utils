@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2009 D. Gilbert
+ *  Copyright (C) 2004-2010 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static char * version_str = "0.34 20090610";    /* spc4r20 */
+static char * version_str = "0.35 20100309";    /* spc4r20 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -698,7 +698,7 @@ main(int argc, char * argv[])
                     "INQUIRY\n", opts.device_name);
             return SG_LIB_CAT_OTHER;
         }
-        res = sg_cmds_close_device(sg_fd);
+        res = scsi_pt_close_device(sg_fd);
         if (res < 0) {
             fprintf(stderr, "close error: %s\n", safe_strerror(-res));
             return SG_LIB_FILE_ERROR;
@@ -811,7 +811,7 @@ main(int argc, char * argv[])
     res = 0;
 
 err_out:
-    sg_cmds_close_device(sg_fd);
+    scsi_pt_close_device(sg_fd);
     return res;
 }
 
