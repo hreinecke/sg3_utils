@@ -283,6 +283,14 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attrib, int priority)
     ++ptp->in_err;
 }
 
+void
+set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
+{
+    /* do nothing, suppress warnings */
+    objp = objp;
+    flags = flags;
+}
+
 static int
 release_sim(struct sg_pt_base *vp, int device_fd, int verbose) {
     struct sg_pt_osf1_scsi * ptp = &vp->impl;

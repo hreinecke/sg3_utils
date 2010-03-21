@@ -72,6 +72,17 @@ extern void set_scsi_pt_task_management(struct sg_pt_base * objp,
 extern void set_scsi_pt_task_attr(struct sg_pt_base * objp, int attribute,
                                   int priority);
 
+/* Following is a guard which is defined when set_scsi_pt_flags() is
+ * present. Older versions of this library may not have this function. */
+#define SCSI_PT_FLAGS_FUNCTION 1
+/* If neither QUEUE_AT_HEAD nor QUEUE_AT_TAIL are given, or both
+ * are given, use the pass-through default. */
+#define SCSI_PT_FLAGS_QUEUE_AT_TAIL 0x10
+#define SCSI_PT_FLAGS_QUEUE_AT_HEAD 0x20
+/* Set (potentially OS dependant) flags for pass-through mechanism.
+ * Apart from contradictions, flags can be OR-ed together. */
+extern void set_scsi_pt_flags(struct sg_pt_base * objp, int flags);
+
 #define SCSI_PT_DO_START_OK 0
 #define SCSI_PT_DO_BAD_PARAMS 1
 #define SCSI_PT_DO_TIMEOUT 2
