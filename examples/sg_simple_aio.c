@@ -7,15 +7,29 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+/*
+ * To use "aio" then uncomment the 'WANT_AIO' define.
+ * Depending on the distribution libaio and libaio-dev packages
+ * may need to be loaded.
+ * If WANT_AIO is defined then a '-laio' term will most likely
+ * be required in the Makefile.
+ */
+/* #define WANT_AIO 1 */
+
+#ifdef WANT_AIO
 #include <libaio.h>
+#endif
+
 #include "sg_lib.h"
+#include "sg_io_linux.h"
 #include "sg_linux_inc.h"
 
 /* This is a simple program executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver
    This variant to test async I/O.
 
-*  Copyright (C) 2003 D. Gilbert
+*  Copyright (C) 2003-2010 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -23,7 +37,7 @@
 
    Invocation: sg_simple_aio [-x] <sg_device>
 
-   Version 0.91 (20031109)
+   Version 0.92 (20100320)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -39,10 +53,15 @@
 
 #define EBUFF_SZ 256
 
+
+
+#ifdef WANT_AIO
 void my_io_callback(io_context_t ctx, struct iocb *iocb, long res, long res2)
 {
     printf("my_io_callback: res=%ld, res2=%ld\n", res, res2);
 }
+#endif
+
 
 int main(int argc, char * argv[])
 {
@@ -82,7 +101,7 @@ int main(int argc, char * argv[])
     /* An access mode of O_RDWR is required for write()/read() interface */
     if ((sg_fd = open(file_name, O_RDWR)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-		 "sg_simple_aio: error opening file: %s", file_name);
+                 "sg_simple_aio: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
@@ -110,7 +129,7 @@ int main(int argc, char * argv[])
     /* io_hdr.pack_id = 0; */
     /* io_hdr.usr_ptr = NULL; */
 
-#if 1
+#if WANT_AIO
     {
         struct iocb a_iocb;
         struct iocb * iocb_arr[1];
@@ -157,7 +176,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("INQUIRY command error", &io_hdr);
+        sg_chk_n_print3("INQUIRY command error", &io_hdr, 1);
         break;
     }
 
@@ -201,7 +220,7 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        sg_chk_n_print3("Test Unit Ready command error", &io_hdr);
+        sg_chk_n_print3("Test Unit Ready command error", &io_hdr, 1);
         break;
     }
 
