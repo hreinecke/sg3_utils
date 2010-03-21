@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.10 20100312 */
+/* sg_pt_win32 version 1.11 20100321 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -360,6 +360,14 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp,
     struct sg_pt_win32_scsi * psp = vp->implp;
 
     ++psp->in_err;
+}
+
+void
+set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
+{
+    /* do nothing, suppress warnings */
+    objp = objp;
+    flags = flags;
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).

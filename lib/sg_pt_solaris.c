@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_solaris version 1.02 20100312 */
+/* sg_pt_solaris version 1.03 20100321 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -216,6 +216,14 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
     ++ptp->in_err;
     attribute = attribute;      /* dummy to silence compiler */
     priority = priority;        /* dummy to silence compiler */
+}
+
+void
+set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
+{
+    /* do nothing, suppress warnings */
+    objp = objp;
+    flags = flags;
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).

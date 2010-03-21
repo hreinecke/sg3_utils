@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.12 20100312 */
+/* sg_pt_linux version 1.13 20100321 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -269,6 +269,22 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
     ++ptp->in_err;
     attribute = attribute;      /* dummy to silence compiler */
     priority = priority;        /* dummy to silence compiler */
+}
+
+#ifndef SG_FLAG_Q_AT_TAIL
+#define SG_FLAG_Q_AT_TAIL 0x10
+#endif
+
+void
+set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    /* default action of SG (v3) is QUEUE_AT_HEAD */
+    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags)
+        ptp->io_hdr.flags |= SG_FLAG_Q_AT_TAIL;
+    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags)
+        ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_TAIL;
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).
@@ -695,6 +711,22 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
 
     ptp->io_hdr.request_attr = attribute;
     ptp->io_hdr.request_priority = priority;
+}
+
+#ifndef BSG_FLAG_Q_AT_TAIL
+#define BSG_FLAG_Q_AT_TAIL 0x10
+#endif
+
+void
+set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    /* default action of bsg (sg v4) is QUEUE_AT_HEAD */
+    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) 
+        ptp->io_hdr.flags |= BSG_FLAG_Q_AT_TAIL; 
+    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags)
+        ptp->io_hdr.flags &= ~BSG_FLAG_Q_AT_TAIL;
 }
 
 /* N.B. Returns din_resid and ignores dout_resid */
