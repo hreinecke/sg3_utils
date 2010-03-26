@@ -274,6 +274,9 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
 #ifndef SG_FLAG_Q_AT_TAIL
 #define SG_FLAG_Q_AT_TAIL 0x10
 #endif
+#ifndef SG_FLAG_Q_AT_HEAD
+#define SG_FLAG_Q_AT_HEAD 0x20
+#endif
 
 void
 set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
@@ -281,10 +284,15 @@ set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     /* default action of SG (v3) is QUEUE_AT_HEAD */
-    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags)
+    /* default action of block layer SG_IO ioctl is QUEUE_AT_TAIL */
+    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) {
         ptp->io_hdr.flags |= SG_FLAG_Q_AT_TAIL;
-    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags)
+        ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_HEAD;
+    }
+    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags) {
+        ptp->io_hdr.flags |= SG_FLAG_Q_AT_HEAD;
         ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_TAIL;
+    }
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).
