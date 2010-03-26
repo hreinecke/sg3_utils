@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.29 [20100321] [svn: r331]
+Changelog for sg3_utils-1.29 [20100326] [svn: r332]
   - sg_rtpg: new logical block dependent state and bit (spc4r23)
   - sg_start: add '--readonly' option for ATA disks
   - sg_lib: update asc/ascq list to spc4r22
@@ -16,8 +16,8 @@ Changelog for sg3_utils-1.29 [20100321] [svn: r331]
   - sg_modes: new page names from ssc4r01
   - sg_ses: sync with ses3r02 (SAS-2.1 connector types)
   - sg_pt interface: add set_scsi_pt_flags() to permit passing
-    through SCSI_PT_FLAGS_QUEUE_AT_TAIL flag
-  - add examples/sg_queue_tst for SG_FLAG_Q_AT_TAIL
+    through SCSI_PT_FLAGS_QUEUE_AT_TAIL and AT_HEAD flags
+  - add examples/sg_queue_tst+bsg_queue_tst for SG_FLAG_Q_AT_TAIL
   - add AM_MAINTAINER_MODE to configure.ac to lessen build issues
   - add BSD_LICENSE file to this and lib directory, refer to them
     from source and header files. Some source has GPL license

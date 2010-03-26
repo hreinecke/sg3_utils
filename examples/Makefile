@@ -14,6 +14,8 @@ EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
 
 EXTRAS = sg_simple_aio sg_queue_tst
 
+BSG_EXTRAS = bsg_queue_tst
+
 
 MAN_PGS = 
 MAN_PREF = man8
@@ -33,12 +35,15 @@ all: $(EXECS)
 
 extras: $(EXTRAS)
 
+bsg: $(BSG_EXTRAS)
+
+
 depend dep:
 	for i in *.c; do $(CC) $(INCLUDES) $(CFLAGS) -M $$i; \
 	done > .depend
 
 clean:
-	/bin/rm -f *.o $(EXECS) $(EXTRAS) core .depend
+	/bin/rm -f *.o $(EXECS) $(EXTRAS) $(BSG_EXTRAS) core .depend
 
 sg_simple1: sg_simple1.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
@@ -92,6 +97,9 @@ sg_sat_smart_rd_data: sg_sat_smart_rd_data.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_queue_tst: sg_queue_tst.o $(LIBFILESOLD)
+	$(LD) -o $@ $(LDFLAGS) $^ 
+
+bsg_queue_tst: bsg_queue_tst.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 install: $(EXECS)
