@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.94 20100226";    /* SPC-4 revision 23 */
+static char * version_str = "0.95 20100331";    /* SPC-4 revision 23 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2620,6 +2620,7 @@ show_thin_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
+    char * cp;
     char str[PCB_STR_LEN];
 
     printf("Thin provisioning page (sbc-3) [0xc]\n");
@@ -2629,8 +2630,9 @@ show_thin_provisioning_page(unsigned char * resp, int len, int show_pcb)
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
-        if ((pc >= 0x1) && (pc <= 0xff)) {
-            printf("  Threshold resource count [0x%x]:", pc);
+        if ((pc >= 0x1) && (pc <= 0x2)) {
+            cp = (0x1 == pc)? "Available" : "Used";
+            printf("  %s LBA mapping threshold resource count:", cp);
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     fprintf(stderr, "\n    truncated by response length, "

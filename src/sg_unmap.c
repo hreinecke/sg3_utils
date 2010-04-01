@@ -29,7 +29,7 @@
  * logical blocks.
  */
 
-static char * version_str = "1.00 20100312";
+static char * version_str = "1.01 20100331";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -37,6 +37,7 @@ static char * version_str = "1.00 20100312";
 
 
 static struct option long_options[] = {
+        {"anchor", no_argument, 0, 'a'},
         {"grpnum", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'I'},
@@ -52,11 +53,12 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_unmap [--grpnum=GN] [--help] [--in=FILE] [--lba=LBA,LBA..]\n"
-          "                [--num=NUM,NUM...] [--timeout=TO] [--verbose] "
-          "[--version]\n"
-          "                DEVICE\n"
+          "sg_unmap [--anchor] [--grpnum=GN] [--help] [--in=FILE]\n"
+          "                [--lba=LBA,LBA..] [--num=NUM,NUM...] "
+          "[--timeout=TO]\n"
+          "                [--verbose] [--version] DEVICE\n"
           "  where:\n"
+          "    --anchor|-a          set anchor field in cdb\n"
           "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
           "    --help|-h            print out usage message\n"
           "    --in=FILE|-I FILE      read LBA, NUM pairs in ASCII hex "
@@ -331,6 +333,7 @@ main(int argc, char * argv[])
     const char * in_op = NULL;
     int addr_arr_len = 0;
     int num_arr_len = 0;
+    int anchor = 0;
     int timeout = DEF_TIMEOUT_SECS;
     int verbose = 0;
     const char * device_name = NULL;
@@ -343,12 +346,15 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ghIHl:n:t:vV", long_options,
+        c = getopt_long(argc, argv, "aghIHl:n:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'a':
+            ++anchor;
+            break;
         case 'g':
             num = sscanf(optarg, "%d", &res);
             if ((1 == num) && ((res < 0) || (res > 31)))
@@ -493,8 +499,8 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    res = sg_ll_unmap(sg_fd, grpnum, timeout, param_arr, param_len,
-                      1, verbose);
+    res = sg_ll_unmap_v2(sg_fd, anchor, grpnum, timeout, param_arr, param_len,
+                         1, verbose);
     ret = res;
     if (SG_LIB_CAT_NOT_READY == res) {
         fprintf(stderr, "UNMAP failed, device not ready\n");

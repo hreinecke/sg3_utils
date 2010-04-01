@@ -1,13 +1,13 @@
-.TH SG_WRITE_SAME "8" "June 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_WRITE_SAME "8" "March 2010" "sg3_utils\-1.29" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
 .B sg_write_same
-[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR]
-[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-lbdata\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-pbdata\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-unmap\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR]
-[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
+[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-anchor\fR] [\fI\-\-grpnum=GN\fR]
+[\fI\-\-help\fR] [\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-lbdata\fR]
+[\fI\-\-num=NUM\fR] [\fI\-\-pbdata\fR] [\fI\-\-timeout=TO\fR]
+[\fI\-\-unmap\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-wrprotect=WPR\fR] [\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 Send the SCSI WRITE SAME (10, 16 or 32 byte) command to \fIDEVICE\fR. This
@@ -54,6 +54,10 @@ WRITE SAME (10) command.
 send a SCSI WRITE SAME (32) command to \fIDEVICE\fR. The default action (in
 the absence of this option and the \fI\-\-16\fR option) is to send a SCSI
 WRITE SAME (10) command.
+.TP
+\fB\-a\fR, \fB\-\-anchor\fR
+sets the 'Anchor' bit in the cdb. Ignored by WRITE SAME(10). Introduced in
+sbc3r22.
 .TP
 \fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
 sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
@@ -167,9 +171,9 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009 Douglas Gilbert
+Copyright \(co 2009\-2010 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_format,sg_readcap,sg_unmap(sg3_utils)
+.B sg_format,sg_get_lba_status,sg_readcap,sg_unmap(sg3_utils)

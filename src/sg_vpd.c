@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.40 20100312";    /* spc4r23 + sbc3r21 */
+static char * version_str = "0.41 20100331";    /* spc4r23 + sbc3r22 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -64,6 +64,7 @@ extern const struct svpd_values_name_t *
 #define VPD_SECURITY_TOKEN 0xb1 /* OSD */
 #define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
 #define VPD_THIN_PROVISIONING 0xb2   /* SBC-3 */
+#define VPD_REFERRALS 0xb3   /* SBC-3 */
 #define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
 
@@ -158,6 +159,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
      "information"},
     {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
+    {VPD_REFERRALS, 0, 0, 0, "ref", "Referrals (SBC)"},
     {VPD_SA_DEV_CAP, 0, 1, 0, "sad",
      "Sequential access device capabilities (SSC)"},
     {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
@@ -166,7 +168,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SECURITY_TOKEN, 0, 0x11, 0, "st", "Security token (OSD)"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, 0, "tas", "TapeAlert supported flags (SSC)"},
-    {VPD_THIN_PROVISIONING, 0, 0, 0, "thp", "Thin provisioning (SBC)"},
+    {VPD_THIN_PROVISIONING, 0, 0, 0, "thpv", "Thin provisioning (SBC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
 
@@ -1302,53 +1304,55 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-        case 0: case 4: case 7: /* Block limits */
-            if (len < 16) {
-                fprintf(stderr, "Block limits VPD page length too "
-                        "short=%d\n", len);
-                return;
-            }
-            u = (buff[6] << 8) | buff[7];
-            printf("  Optimal transfer length granularity: %u blocks\n", u);
-            u = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) |
-                buff[11];
-            printf("  Maximum transfer length: %u blocks\n", u);
-            u = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) |
-                buff[15];
-            printf("  Optimal transfer length: %u blocks\n", u);
-            if (len > 19) {     /* added in sbc3r09 */
-                u = (buff[16] << 24) | (buff[17] << 16) | (buff[18] << 8) |
-                    buff[19];
-                printf("  Maximum prefetch, xdread, xdwrite transfer length: "
-                       "%u blocks\n", u);
-            }
-            if (len > 27) {     /* added in sbc3r18 */
-                u = ((unsigned int)buff[20] << 24) | (buff[21] << 16) |
-                    (buff[22] << 8) | buff[23];
-                printf("  Maximum unmap LBA count: %u\n", u);
-                u = ((unsigned int)buff[24] << 24) | (buff[25] << 16) |
-                    (buff[26] << 8) | buff[27];
-                printf("  Maximum unmap block descriptor count: %u\n", u);
-            }
-            if (len > 35) {     /* added in sbc3r19 */
-                u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
-                    (buff[30] << 8) | buff[31];
-                printf("  Optimal unmap granularity: %u\n", u);
-                printf("  Unmap granularity alignment valid: %u\n",
-                       !!(buff[32] & 0x80));
-                u = ((unsigned int)(buff[32] & 0x7f) << 24) | (buff[33] << 16) |
-                    (buff[34] << 8) | buff[35];
-                printf("  Unmap granularity alignment: %u\n", u);
-            }
-            break;
-        case 1: case 8:
-            printf("  WORM=%d\n", !!(buff[4] & 0x1));
-            break;
-        case 0x11:
-        default:
-            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-            dStrHex((const char *)buff, len, 0);
-            break;
+    case 0: case 4: case 7: /* Block limits */
+        if (len < 16) {
+            fprintf(stderr, "Block limits VPD page length too "
+                    "short=%d\n", len);
+            return;
+        }
+        printf("  Maximum compare and write length: %u blocks\n",
+               buff[5]);
+        u = (buff[6] << 8) | buff[7];
+        printf("  Optimal transfer length granularity: %u blocks\n", u);
+        u = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) |
+            buff[11];
+        printf("  Maximum transfer length: %u blocks\n", u);
+        u = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) |
+            buff[15];
+        printf("  Optimal transfer length: %u blocks\n", u);
+        if (len > 19) {     /* added in sbc3r09 */
+            u = (buff[16] << 24) | (buff[17] << 16) | (buff[18] << 8) |
+                buff[19];
+            printf("  Maximum prefetch, xdread, xdwrite transfer length: "
+                   "%u blocks\n", u);
+        }
+        if (len > 27) {     /* added in sbc3r18 */
+            u = ((unsigned int)buff[20] << 24) | (buff[21] << 16) |
+                (buff[22] << 8) | buff[23];
+            printf("  Maximum unmap LBA count: %u\n", u);
+            u = ((unsigned int)buff[24] << 24) | (buff[25] << 16) |
+                (buff[26] << 8) | buff[27];
+            printf("  Maximum unmap block descriptor count: %u\n", u);
+        }
+        if (len > 35) {     /* added in sbc3r19 */
+            u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
+                (buff[30] << 8) | buff[31];
+            printf("  Optimal unmap granularity: %u\n", u);
+            printf("  Unmap granularity alignment valid: %u\n",
+                   !!(buff[32] & 0x80));
+            u = ((unsigned int)(buff[32] & 0x7f) << 24) | (buff[33] << 16) |
+                (buff[34] << 8) | buff[35];
+            printf("  Unmap granularity alignment: %u\n", u);
+        }
+        break;
+    case 1: case 8:
+        printf("  WORM=%d\n", !!(buff[4] & 0x1));
+        break;
+    case 0x11:
+    default:
+        printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+        dStrHex((const char *)buff, len, 0);
+        break;
     }
 }
 
@@ -1362,72 +1366,85 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-        case 0: case 4: case 7:
-            if (len < 64) {
-                fprintf(stderr, "Block device characteristics VPD page length "
-                        "too short=%d\n", len);
-                return;
-            }
-            u = (buff[4] << 8) | buff[5];
-            if (0 == u)
-                printf("  Medium rotation rate is not reported\n");
-            else if (1 == u)
-                printf("  Non-rotating medium (e.g. solid state)\n");
-            else if ((u < 0x401) || (0xffff == u))
-                printf("  Reserved [0x%x]\n", u);
-            else
-                printf("  Nominal rotation rate: %d rpm\n", u);
-            u = buff[7] & 0xf;
-            printf("  Nominal form factor");
-            switch (u)
-            {
-            case 0:
-                printf(" not reported\n");
-                break;
-            case 1:
-                printf(": 5.25 inch\n");
-                break;
-            case 2:
-                printf(": 3.5 inch\n");
-                break;
-            case 3:
-                printf(": 2.5 inch\n");
-                break;
-            case 4:
-                printf(": 1.8 inch\n");
-                break;
-            case 5:
-                printf(": less then 1.8 inch\n");
-                break;
-            default:
-                printf(": reserved\n");
-                break;
-            }
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+        if (len < 64) {
+            fprintf(stderr, "Block device characteristics VPD page length "
+                    "too short=%d\n", len);
+            return;
+        }
+        u = (buff[4] << 8) | buff[5];
+        if (0 == u)
+            printf("  Medium rotation rate is not reported\n");
+        else if (1 == u)
+            printf("  Non-rotating medium (e.g. solid state)\n");
+        else if ((u < 0x401) || (0xffff == u))
+            printf("  Reserved [0x%x]\n", u);
+        else
+            printf("  Nominal rotation rate: %d rpm\n", u);
+        u = buff[7] & 0xf;
+        printf("  Nominal form factor");
+        switch (u) {
+        case 0:
+            printf(" not reported\n");
             break;
-        case 1: case 8: case 0x12:
-            printf("  Manufacturer-assigned serial number: %.*s\n",
-                   len - 4, buff + 4);
+        case 1:
+            printf(": 5.25 inch\n");
+            break;
+        case 2:
+            printf(": 3.5 inch\n");
+            break;
+        case 3:
+            printf(": 2.5 inch\n");
+            break;
+        case 4:
+            printf(": 1.8 inch\n");
+            break;
+        case 5:
+            printf(": less then 1.8 inch\n");
             break;
         default:
-            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-            dStrHex((const char *)buff, len, 0);
+            printf(": reserved\n");
             break;
+        }
+        break;
+    case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
+        printf("  Manufacturer-assigned serial number: %.*s\n",
+               len - 4, buff + 4);
+        break;
+    default:
+        printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+        dStrHex((const char *)buff, len, 0);
+        break;
     }
 }
 
 static int
 decode_block_thin_prov_vpd(unsigned char * b, int len)
 {
-    int dp;
+    int dp, anc_sup;
 
     if (len < 4) {
         fprintf(stderr, "Thin provisioning page too short=%d\n",
                 len);
         return SG_LIB_CAT_MALFORMED;
     }
+    printf("  Unmap supported (TPU): %d\n", !!(0x80 & b[5]));
+    printf("  Write same with unmap supported (TPWS): %d\n", !!(0x40 & b[5]));
+    anc_sup = (b[5] >> 1) & 0x7;
+    switch (anc_sup) {
+    case 0:
+        printf("  Anchored LBAs not supported\n");
+        break;
+    case 1:
+        printf("  Anchored LBAs supported\n");
+        break;
+    default:
+        printf("  Anchored LBAs support reserved [%d]\n", anc_sup);
+        break;
+    }
     dp = !!(b[5] & 0x1);
     printf("  Threshold exponent: %d\n", b[4]);
-    printf("  Descriptor present: %d\n", dp);
+    printf("  Descriptor present (DP): %d\n", dp);
     if (dp) {
         const unsigned char * ucp;
         int i_len;
@@ -1496,16 +1513,53 @@ decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-        case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-            decode_block_thin_prov_vpd(buff, len);
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+        decode_block_thin_prov_vpd(buff, len);
+        break;
+    case PDT_TAPE: case PDT_MCHANGER:
+        decode_tapealert_supported_vpd(buff, len);
+        break;
+    default:
+        printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+        dStrHex((const char *)buff, len, 0);
+        break;
+    }
+}
+
+static void
+decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
+{
+    char obuff[DEF_ALLOC_LEN];
+    unsigned int u;
+
+    if (do_hex) {
+        dStrHex((const char *)b, len, 0);
+        return;
+    }
+    switch (pdt) {
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+        if (len < 16) {
+            fprintf(stderr, "Referrals VPD page length too short=%d\n", len);
             break;
-        case PDT_TAPE: case PDT_MCHANGER:
-            decode_tapealert_supported_vpd(buff, len);
-            break;
-        default:
-            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-            dStrHex((const char *)buff, len, 0);
-            break;
+        }
+        u = ((unsigned int)b[8] << 24) | (b[9] << 16) | (b[10] << 8) | b[11];
+        printf("  User data segment size: %u\n", u);
+        u = ((unsigned int)b[12] << 24) | (b[13] << 16) |
+            (b[14] << 8) | b[15];
+        printf("  User data segment multiplier: %u\n", u);
+        break;
+    case PDT_TAPE: case PDT_MCHANGER:
+        memset(obuff, 0, sizeof(obuff));
+        len -= 4;
+        if (len >= (int)sizeof(obuff))
+            len = sizeof(obuff) - 1;
+        memcpy(obuff, b + 4, len);
+        printf("  Automation device serial number: %s\n", obuff);
+        break;
+    default:
+        printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+        dStrHex((const char *)b, len, 0);
+        break;
     }
 }
 
@@ -2205,17 +2259,17 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             pdt = rsp_buff[0] & 0x1f;
             if ((! do_raw) && (! do_quiet)) {
                 switch (pdt) {
-                case 0: case 4: case 7:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
                     printf("Block device characteristics VPD page (SBC):\n");
                     break;
-                case 1: case 8:
+                case PDT_TAPE: case PDT_MCHANGER:
                     printf("Manufactured assigned serial number VPD page "
                            "(SSC):\n");
                     break;
-                case 0x11:
+                case PDT_OSD:
                     printf("Security token VPD page (OSD):\n");
                     break;
-                case 0x12:
+                case PDT_ADC:
                     printf("Manufactured assigned serial number VPD page "
                            "(ADC):\n");
                     break;
@@ -2320,12 +2374,24 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         } else if (! do_raw)
             printf("VPD page=0xb2\n");
         break;
-    case VPD_AUTOMATION_DEV_SN: /* 0xb3 */
-        if ((! do_raw) && (! do_quiet))
-            printf("Automation device serial number (SSC):\n");
+    case 0xb3:          /* VPD page depends on pdt */
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
+            pdt = rsp_buff[0] & 0x1f;
+            if ((! do_raw) && (! do_quiet)) {
+                switch (pdt) {
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                    printf("Referrals VPD page (SBC):\n");
+                    break;
+                case PDT_TAPE: case PDT_MCHANGER:
+                    printf("Automation device serial number VPD page (SSC):\n");
+                    break;
+                default:
+                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb3, pdt);
+                    break;
+                }
+            }
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
@@ -2341,8 +2407,8 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                     res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
                                         1, verbose);
                     if (res) {
-                        fprintf(stderr, "fetching Automation device serial "
-                                "number page (alloc_len=%d) failed\n", len);
+                        fprintf(stderr, "fetching VPD page 0x%x "
+                                "(alloc_len=%d) failed\n", num_vpd, len);
                         return res;
                     }
                 } else {
@@ -2359,15 +2425,11 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
-                memset(obuff, 0, sizeof(obuff));
-                len -= 4;
-                if (len >= (int)sizeof(obuff))
-                    len = sizeof(obuff) - 1;
-                memcpy(obuff, rsp_buff + 4, len);
-                printf("  Automation device serial number: %s\n", obuff);
+                decode_b3_vpd(rsp_buff, len, do_hex, pdt);
             }
             return 0;
-        }
+        } else if (! do_raw)
+            printf("VPD page=0xb3\n");
         break;
     case VPD_DTDE_ADDRESS:      /* 0xb4 */
         if ((! do_raw) && (! do_quiet))

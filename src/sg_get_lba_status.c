@@ -27,7 +27,7 @@
  * This program issues the SCSI GET LBA STATUS command to the given SCSI device.
  */
 
-static char * version_str = "1.01 20100312";
+static char * version_str = "1.02 20100329";    /* sbc2r22 */
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
@@ -312,11 +312,20 @@ main(int argc, char * argv[])
                 for (j = 0; j < 8; ++j)
                     printf("%02x", ucp[j]);
                 printf("  blocks: %d", d_blocks);
-                if ((0 == res) || (1 == res))
-                    printf("  %s\n",
-                           ((0x1 & ucp[12]) ? "unmapped" : "mapped"));
-                else
+                switch (res) {
+                case 0:
+                    printf("  mapped\n");
+                    break;
+                case 1:
+                    printf("  deallocated\n");
+                    break;
+                case 2:
+                    printf("  anchored\n");
+                    break;
+                default:
                     printf("  Provisioning status: %d\n", res);
+                    break;
+                }
             }
         }
         if ((num_descs * 16) + 8 < rlen)
