@@ -1829,12 +1829,24 @@ int
 sg_ll_unmap(int sg_fd, int group_num, int timeout_secs, void * paramp,
             int param_len, int noisy, int verbose)
 {
+    return sg_ll_unmap_v2(sg_fd, 0, group_num, timeout_secs, paramp,
+                          param_len, noisy, verbose);
+}
+
+/* Invokes a SCSI UNMAP (SBC-3) command. Version 2 adds anchor field
+ * (sbc3r22). Otherwise same as sg_ll_unmap() . */
+int
+sg_ll_unmap_v2(int sg_fd, int anchor, int group_num, int timeout_secs,
+               void * paramp, int param_len, int noisy, int verbose)
+{
     int k, res, ret, sense_cat, tmout;
     unsigned char uCmdBlk[UNMAP_CMDLEN] =
                          {UNMAP_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    if (anchor)
+        uCmdBlk[1] |= 0x1;
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
     uCmdBlk[7] = group_num & 0x1f;
     uCmdBlk[7] = (param_len >> 8) & 0xff;

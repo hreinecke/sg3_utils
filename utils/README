@@ -15,8 +15,9 @@ This directory contains these utilities:
 By default, the Makefile only builds the hxascdmp utility. The 'Makefile'
 file (i.e. with no suffix) builds for Linux; the 'Makefile.freebsd' file
 builds for FreeBSD (e.g. 'make -f Makefile.freebsd'); the
-'Makefile.solaris' file builds for Solaris; and the 'Makefile.mingw' builds
-in the Windows MinGW environment (e.g.  msys shell).
+'Makefile.solaris' file builds for Solaris; the 'Makefile.mingw' builds
+in the Windows MinGW environment (e.g.  msys shell); and 'Makefile.cygwin'
+builds in the Windows Cygwin environment.
 
 To build sg_chk_asc the sg_lib.o and sg_lib_data.o files must be present
 (i.e. compiled) in the lib/ subdirectory. One way to meet that requirement
@@ -25,4 +26,4 @@ Then return to this directory and do 'make sg_chk_asc'.
 
 
 Doug Gilbert
-23rd June 2008 
+30th March 2010 

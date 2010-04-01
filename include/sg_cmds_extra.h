@@ -193,6 +193,11 @@ extern int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
 extern int sg_ll_unmap(int sg_fd, int group_num, int timeout_secs,
                        void * paramp, int param_len, int noisy, int verbose);
+/* Invokes a SCSI UNMAP (SBC-3) command. Version 2 adds anchor field
+ * (sbc3r22). Otherwise same as sg_ll_unmap() . */
+extern int sg_ll_unmap_v2(int sg_fd, int anchor, int group_num,
+                          int timeout_secs, void * paramp, int param_len,
+                          int noisy, int verbose);
 
 /* Invokes a SCSI VERIFY (10) command (SBC and MMC).
  * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.

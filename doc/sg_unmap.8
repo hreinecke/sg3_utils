@@ -1,17 +1,18 @@
-.TH SG_UNMAP "8" "June 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_UNMAP "8" "March 2010" "sg3_utils\-1.29" SG3_UTILS
 .SH NAME
 sg_unmap \- sends a SCSI UNMAP command
 .SH SYNOPSIS
 .B sg_unmap
-[\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=FILE\fR]
+[\fI\-\-anchor\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=FILE\fR]
 [\fI\-\-lba=LBA,LBA...\fR] [\fI\-\-num=NUM,NUM...\fR] [\fI\-\-timeout=TO\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Send a SCSI UNMAP command to \fIDEVICE\fR to unmap one or more logical
-blocks. Introduced in SBC\-3 revision 18 under the broad heading
-of "logical block provisioning" or more specifically "thin provisioning".
+blocks. This command was introduced in SBC\-3 revision 18 under the broad
+heading of "logical block provisioning" or more specifically "thin
+provisioning".
 Logical blocks may also be unmapped by the SCSI WRITE SAME (16 and 32
 byte cdbs); see sg_write_same. The unmap capability is closely related to
 the ATA DATA SET MANAGEMENT command with the "Trim" bit set.
@@ -38,6 +39,9 @@ are blank lines. Values may be comma, space and tab separated or appear
 on separate lines.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-a\fR, \fB\-\-anchor\fR
+sets the 'Anchor' bit in the command (introduced in sbc3r22).
 .TP
 \fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
 sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
@@ -109,9 +113,9 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009 Douglas Gilbert
+Copyright \(co 2009\-2010 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_format,sg_readcap,sg_write_same(sg3_utils)
+.B sg_format,sg_get_lba_status,sg_readcap,sg_write_same(sg3_utils)
