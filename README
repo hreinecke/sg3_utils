@@ -104,7 +104,7 @@ include/sg_pt.h . The Linux specific implementation of that pass through is
 found in the lib/sg_pt_linux.c file. Since almost all of the utilities use
 these files, a shared library called "libsgutils<num>.so" is built. Use of
 this library cuts down the size of binary distributions of sg3_utils
-significantly. The build scripts provided in the 'ib subdirectory builds
+significantly. The build scripts provided in the lib subdirectory builds
 libsgutils<num>.so The rest of the source code files have been relocated to
 the src subdirectory.  See the INSTALL file for more information.
 
