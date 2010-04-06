@@ -561,8 +561,9 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             n += sprintf(b + n, " [sense_key=0x%x asc,ascq=0x%x,0x%x]\n",
                          descp[2], descp[3], descp[4]);
             break;
-        case 0xb:       /* Added in SPC-4 rev 23 */
+        case 0xb:       /* Added in SPC-4 rev 23, defined in SBC-3 rev 22 */
             n += sprintf(b + n, "User data segment referral\n");
+            /* Will decode if this 'feature' stays  xxxxxxxxxxxxx */
             processed = 0;
             break;
         default:

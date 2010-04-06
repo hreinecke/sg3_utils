@@ -2,25 +2,30 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.29 [20100331] [svn: r333]
+Changelog for sg3_utils-1.29 [20100406] [svn: r334]
   - sg_rtpg: new logical block dependent state and bit (spc4r23)
   - sg_start: add '--readonly' option for ATA disks
-  - sg_lib: update asc/ascq list to spc4r22
+  - sg_lib: update asc/ascq list to spc4r23
   - sg_inq: update version descriptor list to spc4r23
   - sg_vpd: block device characteristics page: fix form factor
     - update Extended Inquiry VPD page to spc4r23
+    - update Block Limits VPD page to sbc3r22
+    - update Thin Provisioning VPD page to sbc3r22
     - Automation device serial number and Data transfer device
       element VPD pages (ssc4r01)
+    - add Referrals VPD page (sbc3r22)
   - sg_logs: add thin provisioning and solid state media log pages
     - addition of IBM LTO specific log pages
   - sg_modes: new page names from ssc4r01
   - sg_ses: sync with ses3r02 (SAS-2.1 connector types)
+  - sg_unmap: add '--anchor' option (sbc3r22)
+  - sg_write_same: add '--anchor' option (sbc3r22)
   - sg_pt interface: add set_scsi_pt_flags() to permit passing
     through SCSI_PT_FLAGS_QUEUE_AT_TAIL and AT_HEAD flags
   - add examples/sg_queue_tst+bsg_queue_tst for SG_FLAG_Q_AT_TAIL
   - add AM_MAINTAINER_MODE to configure.ac to lessen build issues
-  - add BSD_LICENSE file to this and lib directory, refer to them
-    from source and header files. Some source has GPL license
+  - add BSD_LICENSE file to this and lib directories, refer to
+    it from source and header files. Some source has GPL license
 
 Changelog for sg3_utils-1.28 [20091002] [svn: r315]
   - sg_unmap: new utility for thin provisioning
