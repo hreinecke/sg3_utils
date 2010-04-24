@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.95 20100331";    /* SPC-4 revision 23 */
+static char * version_str = "0.95 20100423";    /* SPC-4 revision 23 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1410,7 +1410,7 @@ static const char * self_test_result[] = {
     "aborted by SEND DIAGNOSTIC",
     "aborted other than by SEND DIAGNOSTIC",
     "unknown error, unable to complete",
-    "self test completed with failure in test segment (which one unkown)",
+    "self test completed with failure in test segment (which one unknown)",
     "first segment in self test failed",
     "second segment in self test failed",
     "another segment in self test failed",
@@ -1656,7 +1656,7 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
                             printf("\n  Threshold temperature = %d C  [IBM "
                                    "extension]", ucp[7]);
                         else
-                            printf("\n  Treshold temperature = <not "
+                            printf("\n  Threshold temperature = <not "
                                    "available>");
                      }
                 }

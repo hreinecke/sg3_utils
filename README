@@ -72,7 +72,7 @@ resets) still need to use the Linux sg driver. Note that various
 drivers (e.g. cdrom/sr) have different open() flag and permissions policies
 that the user may need to take into account.
 
-If you have problems or questions about them please contact the author.
+If users have problems or questions about them please contact the author.
 Documentation for the Linux sg device driver can be found at:
 http://sg.danny.cz/sg/p/sg_v3_ho.html . This is written in DocBook and the
 original xml can be found in the same directory with the ".xml" extension.
@@ -86,27 +86,14 @@ as they please. Attribution is encouraged. Please check the code as other
 contributors (apart from the author) may also have copyright notices. For a
 list of contributors see the CREDITS file.
 
-The include/sg_lib_data.h and lib/sg_lib_data.c files contain ASCII text
-corresponding to most of the SCSI commands, errors and warning conditions.
-The interface to this data plus several related helper functions are found
-x in the include/sg_lib.h and lib/sg_lib.c files. The include/sg_cmds_basic.h
-and lib/sg_cmds_basic.c" files contains code to invoke common SCSI commands
-and associated response processing. The include/sg_cmds_mmc.h and
-lib/sg_cmds_mmc.c files contain code to invoke SCSI commands specific to MMC
-(for cd/dvd/bd devices). The include/sg_cmds_extra.h and lib/sg_cmds_extra.c
-files contains code to invoke lesser used SCSI commands and associated
-response processing. All are guided by recent drafts at www.t10.org which
-is the home site of SCSI (draft) standards. Linux specific code has been
-removed from above mentioned files. The SCSI command implementations
-in lib/sg_cmds_basic.c, lib/sg_cmds_mmc.c and lib/sg_cmds_extra.c access the
-OS pass-through mechanism via the function based interface defined in
-include/sg_pt.h . The Linux specific implementation of that pass through is
-found in the lib/sg_pt_linux.c file. Since almost all of the utilities use
-these files, a shared library called "libsgutils<num>.so" is built. Use of
-this library cuts down the size of binary distributions of sg3_utils
-significantly. The build scripts provided in the lib subdirectory builds
-libsgutils<num>.so The rest of the source code files have been relocated to
-the src subdirectory.  See the INSTALL file for more information.
+To save the repetition of common code (e.g. SCSI error processing) and
+reduce the size of the executable files, a shared library called
+libsgutils<num>.so (its Linux name) is created during the build process.
+That library is built from the contents of the include and lib
+subdirectories. The header files in the include subdirectory can be seen
+as the API of libsgutils and are commented with that in mind. The SCSI
+pass-through code for the supported operating systems is found in the lib
+subdirectory with names like sg_pt_linux.c and sg_pt_win32.c .
 
 All the utilities in the src subdirectory have "man" pages that are
 placed in the doc subdirectory. There is also a sg3_utils (8) man page that
@@ -160,11 +147,18 @@ may require packages containing those utilities to be installed. The
 libtool utility is also required. Naturally a C compiler is required
 and due to the vagaries of libtool a C++ compiler also.
 
+The "./configure" takes many command line options with the defaults
+being usually sufficient to start with. One quirk is that the location
+of the installation is under the /usr/local directory. So the sg_inq
+utility will be installed at /usr/local/bin/sg_inq . This is controlled
+by the "--prefix=<directory>" option which defaults to
+"--prefix=/usr/local". As an example to install the executables in /usr/bin
+and disable the creation of the shared library (libsgutils<num>.so) this
+invocation could be used: "./configure --prefix=/usr --disable-shared".
+
 The C code in this package is written for portability rather than speed.
 It assumes a level of C99 compliance and favours POSIX system and library
 calls over OS specific calls.
-
-More generic build information can be found in the INSTALL file.
 
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
@@ -218,8 +212,8 @@ top level build infrastructure. Linux binary distributions of the sg3_utils
 package (e.g. "rpm" and debian packages) typically contain the shared
 library, the utilities found in the 'src' subdirectory, their associated man
 pages and some documentation files (e.g. README, INSTALL, CREDITS, COPYING
-and COVERAGE). See the INSTALL file for instructions about building and
-installing from a source "tarball".
+and COVERAGE). See the INSTALL file for generic instructions about building
+with autotools (e.g. ./configure ).
 
 Man pages can be read (without building and installing the package) by
 going to the 'doc' subdirectory and executing something like this:
@@ -364,4 +358,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-31st March 2010
+8th April 2010

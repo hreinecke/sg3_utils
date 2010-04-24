@@ -38,7 +38,7 @@ the response to a READ CAPACITY command. The reason for this double check is
 to detect a "format corrupt" state (see NOTES section). This usage will not
 modify the disk.
 .PP
-When this utility is used with the "--format" (or "-F") option it will attempt
+When this utility is used with the "\-\-format" (or "\-F") option it will attempt
 to format the given DEVICE. There is a 10 second pause during which time the
 user is invited (twice 5 seconds apart) to abort sg_format. This occurs just
 prior the SCSI FORMAT UNIT command being issued. See the NOTES section for
@@ -130,8 +130,8 @@ sets the FMTPINFO field in the FORMAT UNIT cdb to a value between 0 and 3.
 The default value is 0. The FMTPINFO field from SBC\-3 revision 16 is a 2
 bit field (bits 7 and 6 of byte 1 in the cdb). Prior to that it was a single
 bit field (bit 7 of byte 1 in the cdb) and there was an accompanying bit
-called RTO_REQ (bit 6 of byte 1 in the cdb). The deprecated options "--pinfo"
-and "--rto-req" represent the older usage. This option should be used in
+called RTO_REQ (bit 6 of byte 1 in the cdb). The deprecated options "\-\-pinfo"
+and "\-\-rto\-req" represent the older usage. This option should be used in
 their place. This option has no action unless \fI\-\-format\fR is given.
 .TP
 \fB\-F\fR, \fB\-\-format\fR
@@ -154,7 +154,7 @@ allow for 64 bit logical block addresses.  Specifically this option sets
 the "longlba" flag in the MODE SENSE (10) command and uses READ CAPACITY (16)
 rather than READ CAPACITY (10). This option does not set the LONGLIST bit
 in the FORMAT UNIT command. The LONGLIST bit is set as required depending
-other parameters (e.g. when '--pie=PIE' is greater than zero).
+other parameters (e.g. when '\-\-pie=PIE' is greater than zero).
 .TP
 \fB\-P\fR, \fB\-\-pfu\fR=\fIPFU\fR
 sets the "Protection Field Usage" field in the parameter block associated

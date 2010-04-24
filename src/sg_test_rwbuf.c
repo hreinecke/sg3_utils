@@ -39,7 +39,7 @@
 #include "sg_io_linux.h"
 
 
-static char * version_str = "1.07 20080318";
+static char * version_str = "1.07 20100423";
 
 #define BPI (signed)(sizeof(int))
 
@@ -520,6 +520,6 @@ err_out:
         if ((0 == ret) && (! do_quick))
                 printf ("Success\n");
         else if (times > 1)
-                printf ("Failed after %d succesful cycles\n", k);
+                printf ("Failed after %d successful cycles\n", k);
         return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

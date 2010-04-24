@@ -2,6 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.30 [20100424] [svn: r338]
+  - sg_inq: update version descriptor list to spc4r24
+  - sg_lib: sync asc/ascq list to spc4r24
+  - sg_read_long: add --readonly option (open() is rw)
+
 Changelog for sg3_utils-1.29 [20100406] [svn: r334]
   - sg_rtpg: new logical block dependent state and bit (spc4r23)
   - sg_start: add '--readonly' option for ATA disks
