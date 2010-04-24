@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.58 20100329";    /* spc-4 rev 23 */
+const char * sg_lib_version_str = "1.59 20100415";    /* spc-4 rev 24 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -793,6 +793,10 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x53,0x02,"Medium removal prevented"},
     {0x53,0x03,"Medium removal prevented by data transfer element"},
     {0x53,0x04,"Medium thread or unthread failure"},
+    {0x53,0x05,"Volume identifier invalid"},
+    {0x53,0x06,"Volume identifier missing"},
+    {0x53,0x07,"Duplicate volume identifier"},
+    {0x53,0x08,"Element status unknown"},
     {0x54,0x00,"SCSI to host system interface failure"},
     {0x55,0x00,"System resource failure"},
     {0x55,0x01,"System buffer full"},

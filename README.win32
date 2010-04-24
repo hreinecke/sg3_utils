@@ -72,10 +72,8 @@ file. An overview of sg3_utils can be found at:
 http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
-
-See the INSTALL file (towards the end) for instructions on how to build
-sg3_utils on Windows operating systems. Some man pages have examples which
-use linux device names which hopefully will not confuse Windows users.
+Some man pages have examples which use linux device names which hopefully
+will not confuse Windows users.
 
 Two pass-through variants
 =========================
@@ -106,18 +104,19 @@ prior to the 'make' call.
 
 Details
 =======
-The ported utilities listed above, all use SCSI command functions declared in
-sg_cmds_basic.h and sg_cmds_extra.h . Those SCSI command functions are
-implemented in the corresponding ".c" files. The ".c" files pass SCSI commands
-to the host operating system via an interface declared in sg_pt.h . There are
-currently four implementations of that interface depending on the host
-operating system:
+Most of the ported utilities listed above use SCSI command functions
+declared in sg_cmds_*.h headers . Those SCSI command functions are
+implemented in the corresponding ".c" files. The ".c" files pass SCSI
+commands to the host operating system via an interface declared in sg_pt.h .
+There are currently five implementations of that interface depending on
+the host operating system:
   - sg_pt_linux.c
   - sg_pt_freebsd.c
   - sg_pt_osf1.c  [Tru64]
+  - sg_pt_solaris.c
   - sg_pt_win32.c
 
-The ASPI32 interface which requires a dll from Adaptec ia not supported.
+The ASPI32 interface which requires a dll from Adaptec is not supported.
 
 The sg_scan utility is a special version for Windows and it attempts to show
 the various available storage device names, one per line. Here is an example
@@ -173,11 +172,15 @@ on Windows setting the SG_LIB_MINGW define may help.
 
 Build environments
 ==================
-This package has various Makefiles so that these utilities can be built
-in either a cygwin and MinGW environment, called Makefile.win32 and
-Makefile.mingw respectively. The executables produced are console
-applications that can be executed in either a cygwin, MSYS or "cmd" shell.
-See the INSTALL file for more details.
+This package uses autotools infrastructure with the now common
+"./configure ; make ; make install" sequence needed to build and install
+from the source found in the tarball. Two Windows environments for building
+Unix code are supported: cygwin and MinGW. If the "./configure" sequence
+fails try using the ./autogen.sh prior to that sequence. The executables
+produced are console applications that can be executed in either a cygwin,
+MSYS or "cmd" shell. Various build options are available by giving
+command line options to "./configure", see the INSTALL file for generic
+information about the build infrastructure.
 
 Binary and Text files
 =====================
@@ -192,4 +195,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-20th September 2009
+10th April 2010

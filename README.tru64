@@ -55,29 +55,31 @@ section 8). An overview of sg3_utils can be found at:
 http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
+This package uses autotools infrastructure with the now common
+"./configure ; make ; make install" sequence needed to build and install
+from the source found in the tarball. If the "./configure" sequence
+fails try using the ./autogen.sh prior to that sequence.
 
-See the INSTALL file (at the end) for instructions on how to build
-sg3_utils on Tru64. Files that are Tru64 specific use the "osf1"
-suffix (apart from this one). Some man pages have examples which
-use linux device names which hopefully will not confuse the Tru64 users.
+Some man pages have examples which use linux device names which hopefully
+will not confuse Tru64 users.
 
 
 Details
 =======
-The ported utilities listed above, all use SCSI command functions
-declared in sg_cmds_basic.h and sg_cmds_extra.h . Those SCSI command
-functions are implemented in the corresponding ".c" files. The ".c"
-files pass SCSI commands to the host operating system via
-an interface declared in sg_pt.h . There are currently four
-implementations of that interface depending on the host operating
+Most of the ported utilities listed above use SCSI command functions
+declared in sg_cmds_*.h headers . Those SCSI command functions are
+implemented in the corresponding ".c" files. The ".c" files pass SCSI
+commands to the host operating system via an interface declared in sg_pt.h .
+There are currently five implementations of that interface depending on
+the host operating system:
 system:
   - sg_pt_linux.c
   - sg_pt_osf1.c  [Tru64]
   - sg_pt_freebsd.c
+  - sg_pt_solaris.c
   - sg_pt_win32.c
 
-The sg_pt_osf1.c file uses the Tru64 CAM SCSI pass through
-mechanism.
+The sg_pt_osf1.c file uses the Tru64 CAM SCSI pass through mechanism.
 
 Tru64 does not have general library support for "long" options
 (e.g. "--verbose") which are used extensively by most of the
@@ -88,4 +90,4 @@ subdirectory. Currently only the Tru64 port uses it.
 
 
 Doug Gilbert
-20th September 2009
+10th April 2010
