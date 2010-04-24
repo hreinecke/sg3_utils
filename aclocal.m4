@@ -18,7 +18,7 @@ you should regenerate the build system entirely.], [63])])
 
 # libtool.m4 - Configure libtool for the host system. -*-Autoconf-*-
 
-# serial 48 Debian 1.5.22-4 AC_PROG_LIBTOOL
+# serial 48 Debian 1.5.22-4+etch1 AC_PROG_LIBTOOL
 
 
 # AC_PROVIDE_IFELSE(MACRO-NAME, IF-PROVIDED, IF-NOT-PROVIDED)
