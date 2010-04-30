@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2009 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2010 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.0 (2009-08-17)"
+#define SG_RAW_VERSION "0.4.1 (2010-04-29)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -40,6 +40,7 @@ static struct option long_options[] = {
     { "nosense", no_argument,       NULL, 'n' },
     { "outfile", required_argument, NULL, 'o' },
     { "request", required_argument, NULL, 'r' },
+    { "readonly", no_argument,      NULL, 'R' },
     { "send",    required_argument, NULL, 's' },
     { "timeout", required_argument, NULL, 't' },
     { "verbose", no_argument,       NULL, 'v' },
@@ -61,6 +62,7 @@ struct opts_t {
     off_t dataout_offset;
     int timeout;
     int no_sense;
+    int readonly;
     int do_help;
     int do_verbose;
     int do_version;
@@ -71,7 +73,7 @@ version()
 {
     fprintf(stderr,
             "sg_raw " SG_RAW_VERSION "\n"
-            "Copyright (C) 2007-2008 Ingo van Lil <inguin@gmx.de>\n"
+            "Copyright (C) 2007-2010 Ingo van Lil <inguin@gmx.de>\n"
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"
             "the GNU General Public License "
@@ -97,6 +99,8 @@ usage()
             "  -o, --outfile=OFILE    Write binary data to OFILE (def: "
             "hexdump to stdout)\n"
             "  -r, --request=RLEN     Request up to RLEN bytes of data\n"
+            "  -R, --readonly         Open DEVICE read-only (default: "
+            "read-write)\n"
             "  -s, --send=SLEN        Send SLEN bytes of data\n"
             "  -t, --timeout=SEC      Timeout in seconds (default: 20)\n"
             "  -v, --verbose          Increase verbosity\n"
@@ -115,7 +119,7 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
     while (1) {
         int c, n;
 
-        c = getopt_long(argc, argv, "r:o:bs:i:k:t:nvhV", long_options, NULL);
+        c = getopt_long(argc, argv, "bhi:k:no:r:Rs:t:vV", long_options, NULL);
         if (c == -1)
             break;
 
@@ -160,6 +164,9 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             optsp->datain_len = n;
+            break;
+        case 'R':
+            ++optsp->readonly;
             break;
         case 's':
             optsp->do_dataout = 1;
@@ -400,8 +407,8 @@ main(int argc, char *argv[])
         goto done;
     }
 
-    sg_fd = scsi_pt_open_device(opts.device_name, 0 /* RDWR */,
-            opts.do_verbose);
+    sg_fd = scsi_pt_open_device(opts.device_name, opts.readonly,
+                                opts.do_verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "%s: %s\n", opts.device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;

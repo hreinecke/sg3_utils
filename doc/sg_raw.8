@@ -1,4 +1,4 @@
-.TH SG_RAW "8" "December 2009" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_RAW "8" "April 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_raw \- sends an arbitrary SCSI command to a device
 .SH SYNOPSIS
@@ -45,6 +45,10 @@ This option is ignored if \fB\-\-request\fR is not specified.
 Expect to receive up to \fIRLEN\fR bytes of data from the \fIDEVICE\fR.
 \fIRLEN\fR may be suffixed with 'k' to use kilobytes (1024 bytes) instead
 of bytes. This option and \fB\-\-send\fR are mutually exclusive.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+Open \fIDEVICE\fR read-only. The default (without this option) is to open
+it read-write.
 .TP
 \fB\-s\fR, \fB\-\-send\fR=\fISLEN\fR
 Read \fISLEN\fR bytes of data, either from stdin or from a file, and send
@@ -108,7 +112,7 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2009 Ingo van Lil
+Copyright \(co 2001\-2010 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
