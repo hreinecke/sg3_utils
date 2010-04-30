@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.95 20100423";    /* SPC-4 revision 23 */
+static char * version_str = "0.96 20100430";    /* SPC-4 revision 24 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -38,6 +38,7 @@ static char * version_str = "0.95 20100423";    /* SPC-4 revision 23 */
 #define VERIFY_ERR_LPAGE 0x5
 #define NON_MEDIUM_LPAGE 0x6
 #define LAST_N_ERR_LPAGE 0x7
+#define FORMAT_STATUS_LPAGE 0x8
 #define LAST_N_DEFERRED_LPAGE 0xb
 #define THIN_PROV_LPAGE 0xc
 #define TEMPERATURE_LPAGE 0xd
@@ -705,7 +706,7 @@ show_page_name(int pg_code, int subpg_code,
         /* disk (direct access) type devices */
         {
             switch (pg_code) {
-            case 0x8:
+            case FORMAT_STATUS_LPAGE:
                 printf("%sFormat status (sbc-2)\n", b);
                 break;
             case THIN_PROV_LPAGE:               /* 0xc */
@@ -3541,7 +3542,7 @@ show_ascii_page(unsigned char * resp, int len,
     case LAST_N_ERR_LPAGE:      /* 0x7 */
         show_last_n_error_page(resp, len, optsp->do_pcb);
         break;
-    case 0x8:
+    case FORMAT_STATUS_LPAGE:   /* 0x8 */
         {
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
