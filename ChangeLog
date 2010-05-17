@@ -5,6 +5,7 @@ directory have their own "man" pages. There is also a sg3_utils man page.
 Changelog for sg3_utils-1.30 [20100430] [svn: r342]
   - sg_inq: update version descriptor list to spc4r24
   - sg_lib: sync asc/ascq list to spc4r24
+    - dStrHex(): trim excess trailing spaces
   - sg_read_long: add --readonly option (open() is rw)
   - sg_raw: add --readonly option (open() is rw)
 

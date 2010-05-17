@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.59 20100415";    /* spc-4 rev 24 */
+const char * sg_lib_version_str = "1.60 20100511";    /* spc-4 rev 24 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
