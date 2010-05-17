@@ -1111,7 +1111,8 @@ safe_strerror(int errnum)
 void
 dStrHex(const char* str, int len, int no_ascii)
 {
-    const char* p = str;
+    const char * p = str;
+    const char * formatstr;
     unsigned char c;
     char buff[82];
     int a = 0;
@@ -1123,6 +1124,7 @@ dStrHex(const char* str, int len, int no_ascii)
 
     if (len <= 0)
         return;
+    formatstr = (0 == no_ascii) ? "%.76s\n" : "%.56s\n";
     memset(buff, ' ', 80);
     buff[80] = '\0';
     if (no_ascii < 0) {
@@ -1134,13 +1136,15 @@ dStrHex(const char* str, int len, int no_ascii)
             sprintf(&buff[bpos], "%.2x", (int)(unsigned char)c);
             buff[bpos + 2] = ' ';
             if ((k > 0) && (0 == ((k + 1) % 16))) {
-                printf("%.60s\n", buff);
+                printf(formatstr, buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
             }
         }
-        if (bpos > bpstart)
-            printf("%.60s\n", buff);
+        if (bpos > bpstart) {
+            buff[bpos + 2] = '\0';
+            printf("%s\n", buff);
+        }
         return;
     }
     /* no_ascii>=0, start each line with address (offset) */
@@ -1162,7 +1166,7 @@ dStrHex(const char* str, int len, int no_ascii)
             buff[cpos++] = c;
         }
         if (cpos > (cpstart + 15)) {
-            printf("%.76s\n", buff);
+            printf(formatstr, buff);
             bpos = bpstart;
             cpos = cpstart;
             a += 16;
@@ -1171,8 +1175,10 @@ dStrHex(const char* str, int len, int no_ascii)
             buff[k + 1] = ' ';
         }
     }
-    if (cpos > cpstart)
-        printf("%.76s\n", buff);
+    if (cpos > cpstart) {
+        buff[cpos] = '\0';
+        printf("%s\n", buff);
+    }
 }
 
 /* Output to ASCII-Hex bytes to 'b' not to exceed 'b_len' characters.
