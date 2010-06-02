@@ -312,8 +312,8 @@ decode_rdac_vpd_c2(unsigned char * buff, int len)
                 "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
         return;
     }
-    printf("  Software Version: %d.%d.%d\n", buff[8], buff[9], buff[10]);
-    printf("  Software Date: %02x/%02x/%02x\n", buff[11], buff[12], buff[13]);
+    printf("  Software Version: %x.%x.%x\n", buff[8], buff[9], buff[10]);
+    printf("  Software Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
     printf("  Features:");
     if (buff[14] & 0x01)
         printf(" Dual Active,");
@@ -464,7 +464,8 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
 #endif
     memset(label, 0, 61);
     label_len = buff[28];
-    memcpy(label, &buff[29], label_len);
+    for(i = 0; i < (label_len - 1); ++i)
+        *(label + i) = buff[29 + (2 * i) + 1];
     printf("  Volume User Label: %s\n", label);
 
     uuid_len = buff[89];
@@ -477,7 +478,8 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
     printf("  Storage Array Unique Identifier: %s\n", uuid);
     memset(label, 0, 61);
     label_len = buff[106];
-    memcpy(label, &buff[107], label_len);
+    for(i = 0; i < (label_len - 1); ++i)
+        *(label + i) = buff[107 + (2 * i) + 1];
     printf("  Storage Array User Label: %s\n", label);
 
     for (i = 0, c = uuid; i < 8; i++) {
