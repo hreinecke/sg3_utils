@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.41 20100331";    /* spc4r23 + sbc3r22 */
+static char * version_str = "0.42 20100522";    /* spc4r23 + sbc3r22 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
