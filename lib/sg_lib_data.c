@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.60 20100511";    /* spc-4 rev 24 */
+const char * sg_lib_version_str = "1.61 20100625";    /* spc-4 rev 25 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -379,6 +379,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x00,0x1c,"Verify operation in progress"},
     {0x00,0x1d,"ATA pass through information available"},
     {0x00,0x1e,"Conflicting SA creation request"},
+    {0x00,0x1f,"Logical unit transitioning to another power condition"},
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},
@@ -415,6 +416,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x17,"Logical unit not ready, calibration required"},
     {0x04,0x18,"Logical unit not ready, a door is open"},
     {0x04,0x19,"Logical unit not ready, operating in sequential mode"},
+    {0x04,0x1a,"Logical unit not ready, start stop unit command in progress"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},

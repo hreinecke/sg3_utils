@@ -39,7 +39,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 24 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 25 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -287,6 +287,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc23, "SAS-2 T10/1760-D revision 14"},
     {0xc27, "SAS-2 T10/1760-D revision 15"},
     {0xc28, "SAS-2 T10/1760-D revision 16"},
+    {0xc2a, "SAS-2 ANSI INCITS 457-2010"},
     {0xc40, "SAS-2.1 (no version claimed)"},
     {0xc48, "SAS-2.1 T10/2125-D revision 04"},
     {0xd20, "FC-PH (no version claimed)"},
@@ -326,6 +327,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xe60, "FC-PI-3 (no version claimed)"},
     {0xe62, "FC-PI-3 T11/1625-D revision 2.0"},
     {0xe68, "FC-PI-3 T11/1625-D revision 2.1"},
+    {0xe6a, "FC-PI-3 T11/1625-D revision 4.0"},
     {0xe80, "FC-PI-4 (no version claimed)"},
     {0xe82, "FC-PI-4 T11/1647-D revision 8.0"},
     {0xea0, "FC 10GFC (no version claimed)"},
@@ -341,6 +343,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xf03, "FC-LS-2 T11/2103-D revision 2.11"},
     {0xf20, "FC-PI-5 (no version claimed)"},
     {0xf27, "FC-PI-5 T11/2118-D revision 2.00"},
+    {0xf28, "FC-PI-5 T11/2118-D revision 3.00"},
+    {0xf40, "FC-PI-6 (no version claimed)"},
     {0x12a0, "FC-SCM (no version claimed)"},
     {0x12a3, "FC-SCM T11/1824DT revision 1.0"},
     {0x12c0, "FC-DA-2 (no version claimed)"},
@@ -380,6 +384,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1623, "ATA/ATAPI-8 ATA-ACS ATA/ATAPI command set (no version "
              "claimed)"},
     {0x1628, "ATA/ATAPI-8 ATA-AAM ANSI INCITS 451-2008"},
+    {0x162a, "ATA/ATAPI-8 ATA8-ACS ANSI INCITS 452-2009 w/ Amendment 1"},
     {0x1728, "Universal Serial Bus Specification, Revision 1.1"},
     {0x1729, "Universal Serial Bus Specification, Revision 2.0"},
     {0x1730, "USB Mass Storage Class Bulk-Only Transport, Revision 1.0"},
