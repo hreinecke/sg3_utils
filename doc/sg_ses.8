@@ -1,4 +1,4 @@
-.TH SG_SES "8" "January 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_SES "8" "June 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -45,14 +45,14 @@ in SES\-2) and Subenclosure String Out diagnostic pages can be set currently.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
 permits a string of comma separated (ASCII) hex bytes to be specified (limit
-512). A (single) space separated string of hex bytes is also allowed but
+1024). A (single) space separated string of hex bytes is also allowed but
 the list needs to be in quotes. This allows the parameters to a control
 diagnostic page to be specified. The string given should not include the
 first 4 bytes (i.e. page code and length). See next entry for using stdin.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\-
-reads a data string from stdin. Spaces, tabs and line feeds additionally
-are permitted as separators.
+reads a data string from stdin, limit 1024 bytes. Spaces, tabs and line feeds
+additionally are permitted as separators.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR
 cuts down on the amount of output from the enclosure status diagnostic

@@ -24,10 +24,11 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.47 20100312";    /* ses3r02 */
+static char * version_str = "1.48 20100610";    /* ses3r02 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
+#define MX_DATA_IN 2048
 
 #define TEMPERATURE_OFFSET 20   /* 8 bits represents -19 C to +235 C */
                                 /* value of 0 (would imply -20 C) reserved */
@@ -1524,7 +1525,8 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
         *arr_len = 0;
     }
     if ('-' == inp[0]) {        /* read from stdin */
-        for (j = 0, off = 0; j < 512; ++j) {
+        for (j = 0, off = 0; j < MX_DATA_IN; ++j) {
+            /* limit lines read to MX_DATA_IN */
             if (NULL == fgets(line, sizeof(line), stdin))
                 break;
             in_len = strlen(line);
@@ -1550,7 +1552,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                         "line %d, pos %d\n", j + 1, m + k + 1);
                 return 1;
             }
-            for (k = 0; k < 1024; ++k) {
+            for (k = 0; k < (MX_DATA_IN - off); ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
                         fprintf(stderr, "read_hex: hex number "
@@ -1573,6 +1575,8 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                 }
             }
             off += k + 1;
+            if (off >= MX_DATA_IN)
+                break;
         }
         *arr_len = off;
     } else {        /* hex string on command line */
@@ -1582,7 +1586,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                     k + 1);
             return 1;
         }
-        for (k = 0; k < 1024; ++k) {
+        for (k = 0; k < MX_DATA_IN; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
                     fprintf(stderr, "read_hex: hex number larger "
@@ -1795,7 +1799,7 @@ main(int argc, char * argv[])
     int byte1 = 0;
     const char * device_name = NULL;
     char buff[48];
-    unsigned char data_arr[1024];
+    unsigned char data_arr[MX_DATA_IN + 16];
     int arr_len = 0;
     int pd_type = 0;
     int ret = 0;
