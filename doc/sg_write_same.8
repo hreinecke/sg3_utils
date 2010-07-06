@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "March 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_WRITE_SAME "8" "June 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -20,7 +20,8 @@ or by calling READ CAPACITY(16) on \fIDEVICE\fR. The contents of the
 block to be written are obtained from the input file \fIIF\fR or
 zeroes are used. If READ CAPACITY(16) is called (which implies \fIIF\fR
 was not given) and the PROT_EN bit is set then the last 8 bytes are
-set to 0xff.
+set to 0xff. If READ CAPACITY(16) fails then READ CAPACITY(10) is
+used to determine the block size.
 .PP
 By default WRITE SAME(10) is sent unless \fILBA\fR (plus \fINUM\fR)
 exceeds 32 bits, \fINUM\fR exceeds 65535 or the \fI\-\-unmap\fR option is
@@ -72,9 +73,9 @@ buffer for the SCSI WRITE SAME command. The length of the data out buffer
 is \fI\-\-xferlen=LEN\fR or, if that is not given, the length of the \fIIF\fR
 file. If \fIIF\fR is "\-" then stdin is read. If this option is not given
 then 0x00 bytes are used as fill with the length of the data out buffer
-obtained from \fI\-\-xferlen=LEN\fR or by calling READ CAPACITY(16). If the
-response to READ CAPACITY(16) has the PROT_EN bit set then data out buffer
-size is modified accordingly with the last 8 bytes set to 0xff.
+obtained from \fI\-\-xferlen=LEN\fR or by calling READ CAPACITY(16 or 10).
+If the response to READ CAPACITY(16) has the PROT_EN bit set then data
+out buffer size is modified accordingly with the last 8 bytes set to 0xff.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
 where \fILBA\fR is the logical block address to start the WRITE SAME command.
@@ -118,7 +119,7 @@ default value is zero. \fIWPR\fR should be a value between 0 and 7.
 .TP
 \fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
 where \fILEN\fR is the data out buffer length. Defaults to the length of
-the \fIIF\fR file or, if that is not given, then the READ CAPACITY(16)
+the \fIIF\fR file or, if that is not given, then the READ CAPACITY(16 or 10)
 command is called on the \fIDEVICE\fR and the 'Logical block length in
 bytes' and the PROT_EN bit in the response are used to determine the
 data out buffer length. If both this option and the \fIIF\fR option are
