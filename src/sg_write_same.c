@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.95 20100331";
+static char * version_str = "0.96 20100629";
 
 
 #define ME "sg_write_same: "
@@ -39,6 +39,7 @@ static char * version_str = "0.95 20100331";
 #define WRITE_SAME10_LEN 10
 #define WRITE_SAME16_LEN 16
 #define WRITE_SAME32_LEN 32
+#define RCAP10_RESP_LEN 8
 #define RCAP16_RESP_LEN 32
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT_SECS 60
@@ -461,8 +462,25 @@ main(int argc, char * argv[])
                           resp_buff[11]);
             prot_en = !!(resp_buff[12] & 0x1);
             opts.xfer_len = block_size + (prot_en ? 8 : 0);
+        } else if ((SG_LIB_CAT_INVALID_OP == res) ||
+                   (SG_LIB_CAT_ILLEGAL_REQ == res)) {
+            if (vb)
+                fprintf(stderr, "Read capacity(16) not supported, try Read "
+                        "capacity(10)\n");
+            res = sg_ll_readcap_10(sg_fd, 0 /* pmi */, 0 /* lba */, resp_buff,
+                                   RCAP10_RESP_LEN, 0, (vb ? (vb - 1): 0));
+            if (0 == res) {
+                block_size = ((resp_buff[4] << 24) |
+                              (resp_buff[5] << 16) |
+                              (resp_buff[6] << 8) |
+                              resp_buff[7]);
+                opts.xfer_len = block_size;
+            }
         } else if (vb)
             fprintf(stderr, "Read capacity(16) failed. Unable to calculate "
+                    "block size\n");
+        if (res)
+            fprintf(stderr, "Read capacity(10) failed. Unable to calculate "
                     "block size\n");
     }
     if (opts.xfer_len < 1) {
@@ -518,7 +536,7 @@ main(int argc, char * argv[])
             close(infd);
     } else {
         if (vb)
-            fprintf(stderr, "Default data-out buffer to %d zeroes\n",
+            fprintf(stderr, "Default data-out buffer set to %d zeros\n",
                     opts.xfer_len);
         if (prot_en) { /* default for protection is 0xff, rest get 0x0 */
             memset(wBuff + opts.xfer_len - 8, 0xff, 8);

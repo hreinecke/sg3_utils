@@ -1,4 +1,4 @@
-.TH SG_START "8" "February 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_START "8" "July 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_start \- send SCSI START STOP UNIT command to start, stop, load or
 eject medium
@@ -152,6 +152,13 @@ In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
 generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
 and DVD drives) can also be specified. For example "sg_start 0 /dev/sda"
 will work in the 2.6 series kernels.
+.PP
+In the Linux 2.6 series, especially with ATA disks, using this utility
+to stop (spin down) a disk may not be sufficient and other mechanisms
+will start the disk again some time later. The user might additionally
+mark the disk as "offline" with 'echo offline > /sys/block/sda/device/state'
+where sda is the block name of the disk. To restart the disk "offline"
+can be replaced with "running".
 .SH EXIT STATUS
 The exit status of sg_start is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
