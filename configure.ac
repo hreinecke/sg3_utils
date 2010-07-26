@@ -1,4 +1,4 @@
-AC_INIT(sg3_utils, 1.27, dgilbert@interlog.com)
+AC_INIT(sg3_utils, 1.28, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE
 AM_CONFIG_HEADER(config.h)
@@ -12,12 +12,11 @@ AC_PROG_LIBTOOL
 
 # check for headers
 AC_HEADER_STDC
-AC_CHECK_HEADERS([linux/types.h linux/bsg.h], [], [],
+AC_CHECK_HEADERS([linux/types.h linux/bsg.h linux/kdev_t.h], [], [],
      [[#ifdef HAVE_LINUX_TYPES_H
      # include <linux/types.h>
      #endif
      ]])
-
 
 # check for functions
 AC_CHECK_FUNCS(getopt_long,
@@ -28,33 +27,33 @@ AC_SUBST(GETOPT_O_FILES)
 
 AC_CANONICAL_HOST
 
-AC_DEFINE_UNQUOTED(SG3_UTILS_BUILD_HOST, "${host}", [sg3_utils Build Host])
+AC_DEFINE_UNQUOTED(SG_LIB_BUILD_HOST, "${host}", [sg3_utils Build Host])
 
 case "${host}" in
         *-*-linux-gnu*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_LINUX, 1, [sg3_utils on linux])
+		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-linux*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_LINUX, 1, [sg3_utils on linux])
+		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-freebsd*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_FREEBSD, 1, [sg3_utils on FreeBSD])
+		AC_DEFINE_UNQUOTED(SG_LIB_FREEBSD, 1, [sg3_utils on FreeBSD])
                 AC_SUBST([os_libs], ['-lcam']);;
         *-*-solaris*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_SOLARIS, 1, [sg3_utils on Solaris])
+		AC_DEFINE_UNQUOTED(SG_LIB_SOLARIS, 1, [sg3_utils on Solaris])
                 AC_SUBST([os_libs], ['']);;
         *-*-osf*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_OSF1, 1, [sg3_utils on Tru64 UNIX])
+		AC_DEFINE_UNQUOTED(SG_LIB_OSF1, 1, [sg3_utils on Tru64 UNIX])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-cygwin*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_WIN32, 1, [sg3_utils on Win32])
+		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-mingw*)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_WIN32, 1, [sg3_utils on Win32])
-		AC_DEFINE_UNQUOTED(SG3_UTILS_MINGW, 1, [also MinGW environment])
+		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
+		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
                 AC_SUBST([os_libs], ['']) ;;
         *)
-		AC_DEFINE_UNQUOTED(SG3_UTILS_LINUX, 1, [assume sg3_utils on linux])
+		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [assume sg3_utils on linux])
                 AC_SUBST([os_libs], ['']) ;;
 esac
 
@@ -69,6 +68,11 @@ AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 AC_ARG_ENABLE([no-linux-bsg],
   AC_HELP_STRING([--enable-no-linux-bsg], [ignore linux bsg (sgv4) if present]),
   AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [ignore linux bsg], )
+)
+
+AC_ARG_ENABLE([win32-spt-direct],
+  AC_HELP_STRING([--enable-win32-spt-direct], [enable Win32 SPT Direct]),
+  AC_DEFINE_UNQUOTED(WIN32_SPT_DIRECT, 1, [enable Win32 SPT Direct], )
 )
 
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile)

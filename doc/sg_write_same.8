@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "April 2007" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_WRITE_SAME "8" "June 2009" "sg3_utils\-1.28" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -23,8 +23,8 @@ was not given) and the PROT_EN bit is set then the last 8 bytes are
 set to 0xff.
 .PP
 By default WRITE SAME(10) is sent unless \fILBA\fR (plus \fINUM\fR)
-exceeds 32 bits, \fINUM\fR exceeds 65535 or \fI\-\-unmap\fR is given.
-In these cases WRITE SAME(16) is sent.
+exceeds 32 bits, \fINUM\fR exceeds 65535 or the \fI\-\-unmap\fR option is
+given. In these cases WRITE SAME(16) is sent.
 .PP
 .B Take care:
 The WRITE SAME(10, 16 and 32) commands interpret a \fINUM\fR of zero
@@ -32,8 +32,8 @@ as write to the end of \fIDEVICE\fR. This utility defaults \fINUM\fR to
 1 . The WRITE SAME commands have no IMMED bit so if \fINUM\fR is
 large (or zero) then an invocation of this utility could take a long
 time, potentially as long as a FORMAT UNIT command. In such situations
-the command timeout value \fITO\fR will most likely need to be increased
-from its default value of 60 seconds.
+the command timeout value \fITO\fR may need to be increased from its
+default value of 60 seconds.
 .PP
 As a precaution against an accidental 'sg_write_same /dev/sda' (for example)
 overwriting LBA 0 on /dev/sda with zeroes, at least one of the
@@ -41,7 +41,7 @@ overwriting LBA 0 on /dev/sda with zeroes, at least one of the
 given. Obviously this utility can destroy a lot of user data so check the
 options carefully.
 .PP
-This utility is based SBC\-3 draft revision 18 found at http://www.t10.org .
+This utility is based SBC\-3 draft revision 19 found at http://www.t10.org .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -99,7 +99,7 @@ considerably more time than 60 seconds to complete.
 \fB\-U\fR, \fB\-\-unmap\fR
 sets the UNMAP bit in the WRITE SAME(16 and 32) cdb. When this option is
 given the default command becomes WRITE SAME(16) since the WRITE SAME(10)
-command does not offer this bit (in SBC\-3 draft revision 18). See UNMAP
+command does not offer this bit (in SBC\-3 draft revision 19). See UNMAP
 section below.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
@@ -121,7 +121,7 @@ data out buffer length. If both this option and the \fIIF\fR option are
 given and \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR
 is the data out buffer length with zeroes used as pad bytes.
 .SH UNMAP
-Thin provisioning is the sophisticated term used in SBC\-3 revision 18
+Thin provisioning is the sophisticated term used in SBC\-3 revision 19
 for the ability to mark blocks as unused. It is closely related to the
 ATA DATA SET MANAGEMENT command with the "Trim" bit set. For large
 storage arrays, it is a way to provision less physical storage than the
@@ -132,8 +132,8 @@ known large sections (or almost all) of the flash memory is not in use.
 .PP
 Support for thin provisioning is indicated by the TPE bit being set in
 the READ CAPACITY(16) command response. That implies at least one of
-the UNMAP, WRITE SAME(16) or WRITE SAME(32) commands is implemented. If
-the UNMAP command is implemented then the "Maximum unmap LBA count"
+the UNMAP or WRITE SAME(16) commands is implemented. If the UNMAP command
+is implemented then the "Maximum unmap LBA count"
 and "Maximum unmap block descriptor count" fields in the Block Limits
 VPD page should both be greater than zero. The READ CAPACITY(16) command
 response also contains a TPRZ bit which if set means that if unmapped
@@ -150,6 +150,11 @@ the \fIDEVICE\fR as if the Unmap bit was zero. In the absence of the
 \fI\-\-in=IF\fR option, this utility will attempt build a data out
 buffer that meets the requirements for the Unmap bit in the cdb to be
 acted on by the \fIDEVICE\fR. 
+.PP
+Logical blocks may also be unmapped by the SCSI UNMAP and FORMAT UNIT
+commands (see the sg_unmap and sg_format utilities). Support for
+thin provisioning is indicated by the TPE bit in the response to the
+SCSI READ CAPACITY (16) command (see the sg_readcap utility).
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
@@ -167,4 +172,4 @@ Copyright \(co 2009 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_readcap
+.B sg_format,sg_readcap,sg_unmap(sg3_utils)

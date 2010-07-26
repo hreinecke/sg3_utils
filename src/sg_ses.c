@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.44 20090401";    /* ses2r19b */
+static char * version_str = "1.46 20090926";    /* ses3r01 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -193,7 +193,7 @@ static struct diag_page_code dpc_arr[] = {
         {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
         {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
         {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
-        {0x3f, "Protocol specific SAS (SAS-1)"},
+        {0x3f, "Protocol specific (SAS transport)"},
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
 };
@@ -214,7 +214,7 @@ static struct diag_page_code in_dpc_arr[] = {
         {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
         {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
         {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
-        {0x3f, "Protocol specific SAS (SAS-1)"},
+        {0x3f, "Protocol specific (SAS transport)"},
         {0x40, "Translate address (SBC)"},
         {0x41, "Device status (SBC)"},
 };
@@ -782,7 +782,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                    !!(statp[1] & 0x4), !!(statp[1] & 0x2));
             printf("Crit Under=%d\n", !!(statp[1] & 0x1));
         }
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
         printf("%sVoltage: %g volts\n", pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
 #else
@@ -795,7 +795,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
             printf("%sIdent=%d, Fail=%d, Warn Over=%d, Crit Over=%d\n",
                     pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                     !!(statp[1] & 0x8), !!(statp[1] & 0x2));
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
         printf("%sCurrent: %g amps\n", pad,
                ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
 #else
@@ -988,7 +988,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         printf("low critical=%s (in minutes)\n", b);
         break;
     case 0x12: /* voltage */
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
         printf("%s%s: high critical=%g %%, high warning=%g %%\n", pad,
                buff, 0.5 * tp[0], 0.5 * tp[1]);
         printf("%s  low warning=%g %%, low critical=%g %% (from nominal "
@@ -1001,7 +1001,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
 #endif
         break;
     case 0x13: /* current */
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
         printf("%s%s: high critical=%g %%, high warning=%g %%\n", pad,
                buff, 0.5 * tp[0], 0.5 * tp[1]);
 #else

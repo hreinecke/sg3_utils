@@ -1,20 +1,55 @@
+sg3-utils (1.28-0.1) unstable; urgency=low
+
+  * New upstream version
+
+ -- Doug Gilbert <dgilbert@interlog.com>  Fri, 02 Oct 2009 00:20:00 -0400
+
 sg3-utils (1.27-0.1) unstable; urgency=low
 
-  * New upstream version
+  [ Martin Pitt ]
+  * Non-maintainer upload; this package blocks DeviceKit, and maintainer is
+    apparently not active any more. Also clean up and modernize the package
+    somewhat while we are at it.
+  * New upstream release (required for current devicekit-disks).
+    (Closes: #532546). Upstream original tarball repacked to not contain
+    debian/ directory.
+  * Rename libsgutils1{,-dev} to libsgutils2-2{,-dev}, upstream bumped SONAME.
+    Also call the library libgsutils2-2 to match SONAME. Add
+    Conflicts/Replaces for "libsgutils2" to provide a clean upgrade from the
+    packages as provided by Upstream and Ubuntu.
+  * debian/rules: Update build rules for upstream Makefile → autotools switch.
+  * debian/rules: Fix cleaning a clean source package.
+  * Demote Recommends to Suggests; the library doesn't actually call the
+    binaries in sg3-utils. (Closes: #532547)
+  * Drop debian/*.dirs, unnecessary with dh_install.
+  * Drop sg3-utils.preinst, not necessary to deal with kernel 2.4 any more.
+  * Drop libsgutils2-0.install, libsgutils2-0-dev.install, these packages
+    don't exist.
+  * Drop libsgutils2.post{inst,rm}: Basically empty, debhelper will create its
+    own.
+  * libsgutils2-dev.install: Drop *.lo.
+  * debian/compat: 4 -> 7. Bump debhelper build-depends accordingly.
+  * debian/control: Bump Standards-Version to 3.8.2.
+  * debian/control: Modernize package description for Linux 2.6.
+    (Closes: #506578)
+  * debian/rules: Drop -k argument from dh_clean (thanks lintian).
 
- -- Doug Gilbert <dgilbert@interlog.com>  Sat, 11 Apr 2009 10:30:00 -0400
+  [ Frank Lichtenheld ]
+  * debian/control, debian/rules: Add dependency of libsgutils-dev on
+    libcam-dev on kfreebsd-*. (Closes: #519460)
 
-sg3-utils (1.26-0.1) unstable; urgency=low
+ -- Martin Pitt <mpitt@debian.org>  Mon, 22 Jun 2009 12:04:20 +0200
 
-  * New upstream version
+sg3-utils (1.24-2) unstable; urgency=low
 
- -- Doug Gilbert <dgilbert@interlog.com>  Wed, 25 Jun 2008 15:00:00 -0400
+  * Cleaned up package description (Closes: #445920).
+  * Don't make libtool think rpath is necessary (Closes: #451153)
+  * Capitalized Linux in extended description (Closes: #457526).
+  * Completed sentence in libsgutils1 long description (Closes: #421391).
+  * Added patch from Aurelian Jarno to build on kfreebsd-* (Closes: #455430).
+  * Symlinks in examples directory cleaned up (Closes: #372610).
 
-sg3-utils (1.25-0.1) unstable; urgency=low
-
-  * New upstream version
-
- -- Doug Gilbert <dgilbert@interlog.com>  Tue, 16 Oct 2007 10:00:00 -0400
+ -- Eric Schwartz (Skif) <emschwar@debian.org>  Sun, 30 Dec 2007 11:52:58 -0700
 
 sg3-utils (1.24-1) unstable; urgency=low
 
@@ -120,5 +155,4 @@ sg3-utils (0.95-1) unstable; urgency=low
   * Adjusted Makefile to include $DESTDIR
 
  -- Eric Schwartz <emschwar@debian.org>  Wed, 14 Nov 2001 17:05:56 -0700
-
 

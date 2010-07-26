@@ -27,7 +27,7 @@
  *
  */
 
-/* sg_pt_win32 version 1.07 20090204 */
+/* sg_pt_win32 version 1.10 20090818 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,15 +40,29 @@
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 /* Use the Microsoft SCSI Pass Through (SPT) interface. It has two
  * variants: "SPT" where data is double buffered; and "SPTD" where data
  * pointers to the user space are passed to the OS. Only Windows
- * 2000, 2003 and XP are supported (i.e. not 95,98 or ME).
- * Currently there is no ASPI interface which relies on a dll
- * from adpatec.
+ * 2000 and later (i.e. not 95,98 or ME).
+ * There is no ASPI interface which relies on a dll from adaptec.
  * This code uses cygwin facilities and is built in a cygwin
  * shell. It can be run in a normal DOS shell if the cygwin1.dll
  * file is put in an appropriate place.
+ * This code can build in a MinGW environment.
+ *
+ * N.B. MSDN says that the "SPT" interface (i.e. double buffered)
+ * should be used for small amounts of data (it says "< 16 KB").
+ * The direct variant (i.e. IOCTL_SCSI_PASS_THROUGH_DIRECT) should
+ * be used for larger amounts of data but the buffer needs to be
+ * "cache aligned". Is that 16 byte alignment or greater?
+ *
+ * This code will default to indirect (i.e. double buffered) access
+ * unless the WIN32_SPT_DIRECT preprocessor constant is defined in
+ * config.h .
  */
 
 #define DEF_TIMEOUT 60       /* 60 seconds */
@@ -67,11 +81,6 @@ struct sg_pt_handle {
 struct sg_pt_handle handle_arr[MAX_OPEN_SIMULT];
 
 struct sg_pt_win32_scsi {
-#ifdef SPTD
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb;
-#else
-    SCSI_PASS_THROUGH_WITH_BUFFERS swb;
-#endif
     unsigned char * dxferp;
     int dxfer_len;
     unsigned char * sensep;
@@ -82,10 +91,18 @@ struct sg_pt_win32_scsi {
     int in_err;
     int os_err;                 /* pseudo unix error */
     int transport_err;          /* windows error number */
+#ifdef WIN32_SPT_DIRECT
+    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb;
+#else
+    /* Last entry in structure so data buffer can be extended */
+    SCSI_PASS_THROUGH_WITH_BUFFERS swb;
+#endif
 };
 
+/* embed pointer so can change on fly if (non-direct) data buffer
+ * is not big enough */
 struct sg_pt_base {
-    struct sg_pt_win32_scsi impl;
+    struct sg_pt_win32_scsi * implp;
 };
 
 
@@ -226,33 +243,42 @@ struct sg_pt_base *
 construct_scsi_pt_obj()
 {
     struct sg_pt_win32_scsi * psp;
+    struct sg_pt_base * vp = NULL;
 
-    psp = (struct sg_pt_win32_scsi *)malloc(sizeof(struct sg_pt_win32_scsi));
+    psp = (struct sg_pt_win32_scsi *)calloc(sizeof(struct sg_pt_win32_scsi),
+                                            1);
     if (psp) {
-        memset(psp, 0, sizeof(struct sg_pt_win32_scsi));
         psp->swb.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
         psp->swb.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
         psp->swb.spt.SenseInfoOffset =
                 offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
         psp->swb.spt.TimeOutValue = DEF_TIMEOUT;
+        vp = malloc(sizeof(struct sg_pt_win32_scsi *)); // yes a pointer
+        if (vp)
+            vp->implp = psp;
+        else
+            free(psp);
     }
-    return (struct sg_pt_base *)psp;
+    return vp;
 }
 
 void
 destruct_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    if (vp) {
+        struct sg_pt_win32_scsi * psp = vp->implp;
 
-    if (psp) {
-        free(psp);
+        if (psp) {
+            free(psp);
+        }
+        free(vp);
     }
 }
 
 void
 clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (psp) {
         memset(psp, 0, sizeof(struct sg_pt_win32_scsi));
@@ -268,7 +294,7 @@ void
 set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
                 int cdb_len)
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (psp->swb.spt.CdbLength > 0)
         ++psp->in_err;
@@ -284,7 +310,7 @@ void
 set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
                   int sense_len)
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (psp->sensep)
         ++psp->in_err;
@@ -298,7 +324,7 @@ void
 set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
                     int dxfer_len)
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (psp->dxferp)
         ++psp->in_err;
@@ -314,7 +340,7 @@ void
 set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
                      int dxfer_len)
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (psp->dxferp)
         ++psp->in_err;
@@ -334,7 +360,7 @@ set_scsi_pt_packet_id(struct sg_pt_base * vp __attribute__ ((unused)),
 void
 set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag __attribute__ ((unused)))
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     ++psp->in_err;
 }
@@ -343,7 +369,7 @@ void
 set_scsi_pt_task_management(struct sg_pt_base * vp,
                             int tmf_code __attribute__ ((unused)))
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     ++psp->in_err;
 }
@@ -353,7 +379,7 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp,
                       int attrib __attribute__ ((unused)),
                       int priority __attribute__ ((unused)))
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     ++psp->in_err;
 }
@@ -365,7 +391,7 @@ int
 do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
 {
     int index = device_fd - WIN32_FDOFFSET;
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
     struct sg_pt_handle * shp;
     BOOL status;
     ULONG returned;
@@ -398,16 +424,29 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         psp->os_err = ENODEV;
         return -psp->os_err;
     }
-#ifdef SPTD
+#ifdef WIN32_SPT_DIRECT
     psp->swb.spt.Length = sizeof (SCSI_PASS_THROUGH_DIRECT);
 #else
     if (psp->dxfer_len > (int)sizeof(psp->swb.ucDataBuf)) {
-        if (verbose)
-            fprintf(sg_warnings_strm, "dxfer_len (%d) too large (limit %d "
-                    "bytes)\n", psp->dxfer_len, sizeof(psp->swb.ucDataBuf));
-        psp->os_err = ENOMEM;
-        return -psp->os_err;
+        int extra = psp->dxfer_len - (int)sizeof(psp->swb.ucDataBuf);
+        struct sg_pt_win32_scsi * epsp;
 
+        if (verbose > 4)
+            fprintf(sg_warnings_strm, "dxfer_len (%d) too large for initial "
+                    "data buffer (%d bytes), try enlarging\n", psp->dxfer_len,
+                    sizeof(psp->swb.ucDataBuf));
+        epsp = (struct sg_pt_win32_scsi *)
+               calloc(sizeof(struct sg_pt_win32_scsi) + extra, 1);
+        if (NULL == epsp) {
+            fprintf(sg_warnings_strm, "do_scsi_pt: failed to enlarge data "
+                    "buffer to %d bytes\n", psp->dxfer_len);
+            psp->os_err = ENOMEM;
+            return -psp->os_err;
+        }
+        memcpy(epsp, psp, sizeof(struct sg_pt_win32_scsi));
+        free(psp);
+        vp->implp = epsp;
+        psp = epsp;
     }
     psp->swb.spt.Length = sizeof (SCSI_PASS_THROUGH);
     psp->swb.spt.DataBufferOffset =
@@ -428,7 +467,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
                 "DataTransferLength=%lu\n",
                 (int)psp->swb.spt.CdbLength, (int)psp->swb.spt.SenseInfoLength,
                 (int)psp->swb.spt.DataIn, psp->swb.spt.DataTransferLength);
-#ifdef SPTD
+#ifdef WIN32_SPT_DIRECT
         fprintf(stderr, "    TimeOutValue=%lu SenseInfoOffset=%lu\n",
                 psp->swb.spt.TimeOutValue, psp->swb.spt.SenseInfoOffset);
 #else
@@ -437,7 +476,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
                 psp->swb.spt.DataBufferOffset, psp->swb.spt.SenseInfoOffset);
 #endif
     }
-#ifdef SPTD
+#ifdef WIN32_SPT_DIRECT
     psp->swb.spt.DataBuffer = psp->dxferp;
     status = DeviceIoControl(shp->fh, IOCTL_SCSI_PASS_THROUGH_DIRECT,
                             &psp->swb,
@@ -465,7 +504,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         psp->os_err = EIO;
         return 0;       /* let app find transport error */
     }
-#ifndef SPTD
+#ifndef WIN32_SPT_DIRECT
     if ((psp->dxfer_len > 0) && (SCSI_IOCTL_DATA_IN == psp->swb.spt.DataIn))
         memcpy(psp->dxferp, psp->swb.ucDataBuf, psp->dxfer_len);
 #endif
@@ -488,7 +527,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
 int
 get_scsi_pt_result_category(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (psp->transport_err)     /* give transport error highest priority */
         return SCSI_PT_RESULT_TRANSPORT_ERR;
@@ -506,7 +545,7 @@ get_scsi_pt_result_category(const struct sg_pt_base * vp)
 int
 get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
 
     return psp->resid;
 }
@@ -514,7 +553,7 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 int
 get_scsi_pt_status_response(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
 
     return psp->scsi_status;
 }
@@ -522,7 +561,7 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 int
 get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
     int len;
 
     len = psp->sense_len - psp->sense_resid;
@@ -532,7 +571,7 @@ get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 int
 get_scsi_pt_duration_ms(const struct sg_pt_base * vp __attribute__ ((unused)))
 {
-    // const struct sg_pt_freebsd_scsi * psp = &vp->impl;
+    // const struct sg_pt_freebsd_scsi * psp = vp->implp;
 
     return -1;
 }
@@ -540,7 +579,7 @@ get_scsi_pt_duration_ms(const struct sg_pt_base * vp __attribute__ ((unused)))
 int
 get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
 
     return psp->transport_err;
 }
@@ -548,7 +587,7 @@ get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 int
 get_scsi_pt_os_err(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
 
     return psp->os_err;
 }
@@ -558,7 +597,7 @@ char *
 get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
                               char * b)
 {
-    struct sg_pt_win32_scsi * psp = (struct sg_pt_win32_scsi *)&vp->impl;
+    struct sg_pt_win32_scsi * psp = (struct sg_pt_win32_scsi *)vp->implp;
     LPVOID lpMsgBuf;
     int k, num, ch;
 
@@ -593,7 +632,7 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
 char *
 get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
     const char * cp;
 
     cp = safe_strerror(psp->os_err);

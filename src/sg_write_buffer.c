@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2009 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static char * version_str = "1.05 20070919";    /* spc4r08 */
+static char * version_str = "1.06 20090420";    /* spc4r08 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -308,7 +308,7 @@ int main(int argc, char * argv[])
                     ret = SG_LIB_FILE_ERROR;
                     goto err_out;
                 }
-                infd = 0;
+                infd = STDIN_FILENO;
             } else {
                 if ((infd = open(file_name, O_RDONLY)) < 0) {
                     snprintf(ebuff, EBUFF_SZ,
@@ -316,7 +316,8 @@ int main(int argc, char * argv[])
                     perror(ebuff);
                     ret = SG_LIB_FILE_ERROR;
                     goto err_out;
-                }
+                } else if (sg_set_binary_mode(infd) < 0)
+                    perror("sg_set_binary_mode");
                 if (wb_skip > 0) {
                     if (lseek(infd, wb_skip, SEEK_SET) < 0) {
                         snprintf(ebuff,  EBUFF_SZ, ME "couldn't skip to "

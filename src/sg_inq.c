@@ -11,7 +11,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.81 20090329";    /* SPC-4 rev 18 */
+static char * version_str = "0.86 20090916";    /* SPC-4 rev 21 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -81,9 +81,10 @@ static char * version_str = "0.81 20090329";    /* SPC-4 rev 18 */
 #define VPD_POWER_CONDITION  0x8a
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
-#define VPD_BLOCK_LIMITS  0xb0
-#define VPD_BLOCK_DEV_CHARS  0xb1
-#define VPD_UPR_EMC  0xc0
+#define VPD_BLOCK_LIMITS 0xb0
+#define VPD_BLOCK_DEV_CHARS 0xb1
+#define VPD_THIN_PROVISIONING 0xb2
+#define VPD_UPR_EMC 0xc0
 #define VPD_RDAC_VERS 0xc2
 #define VPD_RDAC_VAC 0xc9
 
@@ -109,7 +110,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
 static void decode_transport_id(const char * leadin, unsigned char * ucp,
                                 int len);
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
 static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
                             int do_verbose);
 #endif
@@ -155,12 +156,13 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (IBM)"},
     {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (IBM)"},
+    {VPD_THIN_PROVISIONING, 0, 0, 0, "thp", "Thin provisioning (SBC)"},
     {VPD_UPR_EMC, 0, -1, 1, "upr", "Unit path report (EMC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
 
 static struct option long_options[] = {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         {"ata", 0, 0, 'a'},
 #endif
         {"cmddt", 0, 0, 'c'},
@@ -205,7 +207,7 @@ struct opts_t {
 static void
 usage()
 {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
     fprintf(stderr,
             "Usage: sg_inq [--ata] [--cmddt] [--descriptors] [--extended] "
             "[--help] [--hex]\n"
@@ -257,7 +259,7 @@ usage()
 static void
 usage_old()
 {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
     fprintf(stderr,
             "Usage:  sg_inq [-a] [-A] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
             "[-i]\n"
@@ -326,7 +328,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         c = getopt_long(argc, argv, "acdeEhHil:m:NOp:rvVx", long_options,
                         &option_index);
 #else
@@ -337,7 +339,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
 
         switch (c) {
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         case 'a':
             ++optsp->do_ata;
             break;
@@ -450,7 +452,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     ++optsp->do_vpd;
                     ++optsp->num_pages;
                     break;
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
                 case 'A':
                     ++optsp->do_ata;
                     break;
@@ -649,6 +651,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_POWER_CONDITION, 0, "Power condition"},
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
+    {VPD_THIN_PROVISIONING, 0, "Thin provisioning (sbc3)"},
     {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
     {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},
     {0xb0, PDT_OSD, "OSD information (osd)"},
@@ -725,7 +728,8 @@ static const char * network_service_type_arr[] =
     "status",
     "logging",
     "code download",
-    "reserved[0x6]", "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
+    "administrative configuration service",
+    "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
     "reserved[0xa]", "reserved[0xb]", "reserved[0xc]", "reserved[0xd]",
     "reserved[0xe]", "reserved[0xf]", "reserved[0x10]", "reserved[0x11]",
     "reserved[0x12]", "reserved[0x13]", "reserved[0x14]", "reserved[0x15]",
@@ -868,7 +872,7 @@ static const char * code_set_arr[] =
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
-static const char * id_type_arr[] =
+static const char * desig_type_arr[] =
 {
     "vendor specific [0x0]",
     "T10 vendor identification",
@@ -887,7 +891,7 @@ static const char * id_type_arr[] =
 static void
 decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
 {
-    int u, j, m, id_len, p_id, c_set, piv, assoc, id_type, i_len;
+    int u, j, m, id_len, p_id, c_set, piv, assoc, desig_type, i_len;
     int off, ci_off, c_id, d_id, naa, vsi, k;
     uint64_t vsei;
     uint64_t id_ext;
@@ -914,12 +918,12 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         c_set = (ucp[0] & 0xf);
         piv = ((ucp[1] & 0x80) ? 1 : 0);
         assoc = ((ucp[1] >> 4) & 0x3);
-        id_type = (ucp[1] & 0xf);
+        desig_type = (ucp[1] & 0xf);
         if (piv && ((1 == assoc) || (2 == assoc)))
             printf("    transport: %s\n",
                    sg_get_trans_proto_str(p_id, sizeof(b), b));
-        printf("    id_type: %s,  code_set: %s\n", id_type_arr[id_type],
-               code_set_arr[c_set]);
+        printf("    designator_type: %s,  code_set: %s\n",
+               desig_type_arr[desig_type], code_set_arr[c_set]);
         printf("    associated with the %s\n", assoc_arr[assoc]);
         if (do_hex) {
             printf("    designator header(hex): %.2x %.2x %.2x %.2x\n",
@@ -928,7 +932,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
             dStrHex((const char *)ip, i_len, 0);
             continue;
         }
-        switch (id_type) {
+        switch (desig_type) {
         case 0: /* vendor specific */
             k = 0;
             if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
@@ -1426,6 +1430,16 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                     (buff[26] << 8) | buff[27];
                 printf("  Maximum unmap block descriptor count: %u\n", u);
             }
+            if (len > 35) {     /* added in sbc3r19 */
+                u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
+                    (buff[30] << 8) | buff[31];
+                printf("  Optimal unmap granularity: %u\n", u);
+                printf("  Unmap granularity alignment valid: %u\n",
+                       !!(buff[32] & 0x80));
+                u = ((unsigned int)(buff[32] & 0x7f) << 24) |
+                    (buff[33] << 16) | (buff[34] << 8) | buff[35];
+                printf("  Unmap granularity alignment: %u\n", u);
+            }
             break;
         case PDT_TAPE: case PDT_MCHANGER:
             printf("  WORM=%d\n", !!(buff[4] & 0x1));
@@ -1877,7 +1891,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             }
         }
     } else if (res < 0) { /* could be an ATA device */
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
         /* Try an ATA Identify Device command */
         res = try_ata_identify(sg_fd, optsp->do_hex, optsp->do_raw,
                                optsp->do_verbose);
@@ -2521,7 +2535,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         }
         break;
     default:
-        printf(" Only hex output supported\n");
+        printf(" Only hex output supported. sg_vpd decodes more pages.\n");
         return process_vpd(sg_fd, optsp);
     }
     if (res) {
@@ -2676,7 +2690,7 @@ main(int argc, char * argv[])
     }
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
     if (opts.do_ata) {
         res = try_ata_identify(sg_fd, opts.do_hex, opts.do_raw,
                                opts.do_verbose);
@@ -2724,7 +2738,7 @@ err_out:
 }
 
 
-#ifdef SG3_UTILS_LINUX
+#ifdef SG_LIB_LINUX
 /* Following code permits ATA IDENTIFY commands to be performed on
    ATA non "Packet Interface" devices (e.g. ATA disks).
    GPL-ed code borrowed from smartmontools (smartmontools.sf.net).

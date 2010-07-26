@@ -1,6 +1,6 @@
 # This file is an example for the sg_persist utility.
 # It discusses using "TransportID"s which are defined (most recently)
-# in SPC-4 revison 9 section 7.5.4 titled: "TransportID identifiers".
+# in SPC-4 revison 20 section 7.5.4 titled: "TransportID identifiers".
 #
 # The sg_persist utility can take one or more "transportID"s from stdin when
 # either the '--transport-id=-" or "-X -" option is given on the command
@@ -10,32 +10,22 @@
 # they are well formed) use the verbose flag 3 times (i.e. "... -vvv ...").
 
 # Here is a simple example (for SPI) of a comma separted hex list:
-1,0,0,7,0,0,0,1  	# SPI, initiator address=0x7, relative_port_num=1
+1,0,0,7,0,0,0,1         # SPI, initiator address=7, relative_port_num=1
 
-        # Leading spaces and tabs before a '#' or ok
+# and here is the transport specific format for the same thing:
+# spi,1,7
+
+# An example for SAS follows, first as a hex string, then in transport
+# specific format (incremented by 1)
+6,0,0,0,50,6,5,b0,0,6,f2,60
+sas,500605b00006f261
+
+# For iSCSI the hex list form is awkward, better to use the transport
+# specific format. [The leading spaces are ignored.]
+    iqn.5886.com.acme.diskarrays-sn-a8675309
+
+
+        # Leading spaces and tabs before a '#' are ok.
              
-# Leading spaces and tabs are ignored as are redundant separators (space,
-# comma or tab).
-#        1,2    ,,,3,4,5,6,7,8,9
 
-# Playing around with an iSCSI transportID which is the only one defined
-# (in SPC-3 rev20) that can be more than 24 bytes in length.
-#5, 0, 0, 18, 41,42,43,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0
-
-# Just playing around with protocol identifiers that aren't defined
-#1c,22,33,44,55,66,77,88,99
-#a b    ,        c d e f
-
-# 'report and move' requires one (and only one) transprtID.
-# 'register' and 'register and ignore existing key' can optionally take
-# one or more transportIDs.
-
-# This file should work for something like this:
-# sg_persist --out --register-move --prout-type=1 --transport-id=-
-#            --param-rk=111 --param-sark=fff --unreg
-#            /dev/sda < examples/transport_ids.txt
-#
-# ... since there is only one line in this file that has a
-# transportID on it that will be decoded (i.e. the "SPI" one above).
-
-# dpg 20070223
+# dpg 20090824

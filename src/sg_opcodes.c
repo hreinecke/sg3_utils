@@ -26,18 +26,11 @@
 
 #include "sg_pt.h"
 
-static char * version_str = "0.33 20090303";    /* spc4r18 */
-
-/* Notes:
- *  - since support for the SCSI REPORT SUPPORTED OPERATION CODES and
- *    REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS is uncommon, dummy
- *    response code is provided. Uncomment the '#define TEST_CODE'
- *    line for test mode.
- */
+static char * version_str = "0.34 20090610";    /* spc4r20 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
+#define DEF_TIMEOUT_SECS 60
 
 #define SG_MAINTENANCE_IN 0xa3
 #define RSOC_SA     0xc
@@ -57,83 +50,6 @@ static int do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode,
 static int do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy,
                     int verbose);
 
-/* <<<<<<<<<<<<<<< start of test code */
-// #define TEST_CODE
-
-#ifdef TEST_CODE
-
-#warning "<<<< TEST_CODE response compiled in >>>>"
-
-#define DUMMY_CMDS 17
-#define DUMMY_CMD_LEN 8
-#define DUMMY_TO_CMDS 4
-#define DUMMY_TO_CMD_LEN 20
-
-struct cmd_descript_t {
-    unsigned char d[DUMMY_CMD_LEN];
-};
-
-struct dummy_resp_t {
-    unsigned char cdl[4];
-    struct cmd_descript_t descript[DUMMY_CMDS];
-};
-
-static struct dummy_resp_t dummy_resp = {
-    {0, 0, 0, DUMMY_CMD_LEN * DUMMY_CMDS},
-     {{{0, 0, 0, 0, 0, 0, 0, 6}},               /* tur */
-      {{0xa3, 0, 0, 0xc, 0, 1, 0, 12}},         /* rsoc */
-      {{0x12, 0, 0, 0, 0, 0, 0, 6}},            /* inq */
-      {{0x1d, 0, 0, 0, 0, 0, 0, 6}},            /* sd */
-      {{0x25, 0, 0, 0, 0, 0, 0, 10}},           /* rc */
-      {{0x28, 0, 0, 0, 0, 0, 0, 10}},           /* r(10) */
-      {{0x2a, 0, 0, 0, 0, 0, 0, 10}},           /* w(10) */
-      {{0x1a, 0, 0, 0, 0, 0, 0, 6}},            /* ms(6) */
-      {{0x15, 0, 0, 0, 0, 0, 0, 6}},            /* msel(6) */
-      {{0xa3, 0, 0, 0x5, 0, 1, 0, 12}},         /* rii */
-      {{0x5a, 0, 0, 0, 0, 0, 0, 10}},           /* ms(10) */
-      {{0x55, 0, 0, 0, 0, 0, 0, 10}},           /* msel(10) */
-      {{2, 0, 0, 0, 0, 0, 0, 6}},               /* ?? */
-      {{3, 0, 0, 0, 0, 0, 0, 6}},               /* rs */
-      {{4, 0, 0, 0, 0, 0, 0, 6}},               /* f */
-      {{0xa0, 0, 0, 0, 0, 0, 0, 12}},           /* rl */
-      {{0x7f, 0, 0, 0x3, 0, 1, 0, 32}},         /* vl:xdr(32) */
-}};
-
-struct cmd_descript_to_t {
-    unsigned char d[DUMMY_TO_CMD_LEN];
-};
-
-struct dummy_resp_to_t {
-    unsigned char cdl[4];
-    struct cmd_descript_to_t descript[DUMMY_TO_CMDS];
-};
-
-static struct dummy_resp_to_t dummy_to_resp =
-    {{0, 0, 0, DUMMY_TO_CMD_LEN * DUMMY_TO_CMDS},
-     {{{0, 0, 0, 0, 0, 0x2, 0, 6,
-        0, 0xa, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5}},         /* tur */
-      {{0xa3, 0, 0, 0xc, 0, 0x3, 0, 12,
-        0, 0xa, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6}},         /* rsoc */
-      {{4, 0, 0, 0, 0, 0x2, 0, 6,
-        0, 0xa, 0, 0, 0, 0, 0x8, 0, 0, 0, 0x10, 0}},    /* f */
-      {{0x7f, 0, 0, 0x3, 0, 0x3, 0, 32,
-        0, 0xa, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7}},         /* vl:xdr(32) */
-}};
-
-static unsigned char dummy_1_cmd[] = {
-    0, 3, 0, 6, 0x12, 0x3, 0xff, 0x0, 0xff, 0x1
-};
-
-static unsigned char dummy_1_to_cmd[] = {
-    0, 0x83, 0, 6, 0x12, 0x3, 0xff, 0x0, 0xff, 0x1,
-        0, 0xa, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,           /* inq */
-};
-
-static unsigned char dummy_rsmft_r0 = 0xff;
-static unsigned char dummy_rsmft_r1 = 0x1;
-
-#endif
-/* <<<<<<<<<<<<<<< end of test code */
 
 static struct option long_options[] = {
         {"alpha", 0, 0, 'a'},
@@ -173,11 +89,11 @@ static void
 usage()
 {
     fprintf(stderr,
-            "Usage:  sg_opcodes [--alpha] [--help] [--hex] [--opcode=OP] "
-            "[--raw] [--rctd]\n"
-            "                   [--sa=SA] [--tmf] [--unsorted] [--verbose] "
-            "[--version]\n"
-            "                   DEVICE\n"
+            "Usage:  sg_opcodes [--alpha] [--help] [--hex] "
+            "[--opcode=OP[,SA]] [--raw]\n"
+            "                   [--rctd] [--sa=SA] [--tmf] [--unsorted] "
+            "[--verbose]\n"
+            "                   [--version] DEVICE\n"
             "  where:\n"
             "    --alpha|-a      output list of operation codes sorted "
             "alphabetically\n"
@@ -185,6 +101,10 @@ usage()
             "    --hex|-H        output response in hex\n"
             "    --opcode=OP|-o OP    first byte of command to query\n"
             "                         (decimal, prefix with '0x' for hex)\n"
+            "    --opcode=OP,SA|-o OP,SA    opcode (OP) and service action "
+            "(SA)\n"
+            "                         (decimal, each prefix with '0x' for "
+            "hex)\n"
             "    --raw|-r        output response in binary to stdout\n"
             "    --rctd|-R       set RCTD (return command timeout "
             "descriptor) bit\n"
@@ -192,10 +112,11 @@ usage()
             "                     (decimal, prefix with '0x' for hex)\n"
             "    --tmf|-t        output list of supported task management "
             "functions\n"
-            "    --unsorted|-u    output list of operation codes as is "
-            "(unsorted)\n"
+            "    --unsorted|-u    output list of operation codes as is\n"
+            "                     (def: sort by opcode (then service "
+            "action))\n"
             "    --verbose|-v    increase verbosity\n"
-            "    --version|-V    print vesrion string then exit\n\n"
+            "    --version|-V    print version string then exit\n\n"
             "Performs a SCSI REPORT SUPPORTED OPERATION CODES or REPORT "
             "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command\n");
 }
@@ -229,6 +150,8 @@ static int
 process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n;
+    char * cp;
+    char b[32];
 
     while (1) {
         int option_index = 0;
@@ -252,13 +175,36 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         case 'N':
             break;      /* ignore */
         case 'o':
-            n = sg_get_num(optarg);
-            if ((n < 0) || (n > 255)) {
-                fprintf(stderr, "bad argument to '--opcode'\n");
-                usage();
+            if (strlen(optarg) >= (sizeof(b) - 1)) {
+                fprintf(stderr, "argument to '--opcode' too long\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_opcode = n;
+            cp = strchr(optarg, ',');
+            if (cp) {
+                memset(b, 0, sizeof(b));
+                strncpy(b, optarg, cp - optarg);
+                n = sg_get_num(b);
+                if ((n < 0) || (n > 255)) {
+                    fprintf(stderr, "bad OP argument to '--opcode'\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                optsp->do_opcode = n;
+                n = sg_get_num(cp + 1);
+                if ((n < 0) || (n > 0xffff)) {
+                    fprintf(stderr, "bad SA argument to '--opcode'\n");
+                    usage();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                optsp->do_servact = n;
+            } else {
+                n = sg_get_num(optarg);
+                if ((n < 0) || (n > 255)) {
+                    fprintf(stderr, "bad argument to '--opcode'\n");
+                    usage();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                optsp->do_opcode = n;
+            }
             break;
         case 'O':
             optsp->opt_new = 0;
@@ -270,8 +216,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_rctd;
             break;
         case 's':
-           n = sg_get_num(optarg);
-           if (n < 0) {
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 0xffff)) {
                 fprintf(stderr, "bad argument to '--sa'\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
@@ -550,7 +496,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
             serv_act = ((ucp[2] << 8) | ucp[3]);
             sg_get_opcode_sa_name(ucp[0], serv_act, peri_type,
                                   NAME_BUFF_SZ, name_buff);
-            snprintf(sa_buff, sizeof(sa_buff), "%.4x", serv_act);
+            snprintf(sa_buff, sizeof(sa_buff), "%4x", serv_act);
         } else {
             sg_get_opcode_name(ucp[0], peri_type,
                                NAME_BUFF_SZ, name_buff);
@@ -642,11 +588,11 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts, int do_opcode,
         cp = "NOT supported";
         break;
     case 3:
-        cp = "supported (conforming to SCSI standard)";
+        cp = "supported [conforming to SCSI standard]";
         v = 1;
         break;
     case 5:
-        cp = "supported (in a vendor specific manner)";
+        cp = "supported [in a vendor specific manner]";
         v = 1;
         break;
     default:
@@ -729,41 +675,35 @@ main(int argc, char * argv[])
     op_name = opts.do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
 
-    if ((sg_fd = scsi_pt_open_device(opts.device_name, 1 /* RO */,
-                                     opts.do_verbose)) < 0) {
-        fprintf(stderr, "sg_opcodes: error opening file (ro): %s: %s\n",
-                opts.device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
-    }
-    if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.do_verbose)) {
-        peri_type = inq_resp.peripheral_type;
-        if (0 == opts.do_raw) {
-            printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
-                   inq_resp.revision);
-            cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
-            if (strlen(cp) > 0)
-                printf("  Peripheral device type: %s\n", cp);
-            else
-                printf("  Peripheral device type: 0x%x\n", peri_type);
+    if (opts.do_opcode < 0) {
+        if ((sg_fd = scsi_pt_open_device(opts.device_name, 1 /* RO */,
+                                         opts.do_verbose)) < 0) {
+            fprintf(stderr, "sg_opcodes: error opening file (ro): %s: %s\n",
+                    opts.device_name, safe_strerror(-sg_fd));
+            return SG_LIB_FILE_ERROR;
         }
-    } else {
-        fprintf(stderr, "sg_opcodes: %s doesn't respond to a SCSI "
-                "INQUIRY\n", opts.device_name);
-        return SG_LIB_CAT_OTHER;
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.do_verbose)) {
+            peri_type = inq_resp.peripheral_type;
+            if (0 == opts.do_raw) {
+                printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
+                       inq_resp.product, inq_resp.revision);
+                cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
+                if (strlen(cp) > 0)
+                    printf("  Peripheral device type: %s\n", cp);
+                else
+                    printf("  Peripheral device type: 0x%x\n", peri_type);
+            }
+        } else {
+            fprintf(stderr, "sg_opcodes: %s doesn't respond to a SCSI "
+                    "INQUIRY\n", opts.device_name);
+            return SG_LIB_CAT_OTHER;
+        }
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+            return SG_LIB_FILE_ERROR;
+        }
     }
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
-        return SG_LIB_FILE_ERROR;
-    }
-
-#ifndef TEST_CODE
-    if (5 == peri_type) {
-        printf("'%s' command not supported\nfor CD/DVD devices\n",
-               op_name);
-        return SG_LIB_CAT_OTHER;
-    }
-#endif
 
     if ((sg_fd = scsi_pt_open_device(opts.device_name, 0 /* RW */,
                                      opts.do_verbose)) < 0) {
@@ -774,7 +714,6 @@ main(int argc, char * argv[])
     if (opts.do_opcode >= 0)
         rep_opts = ((opts.do_servact >= 0) ? 2 : 1);
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
-#ifndef TEST_CODE
     if (opts.do_taskman)
         res = do_rstmf(sg_fd, rsoc_buff, sizeof(rsoc_buff), 0,
                        opts.do_verbose);
@@ -799,36 +738,13 @@ main(int argc, char * argv[])
         fprintf(stderr, "%s: operation not supported\n", op_name);
         goto err_out;
     case SG_LIB_CAT_ILLEGAL_REQ:
-        fprintf(stderr, "bad field in cdb including %s not supported\n",
+        fprintf(stderr, "bad field in cdb (including %s not supported)\n",
                 op_name);
         goto err_out;
     default:
         fprintf(stderr, "%s failed\n", op_name);
         goto err_out;
     }
-#else
-    if (opts.do_taskman) {
-        rsoc_buff[0] = dummy_rsmft_r0;
-        rsoc_buff[1] = dummy_rsmft_r1;
-    } else if (opts.do_rctd) {
-        if (0 == rep_opts) {
-#if 1
-            memcpy(rsoc_buff, (unsigned char *)&dummy_to_resp,
-                   sizeof(dummy_to_resp));
-#else
-            memcpy(rsoc_buff, (unsigned char *)&dummy_resp,
-                   sizeof(dummy_resp));
-#endif
-        } else
-            memcpy(rsoc_buff, dummy_1_to_cmd, sizeof(dummy_1_to_cmd));
-    } else {
-        if (0 == rep_opts)
-            memcpy(rsoc_buff, (unsigned char *)&dummy_resp,
-                   sizeof(dummy_resp));
-        else
-            memcpy(rsoc_buff, dummy_1_cmd, sizeof(dummy_1_cmd));
-    }
-#endif
     if (opts.do_taskman) {
         if (opts.do_raw) {
             dStrRaw((const char *)rsoc_buff, 4);
@@ -940,7 +856,7 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
     set_scsi_pt_cdb(ptvp, rsocCmdBlk, sizeof(rsocCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, "Report Supported Operation Codes", res,
                                mx_resp_len, sense_b, noisy, verbose,
                                &sense_cat);
@@ -1000,7 +916,7 @@ do_rstmf(int sg_fd, void * resp, int mx_resp_len, int noisy, int verbose)
     set_scsi_pt_cdb(ptvp, rstmfCmdBlk, sizeof(rstmfCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, "Report Supported Task management "
                                "functions", res, mx_resp_len, sense_b, noisy,
                                 verbose, &sense_cat);

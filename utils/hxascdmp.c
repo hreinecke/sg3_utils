@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,11 +39,45 @@
 
 static int bytes_per_line = DEF_BYTES_PER_LINE;
 
-static const char * version_str = "1.10 20080321";
+static const char * version_str = "1.13 20090510";
 
 #define CHARS_PER_HEX_BYTE 3
 #define BINARY_START_COL 6
 #define MAX_LINE_LENGTH 257
+
+
+#ifdef SG_LIB_MINGW
+/* Non Unix OSes distinguish between text and binary files.
+   Set text mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+int
+sg_set_text_mode(int fd)
+{
+    return setmode(fd, O_TEXT);
+}
+
+/* Set binary mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+int
+sg_set_binary_mode(int fd)
+{
+    return setmode(fd, O_BINARY);
+}
+
+#else
+/* For Unix the following functions are dummies. */
+int
+sg_set_text_mode(int fd)
+{
+    return fd;  /* fd should be >= 0 */
+}
+
+int
+sg_set_binary_mode(int fd)
+{
+    return fd;
+}
+#endif
 
 
 static void
@@ -176,7 +210,7 @@ main(int argc, const char ** argv)
     int num = 8192;
     long start = 0;
     int res, k, u;
-    int inFile = 0;     /* stdin */
+    int inFile = STDIN_FILENO;
     int doHelp = 0;
     int doHex = 0;
     int hasFilename = 0;
@@ -227,6 +261,7 @@ main(int argc, const char ** argv)
                 fprintf(stderr, "Couldn't open file: %s\n", argv[k]);
                 ret = 1;
             } else {
+                sg_set_binary_mode(inFile);
                 start = 0;
                 printf("%shex dump of file: %s\n",
                        (doHex ? "" : "ASCII "), argv[k]);
@@ -242,6 +277,7 @@ main(int argc, const char ** argv)
             printf("\n");
         }
     } else {
+	sg_set_binary_mode(inFile);
         while ((res = read(inFile, buff, num)) > 0) {
             if (doHex)
                 dStrHexOnly(buff, res, start);

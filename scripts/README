@@ -18,8 +18,6 @@ Details
 Each script supplies more information, typically by supplying a '-h'
 or '--help' option. The script source often contains explanatory
 information. Following is a usage summary with a one line description:
-   sas_disk_blink [-h] [-s <n>] <device>
-	- blink LED on <device> using RLM bit in SAS targets
    scsi_logging_level [OPTIONS]
         - set Linux SCSI subsystem logging level
    scsi_mandat [-h] [-L] [-q] <device>
@@ -28,18 +26,21 @@ information. Following is a usage summary with a one line description:
         - fetch capacity/size information for each <device>
    scsi_ready [-h] [-v] <device>+
         - check the media ready status on each <device>
-   scsi_satl [-h] [-L] [-q] <device>
-	- check <device> for SCSI to ATA Translation Layer (SATL)
-   scsi_start [-h] [-v] <device>+
+   scsi_satl [-h] [-L] [-q] [-v] <device>
+        - check <device> for SCSI to ATA Translation Layer (SATL)
+   scsi_start [-h] [-v] [-w] <device>+
         - start media (i.e. spin up) in each <device>
-   scsi_stop [-h] [-v] <device>+
+   scsi_stop [-h] [-v] [-w] <device>+
         - stop media (i.e. spin down) in each <device>
    scsi_temperature [-h] [-v] <device>+
         - check temperature in each <device>
 
 These scripts assume that the main sg3_utils utilities are installed
-and are on the user's PATH. The sas_disk_blink script relies on the
-sdparm utility.
+and are on the user's PATH.
+
+This directory, prior to sg3_utils-1.28, contained the sas_disk_blink
+script. Since it depends on the sdparm utility it has been moved to
+the sdparm package in its scripts directory.
 
 Douglas Gilbert
-25th January 2007
+25th August 2009

@@ -68,6 +68,13 @@ extern int sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist,
                              int timeout_secs, void * paramp, int param_len,
                              int noisy, int verbose);
 
+/* Invokes a SCSI GET LBA STATUS command (SBC). Returns 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> GET LBA STATUS not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
+extern int sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
+                                int alloc_len, int noisy, int verbose);
+
 /* Invokes a SCSI PERSISTENT RESERVE IN command (SPC). Returns 0
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
  * SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
@@ -84,6 +91,13 @@ extern int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact,
                                         int rq_scope, unsigned int rq_type,
                                         void * paramp, int param_len,
                                         int noisy, int verbose);
+
+/* Invokes a SCSI READ BLOCK LIMITS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> READ BLOCK LIMITS not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
+extern int sg_ll_read_block_limits(int sg_fd, void * resp,
+                                   int mx_resp_len, int noisy, int verbose);
 
 /* Invokes a SCSI READ BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
@@ -194,6 +208,13 @@ extern int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
  * -1 -> other failure */
 extern int sg_ll_set_id_info(int sg_fd, int itype, void * paramp,
                              int param_len, int noisy, int verbose);
+
+/* Invokes a SCSI UNMAP (SBC-3) command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> command not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+extern int sg_ll_unmap(int sg_fd, int group_num, int timeout_secs,
+                       void * paramp, int param_len, int noisy, int verbose);
 
 /* Invokes a SCSI VERIFY (10) command (SBC and MMC).
  * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.

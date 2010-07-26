@@ -31,8 +31,12 @@
 
 #include "sg_pt.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-static const char * scsi_pt_version_str = "2.04 20090308";
+
+static const char * scsi_pt_version_str = "2.04 20090420";
 
 const char *
 scsi_pt_version()

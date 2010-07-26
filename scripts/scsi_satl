@@ -4,6 +4,7 @@
 # Script to test compliance of SCSI commands on a SCSI to ATA
 # Translation (SAT) Layer (SATL). This script was compiled using
 # sat-r09.pdf found at www.t10.org .
+# The scripts still seems to be valid for sat2r09.pdf .
 # The vintage is SPC-3 and SPC-4 (see www.t10.org).
 #
 # Coverage:
@@ -22,13 +23,14 @@
 #                        device, if packet device add "-p" option
 #
 # This script uses utilities from sg3_utils package (version
-# 1.22 or later) and sdparm (version 0.99 or later)
+# 1.22 or later)
 #
-# Douglas Gilbert 20080328
+# Douglas Gilbert 20090930
 
 
-quiet=0
 log=0
+quiet=0
+verbose=""
 
 file_err=0
 inv_opcode=0
@@ -47,10 +49,11 @@ total_err=0
 
 usage()
 {
-  echo "Usage: scsi_satl [-h] [-L] [-q] <device>"
+  echo "Usage: scsi_satl [-h] [-L] [-q] [-v] <device>"
   echo "  where:  -h, --help       print usage message"
   echo "          -L, --log        append stderr to 'scsi_satl.err'"
   echo "          -q, --quiet      suppress some output"
+  echo "          -v, --verbose    more verbose output"
   echo ""
   echo "Check <device> for SCSI to ATA Translation Layer (SATL) support"
 }
@@ -71,6 +74,7 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     h|-help) usage ; exit 1 ;;
     L|-log) let log=$log+1 ;;
     q|-quiet) let quiet=$quiet+1 ;;
+    v|-verbose) verbose="-v" ;;
     *) echo "Unknown option: -$opt " ; exit 1 ;;
   esac
   shift
@@ -87,9 +91,14 @@ do
 
   if [ $log -eq 0 ]
   then
-    $command $1 > /dev/null 2>> /dev/null
+    if [ $verbose ]
+    then
+      $command $verbose $1 > /dev/null
+    else
+      $command $1 > /dev/null 2>> /dev/null
+    fi
   else
-    $command $1 > /dev/null 2>> scsi_satl.err
+    $command $verbose $1 > /dev/null 2>> scsi_satl.err
   fi
   res=$?
   case "$res" in

@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2008 Douglas Gilbert.
+ * Copyright (c) 2007-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,6 +47,8 @@ extern "C" {
 /* Commands with service actions that change the command name */
 #define SG_MAINTENANCE_IN 0xa3
 #define SG_MAINTENANCE_OUT 0xa4
+#define SG_PERSISTENT_RESERVE_IN 0x5e
+#define SG_PERSISTENT_RESERVE_OUT 0x5f
 #define SG_SERVICE_ACTION_IN_12 0xab
 #define SG_SERVICE_ACTION_OUT_12 0xa9
 #define SG_SERVICE_ACTION_IN_16 0x9e
@@ -80,6 +82,8 @@ extern const char * sg_lib_version_str;
 extern struct sg_lib_value_name_t sg_lib_normal_opcodes[];
 extern struct sg_lib_value_name_t sg_lib_maint_in_arr[];
 extern struct sg_lib_value_name_t sg_lib_maint_out_arr[];
+extern struct sg_lib_value_name_t sg_lib_pr_in_arr[];
+extern struct sg_lib_value_name_t sg_lib_pr_out_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_in12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_in16_arr[];

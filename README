@@ -6,7 +6,7 @@ This package contains low level utilities for devices that use a SCSI
 command set. Apart from SCSI parallel interface (SPI) devices, the SCSI
 command set is used by ATAPI devices (CD/DVDs and tapes), USB mass storage
 devices, Fibre Channel disks, IEEE 1394 storage devices (that use the
-"SBP" protocol), SAS, iSCSI and FCoE (and others).
+"SBP" protocol), SAS, iSCSI and FCoE devices (amongst others).
 
 This package originally targeted the Linux SCSI subsystem. Since most
 operating systems contain a SCSI command pass-through mechanism, many
@@ -150,6 +150,32 @@ Darwin is not supported because the Apple folks do not want to give their
 users a pass-through SCSI interface. The author has read about creative
 hackers using a VM containing a real OS to circumvent the Apple restriction.
 
+Building
+========
+This package is designed to be built with the usual:
+    "./configure ; make ; make install"
+sequence. In some situations that may need to be prefixed by a call to
+the "./autogen.sh" script which invokes autoconf and automake. That in turn
+may require packages containing those utilities to be installed. The
+libtool utility is also required. Naturally a C compiler is required
+and due to the vagaries of libtool a C++ compiler also.
+
+The C code in this package is written for portability rather than speed.
+It assumes a level of C99 compliance and favours POSIX system and library
+calls over OS specific calls.
+
+More generic build information can be found in the INSTALL file.
+
+In Linux there are package build files for "rpm" based and for "deb" based
+systems. The 'sg3_utils.spec' file in the main directory can be used like
+this: 'rpmbuild -ba sg3_utils.spec' in a rpmbuild tree SPECS directory.
+
+The 'build_debian.sh' script should build several "deb" packages and place
+them in the parent directory. In debian based systems doing
+a 'apt-get install build-essential' is one way to get most of build
+environment needed if it has not already been loaded. There are now some
+problems with this script and the superseded Debian 4.0 ("etch"). See
+debian/README.debian4 for a workaround.
 
 Warning
 =======
@@ -175,13 +201,14 @@ Utilities
 Here is list in alphabetical order of utilities found in the 'src'
 subdirectory of the sg3_utils package:
   - sginfo, sgm_dd, sgp_dd, sg_dd, sg_emc_trespass, sg_get_config,
-    sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map, sg_map26,
-    sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_raw, sg_rbuf, sg_rdac,
-    sg_read, sg_readcap, sg_read_buffer, sg_read_long, sg_reassign,
-    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_safte, sg_sat_identify,
-    sg_sat_phy_event, sg_sat_set_features, sg_scan, sg_senddiag, sg_ses,
-    sg_start, sg_stpg, sg_sync, sg_test_rwbuff, sg_turs, sg_verify, sg_vpd,
-    sg_write_buffer, sg_write_long, sg_write_same, sg_wr_mode
+    sg_get_lba_status, sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map,
+    sg_map26, sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_raw, sg_rbuf,
+    sg_rdac, sg_read, sg_readcap, sg_read_block_limits, sg_read_buffer,
+    sg_read_long, sg_reassign, sg_request, sg_reset, sg_rmsn, sg_rtpg,
+    sg_safte, sg_sat_identify, sg_sat_phy_event, sg_sat_set_features,
+    sg_scan, sg_senddiag, sg_ses, sg_start, sg_stpg, sg_sync, sg_test_rwbuff,
+    sg_turs, sg_unmap, sg_verify, sg_vpd, sg_write_buffer, sg_write_long,
+    sg_write_same, sg_wr_mode
 
 Each of the above utilities depends on header files found in the 'include'
 subdirectory and library code found in the 'lib' subdirectory. Associated
@@ -310,11 +337,13 @@ interface by defining the SG3_UTILS_OLD_OPTS environment variable
 or using '-O' as the first command line option.
 
 The more recent utilities that use "getopt_long" only are:
-  - sg_format sg_get_config sg_ident sg_luns sg_map26 sg_persist
-    sg_prevent sg_raw sg_read_buffer sg_read_long sg_reassign sg_requests
-    sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event
-    sg_sat_set_features sg_scan(w) sg_ses sg_stpg sg_sync sg_test_rwbuf
-    sg_verify sg_vpd sg_write_buffer sg_write_long sg_write_same sg_wr_mode
+  - sg_format sg_get_config sg_get_lba_status sg_ident sg_luns sg_map26
+    sg_persist sg_prevent sg_raw sg_read_block_limits sg_read_buffer
+    sg_read_long sg_reassign sg_requests sg_rmsn sg_rtpg sg_safte
+    sg_sat_identify sg_sat_phy_event sg_sat_set_features sg_scan(w) sg_ses
+    sg_stpg sg_sync sg_test_rwbuf sg_unmap sg_verify sg_vpd sg_write_buffer
+    sg_write_long sg_write_same sg_wr_mode
+
 
 Dangerous code
 ==============
@@ -335,4 +364,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-11th April 2009
+2nd October 2009

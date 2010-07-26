@@ -1,0 +1,40 @@
+#                sg_unmap_example.txt
+# This is an example of the contents of a file that can be given to sg_unmap
+# For example, assume the /dev/sdc is a scratch disk (e.g. one made by the
+# scsi_debug kernel module) then:
+#    sg_unmap --in=sg_unmap_example.txt /dev/sdc
+
+0x12345677,1	# unmap LBA 0x12345677
+0x12345678 2	# unmap LBA 0x12345678 and 0x12345679
+0x12340000 3333	# unmap 3333 blocks starting at LBA 0x12340000
+
+0X5a5a5a5a5a	0  # unmaps 0 blocks (i.e. does nothing)
+
+    a5a5a5h
+7		# unmap 7 blocks starting at LBA 0xa5a5a5
+
+# Note that there can be leading and trailing whitespace and whitespace
+# (plus comma) can be a separator.
+#
+# Example invocation:
+# $ sg_unmap --in=../examples/sg_unmap_example.txt -vv /dev/sdc
+# open /dev/sg2 with flags=0x802
+#     unmap cdb: 42 00 00 00 00 00 00 00 58 00 
+#     unmap parameter list:
+#         00 56 00 50 00 00 00 00  00 00 00 00 12 34 56 77    
+#         00 00 00 01 00 00 00 00  00 00 00 00 12 34 56 78    
+#         00 00 00 02 00 00 00 00  00 00 00 00 12 34 00 00    
+#         00 00 0d 05 00 00 00 00  00 00 00 5a 5a 5a 5a 5a    
+#         00 00 00 00 00 00 00 00  00 00 00 00 00 a5 a5 a5    
+#         00 00 00 07 00 00 00 00
+# sg_cmds_process_resp: slen=18
+# unmap:  Fixed format, current;  Sense key: Illegal Request
+#  Additional sense: Invalid command operation code
+#  Raw sense data (in hex):
+#         70 00 05 00 00 00 00 0a  00 00 00 00 20 00 00 00    
+#         00 00                                               
+# UNMAP not supported
+#
+# --------------------------------------------------------
+# Notice the 8 byte header then 5 descriptors in the parameter
+# list

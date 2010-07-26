@@ -47,6 +47,10 @@
 #include "sg_pt.h"
 #include "sg_lib.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 
 #define DEF_TIMEOUT 60       /* 60 seconds */
 

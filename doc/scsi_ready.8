@@ -1,0 +1,40 @@
+.TH SCSI_READY "8" "October 2009" "sg3_utils\-1.28" SG3_UTILS
+.SH NAME
+scsi_ready \- do SCSI TEST UNIT READY on devices
+.SH SYNOPSIS
+.B scsi_ready
+[\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-verbose\fR]
+\fIDEVICE\fR [\fIDEVICE\fR]*
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This bourne shell script calls the sg_turs utility on each given
+\fIDEVICE\fR. This will send a SCSI TEST UNIT READY command to each
+\fIDEVICE\fR. Disks, tape drives and DVD/BD players amongst others
+may respond to this SCSI command.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-brief\fR
+for each \fIDEVICE\fR given output a line containing either '    ready'
+or '    device not ready'. If \fIDEVICE\fR is not found or there is
+another serious error then an error message will appear instead.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level or verbosity.
+.SH EXIT STATUS
+The exit status of this script is 0 when it is successful. Otherwise the
+exit status is that of the last sg_turs utility called. See
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by D. Gilbert
+.SH COPYRIGHT
+Copyright \(co 2009 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_turs (sg3_utils)

@@ -42,16 +42,16 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
+/* A utility program originally written for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI command REPORT LUNS to the given SCSI device.
+ * This program issues the SCSI REPORT LUNS command to the given SCSI device.
  */
 
-static char * version_str = "1.14 20080510";
+static char * version_str = "1.15 20090920";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
-#define DEF_RLUNS_BUFF_LEN MAX_RLUNS_BUFF_LEN
+#define DEF_RLUNS_BUFF_LEN (1024 * 8)
 
 static unsigned char reportLunsBuff[MAX_RLUNS_BUFF_LEN];
 
@@ -97,7 +97,6 @@ usage()
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI REPORT LUNS command\n"
             );
-
 }
 
 /* Decoded according to SAM-4 rev 4. Note that one draft: BCC rev 0,

@@ -14,7 +14,7 @@
 
 #define SCSI_MAX_SENSE_LEN 64
 #define SCSI_MAX_CDB_LEN 16
-#define SCSI_MAX_INDIRECT_DATA 8192
+#define SCSI_MAX_INDIRECT_DATA 16384
 
 typedef struct {
         USHORT          Length;

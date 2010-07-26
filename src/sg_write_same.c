@@ -48,7 +48,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.91 20090331";
+static char * version_str = "0.93 20090610";
 
 
 #define ME "sg_write_same: "
@@ -63,7 +63,7 @@ static char * version_str = "0.91 20090331";
 #define WRITE_SAME32_LEN 32
 #define RCAP16_RESP_LEN 32
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
-#define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
+#define DEF_TIMEOUT_SECS 60
 #define DEF_WS_CDB_SIZE WRITE_SAME10_LEN
 #define DEF_WS_NUMBLOCKS 1
 #define MAX_XFER_LEN (64 * 1024)
@@ -95,7 +95,7 @@ struct opts_t {
     int lbdata;
     int numblocks;
     int pbdata;
-    int timeout_ms;
+    int timeout;
     int unmap;
     int verbose;
     int wrprotect;
@@ -258,7 +258,7 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     set_scsi_pt_cdb(ptvp, wsCmdBlk, cdb_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, optsp->xfer_len);
-    res = do_scsi_pt(ptvp, sg_fd, optsp->timeout_ms, optsp->verbose);
+    res = do_scsi_pt(ptvp, sg_fd, optsp->timeout, optsp->verbose);
     ret = sg_cmds_process_resp(ptvp, "Write same", res, 0, sense_b,
                                1 /*noisy */, optsp->verbose, &sense_cat);
     if (-1 == ret)
@@ -322,7 +322,7 @@ main(int argc, char * argv[])
     memset(&opts, 0, sizeof(opts));
     opts.numblocks = DEF_WS_NUMBLOCKS;
     opts.pref_cdb_size = DEF_WS_CDB_SIZE;
-    opts.timeout_ms = DEF_TIMEOUT;
+    opts.timeout = DEF_TIMEOUT_SECS;
     vb = 0;
     while (1) {
         int option_index = 0;
@@ -375,8 +375,8 @@ main(int argc, char * argv[])
             opts.pref_cdb_size = 16;
             break;
         case 't':
-            opts.timeout_ms = sg_get_num(optarg) * 1000;
-            if (opts.timeout_ms < 0)  {
+            opts.timeout = sg_get_num(optarg);
+            if (opts.timeout < 0)  {
                 fprintf(stderr, "bad argument to '--timeout'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -496,16 +496,19 @@ main(int argc, char * argv[])
         goto err_out;
     }
     if (opts.ifilename[0]) {
-        if (got_stdin)
-            infd = 0;
-        else {
+        if (got_stdin) {
+            infd = STDIN_FILENO;
+            if (sg_set_binary_mode(STDIN_FILENO) < 0)
+                perror("sg_set_binary_mode");
+        } else {
             if ((infd = open(opts.ifilename, O_RDONLY)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for reading", opts.ifilename);
                 perror(ebuff);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
-            }
+            } else if (sg_set_binary_mode(infd) < 0)
+                perror("sg_set_binary_mode");
         }
         res = read(infd, wBuff, opts.xfer_len);
         if (res < 0) {

@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.36 20090402";
+static char * version_str = "0.37 20090903";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -43,6 +43,8 @@ static char * version_str = "0.36 20090402";
 #define PROUT_REG_IGN_SA 0x6
 #define PROUT_REG_MOVE_SA 0x7
 #define MX_ALLOC_LEN 8192
+#define MX_TIDS 32
+#define MX_TID_LEN 256
 
 struct opts_t {
     unsigned int prout_type;
@@ -57,8 +59,7 @@ struct opts_t {
     int param_unreg;
     int inquiry;
     int hex;
-    unsigned char transportid_arr[MX_ALLOC_LEN];
-    int transportid_arr_len;
+    unsigned char transportid_arr[MX_TIDS * MX_TID_LEN];
     int num_transportids;
     unsigned int alloc_len;
     int verbose;
@@ -163,10 +164,10 @@ usage()
             "    --param-alltgpt|-Y         PR Out parameter 'ALL_TG_PT'\n"
             "    --param-aptpl|-Z           PR Out parameter 'APTPL'\n"
             "    --param-rk=RK|-K RK        PR Out parameter reservation key\n"
-            "                               (RK in hex)\n"
+            "                               (RK is in hex)\n"
             "    --param-sark=SARK|-S SARK    PR Out parameter service "
             "action\n"
-            "                               reservation key (SARK in "
+            "                               reservation key (SARK is in "
             "hex)\n"
             "    --preempt|-P               PR Out: Preempt\n"
             "    --preempt-abort|-A         PR Out: Preempt and Abort\n"
@@ -185,10 +186,9 @@ usage()
             "    --release|-L               PR Out: Release\n"
             "    --report-capabilities|-c   PR In: Report Capabilities\n"
             "    --reserve|-R               PR Out: Reserve\n"
-            "    --transport-id=H,H...|-X H,H...    TransportID "
-            "hex number(s),\n"
-            "                               comma separated list of bytes\n"
-            "    --transport-id=-|-X -      read TransportID from stdin\n"
+            "    --transport-id=TIDS|-X TIDS    one or more "
+            "TransportIDs can\n"
+            "                               be given in several forms\n"
             "    --unreg|-U                 optional with PR Out Register "
             "and Move\n"
             "    --verbose|-v               output additional debug "
@@ -199,13 +199,16 @@ usage()
 }
 
 static void
-decode_transport_id(const char * leadin, unsigned char * ucp, int len)
+decode_transport_id(const char * leadin, unsigned char * ucp, int len,
+                    int num_tids)
 {
     int format_code, proto_id, num, j, k;
     uint64_t ull;
     int bump;
 
-    for (k = 0, bump = 24; k < len; k += bump, ucp += bump) {
+    if (num_tids > 0)
+        len = num_tids * MX_TID_LEN; 
+    for (k = 0, bump = MX_TID_LEN; k < len; k += bump, ucp += bump) {
         if ((len < 24) || (0 != (len % 4)))
             printf("%sTransport Id short or not multiple of 4 "
                    "[length=%d]:\n", leadin, len);
@@ -220,7 +223,6 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
-            bump = 24;
             break;
         case TPROTO_SPI: /* Parallel SCSI */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
@@ -230,13 +232,11 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                        format_code);
             printf("%s  relative port number (of corresponding target): "
                    "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
-            bump = 24;
             break;
         case TPROTO_SSA:
             printf("%s  SSA (transport id not defined):\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
             break;
         case TPROTO_1394: /* IEEE 1394 */
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
@@ -244,7 +244,6 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
-            bump = 24;
             break;
         case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
@@ -252,7 +251,6 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 16, 0);
-            bump = 24;
             break;
         case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
@@ -260,12 +258,11 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             if (0 == format_code)
                 printf("name: %.*s\n", num, &ucp[4]);
             else if (1 == format_code)
-                printf("world wide unique port id: %.*s\n", num, &ucp[4]);
+                printf("name and session id: %.*s\n", num, &ucp[4]);
             else {
                 printf("  [Unexpected format code: %d]\n", format_code);
                 dStrHex((const char *)ucp, num + 4, 0);
             }
-            bump = (((num + 4) < 24) ? 24 : num + 4);
             break;
         case TPROTO_SAS:
             ull = 0;
@@ -274,30 +271,26 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
                     ull <<= 8;
                 ull |= ucp[4 + j];
             }
-            printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
+            printf("%s  SAS address: 0x%016" PRIx64 "\n", leadin, ull);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            bump = 24;
             break;
         case TPROTO_ADT:
             printf("%s  ADT:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
             break;
         case TPROTO_ATA:
             printf("%s  ATAPI:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
             break;
         case TPROTO_NONE:
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
             break;
         }
     }
@@ -348,7 +341,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
             printf("  Persist Through Power Loss Capable(PTPL_C): %d\n",
                    !!(pr_buff[2] & 0x1));
             printf("  Type Mask Valid(TMV): %d\n", !!(pr_buff[3] & 0x80));
-            printf("  Allow commands: %d\n", (pr_buff[3] >> 4) & 0x7);
+            printf("  Allow Commands: %d\n", (pr_buff[3] >> 4) & 0x7);
             printf("  Persist Through Power Loss Active(PTPL_A): %d\n",
                    !!(pr_buff[3] & 0x1));
             if (pr_buff[3] & 0x80) {
@@ -429,6 +422,11 @@ prin_work(int sg_fd, const struct opts_t * optsp)
         } else if (PRIN_RFSTAT_SA == optsp->prin_sa) {
             printf("  PR generation=0x%x\n", pr_gen);
             ucp = pr_buff + 8;
+            if (0 == add_len) {
+                printf("  No full status descriptors\n");
+                if (optsp->verbose)
+                printf("  So there are no registered IT nexuses\n");
+            }
             for (k = 0; k < add_len; k += num, ucp += num) {
                 add_desc_len = ((ucp[20] << 24) | (ucp[21] << 16) |
                                 (ucp[22] << 8) | ucp[23]);
@@ -460,22 +458,51 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                 } else
                     printf("      not reservation holder\n");
                 if (add_desc_len > 0)
-                    decode_transport_id("      ", &ucp[24], add_desc_len);
+                    decode_transport_id("      ", &ucp[24], add_desc_len, 0);
             }
         }
     }
     return 0;
 }
 
+/* Compact the 2 dimensional transportid_arr into a one dimensional
+ * array in place returning the length. */
 static int
-prout_work(int sg_fd, const struct opts_t * optsp)
+compact_transportid_array(struct opts_t * optsp)
+{
+    int k, off, protocol_id, len;
+    int compact_len = 0;
+    unsigned char * ucp = optsp->transportid_arr;
+
+    for (k = 0, off = 0; ((k < optsp->num_transportids) && (k < MX_TIDS));
+         ++k, off += MX_TID_LEN) {
+        protocol_id = ucp[off] & 0xf;
+        if (TPROTO_ISCSI == protocol_id) {
+            len = (ucp[off + 2] << 8) + ucp[off + 3] + 4;
+            if (len < 24)
+                len = 24;
+            if (off > compact_len)
+                memmove(ucp + compact_len, ucp + off, len);
+            compact_len += len;
+
+        } else {
+            if (off > compact_len)
+                memmove(ucp + compact_len, ucp + off, 24);
+            compact_len += 24;
+        }
+    }
+    return compact_len;
+}
+
+static int
+prout_work(int sg_fd, struct opts_t * optsp)
 {
     int j, len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
     uint64_t param_rk;
     uint64_t param_sark;
 
-    t_arr_len = optsp->transportid_arr_len;
+    t_arr_len = compact_transportid_array(optsp);
     param_rk = optsp->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
     for (j = 7; j >= 0; --j) {
@@ -531,14 +558,14 @@ prout_work(int sg_fd, const struct opts_t * optsp)
 }
 
 static int
-prout_rmove_work(int sg_fd, const struct opts_t * optsp)
+prout_reg_move_work(int sg_fd, struct opts_t * optsp)
 {
     int j, len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
     uint64_t param_rk;
     uint64_t param_sark;
 
-    t_arr_len = optsp->transportid_arr_len;
+    t_arr_len = compact_transportid_array(optsp);
     param_rk = optsp->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
     for (j = 7; j >= 0; --j) {
@@ -587,103 +614,289 @@ prout_rmove_work(int sg_fd, const struct opts_t * optsp)
     return 0;
 }
 
-/* Build transportid byte array from ASCII hexadecimal number which are comma
- * (or (single) space) separated. Direct form can only contain one transport
- * ID. In the indirect form (when '-'==*inp) there can be multiple transport
- * IDs, all assumed to contain the same number of bytes each. Fuller
- * description in manpage of sg_persist(8). Returns 0 if successful, else 1 .
- * N.B. Contains transport ID related special handling (e.g. rounds up to
- * 24 bytes)
+/* Decode various symbolic forms of TransportIDs into SPC-4 format.
+ * Returns 1 if one found, else returns 0. */
+static int
+decode_sym_transportid(const char * lcp, unsigned char * tidp)
+{
+    int k, j, n, b, c, len, alen;
+    const char * ecp;
+    const char * isip;
+
+    if ((0 == memcmp("sas,", lcp, 4)) || (0 == memcmp("SAS,", lcp, 4))) {
+        lcp += 4;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF");
+        if (16 != k) {
+            fprintf(stderr, "badly formed symbolic SAS TransportID: %s\n",
+                    lcp);
+            return 0;
+        }
+        memset(tidp, 0, 24);
+        tidp[0] = TPROTO_SAS;
+        for (k = 0, j = 0, b = 0; k < 16; ++k) {
+            c = lcp[k];
+            if (isdigit(c))
+                n = c - 0x30;
+            else if (isupper(c))
+                n = c - 0x37;
+            else
+                n = c - 0x57;
+            if (k & 1) {
+                tidp[4 + j] = b | n;
+                ++j;
+            } else
+                b = n << 4; 
+        }
+        return 1;
+    } else if ((0 == memcmp("spi,", lcp, 4)) ||
+               (0 == memcmp("SPI,", lcp, 4))) {
+        lcp += 4;
+        if (2 != sscanf(lcp, "%d,%d", &b, &c)) {
+            fprintf(stderr, "badly formed symbolic SPI TransportID: %s\n",
+                    lcp);
+            return 0;
+        }
+        tidp[0] = TPROTO_SPI;
+        tidp[2] = (b >> 8) & 0xff;
+        tidp[3] = b & 0xff;
+        tidp[6] = (c >> 8) & 0xff;
+        tidp[7] = c & 0xff;
+        return 1;
+    } else if ((0 == memcmp("fcp,", lcp, 4)) ||
+               (0 == memcmp("FCP,", lcp, 4))) {
+        lcp += 4;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF");
+        if (16 != k) {
+            fprintf(stderr, "badly formed symbolic FCP TransportID: %s\n",
+                    lcp);
+            return 0;
+        }
+        memset(tidp, 0, 24);
+        tidp[0] = TPROTO_FCP;
+        for (k = 0, j = 0, b = 0; k < 16; ++k) {
+            c = lcp[k];
+            if (isdigit(c))
+                n = c - 0x30;
+            else if (isupper(c))
+                n = c - 0x37;
+            else
+                n = c - 0x57;
+            if (k & 1) {
+                tidp[8 + j] = b | n;
+                ++j;
+            } else
+                b = n << 4; 
+        }
+        return 1;
+    } else if ((0 == memcmp("sbp,", lcp, 4)) ||
+               (0 == memcmp("SBP,", lcp, 4))) {
+        lcp += 4;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF");
+        if (16 != k) {
+            fprintf(stderr, "badly formed symbolic SBP TransportID: %s\n",
+                    lcp);
+            return 0;
+        }
+        memset(tidp, 0, 24);
+        tidp[0] = TPROTO_1394;
+        for (k = 0, j = 0, b = 0; k < 16; ++k) {
+            c = lcp[k];
+            if (isdigit(c))
+                n = c - 0x30;
+            else if (isupper(c))
+                n = c - 0x37;
+            else
+                n = c - 0x57;
+            if (k & 1) {
+                tidp[8 + j] = b | n;
+                ++j;
+            } else
+                b = n << 4; 
+        }
+        return 1;
+    } else if ((0 == memcmp("srp,", lcp, 4)) ||
+               (0 == memcmp("SRP,", lcp, 4))) {
+        lcp += 4;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF");
+        if (16 != k) {
+            fprintf(stderr, "badly formed symbolic SRP TransportID: %s\n",
+                    lcp);
+            return 0;
+        }
+        memset(tidp, 0, 24);
+        tidp[0] = TPROTO_SRP;
+        for (k = 0, j = 0, b = 0; k < 32; ++k) {
+            c = lcp[k];
+            if (isdigit(c))
+                n = c - 0x30;
+            else if (isupper(c))
+                n = c - 0x37;
+            else
+                n = c - 0x57;
+            if (k & 1) {
+                tidp[8 + j] = b | n;
+                ++j;
+            } else
+                b = n << 4; 
+        }
+        return 1;
+    } else if (0 == memcmp("iqn.", lcp, 4)) {
+        ecp = strpbrk(lcp, " \t");
+        isip = strstr(lcp, ",i,0x");
+        if (ecp && (isip > ecp))
+            isip = NULL;
+        len = ecp ? (ecp - lcp) : (int)strlen(lcp);
+        memset(tidp, 0, 24);
+        tidp[0] = TPROTO_ISCSI | (isip ? 0x40 : 0x0);
+        alen = len + 1; /* at least one trailing null */
+        if (alen < 20)
+            alen = 20;
+        else if (0 != (alen % 4))
+            alen = ((alen / 4) + 1) * 4;
+        if (alen > 241) { /* sam5r02.pdf A.2 (Annex) */
+            fprintf(stderr, "iSCSI name too long, alen=%d\n", alen); 
+            return 0;
+        }
+        tidp[3] = alen & 0xff;
+        memcpy(tidp + 4, lcp, len);
+        return 1;
+    }
+    fprintf(stderr, "unable to parse symbolic TransportID: %s\n", lcp);
+    return 0;
+}
+
+/* Read one or more TransportIDs from the given file or from stdin.
+ * Returns 0 if successful, 1 otherwise. */
+static int
+decode_file_tids(const char * fnp, struct opts_t * optsp)
+{
+    FILE * fp = stdin;
+    int in_len, k, j, m;
+    unsigned int h;
+    const char * lcp;
+    char line[512];
+    int off = 0;
+    int num = 0;
+    unsigned char * tid_arr = optsp->transportid_arr;
+
+    if (fnp) {
+        fp = fopen(fnp, "r");
+        if (NULL == fp) {
+            fprintf(stderr, "decode_file_tids: unable to open %s\n", fnp);
+            return 1;
+        }
+    }
+    for (j = 0, off = 0; j < 512; ++j) {
+        if (NULL == fgets(line, sizeof(line), fp))
+            break;
+        in_len = strlen(line);
+        if (in_len > 0) {
+            if ('\n' == line[in_len - 1]) {
+                --in_len;
+                line[in_len] = '\0';
+            }
+        }
+        if (0 == in_len)
+            continue;
+        lcp = line;
+        m = strspn(lcp, " \t");
+        if (m == in_len)
+            continue;
+        lcp += m;
+        in_len -= m;
+        if ('#' == *lcp)
+            continue;
+        if (decode_sym_transportid(lcp, tid_arr + off))
+            goto my_cont_a;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
+        if ((k < in_len) && ('#' != lcp[k])) {
+            fprintf(stderr, "decode_file_tids: syntax error at "
+                    "line %d, pos %d\n", j + 1, m + k + 1);
+            goto bad;
+        }
+        for (k = 0; k < 1024; ++k) {
+            if (1 == sscanf(lcp, "%x", &h)) {
+                if (h > 0xff) {
+                    fprintf(stderr, "decode_file_tids: hex number "
+                            "larger than 0xff in line %d, pos %d\n",
+                            j + 1, (int)(lcp - line + 1));
+                    goto bad;
+                }
+                if ((off + k) >= (int)sizeof(optsp->transportid_arr)) {
+                    fprintf(stderr, "decode_file_tids: array length "
+                            "exceeded\n");
+                    goto bad;
+                }
+                tid_arr[off + k] = h;
+                lcp = strpbrk(lcp, " ,\t");
+                if (NULL == lcp)
+                    break;
+                lcp += strspn(lcp, " ,\t");
+                if ('\0' == *lcp)
+                    break;
+            } else {
+                if ('#' == *lcp) {
+                    --k;
+                    break;
+                }
+                fprintf(stderr, "decode_file_tids: error in "
+                        "line %d, at pos %d\n", j + 1,
+                        (int)(lcp - line + 1));
+                goto bad;
+            }
+        }
+my_cont_a:
+        off += MX_TID_LEN;
+        if (off >= (MX_TIDS * MX_TID_LEN)) {
+            fprintf(stderr, "decode_file_tids: array length exceeded\n");
+            goto bad;
+        }
+        ++num;
+    }
+    optsp->num_transportids = num;
+    return 0;
+
+bad:
+   if (fnp)
+        fclose(fp);
+   return 1;
+}
+
+/* Build transportid array which may contain one or more TransportIDs.
+ * A single TransportID can appear on the command line either as a list of
+ * comma (or single space) separated ASCII hex bytes, or in some transport
+ * protocol specific form (e.g. "sas,5000c50005b32001"). One or more
+ * TransportIDs may be given in a file (syntax: "file=<name>") or read from
+ * stdin in (when "-" is given). Fuller description in manpage of
+ * sg_persist(8). Returns 0 if successful, else 1 .
  */
 static int
 build_transportid(const char * inp, struct opts_t * optsp)
 {
-    int in_len, k, j, m;
+    int in_len;
+    int k = 0;
     unsigned int h;
     const char * lcp;
-    unsigned char * tid_arr;
+    unsigned char * tid_arr = optsp->transportid_arr;
     char * cp;
     char * c2p;
 
-    tid_arr = optsp->transportid_arr;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len) {
-        optsp->transportid_arr_len = 0;
         optsp->num_transportids = 0;
     }
-    if ('-' == inp[0]) {        /* read from stdin */
-        char line[512];
-        int off = 0;
-        int num = 0;
-
-        for (j = 0, off = 0; j < 512; ++j) {
-            if (NULL == fgets(line, sizeof(line), stdin))
-                break;
-            in_len = strlen(line);
-            if (in_len > 0) {
-                if ('\n' == line[in_len - 1]) {
-                    --in_len;
-                    line[in_len] = '\0';
-                }
-            }
-            if (0 == in_len)
-                continue;
-            lcp = line;
-            m = strspn(lcp, " \t");
-            if (m == in_len)
-                continue;
-            lcp += m;
-            in_len -= m;
-            if ('#' == *lcp)
-                continue;
-            k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-            if ((k < in_len) && ('#' != lcp[k])) {
-                fprintf(stderr, "build_transportid: syntax error at "
-                        "line %d, pos %d\n", j + 1, m + k + 1);
-                return 1;
-            }
-            for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%x", &h)) {
-                    if (h > 0xff) {
-                        fprintf(stderr, "build_transportid: hex number "
-                                "larger than 0xff in line %d, pos %d\n",
-                                j + 1, (int)(lcp - line + 1));
-                        return 1;
-                    }
-                    if ((off + k) >= (int)sizeof(optsp->transportid_arr)) {
-                        fprintf(stderr, "build_transportid: array length "
-                                "exceeded\n");
-                        return 1;
-                    }
-                    tid_arr[off + k] = h;
-                    lcp = strpbrk(lcp, " ,\t");
-                    if (NULL == lcp)
-                        break;
-                    lcp += strspn(lcp, " ,\t");
-                    if ('\0' == *lcp)
-                        break;
-                } else {
-                    if ('#' == *lcp) {
-                        --k;
-                        break;
-                    }
-                    fprintf(stderr, "build_transportid: error in "
-                            "line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
-                    return 1;
-                }
-            }
-            if (k < 24)
-                k = 24;
-            else if (0 != (k % 4))
-                k = ((k / 4) + 1) * 4;
-            off += k;
-            ++num;
-        }
-        optsp->transportid_arr_len = off;
-        optsp->num_transportids = num;
-    } else {        /* hex string on command line */
+    if (('-' == inp[0]) ||
+        (0 == memcmp("file=", inp, 5)) ||
+        (0 == memcmp("FILE=", inp, 5))) {
+        if ('-' == inp[0])
+            lcp = NULL;         /* read from stdin */
+        else
+            lcp = inp + 5;      /* read from given file */
+        return decode_file_tids(lcp, optsp);
+    } else {        /* TransportID given directly on command line */
+        if (decode_sym_transportid(lcp, tid_arr))
+            goto my_cont_b;
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "build_transportid: error at pos %d\n",
@@ -713,11 +926,7 @@ build_transportid(const char * inp, struct opts_t * optsp)
                 return 1;
             }
         }
-        if (k < 24)
-            k = 24;
-        else if (0 != (k % 4))
-            k = ((k / 4) + 1) * 4;
-        optsp->transportid_arr_len = k;
+my_cont_b:
         optsp->num_transportids = 1;
         if (k >= (int)sizeof(optsp->transportid_arr)) {
             fprintf(stderr, "build_transportid: array length exceeded\n");
@@ -981,7 +1190,7 @@ main(int argc, char * argv[])
                 "command line (or stdin): %d\n", opts.num_transportids);
         fprintf(stderr, "  Decode given transport-ids:\n");
         decode_transport_id("      ", opts.transportid_arr,
-                            opts.transportid_arr_len);
+                            0, opts.num_transportids);
     }
 
     if (opts.inquiry) {
@@ -1018,7 +1227,7 @@ main(int argc, char * argv[])
     if (opts.prin)
         ret = prin_work(sg_fd, &opts);
     else if (PROUT_REG_MOVE_SA == opts.prout_sa)
-        ret = prout_rmove_work(sg_fd, &opts);
+        ret = prout_reg_move_work(sg_fd, &opts);
     else /* PROUT commands other than 'register and move' */
         ret = prout_work(sg_fd, &opts);
 

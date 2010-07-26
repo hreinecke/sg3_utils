@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2008 Douglas Gilbert.
+ * Copyright (c) 1999-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -70,6 +70,10 @@
 
 #include "sg_lib.h"
 #include "sg_lib_data.h"
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
@@ -546,7 +550,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             processed = 0;
             break;
         case 9:
-            n += sprintf(b + n, "ATA Return\n");
+            n += sprintf(b + n, "ATA Status Return\n");
             if (add_len >= 12) {
                 int extended, sector_count;
 
@@ -566,6 +570,18 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                         descp[12], descp[13]);
             } else
                 processed = 0;
+            break;
+        case 0xa:       /* Added in SPC-4 rev 17 */
+            n += sprintf(b + n, "Progress indication\n");
+            if (add_len < 6) {
+                processed = 0;
+                n += sprintf(b + n, " field too short\n");
+                break;
+            }
+            progress = (descp[6] << 8) + descp[7];
+            n += sprintf(b + n, "    %d %%", (progress * 100) / 0x10000);
+            n += sprintf(b + n, " [sense_key=0x%x asc,ascq=0x%x,0x%x]\n",
+                         descp[2], descp[3], descp[4]);
             break;
         default:
             n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
@@ -987,6 +1003,22 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         else
             snprintf(buff, buff_len, "Service action out(16)=0x%x",
                      service_action);
+        break;
+    case SG_PERSISTENT_RESERVE_IN:
+        vnp = get_value_name(sg_lib_pr_in_arr, service_action, peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Persistent reserve in, service "
+                     "action=0x%x", service_action);
+        break;
+    case SG_PERSISTENT_RESERVE_OUT:
+        vnp = get_value_name(sg_lib_pr_out_arr, service_action, peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Persistent reserve out, service "
+                     "action=0x%x", service_action);
         break;
     default:
         sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
@@ -1570,10 +1602,14 @@ sg_lib_version()
 }
 
 
-#ifdef SG3_UTILS_MINGW
+#ifdef SG_LIB_MINGW
 /* Non Unix OSes distinguish between text and binary files.
    Set text mode on fd. Does nothing in Unix. Returns negative number on
    failure. */
+
+#include <unistd.h>
+#include <fcntl.h>
+
 int
 sg_set_text_mode(int fd)
 {

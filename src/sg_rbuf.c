@@ -4,7 +4,6 @@
 #endif
 
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,7 +51,7 @@
 #endif
 
 
-static char * version_str = "4.88 20071226";
+static char * version_str = "4.88 20090908";
 
 static struct option long_options[] = {
         {"buffer", 1, 0, 'b'},

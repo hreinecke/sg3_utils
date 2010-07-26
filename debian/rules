@@ -9,15 +9,13 @@
 # Uncomment this to turn on verbose mode. 
 # export DH_VERBOSE=1
 
-# Debhelper compatibility level
-export DH_COMPAT=4
+DEB_HOST_ARCH_OS := $(shell dpkg-architecture -qDEB_HOST_ARCH_OS 2>/dev/null)
 
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
 	# Add here commands to configure the package.
 	CFLAGS="$(CFLAGS)" ./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --bindir=/usr/bin --prefix=/usr --mandir=\$${prefix}/share/man
-
 	touch configure-stamp
 
 build: configure-stamp build-stamp
@@ -34,7 +32,7 @@ clean:
 	dh_testroot
 
 	# Add here commands to clean up after the build process.
-	-$(MAKE) clean
+	-$(MAKE) distclean
 
 	rm -f build-stamp configure-stamp debian/substvars
 
@@ -44,14 +42,15 @@ install: DH_OPTIONS=
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	dh_clean
 	dh_installdirs
 
 	# Add here commands to install the package into debian/tmp
 	$(MAKE) -e install DESTDIR=$(CURDIR)/debian/tmp PREFIX=/usr
 
-	find debian/tmp/usr/bin debian/tmp/usr/lib -type f -exec chrpath -d {} \;
 	dh_install --autodest --sourcedir=debian/tmp
+	cp scripts/scsi* debian/sg3-utils/usr/bin
+
 	dh_installman
 
 # Build architecture-independent files here.
@@ -73,6 +72,9 @@ binary-arch: build install
 	dh_fixperms -a
 	dh_makeshlibs -V -v
 	dh_installdeb -a
+ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
+	echo kfreebsd:Depends=libcam-dev >>debian/libsgutils2-dev.substvars
+endif
 	dh_shlibdeps -ldebian/tmp/usr/lib -L libsgutils2
 	dh_gencontrol -a
 	dh_md5sums -a

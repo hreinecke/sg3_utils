@@ -2,7 +2,7 @@
 #define SG_IO_LINUX_H
 
 /*
- * Copyright (c) 2004-2005 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  */
 
 /*
- * Version 1.02 [20070121]
+ * Version 1.02 [20090708]
  */
 
 /*
@@ -142,7 +142,8 @@ extern void sg_print_driver_status(int driver_status);
 
 /* sg_chk_n_print() returns 1 quietly if there are no errors/warnings
    else it prints errors/warnings (prefixed by 'leadin') to
-   'sg_warnings_fd' and returns 0. */
+   'sg_warnings_fd' and returns 0. raw_sinfo indicates whether the
+   raw sense buffer (in ASCII hex) should be printed. */
 extern int sg_chk_n_print(const char * leadin, int masked_status,
                           int host_status, int driver_status,
                           const unsigned char * sense_buffer, int sb_len,

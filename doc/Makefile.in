@@ -32,7 +32,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 subdir = doc
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -156,15 +156,16 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 @OS_FREEBSD_TRUE@man_MANS = \
 @OS_FREEBSD_TRUE@	sg3_utils.8 \
-@OS_FREEBSD_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
+@OS_FREEBSD_TRUE@	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+@OS_FREEBSD_TRUE@	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 @OS_FREEBSD_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
-@OS_FREEBSD_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
-@OS_FREEBSD_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
+@OS_FREEBSD_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
+@OS_FREEBSD_TRUE@	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
 @OS_FREEBSD_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_FREEBSD_TRUE@	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 @OS_FREEBSD_TRUE@	sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 \
-@OS_FREEBSD_TRUE@	sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-@OS_FREEBSD_TRUE@	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
+@OS_FREEBSD_TRUE@	sg_sync.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 \
+@OS_FREEBSD_TRUE@	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 
 # sg_dd, sg_emc_trespass(?), sginfo, sg_map26, sg_map, sgm_dd, sgp_dd,
@@ -174,64 +175,70 @@ top_srcdir = @top_srcdir@
 # sg_scan is shared by Linux and Win32
 @OS_LINUX_TRUE@man_MANS = \
 @OS_LINUX_TRUE@	sg3_utils.8 \
-@OS_LINUX_TRUE@	sg_dd.8 sg_emc_trespass.8 sg_format.8 sg_get_config.8 sg_ident.8 \
+@OS_LINUX_TRUE@	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+@OS_LINUX_TRUE@	sg_dd.8 sg_emc_trespass.8 sg_format.8 sg_get_config.8 \
+@OS_LINUX_TRUE@	sg_get_lba_status.8 sg_ident.8 \
 @OS_LINUX_TRUE@	sginfo.8 sg_inq.8 sg_logs.8 sg_luns.8 sg_map26.8 sg_map.8 \
 @OS_LINUX_TRUE@	sgm_dd.8 sg_modes.8 sg_opcodes.8 sgp_dd.8 sg_persist.8 \
 @OS_LINUX_TRUE@	sg_prevent.8 sg_raw.8 sg_rbuf.8 sg_rdac.8 sg_read.8 sg_readcap.8 \
-@OS_LINUX_TRUE@	sg_read_buffer.8 sg_read_long.8 sg_reassign.8 sg_requests.8 \
-@OS_LINUX_TRUE@	sg_reset.8 sg_rmsn.8 sg_rtpg.8 sg_safte.8 sg_sat_identify.8 \
-@OS_LINUX_TRUE@	sg_sat_phy_event.8 sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 \
-@OS_LINUX_TRUE@	sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 sg_test_rwbuf.8 sg_turs.8 \
-@OS_LINUX_TRUE@	sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
-@OS_LINUX_TRUE@	sg_write_same.8 sg_wr_mode.8
+@OS_LINUX_TRUE@	sg_read_block_limits.8 sg_read_buffer.8 sg_read_long.8 sg_reassign.8 \
+@OS_LINUX_TRUE@	sg_requests.8 sg_reset.8 sg_rmsn.8 sg_rtpg.8 sg_safte.8 \
+@OS_LINUX_TRUE@	sg_sat_identify.8 sg_sat_phy_event.8 sg_sat_set_features.8 sg_scan.8 \
+@OS_LINUX_TRUE@	sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 sg_sync.8 \
+@OS_LINUX_TRUE@	sg_test_rwbuf.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 \
+@OS_LINUX_TRUE@	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 @OS_OSF_TRUE@man_MANS = \
 @OS_OSF_TRUE@	sg3_utils.8 \
-@OS_OSF_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
+@OS_OSF_TRUE@	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+@OS_OSF_TRUE@	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 @OS_OSF_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
-@OS_OSF_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
-@OS_OSF_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
+@OS_OSF_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
+@OS_OSF_TRUE@	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
 @OS_OSF_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_OSF_TRUE@	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 @OS_OSF_TRUE@	sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 \
-@OS_OSF_TRUE@	sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-@OS_OSF_TRUE@	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
+@OS_OSF_TRUE@	sg_sync.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 \
+@OS_OSF_TRUE@	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 @OS_SOLARIS_TRUE@man_MANS = \
 @OS_SOLARIS_TRUE@	sg3_utils.8 \
-@OS_SOLARIS_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
+@OS_SOLARIS_TRUE@	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+@OS_SOLARIS_TRUE@	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 @OS_SOLARIS_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
-@OS_SOLARIS_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
-@OS_SOLARIS_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
+@OS_SOLARIS_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
+@OS_SOLARIS_TRUE@	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
 @OS_SOLARIS_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_SOLARIS_TRUE@	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 @OS_SOLARIS_TRUE@	sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 sg_start.8 sg_stpg.8 \
-@OS_SOLARIS_TRUE@	sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-@OS_SOLARIS_TRUE@	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
+@OS_SOLARIS_TRUE@	sg_sync.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 \
+@OS_SOLARIS_TRUE@	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 @OS_WIN32_CYGWIN_TRUE@man_MANS = \
 @OS_WIN32_CYGWIN_TRUE@	sg3_utils.8 \
-@OS_WIN32_CYGWIN_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
+@OS_WIN32_CYGWIN_TRUE@	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+@OS_WIN32_CYGWIN_TRUE@	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
-@OS_WIN32_CYGWIN_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
-@OS_WIN32_CYGWIN_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
+@OS_WIN32_CYGWIN_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
+@OS_WIN32_CYGWIN_TRUE@	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_rtpg.8 sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 \
-@OS_WIN32_CYGWIN_TRUE@	sg_stpg.8 sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-@OS_WIN32_CYGWIN_TRUE@	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
+@OS_WIN32_CYGWIN_TRUE@	sg_stpg.8 sg_sync.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 \
+@OS_WIN32_CYGWIN_TRUE@	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 @OS_WIN32_MINGW_TRUE@man_MANS = \
 @OS_WIN32_MINGW_TRUE@	sg3_utils.8 \
-@OS_WIN32_MINGW_TRUE@	sg_format.8 sg_get_config.8 sg_ident.8 \
+@OS_WIN32_MINGW_TRUE@	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+@OS_WIN32_MINGW_TRUE@	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 @OS_WIN32_MINGW_TRUE@	sg_inq.8 sg_logs.8 sg_luns.8 \
-@OS_WIN32_MINGW_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 \
-@OS_WIN32_MINGW_TRUE@	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 sg_read_buffer.8 \
+@OS_WIN32_MINGW_TRUE@	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
+@OS_WIN32_MINGW_TRUE@	sg_rdac.8 sg_readcap.8 sg_read_block_limits.8 sg_read_buffer.8 \
 @OS_WIN32_MINGW_TRUE@	sg_read_long.8 sg_reassign.8 sg_requests.8 sg_rmsn.8 sg_rtpg.8 \
 @OS_WIN32_MINGW_TRUE@	sg_safte.8 sg_sat_identify.8 sg_sat_phy_event.8 \
 @OS_WIN32_MINGW_TRUE@	sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 sg_ses.8 sg_start.8 \
-@OS_WIN32_MINGW_TRUE@	sg_stpg.8 sg_sync.8 sg_turs.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-@OS_WIN32_MINGW_TRUE@	sg_write_long.8 sg_write_same.8 sg_wr_mode.8
+@OS_WIN32_MINGW_TRUE@	sg_stpg.8 sg_sync.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 \
+@OS_WIN32_MINGW_TRUE@	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_wr_mode.8
 
 all: all-am
 

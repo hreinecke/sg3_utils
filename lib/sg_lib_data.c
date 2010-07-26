@@ -32,8 +32,12 @@
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-const char * sg_lib_version_str = "1.48 20090410";    /* spc-4 rev 18 + */
+
+const char * sg_lib_version_str = "1.54 20090826";    /* spc-4 rev 21 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -255,12 +259,33 @@ struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
 struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x10, 0, "Read capacity(16)"},
     {0x11, 0, "Read long(16)"},
+    {0x12, 0, "Get LBA status"},
     {0xffff, 0, NULL},
 };
 
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
     {0x11, 0, "Write long(16)"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
+    {0x0, 0, "Persistent reserve in, read keys"},
+    {0x1, 0, "Persistent reserve in, read reservation"},
+    {0x2, 0, "Persistent reserve in, report capabilities"},
+    {0x3, 0, "Persistent reserve in, read full status"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
+    {0x0, 0, "Persistent reserve out, register"},
+    {0x1, 0, "Persistent reserve out, reserve"},
+    {0x2, 0, "Persistent reserve out, release"},
+    {0x3, 0, "Persistent reserve out, clear"},
+    {0x4, 0, "Persistent reserve out, preempt"},
+    {0x5, 0, "Persistent reserve out, preempt and abort"},
+    {0x6, 0, "Persistent reserve out, register and ignore existing key"},
+    {0x7, 0, "Persistent reserve out, register and move"},
     {0xffff, 0, NULL},
 };
 
@@ -404,8 +429,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
                 "notify (enable spinup) required"},
     {0x04,0x12,"Logical unit not ready, offline"},
     {0x04,0x13,"Logical unit not ready, SA creation in progress"},
-        /* Would "... in progress" read better in the following: */
-    {0x04,0x14,"Logical unit not ready, space allocation in process"},
+    {0x04,0x14,"Logical unit not ready, space allocation in progress"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -668,6 +692,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x38,0x02,"Esn - power management class event"},
     {0x38,0x04,"Esn - media class event"},
     {0x38,0x06,"Esn - device busy class event"},
+    {0x38,0x07,"Thin provisioning soft threshold reached"},
     {0x39,0x00,"Saving parameters not supported"},
     {0x3A,0x00,"Medium not present"},
     {0x3A,0x01,"Medium not present - tray closed"},
@@ -761,6 +786,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x4B,0x04,"Nak received"},
     {0x4B,0x05,"Data offset error"},
     {0x4B,0x06,"Initiator response timeout"},
+    {0x4B,0x07,"Connection lost"},
     {0x4C,0x00,"Logical unit failed self-configuration"},
     /*
      * ASC 0x4D overridden by an "additional2" array entry

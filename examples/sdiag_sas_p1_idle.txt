@@ -1,0 +1,14 @@
+# This is the hex for a SAS protocol specific diagnostic
+# page. It will attempt to put phy identifier 1 of the
+# given device into IDLE (continuously transmit idle dwords) mode.
+# Physical transmission speed is 3 Gbps (last number on first
+# active line can be 8 for 1.5Gbps, 9 for 3Gbps and 10 for 6Gbps).
+# See sdiag_sas_p1_stop.txt to turn off this test pattern.
+# N.B. This will turn the receiver off on phy id 1.
+#
+# Usage example: 'sg_senddiag --pf --raw=- /dev/sg2 < {this_file}'
+#
+3f,6,0,1c,1,1,12,9,
+0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0

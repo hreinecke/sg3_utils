@@ -8,15 +8,15 @@ if OS_LINUX
 # sg_scan is shared by Linux and Win32
 
 bin_PROGRAMS = \
-	sg_dd sg_emc_trespass sg_format sg_get_config sg_ident \
-	sginfo sg_inq sg_logs sg_luns sg_map26 sg_map \
+	sg_dd sg_emc_trespass sg_format sg_get_config sg_get_lba_status \
+	sg_ident sginfo sg_inq sg_logs sg_luns sg_map26 sg_map \
 	sgm_dd sg_modes sg_opcodes sgp_dd sg_persist \
 	sg_prevent sg_raw sg_rbuf sg_rdac sg_read sg_readcap \
-	sg_read_buffer sg_read_long sg_reassign sg_requests \
-	sg_reset sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_test_rwbuf sg_turs sg_verify sg_vpd sg_write_buffer \
-	sg_write_long sg_write_same sg_wr_mode
+	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
+	sg_requests sg_reset sg_rmsn sg_rtpg sg_safte sg_sat_identify \
+	sg_sat_phy_event sg_sat_set_features sg_scan sg_senddiag sg_ses \
+	sg_start sg_stpg sg_sync sg_test_rwbuf sg_turs sg_unmap sg_verify \
+	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -30,15 +30,15 @@ endif
 if OS_WIN32_MINGW
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_ident \
+	sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns \
 	sg_modes sg_opcodes sg_persist \
-	sg_prevent sg_raw sg_rdac sg_readcap \
+	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_wr_mode
+	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -52,15 +52,15 @@ endif
 if OS_WIN32_CYGWIN
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_ident \
+	sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns \
 	sg_modes sg_opcodes sg_persist \
-	sg_prevent sg_raw sg_rdac sg_readcap \
+	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_wr_mode
+	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -74,15 +74,15 @@ endif
 if OS_FREEBSD
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_ident \
+	sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns \
 	sg_modes sg_opcodes sg_persist \
-	sg_prevent sg_raw sg_rdac sg_readcap \
+	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_wr_mode
+	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_wr_mode
 
 endif
 
@@ -90,15 +90,15 @@ endif
 if OS_SOLARIS
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_ident \
+	sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns \
 	sg_modes sg_opcodes sg_persist \
-	sg_prevent sg_raw sg_rdac sg_readcap \
+	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_wr_mode
+	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_wr_mode
 
 endif
 
@@ -106,15 +106,15 @@ endif
 if OS_OSF
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_ident \
+	sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns \
 	sg_modes sg_opcodes sg_persist \
-	sg_prevent sg_raw sg_rdac sg_readcap \
+	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
 	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_turs sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_wr_mode
+	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_wr_mode
 
 endif
 
@@ -133,6 +133,9 @@ sg_format_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_get_config_SOURCES = sg_get_config.c
 sg_get_config_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_get_lba_status_SOURCES = sg_get_lba_status.c
+sg_get_lba_status_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_ident_SOURCES = sg_ident.c
 sg_ident_LDADD = ../lib/libsgutils2.la @os_libs@
@@ -187,6 +190,9 @@ sg_read_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_readcap_SOURCES = sg_readcap.c
 sg_readcap_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_read_block_limits_SOURCES = sg_read_block_limits.c
+sg_read_block_limits_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_read_buffer_SOURCES = sg_read_buffer.c
 sg_read_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
@@ -244,6 +250,9 @@ sg_test_rwbuf_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_turs_SOURCES = sg_turs.c
 sg_turs_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_unmap_SOURCES = sg_unmap.c
+sg_unmap_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_verify_SOURCES = sg_verify.c
 sg_verify_LDADD = ../lib/libsgutils2.la @os_libs@

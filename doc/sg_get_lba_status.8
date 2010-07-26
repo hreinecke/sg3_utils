@@ -1,0 +1,79 @@
+.TH SG_GET_LBA_STATUS "8" "September 2009" "sg3_utils\-1.28" SG3_UTILS
+.SH NAME
+sg_get_lba_status \- send the SCSI GET LBA STATUS command
+.SH SYNOPSIS
+.B sg_get_lba_status
+[\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send the SCSI GET LBA STATUS command to the \fIDEVICE\fR and outputs the
+response. This command was introduced in (draft) SBC\-3 revision 20 and
+devices that support thin provisioning should support this command.
+.PP
+The default action is to decode the response into one LBA status descriptor
+per line output to stdout. The descriptor LBA is output in hex (prefixed
+by '0x') and the number of blocks is output in decimal followed by the
+provisioning status in decimal. The provisioning status can be in the
+range 0 to 15 of which only 0 (mapped) and 1 (unmapped) are used currently.
+The amount of output can be reduced by the \fI\-\-brief\fR option.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-brief\fR
+when use once then one LBA status descriptor per line is output to stdout.
+Each line has this
+format: "0x<descriptor_LBA>  0x<blocks> <provisioning_status>". So the
+descriptor LBA and blocks are output in hex and the provisioning status
+in decimal. When used twice (e.g. '\-bb' or '\-\-brief \-\-brief') the
+the provisioning status of the given \fILBA\fR (or LBA 0 if the
+\fI\-\-lba\fR option is not given) is output to stdout. A check is made
+that the given \fILBA\fR lies on the range of the first returned LBA
+status descriptor (as it should according to SBC\-3 revision 20) and
+warnings are sent to stderr if it doesn't.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output response to this command in ASCII hex.
+.TP
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the starting Logical Block Address (LBA) to check the
+provisioning status for. Note that the \fIDEVICE\fR chooses how many
+following blocks that it will return provisioning status for.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+where \fILEN\fR is the (maximum) response length in bytes. It is placed in
+the cdb's "allocation length" field. If not given then 24 is used. 24 is
+enough space for the response header and one LBA status descriptor.
+\fILEN\fR should be 8 plus a multiple of 16 (e.g. 24, 40, and 56 are suitable).
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output response in binary (to stdout).
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output). Additional output
+caused by this option is sent to stderr.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+For a discussion of thin provisioning see section 4.6.3 of sbcr20.pdf
+at http://www.t10.org (or the corresponding section of a later draft).
+.SH EXIT STATUS
+The exit status of sg_get_lba_status is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2009 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_write_same(8), sg_unmap(8)

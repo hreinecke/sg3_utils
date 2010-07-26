@@ -4,16 +4,19 @@
 #
 #  Send a TEST UNIT READY SCSI command to each given device.
 #
-#  This script assumes the sg3_utils package is installed.
+#  This script assumes the sg3_utils package is installed and uses
+#  the sg_turs utility..
 #
 ###############################################
 
 verbose=""
+brief=""
 
 usage()
 {
-  echo "Usage: scsi_ready [-h] [-v] <device>+"
+  echo "Usage: scsi_ready [-b] [-h] [-v] <device>+"
   echo "  where:"
+  echo "    -b, --brief          print 'ready' or 'device not ready' only"
   echo "    -h, --help           print usage message"
   echo "    -v, --verbose        more verbose output"
   echo ""
@@ -30,8 +33,11 @@ opt="$1"
 while test ! -z "$opt" -a -z "${opt##-*}"; do
   opt=${opt#-}
   case "$opt" in
+    b|-brief) brief="1" ;;
     h|-help) usage ; exit 0 ;;
     v|-verbose) verbose="-v" ;;
+    vv) verbose="-vv" ;;
+    vvv) verbose="-vvv" ;;
     *) echo "Unknown option: -$opt " ; exit 1 ;;
   esac
   shift
@@ -40,7 +46,9 @@ done
 
 for i
 do
-	echo "sg_turs $verbose $i"
+	if [ ! $brief ] ; then
+		echo "sg_turs $verbose $i"
+	fi
 	echo -n "    "
         if sg_turs $verbose $i ; then
 		echo "ready"

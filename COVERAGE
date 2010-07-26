@@ -6,13 +6,14 @@ on the right. The second table lists supported ATA commands.
 
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
-ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features
-                    (main directory); sg_sat_chk_power, sg__sat_identify, 
-                    sg_sat_phy_event, sg__sat_set_features,
-                    sg_sat_smart_rd_data (previous five in the examples
-                    directory), ++
+ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
+                    sg_sat_phy_event, ++
+		    [sg_sat_chk_power, sg__sat_identify,
+		     sg__sat_set_features, sg_sat_smart_rd_data
+		     (previous four in the examples directory)]
 ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
 GET CONFIGURATION   sg_get_config, ++
+GET LBA STATUS      sg_get_lba_status, ++
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
                     sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
                     sg_persist, sg_scan, sg_ses, sg_vpd ++
@@ -34,6 +35,7 @@ READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
+READ BLOCK LIMITS   sg_read_block_limits, ++
 READ BUFFER         sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
@@ -56,6 +58,7 @@ SET TARGET PORT GROUPS       sg_stpg, ++
 START STOP          sg_start, ++
 SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
 TEST UNIT READY     sg_turs, sg_format, ++
+UNMAP               sg_unmap, ++
 VERIFY(10)          sg_verify, ++
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
@@ -91,4 +94,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Doug Gilbert
-11th March 2009
+20th September 2009

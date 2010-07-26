@@ -10,13 +10,15 @@
 
 verbose=""
 brief=""
+long_opt=""
 
 usage()
 {
-  echo "Usage: scsi_readcap [-b] [-h] [-v] <device>+"
+  echo "Usage: scsi_readcap [-b] [-h] [-l] [-v] <device>+"
   echo "  where:"
   echo "    -b, --brief          output brief capacity data"
   echo "    -h, --help           print usage message"
+  echo "    -1, --long           send longer SCSI READ CAPACITY (16) cdb"
   echo "    -v, --verbose        more verbose output"
   echo ""
   echo "Use SCSI READ CAPACITY command to fetch the size of each <device>"
@@ -34,8 +36,10 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   case "$opt" in
     b|-brief) brief="-b" ;;
     h|-help) usage ; exit 0 ;;
+    l|-long) long_opt="--16" ;;
     v|-verbose) verbose="-v" ;;
     vv) verbose="-vv" ;;
+    vvv) verbose="-vvv" ;;
     *) echo "Unknown option: -$opt " ; exit 1 ;;
   esac
   shift
@@ -44,6 +48,10 @@ done
 
 for i
 do
-	echo "sg_readcap $brief $verbose $i"
-        sg_readcap $brief $verbose $i
+	if [ $brief ] ; then
+        	sg_readcap $brief $long_opt $verbose $i 2> /dev/null
+	else
+		echo "sg_readcap $brief $long_opt $verbose $i"
+        	sg_readcap $brief $long_opt $verbose $i
+	fi
 done
