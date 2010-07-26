@@ -185,7 +185,7 @@ static int do_set_features(int sg_fd, int feature, int count, int lba,
                         fprintf(stderr, "ATA PASS-THROUGH (%d), bad "
                                 "field in cdb\n", cdb_len);
                 }
-                return ret; 
+                return ret;
             case SPC_SK_NO_SENSE:
             case SPC_SK_RECOVERED_ERROR:
                 if ((0x0 == ssh.asc) &&

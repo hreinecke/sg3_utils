@@ -46,7 +46,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.04 20080115";
+static char * version_str = "1.05 20080510";
 
 #define ME "sg_read_buffer: "
 
@@ -270,6 +270,13 @@ main(int argc, char * argv[])
         memset(resp, 0, rb_len);
     } else
         resp = NULL;
+
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {

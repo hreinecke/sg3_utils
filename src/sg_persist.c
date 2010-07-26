@@ -16,18 +16,18 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004-2007 D. Gilbert
+/* A utility program originally written for the Linux OS SCSI subsystem.
+*  Copyright (C) 2004-2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   This program issues the SCSI PERSISTENT IN and OUT commands. 
+   This program issues the SCSI PERSISTENT IN and OUT commands.
 
 */
 
-static char * version_str = "0.33 20071219";
+static char * version_str = "0.36 20090402";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -44,39 +44,60 @@ static char * version_str = "0.33 20071219";
 #define PROUT_REG_MOVE_SA 0x7
 #define MX_ALLOC_LEN 8192
 
+struct opts_t {
+    unsigned int prout_type;
+    uint64_t param_rk;
+    uint64_t param_sark;
+    unsigned int param_rtp;
+    int prin;
+    int prin_sa;
+    int prout_sa;
+    int param_alltgpt;
+    int param_aptpl;
+    int param_unreg;
+    int inquiry;
+    int hex;
+    unsigned char transportid_arr[MX_ALLOC_LEN];
+    int transportid_arr_len;
+    int num_transportids;
+    unsigned int alloc_len;
+    int verbose;
+};
+
 
 static struct option long_options[] = {
-        {"clear", 0, 0, 'C'},
-        {"device", 1, 0, 'd'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"in", 0, 0, 'i'},
-        {"no-inquiry", 0, 0, 'n'},
-        {"out", 0, 0, 'o'},
-        {"param-alltgpt", 0, 0, 'Y'},
-        {"param-aptpl", 0, 0, 'Z'},
-        {"param-rk", 1, 0, 'K'},
-        {"param-sark", 1, 0, 'S'},
-        {"param-unreg", 0, 0, 'U'},
-        {"preempt", 0, 0, 'P'},
-        {"preempt-abort", 0, 0, 'A'},
-        {"prout-type", 1, 0, 'T'},
-        {"read-full-status", 0, 0, 's'},
-        {"read-keys", 0, 0, 'k'},
-        {"read-reservation", 0, 0, 'r'},
-        {"read-status", 0, 0, 's'},
-        {"register", 0, 0, 'G'},
-        {"register-ignore", 0, 0, 'I'},
-        {"register-move", 0, 0, 'M'},
-        {"release", 0, 0, 'L'},
-        {"relative-target-port", 1, 0, 'Q'},
-        {"report-capabilities", 0, 0, 'c'},
-        {"reserve", 0, 0, 'R'},
-        {"transport-id", 1, 0, 'X'},
-        {"unreg", 0, 0, 'U'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {0, 0, 0, 0}
+    {"alloc-length", 1, 0, 'l'},
+    {"clear", 0, 0, 'C'},
+    {"device", 1, 0, 'd'},
+    {"help", 0, 0, 'h'},
+    {"hex", 0, 0, 'H'},
+    {"in", 0, 0, 'i'},
+    {"no-inquiry", 0, 0, 'n'},
+    {"out", 0, 0, 'o'},
+    {"param-alltgpt", 0, 0, 'Y'},
+    {"param-aptpl", 0, 0, 'Z'},
+    {"param-rk", 1, 0, 'K'},
+    {"param-sark", 1, 0, 'S'},
+    {"param-unreg", 0, 0, 'U'},
+    {"preempt", 0, 0, 'P'},
+    {"preempt-abort", 0, 0, 'A'},
+    {"prout-type", 1, 0, 'T'},
+    {"read-full-status", 0, 0, 's'},
+    {"read-keys", 0, 0, 'k'},
+    {"read-reservation", 0, 0, 'r'},
+    {"read-status", 0, 0, 's'},
+    {"register", 0, 0, 'G'},
+    {"register-ignore", 0, 0, 'I'},
+    {"register-move", 0, 0, 'M'},
+    {"release", 0, 0, 'L'},
+    {"relative-target-port", 1, 0, 'Q'},
+    {"report-capabilities", 0, 0, 'c'},
+    {"reserve", 0, 0, 'R'},
+    {"transport-id", 1, 0, 'X'},
+    {"unreg", 0, 0, 'U'},
+    {"verbose", 0, 0, 'v'},
+    {"version", 0, 0, 'V'},
+    {0, 0, 0, 0}
 };
 
 static const char * prin_sa_strs[] = {
@@ -89,7 +110,7 @@ static const char * prin_sa_strs[] = {
     "[reserved 0x6]",
     "[reserved 0x7]",
 };
-static const int num_prin_sa_strs = sizeof(prin_sa_strs) / 
+static const int num_prin_sa_strs = sizeof(prin_sa_strs) /
                                     sizeof(prin_sa_strs[0]);
 
 static const char * prout_sa_strs[] = {
@@ -103,15 +124,34 @@ static const char * prout_sa_strs[] = {
     "Register and move",
     "[reserved 0x8]",
 };
-static const int num_prout_sa_strs = sizeof(prout_sa_strs) / 
+static const int num_prout_sa_strs = sizeof(prout_sa_strs) /
                                      sizeof(prout_sa_strs[0]);
 
+static const char * pr_type_strs[] = {
+    "obsolete [0]",
+    "Write Exclusive",
+    "obsolete [2]",
+    "Exclusive Access",
+    "obsolete [4]",
+    "Write Exclusive, registrants only",
+    "Exclusive Access, registrants only",
+    "Write Exclusive, all registrants",
+    "Exclusive Access, all registrants",
+    "obsolete [9]", "obsolete [0xa]", "obsolete [0xb]", "obsolete [0xc]",
+    "obsolete [0xd]", "obsolete [0xe]", "obsolete [0xf]",
+};
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr,
             "Usage: sg_persist [OPTIONS] [DEVICE]\n"
             "  where OPTIONS include:\n"
+            "    --alloc-length=LEN|-l LEN    allocation length hex value "
+            "(used with\n"
+            "                                 PR In only) (default: 8192 "
+            "(2000 in hex))\n"
             "    --clear|-C                 PR Out: Clear\n"
             "    --device=DEVICE|-d DEVICE    query or change DEVICE\n"
             "    --help|-h                  output this usage message\n"
@@ -132,7 +172,8 @@ static void usage()
             "    --preempt-abort|-A         PR Out: Preempt and Abort\n"
             "    --prout-type=TYPE|-T TYPE    PR Out command type\n"
             "    --read-full-status|-s      PR In: Read Full Status\n"
-            "    --read-keys|-k             PR In: Read Keys\n"
+            "    --read-keys|-k             PR In: Read Keys\n");
+    fprintf(stderr,
             "    --read-reservation|-r      PR In: Read Reservation\n"
             "    --read-status|-s           PR In: Read Full Status\n"
             "    --register|-G              PR Out: Register\n"
@@ -157,22 +198,8 @@ static void usage()
             "Performs a SCSI PERSISTENT RESERVE (IN or OUT) command\n");
 }
 
-static const char * pr_type_strs[] = {
-    "obsolete [0]",
-    "Write Exclusive",
-    "obsolete [2]",
-    "Exclusive Access",
-    "obsolete [4]",
-    "Write Exclusive, registrants only",
-    "Exclusive Access, registrants only",
-    "Write Exclusive, all registrants",
-    "Exclusive Access, all registrants",
-    "obsolete [9]", "obsolete [0xa]", "obsolete [0xb]", "obsolete [0xc]",
-    "obsolete [0xd]", "obsolete [0xe]", "obsolete [0xf]",
-};
-
-static void decode_transport_id(const char * leadin, unsigned char * ucp,
-                                int len)
+static void
+decode_transport_id(const char * leadin, unsigned char * ucp, int len)
 {
     int format_code, proto_id, num, j, k;
     uint64_t ull;
@@ -189,7 +216,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
         switch (proto_id) {
         case TPROTO_FCP: /* Fibre channel */
             printf("%s  FCP-2 World Wide Name:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
@@ -198,7 +225,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
         case TPROTO_SPI: /* Parallel SCSI */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
                    leadin, ((ucp[2] << 8) | ucp[3]));
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
@@ -213,7 +240,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             break;
         case TPROTO_1394: /* IEEE 1394 */
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 8, 0);
@@ -221,7 +248,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
             break;
         case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             dStrHex((const char *)&ucp[8], 16, 0);
@@ -248,7 +275,7 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
                 ull |= ucp[4 + j];
             }
             printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
-            if (0 != format_code) 
+            if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             bump = 24;
@@ -276,7 +303,8 @@ static void decode_transport_id(const char * leadin, unsigned char * ucp,
     }
 }
 
-static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
+static int
+prin_work(int sg_fd, const struct opts_t * optsp)
 {
     int k, j, num, res, add_len, add_desc_len, rel_pt_addr;
     unsigned int pr_gen;
@@ -285,8 +313,8 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
     unsigned char pr_buff[MX_ALLOC_LEN];
 
     memset(pr_buff, 0, sizeof(pr_buff));
-    res = sg_ll_persistent_reserve_in(sg_fd, prin_sa, pr_buff,
-                                      sizeof(pr_buff), 1, do_verbose);
+    res = sg_ll_persistent_reserve_in(sg_fd, optsp->prin_sa, pr_buff,
+                                      optsp->alloc_len, 1, optsp->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "PR in: command not supported\n");
@@ -301,13 +329,13 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
             fprintf(stderr, "PR in: command failed\n");
         return res;
     }
-    if (PRIN_RCAP_SA == prin_sa) {
+    if (PRIN_RCAP_SA == optsp->prin_sa) {
         if (8 != pr_buff[1]) {
             fprintf(stderr, "Unexpected response for PRIN Report "
                             "Capabilities\n");
             return SG_LIB_CAT_MALFORMED;
         }
-        if (do_hex)
+        if (optsp->hex)
             dStrHex((const char *)pr_buff, 8, 1);
         else {
             printf("Report capabilities response:\n");
@@ -340,11 +368,11 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
             }
         }
     } else {
-        pr_gen = ((pr_buff[0] << 24) | (pr_buff[1] << 16) | 
-                  (pr_buff[2] << 8) | pr_buff[3]); 
-        add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) | 
-                   (pr_buff[6] << 8) | pr_buff[7]); 
-        if (do_hex) {
+        pr_gen = ((pr_buff[0] << 24) | (pr_buff[1] << 16) |
+                  (pr_buff[2] << 8) | pr_buff[3]);
+        add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) |
+                   (pr_buff[6] << 8) | pr_buff[7]);
+        if (optsp->hex) {
             printf("  PR generation=0x%x, ", pr_gen);
             if (add_len <= 0)
                 printf("Additional length=%d\n", add_len);
@@ -356,7 +384,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                 printf("Additional length=%d\n", add_len);
                 dStrHex((const char *)(pr_buff + 8), add_len, 1);
             }
-        } else if (PRIN_RKEY_SA == prin_sa) {
+        } else if (PRIN_RKEY_SA == optsp->prin_sa) {
             printf("  PR generation=0x%x, ", pr_gen);
             num = add_len / 8;
             if (num > 0) {
@@ -376,7 +404,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                 }
             } else
                 printf("there are NO registered reservation keys\n");
-        } else if (PRIN_RRES_SA == prin_sa) {
+        } else if (PRIN_RRES_SA == optsp->prin_sa) {
             printf("  PR generation=0x%x, ", pr_gen);
             num = add_len / 16;
             if (num > 0) {
@@ -398,7 +426,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                 printf(" type: %s\n", pr_type_strs[j]);
             } else
                 printf("there is NO reservation held\n");
-        } else if (PRIN_RFSTAT_SA == prin_sa) {
+        } else if (PRIN_RFSTAT_SA == optsp->prin_sa) {
             printf("  PR generation=0x%x\n", pr_gen);
             ucp = pr_buff + 8;
             for (k = 0; k < add_len; k += num, ucp += num) {
@@ -417,7 +445,7 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
                 else {
                     printf("      All target ports bit clear\n");
                     rel_pt_addr = ((ucp[18] << 8) | ucp[19]);
-                    printf("      Relative port address: 0x%x\n", 
+                    printf("      Relative port address: 0x%x\n",
                            rel_pt_addr);
                 }
                 if (ucp[12] & 0x1) {
@@ -439,40 +467,43 @@ static int prin_work(int sg_fd, int prin_sa, int do_verbose, int do_hex)
     return 0;
 }
 
-static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type, 
-                      uint64_t param_rk, uint64_t param_sark,
-                      int param_alltgpt, int param_aptpl,
-                      unsigned char * transportidp, int transportid_len,
-                      int do_verbose)
+static int
+prout_work(int sg_fd, const struct opts_t * optsp)
 {
-    int j, len, res;
+    int j, len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
+    uint64_t param_rk;
+    uint64_t param_sark;
 
+    t_arr_len = optsp->transportid_arr_len;
+    param_rk = optsp->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
     for (j = 7; j >= 0; --j) {
         pr_buff[j] = (param_rk & 0xff);
         param_rk >>= 8;
     }
+    param_sark = optsp->param_sark;
     for (j = 7; j >= 0; --j) {
         pr_buff[8 + j] = (param_sark & 0xff);
         param_sark >>= 8;
     }
-    if (param_alltgpt)
+    if (optsp->param_alltgpt)
         pr_buff[20] |= 0x4;
-    if (param_aptpl)
+    if (optsp->param_aptpl)
         pr_buff[20] |= 0x1;
     len = 24;
-    if (transportid_len > 0) {
+    if (t_arr_len > 0) {
         pr_buff[20] |= 0x8;     /* set SPEC_I_PT bit */
-        memcpy(&pr_buff[28], transportidp, transportid_len);
-        len += (transportid_len + 4);
-        pr_buff[24] = (unsigned char)((transportid_len >> 24) & 0xff);
-        pr_buff[25] = (unsigned char)((transportid_len >> 16) & 0xff);
-        pr_buff[26] = (unsigned char)((transportid_len >> 8) & 0xff);
-        pr_buff[27] = (unsigned char)(transportid_len & 0xff);
+        memcpy(&pr_buff[28], optsp->transportid_arr, t_arr_len);
+        len += (t_arr_len + 4);
+        pr_buff[24] = (unsigned char)((t_arr_len >> 24) & 0xff);
+        pr_buff[25] = (unsigned char)((t_arr_len >> 16) & 0xff);
+        pr_buff[26] = (unsigned char)((t_arr_len >> 8) & 0xff);
+        pr_buff[27] = (unsigned char)(t_arr_len & 0xff);
     }
-    res = sg_ll_persistent_reserve_out(sg_fd, prout_sa, 0, prout_type,
-                                       pr_buff, len, 1, do_verbose);
+    res = sg_ll_persistent_reserve_out(sg_fd, optsp->prout_sa, 0,
+                                       optsp->prout_type, pr_buff, len, 1,
+                                       optsp->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "PR out:, command not supported\n");
@@ -486,54 +517,57 @@ static int prout_work(int sg_fd, int prout_sa, unsigned int prout_type,
         else
             fprintf(stderr, "PR out: command failed\n");
         return res;
-    } else if (do_verbose) {
+    } else if (optsp->verbose) {
         char buff[64];
 
-        if (prout_sa < num_prout_sa_strs)
-            strncpy(buff, prout_sa_strs[prout_sa], sizeof(buff));
+        if (optsp->prout_sa < num_prout_sa_strs)
+            strncpy(buff, prout_sa_strs[optsp->prout_sa], sizeof(buff));
         else
-            snprintf(buff, sizeof(buff), "service action=0x%x", prout_sa);
+            snprintf(buff, sizeof(buff), "service action=0x%x",
+                     optsp->prout_sa);
         fprintf(stderr, "PR out: command (%s) successful\n", buff);
     }
     return 0;
 }
 
-static int prout_rmove_work(int sg_fd, unsigned int prout_type, 
-                      uint64_t param_rk, uint64_t param_sark, int param_unreg,
-                      int param_aptpl, unsigned int rel_target_port,
-                      unsigned char * transportidp, int transportid_len,
-                      int do_verbose)
+static int
+prout_rmove_work(int sg_fd, const struct opts_t * optsp)
 {
-    int j, len, res;
+    int j, len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
+    uint64_t param_rk;
+    uint64_t param_sark;
 
+    t_arr_len = optsp->transportid_arr_len;
+    param_rk = optsp->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
     for (j = 7; j >= 0; --j) {
         pr_buff[j] = (param_rk & 0xff);
         param_rk >>= 8;
     }
+    param_sark = optsp->param_sark;
     for (j = 7; j >= 0; --j) {
         pr_buff[8 + j] = (param_sark & 0xff);
         param_sark >>= 8;
     }
-    if (param_unreg)
+    if (optsp->param_unreg)
         pr_buff[17] |= 0x2;
-    if (param_aptpl)
+    if (optsp->param_aptpl)
         pr_buff[17] |= 0x1;
-    pr_buff[18] = (unsigned char)((rel_target_port >> 8) & 0xff);
-    pr_buff[19] = (unsigned char)(rel_target_port & 0xff);
+    pr_buff[18] = (unsigned char)((optsp->param_rtp >> 8) & 0xff);
+    pr_buff[19] = (unsigned char)(optsp->param_rtp & 0xff);
     len = 24;
-    if (transportid_len > 0) {
-        memcpy(&pr_buff[24], transportidp, transportid_len);
-        len += transportid_len;
-        pr_buff[20] = (unsigned char)((transportid_len >> 24) & 0xff);
-        pr_buff[21] = (unsigned char)((transportid_len >> 16) & 0xff);
-        pr_buff[22] = (unsigned char)((transportid_len >> 8) & 0xff);
-        pr_buff[23] = (unsigned char)(transportid_len & 0xff);
+    if (t_arr_len > 0) {
+        memcpy(&pr_buff[24], optsp->transportid_arr, t_arr_len);
+        len += t_arr_len;
+        pr_buff[20] = (unsigned char)((t_arr_len >> 24) & 0xff);
+        pr_buff[21] = (unsigned char)((t_arr_len >> 16) & 0xff);
+        pr_buff[22] = (unsigned char)((t_arr_len >> 8) & 0xff);
+        pr_buff[23] = (unsigned char)(t_arr_len & 0xff);
     }
     res = sg_ll_persistent_reserve_out(sg_fd, PROUT_REG_MOVE_SA, 0,
-                                       prout_type, pr_buff, len, 1,
-                                       do_verbose);
+                                       optsp->prout_type, pr_buff, len, 1,
+                                       optsp->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "PR out: command not supported\n");
@@ -547,30 +581,36 @@ static int prout_rmove_work(int sg_fd, unsigned int prout_type,
         else
             fprintf(stderr, "PR out: command failed\n");
         return res;
-    } else if (do_verbose)
+    } else if (optsp->verbose)
         fprintf(stderr, "PR out: 'register and move' "
                 "command successful\n");
     return 0;
 }
 
-static int build_transportid(const char * inp, unsigned char * tid_arr,
-                             int * tid_arr_len, int * num_tids,
-                             int max_arr_len)
+/* Build transportid byte array from ASCII hexadecimal number which are comma
+ * (or (single) space) separated. Direct form can only contain one transport
+ * ID. In the indirect form (when '-'==*inp) there can be multiple transport
+ * IDs, all assumed to contain the same number of bytes each. Fuller
+ * description in manpage of sg_persist(8). Returns 0 if successful, else 1 .
+ * N.B. Contains transport ID related special handling (e.g. rounds up to
+ * 24 bytes)
+ */
+static int
+build_transportid(const char * inp, struct opts_t * optsp)
 {
     int in_len, k, j, m;
     unsigned int h;
     const char * lcp;
+    unsigned char * tid_arr;
     char * cp;
+    char * c2p;
 
-    if ((NULL == inp) || (NULL == tid_arr) ||
-        (NULL == tid_arr_len))
-        return 1;
+    tid_arr = optsp->transportid_arr;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len) {
-        *tid_arr_len = 0;
-        if (num_tids)
-            *num_tids = 0;
+        optsp->transportid_arr_len = 0;
+        optsp->num_transportids = 0;
     }
     if ('-' == inp[0]) {        /* read from stdin */
         char line[512];
@@ -611,7 +651,7 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
                                 j + 1, (int)(lcp - line + 1));
                         return 1;
                     }
-                    if ((off + k) >= max_arr_len) {
+                    if ((off + k) >= (int)sizeof(optsp->transportid_arr)) {
                         fprintf(stderr, "build_transportid: array length "
                                 "exceeded\n");
                         return 1;
@@ -641,17 +681,16 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
             off += k;
             ++num;
         }
-        *tid_arr_len = off;
-        if (num_tids)
-            *num_tids = num;
+        optsp->transportid_arr_len = off;
+        optsp->num_transportids = num;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "build_transportid: error at pos %d\n",
                     k + 1);
             return 1;
         }
-        for (k = 0; k < max_arr_len; ++k) {
+        for (k = 0; k < (int)sizeof(optsp->transportid_arr); ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
                     fprintf(stderr, "build_transportid: hex number larger "
@@ -660,8 +699,13 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
                 }
                 tid_arr[k] = h;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "build_transportid: error at pos %d\n",
@@ -673,10 +717,9 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
             k = 24;
         else if (0 != (k % 4))
             k = ((k / 4) + 1) * 4;
-        *tid_arr_len = k;
-        if (num_tids)
-            *num_tids = 1;
-        if (k >= max_arr_len) {
+        optsp->transportid_arr_len = k;
+        optsp->num_transportids = 1;
+        if (k >= (int)sizeof(optsp->transportid_arr)) {
             fprintf(stderr, "build_transportid: array length exceeded\n");
             return 1;
         }
@@ -685,13 +728,10 @@ static int build_transportid(const char * inp, unsigned char * tid_arr,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, c, res;
-    unsigned int prout_type;
-    uint64_t param_rk = 0;
-    uint64_t param_sark = 0;
-    unsigned int param_rtp = 0;
     const char * device_name = NULL;
     char buff[48];
     int num_prin_sa = 0;
@@ -699,99 +739,104 @@ int main(int argc, char * argv[])
     int num_prout_param = 0;
     int want_prin = 0;
     int want_prout = 0;
-    int prin = 1;
-    int prin_sa = -1;
-    int prout_sa = -1;
-    int param_alltgpt = 0;
-    int param_aptpl = 0;
-    int param_unreg = 0;
-    int do_inquiry = 1;
-    int do_hex = 0;
-    int do_verbose = 0;
     int peri_type = 0;
     int ret = 0;
-    unsigned char transportid_arr[MX_ALLOC_LEN];
-    int transportid_arr_len = 0;
-    int num_transportids = 0;
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
+    struct opts_t opts;
 
+    memset(&opts, 0, sizeof(opts));
+    opts.prin = 1;
+    opts.prin_sa = -1;
+    opts.prout_sa = -1;
+    opts.inquiry = 1;
+    opts.alloc_len = MX_ALLOC_LEN;
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AcCd:GHhiIkK:LMnoPQrRsS:T:UvVX:YZ", 
+        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQrRsS:T:UvVX:YZ",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'A':
-            prout_sa = PROUT_PREE_AB_SA;
+            opts.prout_sa = PROUT_PREE_AB_SA;
             ++num_prout_sa;
             break;
         case 'c':
-            prin_sa = PRIN_RCAP_SA;
+            opts.prin_sa = PRIN_RCAP_SA;
             ++num_prin_sa;
             break;
         case 'C':
-            prout_sa = PROUT_CLEAR_SA;
+            opts.prout_sa = PROUT_CLEAR_SA;
             ++num_prout_sa;
             break;
         case 'd':
             device_name = optarg;
             break;
         case 'G':
-            prout_sa = PROUT_REG_SA;
+            opts.prout_sa = PROUT_REG_SA;
             ++num_prout_sa;
             break;
         case 'h':
             usage();
             return 0;
         case 'H':
-            do_hex = 1;
+            ++opts.hex;
             break;
         case 'i':
             want_prin = 1;
             break;
         case 'I':
-            prout_sa = PROUT_REG_IGN_SA;
+            opts.prout_sa = PROUT_REG_IGN_SA;
             ++num_prout_sa;
             break;
         case 'k':
-            prin_sa = PRIN_RKEY_SA;
+            opts.prin_sa = PRIN_RKEY_SA;
             ++num_prin_sa;
             break;
         case 'K':
-            if (1 != sscanf(optarg, "%" SCNx64 "", &param_rk)) {
+            if (1 != sscanf(optarg, "%" SCNx64 "", &opts.param_rk)) {
                 fprintf(stderr, "bad argument to '--param-rk'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
+        case 'l':
+            if (1 != sscanf(optarg, "%x", &opts.alloc_len)) {
+                fprintf(stderr, "bad argument to '--alloc-length'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            } else if (MX_ALLOC_LEN < opts.alloc_len) {
+                fprintf(stderr, "'--alloc-length' argument exceeds maximum"
+                        " value(%d)\n", MX_ALLOC_LEN);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
         case 'L':
-            prout_sa = PROUT_REL_SA;
+            opts.prout_sa = PROUT_REL_SA;
             ++num_prout_sa;
             break;
         case 'M':
-            prout_sa = PROUT_REG_MOVE_SA;
+            opts.prout_sa = PROUT_REG_MOVE_SA;
             ++num_prout_sa;
             break;
         case 'n':
-            do_inquiry = 0;
+            opts.inquiry = 0;
             break;
         case 'o':
             want_prout = 1;
             break;
         case 'P':
-            prout_sa = PROUT_PREE_SA;
+            opts.prout_sa = PROUT_PREE_SA;
             ++num_prout_sa;
             break;
         case 'Q':
-            if (1 != sscanf(optarg, "%x", &param_rtp)) {
+            if (1 != sscanf(optarg, "%x", &opts.param_rtp)) {
                 fprintf(stderr, "bad argument to '--relative-target-port'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            if (param_rtp > 0xffff) {
+            if (opts.param_rtp > 0xffff) {
                 fprintf(stderr, "argument to '--relative-target-port' 0 to "
                         "ffff inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -799,57 +844,53 @@ int main(int argc, char * argv[])
             ++num_prout_param;
             break;
         case 'r':
-            prin_sa = PRIN_RRES_SA;
+            opts.prin_sa = PRIN_RRES_SA;
             ++num_prin_sa;
             break;
         case 'R':
-            prout_sa = PROUT_RES_SA;
+            opts.prout_sa = PROUT_RES_SA;
             ++num_prout_sa;
             break;
         case 's':
-            prin_sa = PRIN_RFSTAT_SA;
+            opts.prin_sa = PRIN_RFSTAT_SA;
             ++num_prin_sa;
             break;
         case 'S':
-            if (1 != sscanf(optarg, "%" SCNx64 "", &param_sark)) {
+            if (1 != sscanf(optarg, "%" SCNx64 "", &opts.param_sark)) {
                 fprintf(stderr, "bad argument to '--param-sark'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
         case 'T':
-            if (1 != sscanf(optarg, "%x", &prout_type)) {
+            if (1 != sscanf(optarg, "%x", &opts.prout_type)) {
                 fprintf(stderr, "bad argument to '--prout-type'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
         case 'U':
-            param_unreg = 1;
+            opts.param_unreg = 1;
             break;
         case 'v':
-            ++do_verbose;
+            ++opts.verbose;
             break;
         case 'V':
             fprintf(stderr, "version: %s\n", version_str);
             return 0;
         case 'X':
-            memset(transportid_arr, 0, sizeof(transportid_arr));
-            if (0 != build_transportid(optarg, transportid_arr, 
-                                       &transportid_arr_len, 
-                                       &num_transportids,
-                                       sizeof(transportid_arr))) {
+            if (0 != build_transportid(optarg, &opts)) {
                 fprintf(stderr, "bad argument to '--transport-id'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
         case 'Y':
-            param_alltgpt = 1;
+            opts.param_alltgpt = 1;
             ++num_prout_param;
             break;
         case 'Z':
-            param_aptpl = 1;
+            opts.param_aptpl = 1;
             ++num_prout_param;
             break;
         case '?':
@@ -886,7 +927,7 @@ int main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     } else if (want_prout) { /* syntax check on PROUT arguments */
-        prin = 0;
+        opts.prin = 0;
         if ((1 != num_prout_sa) || (0 != num_prin_sa)) {
             fprintf(stderr, ">> For Persistent Reserve Out one and "
                     "only one appropriate\n>> service action must be "
@@ -904,7 +945,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, ">> No service action given; assume Persistent"
                     " Reserve In command\n"
                     ">> with Read Keys service action\n");
-            prin_sa = 0;
+            opts.prin_sa = 0;
             ++num_prin_sa;
         } else if (num_prin_sa > 1)  {
             fprintf(stderr, "Too many service actions given; choose "
@@ -913,41 +954,44 @@ int main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if ((param_unreg || param_rtp) && (PROUT_REG_MOVE_SA != prout_sa)) {
+    if ((opts.param_unreg || opts.param_rtp) &&
+        (PROUT_REG_MOVE_SA != opts.prout_sa)) {
         fprintf(stderr, "--unreg or --relative-target-port"
                 " only useful with --register-move\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((PROUT_REG_MOVE_SA == prout_sa) && (1 != num_transportids)) {
+    if ((PROUT_REG_MOVE_SA == opts.prout_sa) &&
+        (1 != opts.num_transportids)) {
         fprintf(stderr, "with --register-move one (and only one) "
                 "--transport-id should be given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (((PROUT_RES_SA == prout_sa) ||
-         (PROUT_REL_SA == prout_sa) ||
-         (PROUT_PREE_SA == prout_sa) ||
-         (PROUT_PREE_AB_SA == prout_sa)) &&
-        (0 == prout_type)) {
+    if (((PROUT_RES_SA == opts.prout_sa) ||
+         (PROUT_REL_SA == opts.prout_sa) ||
+         (PROUT_PREE_SA == opts.prout_sa) ||
+         (PROUT_PREE_AB_SA == opts.prout_sa)) &&
+        (0 == opts.prout_type)) {
         fprintf(stderr, "warning>>> --prout-type probably needs to be "
                 "given\n");
     }
-    if ((do_verbose > 2) && num_transportids) {
+    if ((opts.verbose > 2) && opts.num_transportids) {
         fprintf(stderr, "number of tranport-ids decoded from "
-                "command line (or stdin): %d\n", num_transportids);
+                "command line (or stdin): %d\n", opts.num_transportids);
         fprintf(stderr, "  Decode given transport-ids:\n");
-        decode_transport_id("      ", transportid_arr, transportid_arr_len);
+        decode_transport_id("      ", opts.transportid_arr,
+                            opts.transportid_arr_len);
     }
 
-    if (do_inquiry) {
+    if (opts.inquiry) {
         if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */,
-                                         do_verbose)) < 0) {
+                                         opts.verbose)) < 0) {
             fprintf(stderr, "sg_persist: error opening file (ro): %s: %s\n",
                      device_name, safe_strerror(-sg_fd));
             return SG_LIB_FILE_ERROR;
         }
-        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, do_verbose)) {
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.verbose)) {
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                    inq_resp.revision);
             peri_type = inq_resp.peripheral_type;
@@ -957,7 +1001,7 @@ int main(int argc, char * argv[])
             else
                 printf("  Peripheral device type: 0x%x\n", peri_type);
         } else {
-            printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n", 
+            printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n",
                    device_name);
             return SG_LIB_CAT_OTHER;
         }
@@ -965,24 +1009,18 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,
-                                     do_verbose)) < 0) {
+                                     opts.verbose)) < 0) {
         fprintf(stderr, "sg_persist: error opening file (rw): %s: %s\n",
                 device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
-    if (prin)
-        ret = prin_work(sg_fd, prin_sa, do_verbose, do_hex);
-    else if (PROUT_REG_MOVE_SA == prout_sa)
-        ret = prout_rmove_work(sg_fd, prout_type, param_rk,
-                         param_sark, param_unreg, param_aptpl,
-                         param_rtp, transportid_arr, transportid_arr_len,
-                         do_verbose);
-
+    if (opts.prin)
+        ret = prin_work(sg_fd, &opts);
+    else if (PROUT_REG_MOVE_SA == opts.prout_sa)
+        ret = prout_rmove_work(sg_fd, &opts);
     else /* PROUT commands other than 'register and move' */
-        ret = prout_work(sg_fd, prout_sa, prout_type, param_rk,
-                         param_sark, param_alltgpt, param_aptpl,
-                         transportid_arr, transportid_arr_len, do_verbose);
+        ret = prout_work(sg_fd, &opts);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

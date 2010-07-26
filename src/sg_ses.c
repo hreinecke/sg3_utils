@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.42 20080215";    /* ses2r19b */
+static char * version_str = "1.44 20090401";    /* ses2r19b */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -158,8 +158,8 @@ usage()
 }
 
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
- * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, 
- * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, 
+ * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
+ * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failures */
 static int
 do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
@@ -409,7 +409,7 @@ truncated:
 }
 
 /* Returns number of elements written to 'tdhp' or -1 if there is
-   a problem */ 
+   a problem */
 static int
 populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                          unsigned int * generationp, int verbose)
@@ -639,7 +639,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
     case TEMPERATURE_ETC:     /* temperature sensor */
         if ((! filter) || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
             printf("%sIdent=%d, Fail=%d, OT failure=%d, OT warning=%d, "
-                   "UT failure=%d\n", pad, !!(statp[1] & 0x80), 
+                   "UT failure=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[3] & 0x8),
                    !!(statp[3] & 0x4), !!(statp[3] & 0x2));
             printf("%sUT warning=%d\n", pad, !!(statp[3] & 0x1));
@@ -857,7 +857,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
         break;
     case SAS_CONNECTOR_ETC:
         printf("%sIdent=%d, %s, Connector physical "
-               "link=0x%x\n", pad, !!(statp[1] & 0x80), 
+               "link=0x%x\n", pad, !!(statp[1] & 0x80),
                find_sas_connector_type((statp[1] & 0x7f), buff, sizeof(buff)),
                statp[2]);
         printf("%sFail=%d\n", pad, !!(statp[3] & 0x40));
@@ -972,7 +972,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         printf("%s  low warning=%s, low critical=%s (in degrees Celsius)\n", pad,
                reserved_or_num(b, 128, tp[2] - TEMPERATURE_OFFSET,
                                -TEMPERATURE_OFFSET),
-               reserved_or_num(b2, 128, tp[3] - TEMPERATURE_OFFSET, 
+               reserved_or_num(b2, 128, tp[3] - TEMPERATURE_OFFSET,
                                -TEMPERATURE_OFFSET));
         break;
     case 0xb:  /* UPS */
@@ -1492,6 +1492,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
     unsigned int h;
     const char * lcp;
     char * cp;
+    char * c2p;
     char line[512];
 
     if ((NULL == inp) || (NULL == arr) || (NULL == arr_len))
@@ -1538,7 +1539,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                     }
                     arr[off + k] = h;
                     lcp = strpbrk(lcp, " ,\t");
-                    if (NULL == lcp) 
+                    if (NULL == lcp)
                         break;
                     lcp += strspn(lcp, " ,\t");
                     if ('\0' == *lcp)
@@ -1554,7 +1555,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
         }
         *arr_len = off;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "read_hex: error at pos %d\n",
                     k + 1);
@@ -1569,8 +1570,13 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                 }
                 arr[k] = h;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "read_hex: error at pos %d\n",
@@ -1620,8 +1626,11 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
         } else if (do_raw) {
             if (1 == do_raw)
                 dStrHex((const char *)rsp_buff + 4, rsp_len - 4, -1);
-            else
+            else {
+                if (sg_set_binary_mode(STDOUT_FILENO) < 0)
+                    perror("sg_set_binary_mode");
                 dStrRaw((const char *)rsp_buff, rsp_len);
+            }
         } else if (do_hex) {
             if (cp)
                 printf("Response in hex from diagnostic page: %s\n", cp);
@@ -1631,14 +1640,14 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
             dStrHex((const char *)rsp_buff, rsp_len, 0);
         } else {
             switch (page_code) {
-            case DPC_SUPPORTED: 
+            case DPC_SUPPORTED:
                 ses_supported_pages_sdg("Supported diagnostic pages",
                                         rsp_buff, rsp_len);
                 break;
-            case DPC_CONFIGURATION: 
+            case DPC_CONFIGURATION:
                 ses_configuration_sdg(rsp_buff, rsp_len);
                 break;
-            case DPC_ENC_STATUS: 
+            case DPC_ENC_STATUS:
                 res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
@@ -1646,7 +1655,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
                                   rsp_buff, rsp_len, inner_hex, filter);
                 break;
-            case DPC_HELP_TEXT: 
+            case DPC_HELP_TEXT:
                 printf("Help text diagnostic page (for primary "
                        "subenclosure):\n");
                 if (rsp_len > 4)
@@ -1654,7 +1663,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 else
                     printf("  <empty>\n");
                 break;
-            case DPC_STRING: 
+            case DPC_STRING:
                 printf("String In diagnostic page (for primary "
                        "subenclosure):\n");
                 if (rsp_len > 4)
@@ -1662,7 +1671,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 else
                     printf("  <empty>\n");
                 break;
-            case DPC_THRESHOLD: 
+            case DPC_THRESHOLD:
                 res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
@@ -1670,7 +1679,7 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                   rsp_buff, rsp_len, inner_hex, verbose);
                 break;
-            case DPC_ELEM_DESC: 
+            case DPC_ELEM_DESC:
                 res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
@@ -1678,16 +1687,16 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                      rsp_buff, rsp_len);
                 break;
-            case DPC_SHORT_ENC_STATUS: 
+            case DPC_SHORT_ENC_STATUS:
                 printf("Short enclosure status diagnostic page, "
                        "status=0x%x\n", rsp_buff[1]);
                 break;
-            case DPC_ENC_BUSY: 
+            case DPC_ENC_BUSY:
                 printf("Enclosure busy diagnostic page, "
                        "busy=%d [vendor specific=0x%x]\n",
                        rsp_buff[1] & 1, (rsp_buff[1] >> 1) & 0xff);
                 break;
-            case DPC_ADD_ELEM_STATUS: 
+            case DPC_ADD_ELEM_STATUS:
                 res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                                &ref_gen_code, verbose);
                 if (res < 0)
@@ -1695,20 +1704,20 @@ ses_process_status(int sg_fd, int page_code, int do_raw, int do_hex,
                 ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                         rsp_buff, rsp_len, inner_hex);
                 break;
-            case DPC_SUBENC_HELP_TEXT: 
+            case DPC_SUBENC_HELP_TEXT:
                 ses_subenc_help_sdg(rsp_buff, rsp_len);
                 break;
-            case DPC_SUBENC_STRING: 
+            case DPC_SUBENC_STRING:
                 ses_subenc_string_sdg(rsp_buff, rsp_len);
                 break;
-            case DPC_SUPPORTED_SES: 
+            case DPC_SUPPORTED_SES:
                 ses_supported_pages_sdg("Supported SES diagnostic pages",
                                         rsp_buff, rsp_len);
                 break;
-            case DPC_DOWNLOAD_MICROCODE: 
+            case DPC_DOWNLOAD_MICROCODE:
                 ses_download_code_sdg(rsp_buff, rsp_len);
                 break;
-            case DPC_SUBENC_NICKNAME: 
+            case DPC_SUBENC_NICKNAME:
                 ses_subenc_nickname_sdg(rsp_buff, rsp_len);
                 break;
             default:
@@ -1861,7 +1870,7 @@ main(int argc, char * argv[])
         const struct diag_page_code * pcdp = &dpc_arr[0];
         const struct element_type_t * etp = &element_type_arr[0];
 
-    
+
         printf("Known diagnostic pages (followed by page code):\n");
         for (k = 0; k < num; ++k, ++pcdp)
             printf("    %s  [0x%x]\n", pcdp->desc, pcdp->page_code);
@@ -1973,7 +1982,9 @@ main(int argc, char * argv[])
             break;
         default:
             fprintf(stderr, "Setting SES control page 0x%x not supported "
-                    "yet\n", page_code);
+                    "by this utility\n", page_code);
+            fprintf(stderr, "That can be done with the sg_senddiag utility "
+                    "with its '--raw=' option\n");
             ret = SG_LIB_SYNTAX_ERROR;
             break;
         }

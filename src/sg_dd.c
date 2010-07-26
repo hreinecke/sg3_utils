@@ -1,4 +1,4 @@
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE     /* resolves u_char typedef in scsi/scsi.h [lk 2.4] */
 #endif
@@ -18,7 +18,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <sys/time.h> 
+#include <sys/time.h>
+#include <sys/file.h>
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
 
@@ -41,8 +42,8 @@
 
    This program is a specialisation of the Unix "dd" command in which
    either the input or the output file is a scsi generic device, raw
-   device, a block device or a normal file. The block size ('bs') is 
-   assumed to be 512 if not given. This program complains if 'ibs' or 
+   device, a block device or a normal file. The block size ('bs') is
+   assumed to be 512 if not given. This program complains if 'ibs' or
    'obs' are given with a value that differs from 'bs' (or the default 512).
    If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
    not given or 'of=-' then stdout assumed.
@@ -57,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.66 20080130";
+static char * version_str = "5.73 20090205";
 
 #define ME "sg_dd: "
 
@@ -90,7 +91,9 @@ static char * version_str = "5.66 20080130";
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikey value */
-#endif 
+#endif
+
+#define SG_LIB_FLOCK_ERR 90
 
 #define FT_OTHER 1              /* filetype is probably normal */
 #define FT_SG 2                 /* filetype is sg char device or supports
@@ -99,7 +102,8 @@ static char * version_str = "5.66 20080130";
 #define FT_DEV_NULL 8           /* either "/dev/null" or "." as filename */
 #define FT_ST 16                /* filetype is st char device (tape) */
 #define FT_BLOCK 32             /* filetype is block device */
-#define FT_ERROR 64             /* couldn't "stat" file */
+#define FT_FIFO 64              /* filetype is a fifo (name pipe) */
+#define FT_ERROR 128            /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
 
@@ -144,6 +148,7 @@ static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 struct flags_t {
     int append;
+    int cdbsz;
     int coe;
     int dio;
     int direct;
@@ -151,11 +156,12 @@ struct flags_t {
     int dsync;
     int excl;
     int fua;
+    int flock;
+    int nocache;
     int sgio;
     int pdt;
-    int cdbsz;
-    int retries;
     int sparse;
+    int retries;
 };
 
 static struct flags_t iflag;
@@ -163,7 +169,9 @@ static struct flags_t oflag;
 
 static void calc_duration_throughput(int contin);
 
-static void install_handler(int sig_num, void (*sig_handler) (int sig))
+
+static void
+install_handler(int sig_num, void (*sig_handler) (int sig))
 {
     struct sigaction sigact;
     sigaction (sig_num, NULL, &sigact);
@@ -176,13 +184,15 @@ static void install_handler(int sig_num, void (*sig_handler) (int sig))
     }
 }
 
-static void print_stats(const char * str)
+
+static void
+print_stats(const char * str)
 {
     if (0 != dd_count)
         fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
-    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial, 
+    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial,
             in_partial);
-    fprintf(stderr, "%s%"PRId64"+%d records out\n", str, out_full - out_partial, 
+    fprintf(stderr, "%s%"PRId64"+%d records out\n", str, out_full - out_partial,
             out_partial);
     if (oflag.sparse)
         fprintf(stderr, "%s%"PRId64" bypassed records out\n", str, out_sparse);
@@ -199,7 +209,9 @@ static void print_stats(const char * str)
                 unrecovered_errs);
 }
 
-static void interrupt_handler(int sig)
+
+static void
+interrupt_handler(int sig)
 {
     struct sigaction sigact;
 
@@ -214,7 +226,9 @@ static void interrupt_handler(int sig)
     kill(getpid (), sig);
 }
 
-static void siginfo_handler(int sig)
+
+static void
+siginfo_handler(int sig)
 {
     sig = sig;  /* dummy to stop -W warning messages */
     fprintf(stderr, "Progress report, continuing ...\n");
@@ -223,7 +237,9 @@ static void siginfo_handler(int sig)
     print_stats("  ");
 }
 
-static int dd_filetype(const char * filename)
+
+static int
+dd_filetype(const char * filename)
 {
     struct stat st;
     size_t len = strlen(filename);
@@ -233,7 +249,8 @@ static int dd_filetype(const char * filename)
     if (stat(filename, &st) < 0)
         return FT_ERROR;
     if (S_ISCHR(st.st_mode)) {
-        if ((MEM_MAJOR == major(st.st_rdev)) && 
+        /* major() and minor() defined in sys/sysmacros.h */
+        if ((MEM_MAJOR == major(st.st_rdev)) &&
             (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
             return FT_DEV_NULL;
         if (RAW_MAJOR == major(st.st_rdev))
@@ -244,10 +261,14 @@ static int dd_filetype(const char * filename)
             return FT_ST;
     } else if (S_ISBLK(st.st_mode))
         return FT_BLOCK;
+    else if (S_ISFIFO(st.st_mode))
+        return FT_FIFO;
     return FT_OTHER;
 }
 
-static char * dd_filetype_str(int ft, char * buff)
+
+static char *
+dd_filetype_str(int ft, char * buff)
 {
     int off = 0;
 
@@ -257,6 +278,8 @@ static char * dd_filetype_str(int ft, char * buff)
         off += snprintf(buff + off, 32, "SCSI generic (sg) device ");
     if (FT_BLOCK & ft)
         off += snprintf(buff + off, 32, "block device ");
+    if (FT_FIFO & ft)
+        off += snprintf(buff + off, 32, "fifo (named pipe) ");
     if (FT_ST & ft)
         off += snprintf(buff + off, 32, "SCSI tape device ");
     if (FT_RAW & ft)
@@ -268,7 +291,9 @@ static char * dd_filetype_str(int ft, char * buff)
     return buff;
 }
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
            "sg_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
@@ -279,8 +304,8 @@ static void usage()
            "              [blk_sgio=0|1] [bpt=BPT] [cdbsz=6|10|12|16] "
            "[coe=0|1|2|3]\n"
            "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
-           "[retries=RETR] [sync=0|1]\n"
-           "              [time=0|1] [verbose=VERB]\n"
+           "[of2=OFILE2] [retries=RETR]\n"
+           "              [sync=0|1] [time=0|1] [verbose=VERB]\n"
            "  where:\n"
            "    blk_sgio    0->block device use normal I/O(def), 1->use "
            "SG_IO\n"
@@ -305,7 +330,7 @@ static void usage()
            "    if          file or device to read from (def: stdin)\n"
            "    iflag       comma separated list from: [coe,dio,direct,"
            "dpo,dsync,excl,\n"
-           "                fua,null, sgio]\n"
+           "                flock,fua,nocache,null,sgio]\n"
            "    obs         output block size (if given must be same as "
            "'bs=')\n"
            "    odir        1->use O_DIRECT when opening block dev, "
@@ -314,9 +339,13 @@ static void usage()
            "OFILE of '.'\n");
     fprintf(stderr,
            "                treated as /dev/null\n"
+           "    of2         additional output file (def: /dev/null), "
+           "OFILE2 should be\n"
+           "                normal file or pipe\n"
            "    oflag       comma separated list from: [append,coe,dio,"
            "direct,dpo,\n"
-           "                dsync,excl,fua,null,sgio,sparse]\n"
+           "                dsync,excl,flock,fua,nocache, null,sgio,"
+           "sparse]\n"
            "    retries     retry sgio errors RETR times (def: 0)\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
@@ -332,8 +361,10 @@ static void usage()
            "specialized for SCSI devices\n");
 }
 
+
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
-static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
+static int
+scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -374,10 +405,11 @@ static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     return 0;
 }
 
+
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
 /* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
-static int read_blkdev_capacity(int sg_fd, int64_t * num_sect,
-                                int * sect_sz)
+static int
+read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
 #ifdef BLKSSZGET
     if ((ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) && (*sect_sz > 0)) {
@@ -419,9 +451,10 @@ static int read_blkdev_capacity(int sg_fd, int64_t * num_sect,
 #endif
 }
 
-static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
-                             unsigned int blocks, int64_t start_block,
-                             int write_true, int fua, int dpo)
+
+static int
+sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
+                  int64_t start_block, int write_true, int fua, int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
@@ -511,6 +544,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
     return 0;
 }
 
+
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_UNIT_ATTENTION -> try again,
    SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> 'io_addrp' written to,
@@ -518,10 +552,10 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
    SG_LIB_CAT_NOT_READY, SG_LIB_CAT_ABORTED_COMMAND,
    -2 -> ENOMEM
    -1 other errors */
-static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
-                       int64_t from_block, int bs,
-                       const struct flags_t * ifp, int * diop,
-                       uint64_t * io_addrp)
+static int
+sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
+            int bs, const struct flags_t * ifp, int * diop,
+            uint64_t * io_addrp)
 {
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -600,7 +634,7 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
             return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
         else {
             fprintf(stderr, "Medium, hardware or blank check error but "
-                    "no lba of failure given\n");
+                    "no lba of failure in sense\n");
             return res;
         }
         break;
@@ -617,38 +651,43 @@ static int sg_read_low(int sg_fd, unsigned char * buff, int blocks,
             if (verbose > 1)
                 sg_chk_n_print3("reading", &io_hdr, verbose > 1);
             if (sg_scsi_normalize_sense(sbp, slen, &ssh) &&
-                (0x64 == ssh.asc) && (0x0 == ssh.ascq) &&
-                (sg_get_sense_filemark_eom_ili(sbp, slen, NULL, NULL, &ili))
-                && ili) {
-                info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
-                if (*io_addrp > 0) {
-                    ++unrecovered_errs;
-                    return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
-                } else
-                    fprintf(stderr, "MMC READ gave 'illegal mode for this "
-                            "track' and ILI but no LBA of failure\n");
+                (0x64 == ssh.asc) && (0x0 == ssh.ascq)) {
+                if (sg_get_sense_filemark_eom_ili(sbp, slen, NULL, NULL,
+                                                  &ili) && ili) {
+                    info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
+                    if (*io_addrp > 0) {
+                        ++unrecovered_errs;
+                        return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
+                    } else
+                        fprintf(stderr, "MMC READ gave 'illegal mode for "
+                                "this track' and ILI but no LBA of failure\n");
+                }
+                ++unrecovered_errs;
+                return SG_LIB_CAT_MEDIUM_HARD;
             }
         }
         /* drop through */
     default:
         ++unrecovered_errs;
-        sg_chk_n_print3("reading", &io_hdr, verbose > 1);
+        if (verbose > 0)
+            sg_chk_n_print3("reading", &io_hdr, verbose > 1);
         return res;
     }
-    if (diop && *diop && 
+    if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     sum_of_resids += io_hdr.resid;
     return 0;
 }
 
+
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_UNIT_ATTENTION -> try again, SG_LIB_CAT_NOT_READY,
    SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ABORTED_COMMAND,
    -2 -> ENOMEM, -1 other errors */
-static int sg_read(int sg_fd, unsigned char * buff, int blocks,
-                   int64_t from_block, int bs, struct flags_t * ifp,
-                   int * diop, int * blks_readp)
+static int
+sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
+        int bs, struct flags_t * ifp, int * diop, int * blks_readp)
 {
     uint64_t io_addr;
     int64_t lba;
@@ -656,12 +695,14 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
     unsigned char * bp;
     int retries_tmp;
     int ret = 0;
+    int may_coe = 0;
 
     retries_tmp = ifp->retries;
     for (xferred = 0, blks = blocks, lba = from_block, bp = buff;
          blks > 0; blks = blocks - xferred) {
         io_addr = 0;
         repeat = 0;
+        may_coe = 0;
         res = sg_read_low(sg_fd, bp, blks, lba, bs, ifp, diop, &io_addr);
         switch (res) {
         case 0:
@@ -713,6 +754,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
             ret = res;
             goto err_out;
         case SG_LIB_CAT_MEDIUM_HARD:
+            may_coe = 1;
         default:
             if (retries_tmp > 0) {
                 fprintf(stderr, ">>> retrying a sgio read, lba=0x%"PRIx64"\n",
@@ -735,6 +777,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                     "correct range:\n\t[0x%"PRIx64",0x%"PRIx64"]\n", io_addr,
                     (uint64_t)lba,
                     (uint64_t)(lba + blks - 1));
+            may_coe = 1;
             goto err_out;
         }
         blks = (int)(io_addr - (uint64_t)lba);
@@ -819,7 +862,7 @@ static int sg_read(int sg_fd, unsigned char * buff, int blocks,
                 }
                 /* remember for next read_long attempt, if required */
                 read_long_blk_inc = nl - bs;
-                
+
                 if (verbose)
                     fprintf(stderr, "read_long(10): adjusted len=%d\n", nl);
                 r = sg_ll_read_long10(sg_fd, 0, corrct, lba, buffp, nl,
@@ -880,21 +923,29 @@ err_out:
         memset(bp, 0, bs * blks);
         fprintf(stderr, ">> unable to read at blk=%"PRId64" for "
                 "%d bytes, use zeros\n", lba, bs * blks);
+        if (blks > 1)
+            fprintf(stderr, ">>   try reducing bpt to limit number "
+                    "of zeros written near bad block(s)\n");
         /* fudge success */
         if (blks_readp)
             *blks_readp = xferred + blks;
-        return ret;
+        if ((coe_limit > 0) && (++coe_count > coe_limit)) {
+            fprintf(stderr, ">> coe_limit on consecutive reads exceeded\n");
+            return ret;
+        }
+        return may_coe ? 0 : ret;
     } else
         return ret ? ret : -1;
 }
+
 
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
    SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_MEDIUM_HARD,
    SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
    -1 -> unrecoverable error + others */
-static int sg_write(int sg_fd, unsigned char * buff, int blocks,
-                    int64_t to_block, int bs, const struct flags_t * ofp,
-                    int * diop)
+static int
+sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
+         int bs, const struct flags_t * ofp, int * diop)
 {
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -978,13 +1029,15 @@ static int sg_write(int sg_fd, unsigned char * buff, int blocks,
         } else
             return res;
     }
-    if (diop && *diop && 
+    if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
     return 0;
 }
 
-static void calc_duration_throughput(int contin)
+
+static void
+calc_duration_throughput(int contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
@@ -1012,7 +1065,9 @@ static void calc_duration_throughput(int contin)
     }
 }
 
-static int process_flags(const char * arg, struct flags_t * fp)
+
+static int
+process_flags(const char * arg, struct flags_t * fp)
 {
     char buff[256];
     char * cp;
@@ -1040,17 +1095,21 @@ static int process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "dpo"))
             fp->dpo = 1;
         else if (0 == strcmp(cp, "dsync"))
-            fp->dsync = 1;
+            ++fp->dsync;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = 1;
         else if (0 == strcmp(cp, "fua"))
-            fp->fua = 1;
+            ++fp->fua;
+        else if (0 == strcmp(cp, "nocache"))
+            ++fp->nocache;
         else if (0 == strcmp(cp, "null"))
             ;
         else if (0 == strcmp(cp, "sgio"))
             fp->sgio = 1;
         else if (0 == strcmp(cp, "sparse"))
             ++fp->sparse;
+        else if (0 == strcmp(cp, "flock"))
+            ++fp->flock;
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
@@ -1060,11 +1119,276 @@ static int process_flags(const char * arg, struct flags_t * fp)
     return 0;
 }
 
+/* Returns open input file descriptor (>= 0) or a negative value
+ * (-SG_LIB_FILE_ERROR or -SG_LIB_CAT_OTHER) if error.
+ */
+static int
+open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
+        int * in_typep, int verbose)
+{
+    int infd, flags, fl, t, verb, res;
+    char ebuff[EBUFF_SZ];
+    struct sg_simple_inquiry_resp sir;
 
-int main(int argc, char * argv[])
+    verb = (verbose ? verbose - 1: 0);
+    *in_typep = dd_filetype(inf);
+    if (verbose)
+        fprintf(stderr, " >> Input file type: %s\n",
+                dd_filetype_str(*in_typep, ebuff));
+    if (FT_ERROR & *in_typep) {
+        fprintf(stderr, ME "unable access %s\n", inf);
+        goto file_err;
+    } else if ((FT_BLOCK & *in_typep) && ifp->sgio)
+        *in_typep |= FT_SG;
+
+    if (FT_ST & *in_typep) {
+        fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
+        goto file_err;
+    } else if (FT_SG & *in_typep) {
+        flags = O_NONBLOCK;
+        if (ifp->direct)
+            flags |= O_DIRECT;
+        if (ifp->excl)
+            flags |= O_EXCL;
+        if (ifp->dsync)
+            flags |= O_SYNC;
+        fl = O_RDWR;
+        if ((infd = open(inf, fl | flags)) < 0) {
+            fl = O_RDONLY;
+            if ((infd = open(inf, fl | flags)) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                         ME "could not open %s for sg reading", inf);
+                perror(ebuff);
+                goto file_err;
+            }
+        }
+        if (verbose)
+            fprintf(stderr, "        open input(sg_io), flags=0x%x\n",
+                    fl | flags);
+        if (sg_simple_inquiry(infd, &sir, 0, verb)) {
+            fprintf(stderr, "INQUIRY failed on %s\n", inf);
+            goto other_err;
+        }
+        ifp->pdt = sir.peripheral_type;
+        if (verbose)
+            fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
+                    inf, sir.vendor, sir.product, sir.revision, ifp->pdt);
+        if (! (FT_BLOCK & *in_typep)) {
+            t = blk_sz * bpt;
+            res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
+            if (res < 0)
+                perror(ME "SG_SET_RESERVED_SIZE error");
+            res = ioctl(infd, SG_GET_VERSION_NUM, &t);
+            if ((res < 0) || (t < 30000)) {
+                if (FT_BLOCK & *in_typep)
+                    fprintf(stderr, ME "SG_IO unsupported on this block"
+                                    " device\n");
+                else
+                    fprintf(stderr, ME "sg driver prior to 3.x.y\n");
+                goto file_err;
+            }
+        }
+    } else {
+        flags = O_RDONLY;
+        if (ifp->direct)
+            flags |= O_DIRECT;
+        if (ifp->excl)
+            flags |= O_EXCL;
+        if (ifp->dsync)
+            flags |= O_SYNC;
+        infd = open(inf, flags);
+        if (infd < 0) {
+            snprintf(ebuff, EBUFF_SZ,
+                     ME "could not open %s for reading", inf);
+            perror(ebuff);
+            goto file_err;
+        } else {
+            if (verbose)
+                fprintf(stderr, "        open input, flags=0x%x\n",
+                        flags);
+            if (skip > 0) {
+                off64_t offset = skip;
+
+                offset *= blk_sz;       /* could exceed 32 bits here! */
+                if (lseek64(infd, offset, SEEK_SET) < 0) {
+                    snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
+                             "required position on %s", inf);
+                    perror(ebuff);
+                    goto file_err;
+                }
+                if (verbose)
+                    fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
+                            "byte offset=0x%"PRIx64"\n",
+                            (uint64_t)offset);
+            }
+#ifdef HAVE_POSIX_FADVISE
+            if (ifp->nocache) {
+                int rt;
+
+                rt = posix_fadvise(infd, 0, 0, POSIX_FADV_SEQUENTIAL);
+                if (rt)
+                    fprintf(stderr, "open_if: posix_fadvise(SEQUENTIAL), "
+                            "err=%d\n", rt);
+            }
+#endif
+        }
+    }
+    if (ifp->flock) {
+        res = flock(infd, LOCK_EX | LOCK_NB);
+        if (res < 0) {
+            close(infd);
+            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+                     "failed", inf);
+            perror(ebuff);
+            return -SG_LIB_FLOCK_ERR;
+        }
+    }
+    return infd;
+
+file_err:
+    return -SG_LIB_FILE_ERROR;
+other_err:
+    return -SG_LIB_CAT_OTHER;
+}
+
+/* Returns open output file descriptor (>= 0), -1 for don't
+ * bother opening (e.g. /dev/null), or a more negative value
+ * (-SG_LIB_FILE_ERROR or -SG_LIB_CAT_OTHER) if error.
+ */
+static int
+open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
+        int * out_typep, int verbose)
+{
+    int outfd, flags, t, verb, res;
+    char ebuff[EBUFF_SZ];
+    struct sg_simple_inquiry_resp sir;
+
+    verb = (verbose ? verbose - 1: 0);
+    *out_typep = dd_filetype(outf);
+    if (verbose)
+        fprintf(stderr, " >> Output file type: %s\n",
+                dd_filetype_str(*out_typep, ebuff));
+
+    if ((FT_BLOCK & *out_typep) && ofp->sgio)
+        *out_typep |= FT_SG;
+
+    if (FT_ST & *out_typep) {
+        fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
+        goto file_err;
+    } else if (FT_SG & *out_typep) {
+        flags = O_RDWR | O_NONBLOCK;
+        if (ofp->direct)
+            flags |= O_DIRECT;
+        if (ofp->excl)
+            flags |= O_EXCL;
+        if (ofp->dsync)
+            flags |= O_SYNC;
+        if ((outfd = open(outf, flags)) < 0) {
+            snprintf(ebuff, EBUFF_SZ,
+                     ME "could not open %s for sg writing", outf);
+            perror(ebuff);
+            goto file_err;
+        }
+        if (verbose)
+            fprintf(stderr, "        open output(sg_io), flags=0x%x\n",
+                    flags);
+        if (sg_simple_inquiry(outfd, &sir, 0, verb)) {
+            fprintf(stderr, "INQUIRY failed on %s\n", outf);
+            goto other_err;
+        }
+        ofp->pdt = sir.peripheral_type;
+        if (verbose)
+            fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
+                    outf, sir.vendor, sir.product, sir.revision, ofp->pdt);
+        if (! (FT_BLOCK & *out_typep)) {
+            t = blk_sz * bpt;
+            res = ioctl(outfd, SG_SET_RESERVED_SIZE, &t);
+            if (res < 0)
+                perror(ME "SG_SET_RESERVED_SIZE error");
+            res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
+            if ((res < 0) || (t < 30000)) {
+                fprintf(stderr, ME "sg driver prior to 3.x.y\n");
+                goto file_err;
+            }
+        }
+    } else if (FT_DEV_NULL & *out_typep)
+        outfd = -1; /* don't bother opening */
+    else {
+        if (! (FT_RAW & *out_typep)) {
+            flags = O_WRONLY | O_CREAT;
+            if (ofp->direct)
+                flags |= O_DIRECT;
+            if (ofp->excl)
+                flags |= O_EXCL;
+            if (ofp->dsync)
+                flags |= O_SYNC;
+            if (ofp->append)
+                flags |= O_APPEND;
+            if ((outfd = open(outf, flags, 0666)) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                        ME "could not open %s for writing", outf);
+                perror(ebuff);
+                goto file_err;
+            }
+        } else {
+            flags = O_WRONLY;
+            if (ofp->direct)
+                flags |= O_DIRECT;
+            if (ofp->excl)
+                flags |= O_EXCL;
+            if (ofp->dsync)
+                flags |= O_SYNC;
+            if ((outfd = open(outf, flags)) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                        ME "could not open %s for raw writing", outf);
+                perror(ebuff);
+                goto file_err;
+            }
+        }
+        if (verbose)
+            fprintf(stderr, "        %s output, flags=0x%x\n",
+                    ((O_CREAT & flags) ? "create" : "open"), flags);
+        if (seek > 0) {
+            off64_t offset = seek;
+
+            offset *= blk_sz;       /* could exceed 32 bits here! */
+            if (lseek64(outfd, offset, SEEK_SET) < 0) {
+                snprintf(ebuff, EBUFF_SZ,
+                    ME "couldn't seek to required position on %s", outf);
+                perror(ebuff);
+                goto file_err;
+            }
+            if (verbose)
+                fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
+                        "byte offset=0x%"PRIx64"\n",
+                        (uint64_t)offset);
+        }
+    }
+    if (ofp->flock) {
+        res = flock(outfd, LOCK_EX | LOCK_NB);
+        if (res < 0) {
+            close(outfd);
+            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+                     "failed", outf);
+            perror(ebuff);
+            return -SG_LIB_FLOCK_ERR;
+        }
+    }
+    return outfd;
+
+file_err:
+    return -SG_LIB_FILE_ERROR;
+other_err:
+    return -SG_LIB_CAT_OTHER;
+}
+
+
+int
+main(int argc, char * argv[])
 {
     int64_t skip = 0;
     int64_t seek = 0;
+    int64_t out2_off = 0;
     int ibs = 0;
     int obs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
@@ -1075,22 +1399,22 @@ int main(int argc, char * argv[])
     char inf[INOUTF_SZ];
     int in_type = FT_OTHER;
     char outf[INOUTF_SZ];
+    char out2f[INOUTF_SZ];
     int out_type = FT_OTHER;
+    int out2_type = FT_OTHER;
     int dio_incomplete = 0;
     int cdbsz_given = 0;
     int do_sync = 0;
-    int verb = 0;
     int blocks = 0;
-    int res, k, t, buf_sz, dio_tmp, flags, fl, first;
-    int infd, outfd, retries_tmp, blks_read;
+    int res, k, t, buf_sz, dio_tmp, first, blocks_per;
+    int infd, outfd, out2fd, retries_tmp, blks_read;
+    int bytes_read, bytes_of2, bytes_of;
     unsigned char * wrkBuff;
     unsigned char * wrkPos;
     int64_t in_num_sect = -1;
     int64_t out_num_sect = -1;
     int in_sect_sz, out_sect_sz;
     char ebuff[EBUFF_SZ];
-    int blocks_per;
-    struct sg_simple_inquiry_resp sir;
     int sparse_skip = 0;
     int penult_sparse_skip = 0;
     int penult_blocks = 0;
@@ -1098,10 +1422,11 @@ int main(int argc, char * argv[])
 
     inf[0] = '\0';
     outf[0] = '\0';
+    out2f[0] = '\0';
     iflag.cdbsz = DEF_SCSI_CDBSZ;
     oflag.cdbsz = DEF_SCSI_CDBSZ;
     if (argc < 2) {
-        fprintf(stderr, 
+        fprintf(stderr,
                 "Won't default both IFILE to stdin _and_ OFILE to stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
@@ -1149,12 +1474,19 @@ int main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'coe_limit='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key, "count")) {
-            dd_count = sg_get_llnum(buf);
-            if (-1LL == dd_count) {
-                fprintf(stderr, ME "bad argument to 'count='\n");
+        } else if (0 == strcmp(key, "conv")) {
+            if ((0 != strcmp(buf, "sparse")) || process_flags(buf, &oflag)) {
+                fprintf(stderr, ME "bad argument to 'conv='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+        } else if (0 == strcmp(key, "count")) {
+            if (0 != strcmp("-1", buf)) {
+                dd_count = sg_get_llnum(buf);
+                if (-1LL == dd_count) {
+                    fprintf(stderr, ME "bad argument to 'count='\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }   /* treat 'count=-1' as calculate count (same as not given) */
         } else if (0 == strcmp(key, "dio")) {
             oflag.dio = sg_get_num(buf);
             iflag.dio = oflag.dio;
@@ -1168,7 +1500,7 @@ int main(int argc, char * argv[])
             if ('\0' != inf[0]) {
                 fprintf(stderr, "Second IFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else 
+            } else
                 strncpy(inf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &iflag)) {
@@ -1184,8 +1516,14 @@ int main(int argc, char * argv[])
             if ('\0' != outf[0]) {
                 fprintf(stderr, "Second OFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else 
+            } else
                 strncpy(outf, buf, INOUTF_SZ);
+        } else if (strcmp(key, "of2") == 0) {
+            if ('\0' != out2f[0]) {
+                fprintf(stderr, "Second OFILE2 argument??\n");
+                return SG_LIB_SYNTAX_ERROR;
+            } else
+                strncpy(out2f, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oflag)) {
                 fprintf(stderr, ME "bad argument to 'oflag='\n");
@@ -1214,14 +1552,14 @@ int main(int argc, char * argv[])
             do_sync = sg_get_num(buf);
         else if (0 == strcmp(key, "time"))
             do_time = sg_get_num(buf);
-        else if (0 == strncmp(key, "verb", 4)) {
+        else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
-            verb = (verbose ? verbose - 1: 0);
-        } else if ((0 == strncmp(key, "--help", 7)) ||
+        else if ((0 == strncmp(key, "--help", 7)) ||
                    (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--vers", 6)) {
+        } else if ((0 == strncmp(key, "--vers", 6)) ||
+                   (0 == strcmp(key, "-V"))) {
             fprintf(stderr, ME "%s\n", version_str);
             return 0;
         } else {
@@ -1274,211 +1612,38 @@ int main(int argc, char * argv[])
     iflag.pdt = -1;
     oflag.pdt = -1;
     if (inf[0] && ('-' != inf[0])) {
-        in_type = dd_filetype(inf);
-        if (verbose)
-            fprintf(stderr, " >> Input file type: %s\n",
-                    dd_filetype_str(in_type, ebuff));
-        if (FT_ERROR & in_type) {
-            fprintf(stderr, ME "unable access %s\n", inf);
-            return SG_LIB_FILE_ERROR;
-        } else if ((FT_BLOCK & in_type) && iflag.sgio)
-            in_type |= FT_SG;
-
-        if (FT_ST & in_type) {
-            fprintf(stderr, ME "unable to use scsi tape device %s\n", inf);
-            return SG_LIB_FILE_ERROR;
-        } else if (FT_SG & in_type) {
-            flags = O_NONBLOCK;
-            if (iflag.direct)
-                flags |= O_DIRECT;
-            if (iflag.excl)
-                flags |= O_EXCL;
-            if (iflag.dsync)
-                flags |= O_SYNC;
-            fl = O_RDONLY;
-            if ((infd = open(inf, fl | flags)) < 0) {
-                fl = O_RDWR;
-                if ((infd = open(inf, fl | flags)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                             ME "could not open %s for sg reading", inf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-            if (verbose)
-                fprintf(stderr, "        open input(sg_io), flags=0x%x\n",
-                        fl | flags);
-            if (sg_simple_inquiry(infd, &sir, 0, verb)) {
-                fprintf(stderr, "INQUIRY failed on %s\n", inf);
-                return SG_LIB_CAT_OTHER;
-            }
-            iflag.pdt = sir.peripheral_type;
-            if (verbose)
-                fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
-                        inf, sir.vendor, sir.product, sir.revision, iflag.pdt);
-            if (! (FT_BLOCK & in_type)) {
-                t = blk_sz * bpt;
-                res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
-                if (res < 0)
-                    perror(ME "SG_SET_RESERVED_SIZE error");
-                res = ioctl(infd, SG_GET_VERSION_NUM, &t);
-                if ((res < 0) || (t < 30000)) {
-                    if (FT_BLOCK & in_type)
-                        fprintf(stderr, ME "SG_IO unsupported on this block"
-                                        " device\n");
-                    else
-                        fprintf(stderr, ME "sg driver prior to 3.x.y\n");
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-        } else {
-            flags = O_RDONLY;
-            if (iflag.direct)
-                flags |= O_DIRECT;
-            if (iflag.excl)
-                flags |= O_EXCL;
-            if (iflag.dsync)
-                flags |= O_SYNC;
-            infd = open(inf, flags);
-            if (infd < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for reading", inf);
-                perror(ebuff);
-                return SG_LIB_FILE_ERROR;
-            } else {
-                if (verbose)
-                    fprintf(stderr, "        open input, flags=0x%x\n",
-                            flags);
-                if (skip > 0) {
-                    off64_t offset = skip;
-
-                    offset *= blk_sz;       /* could exceed 32 bits here! */
-                    if (lseek64(infd, offset, SEEK_SET) < 0) {
-                        snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
-                                 "required position on %s", inf);
-                        perror(ebuff);
-                        return SG_LIB_FILE_ERROR;
-                    }
-                    if (verbose)
-                        fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
-                                "byte offset=0x%"PRIx64"\n",
-                                (uint64_t)offset);
-                }
-            }
-        }
+        infd = open_if(inf, skip, bpt, &iflag, &in_type, verbose);
+        if (infd < 0)
+            return -infd;
     }
 
     if (outf[0] && ('-' != outf[0])) {
-        out_type = dd_filetype(outf);
-        if (verbose)
-            fprintf(stderr, " >> Output file type: %s\n",
-                    dd_filetype_str(out_type, ebuff));
-
-        if ((FT_BLOCK & out_type) && oflag.sgio)
-            out_type |= FT_SG;
-
-        if (FT_ST & out_type) {
-            fprintf(stderr, ME "unable to use scsi tape device %s\n", outf);
-            return SG_LIB_FILE_ERROR;
-        } else if (FT_SG & out_type) {
-            flags = O_RDWR | O_NONBLOCK;
-            if (oflag.direct)
-                flags |= O_DIRECT;
-            if (oflag.excl)
-                flags |= O_EXCL;
-            if (oflag.dsync)
-                flags |= O_SYNC;
-            if ((outfd = open(outf, flags)) < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for sg writing", outf);
-                perror(ebuff);
-                return SG_LIB_FILE_ERROR;
-            }
-            if (verbose)
-                fprintf(stderr, "        open output(sg_io), flags=0x%x\n",
-                        flags);
-            if (sg_simple_inquiry(outfd, &sir, 0, verb)) {
-                fprintf(stderr, "INQUIRY failed on %s\n", outf);
-                return SG_LIB_CAT_OTHER;
-            }
-            oflag.pdt = sir.peripheral_type;
-            if (verbose)
-                fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
-                        outf, sir.vendor, sir.product, sir.revision, oflag.pdt);
-            if (! (FT_BLOCK & out_type)) {
-                t = blk_sz * bpt;
-                res = ioctl(outfd, SG_SET_RESERVED_SIZE, &t);
-                if (res < 0)
-                    perror(ME "SG_SET_RESERVED_SIZE error");
-                res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
-                if ((res < 0) || (t < 30000)) {
-                    fprintf(stderr, ME "sg driver prior to 3.x.y\n");
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-        } else if (FT_DEV_NULL & out_type)
-            outfd = -1; /* don't bother opening */
-        else {
-            if (! (FT_RAW & out_type)) {
-                flags = O_WRONLY | O_CREAT;
-                if (oflag.direct)
-                    flags |= O_DIRECT;
-                if (oflag.excl)
-                    flags |= O_EXCL;
-                if (oflag.dsync)
-                    flags |= O_SYNC;
-                if (oflag.append)
-                    flags |= O_APPEND;
-                if ((outfd = open(outf, flags, 0666)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                            ME "could not open %s for writing", outf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-            } else {
-                flags = O_WRONLY;
-                if (oflag.direct)
-                    flags |= O_DIRECT;
-                if (oflag.excl)
-                    flags |= O_EXCL;
-                if (oflag.dsync)
-                    flags |= O_SYNC;
-                if ((outfd = open(outf, flags)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                            ME "could not open %s for raw writing", outf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-            }
-            if (verbose)
-                fprintf(stderr, "        %s output, flags=0x%x\n",
-                        ((O_CREAT & flags) ? "create" : "open"), flags);
-            if (seek > 0) {
-                off64_t offset = seek;
-
-                offset *= blk_sz;       /* could exceed 32 bits here! */
-                if (lseek64(outfd, offset, SEEK_SET) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                        ME "couldn't seek to required position on %s", outf);
-                    perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
-                }
-                if (verbose)
-                    fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
-                            "byte offset=0x%"PRIx64"\n",
-                            (uint64_t)offset);
-            }
-        }
+        outfd = open_of(outf, seek, bpt, &oflag, &out_type, verbose);
+        if (outfd < -1)
+            return -outfd;
     }
+
+    if (out2f[0]) {
+        out2_type = dd_filetype(out2f);
+        if ((out2fd = open(out2f, O_WRONLY | O_CREAT, 0666)) < 0) {
+            res = errno;
+            snprintf(ebuff, EBUFF_SZ,
+                     ME "could not open %s for writing", out2f);
+            perror(ebuff);
+            return res;
+        }
+    } else
+        out2fd = -1;
+
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
-        fprintf(stderr, 
+        fprintf(stderr,
                 "Can't have both 'if' as stdin _and_ 'of' as stdout\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (oflag.sparse) {
         if (STDOUT_FILENO == outfd) {
-            fprintf(stderr, "oflag=sparse needs seekable output file\n"); 
+            fprintf(stderr, "oflag=sparse needs seekable output file\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -1526,11 +1691,11 @@ int main(int argc, char * argv[])
         if (FT_SG & out_type) {
             res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Unit attention (readcap out), continuing\n");
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Aborted command (readcap out), continuing\n");
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
@@ -1547,7 +1712,7 @@ int main(int argc, char * argv[])
                         "bs=%d, device claims=%d\n", outf, blk_sz,
                          out_sect_sz);
         } else if (FT_BLOCK & out_type) {
-            if (0 != read_blkdev_capacity(outfd, &out_num_sect, 
+            if (0 != read_blkdev_capacity(outfd, &out_num_sect,
                                           &out_sect_sz)) {
                 fprintf(stderr, "Unable to read block capacity on %s\n",
                         outf);
@@ -1562,8 +1727,8 @@ int main(int argc, char * argv[])
         if (out_num_sect > seek)
             out_num_sect -= seek;
 #ifdef SG_DEBUG
-        fprintf(stderr, 
-            "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", out_num_sect=%"PRId64"\n", 
+        fprintf(stderr,
+            "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", out_num_sect=%"PRId64"\n",
             dd_count, in_num_sect, out_num_sect);
 #endif
         if (dd_count < 0) {
@@ -1599,7 +1764,8 @@ int main(int argc, char * argv[])
 
     if (iflag.dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
         (FT_RAW & out_type)) {
-        size_t psz = getpagesize();
+        size_t psz = sysconf(_SC_PAGESIZE); /* was getpagesize() */
+
         wrkBuff = (unsigned char*)malloc(blk_sz * bpt + psz);
         if (0 == wrkBuff) {
             fprintf(stderr, "Not enough user memory for raw\n");
@@ -1631,6 +1797,9 @@ int main(int argc, char * argv[])
 
     /* <<< main loop that does the copy >>> */
     while (dd_count > 0) {
+        bytes_read = 0;
+        bytes_of = 0;
+        bytes_of2 = 0;
         penult_sparse_skip = sparse_skip;
         penult_blocks = penult_sparse_skip ? blocks : 0;
         sparse_skip = 0;
@@ -1691,11 +1860,30 @@ int main(int argc, char * argv[])
                     in_partial++;
                 }
             }
+            bytes_read = res;
             in_full += blocks;
         }
 
         if (0 == blocks)
             break;      /* nothing read so leave loop */
+
+        if (out2f[0]) {
+            while (((res = write(out2fd, wrkPos, blocks * blk_sz)) < 0)
+                   && (EINTR == errno))
+                ;
+            if (verbose > 2)
+                fprintf(stderr, "write to of2: count=%d, res=%d\n",
+                        blocks * blk_sz, res);
+            if (res < 0) {
+                snprintf(ebuff, EBUFF_SZ, ME "writing to of2, seek=%"PRId64" ",
+                         seek);
+                perror(ebuff);
+                ret = -1;
+                break;
+            }
+            bytes_of2 = res;
+            out2_off += res;
+        }
 
         if ((oflag.sparse) && (dd_count > blocks) &&
             (! (FT_DEV_NULL & out_type))) {
@@ -1795,7 +1983,7 @@ int main(int argc, char * argv[])
                 first = 0;
             }
             if (0 != ret) {
-                fprintf(stderr, "sg_write failed,%s seek=%"PRId64"\n", 
+                fprintf(stderr, "sg_write failed,%s seek=%"PRId64"\n",
                         ((-2 == ret) ? " try reducing bpt," : ""), seek);
                 break;
             } else {
@@ -1825,9 +2013,42 @@ int main(int argc, char * argv[])
                     out_partial++;
                 ret = -1;
                 break;
-            } else
+            } else {
                 out_full += blocks;
+                bytes_of = res;
+            }
         }
+#ifdef HAVE_POSIX_FADVISE
+        {
+            int rt, in_valid, out2_valid, out_valid;
+
+            in_valid = ((FT_OTHER == in_type) || (FT_BLOCK == in_type));
+            out2_valid = ((FT_OTHER == out2_type) || (FT_BLOCK == out2_type));
+            out_valid = ((FT_OTHER == out_type) || (FT_BLOCK == out_type));
+            if (iflag.nocache && (bytes_read > 0) && in_valid) {
+                rt = posix_fadvise(infd, 0, (skip * blk_sz) + bytes_read,
+                                   POSIX_FADV_DONTNEED);
+                // rt = posix_fadvise(infd, (skip * blk_sz), bytes_read,
+                                   // POSIX_FADV_DONTNEED);
+                // rt = posix_fadvise(infd, 0, 0, POSIX_FADV_DONTNEED);
+                if (rt)         /* returns error as result */
+                    fprintf(stderr, "posix_fadvise on read, skip="
+                            "%"PRId64" ,err=%d\n", skip, rt);
+            }
+            if ((oflag.nocache & 2) && (bytes_of2 > 0) && out2_valid) {
+                rt = posix_fadvise(out2fd, 0, 0, POSIX_FADV_DONTNEED);
+                if (rt)
+                    fprintf(stderr, "posix_fadvise on of2, seek="
+                            "%"PRId64" ,err=%d\n", seek, rt);
+            }
+            if ((oflag.nocache & 1) && (bytes_of > 0) && out_valid) {
+                rt = posix_fadvise(outfd, 0, 0, POSIX_FADV_DONTNEED);
+                if (rt)
+                    fprintf(stderr, "posix_fadvise on output, seek="
+                            "%"PRId64" ,err=%d\n", seek, rt);
+            }
+        }
+#endif
         if (dd_count > 0)
             dd_count -= blocks;
         skip += blocks;
@@ -1886,7 +2107,7 @@ int main(int argc, char * argv[])
         int fd;
         char c;
 
-        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n", 
+        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
                 dio_incomplete);
         if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
@@ -1898,7 +2119,7 @@ int main(int argc, char * argv[])
         }
     }
     if (sum_of_resids)
-        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n", 
+        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                 sum_of_resids);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

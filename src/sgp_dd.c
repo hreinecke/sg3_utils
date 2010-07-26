@@ -45,7 +45,7 @@
    program complains if 'ibs' or 'obs' are given with some other value
    than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
    'of' is not given or 'of=-' then stdout assumed.
-   
+
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
    For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
@@ -56,7 +56,7 @@
 
 */
 
-static char * version_str = "5.39 20071226";
+static char * version_str = "5.40 20090205";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -193,7 +193,8 @@ static int do_sync = 0;
 static int exit_status = 0;
 
 
-static void calc_duration_throughput(int contin)
+static void
+calc_duration_throughput(int contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
@@ -217,7 +218,8 @@ static void calc_duration_throughput(int contin)
         fprintf(stderr, "\n");
 }
 
-static void print_stats(const char * str)
+static void
+print_stats(const char * str)
 {
     int64_t infull, outfull;
 
@@ -233,7 +235,8 @@ static void print_stats(const char * str)
             outfull - rcoll.out_partial, rcoll.out_partial);
 }
 
-static void interrupt_handler(int sig)
+static void
+interrupt_handler(int sig)
 {
     struct sigaction sigact;
 
@@ -248,7 +251,8 @@ static void interrupt_handler(int sig)
     kill(getpid (), sig);
 }
 
-static void siginfo_handler(int sig)
+static void
+siginfo_handler(int sig)
 {
     sig = sig;  /* dummy to stop -W warning messages */
     fprintf(stderr, "Progress report, continuing ...\n");
@@ -257,7 +261,8 @@ static void siginfo_handler(int sig)
     print_stats("  ");
 }
 
-static void install_handler(int sig_num, void (*sig_handler) (int sig))
+static void
+install_handler(int sig_num, void (*sig_handler) (int sig))
 {
     struct sigaction sigact;
     sigaction (sig_num, NULL, &sigact);
@@ -271,7 +276,8 @@ static void install_handler(int sig_num, void (*sig_handler) (int sig))
 }
 
 /* Make safe_strerror() thread safe */
-static char * tsafe_strerror(int code, char * ebp)
+static char *
+tsafe_strerror(int code, char * ebp)
 {
     char * cp;
 
@@ -283,7 +289,7 @@ static char * tsafe_strerror(int code, char * ebp)
     ebp[STRERR_BUFF_LEN - 1] = '\0';
     return ebp;
 }
-    
+
 
 /* Following macro from D.R. Butenhof's POSIX threads book:
    ISBN 0-201-63392-2 . [Highly recommended book.] */
@@ -295,7 +301,8 @@ static char * tsafe_strerror(int code, char * ebp)
     } while (0)
 
 
-static int dd_filetype(const char * filename)
+static int
+dd_filetype(const char * filename)
 {
     struct stat st;
     size_t len = strlen(filename);
@@ -319,7 +326,8 @@ static int dd_filetype(const char * filename)
     return FT_OTHER;
 }
 
-static void usage()
+static void
+usage()
 {
    fprintf(stderr, "Usage: "
            "sgp_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
@@ -369,28 +377,32 @@ static void usage()
            "specialized for SCSI devices, uses multiple POSIX threads\n");
 }
 
-static void guarded_stop_in(Rq_coll * clp)
+static void
+guarded_stop_in(Rq_coll * clp)
 {
     pthread_mutex_lock(&clp->in_mutex);
     clp->in_stop = 1;
     pthread_mutex_unlock(&clp->in_mutex);
 }
 
-static void guarded_stop_out(Rq_coll * clp)
+static void
+guarded_stop_out(Rq_coll * clp)
 {
     pthread_mutex_lock(&clp->out_mutex);
     clp->out_stop = 1;
     pthread_mutex_unlock(&clp->out_mutex);
 }
 
-static void guarded_stop_both(Rq_coll * clp)
+static void
+guarded_stop_both(Rq_coll * clp)
 {
     guarded_stop_in(clp);
     guarded_stop_out(clp);
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
-static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
+static int
+scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -427,7 +439,8 @@ static int scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
 /* BLKSSZGET macros problematic (from <linux/fs.h> or <sys/mount.h>). */
-static int read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
+static int
+read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
 #ifdef BLKSSZGET
     if ((ioctl(sg_fd, BLKSSZGET, sect_sz) < 0) && (*sect_sz > 0)) {
@@ -461,7 +474,8 @@ static int read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 #endif
 }
 
-static void * sig_listen_thread(void * v_clp)
+static void *
+sig_listen_thread(void * v_clp)
 {
     Rq_coll * clp = (Rq_coll *)v_clp;
     int sig_number;
@@ -477,7 +491,8 @@ static void * sig_listen_thread(void * v_clp)
     return NULL;
 }
 
-static void cleanup_in(void * v_clp)
+static void
+cleanup_in(void * v_clp)
 {
     Rq_coll * clp = (Rq_coll *)v_clp;
 
@@ -488,7 +503,8 @@ static void cleanup_in(void * v_clp)
     pthread_cond_broadcast(&clp->out_sync_cv);
 }
 
-static void cleanup_out(void * v_clp)
+static void
+cleanup_out(void * v_clp)
 {
     Rq_coll * clp = (Rq_coll *)v_clp;
 
@@ -499,7 +515,8 @@ static void cleanup_out(void * v_clp)
     pthread_cond_broadcast(&clp->out_sync_cv);
 }
 
-static void * read_write_thread(void * v_clp)
+static void *
+read_write_thread(void * v_clp)
 {
     Rq_coll * clp;
     Rq_elem rel;
@@ -558,7 +575,7 @@ static void * read_write_thread(void * v_clp)
         status = pthread_mutex_lock(&clp->out_mutex);
         if (0 != status) err_exit(status, "lock out_mutex");
         if (FT_DEV_NULL != clp->out_type) {
-            while ((! clp->out_stop) && 
+            while ((! clp->out_stop) &&
                    ((rep->blk + seek_skip) != clp->out_blk)) {
                 /* if write would be out of sequence then wait */
                 pthread_cleanup_push(cleanup_out, (void *)clp);
@@ -621,7 +638,8 @@ static void * read_write_thread(void * v_clp)
     return stop_after_write ? NULL : clp;
 }
 
-static int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
+static int
+normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 {
     int res;
     int stop_after_write = 0;
@@ -635,13 +653,13 @@ static int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
         if (clp->in_flags.coe) {
             memset(rep->buffp, 0, rep->num_blks * rep->bs);
             fprintf(stderr, ">> substituted zeros for in blk=%"PRId64" for "
-                    "%d bytes, %s\n", rep->blk, 
-                    rep->num_blks * rep->bs, 
+                    "%d bytes, %s\n", rep->blk,
+                    rep->num_blks * rep->bs,
                     tsafe_strerror(errno, strerr_buff));
             res = rep->num_blks * clp->bs;
         }
         else {
-            fprintf(stderr, "error in normal read, %s\n", 
+            fprintf(stderr, "error in normal read, %s\n",
                     tsafe_strerror(errno, strerr_buff));
             clp->in_stop = 1;
             guarded_stop_out(clp);
@@ -667,7 +685,8 @@ static int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     return stop_after_write;
 }
 
-static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
+static void
+normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 {
     int res;
     char strerr_buff[STRERR_BUFF_LEN];
@@ -679,7 +698,7 @@ static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     if (res < 0) {
         if (clp->out_flags.coe) {
             fprintf(stderr, ">> ignored error for out blk=%"PRId64" for "
-                    "%d bytes, %s\n", rep->blk, 
+                    "%d bytes, %s\n", rep->blk,
                     rep->num_blks * rep->bs,
                     tsafe_strerror(errno, strerr_buff));
             res = rep->num_blks * clp->bs;
@@ -703,9 +722,9 @@ static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     clp->out_rem_count -= blocks;
 }
 
-static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
-                             unsigned int blocks, int64_t start_block,
-                             int write_true, int fua, int dpo)
+static int
+sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
+                  int64_t start_block, int write_true, int fua, int dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
@@ -795,7 +814,8 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
     return 0;
 }
 
-static void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
+static void
+sg_in_operation(Rq_coll * clp, Rq_elem * rep)
 {
     int res;
     int status;
@@ -865,7 +885,8 @@ static void sg_in_operation(Rq_coll * clp, Rq_elem * rep)
     }
 }
 
-static void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
+static void
+sg_out_operation(Rq_coll * clp, Rq_elem * rep)
 {
     int res;
     int status;
@@ -933,7 +954,8 @@ static void sg_out_operation(Rq_coll * clp, Rq_elem * rep)
     }
 }
 
-static int sg_start_io(Rq_elem * rep)
+static int
+sg_start_io(Rq_elem * rep)
 {
     struct sg_io_hdr * hp = &rep->io_hdr;
     int fua = rep->wr ? rep->out_flags.fua : rep->in_flags.fua;
@@ -942,7 +964,7 @@ static int sg_start_io(Rq_elem * rep)
     int cdbsz = rep->wr ? rep->cdbsz_out : rep->cdbsz_in;
     int res;
 
-    if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk, 
+    if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk,
                           rep->wr, fua, dpo)) {
         fprintf(stderr, ME "bad cdb build, start_blk=%"PRId64", blocks=%d\n",
                 rep->blk, rep->num_blks);
@@ -983,7 +1005,8 @@ static int sg_start_io(Rq_elem * rep)
 /* 0 -> successful, SG_LIB_CAT_UNIT_ATTENTION or SG_LIB_CAT_ABORTED_COMMAND
    -> try again, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD,
    -1 other errors */
-static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
+static int
+sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 {
     int res, status;
     struct sg_io_hdr io_hdr;
@@ -1052,7 +1075,8 @@ static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
     return 0;
 }
 
-static int sg_prepare(int fd, int bs, int bpt)
+static int
+sg_prepare(int fd, int bs, int bpt)
 {
     int res, t;
 
@@ -1073,7 +1097,8 @@ static int sg_prepare(int fd, int bs, int bpt)
     return 0;
 }
 
-static int process_flags(const char * arg, struct flags_t * fp)
+static int
+process_flags(const char * arg, struct flags_t * fp)
 {
     char buff[256];
     char * cp;
@@ -1122,7 +1147,8 @@ static int process_flags(const char * arg, struct flags_t * fp)
 #define INOUTF_SZ 512
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int64_t skip = 0;
     int64_t seek = 0;
@@ -1184,11 +1210,13 @@ int main(int argc, char * argv[])
             rcoll.in_flags.coe = sg_get_num(buf);
             rcoll.out_flags.coe = rcoll.in_flags.coe;
         } else if (0 == strcmp(key,"count")) {
-            dd_count = sg_get_llnum(buf);
-            if (-1LL == dd_count) {
-                fprintf(stderr, ME "bad argument to 'count='\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            if (0 != strcmp("-1", buf)) {
+                dd_count = sg_get_llnum(buf);
+                if (-1LL == dd_count) {
+                    fprintf(stderr, ME "bad argument to 'count='\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }   /* treat 'count=-1' as calculate count (same as not given) */
         } else if ((0 == strncmp(key,"deb", 3)) ||
                    (0 == strncmp(key,"verb", 4)))
             rcoll.debug = sg_get_num(buf);
@@ -1257,8 +1285,9 @@ int main(int argc, char * argv[])
                  (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--vers", 6)) {
-            fprintf(stderr, ME ": %s\n", 
+        } else if ((0 == strncmp(key, "--vers", 6)) ||
+                   (0 == strcmp(key, "-V"))) {
+            fprintf(stderr, ME ": %s\n",
                     version_str);
             return 0;
         }
@@ -1445,7 +1474,7 @@ int main(int argc, char * argv[])
         if (FT_SG == rcoll.in_type) {
             res = scsi_read_capacity(rcoll.infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
-                fprintf(stderr, 
+                fprintf(stderr,
                         "Unit attention, media changed(in), continuing\n");
                 res = scsi_read_capacity(rcoll.infd, &in_num_sect,
                                          &in_sect_sz);
@@ -1480,7 +1509,7 @@ int main(int argc, char * argv[])
         if (FT_SG == rcoll.out_type) {
             res = scsi_read_capacity(rcoll.outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
-                fprintf(stderr,         
+                fprintf(stderr,
                         "Unit attention, media changed(out), continuing\n");
                 res = scsi_read_capacity(rcoll.outfd, &out_num_sect,
                                          &out_sect_sz);
@@ -1657,7 +1686,7 @@ int main(int argc, char * argv[])
             }
             close(fd);
         }
-    } 
+    }
     if (rcoll.sum_of_resids)
         fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
                rcoll.sum_of_resids);

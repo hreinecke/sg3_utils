@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,16 +45,16 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
+/* A utility program originally written for the Linux OS SCSI subsystem.
  *
  * This utility invokes the REASSIGN BLOCKS SCSI command to reassign
  * an existing (possibly damaged) lba on a direct access device (e.g.
- * a disk) to a new physical location. The previous contents is 
+ * a disk) to a new physical location. The previous contents is
  * recoverable then it is written to the remapped lba otherwise
  * vendor specific data is written.
  */
 
-static char * version_str = "1.11 20070925";
+static char * version_str = "1.12 20090401";
 
 #define ME "sg_reassign: "
 
@@ -148,11 +148,11 @@ get_llnum(const char * buf)
         return -1LL;
 }
 
-/* Read numbers (up to 64 bits in size) from command line (comma separated */
-/* list) or from stdin (one per line, comma separated list or */
-/* space separated list). Assumed decimal unless prefixed by '0x', '0X' */
-/* or contains trailing 'h' or 'H' (which indicate hex). */
-/* Returns 0 if ok, or 1 if error. */
+/* Read numbers (up to 64 bits in size) from command line (comma (or
+ * (single) space) separated list) or from stdin (one per line, comma
+ * separated list or space separated list). Assumed decimal unless prefixed
+ * by '0x', '0X' or contains trailing 'h' or 'H' (which indicate hex).
+ * Returns 0 if ok, or 1 if error. */
 static int
 build_lba_arr(const char * inp, uint64_t * lba_arr,
               int * lba_arr_len, int max_arr_len)
@@ -161,6 +161,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
     const char * lcp;
     int64_t ll;
     char * cp;
+    char * c2p;
 
     if ((NULL == inp) || (NULL == lba_arr) ||
         (NULL == lba_arr_len))
@@ -239,8 +240,13 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
             if (-1 != ll) {
                 lba_arr[k] = (uint64_t)ll;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "build_lba_arr: error at pos %d\n",
@@ -415,14 +421,14 @@ main(int argc, char * argv[])
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
-    } 
+    }
 
     if (got_addr) {
         if (dummy) {
             fprintf(stderr, ">>> dummy: REASSIGN BLOCKS not executed\n");
             if (verbose) {
                 fprintf(stderr, "  Would have reassigned these blocks:\n");
-                for (j = 0; j < addr_arr_len; ++j) 
+                for (j = 0; j < addr_arr_len; ++j)
                     printf("    0x%" PRIx64 "\n", addr_arr[j]);
             }
             return 0;

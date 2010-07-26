@@ -1,142 +1,240 @@
-                   Installing this package
-                   -----------------------
+Installation Instructions
+*************************
 
-Introduction
-============
-During the development of sg3_utils version 1.25 this package was changed to
-use autotools. Prior to version 1.25 it used handed crafted Makefiles. Also
-the relatively flat directory structure was made deeper in version 1.25. Now
-each utility's main source file is found in the 'src' subdirectory. That
-code typically depends on header files now placed in the 'include'
-subdirectory and library code placed in the 'lib' subdirectory. The man page
-code for each utility has been moved to the 'doc' subdirectory.
+Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005,
+2006, 2007 Free Software Foundation, Inc.
 
-In most cases the build process is now:
-  a) fetch the source tarball, untar it and go to the top level directory,
-     then do
-  b) ./configure
-  c) make
-  d) make install
+This file is free documentation; the Free Software Foundation gives
+unlimited permission to copy, distribute and modify it.
 
-Step d) usually requires root permissions. Notes specific to supported
-architectures are given below. If the architecture supports shared libraries
-(in Unix/Linux) then the default './configure' generates a Makefile that will
-build executables that use a shared library. The name of that shared library
-starts with 'libsgutils'. To build without that shared library use this
-invocation instead of step b): './configure --disable-shared' .
+Basic Installation
+==================
 
-The default prefix for './configure' is "/usr/local". This means that by
-default 'make install' will place the executables in "/usr/local/bin". To
-change this, for example to drop the "local", use an invocation like
-this: './configure --prefix=/usr' . To check that the code compiles clean
-as C++ (with g++) step b) may be changed to "./configure CC=g++". See the
-output of './configure --help' for more information about build options.
+Briefly, the shell commands './configure; make; make install' should
+configure, build, and install this package. If that fails try
+doing './autogen.sh' first and then repeat the above sequence. The
+autogen.sh script may require some autotools packages to be loaded.
 
-The script files that drive the autotools build are configure.ac and
-Makefile.am . There is an instance of Makefile.am found in the main directory
-and the 'lib', 'include', 'src' and 'doc' subdirectories. If any of these
-files are changed, the 'autogen.sh' script in the main directory should be
-run.
+The following more detailed instructions are generic; see the `README'
+file for instructions specific to this package.
 
-Note that only the utilities in the 'src' subdirectory are build by
-the './configure' infrastructure. Code in the 'examples', 'utils'
-and 'archives' directories can be built with simple Makefiles which are
-typically found in those directories.
+   The `configure' shell script attempts to guess correct values for
+various system-dependent variables used during compilation.  It uses
+those values to create a `Makefile' in each directory of the package.
+It may also create one or more `.h' files containing system-dependent
+definitions.  Finally, it creates a shell script `config.status' that
+you can run in the future to recreate the current configuration, and a
+file `config.log' containing compiler output (useful mainly for
+debugging `configure').
 
+   It can also use an optional file (typically called `config.cache'
+and enabled with `--cache-file=config.cache' or simply `-C') that saves
+the results of its tests to speed up reconfiguring.  Caching is
+disabled by default to prevent problems with accidental use of stale
+cache files.
 
-Linux
-=====
-A "spec" file is included for building rpm packages. It is called
-sg3_utils.spec . To build binary and source rpms place a copy of the gzipped
-tarball in the "SOURCES" directory and place a copy of sg3_utils.spec in the
-"SPEC" directory. These directories are found under /usr/src/redhat in
-redhat/fedora distributions. Then from the "SPEC" directory execute
-"rpmbuild -ba sg3_utils.spec". If all goes well a source rpm should be found
-in the SRPMS directory and binary rpms in the RPMS/i386 directory (for i386
-architecture). Note the spec file will only build those utilities found in
-the main directory. When the sg3_utils binary rpm is installed the executables
-and their associated man pages should be placed in appropriate places. The
-sg3_utils.spec file also builds a libsgutils shared object (shared library)
-and a libsgutils-*-devel shared object with a static library and the sg_lib.h,
-sg_cmds.h sg_cmds_basic.h, sg_cmds_mmc.h, sg_cmds_extra.h and sg_pt.h header
-files.
+   If you need to do unusual things to compile the package, please try
+to figure out how `configure' could check whether to do them, and mail
+diffs or instructions to the address given in the `README' so they can
+be considered for the next release.  If you are using the cache, and at
+some point `config.cache' contains results you don't want to keep, you
+may remove or edit it.
 
-Binary rpms (at least in the RedHat distribution) tend to install
-executables in /usr/bin and libraries in /usr/lib .
+   The file `configure.ac' (or `configure.in') is used to create
+`configure' by a program called `autoconf'.  You need `configure.ac' if
+you want to change it or regenerate `configure' using a newer version
+of `autoconf'.
 
-To build debian "deb" (binary) packages, first untar the tarball, then
-change directory to the top level within the sg3_utils source. Then:
- # chmod +x debian/rules
- # dpkg-buildpackage -b -rfakeroot
-The binary deb packages will be placed in the parent directory (of
-the sg3_utils source directory) if all goes well. There is now
-a script called build_debian.sh in the main directory which invokes
-those two commands.
+The simplest way to compile this package is:
 
+  1. `cd' to the directory containing the package's source code and type
+     `./configure' to configure the package for your system.
 
-FreeBSD
-=======
-In FreeBSD, the utilities can be built and installed as shown in the
-Introduction section above.
+     Running `configure' might take a while.  While running, it prints
+     some messages telling which features it is checking for.
 
-Utilities that are linux specific (e.g. sg_map) are not built for
-FreeBSD. See the "bin_PROGRAMS" definition within the OS_FREEBSD
-conditional of the various Makefile.am files for a definitive list.
+  2. Type `make' to compile the package.
 
+  3. Optionally, type `make check' to run any self-tests that come with
+     the package.
 
-Solaris
-=======
-In Solaris, the utilities can be built and installed as shown in the
-Introduction section above.
+  4. Type `make install' to install the programs and any data files and
+     documentation.
 
-Utilities that are linux specific (e.g. sg_map) are not built for
-Solaris. See the "bin_PROGRAMS" definition within the OS_SOLARIS
-conditional of the various Makefile.am files for a definitive list.
+  5. You can remove the program binaries and object files from the
+     source code directory by typing `make clean'.  To also remove the
+     files that `configure' created (so you can compile the package for
+     a different kind of computer), type `make distclean'.  There is
+     also a `make maintainer-clean' target, but that is intended mainly
+     for the package's developers.  If you use it, you may have to get
+     all sorts of other programs in order to regenerate files that came
+     with the distribution.
 
+  6. Often, you can also type `make uninstall' to remove the installed
+     files again.
 
-Tru64 (OSF)
-===========
-In Tru64 (OSF), the utilities can be built and installed as shown in the
-Introduction section above.
+Compilers and Options
+=====================
 
-Utilities that are linux specific (e.g. sg_map) are not built for
-Tru64. See the "bin_PROGRAMS" definition within the OS_OSF
-conditional of the various Makefile.am files for a definitive list.
+Some systems require unusual options for compilation or linking that the
+`configure' script does not know about.  Run `./configure --help' for
+details on some of the pertinent environment variables.
 
+   You can give `configure' initial values for configuration parameters
+by setting variables in the command line or in the environment.  Here
+is an example:
 
-Windows
-=======
-In Windows only the Windows NT, 2000, 2003, XP and Vist operating systems
-(and their variants) are currently supported. The various device names that
-the sg3_utils utilities will accept in Windows can be seen by running the
-sg_scan utility (and perhaps looking at its man page (i.e. sg_scan.8 or
-sg_scan.8w)).
+     ./configure CC=c99 CFLAGS=-g LIBS=-lposix
 
-The source tarball can be built in a cygwin or MinGW environment on Windows.
+   *Note Defining Variables::, for more details.
 
-For cygwin see http://www.cygwin.com for more information. Various extras
-such as 'gcc' (the GNU C compiler) and 'make' need to be loaded as they are
-not in the minimal cygwin default distribution. The utilities can be built
-and installed as shown in the Introduction section above. Utilities that
-are linux specific (e.g. sg_map) are not built for cygwin. See the
-"bin_PROGRAMS" definition within the OS_CYGWIN conditional of the various
-Makefile.am files for a definitive list. Currently the make doesn't build a
-dll (cf shared libraries are built on Linux and FreeBSD) so the executable
-files are bigger than they need to be. Once built, the various ".exe"
-commands can either be executed in a cygwin shell (typically "bash") or a
-DOS shell. If cygwin has not been installed on the target machine then
-the "cygwin1.dll" (obtained from http://www.cygwin.com ) is required.
+Compiling For Multiple Architectures
+====================================
 
-There is also the "Minimalist Gnu for Windows" (MinGW) and its associated
-shell (MSYS) that can serve as a build environment for sg3_utils. This
-removes the dependence on the proprietary cygwin1.dll at the expense
-of some timing features. In a MSYS shell the utilities can be built
-and installed as shown in the Introduction section above. Utilities that
-are linux specific (e.g. sg_map) are not built for MinGW. See the
-"bin_PROGRAMS" definition within the OS_MINGW conditional of the
-Makefile.am file for a definitive list. The executables have a '.exe'
-extension and can be executed in a MSYS or "cmd" shell.
+You can compile the package for more than one kind of computer at the
+same time, by placing the object files for each architecture in their
+own directory.  To do this, you can use GNU `make'.  `cd' to the
+directory where you want the object files and executables to go and run
+the `configure' script.  `configure' automatically checks for the
+source code in the directory that `configure' is in and in `..'.
 
+   With a non-GNU `make', it is safer to compile the package for one
+architecture at a time in the source code directory.  After you have
+installed the package for one architecture, use `make distclean' before
+reconfiguring for another architecture.
 
-Doug Gilbert
-18th February 2008
+Installation Names
+==================
+
+By default, `make install' installs the package's commands under
+`/usr/local/bin', include files under `/usr/local/include', etc.  You
+can specify an installation prefix other than `/usr/local' by giving
+`configure' the option `--prefix=PREFIX'.
+
+   You can specify separate installation prefixes for
+architecture-specific files and architecture-independent files.  If you
+pass the option `--exec-prefix=PREFIX' to `configure', the package uses
+PREFIX as the prefix for installing programs and libraries.
+Documentation and other data files still use the regular prefix.
+
+   In addition, if you use an unusual directory layout you can give
+options like `--bindir=DIR' to specify different values for particular
+kinds of files.  Run `configure --help' for a list of the directories
+you can set and what kinds of files go in them.
+
+   If the package supports it, you can cause programs to be installed
+with an extra prefix or suffix on their names by giving `configure' the
+option `--program-prefix=PREFIX' or `--program-suffix=SUFFIX'.
+
+Optional Features
+=================
+
+Some packages pay attention to `--enable-FEATURE' options to
+`configure', where FEATURE indicates an optional part of the package.
+They may also pay attention to `--with-PACKAGE' options, where PACKAGE
+is something like `gnu-as' or `x' (for the X Window System).  The
+`README' should mention any `--enable-' and `--with-' options that the
+package recognizes.
+
+   For packages that use the X Window System, `configure' can usually
+find the X include and library files automatically, but if it doesn't,
+you can use the `configure' options `--x-includes=DIR' and
+`--x-libraries=DIR' to specify their locations.
+
+Specifying the System Type
+==========================
+
+There may be some features `configure' cannot figure out automatically,
+but needs to determine by the type of machine the package will run on.
+Usually, assuming the package is built to be run on the _same_
+architectures, `configure' can figure that out, but if it prints a
+message saying it cannot guess the machine type, give it the
+`--build=TYPE' option.  TYPE can either be a short name for the system
+type, such as `sun4', or a canonical name which has the form:
+
+     CPU-COMPANY-SYSTEM
+
+where SYSTEM can have one of these forms:
+
+     OS KERNEL-OS
+
+   See the file `config.sub' for the possible values of each field.  If
+`config.sub' isn't included in this package, then this package doesn't
+need to know the machine type.
+
+   If you are _building_ compiler tools for cross-compiling, you should
+use the option `--target=TYPE' to select the type of system they will
+produce code for.
+
+   If you want to _use_ a cross compiler, that generates code for a
+platform different from the build platform, you should specify the
+"host" platform (i.e., that on which the generated programs will
+eventually be run) with `--host=TYPE'.
+
+Sharing Defaults
+================
+
+If you want to set default values for `configure' scripts to share, you
+can create a site shell script called `config.site' that gives default
+values for variables like `CC', `cache_file', and `prefix'.
+`configure' looks for `PREFIX/share/config.site' if it exists, then
+`PREFIX/etc/config.site' if it exists.  Or, you can set the
+`CONFIG_SITE' environment variable to the location of the site script.
+A warning: not all `configure' scripts look for a site script.
+
+Defining Variables
+==================
+
+Variables not defined in a site shell script can be set in the
+environment passed to `configure'.  However, some packages may run
+configure again during the build, and the customized values of these
+variables may be lost.  In order to avoid this problem, you should set
+them in the `configure' command line, using `VAR=value'.  For example:
+
+     ./configure CC=/usr/local2/bin/gcc
+
+causes the specified `gcc' to be used as the C compiler (unless it is
+overridden in the site shell script).
+
+Unfortunately, this technique does not work for `CONFIG_SHELL' due to
+an Autoconf bug.  Until the bug is fixed you can use this workaround:
+
+     CONFIG_SHELL=/bin/bash /bin/bash ./configure CONFIG_SHELL=/bin/bash
+
+`configure' Invocation
+======================
+
+`configure' recognizes the following options to control how it operates.
+
+`--help'
+`-h'
+     Print a summary of the options to `configure', and exit.
+
+`--version'
+`-V'
+     Print the version of Autoconf used to generate the `configure'
+     script, and exit.
+
+`--cache-file=FILE'
+     Enable the cache: use and save the results of the tests in FILE,
+     traditionally `config.cache'.  FILE defaults to `/dev/null' to
+     disable caching.
+
+`--config-cache'
+`-C'
+     Alias for `--cache-file=config.cache'.
+
+`--quiet'
+`--silent'
+`-q'
+     Do not print messages saying which checks are being made.  To
+     suppress all normal output, redirect it to `/dev/null' (any error
+     messages will still be shown).
+
+`--srcdir=DIR'
+     Look for the package's source code in directory DIR.  Usually
+     `configure' can determine that directory automatically.
+
+`configure' also accepts some other, not widely useful, options.  Run
+`configure --help' for more details.
+

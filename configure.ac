@@ -1,4 +1,4 @@
-AC_INIT(sg3_utils, 1.26, dgilbert@interlog.com)
+AC_INIT(sg3_utils, 1.27, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE
 AM_CONFIG_HEADER(config.h)
@@ -12,9 +12,18 @@ AC_PROG_LIBTOOL
 
 # check for headers
 AC_HEADER_STDC
+AC_CHECK_HEADERS([linux/types.h linux/bsg.h], [], [],
+     [[#ifdef HAVE_LINUX_TYPES_H
+     # include <linux/types.h>
+     #endif
+     ]])
+
+
+# check for functions
 AC_CHECK_FUNCS(getopt_long,
 	       GETOPT_O_FILES='',
 	       GETOPT_O_FILES='getopt_long.o')
+AC_CHECK_FUNCS(posix_fadvise)
 AC_SUBST(GETOPT_O_FILES)
 
 AC_CANONICAL_HOST
@@ -57,5 +66,9 @@ AM_CONDITIONAL(OS_SOLARIS, [echo $host_os | grep '^solaris' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 
+AC_ARG_ENABLE([no-linux-bsg],
+  AC_HELP_STRING([--enable-no-linux-bsg], [ignore linux bsg (sgv4) if present]),
+  AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [ignore linux bsg], )
+)
 
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile)

@@ -1,0 +1,6 @@
+Some suggestions and shortcomings:
+
+  - Win32 version of sg_scan doesn't work well in Vista. Rework scanning
+    logic. Done 20090410
+
+  - support the SCSI UNMAP command [20090410]

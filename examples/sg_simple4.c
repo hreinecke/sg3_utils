@@ -94,7 +94,7 @@ int main(int argc, char * argv[])
         close(sg_fd);
         return 1;
     }
-    
+
     /* since I know this program will only read from inqBuff then I use
        PROT_READ rather than PROT_READ | PROT_WRITE */
     inqBuff = (unsigned char *)mmap(NULL, 8000, PROT_READ | PROT_WRITE,
@@ -198,7 +198,7 @@ int main(int argc, char * argv[])
         printf("Test Unit Ready failed so unit may _not_ be ready!\n");
 
     if (do_extra)
-        printf("TEST UNIT READY duration=%u millisecs, resid=%d, " 
+        printf("TEST UNIT READY duration=%u millisecs, resid=%d, "
                "msg_status=%d\n",
                io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
 

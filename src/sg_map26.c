@@ -61,7 +61,7 @@
 #endif
 #include "sg_lib.h"
 
-static char * version_str = "1.06 20080318";
+static char * version_str = "1.08 20081009";
 
 #define ME "sg_map26: "
 
@@ -105,6 +105,12 @@ static char * version_str = "1.06 20080318";
 #define SCSI_DISK15_MAJOR       135
 #endif
 
+/* st minor decodes from Kai Makisara 20081008 */
+#define ST_NBR_MODE_BITS 2
+#define ST_MODE_SHIFT (7 - ST_NBR_MODE_BITS)
+#define TAPE_NR(minor) ( (((minor) & ~255) >> (ST_NBR_MODE_BITS + 1)) | \
+    ((minor) & ~(-1 << ST_MODE_SHIFT)) )
+
 static const char * sys_sg_dir = "/sys/class/scsi_generic/";
 static const char * sys_sd_dir = "/sys/block/";
 static const char * sys_sr_dir = "/sys/block/";
@@ -139,38 +145,39 @@ static const char * nt_names[] = {
         "directory",
 };
 
-static void usage()
+static void
+usage()
 {
         fprintf(stderr, "Usage: "
-                "sg_map26 [--dev_dir=DIR] [--given_is=0|1] [--help] "
-                "[--result=0|1|2|3]\n"
+                "sg_map26 [--dev_dir=DIR] [--given_is=0...1] [--help] "
+                "[--result=0...3]\n"
                 "                [--symlink] [--verbose] [--version] "
                 "DEVICE\n"
                 "  where:\n"
-                "    --dev_dir=DIR|-d DIR    search in DIR for "
+                "    --dev_dir=DIR | -d DIR    search in DIR for "
                 "resulting special\n"
                 "                            (def: directory of DEVICE "
                 "or '/dev')\n"
-                "    --given_is=0|1|-g 0|1    variety of given "
+                "    --given_is=0...1 | -g 0...1    variety of given "
                 "DEVICE\n"
-                "                             0->block or char special "
+                "                                   0->block or char special "
                 "(or symlink to)\n"
-                "                             1->sysfs device, 'dev' or "
+                "                                   1->sysfs device, 'dev' or "
                 "parent\n"
-                "    --help|-h       print out usage message\n"
-                "    --result=0|1|2|3|-r 0|1|2|3    variety of file(s) to "
+                "    --help | -h       print out usage message\n"
+                "    --result=0...3 | -r 0...3    variety of file(s) to "
                 "find\n"
-                "                                   0->mapped block or char "
+                "                                 0->mapped block or char "
                 "special(def)\n"
-                "                                   1->mapped sysfs path\n"
-                "                                   2->matching block or "
+                "                                 1->mapped sysfs path\n"
+                "                                 2->matching block or "
                 "char special\n"
-                "                                   3->matching sysfs "
+                "                                 3->matching sysfs "
                 "path\n"
-                "    --symlink|-s    symlinks to special included in "
+                "    --symlink | -s    symlinks to special included in "
                 "result\n"
-                "    --verbose|-v    increase verbosity of output\n"
-                "    --version|-V    print version string and exit\n\n"
+                "    --verbose | -v    increase verbosity of output\n"
+                "    --version | -V    print version string and exit\n\n"
                 "Maps SCSI device node to corresponding generic node (and "
                 "vv)\n"
                 );
@@ -185,7 +192,8 @@ static void usage()
 static char safe_errbuf[64] = {'u', 'n', 'k', 'n', 'o', 'w', 'n', ' ',
                                'e', 'r', 'r', 'n', 'o', ':', ' ', 0};
 
-static char * ssafe_strerror(int errnum)
+static char *
+ssafe_strerror(int errnum)
 {
         size_t len;
         char * errstr;
@@ -201,7 +209,8 @@ static char * ssafe_strerror(int errnum)
         return errstr;
 }
 
-static int nt_typ_from_filename(const char * filename, int * majj, int * minn)
+static int
+nt_typ_from_filename(const char * filename, int * majj, int * minn)
 {
         struct stat st;
         int ma, mi;
@@ -256,7 +265,8 @@ static int nt_typ_from_filename(const char * filename, int * majj, int * minn)
         return NT_NO_MATCH;
 }
 
-static int nt_typ_from_major(int ma)
+static int
+nt_typ_from_major(int ma)
 {
         switch(ma) {
         case SCSI_DISK0_MAJOR: case SCSI_DISK1_MAJOR:
@@ -301,7 +311,8 @@ struct node_match_item {
 
 static struct node_match_item nd_match;
 
-static int nd_match_scandir_select(const struct dirent * s)
+static int
+nd_match_scandir_select(const struct dirent * s)
 {
         struct stat st;
         char name[D_NAME_LEN_MAX];
@@ -353,9 +364,9 @@ static int nd_match_scandir_select(const struct dirent * s)
                ? 1 : 0;
 }
 
-static int list_matching_nodes(const char * dir_name, int file_type,
-                               int majj, int minn, int follow_symlink,
-                               int verbose)
+static int
+list_matching_nodes(const char * dir_name, int file_type, int majj, int minn,
+                    int follow_symlink, int verbose)
 {
         struct dirent ** namelist;
         int num, k;
@@ -384,18 +395,61 @@ struct sg_item_t {
         char name[NAME_LEN_MAX];
         int ft;
         int nt;
+        int d_type;
 };
+
+static struct sg_item_t for_first;
+
+static int
+first_scandir_select(const struct dirent * s)
+{
+        if (FT_OTHER != for_first.ft)
+                return 0;
+        if ((DT_LNK != s->d_type) &&
+            ((DT_DIR != s->d_type) || ('.' == s->d_name[0])))
+                return 0;
+        strncpy(for_first.name, s->d_name, NAME_LEN_MAX);
+        for_first.ft = FT_CHAR;  /* dummy */
+        for_first.d_type =  s->d_type;
+        return 1;
+}
+
+/* scan for directory entry that is either a symlink or a directory */
+static int
+scan_for_first(const char * dir_name, int verbose)
+{
+        char name[NAME_LEN_MAX];
+        struct dirent ** namelist;
+        int num, k;
+
+        for_first.ft = FT_OTHER;
+        num = scandir(dir_name, &namelist, first_scandir_select, NULL);
+        if (num < 0) {
+                if (verbose > 0) {
+                        snprintf(name, NAME_LEN_MAX, "scandir: %s", dir_name);
+                        perror(name);
+                }
+                return -1;
+        }
+        for (k = 0; k < num; ++k)
+                free(namelist[k]);
+        free(namelist);
+        return num;
+}
 
 static struct sg_item_t from_sg;
 
-static int from_sg_scandir_select(const struct dirent * s)
+static int
+from_sg_scandir_select(const struct dirent * s)
 {
         int len;
 
         if (FT_OTHER != from_sg.ft)
                 return 0;
-        if (DT_LNK != s->d_type)
+        if ((DT_LNK != s->d_type) &&
+            ((DT_DIR != s->d_type) || ('.' == s->d_name[0])))
                 return 0;
+        from_sg.d_type = s->d_type;
         if (0 == strncmp("scsi_changer", s->d_name, 12)) {
                 strncpy(from_sg.name, s->d_name, NAME_LEN_MAX);
                 from_sg.ft = FT_CHAR;
@@ -429,7 +483,8 @@ static int from_sg_scandir_select(const struct dirent * s)
                 return 0;
 }
 
-static int from_sg_scan(const char * dir_name, int verbose)
+static int
+from_sg_scan(const char * dir_name, int verbose)
 {
         struct dirent ** namelist;
         int num, k;
@@ -456,7 +511,8 @@ static int from_sg_scan(const char * dir_name, int verbose)
 
 static struct sg_item_t to_sg;
 
-static int to_sg_scandir_select(const struct dirent * s)
+static int
+to_sg_scandir_select(const struct dirent * s)
 {
         if (FT_OTHER != to_sg.ft)
                 return 0;
@@ -471,7 +527,8 @@ static int to_sg_scandir_select(const struct dirent * s)
                 return 0;
 }
 
-static int to_sg_scan(const char * dir_name)
+static int
+to_sg_scan(const char * dir_name)
 {
         struct dirent ** namelist;
         int num, k;
@@ -488,7 +545,8 @@ static int to_sg_scan(const char * dir_name)
 }
 
 /* Return 1 if directory, else 0 */
-static int if_directory_chdir(const char * dir_name, const char * base_name)
+static int
+if_directory_chdir(const char * dir_name, const char * base_name)
 {
         char buff[D_NAME_LEN_MAX];
         struct stat a_stat;
@@ -507,7 +565,8 @@ static int if_directory_chdir(const char * dir_name, const char * base_name)
 }
 
 /* Return 1 if directory, else 0 */
-static int if_directory_ch2generic(const char * dir_name)
+static int
+if_directory_ch2generic(const char * dir_name)
 {
         char buff[NAME_LEN_MAX];
         struct stat a_stat;
@@ -538,8 +597,9 @@ static int if_directory_ch2generic(const char * dir_name)
 }
 
 /* Return 1 if found, else 0 if problems */
-static int get_value(const char * dir_name, const char * base_name,
-                     char * value, int max_value_len)
+static int
+get_value(const char * dir_name, const char * base_name, char * value,
+          int max_value_len)
 {
         char buff[D_NAME_LEN_MAX];
         FILE * f;
@@ -569,8 +629,9 @@ static int get_value(const char * dir_name, const char * base_name,
         return 1;
 }
 
-static int map_hd(const char * device_dir, int ma, int mi, int result,
-                  int follow_symlink, int verbose)
+static int
+map_hd(const char * device_dir, int ma, int mi, int result,
+       int follow_symlink, int verbose)
 {
         char c, num;
 
@@ -599,9 +660,9 @@ static int map_hd(const char * device_dir, int ma, int mi, int result,
         return 0;
 }
 
-static int map_sd(const char * device_name, const char * device_dir,
-                  int ma, int mi, int result, int follow_symlink,
-                  int verbose)
+static int
+map_sd(const char * device_name, const char * device_dir, int ma, int mi,
+       int result, int follow_symlink, int verbose)
 {
         int index, m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -682,8 +743,9 @@ static int map_sd(const char * device_name, const char * device_dir,
         }
 }
 
-static int map_sr(const char * device_name, const char * device_dir, int ma,
-                  int mi, int result, int follow_symlink, int verbose)
+static int
+map_sr(const char * device_name, const char * device_dir, int ma, int mi,
+       int result, int follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -742,8 +804,9 @@ static int map_sr(const char * device_name, const char * device_dir, int ma,
         }
 }
 
-static int map_st(const char * device_name, const char * device_dir, int ma,
-                  int mi, int result, int follow_symlink, int verbose)
+static int
+map_st(const char * device_name, const char * device_dir, int ma, int mi,
+       int result, int follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -755,7 +818,7 @@ static int map_st(const char * device_name, const char * device_dir, int ma,
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%sst%d", sys_st_dir,
-                 (mi & 0x1f));
+                 TAPE_NR(mi));
         if (3 == result) {
                 printf("%s\n", name);
                 return 0;
@@ -803,8 +866,9 @@ static int map_st(const char * device_name, const char * device_dir, int ma,
         }
 }
 
-static int map_osst(const char * device_name, const char * device_dir, int ma,
-                    int mi, int result, int follow_symlink, int verbose)
+static int
+map_osst(const char * device_name, const char * device_dir, int ma, int mi,
+         int result, int follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -816,7 +880,7 @@ static int map_osst(const char * device_name, const char * device_dir, int ma,
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%sosst%d", sys_osst_dir,
-                 (mi & 0x1f));
+                 TAPE_NR(mi));
         if (3 == result) {
                 printf("%s\n", name);
                 return 0;
@@ -864,8 +928,9 @@ static int map_osst(const char * device_name, const char * device_dir, int ma,
         }
 }
 
-static int map_ch(const char * device_name, const char * device_dir, int ma,
-                  int mi, int result, int follow_symlink, int verbose)
+static int
+map_ch(const char * device_name, const char * device_dir, int ma, int mi,
+       int result, int follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -924,8 +989,9 @@ static int map_ch(const char * device_name, const char * device_dir, int ma,
         }
 }
 
-static int map_sg(const char * device_name, const char * device_dir, int ma,
-                  int mi, int result, int follow_symlink, int verbose)
+static int
+map_sg(const char * device_name, const char * device_dir, int ma, int mi,
+       int result, int follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -955,6 +1021,15 @@ static int map_sg(const char * device_name, const char * device_dir, int ma,
         }
         if ((1 == from_sg_scan(".", verbose)) &&
             (if_directory_chdir(".", from_sg.name))) {
+                if (DT_DIR == from_sg.d_type) {
+                        if ((1 == scan_for_first(".", verbose)) &&
+                            (if_directory_chdir(".", for_first.name))) {
+                                ;
+                        } else {
+                                fprintf(stderr, "unexpected scan_for_first "
+                                        "error\n");
+                        }
+                }
                 if (1 == result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
@@ -984,7 +1059,8 @@ static int map_sg(const char * device_name, const char * device_dir, int ma,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
         int c, num, tt, cont, res;
         int do_dev_dir = 0;

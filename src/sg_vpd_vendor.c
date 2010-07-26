@@ -90,7 +90,7 @@ struct svpd_values_name_t {
 
 
 /* Size of this array must match the array of the same name in sg_vpd.c */
-static unsigned char rsp_buff[MX_ALLOC_LEN + 2];        
+static unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 
 
 /* Supported vendor specific VPD pages */
@@ -166,7 +166,7 @@ static void
 dStrRaw(const char* str, int len)
 {
     int k;
-    
+
     for (k = 0 ; k < len; ++k)
         printf("%c", str[k]);
 }

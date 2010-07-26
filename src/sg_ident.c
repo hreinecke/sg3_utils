@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,7 +49,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static char * version_str = "1.07 20070918";
+static char * version_str = "1.08 20080510";
 
 #define ME "sg_ident: "
 
@@ -74,8 +74,15 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
     int k, n;
 
     if (raw) {
-        if (ii_len > 0)
+        if (ii_len > 0) {
+            if (sg_set_binary_mode(STDOUT_FILENO) < 0)
+                perror("sg_set_binary_mode");
+#if 0
             n = fwrite(iip, 1, ii_len, stdout);
+#else
+            n = write(STDOUT_FILENO, iip, ii_len);
+#endif
+        }
         return;
     }
     if (0x7f == itype) {  /* list of available information types */
@@ -89,7 +96,7 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
             if (ascii)
                 printf("%.*s\n", ii_len, (const char *)iip);
             else
-                dStrHex((const char *)iip, ii_len, 0); 
+                dStrHex((const char *)iip, ii_len, 0);
         }
     }
 }
@@ -221,7 +228,7 @@ int main(int argc, char * argv[])
     memset(rdi_buff, 0x0, sizeof(rdi_buff));
     if (do_set || do_clear) {
         if (do_set) {
-            res = fread(rdi_buff, 1, REPORT_ID_INFO_SANITY_LEN + 2, stdin); 
+            res = fread(rdi_buff, 1, REPORT_ID_INFO_SANITY_LEN + 2, stdin);
             if (res <= 0) {
                 fprintf(stderr, "no data read from stdin; to clear "
                         "identifying information use '--clear' instead\n");
@@ -265,7 +272,7 @@ int main(int argc, char * argv[])
     } else {    /* do report identifying information */
         res = sg_ll_report_id_info(sg_fd, itype, rdi_buff, 4, 1, verbose);
         if (0 == res) {
-            ii_len = (rdi_buff[0] << 24) + (rdi_buff[1] << 16) + 
+            ii_len = (rdi_buff[0] << 24) + (rdi_buff[1] << 16) +
                          (rdi_buff[2] << 8) + rdi_buff[3];
             if ((! raw) && (verbose > 0))
                 printf("Reported identifying information length = %d\n",

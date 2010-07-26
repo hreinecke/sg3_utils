@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2008 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,57 +45,66 @@
 /* A utility program for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI command REPORT LUNS to the given SCSI device. 
+ * This program issues the SCSI command REPORT LUNS to the given SCSI device.
  */
 
-static char * version_str = "1.12 20070919";
+static char * version_str = "1.14 20080510";
 
-#define REPORT_LUNS_BUFF_LEN (1024*64)
-    
-static unsigned char reportLunsBuff[REPORT_LUNS_BUFF_LEN];
+#define MAX_RLUNS_BUFF_LEN (1024 * 64)
+#define DEF_RLUNS_BUFF_LEN MAX_RLUNS_BUFF_LEN
+
+static unsigned char reportLunsBuff[MAX_RLUNS_BUFF_LEN];
 
 
 static struct option long_options[] = {
-        {"decode", 0, 0, 'd'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"quiet", 0, 0, 'q'},
-        {"raw", 0, 0, 'r'},
-        {"select", 1, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"decode", no_argument, 0, 'd'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"maxlen", required_argument, 0, 'm'},
+        {"quiet", no_argument, 0, 'q'},
+        {"raw", no_argument, 0, 'r'},
+        {"select", required_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_luns    [--decode] [--help] [--hex] [--quiet] [--raw] "
-          "[--select=SR]\n"
-          "                  [--verbose] [--version] DEVICE\n"
-          "  where:\n"
-          "    --decode|-d        decode all luns into component parts\n"
-          "    --help|-h          print out usage message\n"
-          "    --hex|-H           output in hexadecimal\n"
-          "    --quiet|-q         output only ASCII hex lun values\n"
-          "    --raw|-r           output in binary\n"
-          "    --select=SR|-s SR    select report SR (def: 0)\n"
-          "                          0 -> luns apart from 'well "
-          "known' lus\n"
-          "                          1 -> only 'well known' "
-          "logical unit numbers\n"
-          "                          2 -> all luns\n"
-          "    --verbose|-v       increase verbosity\n"
-          "    --version|-V       print version string and exit\n\n"
-          "Performs a SCSI REPORT LUNS command\n"
-          );
+            "sg_luns    [--decode] [--help] [--hex] [--maxlen=LEN] [--quiet] "
+            "[--raw]\n"
+            "                  [--select=SR] [--verbose] [--version] DEVICE\n"
+            "  where:\n"
+            "    --decode|-d        decode all luns into component parts\n"
+            "    --help|-h          print out usage message\n"
+            "    --hex|-H           output in hexadecimal\n"
+            "    --maxlen=LEN|-m LEN    max response length (allocation "
+            "length in cdb)\n"
+            "                           (def: 0 -> %d bytes)\n",
+            DEF_RLUNS_BUFF_LEN );
+    fprintf(stderr, "    --quiet|-q         output only ASCII hex lun "
+            "values\n"
+            "    --raw|-r           output in binary\n"
+            "    --select=SR|-s SR    select report SR (def: 0)\n"
+            "                          0 -> luns apart from 'well "
+            "known' lus\n"
+            "                          1 -> only 'well known' "
+            "logical unit numbers\n"
+            "                          2 -> all luns\n"
+            "    --verbose|-v       increase verbosity\n"
+            "    --version|-V       print version string and exit\n\n"
+            "Performs a SCSI REPORT LUNS command\n"
+            );
 
 }
 
 /* Decoded according to SAM-4 rev 4. Note that one draft: BCC rev 0,
  * defines its own "bridge addressing method" in place of the SAM-3
- * "logical addressing method".  */ 
-static void decode_lun(const char * leadin, unsigned char * lunp)
+ * "logical addressing method".  */
+static void
+decode_lun(const char * leadin, unsigned char * lunp)
 {
     int k, j, x, a_method, bus_id, target, lun, len, e_a_method, next_level;
     unsigned char not_spec[8] = {0xff, 0xff, 0xff, 0xff,
@@ -207,7 +216,8 @@ static void decode_lun(const char * leadin, unsigned char * lunp)
     }
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -215,11 +225,13 @@ static void dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, k, m, off, res, c, list_len, luns, trunc;
     int decode = 0;
     int do_hex = 0;
+    int maxlen = 0;
     int do_quiet = 0;
     int do_raw = 0;
     int select_rep = 0;
@@ -230,7 +242,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHqrs:vV", long_options,
+        c = getopt_long(argc, argv, "dhHm:qrs:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -245,6 +257,14 @@ int main(int argc, char * argv[])
             return 0;
         case 'H':
             ++do_hex;
+            break;
+        case 'm':
+            maxlen = sg_get_num(optarg);
+            if ((maxlen < 0) || (maxlen > MAX_RLUNS_BUFF_LEN)) {
+                fprintf(stderr, "argument to '--maxlen' should be %d or "
+                        "less\n", MAX_RLUNS_BUFF_LEN);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'q':
             ++do_quiet;
@@ -290,6 +310,15 @@ int main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (0 == maxlen)
+        maxlen = DEF_RLUNS_BUFF_LEN;
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
+
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
@@ -297,11 +326,11 @@ int main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    memset(reportLunsBuff, 0x0, sizeof(reportLunsBuff));
+    memset(reportLunsBuff, 0x0, maxlen);
     trunc = 0;
 
-    res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff,
-                            sizeof(reportLunsBuff), 1, verbose);
+    res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen, 1,
+                            verbose);
     ret = res;
     if (0 == res) {
         list_len = (reportLunsBuff[0] << 24) + (reportLunsBuff[1] << 16) +
@@ -318,16 +347,16 @@ int main(int argc, char * argv[])
         if (0 == do_quiet)
             printf("Lun list length = %d which imples %d lun entr%s\n",
                    list_len, luns, ((1 == luns) ? "y" : "ies"));
-        if ((list_len + 8) > (int)sizeof(reportLunsBuff)) {
-            luns = ((sizeof(reportLunsBuff) - 8) / 8);
+        if ((list_len + 8) > maxlen) {
+            luns = ((maxlen - 8) / 8);
             trunc = 1;
             fprintf(stderr, "  <<too many luns for internal buffer, will "
-                    "show %d luns>>\n", luns);
+                    "show %d lun%s>>\n", luns, ((1 == luns) ? "" : "s"));
         }
         if (verbose > 1) {
             fprintf(stderr, "\nOutput response in hex\n");
             dStrHex((const char *)reportLunsBuff,
-                    (trunc ? (int)sizeof(reportLunsBuff) : list_len + 8), 1);
+                    (trunc ? maxlen : list_len + 8), 1);
         }
         for (k = 0, off = 8; k < luns; ++k) {
             if (0 == do_quiet) {

@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2007 Douglas Gilbert.
+ * Copyright (c) 2005-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,35 +37,53 @@ extern "C" {
 #endif
 
 /* This declaration hides the fact that each implementation has its own
-   structure "derived" (using a C++ term) from this one. It compiles
-   because 'struct sg_pt_base' is only referenced (by pointer: 'objp')
-   in this interface. An instance of this structure represents the
-   context of one SCSI command. */
+ * structure "derived" (using a C++ term) from this one. It compiles
+ * because 'struct sg_pt_base' is only referenced (by pointer: 'objp')
+ * in this interface. An instance of this structure represents the
+ * context of one SCSI command. */
 struct sg_pt_base;
 
+
+/* The format of the version string is like this: "2.01 20090201".
+ * The leading digit will be incremented if this interface changes
+ * in a way that may impact backward compatibility. */
+extern const char * scsi_pt_version();
 
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 extern int scsi_pt_open_device(const char * device_name, int read_only,
                                int verbose);
 
+/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed
+ * together. Returns valid file descriptor( >= 0 ) if successful, otherwise
+ * returns -1 or a negated errno. */
+extern int scsi_pt_open_flags(const char * device_name, int flags,
+                                     int verbose);
+
 /* Returns 0 if successful. If error in Unix returns negated errno. */
 extern int scsi_pt_close_device(int device_fd);
 
 
-/* Create one struct sg_pt_base object per SCSI command issued */
+/* Creates an object that can be used to issue one or more SCSI commands
+ * (or task management functions). Returns NULL if problem.
+ * Once this object has been created it should be destroyed with
+ * destruct_scsi_pt_obj() when it is no longer needed. */
 extern struct sg_pt_base * construct_scsi_pt_obj(void);
 
-/* Only invoke once per objp */
+/* Clear state information held in *objp . This allows this object to be
+ * used to issue more than one SCSI command. */
+extern void clear_scsi_pt_obj(struct sg_pt_base * objp);
+
+/* Set the CDB (command descriptor block) */
 extern void set_scsi_pt_cdb(struct sg_pt_base * objp,
                             const unsigned char * cdb, int cdb_len);
-/* Only invoke once per objp. Zeroes given 'sense' buffer. */
+/* Set the sense buffer and the maximum length that it can handle */
 extern void set_scsi_pt_sense(struct sg_pt_base * objp, unsigned char * sense,
                               int max_sense_len);
-/* Invoke at most once per objp */
+/* Set a pointer and length to be used for data transferred from device */
 extern void set_scsi_pt_data_in(struct sg_pt_base * objp,   /* from device */
                                 unsigned char * dxferp, int dxfer_len);
-/* Invoke at most once per objp */
+/* Set a pointer and length to be used for data transferred to device */
 extern void set_scsi_pt_data_out(struct sg_pt_base * objp,    /* to device */
                                  const unsigned char * dxferp, int dxfer_len);
 /* The following "set_"s implementations may be dummies */
@@ -79,9 +97,12 @@ extern void set_scsi_pt_task_attr(struct sg_pt_base * objp, int attribute,
 #define SCSI_PT_DO_START_OK 0
 #define SCSI_PT_DO_BAD_PARAMS 1
 #define SCSI_PT_DO_TIMEOUT 2
-/* If OS start error, negated error value (e.g. Unix '-errno') returned,
-   return 0 if okay (i.e. at the very least: command sent). Positive
-   return values are errors (see SCSI_PT_DO_* defines). */
+/* If OS error prior to or during command submission then returns negated
+ * error value (e.g. Unix '-errno'). This includes interrupted system calls
+ * (e.g. by a signal) in which case -EINTR would be returned. Note that
+ * system call errors also can be fetched with get_scsi_pt_os_err().
+ * Return 0 if okay (i.e. at the very least: command sent). Positive
+ * return values are errors (see SCSI_PT_DO_* defines). */
 extern int do_scsi_pt(struct sg_pt_base * objp, int fd, int timeout_secs,
                       int verbose);
 
@@ -115,8 +136,8 @@ extern int get_scsi_pt_duration_ms(const struct sg_pt_base * objp);
 
 
 /* Should be invoked once per objp after other processing is complete in
-   order to clean up resources. For ever successful construct_scsi_pt_obj()
-   call there should be one destruct_scsi_pt_obj().  */
+ * order to clean up resources. For ever successful construct_scsi_pt_obj()
+ * call there should be one destruct_scsi_pt_obj().  */
 extern void destruct_scsi_pt_obj(struct sg_pt_base * objp);
 
 #ifdef __cplusplus

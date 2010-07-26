@@ -145,7 +145,7 @@ static int sysfs_sg_scan(const char * dir_name)
     return num;
 }
 
-static void make_dev_name(char * fname, const char * leadin, int k, 
+static void make_dev_name(char * fname, const char * leadin, int k,
                           int do_numeric)
 {
     char buff[64];
@@ -323,7 +323,7 @@ int main(int argc, char * argv[])
     if (do_all_s || do_sr)
         scan_dev_type("/dev/sr", MAX_SR_DEVS, 1, LIN_DEV_TYPE_SR, last_sg_ind);
     if (do_all_s || do_scd)
-        scan_dev_type("/dev/scd", MAX_SR_DEVS, 1, LIN_DEV_TYPE_SCD, 
+        scan_dev_type("/dev/scd", MAX_SR_DEVS, 1, LIN_DEV_TYPE_SCD,
                       last_sg_ind);
     if (do_all_s || do_st)
         scan_dev_type("/dev/nst", MAX_ST_DEVS, 1, LIN_DEV_TYPE_ST,
@@ -353,7 +353,7 @@ int main(int argc, char * argv[])
             printf(do_extra ? "  -3 -3 -3 -3  -3" : "  some error");
             break;
         case 1:
-            if (do_extra) 
+            if (do_extra)
                 printf("  %d %d %d %d  %d", map_arr[k].sg_dat.host_no,
                        map_arr[k].sg_dat.channel, map_arr[k].sg_dat.scsi_id,
                        map_arr[k].sg_dat.lun, map_arr[k].sg_dat.scsi_type);
@@ -383,7 +383,7 @@ int main(int argc, char * argv[])
                 break;
             }
             if (do_inquiry)
-                printf("  %.8s  %.16s  %.4s", map_arr[k].vendor, 
+                printf("  %.8s  %.16s  %.4s", map_arr[k].vendor,
                        map_arr[k].product, map_arr[k].revision);
             break;
         default:
@@ -394,8 +394,8 @@ int main(int argc, char * argv[])
     }
     return 0;
 }
-        
-static int find_dev_in_sg_arr(My_scsi_idlun * my_idlun, int host_no, 
+
+static int find_dev_in_sg_arr(My_scsi_idlun * my_idlun, int host_no,
                               int last_sg_ind)
 {
     int k;
@@ -430,7 +430,7 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, "Error closing %s ", fname);
             perror("sg_map: close error");
-#ifndef IGN_CLOSE_ERR           
+#ifndef IGN_CLOSE_ERR
             return;
 #else
             ++num_errors;
@@ -484,8 +484,8 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
 #endif
             continue;
         }
-#ifdef DEBUG        
-        printf ("%i(%x) %i %i %i %i\n", host_no, my_idlun.host_unique_id, 
+#ifdef DEBUG
+        printf ("%i(%x) %i %i %i %i\n", host_no, my_idlun.host_unique_id,
                 (my_idlun.dev_id>>24)&0xff, (my_idlun.dev_id>>16)&0xff,
                 (my_idlun.dev_id>>8)&0xff, my_idlun.dev_id&0xff);
 #endif
@@ -495,7 +495,7 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
             map_arr[ind].lin_dev_type = lin_dev_type;
         }
         else
-            printf("Strange, could not find device %s mapped to sg device??\n", 
+            printf("Strange, could not find device %s mapped to sg device??\n",
                    fname);
     }
 }

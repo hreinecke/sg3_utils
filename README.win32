@@ -1,9 +1,13 @@
 Introduction
 ============
 The win32 port of sg3_utils contains those utilities that are _not_ specific
-to Linux. In some cases a utility could be ported but requires more work. An
-example is sg_dd which needs more work beyond the SCSI command pass through
-mechanism.
+to Linux. One utility for listing available devices, sg_scan, has a
+Windows-specific version for this port.
+
+The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
+Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+contains a utility with similar functionality to sg_dd and is available
+for Windows.
 
 Two build environments are caterered for: cygwin (see www.cygwin.com) and
 MinGW ("Minimalist GNU for Windows", see www.mingw.org). Both are based in
@@ -54,6 +58,7 @@ Here is a list of utilities that have been ported:
     sg_wr_mode
     sg_write_buffer
     sg_write_long
+    sg_write_same
 
 Most utility names are indicative of the main SCSI command that they execute.
 Some utilities are slightly higher level, for example sg_ses fetches SCSI
@@ -61,7 +66,7 @@ Enclosure Services (SES) status pages and can send control pages. Each
 utility has a man page (placed in section 8). There is summary of the mapping
 between utility names and the SCSI commands they execute in the COVERAGE
 file. An overview of sg3_utils can be found at:
-http://www.torque.net/sg/sg3_utils.html .
+http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 
@@ -86,38 +91,52 @@ operating system:
 The sg_pt_win32.c file uses the Windows SCSI Pass Through (SPT) mechanism.
 It does not currently use the ASPI32 interface which requires a dll from
 Adaptec. The sg_scan utility is a special version for Windows and it attempts
-to show the various allowable device names, grouping various names for the
-same device on one line. Here is an example of sg_scan's output:
+to show the various available storage device names, one per line. Here is an
+example of sg_scan's output:
 
 # sg_scan
-SCSI0:0,0,0       C:    PD0      IC25N040ATCS05-0        CS4O  *
-SCSI1:0,0,0       D:    CDROM0   HITACHI DVD-ROM GD-S200 0034
-SCSI2:0,0,0       I: +  PD5      QUANTUM LPS525S         3110
-SCSI2:0,6,0             TAPE0    SONY    SDT-7000        0192
-                  E:             Generic USB SD Reader   1.00  pdt=0
-                        PD1      Generic USB SD Reader   1.00
+PD0     [C]     FUJITSU   MHY2160BH         0000
+PD1     [DF]    WD        2500BEV External  1.05  WD-WXE90
+CDROM0  [E]     MATSHITA DVD/CDRW UJDA775  CB03
 
-So the following device names all refer to the same (ATA) disk:
-"SCSI0:0,0,0", "C:" and "PD0". Recent version of windows will only allow the
-"SCSI0:0,0,0" to be used if there isn't another device name available.
-The right hand section of each line is the SCSI INQUIRY command response
-strings (which are constructed by Windows is some cases rather than the
-device). The "*" at the end of the first line flags that the INQUIRY
-response is not quite properly structured (according to SCSI-2) which is
-usually indicative of an ATA disk.
+Here is an example with added bus type:
 
-If no class driver name (e.g. "PD0", "CDROM0" or "TAPE0") is available
-then the SCSI "peripheral device type" (pdt) is placed at the end of the
-line. Common pdt values are 0 for disks, 1 for tapes and 5 for cd/dvd
-drives. The "+" after the "I:" indicates that other volume names
-(letters) map to that device. This occurs when a disk has two or more
-partitions that windows recognizes. The longer "PhysicalDrive" name,
-shown in Windows documentation, may be used but "PD" is obviously
-quicker to type.
+# sg_scan -b
+PD0     [C]     <Ata  >  FUJITSU   MHY2160BH         0000
+PD1     [DF]    <Usb  >  WD        2500BEV External  1.05  WD-WXE90
+CDROM0  [E]     <Atapi>  MATSHITA DVD/CDRW UJDA775  CB03
 
-Finally sg_scan does not manage to put all device names for USB and
-IEEE 1394 devices on one line. The last two lines of output are actually
-the same device.
+Here is an example with added SCSI adapter scan:
+
+# sg_scan -b -s
+PD0     [C]     <Ata  >  ST380011A  8.01
+PD1             <Scsi >  SEAGATE   ST373455SS        2189
+PD2             <Scsi >  ATA       ST3160812AS       D
+PD3             <Scsi >  SEAGATE   ST336754SS        0003
+CDROM0  [F]     <Atapi>  HL-DT-ST DVDRAM GSA-4163B  A103
+TAPE0           <Scsi >  SONY      SDT-7000          0192
+
+SCSI0:0,0,0   claimed=1 pdt=0h dubious  ST380011  A                 8.01
+SCSI1:0,0,0   claimed=1 pdt=5h          HL-DT-ST  DVDRAM GSA-4163B  A103
+SCSI2:0,6,0   claimed=1 pdt=1h          SONY      SDT-7000          0192
+SCSI5:0,17,0  claimed=1 pdt=0h          SEAGATE   ST373455SS        2189
+SCSI5:0,19,0  claimed=1 pdt=0h          ATA       ST3160812AS       D
+SCSI5:0,21,0  claimed=1 pdt=0h          SEAGATE   ST336754SS        0003
+SCSI5:0,112,0 claimed=0 pdt=10h         LSI       PSEUDO DEVICE     2.34
+
+The storage devices scanned are PhysicalDrive<n> (shorted form PD<n> used),
+CDROM<n> (which includes DVD and BD drives) and TAPE<n>. There is also an
+optional SCSI adapter scan with device names of the form SCSI<n>:<b>:<t>:<l> .
+These only come into play for devices that are not claimed by one of the
+storage class drivers. The "LSI PSEUDO DEVICE" device above is an example
+of an unclaimed device. The SCSI adapter scan does not show USB and IEEE
+1394 connected devices.
+
+Volume names (e.g. "C:") that match a storage device (or perhaps a
+partition within that device) are shown in brackets. Notice there can be
+zero, one or more volume names for each storage device. Up to four volume
+names are listed in brackets, if there are more a "+" is added after the
+fourth.
 
 Several utilities have conditional compilation sections based on
 the SG3_UTILS_MINGW define. For those who want to try native C compilers
@@ -131,6 +150,17 @@ Makefile.mingw respectively. The executables produced are console
 applications that can be executed in either a cygwin, MSYS or "cmd" shell.
 See the INSTALL file for more details.
 
+Binary and Text files
+=====================
+A problem has been reported with binary output being written in a MinGW
+environment (or executables build by MinGW). Windows has a concept of text
+and binary files which is not found in Unix. Recent versions of MinGW
+default to opening files in text mode. This can lead to binary output
+(such as when the '--raw' option is given) having 0xa (i.e. LF) translated
+to 0xd,0xa (i.e. CR,LF). sg3_utils version 1.26 attempts to fix this
+problem by changing what it knows to be binary output files to "binary
+mode" with the setmode() Windows command.
+
 
 Doug Gilbert
-2nd December 2007
+10th April 2009

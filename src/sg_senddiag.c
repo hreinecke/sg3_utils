@@ -13,8 +13,8 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2003-2007 D. Gilbert
+/* A utility program originally written for the Linux OS SCSI subsystem
+*  Copyright (C) 2003-2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.34 20070714";
+static char * version_str = "0.35 20090401";
 
 #define ME "sg_senddiag: "
 
@@ -345,7 +345,7 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
 
 /* Return of 0 -> success, otherwise see sg_ll_send_diag() */
 static int do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
-                       int devofl_bit, int unitofl_bit, void * outgoing_pg, 
+                       int devofl_bit, int unitofl_bit, void * outgoing_pg,
                        int outgoing_len, int noisy, int verbose)
 {
     int long_duration = 0;
@@ -397,6 +397,7 @@ static int build_diag_page(const char * inp, unsigned char * mp_arr,
     unsigned int h;
     const char * lcp;
     char * cp;
+    char * c2p;
 
     if ((NULL == inp) || (NULL == mp_arr) ||
         (NULL == mp_arr_len))
@@ -470,7 +471,7 @@ static int build_diag_page(const char * inp, unsigned char * mp_arr,
         }
         *mp_arr_len = off;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "build_diag_page: error at pos %d\n", k + 1);
             return 1;
@@ -484,8 +485,13 @@ static int build_diag_page(const char * inp, unsigned char * mp_arr,
                 }
                 mp_arr[k] = h;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "build_diag_page: error at pos %d\n",
@@ -553,7 +559,7 @@ static void list_page_codes()
     printf("Page_Code  Description\n");
     for (k = 0; k < num; ++k, ++pcdp)
         printf(" 0x%02x      %s\n", pcdp->page_code,
-               (pcdp->desc ? pcdp->desc : "<unknown>"));   
+               (pcdp->desc ? pcdp->desc : "<unknown>"));
 }
 
 
@@ -605,7 +611,7 @@ int main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    
+
     if ((opts.do_doff || opts.do_uoff) && (! opts.do_deftest)) {
         if (opts.opt_new) {
             printf("setting --doff or --uoff only useful when -t is set\n");

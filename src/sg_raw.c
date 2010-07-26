@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2007 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2008 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -9,7 +9,7 @@
  * any later version.
  *
  * This program can be used to send raw SCSI commands (with an optional
- * data phase) through a Generic SCSI interface. 
+ * data phase) through a Generic SCSI interface.
  */
 
 #include <stdlib.h>
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.3.5 (2007-08-20)"
+#define SG_RAW_VERSION "0.3.8 (2008-07-18)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -66,11 +66,12 @@ struct opts_t {
     int do_version;
 };
 
-static void version()
+static void
+version()
 {
     fprintf(stderr,
             "sg_raw " SG_RAW_VERSION "\n"
-            "Copyright (C) 2007 Ingo van Lil <inguin@gmx.de>\n"
+            "Copyright (C) 2007-2008 Ingo van Lil <inguin@gmx.de>\n"
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"
             "the GNU General Public License "
@@ -78,24 +79,25 @@ static void version()
             "There is NO WARRANTY, to the extent permitted by law.\n");
 }
 
-static void usage()
+static void
+usage()
 {
     fprintf(stderr,
-            "Usage: sg_raw [OPTION] DEVICE CDB0 CDB1 ...\n"
+            "Usage: sg_raw [OPTION]* DEVICE CDB0 CDB1 ...\n"
             "\n"
             "Options:\n"
             "  -b, --binary           Dump data in binary form, even when "
             "writing to stdout\n"
             "  -h, --help             Show this message and exit\n"
-            "  -i, --infile=FILE      Read data to send from FILE (default: "
+            "  -i, --infile=IFILE     Read data to send from IFILE (default: "
             "stdin)\n"
             "  -k, --skip=LEN         Skip the first LEN bytes when reading "
             "data to send\n"
             "  -n, --nosense          Don't display sense information\n"
-            "  -o, --outfile=FILE     Write data to FILE (default: hexdump "
-            "to stdout)\n"
-            "  -r, --request=LEN      Request up to LEN bytes of data\n"
-            "  -s, --send=LEN         Send LEN bytes of data\n"
+            "  -o, --outfile=OFILE    Write binary data to OFILE (def: "
+            "hexdump to stdout)\n"
+            "  -r, --request=RLEN     Request up to RLEN bytes of data\n"
+            "  -s, --send=SLEN        Send SLEN bytes of data\n"
             "  -t, --timeout=SEC      Timeout in seconds (default: 20)\n"
             "  -v, --verbose          Increase verbosity\n"
             "  -V, --version          Show version information and exit\n"
@@ -107,7 +109,8 @@ static void usage()
             "  sg_raw -r 1k /dev/sg0 12 00 00 00 60 00\n");
 }
 
-static int process_cl(struct opts_t *optsp, int argc, char *argv[])
+static int
+process_cl(struct opts_t *optsp, int argc, char *argv[])
 {
     while (1) {
         int c, n;
@@ -223,7 +226,8 @@ static int process_cl(struct opts_t *optsp, int argc, char *argv[])
     return 0;
 }
 
-static int skip(int fd, off_t offset)
+static int
+skip(int fd, off_t offset)
 {
     off_t remain;
     char buffer[512];
@@ -253,7 +257,8 @@ static int skip(int fd, off_t offset)
     return 0;
 }
 
-static unsigned char *fetch_dataout(struct opts_t *optsp)
+static unsigned char *
+fetch_dataout(struct opts_t *optsp)
 {
     unsigned char *buf = NULL;
     int fd, len;
@@ -303,19 +308,25 @@ bail:
     return buf;
 }
 
-static int write_dataout(const char *filename, unsigned char *buf, int len)
+static int
+write_dataout(const char *filename, unsigned char *buf, int len)
 {
     int ret = SG_LIB_CAT_OTHER;
     int fd;
 
-    if (filename != NULL) {
+    if ((filename == NULL) ||
+        ((1 == strlen(filename)) && ('-' == filename[0])))
+        fd = STDOUT_FILENO;
+    else {
         fd = creat(filename, 0666);
         if (fd < 0) {
             perror(filename);
             goto bail;
         }
-    } else {
-        fd = STDOUT_FILENO;
+    }
+    if (sg_set_binary_mode(fd) < 0) {
+        perror("sg_set_binary_mode");
+        goto bail;
     }
 
     if (write(fd, buf, len) != len) {
@@ -331,11 +342,13 @@ bail:
     return ret;
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
     int ret = 0;
     int res_cat;
     int slen;
+    int k;
     struct opts_t opts;
     int sg_fd = -1;
     struct sg_pt_base *ptvp = NULL;
@@ -368,6 +381,12 @@ int main(int argc, char *argv[])
     if (ptvp == NULL) {
         fprintf(stderr, "out of memory\n");
         goto done;
+    }
+    if (opts.do_verbose) {
+        fprintf(stderr, "    cdb to send: ");
+        for (k = 0; k < opts.cdb_length; ++k)
+            fprintf(stderr, "%02x ", opts.cdb[k]);
+        fprintf(stderr, "\n");
     }
     set_scsi_pt_cdb(ptvp, opts.cdb, opts.cdb_length);
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
@@ -433,8 +452,14 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Received %d bytes of data:\n", data_len);
                 dStrHex((const char *)dxfer_buffer, data_len, 0);
             } else {
+                const char * cp = "stdout";
+
+                if (opts.datain_file &&
+                    ! ((1 == strlen(opts.datain_file)) &&
+                       ('-' == opts.datain_file[0])))
+                    cp = opts.datain_file;
                 fprintf(stderr, "Writing %d bytes of data to %s\n", data_len,
-                        opts.datain_file? opts.datain_file : "stdout");
+                        cp);
                 ret = write_dataout(opts.datain_file, dxfer_buffer, data_len);
                 if (ret != 0)
                     goto done;

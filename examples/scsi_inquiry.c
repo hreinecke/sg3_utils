@@ -19,16 +19,16 @@
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   This program does a SCSI inquiry command on the given device and 
+   This program does a SCSI inquiry command on the given device and
    outputs some of the result. This program highlights the use of the
-   SCSI_IOCTL_SEND_COMMAND ioctl. This should be able to be applied to 
+   SCSI_IOCTL_SEND_COMMAND ioctl. This should be able to be applied to
    any SCSI device file descriptor (not just one related to sg). [Whether
    this is a good idea on a disk while it is mounted is debatable.
    No detrimental effects when this was tested ...]
 
 Version 0.14 20011218
 */
-        
+
 
 typedef struct my_scsi_ioctl_command {
         unsigned int inlen;  /* _excluding_ scsi command length */
@@ -80,7 +80,7 @@ int main(int argc, char * argv[])
         printf("            scsi_inquiry -n /dev/scd0\n");
         return 1;
     }
-    
+
     if (do_nonblock)
         oflags = O_NONBLOCK;
     s_fd = open(file_name, oflags | O_RDWR);
@@ -116,7 +116,7 @@ int main(int argc, char * argv[])
     }
     else if (res < 0)
         perror("scsi_inquiry: SCSI_IOCTL_SEND_COMMAND err");
-    else 
+    else
         printf("scsi_inquiry: SCSI_IOCTL_SEND_COMMAND status=0x%x\n", res);
 
     res = close(s_fd);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2008 Douglas Gilbert.
+ * Copyright (c) 1999-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
 #include "sg_pt.h"
 
 
-static char * version_str = "1.43 20080327";
+static char * version_str = "1.45 20090228";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -106,6 +106,14 @@ int
 sg_cmds_open_device(const char * device_name, int read_only, int verbose)
 {
     return scsi_pt_open_device(device_name, read_only, verbose);
+}
+
+/* Returns file descriptor >= 0 if successful. If error in Unix returns
+   negated errno. */
+int
+sg_cmds_open_flags(const char * device_name, int flags, int verbose)
+{
+    return scsi_pt_open_flags(device_name, flags, verbose);
 }
 
 /* Returns 0 if successful. If error in Unix returns negated errno. */
@@ -540,8 +548,8 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
                  int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] = 
-                        {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA, 
+    unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] =
+                        {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -684,7 +692,7 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] =
         {MODE_SENSE6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -758,7 +766,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                    int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] =
         {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -832,7 +840,7 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
                    int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SELECT6_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SELECT6_CMDLEN] =
         {MODE_SELECT6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -903,7 +911,7 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
                     int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SELECT10_CMDLEN] = 
+    unsigned char modesCmdBlk[MODE_SELECT10_CMDLEN] =
         {MODE_SELECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1137,7 +1145,7 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
                     int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] = 
+    unsigned char rsCmdBlk[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1146,9 +1154,8 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
         rsCmdBlk[1] |= 0x1;
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
-    if (mx_resp_len > 0xfc) {
-        fprintf(sg_warnings_strm, "SPC-3 says request sense allocation "
-                "length should be <= 252\n");
+    if (mx_resp_len > 0xff) {
+        fprintf(sg_warnings_strm, "mx_resp_len cannot exceed 255\n");
         return -1;
     }
     rsCmdBlk[4] = mx_resp_len & 0xff;
@@ -1271,12 +1278,12 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int
-sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code, 
+sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
                 int mx_resp_len, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] = 
+    unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] =
         {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1348,7 +1355,7 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
                  int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] = 
+    unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] =
         {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1493,7 +1500,7 @@ int
 sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] = 
+    unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] =
                 {PREVENT_ALLOW_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,7 +40,6 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
-#include "sg_pt.h"
 
 /* This program uses a ATA PASS-THROUGH SCSI command to package
    an ATA IDENTIFY (PACKAGE) DEVICE command. See http://www.t10.org
@@ -64,7 +63,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.05 20071202";
+static char * version_str = "1.06 20090303";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -184,7 +183,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                         fprintf(stderr, "ATA PASS-THROUGH (%d), bad "
                                 "field in cdb\n", cdb_len);
                 }
-                return ret; 
+                return ret;
             case SPC_SK_NO_SENSE:
             case SPC_SK_RECOVERED_ERROR:
                 if ((0x0 == ssh.asc) &&
@@ -361,6 +360,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "missing device name!\n");
         usage();
         return 1;
+    }
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,

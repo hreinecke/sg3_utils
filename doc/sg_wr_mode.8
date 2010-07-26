@@ -1,4 +1,4 @@
-.TH SG_WR_MODE "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_WR_MODE "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_wr_mode \- write mode page
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ sg_wr_mode \- write mode page
 Writes a modified mode page to \fIDEVICE\fR. Uses the SCSI MODE SENSE (6
 or 10 byte variant) command to fetch the existing mode data which includes
 a mode page (or subpage). It then combines that with the contents,
-potentially masked, and writes the modified mode page with the SCSI MODE 
+potentially masked, and writes the modified mode page with the SCSI MODE
 SELECT (6 or 10 byte variant) command. This utility does not modify
 the block descriptor(s); if any block descriptors are fetched by the MODE
 SENSE command then the same block descriptors are written back with the
@@ -53,12 +53,13 @@ Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-c\fR, \fB\-\-contents\fR=\fIH,H...\fR
 where \fIH,H...\fR is a string of comma separated hex numbers each of
-which should resolve to a byte value (i.e. 0 to ff inclusive). This is the
-new contents of the mode page to be written to \fIDEVICE\fR, potentially
-filtered by the mask string.
+which should resolve to a byte value (i.e. 0 to ff inclusive). A (single)
+space separated string of hex numbers is also allowed but the list needs to
+be in quotes. This is the new contents of the mode page to be written to
+\fIDEVICE\fR, potentially filtered by the mask string.
 .TP
 \fB\-c\fR, \fB\-\-contents\fR=-
-reads contents string from stdin. The numbers in the string may be comma,
+reads contents string from stdin. The hex numbers in the string may be comma,
 space, tab or linefeed (newline) separated. If a line contains "#" then the
 remaining characters on that line are ignored. Otherwise each non separator
 character should resolve to a byte value (i.e. 0 to ff inclusive). This
@@ -89,13 +90,14 @@ don't support the 10 byte variants hence this option.
 .TP
 \fB\-m\fR, \fB\-\-mask\fR=\fIM,M...\fR
 where \fIM,M...\fR is a string of comma separated hex numbers each of which
-should resolve to a byte value (i.e. 0 to ff inclusive). The mask
-chooses (bit by bit) whether the new mode page comes from the contents (mask
-bit set) or from the existing mode page (mask bit clear). If the mask string
-is shorter than the contents string then the remaining bytes are taken from
-the contents string. If the contents string is shorter than the existing
-mode page then the remaining bytes are taken from the existing mode
-page (i.e. they are left unaltered).
+should resolve to a byte value (i.e. 0 to ff inclusive). A (single) space
+separated string of hex numbers is also allowed but the list needs to be in
+quotes. The mask chooses (bit by bit) whether the new mode page comes from
+the contents (mask bit set) or from the existing mode page (mask bit clear).
+If the mask string is shorter than the contents string then the remaining
+bytes are taken from the contents string. If the contents string is shorter
+than the existing mode page then the remaining bytes are taken from the
+existing mode page (i.e. they are left unaltered).
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 where \fIPG\fR is the page code value to fetch and modify. The page code is
@@ -188,7 +190,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2008 Douglas Gilbert
+Copyright \(co 2004\-2009 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

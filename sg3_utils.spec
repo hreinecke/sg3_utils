@@ -1,16 +1,16 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.26
+Version: 1.27
 # Release: 1%{?dist}
 Release: 1
 License: GPL
 Group: Utilities/System
-Source: ftp://www.torque.net/sg/p/sg3_utils-%{version}.tgz
-Url: http://www.torque.net/sg/sg3_utils.html
+Source: ftp://sg.danny.cz/sg/p/sg3_utils-%{version}.tgz
+Url: http://sg.danny.cz/sg/sg3_utils.html
 Provides: sg_utils
 BuildRequires: libtool
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-Packager: Douglas Gilbert <dougg@torque.net>
+Packager: Douglas Gilbert <dgilbert@interlog.com>
 
 %description
 Collection of Linux utilities for devices that use the SCSI command set.
@@ -46,7 +46,7 @@ developing applications.
 %setup -q
 
 %build
-./configure --prefix=%{_prefix} --mandir=%{_mandir}
+%configure
 
 %install
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
@@ -79,8 +79,12 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Thu Mar 27 2008 - dgilbert at interlog dot com
-- sg_get_config sync with mmc6r01, add sg_sat_phy_event
+* Sat Apr 11 2009 - dgilbert at interlog dot com
+- add sg_write_same; sg_dd split; spc4r18 sync
+  * sg3_utils-1.27
+
+* Wed Jun 25 2008 - dgilbert at interlog dot com
+- add sg_sat_phy_event, sync with drafts prior to this date
   * sg3_utils-1.26
 
 * Tue Oct 16 2007 - dgilbert at interlog dot com

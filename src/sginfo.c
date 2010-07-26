@@ -33,7 +33,7 @@
  * -V    access Verify Error Recovery Page.
  * -T    trace commands (for debugging, double for more debug)
  * -z    do a single fetch for mode pages (rather than double fetch)
- *       
+ *
  * Only one of the following three options can be specified.
  * None of these three implies the current values are returned.
  * -m    Display modifiable fields instead of current values
@@ -60,13 +60,13 @@
  *
  *   You should have received a copy of the GNU General Public License
  *   along with this program; if not, write to the Free Software
- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  
+ *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * Michael Weller (eowmob at exp-math dot uni-essen dot de) 
+ * Michael Weller (eowmob at exp-math dot uni-essen dot de)
  *      11/23/94 massive extensions from 1.4a
  *      08/23/97 fix problems with defect lists
  *
- * Douglas Gilbert (dgilbert at interlog dot com) 
+ * Douglas Gilbert (dgilbert at interlog dot com)
  *      990628   port to sg .... (version 1.81)
  *               up 4KB limit on defect list to 32KB
  *               'sginfo -l' also shows sg devices and mapping to other
@@ -86,21 +86,21 @@
  *              cleaned parameter parsing a bit (it's still a terrible mess!)
  *              Use sr (instead of scd) and sg%d (instead of sga,b,...) in -l
  *                      and support much more devs in -l (incl. nosst)
- *              Fix segfault in defect list (len=0xffff) and adapt formatting 
+ *              Fix segfault in defect list (len=0xffff) and adapt formatting
  *                      to large disks. Support up to 256kB defect lists with
- *                      0xB7 (12byte) command if necessary and fallback to 0x37 
+ *                      0xB7 (12byte) command if necessary and fallback to 0x37
  *                      (10byte) in case of failure. Report truncation.
- *              sizeof(buffer) (which is sizeof(char*) == 4 or 32 bit archs) 
+ *              sizeof(buffer) (which is sizeof(char*) == 4 or 32 bit archs)
  *                      was used incorrectly all over the place. Fixed.
  *                                      [version 1.95]
- * Douglas Gilbert (dgilbert at interlog dot com) 
+ * Douglas Gilbert (dgilbert at interlog dot com)
  *    20020113  snprintf() type cleanup [version 1.96]
  *    20021211  correct sginfo MODE_SELECT, protect against block devices
  *              that answer sg's ioctls. [version 1.97]
  *    20021228  scan for some "scd<n>" as well as "sr<n>" device names [1.98]
  *    20021020  Update control page [1.99]
  *
- * Thomas Steudten (thomas at steudten dot com) 
+ * Thomas Steudten (thomas at steudten dot com)
  *    20040521  add -Fhead feature [version 2.04]
  *
  * Tim Hunt (tim at timhunt dot net)
@@ -110,12 +110,19 @@
  *    20051218  improve disk defect list handling
  */
 
+
+/*
+ * N.B. This utility is in maintenance mode only. This means that serious
+ * bugs will be fixed but no new features or mode page changes will be
+ * added. Please use the sdparm utility.     D. Gilbert 20090316
+ */
+
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.27 [20080115]";
+static const char * version_str = "2.29 [20090329]";
 
 #include <stdio.h>
 #include <string.h>
@@ -142,13 +149,14 @@ static const char * version_str = "2.27 [20080115]";
 static int glob_fd;
 static char *device_name;
 
+#define MAX_SG_DEVS 8192
 #define MAX_RESP6_SIZE 252
 #define MAX_RESP10_SIZE (4*1024)
 #define MAX_BUFFER_SIZE MAX_RESP10_SIZE
 
 #define INQUIRY_RESP_INITIAL_LEN 36
 
-#define MAX_HEADS 127 
+#define MAX_HEADS 127
 #define HEAD_SORT_TOKEN 0x55
 
 #define SIZEOF_BUFFER (16*1024)
@@ -179,24 +187,24 @@ struct mpage_info {
 };
 
 /* declarations of functions decoding known mode pages */
-static int common_disconnect_reconnect(struct mpage_info * mpi, 
+static int common_disconnect_reconnect(struct mpage_info * mpi,
                                        const char * prefix);
 static int common_control(struct mpage_info * mpi, const char * prefix);
-static int common_control_extension(struct mpage_info * mpi, 
+static int common_control_extension(struct mpage_info * mpi,
                                     const char * prefix);
 static int common_proto_spec_lu(struct mpage_info * mpi, const char * prefix);
-static int common_proto_spec_port(struct mpage_info * mpi, 
+static int common_proto_spec_port(struct mpage_info * mpi,
                                   const char * prefix);
-static int common_proto_spec_port_sp1(struct mpage_info * mpi, 
+static int common_proto_spec_port_sp1(struct mpage_info * mpi,
                                       const char * prefix);
-static int common_proto_spec_port_sp2(struct mpage_info * mpi, 
+static int common_proto_spec_port_sp2(struct mpage_info * mpi,
                                       const char * prefix);
-static int common_power_condition(struct mpage_info * mpi, 
+static int common_power_condition(struct mpage_info * mpi,
                                   const char * prefix);
 static int common_informational(struct mpage_info * mpi, const char * prefix);
 static int disk_error_recovery(struct mpage_info * mpi, const char * prefix);
 static int disk_format(struct mpage_info * mpi, const char * prefix);
-static int disk_verify_error_recovery(struct mpage_info * mpi, 
+static int disk_verify_error_recovery(struct mpage_info * mpi,
                                       const char * prefix);
 static int disk_geometry(struct mpage_info * mpi, const char * prefix);
 static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix);
@@ -246,20 +254,20 @@ static struct mpage_name_func mpage_common[] =
     { 0x16, 0, PC_COMMON, "Extended, device-type specific", NULL},
     { 0x18, 0, PC_COMMON, "Protocol specific lu", common_proto_spec_lu},
     { 0x19, 0, PC_COMMON, "Protocol specific port", common_proto_spec_port},
-    { 0x19, 1, PC_COMMON, "Protocol specific port, subpage 1 overload", 
+    { 0x19, 1, PC_COMMON, "Protocol specific port, subpage 1 overload",
       common_proto_spec_port_sp1},
-    { 0x19, 2, PC_COMMON, "Protocol specific port, subpage 2 overload", 
+    { 0x19, 2, PC_COMMON, "Protocol specific port, subpage 2 overload",
       common_proto_spec_port_sp2},
-/*    { 0x19, 2, PC_COMMON, "SPI-4 Saved Training configuration", 
+/*    { 0x19, 2, PC_COMMON, "SPI-4 Saved Training configuration",
         spi4_training_config}, */
     { 0x19, 3, PC_COMMON, "SPI-4 Negotiated Settings", spi4_negotiated},
-    { 0x19, 4, PC_COMMON, "SPI-4 Report transfer capabilities", 
+    { 0x19, 4, PC_COMMON, "SPI-4 Report transfer capabilities",
       spi4_report_xfer},
     { 0x1a, 0, PC_COMMON, "Power Condition", common_power_condition},
     { 0x1c, 0, PC_COMMON, "Informational Exceptions", common_informational},
     { MP_LIST_PAGES, 0, PC_COMMON, "Return all pages", NULL},
 };
-static const int mpage_common_len = sizeof(mpage_common) / 
+static const int mpage_common_len = sizeof(mpage_common) /
                                     sizeof(mpage_common[0]);
 
 static struct mpage_name_func mpage_disk[] =
@@ -281,7 +289,7 @@ static const int mpage_disk_len = sizeof(mpage_disk) / sizeof(mpage_disk[0]);
 
 static struct mpage_name_func mpage_cdvd[] =
 {
-    { 1, 0, PC_CDVD, "Read-Write Error Recovery (cdvd)", 
+    { 1, 0, PC_CDVD, "Read-Write Error Recovery (cdvd)",
       cdvd_error_recovery},
     { 3, 0, PC_CDVD, "MRW", cdvd_mrw},
     { 5, 0, PC_CDVD, "Write parameters", cdvd_write_param},
@@ -290,7 +298,7 @@ static struct mpage_name_func mpage_cdvd[] =
     { 0xe, 0, PC_CDVD, "CD audio control", cdvd_audio_control},
     { 0x18, 0, PC_CDVD, "Feature set support & version", cdvd_feature},
     { 0x1a, 0, PC_CDVD, "Power Condition", common_power_condition},
-    { 0x1c, 0, PC_CDVD, "Fault/failure reporting control", 
+    { 0x1c, 0, PC_CDVD, "Fault/failure reporting control",
       common_informational},
     { 0x1d, 0, PC_CDVD, "Time-out & protect", cdvd_timeout},
     { 0x2a, 0, PC_CDVD, "MM capabilities & mechanical status", cdvd_mm_capab},
@@ -445,7 +453,7 @@ static int do_scsi_io(struct scsi_cmnd_io * sio)
     }
 }
 
-struct mpage_name_func * get_mpage_info(int page_no, int subpage_no, 
+struct mpage_name_func * get_mpage_info(int page_no, int subpage_no,
                                     struct mpage_name_func * mpp, int elems)
 {
     int k;
@@ -546,11 +554,11 @@ static char * get_page_name(struct mpage_info * mpi)
     mpf = get_mpage_name_func(mpi);
     if ((NULL == mpf) || (NULL == mpf->name)) {
         if (mpi->subpage)
-            snprintf(unkn_page_str, sizeof(unkn_page_str), 
-                     "page number=0x%x, subpage number=0x%x", 
+            snprintf(unkn_page_str, sizeof(unkn_page_str),
+                     "page number=0x%x, subpage number=0x%x",
                      mpi->page, mpi->subpage);
         else
-            snprintf(unkn_page_str, sizeof(unkn_page_str), 
+            snprintf(unkn_page_str, sizeof(unkn_page_str),
                      "page number=0x%x", mpi->page);
         return unkn_page_str;
     }
@@ -604,7 +612,7 @@ static int64_t getnbyte_ll(const unsigned char *pnt, int nbyte)
     return result;
 }
 
-static int putnbyte(unsigned char *pnt, unsigned int value, 
+static int putnbyte(unsigned char *pnt, unsigned int value,
                     unsigned int nbyte)
 {
     int i;
@@ -649,7 +657,7 @@ static void bitfield(unsigned char *pageaddr, char * text, int mask, int shift)
 }
 
 #if 0
-static void notbitfield(unsigned char *pageaddr, char * text, int mask, 
+static void notbitfield(unsigned char *pageaddr, char * text, int mask,
                         int shift)
 {
     if (modifiable) {
@@ -695,12 +703,12 @@ static void hexdatafield(unsigned char * pageaddr, int nbytes, char * text)
         unsigned char *ptr;
         unsigned tmp;
 
-        /* Though in main we ensured that a @string has the right format, 
+        /* Though in main we ensured that a @string has the right format,
            we have to check that we are working on a @ hexdata field */
 
         check_parm_type(1);
 
-        ptr = (unsigned char *) (unsigned long) 
+        ptr = (unsigned char *) (unsigned long)
               (replacement_values[next_parameter++]);
         ptr++;                  /* Skip @ */
 
@@ -758,7 +766,7 @@ static int modePageOffset(const unsigned char * resp, int len, int modese_6)
             resp_len = (resp[0] << 8) + resp[1] + 2;
             bd_len = (resp[6] << 8) + resp[7];
             /* LongLBA doesn't change this calculation */
-            offset = bd_len + MPHEADER10_LEN; 
+            offset = bd_len + MPHEADER10_LEN;
         }
         if ((offset + 2) > len) {
             printf("modePageOffset: raw_curr too small, offset=%d "
@@ -787,7 +795,7 @@ static int get_mode_page6(struct mpage_info * mpi, int dbd,
     cmd[1] = 0x00 | (dbd ? 0x8 : 0); /* disable block descriptors bit */
     cmd[2] = (mpi->page_control << 6) | mpi->page;
     cmd[3] = mpi->subpage;      /* subpage code */
-    cmd[4] = initial_len; 
+    cmd[4] = initial_len;
     cmd[5] = 0x00;              /* control */
 
     sci.cmnd = cmd;
@@ -799,7 +807,7 @@ static int get_mode_page6(struct mpage_info * mpi, int dbd,
     if (status) {
         if (mpi->subpage)
             fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_6]\n", get_page_name(mpi), mpi->page, 
+                    "0x%x [mode_sense_6]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
             fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
@@ -828,7 +836,7 @@ static int get_mode_page6(struct mpage_info * mpi, int dbd,
     if (status) {
         if (mpi->subpage)
             fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_6]\n", get_page_name(mpi), mpi->page, 
+                    "0x%x [mode_sense_6]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
             fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
@@ -844,7 +852,7 @@ static int get_mode_page6(struct mpage_info * mpi, int dbd,
 }
 
 /* Reads mode (sub-)page via 10 byte MODE SENSE, returns 0 if ok */
-static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd, 
+static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
                            unsigned char * resp, int sngl_fetch)
 {
     int status, off;
@@ -854,7 +862,7 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
 
     memset(resp, 0, 4);
     cmd[0] = SMODE_SENSE_10;     /* MODE SENSE (10) */
-    cmd[1] = 0x00 | (llbaa ? 0x10 : 0) | (dbd ? 0x8 : 0);         
+    cmd[1] = 0x00 | (llbaa ? 0x10 : 0) | (dbd ? 0x8 : 0);
     cmd[2] = (mpi->page_control << 6) | mpi->page;
     cmd[3] = mpi->subpage;
     cmd[4] = 0x00;              /* (reserved) */
@@ -873,7 +881,7 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
     if (status) {
         if (mpi->subpage)
             fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_10]\n", get_page_name(mpi), mpi->page, 
+                    "0x%x [mode_sense_10]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
             fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
@@ -892,8 +900,8 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
         return status;
     }
 
-    cmd[7] = (mpi->resp_len >> 8) & 0xff;              
-    cmd[8] = (mpi->resp_len & 0xff); 
+    cmd[7] = (mpi->resp_len >> 8) & 0xff;
+    cmd[8] = (mpi->resp_len & 0xff);
     sci.cmnd = cmd;
     sci.cmnd_len = sizeof(cmd);
     sci.dxfer_dir = DXFER_FROM_DEVICE;
@@ -903,7 +911,7 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
     if (status) {
         if (mpi->subpage)
             fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
-                    "0x%x [mode_sense_10]\n", get_page_name(mpi), mpi->page, 
+                    "0x%x [mode_sense_10]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
         else
             fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
@@ -918,15 +926,15 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
     return status;
 }
 
-static int get_mode_page(struct mpage_info * mpi, int dbd, 
+static int get_mode_page(struct mpage_info * mpi, int dbd,
                          unsigned char * resp)
 {
     int res;
 
     if (mode6byte)
-        res = get_mode_page6(mpi, dbd, resp, single_fetch); 
+        res = get_mode_page6(mpi, dbd, resp, single_fetch);
     else
-        res = get_mode_page10(mpi, 0, dbd, resp, single_fetch); 
+        res = get_mode_page10(mpi, 0, dbd, resp, single_fetch);
     if (UNKNOWN_OPCODE == res)
         fprintf(stdout, ">>>>> Try command again with%s '-6' "
                 "argument\n", (mode6byte ? "out the" : " a"));
@@ -944,7 +952,7 @@ static int get_mode_page(struct mpage_info * mpi, int dbd,
 /* Contents should point to the mode parameter header that we obtained
    in a prior read operation.  This way we do not have to work out the
    format of the beast. Assume 0 or 1 block descriptors. */
-static int put_mode_page6(struct mpage_info * mpi, 
+static int put_mode_page6(struct mpage_info * mpi,
                           const unsigned char * msense6_resp, int sp_bit)
 {
     int status;
@@ -959,7 +967,7 @@ static int put_mode_page6(struct mpage_info * mpi,
     cmd[1] = 0x10 | (sp_bit ? 1 : 0); /* always set PF bit */
     cmd[2] = 0x00;
     cmd[3] = 0x00;              /* (reserved) */
-    cmd[4] = resplen;           /* parameter list length */ 
+    cmd[4] = resplen;           /* parameter list length */
     cmd[5] = 0x00;              /* (reserved) */
 
     memcpy(cbuffer1, msense6_resp, resplen);
@@ -987,7 +995,7 @@ static int put_mode_page6(struct mpage_info * mpi,
     if (status) {
         if (mpi->subpage)
             fprintf(stdout, ">>> Unable to store %s mode page 0x%x,"
-                    " subpage 0x%x [msel_6]\n", get_page_name(mpi), 
+                    " subpage 0x%x [msel_6]\n", get_page_name(mpi),
                     mpi->page, mpi->subpage);
         else
             fprintf(stdout, ">>> Unable to store %s mode page 0x%x [msel_6]\n",
@@ -999,7 +1007,7 @@ static int put_mode_page6(struct mpage_info * mpi,
 /* Contents should point to the mode parameter header that we obtained
    in a prior read operation.  This way we do not have to work out the
    format of the beast. Assume 0 or 1 block descriptors. */
-static int put_mode_page10(struct mpage_info * mpi, 
+static int put_mode_page10(struct mpage_info * mpi,
                            const unsigned char * msense10_resp, int sp_bit)
 {
     int status;
@@ -1045,7 +1053,7 @@ static int put_mode_page10(struct mpage_info * mpi,
     if (status) {
         if (mpi->subpage)
             fprintf(stdout, ">>> Unable to store %s mode page 0x%x,"
-                    " subpage 0x%x [msel_10]\n", get_page_name(mpi), 
+                    " subpage 0x%x [msel_10]\n", get_page_name(mpi),
                     mpi->page, mpi->subpage);
         else
             fprintf(stdout, ">>> Unable to store %s mode page 0x%x "
@@ -1054,22 +1062,22 @@ static int put_mode_page10(struct mpage_info * mpi,
     return status;
 }
 
-static int put_mode_page(struct mpage_info * mpi, 
+static int put_mode_page(struct mpage_info * mpi,
                          const unsigned char * msense_resp)
 {
     if (mode6byte)
-        return put_mode_page6(mpi, msense_resp, ! negate_sp_bit); 
+        return put_mode_page6(mpi, msense_resp, ! negate_sp_bit);
     else
-        return put_mode_page10(mpi, msense_resp, ! negate_sp_bit); 
+        return put_mode_page10(mpi, msense_resp, ! negate_sp_bit);
 }
 
-int setup_mode_page(struct mpage_info * mpi, int nparam, 
+int setup_mode_page(struct mpage_info * mpi, int nparam,
                     unsigned char * buff, unsigned char ** o_pagestart)
 {
     int status, offset, rem_pglen;
     unsigned char * pgp;
-  
-    status = get_mode_page(mpi, 0, buff); 
+
+    status = get_mode_page(mpi, 0, buff);
     if (status) {
         printf("\n");
         return status;
@@ -1083,12 +1091,12 @@ int setup_mode_page(struct mpage_info * mpi, int nparam,
     pgp = buff + offset;
     *o_pagestart = pgp;
     rem_pglen = (0x40 & pgp[0]) ? ((pgp[2] << 8) + pgp[3]) : pgp[1];
-        
+
     if (x_interface && replace) {
-        if ((nparam && (n_replacement_values != nparam)) || 
+        if ((nparam && (n_replacement_values != nparam)) ||
             ((! nparam) && (n_replacement_values != rem_pglen))) {
             fprintf(stdout, "Wrong number of replacement values (%i instead "
-                    "of %i)\n", n_replacement_values, 
+                    "of %i)\n", n_replacement_values,
                     nparam ? nparam : rem_pglen);
             return 1;
         }
@@ -1117,7 +1125,7 @@ static int get_protocol_id(int port_not_lu, unsigned char * buff,
     proto_id = buff[off + (spf ? 5 : 2)] & 0xf;
     if (trace_cmd > 0)
         printf("Protocol specific %s, protocol_id=%s\n",
-               (port_not_lu ? "port" : "lu"), 
+               (port_not_lu ? "port" : "lu"),
                sg_get_trans_proto_str(proto_id, sizeof(b), b));
     if (proto_idp)
         *proto_idp = proto_id;
@@ -1422,7 +1430,7 @@ static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
         if (1 == mpi->page_control)     /* modifiable */
             printf("0");
         else
-            printf("0x%8.8x%8.8x", getnbyte(pagestart + 16, 4), 
+            printf("0x%8.8x%8.8x", getnbyte(pagestart + 16, 4),
                    getnbyte(pagestart + 20, 4));
 #endif
     };
@@ -1468,7 +1476,7 @@ static int read_defect_list(int grown_only)
         sorthead = 1;
         headsp = (unsigned int *)malloc(sizeof(unsigned int) * MAX_HEADS);
         if (headsp == NULL) {
-           perror("malloc failed"); 
+           perror("malloc failed");
            return status;
         }
         memset(headsp,0,sizeof(unsigned int) * MAX_HEADS);
@@ -1484,7 +1492,7 @@ static int read_defect_list(int grown_only)
         reallen = -1;
 
         cmd[0] = 0x37;          /* READ DEFECT DATA (10) */
-        cmd[1] = 0x00; 
+        cmd[1] = 0x00;
         cmd[2] = (table ? 0x08 : 0x10) | defectformat;  /*  List, Format */
         cmd[3] = 0x00;          /* (reserved) */
         cmd[4] = 0x00;          /* (reserved) */
@@ -1585,7 +1593,7 @@ static int read_defect_list(int grown_only)
             len = (bp[4] << 24) + (bp[5] << 16) + (bp[6] << 8) + bp[7];
             reallen = len;
         }
-        
+
         if (len > 0) {
             k = len + 8;              /* length of defect list + header */
             if (k > (int)sizeof(cbuffer)) {
@@ -1619,15 +1627,15 @@ static int read_defect_list(int grown_only)
                 sci.dxfer_len = k;
                 sci.dxferp = bp;
                 i = do_scsi_io(&sci);
-                if (i) 
+                if (i)
                     goto trytenbyte;
                 if (trace_cmd > 1) {
                     printf("  cdb response:\n");
                     dump(bp, 8);
                 }
-                reallen = (bp[4] << 24) + (bp[5] << 16) + (bp[6] << 8) + 
+                reallen = (bp[4] << 24) + (bp[5] << 16) + (bp[6] << 8) +
                           bp[7];
-                if (reallen > len) { 
+                if (reallen > len) {
                     trunc = 1;
                 }
                 df = (unsigned char *) (bp + 8);
@@ -1639,7 +1647,7 @@ trytenbyte:
                     trunc = 1;
                 }
                 k = len + 4;            /* length of defect list + header */
-                if (k > (int)sizeof(cbuffer) && NULL == heapp) { 
+                if (k > (int)sizeof(cbuffer) && NULL == heapp) {
                     heapp = (unsigned char *)malloc(k);
                     if (heapp != NULL)
                         bp = heapp;
@@ -1648,7 +1656,7 @@ trytenbyte:
                     bp = cbuffer;
                     k = sizeof(cbuffer);
                     len = k - 4;
-                    trunc = 1; 
+                    trunc = 1;
                 }
                 cmd[0] = 0x37;          /* READ DEFECT DATA (10) */
                 cmd[1] = 0x00;
@@ -1684,11 +1692,11 @@ trytenbyte:
                 printf("at least ");
                 reallen = len;
             }
-            printf("%d entries (%d bytes) in %s table.\n", 
+            printf("%d entries (%d bytes) in %s table.\n",
                    reallen / ((0 == defect_format) ? 4 : 8), reallen,
                    table ? "grown (GLIST)" : "primary (manufacturer,PLIST)");
-            if (!sorthead) 
-                printf("Format (%x) is: %s\n", defect_format, 
+            if (!sorthead)
+                printf("Format (%x) is: %s\n", defect_format,
                    formatname(defect_format));
             i = 0;
             switch (defect_format) {
@@ -1725,7 +1733,7 @@ trytenbyte:
                         i = 0;
                     }
                     else if (!sorthead) printf("|");
-                }                           
+                }
             case 0:     /* lba (32 bit) */
                 while (len > 0) {
                     printf("%10d", getnbyte(df, 4));
@@ -1760,7 +1768,7 @@ trytenbyte:
             if (i && !sorthead)
                 printf("\n");
         }
-        if (trunc) 
+        if (trunc)
                 printf("[truncated]\n");
     }
     if (heapp) {
@@ -1858,7 +1866,7 @@ static int disk_format(struct mpage_info * mpi, const char * prefix)
 
 }
 
-static int disk_verify_error_recovery(struct mpage_info * mpi, 
+static int disk_verify_error_recovery(struct mpage_info * mpi,
                                       const char * prefix)
 {
     int status;
@@ -1890,7 +1898,7 @@ static int disk_verify_error_recovery(struct mpage_info * mpi,
 }
 
 #if 0
-static int peripheral_device_page(struct mpage_info * mpi, 
+static int peripheral_device_page(struct mpage_info * mpi,
                                   const char * prefix)
 {
     static char *idents[] =
@@ -1936,12 +1944,12 @@ static int peripheral_device_page(struct mpage_info * mpi,
     if (bdlen < 0)
         bdlen = 0;
     else {
-        status = setup_mode_page(mpi, 2, cbuffer, &bdlen, 
+        status = setup_mode_page(mpi, 2, cbuffer, &bdlen,
                                  &pagestart);
         if (status)
             return status;
     }
-        
+
     hexfield(pagestart + 2, 2, "Interface Identifier");
     if (!x_interface) {
         for (ident = 0; ident < 35; ident++)
@@ -2594,7 +2602,7 @@ static int fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode page (0x%x)\n", "Fibre Channel port control", 
+        printf("%s mode page (0x%x)\n", "Fibre Channel port control",
                mpi->page);
         printf("----------------------------------------------------\n");
     }
@@ -2696,7 +2704,7 @@ static int spi4_margin_control(struct mpage_info * mpi, const char * prefix)
     if (prefix[0])
         printf("%s", prefix);
     if (!x_interface && !replace) {
-        printf("%s mode subpage (0x%x,0x%x)\n", "SPI-4 Margin control", 
+        printf("%s mode subpage (0x%x,0x%x)\n", "SPI-4 Margin control",
                mpi->page, mpi->subpage);
         printf("--------------------------------------------\n");
     }
@@ -2714,7 +2722,7 @@ static int spi4_margin_control(struct mpage_info * mpi, const char * prefix)
 }
 
 /* Protocol specific mode page for SAS, phy control + discover (subpage 1) */
-static int sas_phy_control_discover(struct mpage_info * mpi, 
+static int sas_phy_control_discover(struct mpage_info * mpi,
                                     const char * prefix)
 {
     int status, off, num_phys, k;
@@ -2768,7 +2776,7 @@ static int sas_phy_control_discover(struct mpage_info * mpi,
 }
 
 
-static int common_proto_spec_port_sp1(struct mpage_info * mpi, 
+static int common_proto_spec_port_sp1(struct mpage_info * mpi,
                                       const char * prefix)
 {
     int status, proto_id;
@@ -2861,7 +2869,7 @@ static int sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int common_proto_spec_port_sp2(struct mpage_info * mpi, 
+static int common_proto_spec_port_sp2(struct mpage_info * mpi,
                                       const char * prefix)
 {
     int status, proto_id;
@@ -2951,12 +2959,12 @@ static void print_hex_page(struct mpage_info * mpi, const char * prefix,
                 printf("mode page: 0x%02x  subpage: 0x%02x   [%s]\n",
                        mpi->page, mpi->subpage, pg_name);
             else
-                printf("mode page: 0x%02x  subpage: 0x%02x\n", mpi->page, 
+                printf("mode page: 0x%02x  subpage: 0x%02x\n", mpi->page,
                    mpi->subpage);
             printf("------------------------------\n");
         } else {
             if (pg_name && (unkn_page_str != pg_name))
-                printf("mode page: 0x%02x   [%s]\n", mpi->page, 
+                printf("mode page: 0x%02x   [%s]\n", mpi->page,
                        pg_name);
             else
                 printf("mode page: 0x%02x\n", mpi->page);
@@ -2965,8 +2973,8 @@ static void print_hex_page(struct mpage_info * mpi, const char * prefix,
     }
     for (k = off; k < len; k++)
     {
-        char nm[8]; 
-    
+        char nm[8];
+
         snprintf(nm, sizeof(nm), "0x%02x", k);
         hexdatafield(pagestart + k, 1, nm);
     }
@@ -2982,21 +2990,21 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
     char prefix[96];
     struct mpage_info local_mp_i;
     struct mpage_name_func * mpf;
-    int multiple = ((MP_LIST_PAGES == mpi->page) || 
+    int multiple = ((MP_LIST_PAGES == mpi->page) ||
                     (MP_LIST_SUBPAGES == mpi->subpage));
 
     if (replace && multiple) {
         printf("Can't list all (sub)pages and use replace (-R) together\n");
         return 1;
     }
-    status = get_mode_page(mpi, 0, cbuffer2); 
+    status = get_mode_page(mpi, 0, cbuffer2);
     if (status) {
         printf("\n");
         return status;
     } else {
         offset = modePageOffset(cbuffer2, mpi->resp_len, mode6byte);
         if (offset < 0) {
-            fprintf(stdout, "mode page=0x%x has bad page format\n", 
+            fprintf(stdout, "mode page=0x%x has bad page format\n",
                     mpi->page);
             fprintf(stdout, "   perhaps '-z' switch may help\n");
             return -1;
@@ -3026,7 +3034,7 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
 
         prefix[0] = '\0';
         done = 0;
-        if ((! decode_in_hex) && ((mpf = get_mpage_name_func(&local_mp_i))) && 
+        if ((! decode_in_hex) && ((mpf = get_mpage_name_func(&local_mp_i))) &&
             mpf->func) {
             if (multiple && x_interface && !replace) {
                 if (local_mp_i.subpage)
@@ -3042,7 +3050,7 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
                 done = 1;
                 status |= res;
             }
-        } 
+        }
         if (! done) {
             if (x_interface && replace)
                 return put_mode_page(&local_mp_i, cbuffer2);
@@ -3050,7 +3058,7 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
                 if (multiple && x_interface && !replace) {
                     if (local_mp_i.subpage)
                         snprintf(prefix, sizeof(prefix), "sginfo -u 0x%x,0x%x"
-                                 " -XR %s ", local_mp_i.page, local_mp_i.subpage, 
+                                 " -XR %s ", local_mp_i.page, local_mp_i.subpage,
                                  device_name);
                     else
                         snprintf(prefix, sizeof(prefix), "sginfo -u 0x%x -XR "
@@ -3209,7 +3217,7 @@ static int do_serial_number()
     }
 
     pagestart = cbuffer;
-    
+
     pagelen = 4 + pagestart[3];
 
     cmd[0] = 0x12;              /* INQUIRY */
@@ -3230,7 +3238,7 @@ static int do_serial_number()
         return status;
     }
     if (trace_cmd > 1) {
-        printf("  inquiry (evpd page 0x80) response:\n");
+        printf("  inquiry (vpd page 0x80) response:\n");
         dump(cbuffer, pagelen);
     }
 
@@ -3278,9 +3286,8 @@ static void make_dev_name(char * fname, int k, int do_numeric)
     }
 }
 
-#define MAX_SG_DEVS 1024
 
-static Sg_map sg_map_arr[MAX_SG_DEVS];
+static Sg_map sg_map_arr[MAX_SG_DEVS + 1];
 
 #define MAX_HOLES 4
 
@@ -3347,7 +3354,7 @@ static void show_devices(int raw)
         }
         err = ioctl(fd, SCSI_IOCTL_GET_IDLUN, &m_idlun);
         if (err < 0) {
-            snprintf(ebuff, EBUFF_SZ, 
+            snprintf(ebuff, EBUFF_SZ,
                      "SCSI(2) ioctl on %s failed", dev_name);
             perror(ebuff);
             close(fd);
@@ -3364,10 +3371,11 @@ static void show_devices(int raw)
         sg_map_arr[j].channel, sg_map_arr[j].target_id, sg_map_arr[j].lun,
         sg_map_arr[j].dev_name);
 #endif
-        ++j;
         printf("%s ", dev_name);
         close(fd);
-    };
+        if (++j >= MAX_SG_DEVS)
+            break;
+    }
     closedir(dir_ptr);
 
     printf("\n"); /* <<<<<<<<<<<<<<<<<<<<< */
@@ -3434,7 +3442,7 @@ static void show_devices(int raw)
                 ((m_idlun.mux4 & 0xff) == sg_map_arr[j].target_id) &&
                 (((m_idlun.mux4 >> 16) & 0xff) == sg_map_arr[j].channel) &&
                 (((m_idlun.mux4 >> 8) & 0xff) == sg_map_arr[j].lun)) {
-                printf("%s [=%s  scsi%d ch=%d id=%d lun=%d]\n", name, 
+                printf("%s [=%s  scsi%d ch=%d id=%d lun=%d]\n", name,
                        sg_map_arr[j].dev_name, bus,
                        ((m_idlun.mux4 >> 16) & 0xff), m_idlun.mux4 & 0xff,
                        ((m_idlun.mux4 >> 8) & 0xff));
@@ -3442,7 +3450,7 @@ static void show_devices(int raw)
             }
         }
         if (NULL == sg_map_arr[j].dev_name)
-            printf("%s [scsi%d ch=%d id=%d lun=%d]\n", name, bus, 
+            printf("%s [scsi%d ch=%d id=%d lun=%d]\n", name, bus,
                    ((m_idlun.mux4 >> 16) & 0xff), m_idlun.mux4 & 0xff,
                    ((m_idlun.mux4 >> 8) & 0xff));
         close(fd);
@@ -3497,7 +3505,7 @@ static int open_sg_io_dev(char * devname)
             return -9999;
         }
         close(fd);
-    
+
         for (k = 0; k < MAX_SG_DEVS; k++) {
             make_dev_name(name, k, do_numeric);
             fd = open(name, O_RDWR | O_NONBLOCK);
@@ -3526,11 +3534,11 @@ static int open_sg_io_dev(char * devname)
                 close(fd);
                 fd = -9999;
             }
-            if ((bus == bbus) && 
+            if ((bus == bbus) &&
                 ((m_idlun.mux4 & 0xff) == (mm_idlun.mux4 & 0xff)) &&
-                (((m_idlun.mux4 >> 8) & 0xff) == 
+                (((m_idlun.mux4 >> 8) & 0xff) ==
                                         ((mm_idlun.mux4 >> 8) & 0xff)) &&
-                (((m_idlun.mux4 >> 16) & 0xff) == 
+                (((m_idlun.mux4 >> 16) & 0xff) ==
                                         ((mm_idlun.mux4 >> 16) & 0xff)))
                 break;
             else {
@@ -3600,7 +3608,7 @@ static void usage(char *errtext)
     "\t-R    Replace parameters - best used with -X (expert use only)\n"
     "\t      [replacement parameters placed after device on command line]\n\n",
     stdout);
-    printf("\t      sginfo version: %s; See man page for more details.\n", 
+    printf("\t      sginfo version: %s; See man page for more details.\n",
            version_str);
     exit(2);
 }
@@ -3673,7 +3681,7 @@ int main(int argc, char *argv[])
                 defectformat = 0x4;
             else if (!strcasecmp(optarg, "head"))
                 defectformat = HEAD_SORT_TOKEN;
-            else 
+            else
                 usage("Illegal -F parameter, must be one of logical, "
                       "physical, index or head");
             break;
@@ -3755,7 +3763,7 @@ int main(int argc, char *argv[])
             else if (j < 1)
                 usage("argument following '-u' should be of form "
                       "<pg>[,<subpg>]");
-            if ((mp_i.page < 0) || (mp_i.page > MP_LIST_PAGES) || 
+            if ((mp_i.page < 0) || (mp_i.page > MP_LIST_PAGES) ||
                 (mp_i.subpage < 0) || (mp_i.subpage > MP_LIST_SUBPAGES))
                 usage("mode pages range from 0 .. 63, subpages from "
                       "1 .. 255");
@@ -3786,7 +3794,7 @@ int main(int argc, char *argv[])
         usage("-R requires -X");
     if (replace && mp_i.page_control)
         usage("-R not allowed for -m, -M or -S");
-    if (x_interface && replace && ((MP_LIST_PAGES == mp_i.page) || 
+    if (x_interface && replace && ((MP_LIST_PAGES == mp_i.page) ||
                         (MP_LIST_SUBPAGES == mp_i.subpage)))
         usage("-XR can be used only with exactly one page.");
 
@@ -3810,7 +3818,7 @@ int main(int argc, char *argv[])
         /*Ensure that this string contains an even number of hex-digits */
                 int len = strlen(argv[optind + j] + 1);
 
-                if ((len & 1) || (len != (int)strspn(argv[optind + j] + 1, 
+                if ((len & 1) || (len != (int)strspn(argv[optind + j] + 1,
                                                 "0123456789ABCDEFabcdef")))
                             usage("Odd number of chars or non-hex digit in @hexdatafield");
 

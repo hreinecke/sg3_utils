@@ -1,21 +1,21 @@
 /* sg_test_rwbuf.c */
 /*
- * Program to test the SCSI host adapter by issueing 
+ * Program to test the SCSI host adapter by issueing
  * write and read operations on a device's buffer
  * and calculating checksums.
- * NOTE: If you can not reserve the buffer of the device 
+ * NOTE: If you can not reserve the buffer of the device
  * for this purpose (SG_GET_RESERVED_SIZE), you risk
  * serious data corruption, if the device is accessed by
  * somebody else in the meantime.
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Doug Gilbert's sg_rbuf program.
  * (c) 1999-2008 Doug Gilbert
- * 
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
- * 
+ *
  * $Id: sg_test_rwbuf.c,v 1.1 2000/03/02 13:50:03 garloff Exp $
  *
  *   2003/11/11  switch sg3_utils version to use SG_IO ioctl [dpg]
@@ -44,11 +44,11 @@ static char * version_str = "1.07 20080318";
 #define BPI (signed)(sizeof(int))
 
 #define RB_MODE_DESC 3
-#define RWB_MODE_DATA 2 
+#define RWB_MODE_DATA 2
 #define RB_DESC_LEN 4
 
 /*  The microcode in a SCSI device is _not_ modified by doing a WRITE BUFFER
- *  with mode set to "data" (0x2) as done by this utility. Therefore this 
+ *  with mode set to "data" (0x2) as done by this utility. Therefore this
  *  utility is safe in that respect. [Mode values 0x4, 0x5, 0x6 and 0x7 are
  *  the dangerous ones :-)]
  */
@@ -62,7 +62,7 @@ static unsigned char *cmpbuf = NULL;
 
 
 /* Options */
-static int size = -1; 
+static int size = -1;
 static char do_quick = 0;
 static int addwrite  = 0;
 static int addread   = 0;
@@ -124,10 +124,10 @@ int find_out_about_buffer (int sg_fd)
                 sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, 1);
                 return res;
         }
-    
+
         buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
         buf_granul = (unsigned char)rbBuff[0];
-#if 0   
+#if 0
         printf("READ BUFFER reports: %02x %02x %02x %02x\n",
                rbBuff[0], rbBuff[1], rbBuff[2], rbBuff[3]);
 #endif
@@ -179,22 +179,22 @@ int do_checksum (int *buf, int len, int quiet)
 
 void do_fill_buffer (int *buf, int len)
 {
-        int sum; 
+        int sum;
         int i; int rln = len;
         srand (time (0));
     retry:
-        if (len >= BPI) 
+        if (len >= BPI)
                 base = 0x12345678 + rand ();
-        else 
+        else
                 base = 0x12345678 + (char) rand ();
         sum = base;
         for (i = 0; i < len/BPI - 1; i++)
         {
                 /* we rely on rand() giving full range of int */
-                buf[i] = rand ();       
+                buf[i] = rand ();
                 sum += buf[i];
         }
-        while (rln%BPI) 
+        while (rln%BPI)
         {
                 ((char*)buf)[--rln] = rand ();
                 sum += ((char*)buf)[rln];
@@ -472,7 +472,7 @@ int main (int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
-   
+
         sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
         if (sg_fd < 0) {
                 perror("sg_test_rwbuf: open error");
@@ -493,7 +493,7 @@ int main (int argc, char * argv[])
                 ret = SG_LIB_CAT_OTHER;
                 goto err_out;
         }
-        
+
         cmpbuf = (unsigned char *)malloc(size);
         for (k = 0; k < times; ++k) {
                 ret = write_buffer (sg_fd, size);

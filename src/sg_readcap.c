@@ -16,7 +16,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2008 D. Gilbert
+*  Copyright (C) 1999 - 2009 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.82 20080222";
+static char * version_str = "3.84 20090410";
 
 #define ME "sg_readcap: "
 
@@ -41,6 +41,7 @@ static struct option long_options[] = {
         {"hex", 0, 0, 'H'},
         {"lba", 1, 0, 'L'},
         {"long", 0, 0, 'l'},
+        {"16", 0, 0, 'l'},
         {"new", 0, 0, 'N'},
         {"old", 0, 0, 'O'},
         {"pmi", 0, 0, 'p'},
@@ -68,8 +69,8 @@ struct opts_t {
 static void usage()
 {
     fprintf(stderr, "Usage: sg_readcap [--brief] [--help] [--hex] "
-            "[--lba=LBA] [--long] [--pmi]\n"
-            "                  [--raw] [--verbose] [--version] "
+            "[--lba=LBA] [--long] [--16]\n"
+            "                  [--pmi] [--raw] [--verbose] [--version] "
             "DEVICE\n"
             "  where:\n"
             "    --brief|-b      brief, two hex numbers: number of blocks "
@@ -82,6 +83,8 @@ static void usage()
             "valid with '--pmi']\n"
             "    --long|-l       use READ CAPACITY (16) cdb (def: use "
             "10 byte cdb)\n"
+            "    --16            use READ CAPACITY (16) cdb (same as "
+            "--long)\n"
             "    --pmi|-p        partial medium indicator (without this "
             "option shows\n"
             "                    total disk capacity)\n"
@@ -362,6 +365,12 @@ int main(int argc, char * argv[])
         usage_for(&opts);
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (opts.do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
 
     memset(resp_buff, 0, sizeof(resp_buff));
 
@@ -412,9 +421,9 @@ int main(int argc, char * argv[])
                     double sz_mb, sz_gb;
 
                     total_sz *= block_size;
-                    sz_mb = ((double)(last_blk_addr + 1) * block_size) / 
+                    sz_mb = ((double)(last_blk_addr + 1) * block_size) /
                             (double)(1048576);
-                    sz_gb = ((double)(last_blk_addr + 1) * block_size) / 
+                    sz_gb = ((double)(last_blk_addr + 1) * block_size) /
                             (double)(1000000000L);
                     printf("Hence:\n");
 #ifdef SG3_UTILS_MINGW
@@ -477,8 +486,11 @@ int main(int argc, char * argv[])
                 goto good;
             }
             printf("Read Capacity results:\n");
-            printf("   Protection: prot_en=%d, p_type=%d\n",
-                   !!(resp_buff[12] & 0x1), ((resp_buff[12] >> 1) & 0x7));
+            printf("   Protection: prot_en=%d, p_type=%d, p_i_exponent=%d\n",
+                   !!(resp_buff[12] & 0x1), ((resp_buff[12] >> 1) & 0x7),
+                   ((resp_buff[13] >> 4) & 0xf));
+            printf("   Thin provisioning: tpe=%d, tprz=%d\n",
+                   !!(resp_buff[14] & 0x80), !!(resp_buff[14] & 0x40));
             if (opts.do_pmi)
                 printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
                        "before delay=0x%" PRIx64 "\n", opts.llba,
@@ -497,9 +509,9 @@ int main(int argc, char * argv[])
                 double sz_mb, sz_gb;
 
                 total_sz *= block_size;
-                sz_mb = ((double)(llast_blk_addr + 1) * block_size) / 
+                sz_mb = ((double)(llast_blk_addr + 1) * block_size) /
                         (double)(1048576);
-                sz_gb = ((double)(llast_blk_addr + 1) * block_size) / 
+                sz_gb = ((double)(llast_blk_addr + 1) * block_size) /
                         (double)(1000000000L);
                 printf("Hence:\n");
 #ifdef SG3_UTILS_MINGW
@@ -512,11 +524,11 @@ int main(int argc, char * argv[])
             }
             goto good;
         }
-        else if (SG_LIB_CAT_INVALID_OP == res) 
+        else if (SG_LIB_CAT_INVALID_OP == res)
             fprintf(stderr, "READ CAPACITY (16) not supported\n");
-        else if (SG_LIB_CAT_NOT_READY == res) 
+        else if (SG_LIB_CAT_NOT_READY == res)
             fprintf(stderr, "READ CAPACITY (16) failed, device not ready\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res) 
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
             fprintf(stderr, "READ CAPACITY (16) failed, aborted command\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (16) cdb "

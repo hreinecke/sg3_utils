@@ -159,7 +159,7 @@ extern int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
 /* Calls sg_scsi_normalize_sense() after obtaining the sense buffer and
    its length from the struct sg_io_hdr pointer. If these cannot be
    obtained, 0 is returned. */
-extern int sg_normalize_sense(const struct sg_io_hdr * hp, 
+extern int sg_normalize_sense(const struct sg_io_hdr * hp,
                               struct sg_scsi_sense_hdr * sshp);
 
 extern int sg_err_category(int masked_status, int host_status,
@@ -175,7 +175,7 @@ extern int sg_err_category3(struct sg_io_hdr * hp);
 
 
 /* Note about SCSI status codes found in older versions of Linux.
-   Linux has traditionally used a 1 bit right shifted and masked 
+   Linux has traditionally used a 1 bit right shifted and masked
    version of SCSI standard status codes. Now CHECK_CONDITION
    and friends (in <scsi/scsi.h>) are deprecated. */
 

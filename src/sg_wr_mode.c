@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Douglas Gilbert.
+ * Copyright (c) 2004-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,13 +40,13 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
+/* A utility program originally written for the Linux OS SCSI subsystem.
  *
  * This program writes the given mode page contents to the corresponding
  * mode page on the given device.
  */
 
-static char * version_str = "1.09 20070919";
+static char * version_str = "1.10 20090401";
 
 #define ME "sg_wr_mode: "
 
@@ -110,9 +110,11 @@ static void usage()
 }
 
 
-/* Read hex numbers from command line (comma separated list) or from */
-/* stdin (one per line, comma separated list or space separated list). */
-/* Returns 0 if ok, or 1 if error. */
+/* Read hex numbers from command line or stdin. On the command line can
+ * either be comma or space separated list. Space separated list need to be
+ * quoted. For stdin (indicated by *inp=='-') there should be either
+ * one entry per line, a comma separated list or space separated list.
+ * Returns 0 if ok, or 1 if error. */
 static int build_mode_page(const char * inp, unsigned char * mp_arr,
                            int * mp_arr_len, int max_arr_len)
 {
@@ -120,6 +122,7 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
     unsigned int h;
     const char * lcp;
     char * cp;
+    char * c2p;
 
     if ((NULL == inp) || (NULL == mp_arr) ||
         (NULL == mp_arr_len))
@@ -193,7 +196,7 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
         }
         *mp_arr_len = off;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "build_mode_page: error at pos %d\n", k + 1);
             return 1;
@@ -207,8 +210,13 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                 }
                 mp_arr[k] = h;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "build_mode_page: error at pos %d\n",
@@ -225,8 +233,9 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
     return 0;
 }
 
-/* Read hex numbers from command line (comma separated list). */
-/* Returns 0 if ok, or 1 if error. */
+/* Read hex numbers from command line (comma separated list).
+ * Can also be (single) space separated list but needs to be quoted on the
+ * command line. Returns 0 if ok, or 1 if error. */
 static int build_mask(const char * inp, unsigned char * mask_arr,
                       int * mask_arr_len, int max_arr_len)
 {
@@ -234,6 +243,7 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
     unsigned int h;
     const char * lcp;
     char * cp;
+    char * c2p;
 
     if ((NULL == inp) || (NULL == mask_arr) ||
         (NULL == mask_arr_len))
@@ -246,7 +256,7 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
         fprintf(stderr, "'--mask' does not accept input from stdin\n");
         return 1;
     } else {        /* hex string on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfF,");
+        k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             fprintf(stderr, "build_mode_page: error at pos %d\n", k + 1);
             return 1;
@@ -260,8 +270,13 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
                 }
                 mask_arr[k] = h;
                 cp = strchr(lcp, ',');
+                c2p = strchr(lcp, ' ');
+                if (NULL == cp)
+                    cp = c2p;
                 if (NULL == cp)
                     break;
+                if (c2p && (c2p < cp))
+                    cp = c2p;
                 lcp = cp + 1;
             } else {
                 fprintf(stderr, "build_mode_page: error at pos %d\n",

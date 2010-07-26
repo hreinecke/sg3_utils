@@ -1,9 +1,14 @@
 Introduction
 ============
 The FreeBSD port of sg3_utils contains those utilities that are _not_
-specific to Linux. In some cases a utility could be ported but
-requires more work. An example is sg_dd which needs more work
-beyond the SCSI command pass through mechanism.
+specific to Linux. In some cases the FreeBSD camcontrol command supplies
+similar functionality; for example 'sg_map' is similar to
+'camcontrol devlist'.
+
+The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
+Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+contains a utility with similar functionality to sg_dd and ddpt is available
+for FreeBSD.
 
 Supported Utilities
 ===================
@@ -15,8 +20,8 @@ Here is a list of utilities that have been ported:
     sg_logs
     sg_luns
     sg_modes
-    sg_persist
     sg_opcodes
+    sg_persist
     sg_prevent
     sg_raw
     sg_rdac
@@ -42,19 +47,21 @@ Here is a list of utilities that have been ported:
     sg_wr_mode
     sg_write_buffer
     sg_write_long
+    sg_write_same
 
 Most utility names are indicative of the main SCSI command
 that they execute.  Some utilities are slightly higher level, for
 example sg_ses fetches SCSI Enclosure Services (SES) status pages and
 can send control pages. Each utility has a man page (placed in
 section 8). An overview of sg3_utils can be found at:
-http://www.torque.net/sg/sg3_utils.html .
+http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 
 See the INSTALL file (at the end) for instructions on how to build
-sg3_utils on FreeBSD. Some man pages have examples which use linux
-device names which hopefully will not confuse the FreeBSD users.
+sg3_utils on FreeBSD. If the "./configure ; make" sequence fails, try
+running "./autogen.sh" first. Some man pages have examples which use
+linux device names which hopefully will not confuse the FreeBSD users.
 
 
 Details
@@ -77,12 +84,15 @@ be used. These can be viewed with the "camcontrol devlist"
 command. To access ATAPI devices (e.g. ATAPI DVD drives) the
 kernel may need to be configured with the "atapicam" device.
 
+Disks is FreeBSD have names like '/dev/da0' while the corresponding
+pass-through device may be '/dev/pass0'.
+
 At the present time these utilities have been lightly tested on a
-FreeBSD version 6.2 system with some SCSI disks, a SCSI tape
+FreeBSD version 7.0 system with some SCSI disks, a SCSI tape
 drive and an ATAPI CD drive.
 
 See the FreeBSD section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-2nd December 2007
+11th March 2009

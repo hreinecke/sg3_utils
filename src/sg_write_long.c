@@ -16,13 +16,13 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2008 D. Gilbert
+   *  Copyright (C) 2004-2009 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
    *  any later version.
 
-   This program issues the SCSI command WRITE LONG to a given SCSI device. 
+   This program issues the SCSI command WRITE LONG to a given SCSI device.
    It sends the command with the logical block address passed as the lba
    argument, and the transfer length set to the xfer_len argument. the
    buffer to be writen to the device filled with 0xff, this buffer includes
@@ -31,7 +31,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.16 20080327";
+static char * version_str = "1.16 20090309";
 
 
 #define MAX_XFER_LEN 10000
@@ -56,7 +56,10 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+
+static void
+usage()
 {
   fprintf(stderr, "Usage: "
           "sg_write_long [--16] [--cor_dis] [--help] [--in=IF] "
@@ -86,7 +89,8 @@ static void usage()
           );
 }
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c, infd, offset;
     unsigned char * writeLongBuff = NULL;
@@ -105,7 +109,7 @@ int main(int argc, char * argv[])
     char ebuff[EBUFF_SZ];
     const char * ten_or;
     int ret = 1;
-    
+
     memset(file_name, 0, sizeof file_name);
     while (1) {
         int option_index = 0;
@@ -151,7 +155,7 @@ int main(int argc, char * argv[])
             break;
         case 'x':
             xfer_len = sg_get_num(optarg);
-           if (-1 == xfer_len) {
+            if (-1 == xfer_len) {
                 fprintf(stderr, "bad argument to '--xfer_len'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -195,7 +199,7 @@ int main(int argc, char * argv[])
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-  
+
     if (wr_uncor) {
         if ('\0' != file_name[0])
             fprintf(stderr, ">>> warning: when '--wr_uncor' given "

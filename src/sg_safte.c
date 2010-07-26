@@ -48,7 +48,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static char * version_str = "0.24 20080327";
+static char * version_str = "0.24 20080513";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -56,8 +56,8 @@ static char * version_str = "0.24 20080327";
 #define EBUFF_SZ 256
 
 #define RB_MODE_DESC 3
-#define RWB_MODE_DATA 2 
-#define RWB_MODE_VENDOR 1 
+#define RWB_MODE_DATA 2
+#define RWB_MODE_VENDOR 1
 #define RB_DESC_LEN 4
 
 #define SAFTE_CFG_FLAG_DOORLOCK 1
@@ -112,7 +112,7 @@ read_safte_configuration(int sg_fd, unsigned char *rb_buff,
     safte_cfg.psupplies = rb_buff[1];
     safte_cfg.slots = rb_buff[2];
     safte_cfg.temps = rb_buff[4];
-    if (rb_buff[3]) 
+    if (rb_buff[3])
         safte_cfg.flags |= SAFTE_CFG_FLAG_DOORLOCK;
     if (rb_buff[5])
         safte_cfg.flags |= SAFTE_CFG_FLAG_ALARM;
@@ -617,6 +617,12 @@ main(int argc, char * argv[])
         fprintf(stderr, "missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
+    }
+    if (do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {

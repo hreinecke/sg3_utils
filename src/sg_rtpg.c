@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2007 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2008 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,7 +48,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.12 20070918";
+static char * version_str = "1.13 20080513";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -232,6 +232,13 @@ int main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
+
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
@@ -252,7 +259,7 @@ int main(int argc, char * argv[])
     ret = res;
     if (0 == res) {
         report_len = (reportTgtGrpBuff[0] << 24) +
-                     (reportTgtGrpBuff[1] << 16) + 
+                     (reportTgtGrpBuff[1] << 16) +
                      (reportTgtGrpBuff[2] << 8) +
                      reportTgtGrpBuff[3] + 4;
         if (report_len > (int)sizeof(reportTgtGrpBuff)) {

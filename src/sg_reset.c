@@ -13,22 +13,20 @@
 #endif
 #include "sg_io_linux.h"
 
-/* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
-   device driver.
-*  Copyright (C) 1999-2007 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program send either device, bus or host resets to device,
-   or bus or host associated with the given sg device.
-
-*/
+/* A utility program originally written for the Linux OS SCSI subsystem.
+ *  Copyright (C) 1999-2009 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ * This program send either device, bus or host resets to device,
+ * or bus or host associated with the given sg device.
+ */
 
 #define ME "sg_reset: "
 
-static char * version_str = "0.55 20070714";
+static char * version_str = "0.55 20090317";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284

@@ -1,34 +1,34 @@
 /*
-** sg_format : format a SCSI disk
-**             potentially with a different number of blocks and block size
-**
-** formerly called blk512-linux.c (v0.4)
-**
-** Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
-** Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
-** Copyright (C) 2005-2007  Douglas Gilbert   dgilbert at interlog dot com
-**
-**   This program is free software; you can redistribute it and/or modify
-**   it under the terms of the GNU General Public License as published by
-**   the Free Software Foundation; either version 2, or (at your option)
-**   any later version.
-**
-** http://www.t10.org/scsi-3.htm
-** http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO
-**
-**
-**  List of some (older) disk manufacturers' block counts.
-**  These are not needed in newer disks which will automatically use
-**  the manufacturers' recommended block count if a count of -1 is given.
-**      Inquiry         Block Count (@512 byte blocks)
-**      ST150150N       8388315
-**      IBM_DCHS04F     8888543
-**      IBM_DGHS09Y     17916240
-**      ST336704FC      71132960
-**      ST318304FC      35145034  (Factory spec is 35885167 sectors)
-**      ST336605FC      ???
-**      ST336753FC      71132960  (Factory spec is 71687372 sectors) 
-*/
+ * sg_format : format a SCSI disk
+ *             potentially with a different number of blocks and block size
+ *
+ * formerly called blk512-linux.c (v0.4)
+ *
+ * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
+ * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
+ * Copyright (C) 2005-2009  Douglas Gilbert   dgilbert at interlog dot com
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2, or (at your option)
+ *   any later version.
+ *
+ * http://www.t10.org/scsi-3.htm
+ * http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO
+ *
+ *
+ *  List of some (older) disk manufacturers' block counts.
+ *  These are not needed in newer disks which will automatically use
+ *  the manufacturers' recommended block count if a count of -1 is given.
+ *      Inquiry         Block Count (@512 byte blocks)
+ *      ST150150N       8388315
+ *      IBM_DCHS04F     8888543
+ *      IBM_DGHS09Y     17916240
+ *      ST336704FC      71132960
+ *      ST318304FC      35145034  (Factory spec is 35885167 sectors)
+ *      ST336605FC      ???
+ *      ST336753FC      71132960  (Factory spec is 71687372 sectors)
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,6 +45,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
+static char * version_str = "1.17 20090324";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -60,74 +61,143 @@
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
 #endif
- 
+
 #ifdef HAVE_MS_SLEEP
 #include <windows.h>
 #define sleep_for(seconds)    Sleep( (seconds) * 1000)
 #else
 #define sleep_for(seconds)    sleep(seconds)
 #endif
- 
+
 
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
 
-static char * version_str = "1.15 20070918";
 
 static struct option long_options[] = {
-        {"count", 1, 0, 'c'},
-        {"cmplst", 1, 0, 'C'},
-        {"dcrt", 0, 0, 'D'},
-        {"early", 0, 0, 'e'},
-        {"format", 0, 0, 'F'},
-        {"help", 0, 0, 'h'},
-        {"long", 0, 0, 'l'},
-        {"pinfo", 0, 0, 'p'},
-        {"pfu", 1, 0, 'P'},
-        {"resize", 0, 0, 'r'},
-        {"rto_req", 0, 0, 'R'},
-        {"security", 0, 0, 'X'},
-        {"six", 0, 0, '6'},
-        {"size", 1, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {"wait", 0, 0, 'w'},
+        {"count", required_argument, 0, 'c'},
+        {"cmplst", required_argument, 0, 'C'},
+        {"dcrt", no_argument, 0, 'D'},
+        {"early", no_argument, 0, 'e'},
+        {"fmtpinfo", required_argument, 0, 'f'},
+        {"format", no_argument, 0, 'F'},
+        {"help", no_argument, 0, 'h'},
+        {"long", no_argument, 0, 'l'},
+        {"pinfo", no_argument, 0, 'p'},
+        {"pfu", required_argument, 0, 'P'},
+        {"pie", required_argument, 0, 'q'},
+        {"resize", no_argument, 0, 'r'},
+        {"rto_req", no_argument, 0, 'R'},
+        {"security", no_argument, 0, 'X'},
+        {"six", no_argument, 0, '6'},
+        {"size", required_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"wait", no_argument, 0, 'w'},
         {0, 0, 0, 0},
 };
 
+
+static void
+usage()
+{
+        printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
+               "[--early]\n"
+               "                 [--fmtpinfo=FPI] [--format] [--help] "
+               "[--long] [--pfu=PFU]\n"
+               "                 [--pie=PIE] [--pinfo] [--resize] "
+               "[--rto_req] [--security]\n"
+               "                 [--six] [--size=SIZE] [--verbose] "
+               "[--version] [--wait]\n"
+               "                 DEVICE\n"
+               "  where:\n"
+               "    --cmplst=0|1\n"
+               "      -C 0|1        sets CMPLST bit in format cdb "
+               "(default: 1)\n"
+               "    --count=COUNT|-c COUNT    number of blocks to "
+               "report after format or\n"
+               "                              resize. With format "
+               "defaults to same as current\n"
+               "    --dcrt|-D       disable certification (doesn't "
+               "verify media)\n"
+               "    --early|-e      exit once format started (user can "
+               "monitor progress)\n"
+               "    --fmtpinfo=FPI|-f FPI    FMTPINFO field value "
+               "(default: 0)\n"
+               "    --format|-F     format unit (default: report current "
+               "count and size)\n"
+               "    --help|-h       prints out this usage message\n"
+               "    --long|-l       allow for 64 bit lbas (default: assume "
+               "32 bit lbas)\n"
+               "    --pfu=PFU|-P PFU    Protection Field Usage value "
+               "(default: 0)\n"
+               "    --pie=PIE|-q PIE    Protection Information Exponent "
+               "(default: 0)\n"
+               "    --pinfo|-p      set upper bit of FMTPINFO field\n"
+               "                    (deprecated use '--fmtpinfo=FPI' "
+               "instead)\n");
+        printf("    --resize|-r     resize (rather than format) to COUNT "
+               "value\n"
+               "    --rto_req|-R    set lower bit of FMTPINFO field\n"
+               "                    (deprecated use '--fmtpinfo=FPI' "
+               "instead)\n"
+               "    --security|-S    set security initialization (SI) bit\n"
+               "    --six|-6        use 6 byte MODE SENSE/SELECT to probe "
+               "device\n"
+               "                    (def: use 10 byte MODE SENSE/SELECT)\n"
+               "    --size=SIZE|-s SIZE    bytes per block, defaults to "
+               "DEVICE's current\n"
+               "                           block size. Only needed to "
+               "change current block\n"
+               "                           size\n"
+               "    --verbose|-v    increase verbosity\n"
+               "    --version|-V    print version details and exit\n"
+               "    --wait|-w       format command waits until format "
+               "operation completes\n"
+               "                    (default: set IMMED=1 and poll with "
+               "Test Unit Ready)\n\n"
+               "\tExample: sg_format --format /dev/sdc\n\n"
+               "This utility formats or resizes SCSI disks.\n");
+        printf("WARNING: This utility will destroy all the data on "
+               "DEVICE when\n\t '--format' is given. Check that you "
+               "have the correct DEVICE.\n");
+}
+
 /* Return 0 on success, else see sg_ll_format_unit() */
 static int
-scsi_format(int fd, int fmtpinfo, int rto_req, int cmplst, int pf_usage,
-            int immed, int dcrt, int si, int early, int verbose)
+scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
+            int dcrt, int pie, int si, int early, int verbose)
 {
-        int res, need_hdr, progress, verb, pl_sz;
-        const char FORMAT_HEADER_SZ = 4;
+        int res, need_hdr, progress, verb, fmt_pl_sz, longlist, off;
+        const int SH_FORMAT_HEADER_SZ = 4;
+        const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
-        unsigned char fmt_pl[FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
+        unsigned char fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
+        longlist = (pie > 0);
+        off = longlist ? LO_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
         fmt_pl[0] = pf_usage & 0x7;  /* protection_field_usage (bits 2-0) */
         fmt_pl[1] = (immed ? 0x2 : 0); /* fov=0, [dpry,dcrt,stpf,ip=0] */
         if (dcrt)
                 fmt_pl[1] |= 0xa0;     /* fov=1, dcrt=1 */
         if (si) {
                 fmt_pl[1] |= 0x88;     /* fov=1, ip=1 */
-                fmt_pl[4] = 0x20;       /* si=1 in init. pattern desc */
+                fmt_pl[off + 0] = 0x20;     /* si=1 in init. pattern desc */
         }
-        fmt_pl[2] = 0;         /* defect list length MSB */
-        fmt_pl[3] = 0;         /* defect list length LSB */
+        if (longlist) 
+                fmt_pl[3] = (pie & 0xf);    /* protection interval exponent */
 
-        need_hdr = (immed || cmplst || dcrt || si || (pf_usage > 0));
+        need_hdr = (immed || cmplst || dcrt || si || (pf_usage > 0) ||
+                    (pie > 0));
+        fmt_pl_sz = 0;
         if (need_hdr)
-                pl_sz = si ? 8 : 4;
-        else
-                pl_sz = 0;
-        res = sg_ll_format_unit(fd, fmtpinfo, rto_req, 0 /* longlist */,
-                                need_hdr /* fmtdata */, cmplst,
-                                0 /* dlist_format */,
-                                (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
-                                fmt_pl, pl_sz, 1, verbose);
+                fmt_pl_sz = off + (si ? INIT_PATTERN_DESC_SZ : 0);
 
+        res = sg_ll_format_unit(fd, fmtpinfo, longlist, need_hdr /*fmtdata*/,
+                                cmplst, 0 /* dlist_format */,
+                                (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
+                                fmt_pl, fmt_pl_sz, 1, verbose);
         switch (res) {
         case 0:
                 break;
@@ -204,9 +274,12 @@ print_read_cap(int fd, int do_16, int verbose)
                                       (resp_buff[10] << 8) |
                                       resp_buff[11]);
                         printf("Read Capacity (16) results:\n");
-                        printf("   Protection: prot_en=%d, rto_en=%d\n",
+                        printf("   Protection: prot_en=%d, p_type=%d\n",
                                !!(resp_buff[12] & 0x1),
-                               !!(resp_buff[12] & 0x2));
+                               ((resp_buff[12] >> 1) & 0x7));
+                        printf("   Thin provisioning: tpe=%d, tprz=%d\n",
+                               !!(resp_buff[14] & 0x80),
+                               !!(resp_buff[14] & 0x40));
                         printf("   Number of blocks=%" PRIu64 "\n",
                                llast_blk_addr + 1);
                         printf("   Block size=%u bytes\n", block_size);
@@ -225,16 +298,16 @@ print_read_cap(int fd, int do_16, int verbose)
                                       (resp_buff[6] << 8) |
                                       resp_buff[7]);
                         printf("Read Capacity (10) results:\n");
-                        printf("   Number of blocks=%u\n", 
+                        printf("   Number of blocks=%u\n",
                                last_blk_addr + 1);
                         printf("   Block size=%u bytes\n", block_size);
                         return (int)block_size;
                 }
         }
-        if (SG_LIB_CAT_NOT_READY == res) 
+        if (SG_LIB_CAT_NOT_READY == res)
                 fprintf(stderr, "READ CAPACITY (%d): device not ready\n",
                         (do_16 ? 16 : 10));
-        else if (SG_LIB_CAT_INVALID_OP == res) 
+        else if (SG_LIB_CAT_INVALID_OP == res)
                 fprintf(stderr, "READ CAPACITY (%d) not supported\n",
                         (do_16 ? 16 : 10));
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
@@ -246,65 +319,9 @@ print_read_cap(int fd, int do_16, int verbose)
         return -1;
 }
 
-static void usage()
-{
-        printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
-               "[--early] [--format]\n"
-               "                 [--help] [--long] [--pfu=PFU] [--pinfo] "
-               "[--resize]\n"
-               "                 [--rto_req] [--security] [--six] "
-               "[--size=SIZE] [--verbose]\n"
-               "                 [--version] [--wait] "
-               "DEVICE\n"
-               "  where:\n"
-               "    --cmplst=0|1\n"
-               "      -C 0|1        sets CMPLST bit in format cdb "
-               "(default: 1)\n"
-               "    --count=COUNT|-c COUNT    number of blocks to "
-               "report after format or\n"
-               "                              resize. With format "
-               "defaults to same as current\n"
-               "    --dcrt|-D       disable certification (doesn't "
-               "verify media)\n"
-               "    --early|-e      exit once format started (user can "
-               "monitor progress)\n"
-               "    --format|-F     format unit (default: report current count"
-               " and size)\n"
-               "    --help|-h       prints out this usage message\n"
-               "    --long|-l       allow for 64 bit lbas (default: assume "
-               "32 bit lbas)\n"
-               "    --pfu=PFU|-P PFU    Protection Field Usage value "
-               "(default: 0)\n"
-               "    --pinfo|-p      set the FMTPINFO bit to format with "
-               "protection\n");
-        printf("                    information (defaults to no protection "
-               "information)\n"
-               "    --resize|-r     resize (rather than format) to COUNT "
-               "value\n"
-               "    --rto_req|-R    set the RTO_REQ bit in format (only "
-               "vaid with '--pinfo')\n"
-               "    --security|-S    set security initialization (SI) bit\n"
-               "    --six|-6        use 6 byte MODE SENSE/SELECT\n"
-               "    --size=SIZE|-s SIZE    bytes per block, defaults to "
-               "DEVICE's current\n"
-               "                           block size. Only needed to "
-               "change current block\n"
-               "                           size\n"
-               "    --verbose|-v    increase verbosity\n"
-               "    --version|-V    print version details and exit\n"
-               "    --wait|-w       format command waits until format "
-               "operation completes\n"
-               "                    (default: set IMMED=1 and poll with "
-               "Test Unit Ready)\n\n"
-               "\tExample: sg_format --format /dev/sdc\n\n"
-               "This utility formats or resizes SCSI disks.\n");
-        printf("WARNING: This utility will destroy all the data on "
-               "DEVICE when\n\t '--format' is given. Check that you "
-               "have the correct DEVICE.\n");
-}
 
-
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
         const int mode_page = THIS_MPAGE_EXISTS;        /* hopefully */
         int fd, res, calc_len, bd_len, dev_specific_param;
@@ -317,9 +334,11 @@ int main(int argc, char **argv)
         int verbose = 0;        /* -v */
         int fwait = 0;          /* -w */
         int mode6 = 0;
-        int pinfo = 0;
+        int fmtpinfo = 0;
+        int pinfo = 0;          /* deprecated, prefer fmtpinfo */
+        int pie = 0;
         int pfu = 0;
-        int rto_req = 0;
+        int rto_req = 0;        /* deprecated, prefer fmtpinfo */
         int cmplst = 1;
         int do_rcap16 = 0;
         int long_lba = 0;
@@ -335,7 +354,7 @@ int main(int argc, char **argv)
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:DeFhlpP:rRs:SvVw6",
+                c = getopt_long(argc, argv, "c:C:Def:FhlpP:q:rRs:SvVw6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -367,6 +386,15 @@ int main(int argc, char **argv)
                 case 'e':
                         early = 1;
                         break;
+                case 'f':
+                        fmtpinfo = sg_get_num(optarg);
+                        if ((fmtpinfo < 0) || ( fmtpinfo > 3)) {
+                                fprintf(stderr, "bad argument to "
+                                        "'--fmtpinfo', accepts 0 to 3 "
+                                        "inclusive\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
+                        break;
                 case 'F':
                         format = 1;
                         break;
@@ -385,6 +413,14 @@ int main(int argc, char **argv)
                         if ((pfu < 0) || ( pfu > 7)) {
                                 fprintf(stderr, "bad argument to '--pfu', "
                                         "accepts 0 to 7 inclusive\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
+                        break;
+                case 'q':
+                        pie = sg_get_num(optarg);
+                        if ((pie < 0) || ( pie > 15)) {
+                                fprintf(stderr, "bad argument to '--pie', "
+                                        "accepts 0 to 15 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -454,10 +490,23 @@ int main(int argc, char **argv)
                         return SG_LIB_SYNTAX_ERROR;
                 } else if (0 != blk_size) {
                         fprintf(stderr, "'--resize' not compatible with "
-                                "'--size')\n");
+                                "'--size'\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 }
+        }
+        if ((pinfo > 0) || (rto_req > 0) || (fmtpinfo > 0)) {
+                if ((pinfo || rto_req) && fmtpinfo) {
+                        fprintf(stderr, "confusing with both '--pinfo' or "
+                                "'--rto_req' together with\n'--fmtpinfo', "
+                                "best use '--fmtpinfo' only\n");
+                        usage();
+                        return SG_LIB_SYNTAX_ERROR;
+                }
+                if (pinfo)
+                        fmtpinfo |= 2;
+                if (rto_req)
+                        fmtpinfo |= 1;
         }
 
         if ((fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {
@@ -480,7 +529,7 @@ int main(int argc, char **argv)
         if (verbose)
                 printf("      PROTECT=%d\n", !!(inq_out.byte_5 & 1));
         if (inq_out.byte_5 & 1)
-                printf("      << supports 'protection information'>>\n");
+                printf("      << supports protection information>>\n");
 
         if ((0 != inq_out.peripheral_type) &&
             (0xe != inq_out.peripheral_type)) {
@@ -516,9 +565,9 @@ int main(int argc, char **argv)
                                 "supported\n", (mode6 ? 6 : 10));
                         fprintf(stderr, "    try again %s the '--six' "
                                 "option\n", (mode6 ? "without" : "with"));
-        
+
                 } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-                        if (long_lba && (! mode6)) 
+                        if (long_lba && (! mode6))
                                 fprintf(stderr, "bad field in MODE SENSE "
                                         "(%d) [longlba flag not supported?]"
                                         "\n", (mode6 ? 6 : 10));
@@ -722,8 +771,8 @@ int main(int argc, char **argv)
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
-                res = scsi_format(fd, pinfo, rto_req, cmplst, pfu, ! fwait,
-                                  dcrt, do_si, early, verbose);
+                res = scsi_format(fd, fmtpinfo, cmplst, pfu, ! fwait, dcrt,
+                                  pie, do_si, early, verbose);
                 ret = res;
                 if (res) {
                         fprintf(stderr, "FORMAT failed\n");

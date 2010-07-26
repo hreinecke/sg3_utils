@@ -53,12 +53,12 @@
  *        safe_strerror(), rename sg_decode_sense() to sg_normalize_sense()
  *        decode descriptor sense data format in full
  *      v0.98 (20040924) [SPC-3 rev 21]
- *        renamed from sg_err.c to sg_lib.c 
+ *        renamed from sg_err.c to sg_lib.c
  *        factor out sg_get_num() and sg_get_llnum() into this file
  *        add 'no_ascii<0' variant to dStrHex for ASCII-hex output only
  *      v1.00 (20041012)
- *        renamed from sg_err.c to sg_lib.c 
- *        change GPL to FreeBSD license 
+ *        renamed from sg_err.c to sg_lib.c
+ *        change GPL to FreeBSD license
  */
 
 #include <stdio.h>
@@ -113,7 +113,7 @@ sg_set_warnings_strm(FILE * warnings_strm)
 #define CMD_NAME_LEN 128
 
 void
-sg_print_command(const unsigned char * command) 
+sg_print_command(const unsigned char * command)
 {
     int k, sz;
     char buff[CMD_NAME_LEN];
@@ -124,7 +124,7 @@ sg_print_command(const unsigned char * command)
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
     fprintf(sg_warnings_strm, "%s [", buff);
-    if (SG_VARIABLE_LENGTH_CMD == command[0]) 
+    if (SG_VARIABLE_LENGTH_CMD == command[0])
         sz = command[7] + 8;
     else
         sz = sg_get_command_size(command[0]);
@@ -157,7 +157,7 @@ sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 }
 
 void
-sg_print_scsi_status(int scsi_status) 
+sg_print_scsi_status(int scsi_status)
 {
     char buff[128];
 
@@ -474,7 +474,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     break;
                 }
                 progress = (descp[5] << 8) + descp[6];
-                n += sprintf(b + n, "%d %%\n", 
+                n += sprintf(b + n, "%d %%\n",
                         (progress * 100) / 0x10000);
                 break;
             case SPC_SK_COPY_ABORTED:
@@ -484,7 +484,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     break;
                 }
                 n += sprintf(b + n, " Relative to start of %s, byte %d",
-                        (descp[4] & 0x20) ? "segment descriptor" : 
+                        (descp[4] & 0x20) ? "segment descriptor" :
                                             "parameter list",
                         (descp[5] << 8) | descp[6]);
                 if (descp[4] & 0x08)
@@ -630,7 +630,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
     if (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh)) {
         switch (ssh.response_code) {
         case 0x70:      /* fixed, current */
-            error = "Fixed format, current"; 
+            error = "Fixed format, current";
             len = (sb_len > 7) ? (sense_buffer[7] + 8) : sb_len;
             len = (len > sb_len) ? sb_len : len;
             break;
@@ -652,7 +652,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             error = "Response code: 0x0 (?)";
             break;
         default:
-            snprintf(error_buff, sizeof(error_buff), 
+            snprintf(error_buff, sizeof(error_buff),
                      "Unknown response code: 0x%x", ssh.response_code);
             error = error_buff;
             break;
@@ -765,7 +765,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 if (n >= buff_len)
                     return;
             }
-        } else { 
+        } else {
             n += snprintf(buff + n, buff_len - n, " fixed descriptor "
                           "length too short, len=%d\n", len);
             if (n >= buff_len)
@@ -839,7 +839,7 @@ sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
             if (sb_len > 2)
                 sshp->sense_key = (0xf & sensep[2]);
             if (sb_len > 7) {
-                sb_len = (sb_len < (sensep[7] + 8)) ? sb_len : 
+                sb_len = (sb_len < (sensep[7] + 8)) ? sb_len :
                                                       (sensep[7] + 8);
                 if (sb_len > 12)
                     sshp->asc = sensep[12];
@@ -865,9 +865,9 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             return SG_LIB_CAT_RECOVERED;
         case SPC_SK_NOT_READY:
             return SG_LIB_CAT_NOT_READY;
-        case SPC_SK_MEDIUM_ERROR: 
-        case SPC_SK_HARDWARE_ERROR: 
-        case SPC_SK_BLANK_CHECK: 
+        case SPC_SK_MEDIUM_ERROR:
+        case SPC_SK_HARDWARE_ERROR:
+        case SPC_SK_BLANK_CHECK:
             return SG_LIB_CAT_MEDIUM_HARD;
         case SPC_SK_UNIT_ATTENTION:
             return SG_LIB_CAT_UNIT_ATTENTION;
@@ -1073,7 +1073,7 @@ safe_strerror(int errnum)
 {
     size_t len;
     char * errstr;
-  
+
     if (errnum < 0)
         errnum = -errnum;
     errstr = strerror(errnum);
@@ -1088,7 +1088,7 @@ safe_strerror(int errnum)
 
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
-   in this file go to sg_warnings_strm (default stderr).] 
+   in this file go to sg_warnings_strm (default stderr).]
    'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 16 ASCII-hex bytes
        = 0     in addition, the bytes are listed in ASCII to the right
@@ -1224,7 +1224,7 @@ swapb_ushort(unsigned short u)
 }
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
-   in this file go to sg_warnings_strm (default stderr).] 
+   in this file go to sg_warnings_strm (default stderr).]
    'no_ascii' allows for 3 output types:
        > 0     each line has address then up to 8 ASCII-hex 16 bit words
        = 0     in addition, the ASCI bytes pairs are listed to the right
@@ -1568,3 +1568,39 @@ sg_lib_version()
 {
     return sg_lib_version_str;
 }
+
+
+#ifdef SG3_UTILS_MINGW
+/* Non Unix OSes distinguish between text and binary files.
+   Set text mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+int
+sg_set_text_mode(int fd)
+{
+    return setmode(fd, O_TEXT);
+}
+
+/* Set binary mode on fd. Does nothing in Unix. Returns negative number on
+   failure. */
+int
+sg_set_binary_mode(int fd)
+{
+    return setmode(fd, O_BINARY);
+}
+
+#else
+/* For Unix the following functions are dummies. */
+int
+sg_set_text_mode(int fd)
+{
+    return fd;  /* fd should be >= 0 */
+}
+
+int
+sg_set_binary_mode(int fd)
+{
+    return fd;
+}
+
+#endif
+

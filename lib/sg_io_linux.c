@@ -43,10 +43,11 @@
 #include "sg_io_linux.h"
 
 
-/* Version 1.02 20060714 */
+/* Version 1.02 20081031 */
 
 
-void sg_print_masked_status(int masked_status) 
+void
+sg_print_masked_status(int masked_status)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
 
@@ -63,7 +64,8 @@ static const char * linux_host_bytes[] = {
 #define LINUX_HOST_BYTES_SZ \
         (int)(sizeof(linux_host_bytes) / sizeof(linux_host_bytes[0]))
 
-void sg_print_host_status(int host_status)
+void
+sg_print_host_status(int host_status)
 {
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
@@ -93,7 +95,8 @@ static const char * linux_driver_suggests[] = {
     (int)(sizeof(linux_driver_suggests) / sizeof(linux_driver_suggests[0]))
 
 
-void sg_print_driver_status(int driver_status)
+void
+sg_print_driver_status(int driver_status)
 {
     int driv, sugg;
     const char * driv_cp = "invalid";
@@ -113,10 +116,10 @@ void sg_print_driver_status(int driver_status)
 
 /* Returns 1 if no errors found and thus nothing printed; otherwise
    prints error/warning (prefix by 'leadin') and returns 0. */
-static int sg_linux_sense_print(const char * leadin, int scsi_status,
-                                int host_status, int driver_status,
-                                const unsigned char * sense_buffer,
-                                int sb_len, int raw_sinfo)
+static int
+sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
+                     int driver_status, const unsigned char * sense_buffer,
+                     int sb_len, int raw_sinfo)
 {
     int done_leadin = 0;
     int done_sense = 0;
@@ -171,8 +174,9 @@ static int sg_linux_sense_print(const char * leadin, int scsi_status,
 
 #ifdef SG_IO
 
-int sg_normalize_sense(const struct sg_io_hdr * hp,
-                       struct sg_scsi_sense_hdr * sshp)
+int
+sg_normalize_sense(const struct sg_io_hdr * hp,
+                   struct sg_scsi_sense_hdr * sshp)
 {
     if ((NULL == hp) || (0 == hp->sb_len_wr)) {
         if (sshp)
@@ -184,8 +188,9 @@ int sg_normalize_sense(const struct sg_io_hdr * hp,
 
 /* Returns 1 if no errors found and thus nothing printed; otherwise
    returns 0. */
-int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
-                    int raw_sinfo)
+int
+sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
+                int raw_sinfo)
 {
     return sg_linux_sense_print(leadin, hp->status, hp->host_status,
                                 hp->driver_status, hp->sbp, hp->sb_len_wr,
@@ -195,10 +200,10 @@ int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
 
 /* Returns 1 if no errors found and thus nothing printed; otherwise
    returns 0. */
-int sg_chk_n_print(const char * leadin, int masked_status,
-                   int host_status, int driver_status,
-                   const unsigned char * sense_buffer, int sb_len,
-                   int raw_sinfo)
+int
+sg_chk_n_print(const char * leadin, int masked_status, int host_status,
+               int driver_status, const unsigned char * sense_buffer,
+               int sb_len, int raw_sinfo)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
 
@@ -208,16 +213,17 @@ int sg_chk_n_print(const char * leadin, int masked_status,
 }
 
 #ifdef SG_IO
-int sg_err_category3(struct sg_io_hdr * hp)
+int
+sg_err_category3(struct sg_io_hdr * hp)
 {
     return sg_err_category_new(hp->status, hp->host_status,
                                hp->driver_status, hp->sbp, hp->sb_len_wr);
 }
 #endif
 
-int sg_err_category(int masked_status, int host_status,
-                    int driver_status, const unsigned char * sense_buffer,
-                    int sb_len)
+int
+sg_err_category(int masked_status, int host_status, int driver_status,
+                const unsigned char * sense_buffer, int sb_len)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
 
@@ -225,8 +231,9 @@ int sg_err_category(int masked_status, int host_status,
                                sense_buffer, sb_len);
 }
 
-int sg_err_category_new(int scsi_status, int host_status, int driver_status, 
-                        const unsigned char * sense_buffer, int sb_len)
+int
+sg_err_category_new(int scsi_status, int host_status, int driver_status,
+                    const unsigned char * sense_buffer, int sb_len)
 {
     int masked_driver_status = (SG_LIB_DRIVER_MASK & driver_status);
 

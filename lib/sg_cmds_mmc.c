@@ -129,7 +129,7 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
                  int mx_resp_len, int noisy, int verbose)
 {
     int res, k, ret, sense_cat;
-    unsigned char gcCmdBlk[GET_CONFIG_CMD_LEN] = {GET_CONFIG_CMD, 0, 0, 0, 
+    unsigned char gcCmdBlk[GET_CONFIG_CMD_LEN] = {GET_CONFIG_CMD, 0, 0, 0,
                                                   0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2009 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,6 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
-#include "sg_pt.h"
 
 /* This program uses a ATA PASS-THROUGH (16 or 12) SCSI command defined
    by SAT to package an ATA READ LOG EXT (2Fh) command to fetch
@@ -69,7 +68,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.01 20071202";
+static char * version_str = "1.03 20090303";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -162,7 +161,7 @@ dStrRaw(const char* str, int len)
 
 /* ATA READ LOG EXT command [2Fh, PIO data-in] */
 /* N.B. "log_addr" is the log page number, "page_in_log" is usually zero */
-static int 
+static int
 do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                 int blk_count, void * resp, int mx_resp_len, int cdb_len,
                 int ck_cond, int extend, int do_hex, int do_raw, int verbose)
@@ -244,7 +243,7 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                         fprintf(stderr, "ATA PASS-THROUGH (%d), bad "
                                 "field in cdb\n", cdb_len);
                 }
-                return ret; 
+                return ret;
             case SPC_SK_NO_SENSE:
             case SPC_SK_RECOVERED_ERROR:
                 if ((0x0 == ssh.asc) &&
@@ -419,6 +418,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "no DEVICE name detected\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
+    }
+    if (raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
     }
 
     if ((sg_fd = open(device_name, O_RDWR)) < 0) {

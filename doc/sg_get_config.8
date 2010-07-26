@@ -1,10 +1,10 @@
-.TH SG_GET_CONFIG "8" "February 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_GET_CONFIG "8" "November 2008" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
-sg_get_config \- sends a SCSI GET CONFIGURATION command
+sg_get_config \- sends a SCSI GET CONFIGURATION command (MMC-4 +)
 .SH SYNOPSIS
 .B sg_get_config
 [\fI\-\-brief\fR] [\fI\-\-current\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-inner\-hex\fR] [\fI\-\-list\fR] [\fI\-\-rt=RT\fR]
+[\fI\-\-inner\-hex\fR] [\fI\-\-list\fR] [\fI\-\-raw\fR] [\fI\-\-rt=RT\fR]
 [\fI\-\-starting=FC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
@@ -12,21 +12,21 @@ sg_get_config \- sends a SCSI GET CONFIGURATION command
 .PP
 Sends a SCSI GET CONFIGURATION command to \fIDEVICE\fR and decodes the
 response. The response includes the features and profiles of the device.
-Typically these devices are CD and DVD players that may (but not
+Typically these devices are CD, DVD, HD-DVD and BD players that may (but not
 necessarily) have media in them. These devices may well be connected via
 ATAPI, USB or IEEE 1394 transports. In such cases they are "SCSI" devices
 only in the sense that they use the "Multi\-Media command" set (MMC).
 MMC is a specialized SCSI command set whose definition can be found
 at http://www.t10.org .
 .PP
-This utility is based on the MMC\-4 and MMC\-5 draft standards. See
-section 5 on "Features and Profile for Multi_Media devices" for more
-information on specific feature parameters and profiles. The manufacturer's
-product manual may also be useful.
+This utility is based on the MMC\-4 and later draft standards. See section
+5 on "Features and Profile for Multi_Media devices" for more information on
+specific feature parameters and profiles. The manufacturer's product manual
+may also be useful.
 .PP
-Since modern DVD writers support many features and profiles, the decoded
-output from this utility can be large. There are various ways to cut down
-the output. If the \fI\-\-brief\fR option is used only the feature names
+Since modern DVD and BD writers support many features and profiles, the
+decoded output from this utility can be large. There are various ways to cut
+down the output. If the \fI\-\-brief\fR option is used only the feature names
 are shown and the feature parameters are not decoded. Alternatively if only
 one feature is of interest then this combination of options is
 appropriate: "\-\-rt=2 \-\-starting=\fIFC\fR". Another possibility is to show
@@ -80,6 +80,11 @@ yields an "illegal field in cdb" error). To simplify the meanings of the
   \fB3\fR : reserved
 .br
 .TP
+\fB\-R\fR, \fB\-\-raw\fR
+output response in binary (to stdout). Note that the short form is \fI\-R\fR
+unlike most other utilities in this package that use \fI\-r\fR for this
+action.
+.TP
 \fB\-s\fR, \fB\-\-starting\fR=\fIFC\fR
 where \fIFC\fR is the feature code value. This option works closely with
 the \fI\-\-rt=RT\fR option. The \fIFC\fR value is in the range 0 to
@@ -99,7 +104,7 @@ brackets. The draft immediately prior to standardization can
 be found at http://www.t10.org . In the initial MMC standard there
 was no GET CONFIGURATION command and the relevant information was
 obtained from the "CD capabilities and mechanical status mode
-page" (mode page 0x2a). It was later renamed the "MM capabilities and 
+page" (mode page 0x2a). It was later renamed the "MM capabilities and
 mechanical status mode page" and has been made obsolete in MMC\-4 and
 MMC\-5. The GET CONFIGURATION command was introduced in MMC\-2 and has
 become a replacement for that mode page. New features such as support
@@ -122,7 +127,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2007 Douglas Gilbert
+Copyright \(co 2004\-2008 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

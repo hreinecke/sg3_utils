@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "October 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_SENDDIAG "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -33,7 +33,7 @@ on the old command line syntax outlines the second group of options.
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-d\fR, \fB\-\-doff\fR
-set the Device Offline (DevOffL) bit (default is clear). Only significant 
+set the Device Offline (DevOffL) bit (default is clear). Only significant
 when \fI\-\-test\fR option is set for the default self\-test. When set other
 operations on any logical units controlled by the this device server (target)
 may be affected (delayed) while a default self\-test is underway.
@@ -67,9 +67,10 @@ bit is set (as required by SPC\-3).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR=\fIH,H...\fR
 string of comma separated hex numbers each of which should resolve to
-a byte value (i.e. 0 to ff inclusive). This sequence forms a diagnostic
-page to be sent with the SCSI SEND DIAGNOSTIC command. Mostly likely
-the \fI\-\-pf\fR option should also be given.
+a byte value (i.e. 0 to ff inclusive). A (single) space separated string
+of hex bytes is also allowed but the list needs to be in quotes. This
+sequence forms a diagnostic page to be sent with the SCSI SEND DIAGNOSTIC
+command. Mostly likely the \fI\-\-pf\fR option should also be given.
 .TP
 \fB\-r\fR, \fB\-\-raw=\-\fR
 reads sequence of bytes from stdin. The sequence may be comma, space, tab
@@ -93,7 +94,7 @@ inactive. Some other values:
 .br
   \fB6\fR : foreground extended self\-test
 .br
-This option is mutually exclusive with default self\-test (i.e. 
+This option is mutually exclusive with default self\-test (i.e.
 can't have (\fIST\fR > 0) and \fI\-\-test\fR).
 .TP
 \fB\-t\fR, \fB\-\-test\fR
@@ -103,7 +104,7 @@ option. Both the \fI\-\-doff\fR and/or \fI\-\-uoff\fR options can be used
 with this option.
 .TP
 \fB\-u\fR, \fB\-\-uoff\fR
-set the Unit Offline (UnitOffL) bit (default is clear). Only significant 
+set the Unit Offline (UnitOffL) bit (default is clear). Only significant
 when \fI\-\-test\fR option is set for the default self\-test. When set other
 operations on this logical unit may be affected (delayed) while a default
 self\-test is underway. Some devices (e.g. Fujitsu disks) do more tests
@@ -168,7 +169,7 @@ be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
 or using '\-\-old' (or '\-O) as the first option.
 .TP
 \fB\-doff\fR
-set the Device Offline (DevOffL) bit (default is clear). Only significant 
+set the Device Offline (DevOffL) bit (default is clear). Only significant
 when \fI\-t\fR option is set for the default self\-test. Equivalent to
 \fI\-\-doff\fR in the main description.
 .TP
@@ -244,7 +245,7 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003\-2007 Douglas Gilbert
+Copyright \(co 2003\-2009 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

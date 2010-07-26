@@ -1,10 +1,10 @@
-.TH SG3_UTILS "8" "January 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG3_UTILS "8" "April 2009" "sg3_utils\-1.27" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
 .B sg_*
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -24,8 +24,8 @@ A good overview of various SCSI standards can be seen in
 http://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
 of the diagram. SCSI commands in common with all device types can be found
 in SPC of which SPC\-4 is the latest major version. Block device specific
-commands (e.g.  as used by disks) are in SBC, those for tape drives in
-SSC and those for CD/DVD drives in MMC. 
+commands (e.g. as used by disks) are in SBC, those for tape drives in SSC
+and those for CD/DVD/HD_DVD/BD drives in MMC.
 .PP
 There are two generations of command line option usage. The newer
 utilities (written since July 2004) use the getopt_long() function to parse
@@ -38,11 +38,10 @@ options can be elided, for example: '\-all' is equivalent to '\-a \-l \-l'.
 The \fIDEVICE\fR argument may appear after, between or prior to any options.
 .PP
 The older utilities, such as sg_inq, had individual command line processing
-code (often found at the top of the main() function) based on a single "\-"
-followed by one or more characters. If an argument is needed then it follows
-a "=" (e.g. '\-p=1f' in sg_modes with its older interface). Various options
-can be elided as long as it is not ambiguous (e.g. '\-vv' to increase the
-verbosity).
+code typically based on a single "\-" followed by one or more characters. If
+an argument is needed then it follows a "=" (e.g. '\-p=1f' in sg_modes with
+its older interface). Various options can be elided as long as it is not
+ambiguous (e.g. '\-vv' to increase the verbosity).
 .PP
 Over time the command line interface of these older utilities became messy
 and overloaded with options. So in sg3_utils version 1.23 the command line
@@ -54,7 +53,10 @@ variable or using '\-O' or '\-\-old' as the first command line option. The
 man pages of the older utilities documents the details.
 .PP
 Several sg3_utils utilities are based on the Unix dd command (e.g. sg_dd)
-and share dd's rather quirky command line interface.
+and permit copying data at the level of SCSI READ and WRITE commands. sg_dd
+is tightly bound to Linux and hence is not ported to other OSes. A more
+generic utility (than sg_dd) called ddpt in a package of the same name has
+been ported to other OSes.
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
@@ -153,6 +155,19 @@ output the usage message then exit.
 for SCSI commands that yield a non\-trivial response, print out that
 response in ASCII hexadecimal.
 .TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
+lengths that vary depending on many factors, only some of which these
+utilities take into account. The maximum response length is typically
+specified in the 'allocation length' field of the cdb. In the absence of
+this option, several utilities use a default allocation length (sometimes
+recommended in the SCSI draft standards) or a "double fetch" strategy.
+See sg_logs(8) for its description of a "double fetch" strategy. These
+techniques are imperfect and in the presence of faulty SCSI targets can
+cause problems (e.g. some USB mass storage devices freeze if they receive
+an INQUIRY allocation length other than 36). Also use of this option
+disables any "double fetch" strategy that may have otherwise been used.
+.TP
 \fB\-r\fR, \fB\-\-raw\fR
 for SCSI commands that yield a non\-trivial response, output that response
 in binary to stdout. If any error messages or warning are produced they are
@@ -168,12 +183,67 @@ to stderr.
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit. Each utility has its own version
 number and date of last code change.
+.SH NUMERIC ARGUMENTS
+Many utilities have command line options that take numeric arguments. These
+numeric arguments can be large values (e.g. a logical block address (LBA) on
+a disk) and can be inconvenient to enter in the default decimal
+representation. So various other representations are permitted.
+.PP
+Multiplicative suffixes are accepted. They are one, two or three letter
+strings appended directly after the number to which they apply:
+.PP
+   c C         *1
+.br
+   w W         *2
+.br
+   b B         *512
+.br
+   k K KiB     *1024
+.br
+   KB          *1000
+.br
+   m M MiB     *1048576
+.br
+   MB          *1000000
+.br
+   g G GiB     *(2^30)
+.br
+   GB          *(10^9)
+.br
+   t T TiB     *(2^40)
+.br
+   TB          *(10^12)
+.br
+   p P PiB     *(2^50)
+.br
+   PB          *(10^15)
+.PP
+An example is "2k" for 2048. The large tera and peta suffixes are only
+available for numeric arguments that might require 64 bits to represent
+internally.
+.PP
+A suffix of the form "x<n>" multiplies the leading number by <n>. An
+example is "2x33" for "66". The leading number cannot be "0" (zero) as
+that would be interpreted as a hexadecimal number (see below).
+.PP
+These multiplicative suffixes are compatible with GNU's dd command (since
+2002) which claims compliance with SI and with IEC 60027\-2.
+.PP
+Alternatively numerical arguments can be given in hexadecimal. There are
+two syntaxes. The number can be preceded by either "0x" or "0X" as found
+in the C programming language. The second hexadecimal representation is a
+trailing "h" or "H" as found in (storage) standards. When hex numbers are
+given, multipliers cannot be used. For example the decimal value "256" can
+be given as "0x100" or "100h".
+.SH WEB SITE
+There is a web page discussing this package at 
+http://sg.danny.cz/sg/sg3_utils.html .
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 1999\-2008 Douglas Gilbert
+Copyright \(co 1999\-2009 Douglas Gilbert
 .br
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files
@@ -182,4 +252,4 @@ code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
 under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(sdparm)
+.B sdparm(sdparm), ddpt(ddpt)

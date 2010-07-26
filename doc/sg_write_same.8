@@ -1,0 +1,170 @@
+.TH SG_WRITE_SAME "8" "April 2007" "sg3_utils\-1.27" SG3_UTILS
+.SH NAME
+sg_write_same \- send the SCSI WRITE SAME command
+.SH SYNOPSIS
+.B sg_write_same
+[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR]
+[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-lbdata\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-pbdata\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-unmap\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR]
+[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+Send the SCSI WRITE SAME (10, 16 or 32 byte) command to \fIDEVICE\fR. This
+command writes the given block \fINUM\fR times to consecutive blocks on
+the \fIDEVICE\fR starting at logical block address \fILBA\fR.
+.PP
+The length of the block to be written multiple times is obtained from
+the \fILEN\fR argument, the length of the given input file \fIIF\fR,
+or by calling READ CAPACITY(16) on \fIDEVICE\fR. The contents of the
+block to be written are obtained from the input file \fIIF\fR or
+zeroes are used. If READ CAPACITY(16) is called (which implies \fIIF\fR
+was not given) and the PROT_EN bit is set then the last 8 bytes are
+set to 0xff.
+.PP
+By default WRITE SAME(10) is sent unless \fILBA\fR (plus \fINUM\fR)
+exceeds 32 bits, \fINUM\fR exceeds 65535 or \fI\-\-unmap\fR is given.
+In these cases WRITE SAME(16) is sent.
+.PP
+.B Take care:
+The WRITE SAME(10, 16 and 32) commands interpret a \fINUM\fR of zero
+as write to the end of \fIDEVICE\fR. This utility defaults \fINUM\fR to
+1 . The WRITE SAME commands have no IMMED bit so if \fINUM\fR is
+large (or zero) then an invocation of this utility could take a long
+time, potentially as long as a FORMAT UNIT command. In such situations
+the command timeout value \fITO\fR will most likely need to be increased
+from its default value of 60 seconds.
+.PP
+As a precaution against an accidental 'sg_write_same /dev/sda' (for example)
+overwriting LBA 0 on /dev/sda with zeroes, at least one of the
+\fI\-\-in=IF\fR, \fI\-\-lba=LBA\fR or \fI\-\-num=NUM\fR options must be
+given. Obviously this utility can destroy a lot of user data so check the
+options carefully.
+.PP
+This utility is based SBC\-3 draft revision 18 found at http://www.t10.org .
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-S\fR, \fB\-\-16\fR
+send a SCSI WRITE SAME (16) command to \fIDEVICE\fR. The default action (in
+the absence of this option and the \fI\-\-32\fR option) is to send a SCSI
+WRITE SAME (10) command.
+.TP
+\fB\-T\fR, \fB\-\-32\fR
+send a SCSI WRITE SAME (32) command to \fIDEVICE\fR. The default action (in
+the absence of this option and the \fI\-\-16\fR option) is to send a SCSI
+WRITE SAME (10) command.
+.TP
+\fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
+sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
+\fIGN\fR should be a value between 0 and 31.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
+read data (binary) from file named \fIIF\fR and use it as the data out
+buffer for the SCSI WRITE SAME command. The length of the data out buffer
+is \fI\-\-xferlen=LEN\fR or, if that is not given, the length of the \fIIF\fR
+file. If \fIIF\fR is "\-" then stdin is read. If this option is not given
+then 0x00 bytes are used as fill with the length of the data out buffer
+obtained from \fI\-\-xferlen=LEN\fR or by calling READ CAPACITY(16). If the
+response to READ CAPACITY(16) has the PROT_EN bit set then data out buffer
+size is modified accordingly with the last 8 bytes set to 0xff.
+.TP
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the logical block address to start the WRITE SAME command.
+Defaults to lba 0 which is a dangerous block to overwrite on a disk that is
+in use. Assumed to be in decimal unless prefixed with '0x' or has a
+trailing 'h'.
+.TP
+\fB\-L\fR, \fB\-\-lbdata\fR
+sets the LBDATA bit in the WRITE SAME cdb.
+.TP
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
+where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write the
+data out buffer to. The default value for \fINUM\fR is 1. The value corresponds
+to the 'Number of logical blocks' field in the WRITE SAME cdb. Note that a
+value of 0 in \fINUM\fR is interpreted as write the data out buffer on every
+block starting at \fILBA\fR to the end of the \fIDEVICE\fR.
+.TP
+\fB\-P\fR, \fB\-\-pbdata\fR
+sets the PBDATA bit in the WRITE SAME cdb.
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
+where \fITO\fR is the command timeout value in seconds. The default value is
+60 seconds. If \fINUM\fR is large (or zero) a WRITE SAME command may require
+considerably more time than 60 seconds to complete.
+.TP
+\fB\-U\fR, \fB\-\-unmap\fR
+sets the UNMAP bit in the WRITE SAME(16 and 32) cdb. When this option is
+given the default command becomes WRITE SAME(16) since the WRITE SAME(10)
+command does not offer this bit (in SBC\-3 draft revision 18). See UNMAP
+section below.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the degree of verbosity (debug messages).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+output version string then exit.
+.TP
+\fB\-w\fR, \fB\-\-wrprotect\fR=\fIWPR\fR
+sets the "Write protect" field in the WRITE SAME cdb to \fIWPR\fR. The
+default value is zero. \fIWPR\fR should be a value between 0 and 7.
+.TP
+\fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
+where \fILEN\fR is the data out buffer length. Defaults to the length of
+the \fIIF\fR file or, if that is not given, then the READ CAPACITY(16)
+command is called on the \fIDEVICE\fR and the 'Logical block length in
+bytes' and the PROT_EN bit in the response are used to determine the
+data out buffer length. If both this option and the \fIIF\fR option are
+given and \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR
+is the data out buffer length with zeroes used as pad bytes.
+.SH UNMAP
+Thin provisioning is the sophisticated term used in SBC\-3 revision 18
+for the ability to mark blocks as unused. It is closely related to the
+ATA DATA SET MANAGEMENT command with the "Trim" bit set. For large
+storage arrays, it is a way to provision less physical storage than the
+READ CAPACITY command reports is available, potentially allocating more
+physical storage when WRITE commands require it. For flash memory it is
+a way of potentially saving power (and perhaps access time) when it is
+known large sections (or almost all) of the flash memory is not in use.
+.PP
+Support for thin provisioning is indicated by the TPE bit being set in
+the READ CAPACITY(16) command response. That implies at least one of
+the UNMAP, WRITE SAME(16) or WRITE SAME(32) commands is implemented. If
+the UNMAP command is implemented then the "Maximum unmap LBA count"
+and "Maximum unmap block descriptor count" fields in the Block Limits
+VPD page should both be greater than zero. The READ CAPACITY(16) command
+response also contains a TPRZ bit which if set means that if unmapped
+blocks are read then zeroes will be returned for the data (and if
+protection information is active, 0xff bytes are returned for that).
+.PP
+In the cases of WRITE SAME(16) and WRITE SAME(32) when the Unmap bit is
+set in the cdb then the data out buffer is also sent. Additionally the
+data section of that data out buffer should be full of 0x0 bytes while
+the data protection block, 8 bytes at the end if present, should be set
+to 0xff bytes. If these conditions are not met and the TPRZ bit is set
+then the Unmap bit is ignored and the data out buffer is written to
+the \fIDEVICE\fR as if the Unmap bit was zero. In the absence of the
+\fI\-\-in=IF\fR option, this utility will attempt build a data out
+buffer that meets the requirements for the Unmap bit in the cdb to be
+acted on by the \fIDEVICE\fR. 
+.SH NOTES
+Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
+suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
+in the sg3_utils(8) man page.
+.SH EXIT STATUS
+The exit status of sg_write_same is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2009 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_readcap
