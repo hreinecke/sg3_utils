@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.74 20100613";
+static char * version_str = "5.74 20100724";
 
 #define ME "sg_dd: "
 
@@ -237,6 +237,48 @@ siginfo_handler(int sig)
     print_stats("  ");
 }
 
+static int bsg_major_checked = 0;
+static int bsg_major = 0;
+
+static void
+find_bsg_major(void)
+{
+    const char * proc_devices = "/proc/devices";
+    FILE *fp;
+    char a[128];
+    char b[128];
+    char * cp;
+    int n;
+
+    if (NULL == (fp = fopen(proc_devices, "r"))) {
+        if (verbose)
+            fprintf(stderr, "fopen %s failed: %s\n", proc_devices,
+                    strerror(errno));
+        return;
+    }
+    while ((cp = fgets(b, sizeof(b), fp))) {
+        if ((1 == sscanf(b, "%s", a)) &&
+            (0 == memcmp(a, "Character", 9)))
+            break;
+    }
+    while (cp && (cp = fgets(b, sizeof(b), fp))) {
+        if (2 == sscanf(b, "%d %s", &n, a)) {
+            if (0 == strcmp("bsg", a)) {
+                bsg_major = n;
+                break;
+            }
+        } else
+            break;
+    }
+    if (verbose > 5) {
+        if (cp)
+            fprintf(stderr, "found bsg_major=%d\n", bsg_major);
+        else
+            fprintf(stderr, "found no bsg char device in %s\n", proc_devices);
+    }
+    fclose(fp);
+}
+
 
 static int
 dd_filetype(const char * filename)
@@ -259,6 +301,12 @@ dd_filetype(const char * filename)
             return FT_SG;
         if (SCSI_TAPE_MAJOR == major(st.st_rdev))
             return FT_ST;
+        if (! bsg_major_checked) {
+            bsg_major_checked = 1;
+            find_bsg_major();
+        }
+        if (bsg_major == (int)major(st.st_rdev))
+            return FT_SG;
     } else if (S_ISBLK(st.st_mode))
         return FT_BLOCK;
     else if (S_ISFIFO(st.st_mode))
