@@ -1,30 +1,8 @@
 /*
- * Copyright (c) 2009 Douglas Gilbert.
+ * Copyright (c) 2009-2010 Douglas Gilbert.
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the BSD_LICENSE file.
  */
 
 #include <unistd.h>
@@ -51,9 +29,7 @@
  * logical blocks.
  */
 
-static char * version_str = "1.00 20090906";
-
-#define ME "sg_unmap: "
+static char * version_str = "1.01 20100331";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -61,6 +37,7 @@ static char * version_str = "1.00 20090906";
 
 
 static struct option long_options[] = {
+        {"anchor", no_argument, 0, 'a'},
         {"grpnum", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'I'},
@@ -76,11 +53,12 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_unmap [--grpnum=GN] [--help] [--in=FILE] [--lba=LBA,LBA..]\n"
-          "                [--num=NUM,NUM...] [--timeout=TO] [--verbose] "
-          "[--version]\n"
-          "                DEVICE\n"
+          "sg_unmap [--anchor] [--grpnum=GN] [--help] [--in=FILE]\n"
+          "                [--lba=LBA,LBA..] [--num=NUM,NUM...] "
+          "[--timeout=TO]\n"
+          "                [--verbose] [--version] DEVICE\n"
           "  where:\n"
+          "    --anchor|-a          set anchor field in cdb\n"
           "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
           "    --help|-h            print out usage message\n"
           "    --in=FILE|-I FILE      read LBA, NUM pairs in ASCII hex "
@@ -355,6 +333,7 @@ main(int argc, char * argv[])
     const char * in_op = NULL;
     int addr_arr_len = 0;
     int num_arr_len = 0;
+    int anchor = 0;
     int timeout = DEF_TIMEOUT_SECS;
     int verbose = 0;
     const char * device_name = NULL;
@@ -367,12 +346,15 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ghIHl:n:t:vV", long_options,
+        c = getopt_long(argc, argv, "aghIHl:n:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'a':
+            ++anchor;
+            break;
         case 'g':
             num = sscanf(optarg, "%d", &res);
             if ((1 == num) && ((res < 0) || (res > 31)))
@@ -407,7 +389,7 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            fprintf(stderr, "version: %s\n", version_str);
             return 0;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
@@ -512,13 +494,13 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+        fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
-    res = sg_ll_unmap(sg_fd, grpnum, timeout, param_arr, param_len,
-                      1, verbose);
+    res = sg_ll_unmap_v2(sg_fd, anchor, grpnum, timeout, param_arr, param_len,
+                         1, verbose);
     ret = res;
     if (SG_LIB_CAT_NOT_READY == res) {
         fprintf(stderr, "UNMAP failed, device not ready\n");

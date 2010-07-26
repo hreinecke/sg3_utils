@@ -9,7 +9,7 @@
 
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2009 D. Gilbert
+*  Copyright (C) 2000-2010 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -39,7 +39,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 21 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 23 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -157,6 +157,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x3f0, "SES-2 ANSI INCITS 448-2008"},
     {0x400, "SSC-3 (no version claimed)"},
     {0x403, "SSC-3 T10/1611-D revision 04a"},
+    {0x407, "SSC-3 T10/1611-D revision 05"},
     {0x420, "MMC-5 (no version claimed)"},
     {0x42f, "MMC-5 T10/1675-D revision 03"},
     {0x431, "MMC-5 T10/1675-D revision 03b"},
@@ -176,6 +177,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x4c0, "SBC-3 (no version claimed)"},
     {0x4e0, "MMC-6 (no version claimed)"},
     {0x4e3, "MMC-6 T10/1836-D revision 2b"},
+    {0x4e5, "MMC-6 T10/1836-D revision 02g"},
     {0x500, "ADC-3 (no version claimed)"},
     {0x520, "SSC-4 (no version claimed)"},
     {0x560, "OSD-3 (no version claimed)"},
@@ -281,6 +283,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc27, "SAS-2 T10/1760-D revision 15"},
     {0xc28, "SAS-2 T10/1760-D revision 16"},
     {0xc40, "SAS-2.1 (no version claimed)"},
+    {0xc48, "SAS-2.1 T10/2125-D revision 04"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
     {0xd3c, "FC-PH ANSI INCITS 230-1994 with Amnd 1 ANSI INCITS "
@@ -291,6 +294,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xd61, "FC-AL-2 T11/1133-D revision 7.0"},
     {0xd63, "FC-AL-2 ANSI INCITS 332-1999 with AM1-2003 & AM2-2006"},
     {0xd64, "FC-AL-2 ANSI INCITS 332-1999 with Amnd 2 AM2-2006"},
+    {0xd65, "FC-AL-2 ISO/IEC 14165-122 with AM1 & AM2"},
     {0xd7c, "FC-AL-2 ANSI INCITS 332-1999"},
     {0xd7d, "FC-AL-2 ANSI INCITS 332-1999 with Amnd 1 AM1:2002"},
     {0xd80, "FC-PH-3 (no version claimed)"},
@@ -299,6 +303,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xdb7, "FC-FS T11/1331-D revision 1.2"},
     {0xdb8, "FC-FS T11/1331-D revision 1.7"},
     {0xdbc, "FC-FS ANSI INCITS 373-2003"},
+    {0xdbd, "FC-FS ISO/IEC 14165-251"},
     {0xdc0, "FC-PI (no version claimed)"},
     {0xddc, "FC-PI ANSI INCITS 352-2002"},
     {0xde0, "FC-PI-2 (no version claimed)"},
@@ -321,16 +326,22 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xea0, "FC 10GFC (no version claimed)"},
     {0xea2, "FC 10GFC ANSI INCITS 364-2003"},
     {0xea3, "FC 10GFC ISO/IEC 14165-116"},
+    {0xea5, "FC 10GFC ISO/IEC 14165-116 with AM1"},
     {0xea6, "FC 10GFC ANSI INCITS 364-2003 with AM1 ANSI INCITS 364/AM1-2007"},
     {0xec0, "FC-SP-2 (no version claimed)"},
     {0xee0, "FC-FS-3 (no version claimed)"},
     {0xee2, "FC-FS-3 T11/1861-D revision 0.9"},
     {0xf00, "FC-LS-2 (no version claimed)"},
+    {0xf03, "FC-LS-2 T11/2103D revision 2.11"},
     {0xf20, "FC-PI-5 (no version claimed)"},
+    {0x12a0, "FC-SCM (no version claimed)"},
+    {0x12a3, "FC-SCM T11/1824DT revision 1.0"},
     {0x12c0, "FC-DA-2 (no version claimed)"},
+    {0x12c3, "FC-DA-2 T11/1870DT revision 1.04"},
     {0x12e0, "FC-DA (no version claimed)"},
     {0x12e2, "FC-DA T11/1513-DT revision 3.1"},
     {0x12e8, "FC-DA ANSI INCITS TR-36 2004"},
+    {0x12e9, "FC-DA ISO/IEC 14165-341"},
     {0x1300, "FC-Tape (no version claimed)"},
     {0x1301, "FC-Tape T11/1315-D revision 1.16"},
     {0x131b, "FC-Tape T11/1315-D revision 1.17"},
@@ -372,9 +383,14 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1eab, "SAT T10/1711-D rev 9"},
     {0x1ead, "SAT ANSI INCITS 431-2007"},
     {0x1ec0, "SAT-2 (no version claimed)"},
-    {0x1ec4, "SAT-2 T10/1826-D revision 6"},
+    {0x1ec4, "SAT-2 T10/1826-D revision 06"},
+    {0x1ec8, "SAT-2 T10/1826-D revision 09"},
     {0x1ee0, "SAT-3 (no version claimed)"},
     {0x20a0, "SPL (no version claimed)"},
+    {0x20a3, "SPL T10/2124D revision 6a"},
+    {0xffc0, "IEEE 1667 (no version claimed)"},
+    {0xffc1, "IEEE 1667-2006"},
+    {0xffc2, "IEEE 1667-2009"},
     {0xffff, NULL},
 };
 

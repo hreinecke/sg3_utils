@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "August 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_PERSIST "8" "December 2009" "sg3_utils\-1.29" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
@@ -325,8 +325,8 @@ the disk spun up and when that happened, the registration was
 successful.
 .SH EXAMPLES
 .PP
-Due to defaults the simplest example executes the 'read keys' sub\-command
-of the PRIN command:
+Due to the various option defaults the simplest example executes
+the 'read keys' sub\-command of the PRIN command:
 .PP
    sg_persist /dev/sdb
 .PP
@@ -379,6 +379,9 @@ An example file that is suitably formatted to pass transportIDs via
 a '\-\-transport\-id=file=transport_ids.txt' option can be found in the
 examples sub\-directory of the sg3_utils package. There is also a
 simple test script called sg_persist_tst.sh in the same directory.
+.PP
+The above sequence of commands was tested successfully on a Seagate Savvio
+10K.3 disk which has a SAS interface.
 .SH EXIT STATUS
 The exit status of sg_persist is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

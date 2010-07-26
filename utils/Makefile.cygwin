@@ -1,0 +1,33 @@
+# Assumes Makefile is used in a cygwin shell
+
+SHELL = /bin/sh
+
+CC = gcc
+LD = gcc
+
+EXECS =	hxascdmp
+
+EXE_S =	hxascdmp.exe
+
+# OS_FLAGS = -DSG_LIB_WIN32 -DSPTD
+OS_FLAGS = -DSG_LIB_WIN32
+LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+EXTRA_FLAGS = $(OS_FLAGS) $(LARGE_FILE_FLAGS)
+
+# CFLAGS = -O2 -Wall -W $(EXTRA_FLAGS)
+CFLAGS = -g -O2 -Wall -W $(EXTRA_FLAGS)
+# CFLAGS = -g -O2 -Wall -W -pedantic -std=c99 $(EXTRA_FLAGS)
+
+LDFLAGS = 
+
+all: $(EXECS)
+
+clean:
+	rm *.o $(EXE_S)
+
+.c.o:
+	$(CC) $(INCLUDES) $(CFLAGS) $(S_CFLAGS) -c -o $@ $<
+
+hxascdmp: hxascdmp.o
+	$(LD) -o $@ $(LDFLAGS) $@.o
+

@@ -15,7 +15,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2009 D. Gilbert
+*  Copyright (C) 2000-2010 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.91 20090918";    /* SPC-4 revision 21 */
+static char * version_str = "0.95 20100331";    /* SPC-4 revision 23 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -44,6 +44,7 @@ static char * version_str = "0.91 20090918";    /* SPC-4 revision 21 */
 #define START_STOP_LPAGE 0xe
 #define APP_CLIENT_LPAGE 0xf
 #define SELF_TEST_LPAGE 0x10
+#define SOLID_STATE_MEDIA_LPAGE 0x11
 #define PORT_SPECIFIC_LPAGE 0x18
 #define STATS_LPAGE 0x19
 #define PCT_LPAGE 0x1a
@@ -707,11 +708,14 @@ show_page_name(int pg_code, int subpg_code,
             case 0x8:
                 printf("%sFormat status (sbc-2)\n", b);
                 break;
-            case THIN_PROV_LPAGE:       /* 0xc */
+            case THIN_PROV_LPAGE:               /* 0xc */
                 printf("%sThin provisioning (sbc-3)\n", b);
                 break;
             case 0x15:
                 printf("%sBackground scan results (sbc-3)\n", b);
+                break;
+            case SOLID_STATE_MEDIA_LPAGE:       /* 0x11 */
+                printf("%sSolid state media (sbc-3)\n", b);
                 break;
             case 0x16:
                 printf("%sATA pass-through results (sat-2)\n", b);
@@ -756,11 +760,23 @@ show_page_name(int pg_code, int subpg_code,
             case 0x16:
                 printf("%sTape diagnostic (ssc-3)\n", b);
                 break;
+            case 0x17:
+                printf("%sVolume statistics (ssc-4)\n", b);
+                break;
             case 0x2d:
                 printf("%sCurrent service information (ssc-3)\n", b);
                 break;
             case TAPE_ALERT_LPAGE:
                 printf("%sTapeAlert (ssc-2)\n", b);
+                break;
+            case 0x30:
+                printf("%sTape usage log (IBM specific)\n", b);
+                break;
+            case 0x31:
+                printf("%sTape capacity log (IBM specific)\n", b);
+                break;
+            case 0x32:
+                printf("%sData compression log (IBM specific)\n", b);
                 break;
             default:
                 done = 0;
@@ -1086,6 +1102,229 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
             printf("\n");
         num -= pl;
         ucp += pl;
+    }
+}
+
+static void
+show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
+{
+    int k, num, extra, pc, pcb;
+    unsigned int n;
+    uint64_t ull;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    if (num < 4) {
+        printf("badly formed tape usage log page\n");
+        return;
+    }
+    printf("Tape usage log page\n");
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        extra = ucp[3] + 4;
+        ull = n = 0;
+        switch (ucp[3]) {
+        case 2:
+            n = (ucp[4] << 8) | ucp[5];
+            break;
+        case 4:
+            n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+            break;
+        case 8:
+            for (n = 0, ull = ucp[4]; n < 8; ++n) {
+                ull <<= 8; ull |= ucp[4 + n];
+            }
+            break;
+        }
+        switch (pc) {
+        case 0x01:
+            if (extra == 8)
+                printf("  Thread count: %u", n);
+            break;
+        case 0x02:
+            if (extra == 12)
+                printf("  Total data sets written: %" PRIu64, ull);
+            break;
+        case 0x03:
+            if (extra == 8)
+                printf("  Total write retries: %u", n);
+            break;
+        case 0x04:
+            if (extra == 6)
+                printf("  Total unrecovered write errors: %u", n);
+            break;
+        case 0x05:
+            if (extra == 6)
+                printf("  Total suspended writes: %u", n);
+            break;
+        case 0x06:
+            if (extra == 6)
+                printf("  Total fatal suspended writes: %u", n);
+            break;
+        case 0x07:
+            if (extra == 12)
+                printf("  Total data sets read: %" PRIu64, ull);
+            break;
+        case 0x08:
+            if (extra == 8)
+                printf("  Total read retries: %u", n);
+            break;
+        case 0x09:
+            if (extra == 6)
+                printf("  Total unrecovered read errors: %u", n);
+            break;
+        case 0x0a:
+            if (extra == 6)
+                printf("  Total suspended reads: %u", n);
+            break;
+        case 0x0b:
+            if (extra == 6)
+                printf("  Total fatal suspended reads: %u", n);
+            break;
+        default:
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+    }
+}
+
+static void
+show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
+{
+    int k, num, extra, pc, pcb;
+    unsigned int n;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    if (num < 4) {
+        printf("badly formed tape capacity log page\n");
+        return;
+    }
+    printf("Tape capacity log page\n");
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        extra = ucp[3] + 4;
+        if (extra != 8)
+            continue;
+        n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+        switch (pc) {
+        case 0x01:
+            printf("  Main partition remaining capacity (in MiB): %u", n);
+            break;
+        case 0x02:
+            printf("  Alternate partition remaining capacity (in MiB): %u", n);
+            break;
+        case 0x03:
+            printf("  Main partition maximum capacity (in MiB): %u", n);
+            break;
+        case 0x04:
+            printf("  Alternate partition maximum capacity (in MiB): %u", n);
+            break;
+        default:
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+    }
+}
+
+static void
+show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
+{
+    int k, num, extra, pc, pcb;
+    unsigned int n;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    if (num < 4) {
+        printf("badly formed data compression log page\n");
+        return;
+    }
+    printf("Data compression log page\n");
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        extra = ucp[3] + 4;
+        switch (ucp[3]) {
+        case 2:
+            n = (ucp[4] << 8) | ucp[5];
+            break;
+        case 4:
+            n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+            break;
+        default:
+            n = 0;
+        }
+        switch (pc) {
+        case 0x00:
+            if (extra == 6)
+                printf("  Read compression ratio x100: %u", n);
+            break;
+        case 0x01:
+            if (extra == 6)
+                printf("  Write compression ratio x100: %u", n);
+            break;
+        case 0x02:
+            if (extra == 8)
+                printf("  Megabytes transferred to server: %u", n);
+            break;
+        case 0x03:
+            if (extra == 8)
+                printf("  Bytes transferred to server: %u", n);
+            break;
+        case 0x04:
+            if (extra == 8)
+                printf("  Megabytes read from tape: %u", n);
+            break;
+        case 0x05:
+            if (extra == 8)
+                printf("  Bytes read from tape: %u", n);
+            break;
+        case 0x06:
+            if (extra == 8)
+                printf("  Megabytes transferred from server: %u", n);
+            break;
+        case 0x07:
+            if (extra == 8)
+                printf("  Bytes transferred from server: %u", n);
+            break;
+        case 0x08:
+            if (extra == 8)
+                printf("  Megabytes written to tape: %u", n);
+            break;
+        case 0x09:
+            if (extra == 8)
+                printf("  Bytes written to tape: %u", n);
+            break;
+        default:
+            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
     }
 }
 
@@ -2376,6 +2615,90 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+static void
+show_thin_provisioning_page(unsigned char * resp, int len, int show_pcb)
+{
+    int j, num, pl, pc, pcb;
+    unsigned char * ucp;
+    char * cp;
+    char str[PCB_STR_LEN];
+
+    printf("Thin provisioning page (sbc-3) [0xc]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if ((pc >= 0x1) && (pc <= 0x2)) {
+            cp = (0x1 == pc)? "Available" : "Used";
+            printf("  %s LBA mapping threshold resource count:", cp);
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    fprintf(stderr, "\n    truncated by response length, "
+                            "expected at least 8 bytes\n");
+                else
+                    fprintf(stderr, "\n    parameter length >= 8 expected, "
+                            "got %d\n", pl);
+                break;
+            }
+            j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+            printf(" %d\n", j);
+        } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
+            printf("  Vendor specific [0x%x]:", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+        } else {
+            printf("  Reserved [parameter_code=0x%x]:", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("\n        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static void
+show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
+{
+    int num, pl, pc, pcb;
+    unsigned char * ucp;
+    char str[PCB_STR_LEN];
+
+    printf("Solid state media page (sbc-3) [0x11]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (0x1 == pc) {
+            printf("  Percentage used endurance indicator:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    fprintf(stderr, "\n    truncated by response length, "
+                            "expected at least 8 bytes\n");
+                else
+                    fprintf(stderr, "\n    parameter length >= 8 expected, "
+                            "got %d\n", pl);
+                break;
+            }
+            printf(" %d%%\n", ucp[7]);
+        } else {
+            printf("  Reserved [parameter_code=0x%x]:", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("\n        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
 static const char * bms_status[] = {
     "no background scans active",
     "background medium scan is active",
@@ -3191,7 +3514,7 @@ show_ascii_page(unsigned char * resp, int len,
         return;
     }
     switch (pg_code) {
-    case SUPP_PAGES_LPAGE:
+    case SUPP_PAGES_LPAGE:      /* 0x0 */
         if (spf) {
             printf("Supported log pages and subpages:\n");
             for (k = 0; k < num; k += 2)
@@ -3203,19 +3526,19 @@ show_ascii_page(unsigned char * resp, int len,
                 show_page_name((int)resp[4 + k], 0, inq_dat);
         }
         break;
-    case BUFF_OVER_UNDER_LPAGE:
+    case BUFF_OVER_UNDER_LPAGE: /* 0x1 */
         show_buffer_under_overrun_page(resp, len, optsp->do_pcb);
         break;
-    case WRITE_ERR_LPAGE:
-    case READ_ERR_LPAGE:
-    case READ_REV_ERR_LPAGE:
-    case VERIFY_ERR_LPAGE:
+    case WRITE_ERR_LPAGE:       /* 0x2 */
+    case READ_ERR_LPAGE:        /* 0x3 */
+    case READ_REV_ERR_LPAGE:    /* 0x4 */
+    case VERIFY_ERR_LPAGE:      /* 0x5 */
         show_error_counter_page(resp, len, optsp->do_pcb);
         break;
-    case NON_MEDIUM_LPAGE:
+    case NON_MEDIUM_LPAGE:      /* 0x6 */
         show_non_medium_error_page(resp, len, optsp->do_pcb);
         break;
-    case LAST_N_ERR_LPAGE:
+    case LAST_N_ERR_LPAGE:      /* 0x7 */
         show_last_n_error_page(resp, len, optsp->do_pcb);
         break;
     case 0x8:
@@ -3231,12 +3554,15 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case LAST_N_DEFERRED_LPAGE:
+    case LAST_N_DEFERRED_LPAGE: /* 0xb */
         show_last_n_deferred_error_page(resp, len, optsp->do_pcb);
         break;
     case 0xc:
         {
             switch (inq_dat->peripheral_type) {
+            case PDT_DISK:
+                show_thin_provisioning_page(resp, len, optsp->do_pcb);
+                break;
             case PDT_TAPE: case PDT_PRINTER:
                 /* tape and (printer) type devices */
                 show_sequential_access_page(resp, len, optsp->do_pcb,
@@ -3248,14 +3574,17 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case TEMPERATURE_LPAGE:
+    case TEMPERATURE_LPAGE:     /* 0xd */
         show_temperature_page(resp, len, optsp->do_pcb, 1, 1);
         break;
-    case START_STOP_LPAGE:
+    case START_STOP_LPAGE:      /* 0xe */
         show_start_stop_page(resp, len, optsp->do_pcb, optsp->do_verbose);
         break;
-    case SELF_TEST_LPAGE:
+    case SELF_TEST_LPAGE:       /* 0x10 */
         show_self_test_page(resp, len, optsp->do_pcb);
+        break;
+    case SOLID_STATE_MEDIA_LPAGE:       /* 0x11 */
+        show_solid_state_media_page(resp, len, optsp->do_pcb);
         break;
     case 0x14:
         {
@@ -3339,6 +3668,15 @@ show_ascii_page(unsigned char * resp, int len,
                 break;
             }
         }
+        break;
+    case 0x30:
+        show_tape_usage_log_page(resp, len, optsp->do_pcb);
+        break;
+    case 0x31:
+        show_tape_capacity_log_page(resp, len, optsp->do_pcb);
+        break;
+    case 0x32:
+        show_data_compression_log_page(resp, len, optsp->do_pcb);
         break;
     case IE_LPAGE:
         show_ie_page(resp, len, optsp->do_pcb, 1);

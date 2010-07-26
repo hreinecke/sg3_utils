@@ -1,30 +1,8 @@
 /*
- * Copyright (c) 2007-2009 Douglas Gilbert.
+ * Copyright (c) 2007-2010 Douglas Gilbert.
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the BSD_LICENSE file.
  */
 
 #include <stdlib.h>
@@ -37,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.54 20090826";    /* spc-4 rev 21 */
+const char * sg_lib_version_str = "1.58 20100329";    /* spc-4 rev 23 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -157,6 +135,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x86, 0, "Access control in"},
     {0x87, 0, "Access control out"},
     {0x88, 0, "Read(16)"},
+    {0x89, 0, "Compare and write"},
     {0x8a, 0, "Write(16)"},
     {0x8b, 0, "Orwrite(16)"},
     {0x8c, 0, "Read attribute"},
@@ -260,6 +239,7 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x10, 0, "Read capacity(16)"},
     {0x11, 0, "Read long(16)"},
     {0x12, 0, "Get LBA status"},
+    {0x13, 0, "Report referrals"},
     {0xffff, 0, NULL},
 };
 
@@ -430,6 +410,11 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x12,"Logical unit not ready, offline"},
     {0x04,0x13,"Logical unit not ready, SA creation in progress"},
     {0x04,0x14,"Logical unit not ready, space allocation in progress"},
+    {0x04,0x15,"Logical unit not ready, robotics disabled"},
+    {0x04,0x16,"Logical unit not ready, configuration required"},
+    {0x04,0x17,"Logical unit not ready, calibration required"},
+    {0x04,0x18,"Logical unit not ready, a door is open"},
+    {0x04,0x19,"Logical unit not ready, operating in sequential mode"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -565,6 +550,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x20,0x09,"Access denied - invalid LU identifier"},
     {0x20,0x0A,"Access denied - invalid proxy token"},
     {0x20,0x0B,"Access denied - ACL LUN conflict"},
+    {0x20,0x0C,"Illegal command when not in append-only mode"},
     {0x21,0x00,"Logical block address out of range"},
     {0x21,0x01,"Invalid element address"},
     {0x21,0x02,"Invalid address for write"},
@@ -673,6 +659,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x30,0x10,"Medium not formatted"},
     {0x30,0x11,"Incompatible volume type"},
     {0x30,0x12,"Incompatible volume qualifier"},
+    {0x30,0x13,"Cleaning volume expired"},
     {0x31,0x00,"Medium format corrupted"},
     {0x31,0x01,"Format command failed"},
     {0x31,0x02,"Zoned formatting failed due to spare linking"},
@@ -818,6 +805,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x08,"Maximum number of supplemental decryption keys exceeded"},
     {0x55,0x09,"Medium auxiliary memory not accessible"},
     {0x55,0x0a,"Data currently unavailable"},
+    {0x55,0x0b,"Insufficient power for operation"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
@@ -1055,7 +1043,7 @@ const char * sg_lib_sense_key_desc[] = {
     "Volume Overflow",          /* Medium full with data to be written */
     "Miscompare",               /* Source data and data on the medium
                                    do not agree */
-    "Key=15"                    /* Reserved */
+    "Completed"                 /* may occur for successful cmd (spc4r23) */
 };
 
 const char * sg_lib_pdt_strs[] = {
@@ -1088,13 +1076,13 @@ const char * sg_lib_pdt_strs[] = {
 const char * sg_lib_transport_proto_strs[] =
 {
     "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-4)",
+    "Parallel SCSI (SPI-5)",
     "SSA (SSA-S3P)",
     "IEEE 1394 (SBP-3)",
     "Remote Direct Memory Access (RDMA)",
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI (SAS)",
-    "Automation/Drive Interface (ADT)",
+    "Automation/Drive Interface (ADT-2)",
     "ATA Packet Interface (ATA/ATAPI-7)",
     "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"

@@ -1,30 +1,8 @@
 /*
- * Copyright (c) 1999-2009 Douglas Gilbert.
+ * Copyright (c) 1999-2010 Douglas Gilbert.
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the BSD_LICENSE file.
  */
 
 #include <stdio.h>
@@ -42,7 +20,6 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -1852,12 +1829,24 @@ int
 sg_ll_unmap(int sg_fd, int group_num, int timeout_secs, void * paramp,
             int param_len, int noisy, int verbose)
 {
+    return sg_ll_unmap_v2(sg_fd, 0, group_num, timeout_secs, paramp,
+                          param_len, noisy, verbose);
+}
+
+/* Invokes a SCSI UNMAP (SBC-3) command. Version 2 adds anchor field
+ * (sbc3r22). Otherwise same as sg_ll_unmap() . */
+int
+sg_ll_unmap_v2(int sg_fd, int anchor, int group_num, int timeout_secs,
+               void * paramp, int param_len, int noisy, int verbose)
+{
     int k, res, ret, sense_cat, tmout;
     unsigned char uCmdBlk[UNMAP_CMDLEN] =
                          {UNMAP_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    if (anchor)
+        uCmdBlk[1] |= 0x1;
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
     uCmdBlk[7] = group_num & 0x1f;
     uCmdBlk[7] = (param_len >> 8) & 0xff;

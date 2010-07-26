@@ -67,6 +67,9 @@ Luben Tuikov <ltuikov at yahoo dot com>
         help with documentation and other suggestions [20061014]
         contribution sg_read_buffer and sg_write_buffer [20061103]
 
+Marius Konitzer <marius dot konitzer at ruhr-uni-bochum dot de
+	log pages on IBM LTO Ultrium drives [20100225]
+
 Mark Knibbs <markk at clara dot co dot uk>
         suggested and tested oflag=sparse for sg_dd
 
@@ -97,4 +100,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-15th June 2009
+25th February 2010

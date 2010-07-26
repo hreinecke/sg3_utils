@@ -1,30 +1,8 @@
 /*
- * Copyright (c) 2009 Douglas Gilbert.
+ * Copyright (c) 2009-2010 Douglas Gilbert.
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the BSD_LICENSE file.
  */
 
 #include <unistd.h>
@@ -48,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.93 20090610";
+static char * version_str = "0.95 20100331";
 
 
 #define ME "sg_write_same: "
@@ -72,6 +50,7 @@ static char * version_str = "0.93 20090610";
 static struct option long_options[] = {
     {"16", no_argument, 0, 'S'},
     {"32", no_argument, 0, 'T'},
+    {"anchor", no_argument, 0, 'a'},
     {"grpnum", required_argument, 0, 'g'},
     {"help", no_argument, 0, 'h'},
     {"in", required_argument, 0, 'i'},
@@ -89,6 +68,7 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
+    int anchor;
     int grpnum;
     char ifilename[256];
     uint64_t lba;
@@ -109,7 +89,8 @@ static void
 usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_write_same [--16] [--32] [--grpnum=GN] [--help] [--in=IF]\n"
+          "sg_write_same [--16] [--32] [--anchor] [--grpnum=GN] [--help] "
+          "[--in=IF]\n"
           "                     [--lba=LBA] [--lbdata] [--num=NUM] "
           "[--pbdata]\n"
           "                     [--timeout=TO] [--unmap] [--verbose] "
@@ -120,6 +101,7 @@ usage()
           "'--unmap' given\n"
           "                         or LBA+NUM needs more than 32 bits)\n"
           "    --32|-T              do WRITE SAME(32) (def: 10 or 16)\n"
+          "    --anchor|-a          set anchor field in cdb\n"
           "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
           "    --help|-h            print out usage message\n"
           "    --in=IF|-i IF        IF is file to fetch one block of data "
@@ -192,6 +174,8 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     case WRITE_SAME16_LEN:
         wsCmdBlk[0] = WRITE_SAME16_OP;
         wsCmdBlk[1] = ((optsp->wrprotect & 0x7) << 5);
+        if (optsp->anchor)
+            wsCmdBlk[1] |= 0x10;
         if (optsp->unmap)
             wsCmdBlk[1] |= 0x8;
         if (optsp->pbdata)
@@ -217,6 +201,8 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
         wsCmdBlk[8] = ((WRITE_SAME32_SA >> 8) & 0xff);
         wsCmdBlk[9] = (WRITE_SAME32_SA & 0xff);
         wsCmdBlk[10] = ((optsp->wrprotect & 0x7) << 5);
+        if (optsp->anchor)
+            wsCmdBlk[10] |= 0x10;
         if (optsp->unmap)
             wsCmdBlk[10] |= 0x8;
         if (optsp->pbdata)
@@ -327,12 +313,15 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "g:hi:l:Ln:PSt:TUvVw:x:", long_options,
+        c = getopt_long(argc, argv, "ag:hi:l:Ln:PSt:TUvVw:x:", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'a':
+            ++opts.anchor;
+            break;
         case 'g':
             opts.grpnum = sg_get_num(optarg);
             if ((opts.grpnum < 0) || (opts.grpnum > 31))  {

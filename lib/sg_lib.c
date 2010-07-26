@@ -1,30 +1,8 @@
 /*
- * Copyright (c) 1999-2009 Douglas Gilbert.
+ * Copyright (c) 1999-2010 Douglas Gilbert.
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the BSD_LICENSE file.
  */
 
 /* NOTICE:
@@ -552,14 +530,14 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
         case 9:
             n += sprintf(b + n, "ATA Status Return\n");
             if (add_len >= 12) {
-                int extended, sector_count;
+                int extend, sector_count;
 
-                extended = descp[2] & 1;
-                sector_count = descp[5] + (extended ? (descp[4] << 8) : 0);
-                n += sprintf(b + n, "    extended=%d  error=0x%x "
-                        " sector_count=0x%x\n", extended, descp[3],
+                extend = descp[2] & 1;
+                sector_count = descp[5] + (extend ? (descp[4] << 8) : 0);
+                n += sprintf(b + n, "    extend=%d  error=0x%x "
+                        " sector_count=0x%x\n", extend, descp[3],
                         sector_count);
-                if (extended)
+                if (extend)
                     n += sprintf(b + n, "    lba=0x%02x%02x%02x%02x%02x%02x\n",
                                  descp[10], descp[8], descp[6],
                                  descp[11], descp[9], descp[7]);
@@ -582,6 +560,11 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             n += sprintf(b + n, "    %d %%", (progress * 100) / 0x10000);
             n += sprintf(b + n, " [sense_key=0x%x asc,ascq=0x%x,0x%x]\n",
                          descp[2], descp[3], descp[4]);
+            break;
+        case 0xb:       /* Added in SPC-4 rev 23, defined in SBC-3 rev 22 */
+            n += sprintf(b + n, "User data segment referral\n");
+            /* Will decode if this 'feature' stays  xxxxxxxxxxxxx */
+            processed = 0;
             break;
         default:
             n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",

@@ -1,30 +1,8 @@
 /*
- * Copyright (c) 2004-2009 Douglas Gilbert.
+ * Copyright (c) 2004-2010 Douglas Gilbert.
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the BSD_LICENSE file.
  */
 
 #include <unistd.h>
@@ -46,7 +24,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.46 20090926";    /* ses3r01 */
+static char * version_str = "1.47 20100312";    /* ses3r02 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -499,6 +477,26 @@ find_sas_connector_type(int conn_type, char * buff, int buff_len)
         snprintf(buff, buff_len, "Mini SAS 4x receptacle (SFF-8088) "
                  "[max 4 phys]");
         break;
+    case 0x3:
+        snprintf(buff, buff_len, "QSFP+ receptacle (SFF-8436) "
+                 "[max 4 phys]");
+        break;
+    case 0x4:
+        snprintf(buff, buff_len, "Mini SAS 4x active receptacle (SFF-8088) "
+                 "[max 4 phys]");
+        break;
+    case 0x5:
+        snprintf(buff, buff_len, "Mini SAS HD 4x receptacle (SFF-8644) "
+                 "[max 4 phys]");
+        break;
+    case 0x6:
+        snprintf(buff, buff_len, "Mini SAS HD 8x receptacle (SFF-8644) "
+                 "[max 8 phys]");
+        break;
+    case 0x7:
+        snprintf(buff, buff_len, "Mini SAS HD 16x receptacle (SFF-8644) "
+                 "[max 16 phys]");
+        break;
     case 0xf:
         snprintf(buff, buff_len, "Vendor specific external connector");
         break;
@@ -508,6 +506,14 @@ find_sas_connector_type(int conn_type, char * buff, int buff_len)
     case 0x11:
         snprintf(buff, buff_len, "Mini SAS 4i receptacle (SFF-8087) "
                  "[max 4 phys]");
+        break;
+    case 0x12:
+        snprintf(buff, buff_len, "Mini SAS HD 4i receptacle (SFF-8643) "
+                 "[max 4 phys]");
+        break;
+    case 0x13:
+        snprintf(buff, buff_len, "Mini SAS HD 8i receptacle (SFF-8643) "
+                 "[max 8 phys]");
         break;
     case 0x20:
         snprintf(buff, buff_len, "SAS Drive backplane receptacle (SFF-8482) "
@@ -522,11 +528,23 @@ find_sas_connector_type(int conn_type, char * buff, int buff_len)
     case 0x23:
         snprintf(buff, buff_len, "SATA device plug [max 1 phy]");
         break;
+    case 0x24:
+        snprintf(buff, buff_len, "Micro SAS receptacle [max 2 phys]");
+        break;
+    case 0x25:
+        snprintf(buff, buff_len, "Micro SATA device plug [max 1 phy]");
+        break;
+    case 0x26:
+        snprintf(buff, buff_len, "Micro SAS plug (SFF-8486) [max 2 phys]");
+        break;
+    case 0x27:
+        snprintf(buff, buff_len, "Micro SAS/SATA plug (SFF-8486) "
+                 "[max 2 phys]");
+        break;
     case 0x2f:
         snprintf(buff, buff_len, "SAS virtual connector [max 1 phy]");
         break;
-    case 0x3f:
-        snprintf(buff, buff_len, "Vendor specific internal connector");
+    case 0x3f: snprintf(buff, buff_len, "Vendor specific internal connector");
         break;
     default:
         if (conn_type < 0x10)
@@ -538,6 +556,9 @@ find_sas_connector_type(int conn_type, char * buff, int buff_len)
         else if (conn_type < 0x30)
             snprintf(buff, buff_len, "unknown internal connector to end "
                      "device, type: 0x%x", conn_type);
+        else if (conn_type < 0x3f)
+            snprintf(buff, buff_len, "reserved for internal connector, "
+                     "type: 0x%x", conn_type);
         else if (conn_type < 0x70)
             snprintf(buff, buff_len, "reserved connector type: 0x%x",
                      conn_type);

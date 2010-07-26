@@ -23,7 +23,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2009 D. Gilbert
+*  Copyright (C) 2000-2010 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.86 20090916";    /* SPC-4 rev 21 */
+static char * version_str = "0.88 20100331";    /* SPC-4 rev 23 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -84,6 +84,7 @@ static char * version_str = "0.86 20090916";    /* SPC-4 rev 21 */
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
 #define VPD_THIN_PROVISIONING 0xb2
+#define VPD_REFERRALS 0xb3
 #define VPD_UPR_EMC 0xc0
 #define VPD_RDAC_VERS 0xc2
 #define VPD_RDAC_VAC 0xc9
@@ -1408,6 +1409,8 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                         "short=%d\n", len);
                 return;
             }
+            printf("  Maximum compare and write length: %u blocks\n",
+                   buff[5]);
             u = (buff[6] << 8) | buff[7];
             printf("  Optimal transfer length granularity: %u blocks\n", u);
             u = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) |

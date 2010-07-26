@@ -1,33 +1,11 @@
 /*
- * Copyright (c) 2005-2009 Douglas Gilbert.
+ * Copyright (c) 2005-2010 Douglas Gilbert.
  * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.12 20090507 */
+/* sg_pt_linux version 1.13 20100321 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -291,6 +269,30 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
     ++ptp->in_err;
     attribute = attribute;      /* dummy to silence compiler */
     priority = priority;        /* dummy to silence compiler */
+}
+
+#ifndef SG_FLAG_Q_AT_TAIL
+#define SG_FLAG_Q_AT_TAIL 0x10
+#endif
+#ifndef SG_FLAG_Q_AT_HEAD
+#define SG_FLAG_Q_AT_HEAD 0x20
+#endif
+
+void
+set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    /* default action of SG (v3) is QUEUE_AT_HEAD */
+    /* default action of block layer SG_IO ioctl is QUEUE_AT_TAIL */
+    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) {
+        ptp->io_hdr.flags |= SG_FLAG_Q_AT_TAIL;
+        ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_HEAD;
+    }
+    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags) {
+        ptp->io_hdr.flags |= SG_FLAG_Q_AT_HEAD;
+        ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_TAIL;
+    }
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).
@@ -717,6 +719,22 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
 
     ptp->io_hdr.request_attr = attribute;
     ptp->io_hdr.request_priority = priority;
+}
+
+#ifndef BSG_FLAG_Q_AT_TAIL
+#define BSG_FLAG_Q_AT_TAIL 0x10
+#endif
+
+void
+set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    /* default action of bsg (sg v4) is QUEUE_AT_HEAD */
+    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) 
+        ptp->io_hdr.flags |= BSG_FLAG_Q_AT_TAIL; 
+    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags)
+        ptp->io_hdr.flags &= ~BSG_FLAG_Q_AT_TAIL;
 }
 
 /* N.B. Returns din_resid and ignores dout_resid */

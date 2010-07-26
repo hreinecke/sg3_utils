@@ -104,7 +104,7 @@ include/sg_pt.h . The Linux specific implementation of that pass through is
 found in the lib/sg_pt_linux.c file. Since almost all of the utilities use
 these files, a shared library called "libsgutils<num>.so" is built. Use of
 this library cuts down the size of binary distributions of sg3_utils
-significantly. The build scripts provided in the 'ib subdirectory builds
+significantly. The build scripts provided in the lib subdirectory builds
 libsgutils<num>.so The rest of the source code files have been relocated to
 the src subdirectory.  See the INSTALL file for more information.
 
@@ -235,10 +235,10 @@ Some of these utilities have man pages.
 
 Here is a list in alphabetical order of utilities found in the 'examples'
 subdirectory:
-  - sg_excl, scsi_inquiry, sg_iovec_tst, sg_sat_chk_power,
-    sg__sat_identify, sg__sat_phy_event, sg__sat_set_features,
-    sg_sat_smart_rd_data, sg_simple1, sg_simple2, sg_simple3, sg_simple4,
-    sg_simple5 and sg_simple16
+  - bsg_queue_tst, sg_excl, scsi_inquiry, sg_iovec_tst, sg_queue_tst,
+    sg_sat_chk_power, sg__sat_identify, sg__sat_phy_event,
+    sg__sat_set_features, sg_sat_smart_rd_data, sg_simple1, sg_simple2,
+    sg_simple3, sg_simple4, sg_simple5 and sg_simple16
 
 Also in that subdirectory is a script to test sg_persist, an example data
 file for sg_persist (called "transport_ids.txt") and an example data file for
@@ -265,7 +265,7 @@ messages.
 Notes for utilities without man pages
 =====================================
 These utils are found in the 'examples' subdirectory.
-
+
 The "scsi_inquiry" program shows the use of the SCSI_IOCTL_SEND_COMMAND
 ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the 
 SCSI sub system mid level and so is common to all sd, sr, st and sg devices. 
@@ -364,4 +364,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-2nd October 2009
+31st March 2010

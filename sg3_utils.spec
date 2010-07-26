@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.28
+Version: 1.29
 # Release: 1%{?dist}
 Release: 1
 License: GPL
@@ -79,6 +79,10 @@ fi
 %{_libdir}/*.la
 
 %changelog
+* Wed Mar 31 2010 - dgilbert at interlog dot com
+- track t10 changes
+  * sg3_utils-1.29
+
 * Fri Oct 02 2009 - dgilbert at interlog dot com
 - add sg_get_lba_status, sg_unmap, sg_read_block_limits
   * sg3_utils-1.28

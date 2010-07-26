@@ -10,5 +10,5 @@ to:
 
 The script then dies in dbclean and the hack to get around that is to
 edit the 'compat' file. It contains "7" which needs to be changed to
-"4".
+"4". Evidently "4" is deprecated and "5" is preferable and should work.
 
