@@ -25,7 +25,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static char * version_str = "1.03 20101213";
+static char * version_str = "1.03 20100312";
 
 
 #define MAX_LINE_LEN 1024

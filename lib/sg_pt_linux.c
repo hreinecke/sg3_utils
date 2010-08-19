@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.13 20100321 */
+/* sg_pt_linux version 1.14 20100812 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -603,8 +603,15 @@ construct_scsi_pt_obj()
 
     ptp = (struct sg_pt_linux_scsi *)
           calloc(1, sizeof(struct sg_pt_linux_scsi));
-    if (ptp)
+    if (ptp) {
         ptp->io_hdr.guard = 'Q';
+#ifdef BSG_PROTOCOL_SCSI
+        ptp->io_hdr.protocol = BSG_PROTOCOL_SCSI;
+#endif
+#ifdef BSG_SUB_PROTOCOL_SCSI_CMD
+        ptp->io_hdr.subprotocol = BSG_SUB_PROTOCOL_SCSI_CMD;
+#endif
+    }
     return (struct sg_pt_base *)ptp;
 }
 
@@ -625,6 +632,12 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     if (ptp) {
         memset(ptp, 0, sizeof(struct sg_pt_linux_scsi));
         ptp->io_hdr.guard = 'Q';
+#ifdef BSG_PROTOCOL_SCSI
+        ptp->io_hdr.protocol = BSG_PROTOCOL_SCSI;
+#endif
+#ifdef BSG_SUB_PROTOCOL_SCSI_CMD
+        ptp->io_hdr.subprotocol = BSG_SUB_PROTOCOL_SCSI_CMD;
+#endif
     }
 }
 
