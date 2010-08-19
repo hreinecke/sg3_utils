@@ -1,4 +1,4 @@
-.TH SG_TURS "8" "March 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_TURS "8" "August 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
@@ -70,8 +70,11 @@ Early standards suggested that the SCSI TEST UNIT READY command be used for
 polling the progress indication. More recent standards seem to suggest
 the SCSI REQUEST SENSE command should be used instead.
 .SH EXIT STATUS
-The exit status of sg_turs is 0 when it is successful. Otherwise see
-the sg3_utils(8) man page.
+The exit status of sg_turs is 0 when it is successful (e.g. in the case of
+a mechanical disk, it is spun up and ready to accept commands). For this
+utility the other exit status of interest is 2 corresponding to
+the "not ready" sense key. For other exit status values see the sg3_utils(8)
+man page.
 .SH OLDER COMMAND LINE OPTIONS
 The options in this section were the only ones available prior to sg3_utils
 version 1.23 . In sg3_utils version 1.23 and later these older options can

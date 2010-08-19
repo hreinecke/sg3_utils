@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.90 20100625";    /* SPC-4 rev 25 */
+static char * version_str = "0.91 20100819";    /* SPC-4 rev 26 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -739,6 +739,7 @@ static const char * network_service_type_arr[] =
     "reserved[0x1e]", "reserved[0x1f]",
 };
 
+/* VPD_MAN_NET_ADDR */
 static void
 decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -781,6 +782,7 @@ static const char * mode_page_policy_arr[] =
     "per I_T nexus",
 };
 
+/* VPD_MODE_PG_POLICY */
 static void
 decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -815,6 +817,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_SCSI_PORTS */
 static void
 decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1259,6 +1262,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
     }
 }
 
+/* VPD_EXT_INQ */
 static void
 decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1286,6 +1290,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
+/* VPD_SOFTW_INF_ID */
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
@@ -1305,6 +1310,7 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_ATA_INFO */
 static void
 decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1364,6 +1370,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
                  sg_is_big_endian());
 }
 
+/* VPD_POWER_CONDITION */
 static void
 decode_power_condition(unsigned char * buff, int len, int do_hex)
 {
@@ -1695,7 +1702,7 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
                         "page\n");
             return SG_LIB_CAT_MALFORMED;
         }
-        len = b[3];
+        len = (b[2] << 8) + b[3];       /* spc4r25 */
         for (k = 0; k < len; ++k) {
             if (VPD_UNIT_SERIAL_NUM == b[k + 4])
                 break;
@@ -1704,7 +1711,7 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
             res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM,
                                 b, sz, 0, verbose);
             if (0 == res) {
-                len = b[3];
+                len = (b[2] << 8) + b[3];       /* spc4r25 */
                 len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
                 if ((VPD_UNIT_SERIAL_NUM == b[1]) && (len > 0)) {
                     memcpy(obuff, b + 4, len);
@@ -2124,7 +2131,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (VPD_UNIT_SERIAL_NUM != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -2179,7 +2186,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         res = sg_ll_inquiry(sg_fd, 0, 1, VPD_SOFTW_INF_ID, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (VPD_SOFTW_INF_ID != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");

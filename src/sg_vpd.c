@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.42 20100522";    /* spc4r23 + sbc3r22 */
+static char * version_str = "0.43 20100819";    /* spc4r26 + sbc3r24 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -327,6 +327,7 @@ static const char * network_service_type_arr[] =
     "reserved[0x1e]", "reserved[0x1f]",
 };
 
+/* VPD_MAN_NET_ADDR */
 static void
 decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -373,6 +374,7 @@ static const char * mode_page_policy_arr[] =
     "per I_T nexus",
 };
 
+/* VPD_MODE_PG_POLICY */
 static void
 decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -411,6 +413,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_SCSI_PORTS */
 static void
 decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
                       int do_quiet)
@@ -1060,6 +1063,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
     }
 }
 
+/* VPD_EXT_INQ */
 static void
 decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1088,6 +1092,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
+/* VPD_SOFTW_INF_ID */
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
@@ -1107,6 +1112,7 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_ATA_INFO */
 static void
 decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
 {
@@ -1169,6 +1175,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
         dWordHex((const unsigned short *)(buff + 60), 256, 0, is_be);
 }
 
+/* VPD_POWER_CONDITION */
 static void
 decode_power_condition(unsigned char * buff, int len, int do_hex)
 {
@@ -1198,6 +1205,7 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
             (buff[16] << 8) + buff[17]);
 }
 
+/* VPD_PROTO_LU */
 static void
 decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1248,6 +1256,7 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_PROTO_PORT */
 static void
 decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1294,6 +1303,9 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_BLOCK_LIMITS sbc */
+/* VPD_SA_DEV_CAP ssc */
+/* VPD_OSD_INFO osd */
 static void
 decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1356,6 +1368,9 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_BLOCK_DEV_CHARS sbc */
+/* VPD_MAN_ASS_SN ssc */
+/* VPD_SECURITY_TOKEN osd */
 static void
 decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1418,6 +1433,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_THIN_PROVISIONING */
 static int
 decode_block_thin_prov_vpd(unsigned char * b, int len)
 {
@@ -1462,6 +1478,7 @@ decode_block_thin_prov_vpd(unsigned char * b, int len)
     return 0;
 }
 
+/* VPD_TA_SUPPORTED */
 static int
 decode_tapealert_supported_vpd(unsigned char * b, int len)
 {
@@ -1651,7 +1668,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -1706,7 +1723,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -1803,7 +1820,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -1886,7 +1903,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;   /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
