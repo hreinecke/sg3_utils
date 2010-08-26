@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.14 20100812 */
+/* sg_pt_linux version 1.15 20100827 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -324,9 +324,9 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
         memset(ptp->io_hdr.sbp, 0, ptp->io_hdr.mx_sb_len);
     if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
         ptp->os_err = errno;
-        if (verbose)
-            fprintf(sg_warnings_strm, "ioctl(SG_IO) failed with os_err "
-                    "(errno) = %d\n", ptp->os_err);
+        if (verbose > 1)
+            fprintf(sg_warnings_strm, "ioctl(SG_IO) failed: %s (errno=%d)\n",
+                    strerror(ptp->os_err), ptp->os_err);
         return -ptp->os_err;
     }
     return 0;
@@ -921,9 +921,9 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
     /* Finally do the v3 SG_IO ioctl */
     if (ioctl(fd, SG_IO, &v3_hdr) < 0) {
         ptp->os_err = errno;
-        if (verbose)
-            fprintf(sg_warnings_strm, "ioctl(SG_IO v3) failed with os_err "
-                    "(errno) = %d\n", ptp->os_err);
+        if (verbose > 1)
+            fprintf(sg_warnings_strm, "ioctl(SG_IO v3) failed: %s "
+                    "(errno=%d)\n", strerror(ptp->os_err), ptp->os_err);
         return -ptp->os_err;
     }
     ptp->io_hdr.device_status = (__u32)v3_hdr.status;
@@ -965,9 +965,9 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
 
         if (fstat(fd, &a_stat) < 0) {
             ptp->os_err = errno;
-            if (verbose)
-                fprintf(sg_warnings_strm, "fstat() failed with os_err "
-                        "(errno) = %d\n", ptp->os_err);
+            if (verbose > 1)
+                fprintf(sg_warnings_strm, "fstat() failed: %s (errno=%d)\n",
+                        strerror(ptp->os_err), ptp->os_err);
             return -ptp->os_err;
         }
 #ifdef HAVE_LINUX_KDEV_T_H
@@ -995,9 +995,9 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     }
     if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
         ptp->os_err = errno;
-        if (verbose)
-            fprintf(sg_warnings_strm, "ioctl(SG_IO v4) failed with os_err "
-                    "(errno) = %d\n", ptp->os_err);
+        if (verbose > 1)
+            fprintf(sg_warnings_strm, "ioctl(SG_IO v4) failed: %s "
+                    "(errno=%d)\n", strerror(ptp->os_err), ptp->os_err);
         return -ptp->os_err;
     }
     return 0;
