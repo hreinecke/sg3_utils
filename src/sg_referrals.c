@@ -29,7 +29,7 @@
  * SCSI device.
  */
 
-static char * version_str = "1.00 20100805";    /* sbc3r24 */
+static char * version_str = "1.01 20100806";    /* sbc3r24 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 24
@@ -114,8 +114,8 @@ decode_referral_desc(const unsigned char * ucp)
         ((uint64_t)ucp[18] << 8) | (uint64_t)ucp[19];
 
     printf("    target port descriptors: %d\n", ucp[3]);
-    printf("    user data segment: first lba %lu, last lba %lu\n",
-           first, last);
+    printf("    user data segment: first lba %" PRIu64 ", last lba %"
+	   PRIu64 "\n", first, last);
 
     n = 20;
     for (j = 0; j < ucp[3]; j++) {
