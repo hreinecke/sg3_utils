@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.30 [20100827] [svn: r349]
+Changelog for sg3_utils-1.30 [20100906] [svn: r350]
   - sg_inq: update version descriptor list to spc4r26
   - sg_lib: sync asc/ascq list to spc4r25 (no change to r26)
     - dStrHex(): trim excess trailing spaces
@@ -14,6 +14,7 @@ Changelog for sg3_utils-1.30 [20100827] [svn: r349]
   - sg_dd: clean count calculation, document nocache flag
     - treat bsg devices as implicit sg_io
   - sg_write_same: if READ CAPACITY(16) fails try 10 byte variant
+  - sg3_utils man page: sections added for OS device names
 
 Changelog for sg3_utils-1.29 [20100406] [svn: r334]
   - sg_rtpg: new logical block dependent state and bit (spc4r23)
