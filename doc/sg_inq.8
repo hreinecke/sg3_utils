@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "February 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_INQ "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_inq \- sends a SCSI INQUIRY or ATA IDENTIFY (PACKET) DEVICE command
 and outputs the response
@@ -324,6 +324,31 @@ Equivalent to '\-\-page=ei' in the main description.
 .TP
 \fB\-?\fR
 output usage message and exit. Ignore all other parameters.
+.SH EXAMPLES
+The examples in this page use Linux device names. For suitable device
+names in other supported Operating Systems see the sg3_utils(8) man page.
+.PP
+To view the standard inquiry response use without options:
+.PP
+   sg_inq /dev/sda
+.PP
+Some SCSI devices include version descriptors indicating the various
+SCSI standards and drafts they support. They can be viewed with:
+.PP
+   sg_inq -d /dev/sda
+.PP
+Modern SCSI devices include Vital Product Data (VPD)pages which can be
+viewed with the SCSI INQUIRY command. To list the supported VPD
+pages (but not their contents) try:
+.PP
+   sg_inq -e /dev/sda
+.PP
+Some VPD pages can be read with the sg_inq utility but a newer utility
+called sg_vpd specializes in showing their contents. The sdparm utility
+can also be used to show the contents of VPD pages.
+.PP
+Further examples of sg_inq together with some typical output can be found
+on http://sg.danny.cz/sg/sg3_utils.html web page.
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"

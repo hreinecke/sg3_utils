@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "February 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG3_UTILS "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -70,6 +70,119 @@ and permit copying data at the level of SCSI READ and WRITE commands. sg_dd
 is tightly bound to Linux and hence is not ported to other OSes. A more
 generic utility (than sg_dd) called ddpt in a package of the same name has
 been ported to other OSes.
+.SH LINUX DEVICE NAMING
+Normal disk block devices have names like /dev/sda, /dev/sdb,
+/dev/sdc, etc. SCSI disks in Linux have always had names like that but
+in recent Linux kernels (e.g. lk 2.6 series) it is becoming more common 
+for almost all disks to be named like that. Partitions within a disk
+are specified by a number appended to the device name, starting at
+1 (e.g. /dev/sda1 ).
+.PP
+Tape drives are named /dev/st<num> or /dev/nst<num> where <num> starts
+at zero. Additionally one letter from this list: "lma" may be appended to
+the name. CD, DVD and BD readers (and writers) are named /dev/sr<num>
+where <num> start at zero. There are less used SCSI device type names,
+the dmesg and the lsscsi commands may help to find if any are attached to
+a running system.
+.PP
+There is also a SCSI device driver which offers alternate generic access
+to SCSI devices. It uses names of the form /dev/sg<num> where <num> starts
+at zero. The "lsscsi -g" command may be useful in finding these and which
+generic name corresponds to a device type name (e.g. /dev/sg2 may
+correspond to /dev/sda). In the lk 2.6 series a block SCSI generic
+driver was introduced and its names are of the form 
+/dev/bsg/<h:c:t:l> where h, c, t and l are numbers. Again see the lsscsi
+command to find the correspondence between that SCSI tuple (i.e. <h:c:t:l>)
+and alternate device names.
+.PP
+Prior to the Linux kernel 2.6 series these utilities could only use
+generic device names (e.g. /dev/sg1 ). In almost all cases in the Linux
+kernel 2.6 series, any device name can be used by these utilities.
+.SH FREEBSD DEVICE NAMING
+SCSI disks have block names of the form /dev/da<num> where <num> is an
+integer starting at zero. The "da" is replaced by "sa" for SCSI tape
+drives and "cd" for SCSI CD/DVD/BD drives. Each SCSI device has a
+corresponding pass-through device name of the form /dev/pass<num>
+where <num> is an integer starting at zero. The "camcontrol devlist"
+command may be useful for finding out which SCSI device names are
+available and the correspondence between between class and pass-through
+names.
+.SH SOLARIS DEVICE NAMING
+SCSI device names below the /dev directory have a form like: c5t4d3s2
+where the number following "c" is the controller (HBA) number, the number
+following "t" is the target number (from the SCSI parallel interface days)
+and the number following "d" is the LUN. Following the "s" is the slice
+number which is related to a partition and by convention "s2" is the whole
+disk.
+.PP
+OpenSolaris also has a c5t4d3p2 form where the number following the "p" is
+the partition number apart from "p0" which is the whole disk. So a whole
+disk may be referred to as either c5t4d3, c5t4d3s2 or c5t4d3p0 .
+.PP
+And these device names are duplicated in the /dev/dsk and /dev/rdsk
+directories. The former is the block device name and the latter is
+for "raw" (or char device) access which is what sg3_utils needs. So in
+OpenSolaris something of the form 'sg_inq /dev/rdsk/c5t4d3p0' should work.
+If it doesn't work then add a '-vvv' option for more debug information.
+Trying this form 'sg_inq /dev/dsk/c5t4d3p0' (note "rdsk" changed to "dsk")
+will result in an "inappropriate ioctl for device" error.
+.PP
+The device names within the /dev directory are typically symbolic links to
+much longer topological names in the /device directory. In Solaris cd/dvd/bd
+drives seem to be treated as disks and so are found in the /dev/rdsk
+directory. Tape drives appear in the /dev/rmt directory.
+.PP
+There is also a sgen (SCSI generic) driver which by default does not attach
+to any device. See the /kernel/drv/sgen.conf file to control what is
+attached. Any attached device will have a device name of the
+form /dev/scsi/c5t4d3 .
+.PP
+Listing available SCSI devices in Solaris seems to be a challenge. "Use
+the 'format' command" advice works but seems a very dangerous way to list
+devices. [It does prompt again before doing any damage.] 'devfsadm -Cv'
+cleans out the clutter in the /dev/rdsk directory, only leaving what
+is "live". The "cfgadm -v" command looks promising.
+.SH WINDOWS DEVICE NAMING
+Storage and related devices can have several device names in Windows.
+Probably the most common in the volume name (e.g. "D:"). There are also
+a "class" device names such as "PhysicalDrive<n>", "CDROM<n>"
+and "TAPE<n>". <n> is an integer starting at 0 allocated in ascending
+order as devices are discovered (and sometimes rediscovered).
+.PP
+Some storage devices have a SCSI lower level device name which starts
+with a SCSI (pseudo) adapter name of the form "SCSI<n>:". To this is added
+sub\-addressing in the form of a "bus" number, a "target" identifier and
+a "lun" (logical unit number). The "bus" number is also known as a "PathId".
+These are assembled to form a device name of the
+form: "SCSI<n>:<bus>,<target>,<lun>". The trailing ",<lun>" may be omitted
+in which case a lun of zero is assumed. This lower level device name cannot
+often be used directly since Windows blocks attempts to use it if a class
+driver has "claimed" the device. There are SCSI device types (e.g.
+Automation/Drive interface type) for which there is no class driver. At
+least two transports ("bus types" in Windows jargon): USB and IEEE 1394 do
+not have a "scsi" device names of this form.
+.PP
+In keeping with DOS file system conventions, the various device names
+can be given in upper, lower or mixed case. Since "PhysicalDrive<n>" is
+tedious to write, a shortened form of "PD<n>" is permitted by all
+utilities in this package.
+.PP
+A single device (e.g. a disk) can have many device names. For
+example: "PD0" can also be "C:", "D:" and "SCSI0:0,1,0". The two volume names
+reflect that the disk has two partitions on it. Disk partitions that are
+not recognised by Windows are not usually given a volume name. However
+Vista does show a volume name for a disk which has no partitions recognised
+by it and when selected invites the user to format it (which may be rather
+unfriendly to other OSes).
+.PP
+These utilities assume a given device name is in the Win32 device namespace.
+To make that explicit "\\\\.\\" can be prepended to the device names mentioned
+in this section. Beware that backslash is an escape character in Unix like
+shells and the C programming language. In a shell like Msys (from MinGW)
+each backslash may need to be typed twice.
+.PP
+The sg_scan utility lists out Windows device names in forms that are
+suitable for other utilities in this package to use.
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
@@ -285,4 +398,4 @@ code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
 under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(sdparm), ddpt(ddpt), mt(1)
+.B sdparm(sdparm), sg_scan(sg3_utils), ddpt(ddpt), lsscsi(lsscsi), dmesg(1), mt(1)
