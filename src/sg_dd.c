@@ -34,7 +34,7 @@
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2008 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2010 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -58,7 +58,7 @@
    This version is designed for the linux kernel 2.4 and 2.6 series.
 */
 
-static char * version_str = "5.73 20090205";
+static char * version_str = "5.74 20100724";
 
 #define ME "sg_dd: "
 
@@ -237,6 +237,48 @@ siginfo_handler(int sig)
     print_stats("  ");
 }
 
+static int bsg_major_checked = 0;
+static int bsg_major = 0;
+
+static void
+find_bsg_major(void)
+{
+    const char * proc_devices = "/proc/devices";
+    FILE *fp;
+    char a[128];
+    char b[128];
+    char * cp;
+    int n;
+
+    if (NULL == (fp = fopen(proc_devices, "r"))) {
+        if (verbose)
+            fprintf(stderr, "fopen %s failed: %s\n", proc_devices,
+                    strerror(errno));
+        return;
+    }
+    while ((cp = fgets(b, sizeof(b), fp))) {
+        if ((1 == sscanf(b, "%s", a)) &&
+            (0 == memcmp(a, "Character", 9)))
+            break;
+    }
+    while (cp && (cp = fgets(b, sizeof(b), fp))) {
+        if (2 == sscanf(b, "%d %s", &n, a)) {
+            if (0 == strcmp("bsg", a)) {
+                bsg_major = n;
+                break;
+            }
+        } else
+            break;
+    }
+    if (verbose > 5) {
+        if (cp)
+            fprintf(stderr, "found bsg_major=%d\n", bsg_major);
+        else
+            fprintf(stderr, "found no bsg char device in %s\n", proc_devices);
+    }
+    fclose(fp);
+}
+
 
 static int
 dd_filetype(const char * filename)
@@ -259,6 +301,12 @@ dd_filetype(const char * filename)
             return FT_SG;
         if (SCSI_TAPE_MAJOR == major(st.st_rdev))
             return FT_ST;
+        if (! bsg_major_checked) {
+            bsg_major_checked = 1;
+            find_bsg_major();
+        }
+        if (bsg_major == (int)major(st.st_rdev))
+            return FT_SG;
     } else if (S_ISBLK(st.st_mode))
         return FT_BLOCK;
     else if (S_ISFIFO(st.st_mode))
@@ -1650,6 +1698,7 @@ main(int argc, char * argv[])
 
     if ((dd_count < 0) || ((verbose > 0) && (0 == dd_count))) {
         in_num_sect = -1;
+        in_sect_sz = -1;
         if (FT_SG & in_type) {
             res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
@@ -1669,8 +1718,7 @@ main(int argc, char * argv[])
                 else
                     fprintf(stderr, "Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
-            }
-            if (in_sect_sz != blk_sz)
+            } else if (in_sect_sz != blk_sz)
                 fprintf(stderr, ">> warning: block size on %s confusion: "
                         "bs=%d, device claims=%d\n", inf, blk_sz, in_sect_sz);
         } else if (FT_BLOCK & in_type) {
@@ -1688,11 +1736,11 @@ main(int argc, char * argv[])
             in_num_sect -= skip;
 
         out_num_sect = -1;
+        out_sect_sz = -1;
         if (FT_SG & out_type) {
             res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-                fprintf(stderr,
-                        "Unit attention (readcap out), continuing\n");
+                fprintf(stderr, "Unit attention (readcap out), continuing\n");
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
                 fprintf(stderr,
@@ -1706,8 +1754,7 @@ main(int argc, char * argv[])
                 else
                     fprintf(stderr, "Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
-            }
-            if (blk_sz != out_sect_sz)
+            } else if (blk_sz != out_sect_sz)
                 fprintf(stderr, ">> warning: block size on %s confusion: "
                         "bs=%d, device claims=%d\n", outf, blk_sz,
                          out_sect_sz);
@@ -1717,8 +1764,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "Unable to read block capacity on %s\n",
                         outf);
                 out_num_sect = -1;
-            }
-            if (blk_sz != out_sect_sz) {
+            } else if (blk_sz != out_sect_sz) {
                 fprintf(stderr, "block size on %s confusion: bs=%d, "
                         "device claims=%d\n", outf, blk_sz, out_sect_sz);
                 out_num_sect = -1;

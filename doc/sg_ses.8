@@ -1,4 +1,4 @@
-.TH SG_SES "8" "January 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_SES "8" "SEPTEMBER 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
@@ -45,14 +45,14 @@ in SES\-2) and Subenclosure String Out diagnostic pages can be set currently.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
 permits a string of comma separated (ASCII) hex bytes to be specified (limit
-512). A (single) space separated string of hex bytes is also allowed but
+1024). A (single) space separated string of hex bytes is also allowed but
 the list needs to be in quotes. This allows the parameters to a control
 diagnostic page to be specified. The string given should not include the
 first 4 bytes (i.e. page code and length). See next entry for using stdin.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\-
-reads a data string from stdin. Spaces, tabs and line feeds additionally
-are permitted as separators.
+reads a data string from stdin, limit 1024 bytes. Spaces, tabs and line feeds
+additionally are permitted as separators.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR
 cuts down on the amount of output from the enclosure status diagnostic
@@ -112,6 +112,9 @@ that support SAF\-TE report "Processor" peripheral device type (0x3) in their
 INQUIRY response. See the sg_safte utility in this package or safte\-monitor
 on the internet.
 .SH EXAMPLES
+These examples use Linux device names. For suitable device names in
+other supported Operating Systems see the sg3_utils(8) man page.
+.PP
 To view the supported pages:
 .PP
    sg_ses /dev/sda
@@ -159,5 +162,5 @@ Copyright \(co 2004\-2010 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq, sg_safte, sg_senddiag (in sg3_utils package);
+.B sg_inq, sg_safte, sg_senddiag, sg3_utils (in sg3_utils package);
 .B safte\-monitor (internet)

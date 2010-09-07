@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "December 2009" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_PERSIST "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_persist \- sends a SCSI PERSISTENT RESERVE (IN or OUT) command
 to manipulate registrations and reservations
@@ -324,6 +324,8 @@ it complained if the disk one stopped. The error indicated it wanted
 the disk spun up and when that happened, the registration was
 successful.
 .SH EXAMPLES
+These examples use Linux device names. For suitable device names in
+other supported Operating Systems see the sg3_utils(8) man page.
 .PP
 Due to the various option defaults the simplest example executes
 the 'read keys' sub\-command of the PRIN command:
@@ -390,9 +392,9 @@ Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2009 Douglas Gilbert
+Copyright \(co 2004\-2010 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B scsires(internet)
+.B sg3_utils(sg3_utils), scsires(internet)

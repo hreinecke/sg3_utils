@@ -1,4 +1,4 @@
-.TH SG_RAW "8" "December 2009" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_RAW "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_raw \- sends an arbitrary SCSI command to a device
 .SH SYNOPSIS
@@ -46,6 +46,10 @@ Expect to receive up to \fIRLEN\fR bytes of data from the \fIDEVICE\fR.
 \fIRLEN\fR may be suffixed with 'k' to use kilobytes (1024 bytes) instead
 of bytes. This option and \fB\-\-send\fR are mutually exclusive.
 .TP
+\fB\-R\fR, \fB\-\-readonly\fR
+Open \fIDEVICE\fR read-only. The default (without this option) is to open
+it read-write.
+.TP
 \fB\-s\fR, \fB\-\-send\fR=\fISLEN\fR
 Read \fISLEN\fR bytes of data, either from stdin or from a file, and send
 them to the \fIDEVICE\fR. This option and \fB\-\-request\fR are mutually
@@ -73,6 +77,8 @@ The ability to send more than a 16 byte CDB (in some cases 12 byte CDB)
 may be restricted by the pass-through interface, the low level driver
 or the transport. Bidirectional data commands are no yet supported.
 .SH EXAMPLES
+These examples use Linux device names. For suitable device names in
+other supported Operating Systems see the sg3_utils(8) man page.
 .TP
 sg_raw /dev/scd0 1b 00 00 00 02 00
 Eject the medium in CD drive /dev/scd0.
@@ -108,10 +114,10 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2009 Ingo van Lil
+Copyright \(co 2001\-2010 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq sg_vpd(sg3_utils), plscsi
+.B sg_inq, sg_vpd, sg3_utils (sg3_utils), plscsi
 
