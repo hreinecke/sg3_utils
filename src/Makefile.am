@@ -10,9 +10,9 @@ if OS_LINUX
 bin_PROGRAMS = \
 	sg_dd sg_emc_trespass sg_format sg_get_config sg_get_lba_status \
 	sg_ident sginfo sg_inq sg_logs sg_luns sg_map26 sg_map \
-	sgm_dd sg_modes sg_opcodes sgp_dd sg_persist \
-	sg_prevent sg_raw sg_rbuf sg_rdac sg_read sg_readcap \
-	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
+	sgm_dd sg_modes sg_opcodes sgp_dd sg_persist sg_prevent \
+	sg_raw sg_rbuf sg_rdac sg_read sg_readcap sg_read_block_limits \
+	sg_read_buffer sg_read_long sg_reassign sg_referrals \
 	sg_requests sg_reset sg_rmsn sg_rtpg sg_safte sg_sat_identify \
 	sg_sat_phy_event sg_sat_set_features sg_scan sg_senddiag sg_ses \
 	sg_start sg_stpg sg_sync sg_test_rwbuf sg_turs sg_unmap sg_verify \
@@ -205,6 +205,9 @@ sg_reassign_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_requests_SOURCES = sg_requests.c
 sg_requests_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_referrals_SOURCES = sg_referrals.c
+sg_referrals_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_reset_SOURCES = sg_reset.c
 sg_reset_LDADD = @os_libs@

@@ -79,6 +79,7 @@
 #define SET_IDENTIFYING_INFORMATION_SA 0x6
 #define SET_TGT_PRT_GRP_SA 0xa
 #define WRITE_LONG_16_SA 0x11
+#define REPORT_REFERRALS_SA 0x13
 
 
 /* Invokes a SCSI GET LBA STATUS command (SBC). Returns 0 -> success,
@@ -265,6 +266,80 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, int noisy,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "set target port group", res, 0,
                                sense_b, noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI REPORT REFERRALS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Report Referrals not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
+ * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
+int
+sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg, void * resp,
+                       int mx_resp_len, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char repRefCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] =
+                         {SERVICE_ACTION_IN_16_CMD, REPORT_REFERRALS_SA,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    repRefCmdBlk[2] = (start_llba >> 56) & 0xff;
+    repRefCmdBlk[3] = (start_llba >> 48) & 0xff;
+    repRefCmdBlk[4] = (start_llba >> 40) & 0xff;
+    repRefCmdBlk[5] = (start_llba >> 32) & 0xff;
+    repRefCmdBlk[6] = (start_llba >> 24) & 0xff;
+    repRefCmdBlk[7] = (start_llba >> 16) & 0xff;
+    repRefCmdBlk[8] = (start_llba >> 8) & 0xff;
+    repRefCmdBlk[9] = start_llba & 0xff;
+    repRefCmdBlk[10] = (mx_resp_len >> 24) & 0xff;
+    repRefCmdBlk[11] = (mx_resp_len >> 16) & 0xff;
+    repRefCmdBlk[12] = (mx_resp_len >> 8) & 0xff;
+    repRefCmdBlk[13] = mx_resp_len & 0xff;
+    repRefCmdBlk[14] = one_seg & 0x1;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    report referrals cdb: ");
+        for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", repRefCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "report target port groups: out of "
+                "memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, repRefCmdBlk, sizeof(repRefCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "report referrals", res,
+                               mx_resp_len, sense_b, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {

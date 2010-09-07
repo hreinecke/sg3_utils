@@ -133,6 +133,7 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc",
      "Block device characteristics (SBC)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
+    {VPD_REFERRALS, 0, 0, 0, "ref", "Referrals (SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
 #if 0
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
@@ -653,6 +654,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
     {VPD_THIN_PROVISIONING, 0, "Thin provisioning (sbc3)"},
+    {VPD_REFERRALS, 0, "Referrals (sbc3)"},
     {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
     {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},
     {0xb0, PDT_OSD, "OSD information (osd)"},
@@ -1285,8 +1287,9 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
            !!(buff[6] & 0x1));
-    printf("  P_I_I_SUP=%d LUICLR=%d CBCS=%d\n",
-           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x1));
+    printf("  P_I_I_SUP=%d LUICLR=%d CBCS=%d R_SUP=%d\n",
+           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x1),
+           !!(buff[8] & 0x10));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
 }
 
@@ -1491,6 +1494,38 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
             printf("  Manufacturer-assigned serial number: %.*s\n",
                    len - 4, buff + 4);
+            break;
+        default:
+            printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+            dStrHex((const char *)buff, len, 0);
+            break;
+    }
+}
+
+static void
+decode_b3_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+{
+    unsigned int s, m;
+
+    if (do_hex) {
+        dStrHex((const char *)buff, len, 0);
+        return;
+    }
+    switch (pdt) {
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+            if (len < 0xc0) {
+                fprintf(stderr, "Block device characteristics VPD page length "
+                        "too short=%d\n", len);
+                return;
+            }
+            s = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) | buff[11];
+            m = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) | buff[15];
+            if (0 == s)
+                printf("  Single user data segment\n");
+            else if (0 == m)
+                printf("  Segment size specified by user data segment descriptor\n");
+            else
+                printf("  Segment size: %u, segment multiplier: %u\n", s, m);
             break;
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
@@ -2429,6 +2464,43 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
                 decode_b1_vpd(rsp_buff, len, optsp->do_hex, pdt);
         } else if (! optsp->do_raw)
             printf("VPD INQUIRY: page=0xb1\n");
+        break;
+    case 0xb3:  /* could be REFERRALS but need pdt */
+        res = sg_ll_inquiry(sg_fd, 0, 1, 0xb3, rsp_buff,
+                            DEF_ALLOC_LEN, 1, optsp->do_verbose);
+        if (0 == res) {
+            pdt = rsp_buff[0] & 0x1f;
+            if (! optsp->do_raw) {
+                switch (pdt) {
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                    printf("VPD INQUIRY: Referrals VPD page (SBC)\n");
+                    break;
+                default:
+                    printf("VPD INQUIRY: page=0x%x, pdt=0x%x\n", 0xb3, pdt);
+                    break;
+                }
+            }
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (0xb3 != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > MX_ALLOC_LEN) {
+                fprintf(stderr, "response length too long: %d > %d\n", len,
+                       MX_ALLOC_LEN);
+                return SG_LIB_CAT_MALFORMED;
+            } else if (len > DEF_ALLOC_LEN) {
+                if (sg_ll_inquiry(sg_fd, 0, 1, 0xb3, rsp_buff,
+                                  len, 1, optsp->do_verbose))
+                    return SG_LIB_CAT_OTHER;
+            }
+            if (optsp->do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else
+                decode_b3_vpd(rsp_buff, len, optsp->do_hex, pdt);
+        } else if (! optsp->do_raw)
+            printf("VPD INQUIRY: page=0xb3\n");
         break;
     case VPD_UPR_EMC:   /* 0xc0 */
         if (!optsp->do_raw)
