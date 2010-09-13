@@ -29,17 +29,53 @@
  * SCSI device.
  */
 
-static char * version_str = "1.01 20100806";    /* sbc3r24 */
+static char * version_str = "1.03 20100812";    /* sbc3r24 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
-#define DEF_REFER_BUFF_LEN 24
+#define DEF_REFER_BUFF_LEN 256
+
+#define TPGS_STATE_OPTIMIZED 0x0
+#define TPGS_STATE_NONOPTIMIZED 0x1
+#define TPGS_STATE_STANDBY 0x2
+#define TPGS_STATE_UNAVAILABLE 0x3
+#define TPGS_STATE_LB_DEPENDENT 0x4
+#define TPGS_STATE_OFFLINE 0xe          /* SPC-4 rev 9 */
+#define TPGS_STATE_TRANSITIONING 0xf
 
 static unsigned char referralBuff[DEF_REFER_BUFF_LEN];
 static unsigned char * referralBuffp = referralBuff;
 
+static const char *decode_tpgs_state(const int st)
+{
+    switch (st) {
+    case TPGS_STATE_OPTIMIZED:
+        return "active/optimized";
+        break;
+    case TPGS_STATE_NONOPTIMIZED:
+        return "active/non optimized";
+        break;
+    case TPGS_STATE_STANDBY:
+        return "standby";
+        break;
+    case TPGS_STATE_UNAVAILABLE:
+        return "unavailable";
+        break;
+    case TPGS_STATE_LB_DEPENDENT:
+        return "logical block dependent";
+        break;
+    case TPGS_STATE_OFFLINE:
+        return "offline";
+        break;
+    case TPGS_STATE_TRANSITIONING:
+        return "transitioning between states";
+        break;
+    default:
+        return "unknown";
+        break;
+    }
+}
 
 static struct option long_options[] = {
-        {"brief", no_argument, 0, 'b'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"lba", required_argument, 0, 'l'},
@@ -55,15 +91,11 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-            "sg_referrals  [--brief] [--help] [--hex] [--lba=LBA]\n"
-            "                          [--maxlen=LEN] [--raw] [--verbose] "
+            "sg_referrals  [--help] [--hex] [--lba=LBA] [--maxlen=LEN]\n"
+            "                     [--one-segment] [--raw] [--verbose] "
             "[--version]\n"
-            "                          DEVICE\n"
+            "                     DEVICE\n"
             "  where:\n"
-            "    --brief|-b        a descriptor per line: "
-            "<lba_hex blocks_hex p_status>\n"
-            "                      use twice ('-bb') for given LBA "
-            "provisioning status\n"
             "    --help|-h         print out usage message\n"
             "    --hex|-H          output in hexadecimal\n"
             "    --lba=LBA|-l LBA    starting LBA (logical block address) "
@@ -73,7 +105,7 @@ usage()
             "                           (def: 0 -> %d bytes)\n",
             DEF_REFER_BUFF_LEN );
     fprintf(stderr,
-            "    --one-segment|-s  return information about the specified\n"
+            "    --one-segment|-s    return information about the specified\n"
             "                      segment only\n"
             "    --raw|-r          output in binary\n"
             "    --verbose|-v      increase verbosity\n"
@@ -96,12 +128,15 @@ dStrRaw(const char* str, int len)
  * -1 for error.
  */
 static int
-decode_referral_desc(const unsigned char * ucp)
+decode_referral_desc(const unsigned char * ucp, int bytes)
 {
     int j, n;
     uint64_t first, last;
 
     if (NULL == ucp)
+        return -1;
+
+    if (bytes < 20)
         return -1;
 
     first = ((uint64_t)ucp[4] << 56) | ((uint64_t)ucp[5] << 48) |
@@ -115,14 +150,17 @@ decode_referral_desc(const unsigned char * ucp)
 
     printf("    target port descriptors: %d\n", ucp[3]);
     printf("    user data segment: first lba %" PRIu64 ", last lba %"
-	   PRIu64 "\n", first, last);
-
+          PRIu64 "\n", first, last);
     n = 20;
+    bytes -= n;
     for (j = 0; j < ucp[3]; j++) {
+        if (bytes < 4)
+            return -1;
         printf("      target port descriptor %d:\n", j);
-        printf("        port group %d state %x\n",
-               (ucp[n+2] << 8) | (ucp[n+3]), ucp[n] & 0xf);
+        printf("        port group %x state (%s)\n",
+               (ucp[n+2] << 8) | (ucp[n+3]), decode_tpgs_state(ucp[n] & 0xf));
         n += 4;
+        bytes -= 4;
     }
     return n;
 }
@@ -132,7 +170,6 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, k, res, c, rlen;
-    int do_brief = 0;
     int do_hex = 0;
     int do_one_segment = 0;
     int64_t ll;
@@ -140,6 +177,7 @@ main(int argc, char * argv[])
     int maxlen = DEF_REFER_BUFF_LEN;
     int do_raw = 0;
     int verbose = 0;
+    int desc = 0;
     const char * device_name = NULL;
     const unsigned char * ucp;
     int ret = 0;
@@ -147,15 +185,12 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bhHl:m:rvV", long_options,
+        c = getopt_long(argc, argv, "hHl:m:rsvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
-        case 'b':
-            ++do_brief;
-            break;
         case 'h':
         case '?':
             usage();
@@ -179,7 +214,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
-        case 'o':
+        case 's':
             ++do_one_segment;
             break;
         case 'r':
@@ -212,7 +247,7 @@ main(int argc, char * argv[])
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        fprintf(stderr, "No DEVICE argument given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -244,8 +279,15 @@ main(int argc, char * argv[])
     ret = res;
     if (0 == res) {
         if (maxlen >= 4)
+            /*
+             * This is strictly speaking incorrect. However, the
+             * spec reserved bytes 0 and 1, so some implementations
+             * might want to use them to increase the number of
+             * possible user segments.
+             * And maybe someone takes a pity and updates the spec ...
+             */
             rlen = (referralBuffp[0] << 24) + (referralBuffp[1] << 16) +
-                   (referralBuffp[2] << 8) + referralBuffp[3] + 8;
+                   (referralBuffp[2] << 8) + referralBuffp[3] + 4;
         else
             rlen = maxlen;
         k = (rlen > maxlen) ? maxlen : rlen;
@@ -275,13 +317,16 @@ main(int argc, char * argv[])
         ucp = referralBuffp + 4;
         k = 0;
         printf("Report referrals:\n");
-        while (k < rlen) {
-            printf("  descriptor %d:\n", k + 1);
-            res = decode_referral_desc(ucp + k);
-            if (res < 0)
-                fprintf(stderr, "descriptor %d: bad LBA status descriptor "
-                        "returned %d\n", k + 1, res);
+        while (k < rlen - 4) {
+            printf("  descriptor %d:\n", desc);
+            res = decode_referral_desc(ucp + k, rlen - 4 - k);
+            if (res < 0) {
+                fprintf(stderr, "bad user data segment referral descriptor\n");
+                k = rlen - 4;
+                break;
+            }
             k += res;
+            desc++;
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Referrals command not supported\n");

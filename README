@@ -198,11 +198,11 @@ subdirectory of the sg3_utils package:
     sg_get_lba_status, sg_format, sg_ident, sg_inq, sg_logs, sg_luns, sg_map,
     sg_map26, sg_modes, sg_opcodes, sg_persist, sg_prevent, sg_raw, sg_rbuf,
     sg_rdac, sg_read, sg_readcap, sg_read_block_limits, sg_read_buffer,
-    sg_read_long, sg_reassign, sg_request, sg_reset, sg_rmsn, sg_rtpg,
-    sg_safte, sg_sat_identify, sg_sat_phy_event, sg_sat_set_features,
-    sg_scan, sg_senddiag, sg_ses, sg_start, sg_stpg, sg_sync, sg_test_rwbuff,
-    sg_turs, sg_unmap, sg_verify, sg_vpd, sg_write_buffer, sg_write_long,
-    sg_write_same, sg_wr_mode
+    sg_read_long, sg_reassign, sg_referrals, sg_request, sg_reset, sg_rmsn,
+    sg_rtpg, sg_safte, sg_sat_identify, sg_sat_phy_event,
+    sg_sat_set_features, sg_scan, sg_senddiag, sg_ses, sg_start, sg_stpg,
+    sg_sync, sg_test_rwbuff, sg_turs, sg_unmap, sg_verify, sg_vpd,
+    sg_write_buffer, sg_write_long, sg_write_same, sg_wr_mode
 
 Each of the above utilities depends on header files found in the 'include'
 subdirectory and library code found in the 'lib' subdirectory. Associated
@@ -221,11 +221,6 @@ going to the 'doc' subdirectory and executing something like this:
 
 To see which SCSI commands (and ATA commands) are used by these utilities
 refer to the COVERAGE file.
-
-Here is a list in alphabetical order of utilities found in the 'archive'
-subdirectory:
-  - isosize, scsi_devfs_scan, sg_debug, sgq_dd
-Some of these utilities have man pages.
 
 Here is a list in alphabetical order of utilities found in the 'examples'
 subdirectory:
@@ -265,14 +260,6 @@ ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the
 SCSI sub system mid level and so is common to all sd, sr, st and sg devices. 
 That ioctl is deprecated in the lk 2.6 series. This program has been placed
 in the "examples" subdirectory.
-
-"sgq_dd" is yet another variant of dd found in the archive directory.
-From the user's point of view it is very similar to sgp_dd but uses a
-non-blocking state machine rather then POSIX threads for parallelism.
-
-"sg_debug" is effectively defunct now. The user can instead execute:
-'cat /proc/scsi/sg/debug' . This command has been placed in the archive
-directory.
 
 "sg_simple1" and "sg_simple2" are example programs demonstrating calls
 to the SCSI INQUIRY and TEST UNIT READY commands. They only differ in their
@@ -333,10 +320,10 @@ or using '-O' as the first command line option.
 The more recent utilities that use "getopt_long" only are:
   - sg_format sg_get_config sg_get_lba_status sg_ident sg_luns sg_map26
     sg_persist sg_prevent sg_raw sg_read_block_limits sg_read_buffer
-    sg_read_long sg_reassign sg_requests sg_rmsn sg_rtpg sg_safte
-    sg_sat_identify sg_sat_phy_event sg_sat_set_features sg_scan(w) sg_ses
-    sg_stpg sg_sync sg_test_rwbuf sg_unmap sg_verify sg_vpd sg_write_buffer
-    sg_write_long sg_write_same sg_wr_mode
+    sg_read_long sg_reassign sg_referrals sg_requests sg_rmsn sg_rtpg
+    sg_safte sg_sat_identify sg_sat_phy_event sg_sat_set_features
+    sg_scan(w) sg_ses sg_stpg sg_sync sg_test_rwbuf sg_unmap sg_verify
+    sg_vpd sg_write_buffer sg_write_long sg_write_same sg_wr_mode
 
 
 Dangerous code
@@ -358,4 +345,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-19th August 2010
+13th September 2010

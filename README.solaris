@@ -29,6 +29,7 @@ Here is a list of utilities that have been ported:
     sg_read_long
     sg_readcap
     sg_reassign
+    sg_referrals
     sg_requests
     sg_rmsn
     sg_rtpg
@@ -133,4 +134,4 @@ disks to accept SCSI commands including the SCSI ATA PASS THROUGH commands.
 
 
 Doug Gilbert
-10th April 2010
+13th September 2010

@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.43 20100819";    /* spc4r26 + sbc3r24 */
+static char * version_str = "0.44 20100913";    /* spc4r26 + sbc3r24 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1522,6 +1522,8 @@ decode_tapealert_supported_vpd(unsigned char * b, int len)
     return 0;
 }
 
+/* VPD_THIN_PROVISIONING sbc */
+/* VPD_TA_SUPPORTED ssc */
 static void
 decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1543,6 +1545,8 @@ decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_REFERRALS sbc */
+/* VPD_AUTOMATION_DEV_SN ssc */
 static void
 decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
 {

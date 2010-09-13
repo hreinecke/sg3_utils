@@ -1,0 +1,67 @@
+.TH SG_REFERRALS "8" "March 2010" "sg3_utils\-1.29" SG3_UTILS
+.SH NAME
+sg_referrals \- send the SCSI REPORT REFERRALS command
+.SH SYNOPSIS
+.B sg_referrals
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-one-segment\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send the SCSI REPORT REFERRALS command to the \fIDEVICE\fR and outputs the
+response. This command was introduced in (draft) SBC\-3 revision 24 and
+devices that support referrals should support this command.
+.PP
+The default action is to decode the response for all user data segment
+referral descriptors. The amount of output can be reduced by the 
+\fI\-\-lba\fR and \fI\-\-one-segment\fR options.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output response to this command in ASCII hex.
+.TP
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the Logical Block Address (LBA) in the first user
+data segment the \fIDEVICE\fR should report the referrals parameter
+data for.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+where \fILEN\fR is the (maximum) response length in bytes. It is placed in
+the cdb's "allocation length" field. If not given then 256 is used. 256 is
+enough space for the response header and user data segment descriptors.
+.TP
+\fB\-s\fR, \fB\-\-one-segment\fR
+report the user data segment of the segment spefified by the \fILBA\fR
+parameter only.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output response in binary (to stdout).
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output). Additional output
+caused by this option is sent to stderr.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+For a discussion of referrals see section 4.25 of sbc3r24.pdf
+at http://www.t10.org (or the corresponding section of a later draft).
+.SH EXIT STATUS
+The exit status of sg_referrals is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert and Hannes Reinecke.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2009\-2010 Douglas Gilbert and Hannes Reinecke
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_vpd(8)
