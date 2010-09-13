@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.91 20100819";    /* SPC-4 rev 26 */
+static char * version_str = "0.92 20100913";    /* SPC-4 rev 26 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -83,6 +83,7 @@ static char * version_str = "0.91 20100819";    /* SPC-4 rev 26 */
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
+#define VPD_MAN_ASS_SN 0xb1 
 #define VPD_THIN_PROVISIONING 0xb2
 #define VPD_REFERRALS 0xb3
 #define VPD_UPR_EMC 0xc0
@@ -1465,6 +1466,8 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_BLOCK_DEV_CHARS sbc */
+/* VPD_MAN_ASS_SN ssc */
 static void
 decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1502,6 +1505,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_REFERRALS sbc */
 static void
 decode_b3_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1514,8 +1518,7 @@ decode_b3_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 0xc0) {
-                fprintf(stderr, "Block device characteristics VPD page length "
-                        "too short=%d\n", len);
+                fprintf(stderr, "Referrals VPD page length too short=%d\n", len);
                 return;
             }
             s = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) | buff[11];
@@ -2372,7 +2375,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
                 decode_power_condition(rsp_buff, len, optsp->do_hex);
         }
         break;
-    case 0xb0:  /* could be BLOCK LIMITS but need to know pdt to find out */
+    case 0xb0:  /* VPD pages in B0h to BFh range depend on pdt */
         res = sg_ll_inquiry(sg_fd, 0, 1, 0xb0, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
@@ -2416,7 +2419,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         } else if (! optsp->do_raw)
             printf("VPD INQUIRY: page=0xb0\n");
         break;
-    case 0xb1:  /* could be BLOCK DEVICE CHARACTERISTICS but need pdt */
+    case 0xb1:  /* VPD pages in B0h to BFh range depend on pdt */
         res = sg_ll_inquiry(sg_fd, 0, 1, 0xb1, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {
@@ -2465,7 +2468,10 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         } else if (! optsp->do_raw)
             printf("VPD INQUIRY: page=0xb1\n");
         break;
-    case 0xb3:  /* could be REFERRALS but need pdt */
+    case 0xb2:  /* VPD pages in B0h to BFh range depend on pdt */
+        printf(" Only hex output supported. sg_vpd decodes the B2h page.\n");
+        return process_vpd(sg_fd, optsp);
+    case 0xb3:  /* VPD pages in B0h to BFh range depend on pdt */
         res = sg_ll_inquiry(sg_fd, 0, 1, 0xb3, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
         if (0 == res) {

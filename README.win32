@@ -41,6 +41,7 @@ Here is a list of utilities that have been ported:
     sg_read_long
     sg_readcap
     sg_reassign
+    sg_referrals
     sg_requests
     sg_rmsn
     sg_rtpg
@@ -195,4 +196,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-10th April 2010
+13th September 2010
