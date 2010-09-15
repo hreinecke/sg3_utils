@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.1 (2010-04-29)"
+#define SG_RAW_VERSION "0.4.2 (2010-09-15)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -98,18 +98,19 @@ usage()
             "  -n, --nosense          Don't display sense information\n"
             "  -o, --outfile=OFILE    Write binary data to OFILE (def: "
             "hexdump to stdout)\n"
-            "  -r, --request=RLEN     Request up to RLEN bytes of data\n"
+            "  -r, --request=RLEN     Request up to RLEN bytes of data "
+            "(data-in)\n"
             "  -R, --readonly         Open DEVICE read-only (default: "
             "read-write)\n"
-            "  -s, --send=SLEN        Send SLEN bytes of data\n"
+            "  -s, --send=SLEN        Send SLEN bytes of data (data-out)\n"
             "  -t, --timeout=SEC      Timeout in seconds (default: 20)\n"
             "  -v, --verbose          Increase verbosity\n"
             "  -V, --version          Show version information and exit\n"
             "\n"
-            "Between 6 and 256 command bytes (two hex digits each) can be\n"
-            "specified and will be sent to DEVICE.\n"
-            "\n"
-            "Example: Perform INQUIRY on /dev/sg0:\n"
+            "Between 6 and 256 command bytes (two hex digits each) can be "
+            "specified\nand will be sent to DEVICE. Bidirectional commands "
+            "accepted.\n\n"
+            "Simple example: Perform INQUIRY on /dev/sg0:\n"
             "  sg_raw -r 1k /dev/sg0 12 00 00 00 60 00\n");
 }
 
@@ -194,11 +195,6 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
         default:
             return SG_LIB_SYNTAX_ERROR;
         }
-    }
-
-    if (optsp->do_datain && optsp->do_dataout) {
-        fprintf(stderr, "Can't use '--request' and '--send' together\n");
-        return SG_LIB_SYNTAX_ERROR;
     }
 
     if (optind >= argc) {
@@ -390,7 +386,8 @@ main(int argc, char *argv[])
     int sg_fd = -1;
     struct sg_pt_base *ptvp = NULL;
     unsigned char sense_buffer[32];
-    unsigned char *dxfer_buffer = NULL;
+    unsigned char * dxfer_buffer_in = NULL;
+    unsigned char * dxfer_buffer_out = NULL;
     unsigned char *wrkBuf = NULL;
 
     memset(&opts, 0, sizeof(opts));
@@ -430,20 +427,21 @@ main(int argc, char *argv[])
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
 
     if (opts.do_dataout) {
-        dxfer_buffer = fetch_dataout(&opts);
-        if (dxfer_buffer == NULL) {
+        dxfer_buffer_out = fetch_dataout(&opts);
+        if (dxfer_buffer_out == NULL) {
             ret = SG_LIB_CAT_OTHER;
             goto done;
         }
-        set_scsi_pt_data_out(ptvp, dxfer_buffer, opts.dataout_len);
-    } else if (opts.do_datain) {
-        dxfer_buffer = my_memalign(opts.datain_len, &wrkBuf);
-        if (dxfer_buffer == NULL) {
+        set_scsi_pt_data_out(ptvp, dxfer_buffer_out, opts.dataout_len);
+    } 
+    if (opts.do_datain) {
+        dxfer_buffer_in = my_memalign(opts.datain_len, &wrkBuf);
+        if (dxfer_buffer_in == NULL) {
             perror("malloc");
             ret = SG_LIB_CAT_OTHER;
             goto done;
         }
-        set_scsi_pt_data_in(ptvp, dxfer_buffer, opts.datain_len);
+        set_scsi_pt_data_in(ptvp, dxfer_buffer_in, opts.datain_len);
     }
 
     ret = do_scsi_pt(ptvp, sg_fd, opts.timeout, opts.do_verbose);
@@ -488,7 +486,7 @@ main(int argc, char *argv[])
         } else {
             if (opts.datain_file == NULL && !opts.datain_binary) {
                 fprintf(stderr, "Received %d bytes of data:\n", data_len);
-                dStrHex((const char *)dxfer_buffer, data_len, 0);
+                dStrHex((const char *)dxfer_buffer_in, data_len, 0);
             } else {
                 const char * cp = "stdout";
 
@@ -498,7 +496,8 @@ main(int argc, char *argv[])
                     cp = opts.datain_file;
                 fprintf(stderr, "Writing %d bytes of data to %s\n", data_len,
                         cp);
-                ret = write_dataout(opts.datain_file, dxfer_buffer, data_len);
+                ret = write_dataout(opts.datain_file, dxfer_buffer_in,
+                                    data_len);
                 if (ret != 0)
                     goto done;
             }

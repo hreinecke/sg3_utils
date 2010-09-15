@@ -7,7 +7,10 @@ sg_raw \- sends an arbitrary SCSI command to a device
 This utility sends an arbitrary SCSI command (between 6 and 256 bytes) to
 the \fIDEVICE\fR. There may be no associated data transfer; or data may be
 read from a file and sent to the \fIDEVICE\fR; or data may be received from
-the \fIDEVICE\fR and then displayed or written to a file.
+the \fIDEVICE\fR and then displayed or written to a file. If supported
+by the pass through, bidirectional commands may be sent (i.e. containing
+both data to be sent to the \fIDEVICE\fR and received from the
+\fIDEVICE\fR).
 .PP
 The SCSI command may be between 6 and 256 bytes long. Each command byte is
 specified in plain hex format (00..FF) without a prefix or suffix. See
@@ -44,7 +47,7 @@ This option is ignored if \fB\-\-request\fR is not specified.
 \fB\-r\fR, \fB\-\-request\fR=\fIRLEN\fR
 Expect to receive up to \fIRLEN\fR bytes of data from the \fIDEVICE\fR.
 \fIRLEN\fR may be suffixed with 'k' to use kilobytes (1024 bytes) instead
-of bytes. This option and \fB\-\-send\fR are mutually exclusive.
+of bytes.
 .TP
 \fB\-R\fR, \fB\-\-readonly\fR
 Open \fIDEVICE\fR read-only. The default (without this option) is to open
@@ -52,8 +55,7 @@ it read-write.
 .TP
 \fB\-s\fR, \fB\-\-send\fR=\fISLEN\fR
 Read \fISLEN\fR bytes of data, either from stdin or from a file, and send
-them to the \fIDEVICE\fR. This option and \fB\-\-request\fR are mutually
-exclusive.
+them to the \fIDEVICE\fR.
 .TP
 \fB\-t\fR, \fB\-\-timeout\fR=\fISEC\fR
 Wait up to \fISEC\fR seconds for command completion (default: 20).
@@ -75,7 +77,7 @@ Product Pages of a devices which may contain useful information.
 .PP
 The ability to send more than a 16 byte CDB (in some cases 12 byte CDB)
 may be restricted by the pass-through interface, the low level driver
-or the transport. Bidirectional data commands are no yet supported.
+or the transport.
 .SH EXAMPLES
 These examples use Linux device names. For suitable device names in
 other supported Operating Systems see the sg3_utils(8) man page.

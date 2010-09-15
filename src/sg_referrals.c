@@ -29,7 +29,7 @@
  * SCSI device.
  */
 
-static char * version_str = "1.03 20100812";    /* sbc3r24 */
+static char * version_str = "1.03 20100813";    /* sbc3r24 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -105,8 +105,8 @@ usage()
             "                           (def: 0 -> %d bytes)\n",
             DEF_REFER_BUFF_LEN );
     fprintf(stderr,
-            "    --one-segment|-s    return information about the specified\n"
-            "                      segment only\n"
+            "    --one-segment|-s    return information about the specified "
+            "segment only\n"
             "    --raw|-r          output in binary\n"
             "    --verbose|-v      increase verbosity\n"
             "    --version|-V      print version string and exit\n\n"
