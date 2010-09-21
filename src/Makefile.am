@@ -31,11 +31,10 @@ if OS_WIN32_MINGW
 
 bin_PROGRAMS = \
 	sg_format sg_get_config sg_get_lba_status sg_ident \
-	sg_inq sg_logs sg_luns \
-	sg_modes sg_opcodes sg_persist \
+	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
-	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
+	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
+	sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
@@ -53,11 +52,10 @@ if OS_WIN32_CYGWIN
 
 bin_PROGRAMS = \
 	sg_format sg_get_config sg_get_lba_status sg_ident \
-	sg_inq sg_logs sg_luns \
-	sg_modes sg_opcodes sg_persist \
+	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
-	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
+	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
+	sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
@@ -75,11 +73,10 @@ if OS_FREEBSD
 
 bin_PROGRAMS = \
 	sg_format sg_get_config sg_get_lba_status sg_ident \
-	sg_inq sg_logs sg_luns \
-	sg_modes sg_opcodes sg_persist \
+	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
-	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
+	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
+	sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
@@ -91,11 +88,10 @@ if OS_SOLARIS
 
 bin_PROGRAMS = \
 	sg_format sg_get_config sg_get_lba_status sg_ident \
-	sg_inq sg_logs sg_luns \
-	sg_modes sg_opcodes sg_persist \
+	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
-	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
+	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
+	sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
@@ -107,11 +103,10 @@ if OS_OSF
 
 bin_PROGRAMS = \
 	sg_format sg_get_config sg_get_lba_status sg_ident \
-	sg_inq sg_logs sg_luns \
-	sg_modes sg_opcodes sg_persist \
+	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
-	sg_read_buffer sg_read_long sg_reassign sg_requests sg_rmsn \
-	sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
+	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
+	sg_rmsn sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event \
 	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg \
 	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
 	sg_write_long sg_write_same sg_wr_mode
