@@ -1,4 +1,4 @@
-.TH HXASCDMP "1" "April 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH HXASCDMP "1" "September 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 hxascdmp \- hexadecimal ASCII dump
 .SH SYNOPSIS
@@ -76,12 +76,22 @@ hex dump of file: 3bm.txt
  00      74 68 72 65 65 20 62 6c  69 6e 64 20 6d 69 63 65
 .br
  10      2c 09 0d aa 0a
+.PP
+For comparison the hexdump utility gives similar output:
+.PP
+   $ hexdump -C 3bm.txt
+.br
+00000000  74 68 72 65 65 20 62 6c  69 6e 64 20 6d 69 63 65  |three blind mice|
+.br
+00000010  2c 09 0d aa 0a                                    |,....|
+.br
+00000015
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2009 Douglas Gilbert
+Copyright \(co 2004\-2010 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

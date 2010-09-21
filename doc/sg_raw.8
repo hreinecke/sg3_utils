@@ -79,8 +79,9 @@ The ability to send more than a 16 byte CDB (in some cases 12 byte CDB)
 may be restricted by the pass-through interface, the low level driver
 or the transport.
 .SH EXAMPLES
-These examples use Linux device names. For suitable device names in
-other supported Operating Systems see the sg3_utils(8) man page.
+These examples, apart from the last one, use Linux device names. For
+suitable device names in other supported Operating Systems see the
+sg3_utils(8) man page.
 .TP
 sg_raw /dev/scd0 1b 00 00 00 02 00
 Eject the medium in CD drive /dev/scd0.
@@ -100,6 +101,14 @@ This will use the SCSI READ BUFFER command to read 512 bytes from
 the "data" buffer (i.e. mode 2) then write it to the o512.bin file.
 When used in conjunction with the previous example, if both commands
 work then 'cmp i512.bin o512.bin' should show a match.
+.TP
+sg_raw --infile=urandom.bin --send=512 --request=512 --outfile=out.bin "/dev/bsg/7:0:0:0" 53 00 00 00 00 00 00 00 01 00
+This is a bidirectional XDREADWRITE(10) command being sent via a Linux
+bsg device. Note that data is being read from "urandom.bin" and sent
+to the device (data-out) while resulting data (data-in) is placed
+in the "out.bin" file. Also note the length of both is 512 bytes
+which corresponds to the transfer length of 1 (block) in the cdb (i.e.
+the second last byte).
 .TP
 sg_raw.exe PhysicalDrive1 a1 0c 0e 00 00 00 00 00 00 e0 00 00
 This example is from Windows and shows a ATA STANDBY IMMEDIATE command
