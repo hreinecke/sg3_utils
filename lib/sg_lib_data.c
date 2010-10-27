@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.61 20100625";    /* spc-4 rev 25 */
+const char * sg_lib_version_str = "1.62 20101011";    /* spc-4 rev 27 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -469,6 +469,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x10,0x01,"Logical block guard check failed"},
     {0x10,0x02,"Logical block application tag check failed"},
     {0x10,0x03,"Logical block reference tag check failed"},
+    {0x10,0x04,"Logical block protection error on recover buffered data"},
     {0x11,0x00,"Unrecovered read error"},
     {0x11,0x01,"Read retries exhausted"},
     {0x11,0x02,"Error too long to correct"},
@@ -639,6 +640,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x09,"Previous reservation conflict status"},
     {0x2C,0x0A,"Partition or collection contains user objects"},
     {0x2C,0x0B,"Not reserved"},
+    {0x2C,0x0C,"ORWRITE generation does not match"},
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2F,0x00,"Commands cleared by another initiator"},
@@ -1059,12 +1061,12 @@ const char * sg_lib_pdt_strs[] = {
     "processor",        /* often SAF-TE (seldom scanner) device */
     "write once optical disk",
     /* 5 */ "cd/dvd",
-    "scanner",
+    "scanner",			/* obsolete */
     "optical memory device",
     "medium changer",
-    "communications",
-    /* 0xa */ "graphics [0xa]",
-    "graphics [0xb]",
+    "communications",		/* obsolete */
+    /* 0xa */ "graphics [0xa]",	/* obsolete */
+    "graphics [0xb]",		/* obsolete */
     "storage array controller",
     "enclosure services device",
     "simplified direct access device",

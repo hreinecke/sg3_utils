@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.92 20100913";    /* SPC-4 rev 26 */
+static char * version_str = "0.94 20101027";    /* SPC-4 rev 27 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1292,6 +1292,8 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x1),
            !!(buff[8] & 0x10));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
+    printf("  Extended self-test completion minutes=%d\n",
+           (buff[10] << 8) + buff[11]);     /* spc4r27 */
 }
 
 /* VPD_SOFTW_INF_ID */
@@ -1816,7 +1818,10 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
                        "qualifier [%d]\n", pqual);
         }
         len = rsp_buff[4] + 5;
-        ansi_version = rsp_buff[2] & 0x7;
+        /* N.B. rsp_buff[2] full byte is 'version' in SPC-2,3,4 but in SPC
+         * [spc-r11a (1997)] bits 6,7: ISO/IEC version; bits 3-5: ECMA
+         * version; bits 0-2: SCSI version */
+        ansi_version = rsp_buff[2] & 0x7;       /* Only take SCSI version */
         peri_type = rsp_buff[0] & 0x1f;
         if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) &&
             (0 == optsp->resp_len)) {

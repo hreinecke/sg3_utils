@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Mon Sep 13 2010 - dgilbert at interlog dot com
+* Mon Oct 25 2010 - dgilbert at interlog dot com
 - add sg_referrals; track t10 changes
   * sg3_utils-1.30
 
