@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.96 20100629";
+static char * version_str = "0.97 20101025";
 
 
 #define ME "sg_write_same: "
@@ -144,8 +144,7 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     cdb_len = optsp->pref_cdb_size;
     if (WRITE_SAME10_LEN == cdb_len) {
         llba = optsp->lba + optsp->numblocks;
-        if ((optsp->numblocks > 0xffff) || (llba > ULONG_MAX) ||
-            optsp->unmap) {
+        if ((optsp->numblocks > 0xffff) || (llba > ULONG_MAX)) {
             cdb_len = WRITE_SAME16_LEN;
             if (optsp->verbose)
                 fprintf(stderr, "do_write_same: use WRITE SAME(16) instead "
@@ -159,6 +158,12 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     case WRITE_SAME10_LEN:
         wsCmdBlk[0] = WRITE_SAME10_OP;
         wsCmdBlk[1] = ((optsp->wrprotect & 0x7) << 5);
+        /* ANCHOR + UNMAP not allowed for WRITE_SAME10 in sbc3r24 but a
+         * proposal has been made to allow it. Anticipate approval. */
+        if (optsp->anchor)
+            wsCmdBlk[1] |= 0x10;
+        if (optsp->unmap)
+            wsCmdBlk[1] |= 0x8;
         if (optsp->pbdata)
             wsCmdBlk[1] |= 0x4;
         if (optsp->lbdata)

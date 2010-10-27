@@ -2,20 +2,26 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.30 [20100920] [svn: r359]
+Changelog for sg3_utils-1.30 [20101027] [svn: r360]
   - sg_referrals: new utility for REPORT REFERRALS
-  - sg_inq: update version descriptor list to spc4r26
-  - sg_lib: sync asc/ascq list to spc4r25 (no change to r26)
+  - sg_inq: update version descriptor list to spc4r27
+    - extended inquiry vpd page add extended self test
+      completion minutes field
+  - sg_lib: sync asc/ascq list to spc4r27
     - dStrHex(): trim excess trailing spaces
   - sg_read_long: add --readonly option (open() is rw)
   - sg_raw: add --readonly option (open() is rw)
-    - relax restriction on bidirectional commands
+    - allow bidirectional commands
   - sg_vpd: rdac vendor page [0xc8] parse corrections
+    - extended inquiry vpd page add extended self test
+      completion minutes field
   - sg_ses: expand --date (in) buffer to 2048 bytes
   - sg_opcodes: add extended parameter data for TMFs (spc4r26)
   - sg_dd: clean count calculation, document nocache flag
     - treat bsg devices as implicit sg_io
   - sg_write_same: if READ CAPACITY(16) fails try 10 byte variant
+    - anticipate approval of proposal to allow UNMAP and ANCHOR
+      bits to be set on WRITE SAME(10)
   - sg3_utils man page: sections added for OS device names
 
 Changelog for sg3_utils-1.29 [20100406] [svn: r334]
