@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.45 20101011";    /* spc4r27 + sbc3r24 */
+static char * version_str = "0.46 20101030";    /* spc4r27 + sbc3r25 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -63,7 +63,7 @@ extern const struct svpd_values_name_t *
 #define VPD_MAN_ASS_SN 0xb1     /* SSC-3, ADC-2 */
 #define VPD_SECURITY_TOKEN 0xb1 /* OSD */
 #define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
-#define VPD_THIN_PROVISIONING 0xb2   /* SBC-3 */
+#define VPD_LB_PROVISIONING 0xb2   /* SBC-3 */
 #define VPD_REFERRALS 0xb3   /* SBC-3 */
 #define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
@@ -148,6 +148,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
     {VPD_IMP_OP_DEF, 0, -1, 0, "iod",
      "Implemented operating definition (obsolete)"},
+    {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv",
+     "Logical block provisioning (SBC)"},
     {VPD_MAN_ASS_SN, 0, 1, 0, "mas",
      "Manufacturer assigned serial number (SSC)"},
     {VPD_MAN_ASS_SN, 0, 0x12, 0, "masa",
@@ -168,7 +170,6 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SECURITY_TOKEN, 0, 0x11, 0, "st", "Security token (OSD)"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, 0, "tas", "TapeAlert supported flags (SSC)"},
-    {VPD_THIN_PROVISIONING, 0, 0, 0, "thpv", "Thin provisioning (SBC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
 
@@ -1435,14 +1436,14 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
-/* VPD_THIN_PROVISIONING */
+/* VPD_LB_PROVISIONING */
 static int
-decode_block_thin_prov_vpd(unsigned char * b, int len)
+decode_block_lb_prov_vpd(unsigned char * b, int len)
 {
     int dp, anc_sup;
 
     if (len < 4) {
-        fprintf(stderr, "Thin provisioning page too short=%d\n",
+        fprintf(stderr, "Logical block provisioning page too short=%d\n",
                 len);
         return SG_LIB_CAT_MALFORMED;
     }
@@ -1470,8 +1471,8 @@ decode_block_thin_prov_vpd(unsigned char * b, int len)
         ucp = b + 8;
         i_len = ucp[3];
         if (0 == i_len) {
-            fprintf(stderr, "Thin provisioning page provisioning group "
-                    "descriptor too short=%d\n", i_len);
+            fprintf(stderr, "Logical block provisioning page provisioning "
+                    "group descriptor too short=%d\n", i_len);
             return 0;
         }
         printf("  Provisioning group descriptor\n");
@@ -1524,7 +1525,7 @@ decode_tapealert_supported_vpd(unsigned char * b, int len)
     return 0;
 }
 
-/* VPD_THIN_PROVISIONING sbc */
+/* VPD_LB_PROVISIONING sbc */
 /* VPD_TA_SUPPORTED ssc */
 static void
 decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
@@ -1535,7 +1536,7 @@ decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
     switch (pdt) {
     case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-        decode_block_thin_prov_vpd(buff, len);
+        decode_block_lb_prov_vpd(buff, len);
         break;
     case PDT_TAPE: case PDT_MCHANGER:
         decode_tapealert_supported_vpd(buff, len);
@@ -2348,7 +2349,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             if ((! do_raw) && (! do_quiet)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-                    printf("Thin provisioning VPD page (SBC):\n");
+                    printf("Logical block provisioning VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
                     printf("TapeAlert supported flags VPD page (SSC):\n");

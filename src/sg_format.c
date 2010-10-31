@@ -45,7 +45,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.17 20090324";
+static char * version_str = "1.18 20101030";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -277,8 +277,8 @@ print_read_cap(int fd, int do_16, int verbose)
                         printf("   Protection: prot_en=%d, p_type=%d\n",
                                !!(resp_buff[12] & 0x1),
                                ((resp_buff[12] >> 1) & 0x7));
-                        printf("   Thin provisioning: tpe=%d, tprz=%d\n",
-                               !!(resp_buff[14] & 0x80),
+                        printf("   Logical block provisioning: lbpme=%d, "
+                               "lbprz=%d\n", !!(resp_buff[14] & 0x80),
                                !!(resp_buff[14] & 0x40));
                         printf("   Number of blocks=%" PRIu64 "\n",
                                llast_blk_addr + 1);

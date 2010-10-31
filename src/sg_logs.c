@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.96 20100430";    /* SPC-4 revision 24 */
+static char * version_str = "0.97 20101028";    /* spc4r27 + sbc3r25 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -40,13 +40,13 @@ static char * version_str = "0.96 20100430";    /* SPC-4 revision 24 */
 #define LAST_N_ERR_LPAGE 0x7
 #define FORMAT_STATUS_LPAGE 0x8
 #define LAST_N_DEFERRED_LPAGE 0xb
-#define THIN_PROV_LPAGE 0xc
+#define LB_PROV_LPAGE 0xc
 #define TEMPERATURE_LPAGE 0xd
 #define START_STOP_LPAGE 0xe
 #define APP_CLIENT_LPAGE 0xf
 #define SELF_TEST_LPAGE 0x10
 #define SOLID_STATE_MEDIA_LPAGE 0x11
-#define PORT_SPECIFIC_LPAGE 0x18
+#define PROTO_SPECIFIC_LPAGE 0x18
 #define STATS_LPAGE 0x19
 #define PCT_LPAGE 0x1a
 #define TAPE_ALERT_LPAGE 0x2e
@@ -661,7 +661,7 @@ show_page_name(int pg_code, int subpg_code,
         case START_STOP_LPAGE: printf("%sStart-stop cycle counter", b); break;
         case APP_CLIENT_LPAGE: printf("%sApplication client", b); break;
         case SELF_TEST_LPAGE: printf("%sSelf-test results", b); break;
-        case PORT_SPECIFIC_LPAGE: printf("%sProtocol specific port", b); break;
+        case PROTO_SPECIFIC_LPAGE: printf("%sProtocol specific port", b); break;
         case STATS_LPAGE:
             printf("%sGeneral statistics and performance", b);
             break;
@@ -709,8 +709,8 @@ show_page_name(int pg_code, int subpg_code,
             case FORMAT_STATUS_LPAGE:
                 printf("%sFormat status (sbc-2)\n", b);
                 break;
-            case THIN_PROV_LPAGE:               /* 0xc */
-                printf("%sThin provisioning (sbc-3)\n", b);
+            case LB_PROV_LPAGE:                 /* 0xc */
+                printf("%sLogical block provisioning (sbc-3)\n", b);
                 break;
             case 0x15:
                 printf("%sBackground scan results (sbc-3)\n", b);
@@ -869,6 +869,7 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
         outp[0] = '\0';
 }
 
+/* BUFF_OVER_UNDER_LPAGE */
 static void
 show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -934,6 +935,7 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* WRITE_ERR_LPAGE; READ_ERR_LPAGE; READ_REV_ERR_LPAGE; VERIFY_ERR_LPAGE */
 static void
 show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1001,6 +1003,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* NON_MEDIUM_LPAGE */
 static void
 show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1050,6 +1053,7 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* PCT_LPAGE */
 static void
 show_power_condition_transitions_page(unsigned char * resp, int len,
                                       int show_pcb)
@@ -1329,6 +1333,7 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* LAST_N_ERR_LPAGE */
 static void
 show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1370,6 +1375,7 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* LAST_N_DEFERRED_LPAGE */
 static void
 show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1419,6 +1425,7 @@ static const char * self_test_result[] = {
     "reserved",
     "self test in progress"};
 
+/* SELF_TEST_LPAGE */
 static void
 show_self_test_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1465,6 +1472,7 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* TEMPERATURE_LPAGE */
 static void
 show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
                       int show_unknown)
@@ -1517,6 +1525,7 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
     }
 }
 
+/* START_STOP_LPAGE */
 static void
 show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
 {
@@ -1614,6 +1623,7 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
     }
 }
 
+/* IE_LPAGE */
 static void
 show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 {
@@ -1806,6 +1816,7 @@ show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
     }
 }
 
+/* PROTO_SPECIFIC_LPAGE for a SAS port */
 static void
 show_sas_port_param(unsigned char * ucp, int param_len,
                     const struct opts_t * optsp)
@@ -1994,6 +2005,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
     }
 }
 
+/* PROTO_SPECIFIC_LPAGE */
 static int
 show_protocol_specific_page(unsigned char * resp, int len,
                             const struct opts_t * optsp)
@@ -2003,7 +2015,7 @@ show_protocol_specific_page(unsigned char * resp, int len,
 
     num = len - 4;
     if (optsp->do_name)
-        printf("log_page=0x%x\n", PORT_SPECIFIC_LPAGE);
+        printf("log_page=0x%x\n", PROTO_SPECIFIC_LPAGE);
     for (k = 0, ucp = resp + 4; k < num; ) {
         param_len = ucp[3] + 4;
         if (6 != (0xf & ucp[4]))
@@ -2018,6 +2030,7 @@ show_protocol_specific_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
+/* STATS_LPAGE, 0x0 to 0x1f */
 static int
 show_stats_perform_page(unsigned char * resp, int len,
                         const struct opts_t * optsp)
@@ -2344,6 +2357,7 @@ show_stats_perform_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
+/* STATS_LPAGE, CACHE_STATS_SUBPG */
 static int
 show_cache_stats_page(unsigned char * resp, int len,
                       const struct opts_t * optsp)
@@ -2476,6 +2490,7 @@ show_cache_stats_page(unsigned char * resp, int len,
     return 1;
 }
 
+/* FORMAT_STATUS_LPAGE */
 static void
 show_format_status_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2616,15 +2631,16 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* LB_PROV_LPAGE */
 static void
-show_thin_provisioning_page(unsigned char * resp, int len, int show_pcb)
+show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
     char * cp;
     char str[PCB_STR_LEN];
 
-    printf("Thin provisioning page (sbc-3) [0xc]\n");
+    printf("Logical block provisioning page (sbc-3) [0xc]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -2661,6 +2677,7 @@ show_thin_provisioning_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* SOLID_STATE_MEDIA_LPAGE */
 static void
 show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3561,8 +3578,8 @@ show_ascii_page(unsigned char * resp, int len,
     case 0xc:
         {
             switch (inq_dat->peripheral_type) {
-            case PDT_DISK:
-                show_thin_provisioning_page(resp, len, optsp->do_pcb);
+            case PDT_DISK: /* LB_PROV_LPAGE */
+                show_lb_provisioning_page(resp, len, optsp->do_pcb);
                 break;
             case PDT_TAPE: case PDT_PRINTER:
                 /* tape and (printer) type devices */
@@ -3644,7 +3661,7 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case PORT_SPECIFIC_LPAGE:
+    case PROTO_SPECIFIC_LPAGE:
         done = show_protocol_specific_page(resp, len, optsp);
         break;
     case STATS_LPAGE: /* defined for subpages 0 to 32 inclusive */
@@ -3822,7 +3839,7 @@ main(int argc, char * argv[])
                     "implying other pages\n");
             return SG_LIB_FILE_ERROR;
         }
-        opts.pg_code = PORT_SPECIFIC_LPAGE;
+        opts.pg_code = PROTO_SPECIFIC_LPAGE;
     }
     pg_len = 0;
 

@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.94 20101027";    /* SPC-4 rev 27 */
+static char * version_str = "0.94 20101030";    /* SPC-4 rev 27 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -84,7 +84,7 @@ static char * version_str = "0.94 20101027";    /* SPC-4 rev 27 */
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
 #define VPD_MAN_ASS_SN 0xb1 
-#define VPD_THIN_PROVISIONING 0xb2
+#define VPD_LB_PROVISIONING 0xb2
 #define VPD_REFERRALS 0xb3
 #define VPD_UPR_EMC 0xc0
 #define VPD_RDAC_VERS 0xc2
@@ -149,6 +149,8 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
     {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
+    {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv", "Logical block provisioning "
+     "(SBC)"},
     {VPD_POWER_CONDITION, 0, -1, 0, "po", "Power condition"},
     {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
      "information"},
@@ -159,7 +161,6 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (IBM)"},
     {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (IBM)"},
-    {VPD_THIN_PROVISIONING, 0, 0, 0, "thp", "Thin provisioning (SBC)"},
     {VPD_UPR_EMC, 0, -1, 1, "upr", "Unit path report (EMC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
@@ -654,7 +655,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_POWER_CONDITION, 0, "Power condition"},
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
-    {VPD_THIN_PROVISIONING, 0, "Thin provisioning (sbc3)"},
+    {VPD_LB_PROVISIONING, 0, "Logical block provisioning (sbc3)"},
     {VPD_REFERRALS, 0, "Referrals (sbc3)"},
     {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
     {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},

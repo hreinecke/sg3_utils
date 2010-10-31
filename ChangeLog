@@ -2,8 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.30 [20101027] [svn: r360]
+Changelog for sg3_utils-1.30 [20101031] [svn: r361]
   - sg_referrals: new utility for REPORT REFERRALS
+  - sbc3r25 renames 'thin' provisioning' to 'logical block
+    provisioning': changes in sg_format, sg_inq, sg_logs,
+    sg_modes, sg_readcap, sg_vpd
   - sg_inq: update version descriptor list to spc4r27
     - extended inquiry vpd page add extended self test
       completion minutes field

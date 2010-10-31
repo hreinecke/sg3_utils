@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.33 20100228";
+static char * version_str = "1.34 20101028";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -522,6 +522,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x5, 0x0, "Flexible geometry (obsolete)"},
     {0x7, 0x0, "Verify error recovery"},
     {0x8, 0x0, "Caching"},
+    {0xa, 0xf0, "Application tag"},
     {0xa, 0xf1, "Parallel ATA control (SAT)"},
     {0xa, 0xf2, "Reserved (SATA control) (SAT)"},
     {0xb, 0x0, "Medium types supported (obsolete)"},
@@ -530,7 +531,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x10, 0x0, "XOR control"},
     {0x1a, 0xf1, "ATA Power condition"},
     {0x1c, 0x1, "Background control"},
-    {0x1c, 0x2, "Thin provisioning"},
+    {0x1c, 0x2, "Logical block provisioning"},
 };
 
 static struct page_code_desc pc_desc_tape[] = {

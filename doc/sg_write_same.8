@@ -127,8 +127,8 @@ data out buffer length. If both this option and the \fIIF\fR option are
 given and \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR
 is the data out buffer length with zeroes used as pad bytes.
 .SH UNMAP
-Thin provisioning is the complicated term used in SBC\-3 revision 19
-for the ability to mark blocks as unused. It is closely related to the
+Logical block provisioning is the complicated term used in SBC\-3 revision
+27 for the ability to mark blocks as unused. It is closely related to the
 ATA DATA SET MANAGEMENT command with the "Trim" bit set. For large
 storage arrays, it is a way to provision less physical storage than the
 READ CAPACITY command reports is available, potentially allocating more
@@ -136,20 +136,20 @@ physical storage when WRITE commands require it. For flash memory it is
 a way of potentially saving power (and perhaps access time) when it is
 known large sections (or almost all) of the flash memory is not in use.
 .PP
-Support for thin provisioning is indicated by the TPE bit being set in
-the READ CAPACITY(16) command response. That implies at least one of
+Support for logical block provisioning is indicated by the LBPME bit being
+set in the READ CAPACITY(16) command response. That implies at least one of
 the UNMAP or WRITE SAME(16) commands is implemented. If the UNMAP command
 is implemented then the "Maximum unmap LBA count"
 and "Maximum unmap block descriptor count" fields in the Block Limits
 VPD page should both be greater than zero. The READ CAPACITY(16) command
-response also contains a TPRZ bit which if set means that if unmapped
+response also contains a LBPRZ bit which if set means that if unmapped
 blocks are read then zeroes will be returned for the data (and if
 protection information is active, 0xff bytes are returned for that).
 .PP
 When the UNMAP bit is set in the cdb then the data out buffer is also sent.
 Additionally the data section of that data out buffer should be full of 0x0
 bytes while the data protection block, 8 bytes at the end if present, should
-be set to 0xff bytes. If these conditions are not met and the TPRZ bit is
+be set to 0xff bytes. If these conditions are not met and the LBPRZ bit is
 set then the UNMAP bit is ignored and the data out buffer is written to the
 \fIDEVICE\fR as if the UNMAP bit was zero. In the absence of the
 \fI\-\-in=IF\fR option, this utility will attempt build a data out buffer
@@ -157,8 +157,8 @@ that meets the requirements for the UNMAP bit in the cdb to be acted on by
 the \fIDEVICE\fR. 
 .PP
 Logical blocks may also be unmapped by the SCSI UNMAP and FORMAT UNIT
-commands (see the sg_unmap and sg_format utilities). Support for
-thin provisioning is indicated by the TPE bit in the response to the
+commands (see the sg_unmap and sg_format utilities). Support for logical
+block provisioning is indicated by the LBPME bit in the response to the
 SCSI READ CAPACITY (16) command (see the sg_readcap utility).
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
