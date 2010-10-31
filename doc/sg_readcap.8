@@ -1,4 +1,4 @@
-.TH SG_READCAP "8" "September 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_READCAP "8" "October 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_readcap \- sends a SCSI READ CAPACITY command
 .SH SYNOPSIS
@@ -23,12 +23,12 @@ are counted origin zero (i.e. starting at block zero)). This is the source
 of many "off by one" errors.
 .PP
 The READ CAPACITY(16) response provides additional information not found in
-the READ CAPACITY(10) response. This includes protection and thin provisioning
-information, plus the number of logical blocks per physical block. So even
-though the media size may not exceed what READ CAPACITY(10) can show, it may
-still be useful to examine the response to READ CAPACITY(16). Sadly there
-are horrible SCSI command set implementations in the wild that crash when
-the READ CAPACITY(16) command is sent to them.
+the READ CAPACITY(10) response. This includes protection and logical block
+provisioning information, plus the number of logical blocks per physical
+block. So even though the media size may not exceed what READ CAPACITY(10)
+can show, it may still be useful to examine the response to READ
+CAPACITY(16). Sadly there are horrible SCSI command set implementations in
+the wild that crash when the READ CAPACITY(16) command is sent to them.
 .PP
 Device capacity is the product of the number of blocks by the block size.
 This utility outputs this figure in bytes, MiB (1048576 bytes per MiB)
@@ -155,7 +155,7 @@ outputs version string then exits.
 .SH AUTHORS
 Written by Douglas Gilbert
 .SH COPYRIGHT
-Copyright \(co 1999\-2009 Douglas Gilbert
+Copyright \(co 1999\-2010 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.62 20101011";    /* spc-4 rev 27 */
+const char * sg_lib_version_str = "1.63 20101028";    /* spc-4 rev 27 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -283,6 +283,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xb, 0, "Write(32)"},
     {0xc, 0, "Write an verify(32)"},
     {0xd, 0, "Write same(32)"},
+    {0xe, 0, "Orwrite(32)"},    /* added sbc3r25 */
     {0x1800, 0, "Receive credential"},
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},
@@ -1061,12 +1062,12 @@ const char * sg_lib_pdt_strs[] = {
     "processor",        /* often SAF-TE (seldom scanner) device */
     "write once optical disk",
     /* 5 */ "cd/dvd",
-    "scanner",			/* obsolete */
+    "scanner",                  /* obsolete */
     "optical memory device",
     "medium changer",
-    "communications",		/* obsolete */
-    /* 0xa */ "graphics [0xa]",	/* obsolete */
-    "graphics [0xb]",		/* obsolete */
+    "communications",           /* obsolete */
+    /* 0xa */ "graphics [0xa]", /* obsolete */
+    "graphics [0xb]",           /* obsolete */
     "storage array controller",
     "enclosure services device",
     "simplified direct access device",

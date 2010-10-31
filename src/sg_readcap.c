@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.84 20090422";
+static char * version_str = "3.85 20101030";
 
 #define ME "sg_readcap: "
 
@@ -489,7 +489,7 @@ int main(int argc, char * argv[])
             printf("   Protection: prot_en=%d, p_type=%d, p_i_exponent=%d\n",
                    !!(resp_buff[12] & 0x1), ((resp_buff[12] >> 1) & 0x7),
                    ((resp_buff[13] >> 4) & 0xf));
-            printf("   Thin provisioning: tpe=%d, tprz=%d\n",
+            printf("   Logical block provisioning: lbpme=%d, lbprz=%d\n",
                    !!(resp_buff[14] & 0x80), !!(resp_buff[14] & 0x40));
             if (opts.do_pmi)
                 printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
