@@ -1,13 +1,14 @@
-.TH SG_WRITE_SAME "8" "October 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_WRITE_SAME "8" "November 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
 .B sg_write_same
-[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-anchor\fR] [\fI\-\-grpnum=GN\fR]
-[\fI\-\-help\fR] [\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-lbdata\fR]
-[\fI\-\-num=NUM\fR] [\fI\-\-pbdata\fR] [\fI\-\-timeout=TO\fR]
-[\fI\-\-unmap\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-wrprotect=WPR\fR] [\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
+[\fI\-\-10\fR] [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-anchor\fR]
+[\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=IF\fR]
+[\fI\-\-lba=LBA\fR] [\fI\-\-lbdata\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-pbdata\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-unmap\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR]
+[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 Send the SCSI WRITE SAME (10, 16 or 32 byte) command to \fIDEVICE\fR. This
@@ -23,13 +24,17 @@ was not given) and the PROT_EN bit is set then the last 8 bytes are
 set to 0xff. If READ CAPACITY(16) fails then READ CAPACITY(10) is
 used to determine the block size.
 .PP
-By default WRITE SAME(10) is sent unless \fILBA\fR (plus \fINUM\fR)
-exceeds 32 bits or \fINUM\fR exceeds 65535. In these cases WRIT
-SAME(16) is sent.
+If neither \fI\-\-10\fR, \fI\-\-16\fR nor \fI\-\-32\fR is given then
+WRITE SAME(10) is sent unless one of the following conditions is met.
+If \fILBA\fR (plus \fINUM\fR) exceeds 32 bits, \fINUM\fR exceeds 65535,
+or the \fI\-\-unmap\fR option is given then WRITE SAME(16) is sent.
+The \fI\-\-10\fR, \fI\-\-16\fR and \fI\-\-32\fR options are mutually
+exclusive.
 .PP
 As of SBC\-3 revision 24 the UNMAP and ANCHOR bits are not supported by
 WRITE SAME (10). However there is a proposal to allow that case and
-this utility now allows those bits to be set for WRITE SAME (10).
+this utility now allows those bits to be set for WRITE SAME (10) when
+the \fI\-\-10\fR is given.
 .PP
 .B Take care:
 The WRITE SAME(10, 16 and 32) commands interpret a \fINUM\fR of zero
@@ -45,23 +50,24 @@ overwriting LBA 0 on /dev/sda with zeroes, at least one of the
 \fI\-\-in=IF\fR, \fI\-\-lba=LBA\fR or \fI\-\-num=NUM\fR options must be
 given. Obviously this utility can destroy a lot of user data so check the
 options carefully.
-.PP
-This utility is based SBC\-3 draft revision 19 found at http://www.t10.org .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-R\fR, \fB\-\-10\fR
+send a SCSI WRITE SAME (10) command to \fIDEVICE\fR. This option has been
+added to allow the \fI\-\-unmap\fR (and \fI\-\-anchor\fR) options to be
+set on the SCSI WRITE SAME (10) command. As of the SBC\-3 revision 25
+draft this has been proposed but hasn't be accepted.
+.TP
 \fB\-S\fR, \fB\-\-16\fR
-send a SCSI WRITE SAME (16) command to \fIDEVICE\fR. The default action (in
-the absence of this option and the \fI\-\-32\fR option) is to send a SCSI
-WRITE SAME (10) command.
+send a SCSI WRITE SAME (16) command to \fIDEVICE\fR.
 .TP
 \fB\-T\fR, \fB\-\-32\fR
-send a SCSI WRITE SAME (32) command to \fIDEVICE\fR. The default action (in
-the absence of this option and the \fI\-\-16\fR option) is to send a SCSI
-WRITE SAME (10) command.
+send a SCSI WRITE SAME (32) command to \fIDEVICE\fR.
 .TP
 \fB\-a\fR, \fB\-\-anchor\fR
 sets the ANCHOR bit in the cdb. Introduced in SBC\-3 revision 22.
+That draft requires the \fI\-\-unmap\fR option to also be specified.
 .TP
 \fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
 sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
@@ -128,7 +134,7 @@ given and \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR
 is the data out buffer length with zeroes used as pad bytes.
 .SH UNMAP
 Logical block provisioning is the complicated term used in SBC\-3 revision
-27 for the ability to mark blocks as unused. It is closely related to the
+25 for the ability to mark blocks as unused. It is closely related to the
 ATA DATA SET MANAGEMENT command with the "Trim" bit set. For large
 storage arrays, it is a way to provision less physical storage than the
 READ CAPACITY command reports is available, potentially allocating more
@@ -137,14 +143,15 @@ a way of potentially saving power (and perhaps access time) when it is
 known large sections (or almost all) of the flash memory is not in use.
 .PP
 Support for logical block provisioning is indicated by the LBPME bit being
-set in the READ CAPACITY(16) command response. That implies at least one of
-the UNMAP or WRITE SAME(16) commands is implemented. If the UNMAP command
-is implemented then the "Maximum unmap LBA count"
-and "Maximum unmap block descriptor count" fields in the Block Limits
-VPD page should both be greater than zero. The READ CAPACITY(16) command
-response also contains a LBPRZ bit which if set means that if unmapped
-blocks are read then zeroes will be returned for the data (and if
-protection information is active, 0xff bytes are returned for that).
+set in the READ CAPACITY(16) command response (see the sg_readcap utility).
+That implies at least one of the UNMAP or WRITE SAME(16) commands is
+implemented. If the UNMAP command is implemented then
+the "Maximum unmap LBA count" and "Maximum unmap block descriptor count"
+fields in the Block Limits VPD page should both be greater than zero. The
+READ CAPACITY(16) command response also contains a LBPRZ bit which if set
+means that if unmapped blocks are read then zeroes will be returned for the
+data (and if protection information is active, 0xff bytes are returned for
+that).
 .PP
 When the UNMAP bit is set in the cdb then the data out buffer is also sent.
 Additionally the data section of that data out buffer should be full of 0x0
@@ -157,9 +164,7 @@ that meets the requirements for the UNMAP bit in the cdb to be acted on by
 the \fIDEVICE\fR. 
 .PP
 Logical blocks may also be unmapped by the SCSI UNMAP and FORMAT UNIT
-commands (see the sg_unmap and sg_format utilities). Support for logical
-block provisioning is indicated by the LBPME bit in the response to the
-SCSI READ CAPACITY (16) command (see the sg_readcap utility).
+commands (see the sg_unmap and sg_format utilities).
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section

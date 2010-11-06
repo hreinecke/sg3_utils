@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.30 [20101031] [svn: r361]
+Changelog for sg3_utils-1.30 [20101105] [svn: r362]
   - sg_referrals: new utility for REPORT REFERRALS
   - sbc3r25 renames 'thin' provisioning' to 'logical block
     provisioning': changes in sg_format, sg_inq, sg_logs,
@@ -24,7 +24,7 @@ Changelog for sg3_utils-1.30 [20101031] [svn: r361]
     - treat bsg devices as implicit sg_io
   - sg_write_same: if READ CAPACITY(16) fails try 10 byte variant
     - anticipate approval of proposal to allow UNMAP and ANCHOR
-      bits to be set on WRITE SAME(10)
+      bits to be set on WRITE SAME(10) with '--10' option
   - sg3_utils man page: sections added for OS device names
 
 Changelog for sg3_utils-1.29 [20100406] [svn: r334]

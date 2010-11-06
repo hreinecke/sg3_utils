@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.97 20101025";
+static char * version_str = "0.98 20101104";
 
 
 #define ME "sg_write_same: "
@@ -49,6 +49,7 @@ static char * version_str = "0.97 20101025";
 #define EBUFF_SZ 256
 
 static struct option long_options[] = {
+    {"10", no_argument, 0, 'R'},
     {"16", no_argument, 0, 'S'},
     {"32", no_argument, 0, 'T'},
     {"anchor", no_argument, 0, 'a'},
@@ -82,6 +83,7 @@ struct opts_t {
     int wrprotect;
     int xfer_len;
     int pref_cdb_size;
+    int want_ws10;
 };
 
 
@@ -90,14 +92,16 @@ static void
 usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_write_same [--16] [--32] [--anchor] [--grpnum=GN] [--help] "
-          "[--in=IF]\n"
-          "                     [--lba=LBA] [--lbdata] [--num=NUM] "
-          "[--pbdata]\n"
+          "sg_write_same [--10] [--16] [--32] [--anchor] [--grpnum=GN] "
+          "[--help]\n"
+          "                     [--in=IF] [--lba=LBA] [--lbdata] "
+          "[--num=NUM] [--pbdata]\n"
           "                     [--timeout=TO] [--unmap] [--verbose] "
           "[--version]\n"
           "                     [--wrprotect=WRP] [xferlen=LEN] DEVICE\n"
           "  where:\n"
+          "    --10|-R              do WRITE SAME(10) (even if '--unmap' "
+          "is given)\n"
           "    --16|-S              do WRITE SAME(16) (def: 10 unless "
           "'--unmap' given\n"
           "                         or LBA+NUM needs more than 32 bits)\n"
@@ -144,7 +148,8 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     cdb_len = optsp->pref_cdb_size;
     if (WRITE_SAME10_LEN == cdb_len) {
         llba = optsp->lba + optsp->numblocks;
-        if ((optsp->numblocks > 0xffff) || (llba > ULONG_MAX)) {
+        if ((optsp->numblocks > 0xffff) || (llba > ULONG_MAX) ||
+            (optsp->unmap && (0 == optsp->want_ws10))) {
             cdb_len = WRITE_SAME16_LEN;
             if (optsp->verbose)
                 fprintf(stderr, "do_write_same: use WRITE SAME(16) instead "
@@ -158,8 +163,8 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     case WRITE_SAME10_LEN:
         wsCmdBlk[0] = WRITE_SAME10_OP;
         wsCmdBlk[1] = ((optsp->wrprotect & 0x7) << 5);
-        /* ANCHOR + UNMAP not allowed for WRITE_SAME10 in sbc3r24 but a
-         * proposal has been made to allow it. Anticipate approval. */
+        /* ANCHOR + UNMAP not allowed for WRITE_SAME10 in sbc3r24+r25 but
+         * a proposal has been made to allow it. Anticipate approval. */
         if (optsp->anchor)
             wsCmdBlk[1] |= 0x10;
         if (optsp->unmap)
@@ -319,7 +324,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ag:hi:l:Ln:PSt:TUvVw:x:", long_options,
+        c = getopt_long(argc, argv, "ag:hi:l:Ln:PRSt:TUvVw:x:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -366,7 +371,15 @@ main(int argc, char * argv[])
         case 'P':
             ++opts.pbdata;
             break;
+        case 'R':
+            ++opts.want_ws10;
+            break;
         case 'S':
+            if (DEF_WS_CDB_SIZE != opts.pref_cdb_size) {
+                fprintf(stderr, "only one '--10', '--16' or '--32' "
+                        "please\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             opts.pref_cdb_size = 16;
             break;
         case 't':
@@ -377,6 +390,11 @@ main(int argc, char * argv[])
             }
             break;
         case 'T':
+            if (DEF_WS_CDB_SIZE != opts.pref_cdb_size) {
+                fprintf(stderr, "only one '--10', '--16' or '--32' "
+                        "please\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             opts.pref_cdb_size = 32;
             break;
         case 'U':
@@ -420,6 +438,10 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+    if (opts.want_ws10 && (DEF_WS_CDB_SIZE != opts.pref_cdb_size)) {
+        fprintf(stderr, "only one '--10', '--16' or '--32' please\n");
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
