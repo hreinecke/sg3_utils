@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.97 20101028";    /* spc4r27 + sbc3r25 */
+static char * version_str = "0.98 20101102";    /* spc4r27 + sbc3r25 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -760,9 +760,11 @@ show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x16:
                 printf("%sTape diagnostic (ssc-3)\n", b);
+                done = 0;
                 break;
             case 0x17:
                 printf("%sVolume statistics (ssc-4)\n", b);
+                done = 0;
                 break;
             case 0x2d:
                 printf("%sCurrent service information (ssc-3)\n", b);
@@ -824,6 +826,11 @@ show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x15:
                 printf("%sService buffers information (adc)\n", b);
+                done = 0;
+                break;
+            case 0x16:
+                printf("%sTape diagnostic (adc)\n", b);
+                done = 0;
                 break;
             default:
                 done = 0;
