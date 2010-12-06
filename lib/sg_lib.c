@@ -317,7 +317,7 @@ sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
                           int * progress_outp)
 {
     const unsigned char * ucp;
-    int sk;
+    int sk, sk_pr;
 
     if (sb_len < 7)
         return 0;
@@ -336,13 +336,18 @@ sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
             return 0;
     case 0x72:
     case 0x73:
+        /* sense key specific progress (0x2) or progress descriptor (0xa) */
         sk = (sensep[1] & 0xf);
-        if ((SPC_SK_NO_SENSE != sk) && (SPC_SK_NOT_READY != sk))
-            return 0;
-        ucp = sg_scsi_sense_desc_find(sensep, sb_len, 2 /* sense key spec. */);
-        if (ucp && (0x6 == ucp[1]) && (0x80 & ucp[4])) {
+        sk_pr = (SPC_SK_NO_SENSE == sk) || (SPC_SK_NOT_READY == sk);
+        if (sk_pr && ((ucp = sg_scsi_sense_desc_find(sensep, sb_len, 2))) &&
+            (0x6 == ucp[1]) && (0x80 & ucp[4])) {
             if (progress_outp)
                 *progress_outp = (ucp[5] << 8) + ucp[6];
+            return 1;
+        } else if (((ucp = sg_scsi_sense_desc_find(sensep, sb_len, 0xa))) &&
+                   ((0x6 == ucp[1]))) {
+            if (progress_outp)
+                *progress_outp = (ucp[6] << 8) + ucp[7];
             return 1;
         } else
             return 0;
@@ -371,6 +376,12 @@ sg_get_trans_proto_str(int tpi, int buff_len, char * buff)
     return buff;
 }
 
+static const char * sdata_src[] = {
+    "unknown",
+    "Extended Copy command source device",
+    "Extended Copy command destination device",
+    };
+
 
 /* Print descriptor format sense descriptors (assumes sense buffer is
    in descriptor format) */
@@ -379,9 +390,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                              int buff_len, char * buff)
 {
     int add_sen_len, add_len, desc_len, k, j, sense_key, processed;
-    int n, progress;
+    int n, progress, pr, rem;
     const unsigned char * descp;
-    char b[256];
+    const char * dtsp = "   >> descriptor too short";
+    char b[800];
 
     if ((NULL == buff) || (buff_len <= 0))
         return;
@@ -393,7 +405,9 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
     sense_key = (sense_buffer[1] & 0xf);
     for (desc_len = 0, k = 0; k < add_sen_len; k += desc_len) {
         descp += desc_len;
-        add_len = (k < (add_sen_len - 1)) ? descp[1]: -1;
+        add_len = (k < (add_sen_len - 1)) ? descp[1] : -1;
+        if ((k + add_len + 2) > add_sen_len)
+            add_len = add_sen_len - k - 2;
         desc_len = add_len + 2;
         n = 0;
         n += sprintf(b + n, "  Descriptor type: ");
@@ -406,8 +420,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 for (j = 0; j < 8; ++j)
                     n += sprintf(b + n, "%02x", descp[4 + j]);
                 n += sprintf(b + n, "\n");
-            } else
+            } else {
+                n += sprintf(b + n, "%s\n", dtsp);
                 processed = 0;
+            }
             break;
         case 1:
             n += sprintf(b + n, "Command specific\n");
@@ -416,8 +432,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 for (j = 0; j < 8; ++j)
                     n += sprintf(b + n, "%02x", descp[4 + j]);
                 n += sprintf(b + n, "\n");
-            } else
+            } else {
+                n += sprintf(b + n, "%s\n", dtsp);
                 processed = 0;
+            }
             break;
         case 2:
             n += sprintf(b + n, "Sense key specific:");
@@ -425,6 +443,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             case SPC_SK_ILLEGAL_REQUEST:
                 n += sprintf(b + n, " Field pointer\n");
                 if (add_len < 6) {
+                    n += sprintf(b + n, "%s\n", dtsp);
                     processed = 0;
                     break;
                 }
@@ -441,6 +460,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             case SPC_SK_RECOVERED_ERROR:
                 n += sprintf(b + n, " Actual retry count\n");
                 if (add_len < 6) {
+                    n += sprintf(b + n, "%s\n", dtsp);
                     processed = 0;
                     break;
                 }
@@ -451,17 +471,19 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             case SPC_SK_NOT_READY:
                 n += sprintf(b + n, " Progress indication: ");
                 if (add_len < 6) {
+                    n += sprintf(b + n, "%s\n", dtsp);
                     processed = 0;
-                    n += sprintf(b + n, " field too short\n");
                     break;
                 }
                 progress = (descp[5] << 8) + descp[6];
-                n += sprintf(b + n, "%d %%\n",
-                        (progress * 100) / 0x10000);
+                pr = (progress * 100) / 65536;
+                rem = ((progress * 100) % 65536) / 655;
+                n += sprintf(b + n, "%d.%02d%%\n", pr, rem);
                 break;
             case SPC_SK_COPY_ABORTED:
                 n += sprintf(b + n, " Segment pointer\n");
                 if (add_len < 6) {
+                    n += sprintf(b + n, "%s\n", dtsp);
                     processed = 0;
                     break;
                 }
@@ -490,8 +512,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             n += sprintf(b + n, "Field replaceable unit\n");
             if (add_len >= 2)
                 n += sprintf(b + n, "    code=0x%x\n", descp[3]);
-            else
+            else {
+                n += sprintf(b + n, "%s\n", dtsp);
                 processed = 0;
+            }
             break;
         case 4:
             n += sprintf(b + n, "Stream commands\n");
@@ -504,16 +528,20 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     n += sprintf(b + n, "    Incorrect Length Indicator "
                             "(ILI)");
                 n += sprintf(b + n, "\n");
-            } else
+            } else {
+                n += sprintf(b + n, "%s\n", dtsp);
                 processed = 0;
+            }
             break;
         case 5:
             n += sprintf(b + n, "Block commands\n");
             if (add_len >= 2)
                 n += sprintf(b + n, "    Incorrect Length Indicator "
                         "(ILI) %s\n", (descp[3] & 0x20) ? "set" : "clear");
-            else
+            else {
+                n += sprintf(b + n, "%s\n", dtsp);
                 processed = 0;
+            }
             break;
         case 6:
             n += sprintf(b + n, "OSD object identification\n");
@@ -546,18 +574,22 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                                  descp[11], descp[9], descp[7]);
                 n += sprintf(b + n, "    device=0x%x  status=0x%x\n",
                         descp[12], descp[13]);
-            } else
+            } else {
+                n += sprintf(b + n, "%s\n", dtsp);
                 processed = 0;
+            }
             break;
         case 0xa:       /* Added in SPC-4 rev 17 */
             n += sprintf(b + n, "Progress indication\n");
             if (add_len < 6) {
+                n += sprintf(b + n, "%s\n", dtsp);
                 processed = 0;
-                n += sprintf(b + n, " field too short\n");
                 break;
             }
             progress = (descp[6] << 8) + descp[7];
-            n += sprintf(b + n, "    %d %%", (progress * 100) / 0x10000);
+            pr = (progress * 100) / 65536;
+            rem = ((progress * 100) % 65536) / 655;
+            n += sprintf(b + n, "    %d.02%d%%", pr, rem);
             n += sprintf(b + n, " [sense_key=0x%x asc,ascq=0x%x,0x%x]\n",
                          descp[2], descp[3], descp[4]);
             break;
@@ -565,6 +597,38 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             n += sprintf(b + n, "User data segment referral\n");
             /* Will decode if this 'feature' stays  xxxxxxxxxxxxx */
             processed = 0;
+            break;
+        case 0xc:       /* Added in SPC-4 rev 28 */
+            n += sprintf(b + n, "Forwarded sense data\n");
+            if (add_len < 2) {
+                n += sprintf(b + n, "%s\n", dtsp);
+                processed = 0;
+                break;
+            }
+            n += sprintf(b + n, "    FSDT: %s\n",
+                         (descp[2] & 0x80) ? "set" : "clear");
+            j = descp[2] & 0xf;
+            if (j < 3)
+                n += sprintf(b + n, "    Sense data source: %s\n",
+                             sdata_src[j]);
+            else
+                n += sprintf(b + n, "    Sense data source: reserved [%d]\n",
+                             j);
+            {
+                char c[200];
+
+                sg_get_scsi_status_str(descp[3], sizeof(c) - 1, c);
+                c[sizeof(c) - 1] = '\0';
+                n += sprintf(b + n, "    Forwarded status: %s\n", c);
+                if (add_len > 2) {
+                    /* recursing; hope not to get carried away */
+                    n += sprintf(b + n, " vvvvvvvvvvvvvvvv\n");
+                    sg_get_sense_str(NULL, descp + 4, add_len - 2, 0,
+                                     sizeof(c), c);
+                    n += sprintf(b + n, "%s", c);
+                    n += sprintf(b + n, " ^^^^^^^^^^^^^^^^\n");
+                }
+            }
             break;
         default:
             n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
@@ -575,8 +639,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
         if (! processed) {
             if (add_len > 0) {
                 n += sprintf(b + n, "    ");
-                for (j = 0; (j < add_len) && ((k + j + 2) < add_sen_len);
-                     ++j) {
+                for (j = 0; j < add_len; ++j) {
                     if ((j > 0) && (0 == (j % 24)))
                         n += sprintf(b + n, "\n    ");
                     n += sprintf(b + n, "%02x ", descp[j + 2]);
@@ -603,7 +666,7 @@ void
 sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                  int sb_len, int raw_sinfo, int buff_len, char * buff)
 {
-    int len, valid, progress, n, r;
+    int len, valid, progress, n, r, pr, rem;
     unsigned int info;
     int descriptor_format = 0;
     const char * error = NULL;
@@ -726,8 +789,10 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 case SPC_SK_NO_SENSE:
                 case SPC_SK_NOT_READY:
                     progress = (sense_buffer[16] << 8) + sense_buffer[17];
-                    r += sprintf(b + r, "  Progress indication: %d %%\n",
-                                (progress * 100) / 0x10000);
+                    pr = (progress * 100) / 65536;
+                    rem = ((progress * 100) % 65536) / 655;
+                    r += sprintf(b + r, "  Progress indication: %d.%02d%%\n",
+                                 pr, rem);
                     break;
                 case SPC_SK_HARDWARE_ERROR:
                 case SPC_SK_MEDIUM_ERROR:

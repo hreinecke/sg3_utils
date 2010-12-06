@@ -11,6 +11,7 @@ for Solaris.
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
+    sg_decode_sense
     sg_format
     sg_get_config
     sg_get_lba_status
@@ -134,4 +135,4 @@ disks to accept SCSI commands including the SCSI ATA PASS THROUGH commands.
 
 
 Doug Gilbert
-13th September 2010
+5th December 2010

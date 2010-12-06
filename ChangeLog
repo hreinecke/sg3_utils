@@ -2,8 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.31 [20101112] [svn: r364]
-  - xxxxxxxxxxxxx
+Changelog for sg3_utils-1.31 [20101205] [svn: r365]
+  - sg_decode_sense: new utility to decode sense data
+  - sync asc/ascq and version descriptors with spc4r28
+  - sg_lib: implement forwarded sense data descriptor
+  - sg_lib, sg_turs, sg_format: more precision for progress
+    indication (two places after decimal point)
 
 Changelog for sg3_utils-1.30 [20101111] [svn: r363]
   - sg_referrals: new utility for REPORT REFERRALS
@@ -21,7 +25,7 @@ Changelog for sg3_utils-1.30 [20101111] [svn: r363]
   - sg_vpd: rdac vendor page [0xc8] parse corrections
     - extended inquiry vpd page add extended self test
       completion minutes field
-  - sg_ses: expand --date (in) buffer to 2048 bytes
+  - sg_ses: expand --data (in) buffer to 2048 bytes
   - sg_opcodes: add extended parameter data for TMFs (spc4r26)
   - sg_dd: clean count calculation, document nocache flag
     - treat bsg devices as implicit sg_io

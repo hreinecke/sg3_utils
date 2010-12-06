@@ -8,9 +8,9 @@ if OS_LINUX
 # sg_scan is shared by Linux and Win32
 
 bin_PROGRAMS = \
-	sg_dd sg_emc_trespass sg_format sg_get_config sg_get_lba_status \
-	sg_ident sginfo sg_inq sg_logs sg_luns sg_map26 sg_map \
-	sgm_dd sg_modes sg_opcodes sgp_dd sg_persist sg_prevent \
+	sg_dd sg_decode_sense sg_emc_trespass sg_format sg_get_config \
+	sg_get_lba_status sg_ident sginfo sg_inq sg_logs sg_luns sg_map26 \
+	sg_map sgm_dd sg_modes sg_opcodes sgp_dd sg_persist sg_prevent \
 	sg_raw sg_rbuf sg_rdac sg_read sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_referrals \
 	sg_requests sg_reset sg_rmsn sg_rtpg sg_safte sg_sat_identify \
@@ -30,7 +30,7 @@ endif
 if OS_WIN32_MINGW
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_get_lba_status sg_ident \
+	sg_decode_sense sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
@@ -51,7 +51,7 @@ endif
 if OS_WIN32_CYGWIN
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_get_lba_status sg_ident \
+	sg_decode_sense sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
@@ -72,7 +72,7 @@ endif
 if OS_FREEBSD
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_get_lba_status sg_ident \
+	sg_decode_sense sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
@@ -87,7 +87,7 @@ endif
 if OS_SOLARIS
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_get_lba_status sg_ident \
+	sg_decode_sense sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
@@ -102,7 +102,7 @@ endif
 if OS_OSF
 
 bin_PROGRAMS = \
-	sg_format sg_get_config sg_get_lba_status sg_ident \
+	sg_decode_sense sg_format sg_get_config sg_get_lba_status sg_ident \
 	sg_inq sg_logs sg_luns sg_modes sg_opcodes sg_persist \
 	sg_prevent sg_raw sg_rdac sg_readcap sg_read_block_limits \
 	sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests \
@@ -119,6 +119,9 @@ AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 
 sg_dd_SOURCES =	sg_dd.c
 sg_dd_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_decode_sense_SOURCES =	sg_decode_sense.c
+sg_decode_sense_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_emc_trespass_SOURCES = sg_emc_trespass.c
 sg_emc_trespass_LDADD = ../lib/libsgutils2.la @os_libs@

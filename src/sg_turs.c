@@ -21,7 +21,7 @@
    data transfer (and no REQUEST SENSE command iff the unit is ready)
    then this can be used for timing per SCSI command overheads.
 
- * Copyright (C) 2000-2009 D. Gilbert
+ * Copyright (C) 2000-2010 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 
  */
 
-static char * version_str = "3.27 20090422";
+static char * version_str = "3.28 20101203";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -265,7 +265,7 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, res, progress;
+    int sg_fd, k, res, progress, pr, rem;
     int num_errs = 0;
     int reported = 0;
     int ret = 0;
@@ -310,9 +310,11 @@ int main(int argc, char * argv[])
             if (progress < 0) {
                 ret = res;
                 break;
-            } else
-                printf("Progress indication: %d%% done\n",
-                                (progress * 100) / 65536);
+            } else {
+                pr = (progress * 100) / 65536;
+                rem = ((progress * 100) % 65536) / 655;
+                printf("Progress indication: %d.%02d%% done\n", pr, rem);
+            }
         }
         if (opts.do_number > 1)
             printf("Completed %d Test Unit Ready commands\n",
