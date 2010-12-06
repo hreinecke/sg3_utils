@@ -34,7 +34,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@bin_PROGRAMS = sg_decode_sense$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_get_config$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_get_lba_status$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_ident$(EXEEXT) \
@@ -74,7 +75,8 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_wr_mode$(EXEEXT)
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@bin_PROGRAMS = sg_decode_sense$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_get_config$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_get_lba_status$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_ident$(EXEEXT) \
@@ -114,7 +116,8 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_wr_mode$(EXEEXT)
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@bin_PROGRAMS = sg_decode_sense$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_get_config$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_get_lba_status$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_ident$(EXEEXT) \
@@ -153,7 +156,8 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_wr_mode$(EXEEXT)
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@bin_PROGRAMS = sg_decode_sense$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_get_config$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_get_lba_status$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_ident$(EXEEXT) \
@@ -193,6 +197,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_wr_mode$(EXEEXT)
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@bin_PROGRAMS = sg_dd$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_decode_sense$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_emc_trespass$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_format$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_get_config$(EXEEXT) \
@@ -243,8 +248,8 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_same$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_wr_mode$(EXEEXT)
-@OS_FREEBSD_TRUE@bin_PROGRAMS = sg_format$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_get_config$(EXEEXT) \
+@OS_FREEBSD_TRUE@bin_PROGRAMS = sg_decode_sense$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_format$(EXEEXT) sg_get_config$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_get_lba_status$(EXEEXT) sg_ident$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_inq$(EXEEXT) sg_logs$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
@@ -281,6 +286,9 @@ PROGRAMS = $(bin_PROGRAMS)
 am_sg_dd_OBJECTS = sg_dd.$(OBJEXT)
 sg_dd_OBJECTS = $(am_sg_dd_OBJECTS)
 sg_dd_DEPENDENCIES = ../lib/libsgutils2.la
+am_sg_decode_sense_OBJECTS = sg_decode_sense.$(OBJEXT)
+sg_decode_sense_OBJECTS = $(am_sg_decode_sense_OBJECTS)
+sg_decode_sense_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_emc_trespass_OBJECTS = sg_emc_trespass.$(OBJEXT)
 sg_emc_trespass_OBJECTS = $(am_sg_emc_trespass_OBJECTS)
 sg_emc_trespass_DEPENDENCIES = ../lib/libsgutils2.la
@@ -444,14 +452,14 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
-	$(sg_format_SOURCES) $(sg_get_config_SOURCES) \
-	$(sg_get_lba_status_SOURCES) $(sg_ident_SOURCES) \
-	$(sg_inq_SOURCES) $(sg_logs_SOURCES) $(sg_luns_SOURCES) \
-	$(sg_map_SOURCES) $(sg_map26_SOURCES) $(sg_modes_SOURCES) \
-	$(sg_opcodes_SOURCES) $(sg_persist_SOURCES) \
-	$(sg_prevent_SOURCES) $(sg_raw_SOURCES) $(sg_rbuf_SOURCES) \
-	$(sg_rdac_SOURCES) $(sg_read_SOURCES) \
+SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
+	$(sg_emc_trespass_SOURCES) $(sg_format_SOURCES) \
+	$(sg_get_config_SOURCES) $(sg_get_lba_status_SOURCES) \
+	$(sg_ident_SOURCES) $(sg_inq_SOURCES) $(sg_logs_SOURCES) \
+	$(sg_luns_SOURCES) $(sg_map_SOURCES) $(sg_map26_SOURCES) \
+	$(sg_modes_SOURCES) $(sg_opcodes_SOURCES) \
+	$(sg_persist_SOURCES) $(sg_prevent_SOURCES) $(sg_raw_SOURCES) \
+	$(sg_rbuf_SOURCES) $(sg_rdac_SOURCES) $(sg_read_SOURCES) \
 	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
@@ -466,14 +474,14 @@ SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
 	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
 	$(sg_write_same_SOURCES) $(sginfo_SOURCES) $(sgm_dd_SOURCES) \
 	$(sgp_dd_SOURCES)
-DIST_SOURCES = $(sg_dd_SOURCES) $(sg_emc_trespass_SOURCES) \
-	$(sg_format_SOURCES) $(sg_get_config_SOURCES) \
-	$(sg_get_lba_status_SOURCES) $(sg_ident_SOURCES) \
-	$(sg_inq_SOURCES) $(sg_logs_SOURCES) $(sg_luns_SOURCES) \
-	$(sg_map_SOURCES) $(sg_map26_SOURCES) $(sg_modes_SOURCES) \
-	$(sg_opcodes_SOURCES) $(sg_persist_SOURCES) \
-	$(sg_prevent_SOURCES) $(sg_raw_SOURCES) $(sg_rbuf_SOURCES) \
-	$(sg_rdac_SOURCES) $(sg_read_SOURCES) \
+DIST_SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
+	$(sg_emc_trespass_SOURCES) $(sg_format_SOURCES) \
+	$(sg_get_config_SOURCES) $(sg_get_lba_status_SOURCES) \
+	$(sg_ident_SOURCES) $(sg_inq_SOURCES) $(sg_logs_SOURCES) \
+	$(sg_luns_SOURCES) $(sg_map_SOURCES) $(sg_map26_SOURCES) \
+	$(sg_modes_SOURCES) $(sg_opcodes_SOURCES) \
+	$(sg_persist_SOURCES) $(sg_prevent_SOURCES) $(sg_raw_SOURCES) \
+	$(sg_rbuf_SOURCES) $(sg_rdac_SOURCES) $(sg_read_SOURCES) \
 	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
@@ -609,6 +617,8 @@ AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 # AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c99
 sg_dd_SOURCES = sg_dd.c
 sg_dd_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_decode_sense_SOURCES = sg_decode_sense.c
+sg_decode_sense_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_emc_trespass_SOURCES = sg_emc_trespass.c
 sg_emc_trespass_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_format_SOURCES = sg_format.c
@@ -789,6 +799,9 @@ clean-binPROGRAMS:
 sg_dd$(EXEEXT): $(sg_dd_OBJECTS) $(sg_dd_DEPENDENCIES) 
 	@rm -f sg_dd$(EXEEXT)
 	$(LINK) $(sg_dd_OBJECTS) $(sg_dd_LDADD) $(LIBS)
+sg_decode_sense$(EXEEXT): $(sg_decode_sense_OBJECTS) $(sg_decode_sense_DEPENDENCIES) 
+	@rm -f sg_decode_sense$(EXEEXT)
+	$(LINK) $(sg_decode_sense_OBJECTS) $(sg_decode_sense_LDADD) $(LIBS)
 sg_emc_trespass$(EXEEXT): $(sg_emc_trespass_OBJECTS) $(sg_emc_trespass_DEPENDENCIES) 
 	@rm -f sg_emc_trespass$(EXEEXT)
 	$(LINK) $(sg_emc_trespass_OBJECTS) $(sg_emc_trespass_LDADD) $(LIBS)
@@ -947,6 +960,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_dd.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_decode_sense.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_emc_trespass.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_format.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_get_config.Po@am__quote@

@@ -45,7 +45,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.18 20101030";
+static char * version_str = "1.19 20101203";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -54,9 +54,10 @@ static char * version_str = "1.18 20101030";
 #define THIS_MPAGE_EXISTS RW_ERROR_RECOVERY_PAGE
 
 #define SHORT_TIMEOUT           20   /* 20 seconds unless immed=0 ... */
-#define FORMAT_TIMEOUT          (4 * 3600)       /* 4 hours ! */
+#define FORMAT_TIMEOUT          (15 * 3600)       /* 15 hours ! */
+                        /* Seagate ST32000444SS 2TB disk takes 9.5 hours */
 
-#define POLL_DURATION_SECS 30
+#define POLL_DURATION_SECS 60
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -168,7 +169,7 @@ static int
 scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
             int dcrt, int pie, int si, int early, int verbose)
 {
-        int res, need_hdr, progress, verb, fmt_pl_sz, longlist, off;
+        int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
@@ -241,10 +242,12 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                 progress = -1;
                 res = sg_ll_test_unit_ready_progress(fd, 0, &progress, 0,
                                                      verb);
-                if (progress >= 0)
-                        printf("Format in progress, %d%% done\n",
-                                (progress * 100) / 65536);
-                else
+                if (progress >= 0) {
+                        pr = (progress * 100) / 65536;
+                        rem = ((progress * 100) % 65536) / 655;
+                        printf("Format in progress, %d.%02d%% done\n",
+                               pr, rem);
+                } else
                         break;
         }
         printf("FORMAT Complete\n");

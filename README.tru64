@@ -8,6 +8,7 @@ beyond the SCSI command pass through mechanism.
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
+    sg_decode_sense
     sg_format
     sg_get_config
     sg_get_lba_status
@@ -91,4 +92,4 @@ subdirectory. Currently only the Tru64 port uses it.
 
 
 Doug Gilbert
-13th September 2010
+5th December 2010

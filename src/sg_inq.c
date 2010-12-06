@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.94 20101030";    /* SPC-4 rev 27 */
+static char * version_str = "0.95 20101116";    /* SPC-4 rev 28 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0

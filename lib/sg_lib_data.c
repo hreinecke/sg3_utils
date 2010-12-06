@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.63 20101028";    /* spc-4 rev 27 */
+const char * sg_lib_version_str = "1.65 20101205";    /* spc-4 rev 28 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -471,6 +471,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x10,0x02,"Logical block application tag check failed"},
     {0x10,0x03,"Logical block reference tag check failed"},
     {0x10,0x04,"Logical block protection error on recover buffered data"},
+    {0x10,0x05,"Logical block protection method error"},
     {0x11,0x00,"Unrecovered read error"},
     {0x11,0x01,"Read retries exhausted"},
     {0x11,0x02,"Error too long to correct"},
