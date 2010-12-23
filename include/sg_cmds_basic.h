@@ -232,15 +232,16 @@ extern const char * sg_cmds_version();
 
 struct sg_pt_base;
 
-/* This is an internal worker used by both sg_cmds_basic and sg_cmds_extra */
-/* Returns -2 for sense data (may not be fatal), -1 for failed or the
-   number of bytes fetched. For data out (to device) or no data, set
-   'mx_resp_len' to 0 or less. If -2 returned then sense category
-   output via 'o_sense_cat' pointer (if not NULL). Outputs to
-   sg_warnings_strm (def: stderr) if problems; depending on 'noisy'
-   and 'verbose' settings */
+/* This is a helper function used by all sg_cmds_* implementations.
+ * If valid sense data is found it is decoded and output to sg_warnings_strm
+ * (def: stderr); depending on the 'noisy' and 'verbose' settings.
+ * Returns -2 for sense data (may not be fatal), -1 for failed or the
+ * number of data in bytes received. For data out (to device) or no data,
+ * set 'mx_di_len' to 0 or less. If -2 returned then sense category
+ * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
+ * categories also have data in bytes received; -2 is still returned. */
 extern int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
-                                int res, int mx_resp_len,
+                                int res, int mx_di_len,
                                 const unsigned char * sense_b, int noisy,
                                 int verbose, int * o_sense_cat);
 
