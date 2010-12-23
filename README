@@ -169,7 +169,10 @@ them in the parent directory. In debian based systems doing
 a 'apt-get install build-essential' is one way to get most of build
 environment needed if it has not already been loaded. There are now some
 problems with this script and the superseded Debian 4.0 ("etch"). See
-debian/README.debian4 for a workaround.
+debian/README.debian4 for a workaround. Amongst other things debian
+builds are sensitive to the value in the debian/compat file. If it
+contains "7" then it works on lenny and gives warning on squeeze (but
+fails on the earlier etch).
 
 Warning
 =======
@@ -345,4 +348,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-5th December 2010
+22nd December 2010

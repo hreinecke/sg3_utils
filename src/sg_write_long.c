@@ -16,7 +16,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2009 D. Gilbert
+   *  Copyright (C) 2004-2010 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
    This code was contributed by Saeed Bishara
 */
 
-static char * version_str = "1.17 20090420";
+static char * version_str = "1.18 20101215";
 
 
 #define MAX_XFER_LEN 10000
@@ -85,7 +85,9 @@ usage()
           "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000) "
           "(default:\n"
           "                             520 bytes)\n\n"
-          "Performs a SCSI WRITE LONG (10 or 16) command\n"
+          "Performs a SCSI WRITE LONG (10 or 16) command. Writes a single "
+          "block\nincluding associated ECC data. Valid data can be obtained "
+          "from the\nSCSI READ LONG command. See the sg_read_long utility.\n"
           );
 }
 

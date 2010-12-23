@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.49 20100331";
+static char * version_str = "1.50 20101222";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -106,18 +106,21 @@ sg_cmds_close_device(int device_fd)
 }
 
 
-/* Returns -2 for sense data (may not be fatal), -1 for failed or the
-   number of bytes fetched. For data out (to device) or no data, set
-   'mx_resp_len' to 0 or less. If -2 returned then sense category
-   output via 'o_sense_cat' pointer (if not NULL). Outputs to
-   sg_warnings_strm (def: stderr) if problems; depending on 'noisy'
-   and 'verbose' */
+/* This is a helper function used by all sg_cmds_* implementations.
+ * If valid sense data is found it is decoded and output to sg_warnings_strm
+ * (def: stderr); depending on the 'noisy' and 'verbose' settings.
+ * Returns -2 for sense data (may not be fatal), -1 for failed, or the
+ * number of data in bytes received. For data out (to device) or no data,
+ * set 'mx_di_len' to 0 or less. If -2 returned then sense category
+ * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
+ * categories also have data in bytes received; -2 is still returned. */
 int
 sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
-                     int mx_resp_len, const unsigned char * sense_b,
+                     int mx_di_len, const unsigned char * sense_b,
                      int noisy, int verbose, int * o_sense_cat)
 {
     int got, cat, duration, slen, scat, n, resid;
+    int check_data_in = 0;
     char b[1024];
 
     if (NULL == leadin)
@@ -136,14 +139,14 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
     }
     if ((verbose > 2) && ((duration = get_scsi_pt_duration_ms(ptvp)) >= 0))
         fprintf(sg_warnings_strm, "      duration=%d ms\n", duration);
-    resid = (mx_resp_len > 0) ? get_scsi_pt_resid(ptvp) : 0;
+    resid = (mx_di_len > 0) ? get_scsi_pt_resid(ptvp) : 0;
     switch ((cat = get_scsi_pt_result_category(ptvp))) {
     case SCSI_PT_RESULT_GOOD:
-        if (mx_resp_len > 0) {
-            got = mx_resp_len - resid;
+        if (mx_di_len > 0) {
+            got = mx_di_len - resid;
             if (verbose && (resid > 0))
                 fprintf(sg_warnings_strm, "    %s: requested %d bytes but "
-                        "got %d bytes\n", leadin, mx_resp_len, got);
+                        "got %d bytes\n", leadin, mx_di_len, got);
             return got;
         } else
             return 0;
@@ -168,6 +171,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
             break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_MEDIUM_HARD:
+            ++check_data_in;
         default:
             n = noisy;
             break;
@@ -176,12 +180,12 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
             sg_get_sense_str(leadin, sense_b, slen, (verbose > 1),
                              sizeof(b), b);
             fprintf(sg_warnings_strm, "%s", b);
-        }
-        if (verbose && (mx_resp_len > 0) && (resid > 0)) {
-            got = mx_resp_len - resid;
-            if ((verbose > 2) || (got > 0))
-                fprintf(sg_warnings_strm, "    requested %d bytes but "
-                        "got %d bytes\n", mx_resp_len, got);
+            if ((mx_di_len > 0) && (resid > 0)) {
+                got = mx_di_len - resid;
+                if ((verbose > 2) || check_data_in || (got > 0))
+                    fprintf(sg_warnings_strm, "    requested %d bytes but "
+                            "got %d bytes\n", mx_di_len, got);
+            }
         }
         if (o_sense_cat)
             *o_sense_cat = scat;

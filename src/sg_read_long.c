@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.17 20100424";
+static char * version_str = "1.18 20101215";
 
 #define MAX_XFER_LEN 10000
 
@@ -78,7 +78,8 @@ usage()
           " exit\n"
           "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000)"
           " default 520\n\n"
-          "Perform a SCSI READ LONG (10 or 16) command\n"
+          "Perform a SCSI READ LONG (10 or 16) command. Reads a single "
+          "block with\nassociated ECC data. User data could be scrambled.\n"
           );
 }
 
