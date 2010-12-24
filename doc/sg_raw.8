@@ -1,4 +1,4 @@
-.TH SG_RAW "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_RAW "8" "December 2010" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_raw \- sends an arbitrary SCSI command to a device
 .SH SYNOPSIS
@@ -102,10 +102,10 @@ the "data" buffer (i.e. mode 2) then write it to the o512.bin file.
 When used in conjunction with the previous example, if both commands
 work then 'cmp i512.bin o512.bin' should show a match.
 .TP
-sg_raw --infile=urandom.bin --send=512 --request=512 --outfile=out.bin "/dev/bsg/7:0:0:0" 53 00 00 00 00 00 00 00 01 00
+sg_raw \-\-infile=urandom.bin \-\-send=512 \-\-request=512 \-\-outfile=out.bin "/dev/bsg/7:0:0:0" 53 00 00 00 00 00 00 00 01 00
 This is a bidirectional XDREADWRITE(10) command being sent via a Linux
 bsg device. Note that data is being read from "urandom.bin" and sent
-to the device (data-out) while resulting data (data-in) is placed
+to the device (data\-out) while resulting data (data\-in) is placed
 in the "out.bin" file. Also note the length of both is 512 bytes
 which corresponds to the transfer length of 1 (block) in the cdb (i.e.
 the second last byte).
