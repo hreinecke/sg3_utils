@@ -87,7 +87,7 @@ a running system.
 .PP
 There is also a SCSI device driver which offers alternate generic access
 to SCSI devices. It uses names of the form /dev/sg<num> where <num> starts
-at zero. The "lsscsi -g" command may be useful in finding these and which
+at zero. The "lsscsi \-g" command may be useful in finding these and which
 generic name corresponds to a device type name (e.g. /dev/sg2 may
 correspond to /dev/sda). In the lk 2.6 series a block SCSI generic
 driver was introduced and its names are of the form 
@@ -164,7 +164,7 @@ And these device names are duplicated in the /dev/dsk and /dev/rdsk
 directories. The former is the block device name and the latter is
 for "raw" (or char device) access which is what sg3_utils needs. So in
 OpenSolaris something of the form 'sg_inq /dev/rdsk/c5t4d3p0' should work.
-If it doesn't work then add a '-vvv' option for more debug information.
+If it doesn't work then add a '\-vvv' option for more debug information.
 Trying this form 'sg_inq /dev/dsk/c5t4d3p0' (note "rdsk" changed to "dsk")
 will result in an "inappropriate ioctl for device" error.
 .PP
@@ -180,9 +180,9 @@ form /dev/scsi/c5t4d3 .
 .PP
 Listing available SCSI devices in Solaris seems to be a challenge. "Use
 the 'format' command" advice works but seems a very dangerous way to list
-devices. [It does prompt again before doing any damage.] 'devfsadm -Cv'
+devices. [It does prompt again before doing any damage.] 'devfsadm \-Cv'
 cleans out the clutter in the /dev/rdsk directory, only leaving what
-is "live". The "cfgadm -v" command looks promising.
+is "live". The "cfgadm \-v" command looks promising.
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
