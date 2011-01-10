@@ -23,7 +23,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2010 D. Gilbert
+*  Copyright (C) 2000-2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.95 20101116";    /* SPC-4 rev 28 */
+static char * version_str = "0.96 20110110";    /* SPC-4 rev 28 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -254,10 +254,12 @@ usage()
             "    --raw|-r        output response in binary (to stdout)\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string then exit\n"
-            "    --vpd|-e        vital product data (set page with\n"
-            "                    '--page=PG')\n\n"
-            "Performs a SCSI INQUIRY command.\n"
-            "If no options given then does a 'standard' INQUIRY.\n");
+            "    --vpd|-e        vital product data (set page with "
+            "'--page=PG')\n\n"
+            "Performs a SCSI INQUIRY command. "
+            "If no options given then does a\n'standard' INQUIRY. Can list "
+            "VPD pages with '--vpd' or '--page=PG'\noption. The sg_vpd "
+            "utility has a more up to date list of VPD pages.\n");
 }
 
 static void

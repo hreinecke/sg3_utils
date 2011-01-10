@@ -1,4 +1,4 @@
-.TH SG_START "8" "July 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_START "8" "January 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_start \- send SCSI START STOP UNIT command to start, stop, load or
 eject medium
@@ -158,7 +158,11 @@ to stop (spin down) a disk may not be sufficient and other mechanisms
 will start the disk again some time later. The user might additionally
 mark the disk as "offline" with 'echo offline > /sys/block/sda/device/state'
 where sda is the block name of the disk. To restart the disk "offline"
-can be replaced with "running".
+can be replaced with "running". Note that once the 'state' is set to
+offline, no SCSI commands can be sent to the device until it is set back
+to running. Also stopping a disk via a pass\-through
+interface (e.g. /dev/sg1 or /dev/bsg/1:0:0:0) may reduce unwanted side
+effects (such as restarting it again when this utility completes).
 .SH EXIT STATUS
 The exit status of sg_start is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -254,7 +258,7 @@ Written by K. Garloff and D. Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2010 Kurt Garloff, Douglas Gilbert
+Copyright \(co 2002\-2011 Kurt Garloff, Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
