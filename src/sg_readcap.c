@@ -16,7 +16,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2009 D. Gilbert
+*  Copyright (C) 1999 - 2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.85 20101030";
+static char * version_str = "3.86 20110121";
 
 #define ME "sg_readcap: "
 
@@ -87,7 +87,8 @@ static void usage()
             "--long)\n"
             "    --pmi|-p        partial medium indicator (without this "
             "option shows\n"
-            "                    total disk capacity)\n"
+            "                    total disk capacity) [made obsolete in "
+	    "sbc3r26]\n"
             "    --raw|-r        output response in binary to stdout\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.46 20101030";    /* spc4r27 + sbc3r25 */
+static char * version_str = "0.47 20110122";    /* spc4r29 + sbc3r26 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1325,6 +1325,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                     "short=%d\n", len);
             return;
         }
+        printf("  Write same no zero (WSNZ): %d\n", !!(buff[4] & 0x1));
         printf("  Maximum compare and write length: %u blocks\n",
                buff[5]);
         u = (buff[6] << 8) | buff[7];
@@ -1350,6 +1351,9 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Maximum unmap block descriptor count: %u\n", u);
         }
         if (len > 35) {     /* added in sbc3r19 */
+            int m;
+            uint64_t mwsl;
+
             u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
                 (buff[30] << 8) | buff[31];
             printf("  Optimal unmap granularity: %u\n", u);
@@ -1358,6 +1362,15 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             u = ((unsigned int)(buff[32] & 0x7f) << 24) | (buff[33] << 16) |
                 (buff[34] << 8) | buff[35];
             printf("  Unmap granularity alignment: %u\n", u);
+            /* added in sbc3r26 */
+            mwsl = 0;
+            for (m = 0; m < 8; ++m) {
+                if (m > 0)
+                    mwsl <<= 8;
+                mwsl |= buff[36 + m];
+            }
+            printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
+                   mwsl);
         }
         break;
     case 1: case 8:
@@ -1440,28 +1453,21 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 static int
 decode_block_lb_prov_vpd(unsigned char * b, int len)
 {
-    int dp, anc_sup;
+    int dp;
 
     if (len < 4) {
         fprintf(stderr, "Logical block provisioning page too short=%d\n",
                 len);
         return SG_LIB_CAT_MALFORMED;
     }
-    printf("  Unmap supported (TPU): %d\n", !!(0x80 & b[5]));
-    printf("  Write same with unmap supported (TPWS): %d\n", !!(0x40 & b[5]));
-    anc_sup = (b[5] >> 1) & 0x7;
-    switch (anc_sup) {
-    case 0:
-        printf("  Anchored LBAs not supported\n");
-        break;
-    case 1:
-        printf("  Anchored LBAs supported\n");
-        break;
-    default:
-        printf("  Anchored LBAs support reserved [%d]\n", anc_sup);
-        break;
-    }
+    printf("  Unmap command supported (LBPU): %d\n", !!(0x80 & b[5]));
+    printf("  Write same (16) with unmap bit supported (LBWS): %d\n",
+           !!(0x40 & b[5]));
+    printf("  Write same (10) with unmap bit supported (LBWS10): %d\n",
+           !!(0x20 & b[5]));
+    printf("  Anchored LBAs supported (ANC_SUP): %d\n", !!(0x2 & b[5]));
     dp = !!(b[5] & 0x1);
+    // sbc3r26 refers to a provisioning type field but not shown in page
     printf("  Threshold exponent: %d\n", b[4]);
     printf("  Descriptor present (DP): %d\n", dp);
     if (dp) {

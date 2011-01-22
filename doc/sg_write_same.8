@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "November 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_WRITE_SAME "8" "January 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -31,10 +31,11 @@ or the \fI\-\-unmap\fR option is given then WRITE SAME(16) is sent.
 The \fI\-\-10\fR, \fI\-\-16\fR and \fI\-\-32\fR options are mutually
 exclusive.
 .PP
-As of SBC\-3 revision 24 the UNMAP and ANCHOR bits are not supported by
-WRITE SAME (10). However there is a proposal to allow that case and
-this utility now allows those bits to be set for WRITE SAME (10) when
-the \fI\-\-10\fR is given.
+In SBC\-3 revision 26 the UNMAP and ANCHOR bits were added to the
+WRITE SAME (10) command. Since the UNMAP bit has been in WRITE SAME (16)
+and WRITE SAME (32) since SBC\-3 revision 18, the lower of the two (i.e.
+WRITE SAME (16)) is the default when the \fI\-\-unmap\fR option is given.
+To send WRITE SAME (10) use the \fI\-\-10\fR option.
 .PP
 .B Take care:
 The WRITE SAME(10, 16 and 32) commands interpret a \fINUM\fR of zero
@@ -43,7 +44,17 @@ as write to the end of \fIDEVICE\fR. This utility defaults \fINUM\fR to
 large (or zero) then an invocation of this utility could take a long
 time, potentially as long as a FORMAT UNIT command. In such situations
 the command timeout value \fITO\fR may need to be increased from its
-default value of 60 seconds.
+default value of 60 seconds. In SBC\-3 revision 26 the WSNZ (write same
+no zero) bit was added to the Block Limits VPD page [0xB0]. If set the
+WRITE SAME commands will not accepts a \fINUM\fR of zero. The same
+SBC\-3 revision added the "Maximum Write Same Length" field to the Block
+Limits VPD page.
+.PP
+The Logical Block Provisioning VPD page [0xB2] contains the LBWS and
+LBW10 bits. If LBWS is set then WRITE SAME (16) supports the UNMAP bit.
+If LBWS10 is set then WRITE SAME (10) supports the UNMAP bit. If either
+LBWS or LBWS10 is set and the WRITE SAME (32) is supported then WRITE
+SAME (32) supports the UNMAP bit. This is as of SBC\-3 revision 26.
 .PP
 As a precaution against an accidental 'sg_write_same /dev/sda' (for example)
 overwriting LBA 0 on /dev/sda with zeroes, at least one of the
@@ -54,10 +65,9 @@ options carefully.
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-R\fR, \fB\-\-10\fR
-send a SCSI WRITE SAME (10) command to \fIDEVICE\fR. This option has been
-added to allow the \fI\-\-unmap\fR (and \fI\-\-anchor\fR) options to be
-set on the SCSI WRITE SAME (10) command. As of the SBC\-3 revision 25
-draft this has been proposed but hasn't be accepted.
+send a SCSI WRITE SAME (10) command to \fIDEVICE\fR. The ability to
+set the \fI\-\-unmap\fR (and \fI\-\-anchor\fR) options to this command
+was added in SBC\-3 revision 26.
 .TP
 \fB\-S\fR, \fB\-\-16\fR
 send a SCSI WRITE SAME (16) command to \fIDEVICE\fR.
@@ -133,7 +143,7 @@ data out buffer length. If both this option and the \fIIF\fR option are
 given and \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR
 is the data out buffer length with zeroes used as pad bytes.
 .SH UNMAP
-Logical block provisioning is the complicated term used in SBC\-3 revision
+Logical block provisioning is a new term introduced in SBC\-3 revision
 25 for the ability to mark blocks as unused. It is closely related to the
 ATA DATA SET MANAGEMENT command with the "Trim" bit set. For large
 storage arrays, it is a way to provision less physical storage than the
