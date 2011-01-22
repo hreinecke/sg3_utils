@@ -1,4 +1,4 @@
-.TH SG_READCAP "8" "October 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_READCAP "8" "January 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_readcap \- sends a SCSI READ CAPACITY command
 .SH SYNOPSIS
@@ -66,6 +66,7 @@ will yield the last block address after \fILBA\fR prior to a delay. For a
 disk, given a \fILBA\fR it yields the highest numbered block on the same
 cylinder (i.e. before the heads need to move). \fILBA\fR is assumed to be
 decimal unless prefixed by "0x" or it has a trailing "h". Defaults to 0.
+This option was made obsolete in SBC\-3 revision 26.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 Use the 16 byte cdb variant of the READ CAPACITY command. The default
@@ -85,7 +86,8 @@ switch to older style options.
 partial medium indicator: for finding the next block address prior to
 some delay (e.g. head movement). In the absence of this option, the
 total number of blocks and the block size of the device are output.
-Used in conjunction with the \fI\-\-lba=LBA\fR option.
+Used in conjunction with the \fI\-\-lba=LBA\fR option. This option was
+made obsolete in SBC\-3 revision 26.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary to stdout.
@@ -155,7 +157,7 @@ outputs version string then exits.
 .SH AUTHORS
 Written by Douglas Gilbert
 .SH COPYRIGHT
-Copyright \(co 1999\-2010 Douglas Gilbert
+Copyright \(co 1999\-2011 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

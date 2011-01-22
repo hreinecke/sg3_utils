@@ -79,8 +79,8 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Mon Jan 10 2011 - dgilbert at interlog dot com
-- add sg_decode_sense
+* Sat Jan 22 2011 - dgilbert at interlog dot com
+- add sg_decode_sense; track t10 changes
   * sg3_utils-1.31
 
 * Fri Nov 05 2010 - dgilbert at interlog dot com
