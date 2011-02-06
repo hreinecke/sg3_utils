@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.08 20100312";
+static char * version_str = "1.09 20110206";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -34,6 +34,7 @@ static char * version_str = "1.08 20100312";
 static struct option long_options[] = {
         {"help", 0, 0, 'h'},
         {"raw", 0, 0, 'r'},
+        {"readonly", 0, 0, 'R'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -42,11 +43,14 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_rmsn   [--help] [--raw] [--verbose] [--version] DEVICE\n"
+          "sg_rmsn   [--help] [--raw] [--readonly] [--verbose] [--version]\n"
+          "                 DEVICE\n"
           "  where:\n"
           "    --help|-h       print out usage message\n"
           "    --raw|-r        output serial number to stdout "
           "(potentially binary)\n"
+          "    --readonly|-R    open DEVICE read-only (def: open it "
+          "read-write)\n"
           "    --verbose|-v    increase verbosity\n"
           "    --version|-V    print version string and exit\n\n"
           "Performs a SCSI READ MEDIA SERIAL NUMBER command\n"
@@ -59,6 +63,7 @@ int main(int argc, char * argv[])
     unsigned char rmsn_buff[4];
     unsigned char * ucp = NULL;
     int raw = 0;
+    int readonly = 0;
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
@@ -66,7 +71,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hrvV", long_options,
+        c = getopt_long(argc, argv, "hrRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -77,7 +82,10 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         case 'r':
-            raw = 1;
+            ++raw;
+            break;
+        case 'R':
+            ++readonly;
             break;
         case 'v':
             ++verbose;
@@ -117,7 +125,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

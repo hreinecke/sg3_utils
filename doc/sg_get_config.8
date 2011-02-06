@@ -1,12 +1,12 @@
-.TH SG_GET_CONFIG "8" "November 2008" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_GET_CONFIG "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_get_config \- sends a SCSI GET CONFIGURATION command (MMC-4 +)
 .SH SYNOPSIS
 .B sg_get_config
 [\fI\-\-brief\fR] [\fI\-\-current\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-inner\-hex\fR] [\fI\-\-list\fR] [\fI\-\-raw\fR] [\fI\-\-rt=RT\fR]
-[\fI\-\-starting=FC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-inner\-hex\fR] [\fI\-\-list\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-rt=RT\fR] [\fI\-\-starting=FC\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -57,6 +57,12 @@ list all known feature and profile names. Ignore the device name (if given).
 Simply lists the feature names and profiles (followed by their hex values)
 that this utility knows about. If \fI\-\-brief\fR is also given then only
 feature names are listed.
+.TP
+\fB\-q\fR, \fB\-\-readonly\fR
+opens the DEVICE read\-only rather than read\-write which is the
+default. The Linux sg driver needs read\-write access for the SCSI
+GET CONFIGURATION command but other access methods may require
+read\-only access.
 .TP
 \fB\-r\fR, \fB\-\-rt\fR=\fIRT\fR
 where \fIRT\fR is the field of that name in the GET CONFIGURATION cdb.
@@ -127,7 +133,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2008 Douglas Gilbert
+Copyright \(co 2004\-2011 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
