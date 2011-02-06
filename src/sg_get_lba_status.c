@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2010 Douglas Gilbert.
+ * Copyright (c) 2009-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * This program issues the SCSI GET LBA STATUS command to the given SCSI device.
  */
 
-static char * version_str = "1.02 20100329";    /* sbc2r22 */
+static char * version_str = "1.03 20110204";    /* sbc2r22 */
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
@@ -280,8 +280,8 @@ main(int argc, char * argv[])
                         "descriptor:\n" "  descriptor LBA: 0x");
                 for (j = 0; j < 8; ++j)
                     fprintf(stderr, "%02x", glbasBuffp[8 + j]);
-                fprintf(stderr, "  blocks: 0x%x  p_status: %d\n", d_blocks,
-                        res);
+                fprintf(stderr, "  blocks: 0x%x  p_status: %d\n",
+                        (unsigned int)d_blocks, res);
                 ret = SG_LIB_CAT_OTHER;
                 goto the_end;
             }
@@ -306,12 +306,12 @@ main(int argc, char * argv[])
                 printf("0x");
                 for (j = 0; j < 8; ++j)
                     printf("%02x", ucp[j]);
-                printf("  0x%x  %d\n", d_blocks, res);
+                printf("  0x%x  %d\n", (unsigned int)d_blocks, res);
             } else {
                 printf("descriptor LBA: 0x");
                 for (j = 0; j < 8; ++j)
                     printf("%02x", ucp[j]);
-                printf("  blocks: %d", d_blocks);
+                printf("  blocks: %u", (unsigned int)d_blocks);
                 switch (res) {
                 case 0:
                     printf("  mapped\n");

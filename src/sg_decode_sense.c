@@ -24,7 +24,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.00 20101204";
+static char * version_str = "1.01 20110202";
 
 #define MAX_SENSE_LEN (256 + 8) /* max descriptor format currently */
 
@@ -185,7 +185,7 @@ static int file2hex_arr(const char * fname, unsigned char * mp_arr,
     fn_len = strlen(fname);
     if (0 == fn_len)
         return 1;
-    if ((1 == in_len) && ('-' == fname[0]))        /* read from stdin */
+    if ((1 == fn_len) && ('-' == fname[0]))        /* read from stdin */
         fp = stdin;
     else {
         fp = fopen(fname, "r");
