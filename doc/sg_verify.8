@@ -1,11 +1,11 @@
-.TH SG_VERIFY "8" "March 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_VERIFY "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
 .B sg_verify
 [\fI\-\-bpc=BPC\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR] [\fI\-\-help\fR]
-[\fI\-\-lba=LBA\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-vrprotect=VRP\fR] \fIDEVICE\fR
+[\fI\-\-lba=LBA\fR] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-vrprotect=VRP\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -51,6 +51,10 @@ where \fILBA\fR specifies the logical block address of the first block to
 start the verify operation. \fILBA\fR is assumed to be decimal unless prefixed
 by '0x' or a trailing 'h' (see below). The default value is 0 (i.e. the start
 of the device).
+\fB\-r\fR, \fB\-\-readonly\fR
+opens the DEVICE read\-only rather than read\-write which is the
+default. The Linux sg driver needs read\-write access for the SCSI
+VERIFY command but other access methods may require read\-only access.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -85,7 +89,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2009 Douglas Gilbert
+Copyright \(co 2004\-2011 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

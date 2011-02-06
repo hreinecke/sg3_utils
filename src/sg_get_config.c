@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.36 20100312";    /* mmc6r02 */
+static char * version_str = "0.37 20110206";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -45,6 +45,7 @@ static struct option long_options[] = {
         {"inner-hex", 0, 0, 'i'},
         {"list", 0, 0, 'l'},
         {"raw", 0, 0, 'R'},
+        {"readonly", 0, 0, 'q'},
         {"rt", 1, 0, 'r'},
         {"starting", 1, 0, 's'},
         {"verbose", 0, 0, 'v'},
@@ -59,9 +60,9 @@ usage()
     fprintf(stderr,
             "Usage:  sg_get_config [--brief] [--current] [--help] [--hex] "
             "[--inner-hex]\n"
-            "                      [--list] [--raw] [--rt=RT] "
-            "[--starting=FC]\n"
-            "                      [--verbose] [--version] DEVICE\n"
+            "                      [--list] [--raw] [--readonly] [--rt=RT]\n"
+            "                      [--starting=FC] [--verbose] [--version] "
+            "DEVICE\n"
             "  where:\n"
             "    --brief|-b       only give feature names of DEVICE "
             "(don't decode)\n"
@@ -74,6 +75,8 @@ usage()
             "    --list|-l        list all known features + profiles "
             "(ignore DEVICE)\n"
             "    --raw|-R         output in binary (to stdout)\n"
+            "    --readonly|-q    open DEVICE read-only (def: open it "
+            "read-write)\n"
             "    --rt=RT|-r RT    default value is 0\n"
             "                     0 -> all feature descriptors (regardless "
             "of currency)\n"
@@ -951,6 +954,7 @@ main(int argc, char * argv[])
     int inner_hex = 0;
     int list = 0;
     int do_raw = 0;
+    int readonly = 0;
     int rt = 0;
     int starting = 0;
     int verbose = 0;
@@ -963,7 +967,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bchHilr:Rs:vV", long_options,
+        c = getopt_long(argc, argv, "bchHilqr:Rs:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -987,6 +991,9 @@ main(int argc, char * argv[])
             break;
         case 'l':
             list = 1;
+            break;
+        case 'q':
+            ++readonly;
             break;
         case 'r':
             rt = sg_get_num(optarg);
@@ -1064,7 +1071,7 @@ main(int argc, char * argv[])
     }
     sg_cmds_close_device(sg_fd);
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error (rw): %s\n", safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
