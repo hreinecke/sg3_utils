@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.13 20100312";
+static char * version_str = "1.14 20110206";
 
 #define ME "sg_verify: "
 
@@ -217,7 +217,7 @@ main(int argc, char * argv[])
                 break;
             case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
                 fprintf(stderr, "medium or hardware error, reported "
-                        "lba=0x%u\n", info);
+                        "lba=0x%x\n", info);
                 break;
             default:
                 fprintf(stderr, "Verify(10) failed near lba=%" PRIu64

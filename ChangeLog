@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.31 [20110125] [svn: r375]
+Changelog for sg3_utils-1.31 [20110206] [svn: r376]
   - sg_decode_sense: new utility to decode sense data
   - sg_vpd: LB provisioning + Block limits pages (sbc3r26)
   - sync asc/ascq and version descriptors with spc4r28

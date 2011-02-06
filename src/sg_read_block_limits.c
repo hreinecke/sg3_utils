@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2010 Douglas Gilbert.
+ * Copyright (c) 2009-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  * SCSI device.
  */
 
-static char * version_str = "1.01 20100312";
+static char * version_str = "1.02 20110204";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
@@ -59,7 +59,7 @@ usage()
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI READ BLOCK LIMITS command and decode the "
-	    "response\n"
+            "response\n"
             );
 }
 
@@ -156,20 +156,20 @@ main(int argc, char * argv[])
       }
 
       max_block_size = (readBlkLmtBuff[0] << 24) +
-		       (readBlkLmtBuff[1] << 16) +
-		       (readBlkLmtBuff[2] << 8) + readBlkLmtBuff[3];
+                       (readBlkLmtBuff[1] << 16) +
+                       (readBlkLmtBuff[2] << 8) + readBlkLmtBuff[3];
       min_block_size = (readBlkLmtBuff[4] << 8) + readBlkLmtBuff[5];
       k = min_block_size / 1024;
       fprintf(stderr, "Read Block Limits results:\n");
-      fprintf(stderr, "\tMinimum block size: %d byte(s)",
-              (int)min_block_size);
+      fprintf(stderr, "\tMinimum block size: %u byte(s)",
+              (unsigned int)min_block_size);
       if (k != 0)
         fprintf(stderr, ", %d KB", k);
       fprintf(stderr, "\n");
       k = max_block_size / 1024;
       m = max_block_size / 1048576;
-      fprintf(stderr, "\tMaximum block size: %d byte(s)",
-              max_block_size);
+      fprintf(stderr, "\tMaximum block size: %u byte(s)",
+              (unsigned int)max_block_size);
       if (k != 0)
         fprintf(stderr, ", %d KB", k);
       if (m != 0)
