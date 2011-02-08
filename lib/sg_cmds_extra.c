@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2010 Douglas Gilbert.
+ * Copyright (c) 1999-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -66,6 +66,8 @@
 #define UNMAP_CMDLEN 10
 #define VERIFY10_CMD 0x2f
 #define VERIFY10_CMDLEN 10
+#define VERIFY16_CMD 0x8f
+#define VERIFY16_CMDLEN 16
 #define WRITE_LONG10_CMD 0x3f
 #define WRITE_LONG10_CMDLEN 10
 #define WRITE_BUFFER_CMD 0x3b
@@ -1571,6 +1573,102 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
                 if (valid) {
                     if (infop)
                         *infop = (unsigned int)ull;
+                    ret = SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
+                } else
+                    ret = SG_LIB_CAT_MEDIUM_HARD;
+            }
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI VERIFY (16) command (SBC and MMC).
+ * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.
+ * Returns of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Verify(16) not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_MEDIUM_HARD -> medium or hardware error, no valid info,
+ * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> as previous, with valid info,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+int
+sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk, uint64_t llba,
+               int veri_len, int group_num, void * data_out,
+               int data_out_len, uint64_t * infop, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char vCmdBlk[VERIFY16_CMDLEN] =
+                {VERIFY16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
+                 ((bytechk & 0x1) << 1) ;
+    vCmdBlk[2] = (llba >> 56) & 0xff;
+    vCmdBlk[3] = (llba >> 48) & 0xff;
+    vCmdBlk[4] = (llba >> 40) & 0xff;
+    vCmdBlk[5] = (llba >> 32) & 0xff;
+    vCmdBlk[6] = (llba >> 24) & 0xff;
+    vCmdBlk[7] = (llba >> 16) & 0xff;
+    vCmdBlk[8] = (llba >> 8) & 0xff;
+    vCmdBlk[9] = llba & 0xff;
+    vCmdBlk[10] = (veri_len >> 24) & 0xff;
+    vCmdBlk[11] = (veri_len >> 16) & 0xff;
+    vCmdBlk[12] = (veri_len >> 8) & 0xff;
+    vCmdBlk[13] = veri_len & 0xff;
+    vCmdBlk[14] = group_num & 0x1f;
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose > 1) {
+        fprintf(sg_warnings_strm, "    Verify(16) cdb: ");
+        for (k = 0; k < VERIFY16_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", vCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "verify (16): out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, vCmdBlk, sizeof(vCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    if (data_out_len > 0)
+        set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, data_out_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "verify (16)", res, 0, sense_b,
+                               noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        case SG_LIB_CAT_MEDIUM_HARD:
+            {
+                int valid, slen;
+                uint64_t ull = 0;
+
+                slen = get_scsi_pt_sense_len(ptvp);
+                valid = sg_get_sense_info_fld(sense_b, slen, &ull);
+                if (valid) {
+                    if (infop)
+                        *infop = ull;
                     ret = SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;
                 } else
                     ret = SG_LIB_CAT_MEDIUM_HARD;

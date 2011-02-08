@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -220,6 +220,20 @@ extern int sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
                           unsigned int lba, int veri_len, void * data_out,
                           int data_out_len, unsigned int * infop, int noisy,
                           int verbose);
+
+/* Invokes a SCSI VERIFY (16) command (SBC).
+ * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.
+ * Returns of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Verify(16) not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_MEDIUM_HARD -> medium or hardware error, no valid info,
+ * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> as previous, with valid info,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+extern int sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk,
+                          uint64_t llba, int veri_len, int group_num,
+                          void * data_out, int data_out_len,
+                          uint64_t * infop, int noisy, int verbose);
 
 /* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,

@@ -137,6 +137,9 @@ extern void destruct_scsi_pt_obj(struct sg_pt_base * objp);
  * (i.e. library compile time) and is usually indirect. */
 extern void scsi_pt_win32_direct(int state_direct);
 
+/* Returns current SPT interface state, 1 for direct, 0 for indirect */
+extern int scsi_pt_win32_spt_state(void);
+
 #endif
 
 #ifdef __cplusplus
