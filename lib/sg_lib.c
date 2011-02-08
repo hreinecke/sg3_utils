@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2010 Douglas Gilbert.
+ * Copyright (c) 1999-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -376,6 +376,78 @@ sg_get_trans_proto_str(int tpi, int buff_len, char * buff)
     return buff;
 }
 
+#define TPGS_STATE_OPTIMIZED 0x0
+#define TPGS_STATE_NONOPTIMIZED 0x1
+#define TPGS_STATE_STANDBY 0x2
+#define TPGS_STATE_UNAVAILABLE 0x3
+#define TPGS_STATE_OFFLINE 0xe
+#define TPGS_STATE_TRANSITIONING 0xf
+
+static int
+decode_tpgs_state(int st, char * b, int blen)
+{
+    switch (st) {
+    case TPGS_STATE_OPTIMIZED:
+        return snprintf(b, blen, "active/optimized");
+    case TPGS_STATE_NONOPTIMIZED:
+        return snprintf(b, blen, "active/non optimized");
+    case TPGS_STATE_STANDBY:
+        return snprintf(b, blen, "standby");
+    case TPGS_STATE_UNAVAILABLE:
+        return snprintf(b, blen, "unavailable");
+    case TPGS_STATE_OFFLINE:
+        return snprintf(b, blen, "offline");
+    case TPGS_STATE_TRANSITIONING:
+        return snprintf(b, blen, "transitioning between states");
+    default:
+        return snprintf(b, blen, "unknown: 0x%x", st);
+    }
+}
+
+static int
+uds_referral_descriptor_str(char * sp, const unsigned char * dp, int alen)
+{
+    int n = 0;
+    int dlen = alen - 2;
+    int k, j, g, f, tpgd;
+    const unsigned char * tp;
+    uint64_t ull;
+    char c[40];
+
+    n += sprintf(sp + n, "   Not all referrals: %d\n", !!(dp[2] & 0x1));
+    dp += 4;
+    for (k = 0, f = 1; (k + 4) < dlen; k += g, dp += g, ++f) {
+        tpgd = dp[3];
+        g = (tpgd * 4) + 20;
+        n += sprintf(sp + n, "    Descriptor %d\n", f);
+        if ((k + g) > dlen) {
+            n += sprintf(sp + n, "      truncated descriptor, stop\n");
+            return n;
+        }
+        ull = 0;
+        for (j = 0; j < 8; ++j) {
+            if (j > 0)
+                ull <<= 8;
+            ull |= dp[4 + j];
+        }
+        n += sprintf(sp + n, "      first uds LBA: 0x%"PRIx64"\n", ull);
+        ull = 0;
+        for (j = 0; j < 8; ++j) {
+            if (j > 0)
+                ull <<= 8;
+            ull |= dp[12 + j];
+        }
+        n += sprintf(sp + n, "      last uds LBA:  0x%"PRIx64"\n", ull);
+        for (j = 0; j < tpgd; ++j) {
+            tp = dp + 20 + (j * 4);
+            decode_tpgs_state(tp[0] & 0xf, c, sizeof(c));
+            n += sprintf(sp + n, "        tpg: %d  state: %s\n",
+                         (tp[2] << 8) + tp[3], c);
+        }
+    }
+    return n;
+}
+
 static const char * sdata_src[] = {
     "unknown",
     "Extended Copy command source device",
@@ -393,7 +465,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
     int n, progress, pr, rem;
     const unsigned char * descp;
     const char * dtsp = "   >> descriptor too short";
-    char b[800];
+    char b[2048];
 
     if ((NULL == buff) || (buff_len <= 0))
         return;
@@ -595,8 +667,12 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         case 0xb:       /* Added in SPC-4 rev 23, defined in SBC-3 rev 22 */
             n += sprintf(b + n, "User data segment referral\n");
-            /* Will decode if this 'feature' stays  xxxxxxxxxxxxx */
-            processed = 0;
+            if (add_len < 2) {
+                n += sprintf(b + n, "%s\n", dtsp);
+                processed = 0;
+                break;
+            }
+            n += uds_referral_descriptor_str(b + n, descp, add_len);
             break;
         case 0xc:       /* Added in SPC-4 rev 28 */
             n += sprintf(b + n, "Forwarded sense data\n");

@@ -24,14 +24,14 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.01 20110202";
+static char * version_str = "1.02 20110208";
 
 #define MAX_SENSE_LEN (256 + 8) /* max descriptor format currently */
 
 static struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
+    {"file", required_argument, 0, 'f'},
     {"help", no_argument, 0, 'h'},
-    {"hex", required_argument, 0, 'H'},
     {"status", required_argument, 0, 's'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
@@ -42,8 +42,8 @@ static struct option long_options[] = {
 struct opts_t {
     int do_binary;
     const char * fname;
+    int do_file;
     int do_help;
-    int do_hex;
     int do_status;
     int sstatus;
     int do_verbose;
@@ -58,7 +58,7 @@ static void
 usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_decode_sense [--binary=FN] [--help] [--hex=FN] [--status=SS]\n"
+          "sg_decode_sense [--binary=FN] [--file=FN] [--help] [--status=SS]\n"
           "                       [--verbose] [--version] [--write=WFN] "
           "H1 H2 H3 ...\n"
           "  where:\n"
@@ -66,11 +66,11 @@ usage()
           "data in\n"
           "                          binary from. If FN is '-' then read "
           "from stdin\n"
-          "    --help|-h             print out usage message\n"
-          "    --hex=FN|-H FN        FN is a file name from which to read "
+          "    --file=FN|-H FN       FN is a file name from which to read "
           "sense data\n"
           "                          in ASCII hexadecimal. Interpret '-' "
           "as stdin\n"
+          "    --help|-h             print out usage message\n"
           "    --status=SS |-s SS    SCSI status value in hex\n"
           "    --verbose|-v          increase verbosity\n"
           "    --version|-V          print version string then exit\n"
@@ -95,7 +95,7 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
     long val;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:hH:s:vVw:", long_options, NULL);
+        c = getopt_long(argc, argv, "b:f:hs:vVw:", long_options, NULL);
         if (c == -1)
             break;
 
@@ -103,25 +103,25 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
         case 'b':
             if (optsp->fname) {
                 fprintf(stderr, "expect only one '--binary=FN' or "
-                        "'--hex=FN' option\n");
+                        "'--file=FN' option\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++optsp->do_binary;
+            optsp->fname = optarg;
+            break;
+        case 'f':
+            if (optsp->fname) {
+                fprintf(stderr, "expect only one '--binary=FN' or "
+                        "'--file=FN' option\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            ++optsp->do_file;
             optsp->fname = optarg;
             break;
         case 'h':
         case '?':
             optsp->do_help = 1;
             return 0;
-        case 'H':
-            if (optsp->fname) {
-                fprintf(stderr, "expect only one '--binary=FN' or "
-                        "'--hex=FN' option\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            ++optsp->do_hex;
-            optsp->fname = optarg;
-            break;
         case 's':
             if (1 != sscanf(optarg, "%x", &ul)) {
                 fprintf(stderr, "'--status=SS' expects a byte value\n");
@@ -292,7 +292,7 @@ main(int argc, char *argv[])
         printf("SCSI status: %s\n", b);
     }
 
-    if ((0 == opts.sense_len) && (! opts.do_binary) && (! opts.do_hex)) {
+    if ((0 == opts.sense_len) && (! opts.do_binary) && (! opts.do_file)) {
         if (opts.do_status)
             return 0;
         fprintf(stderr, ">> Need sense data on the command line or in a "
@@ -300,12 +300,12 @@ main(int argc, char *argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.sense_len && (opts.do_binary || opts.do_hex)) {
+    if (opts.sense_len && (opts.do_binary || opts.do_file)) {
         fprintf(stderr, ">> Need sense data on command line or in a file, "
                 "not both\n\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_binary && opts.do_hex) {
+    if (opts.do_binary && opts.do_file) {
         fprintf(stderr, ">> Either a binary file or a ASCII hexadecimal, "
                 "file not both\n\n");
         return SG_LIB_SYNTAX_ERROR;
@@ -324,7 +324,7 @@ main(int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         opts.sense_len = s;
-    } else if (opts.do_hex) {
+    } else if (opts.do_file) {
         ret = file2hex_arr(opts.fname, opts.sense, &opts.sense_len,
                            MAX_SENSE_LEN);
         if (ret) {

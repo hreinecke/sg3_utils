@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.12 20110206 */
+/* sg_pt_win32 version 1.13 20110207 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,6 +97,13 @@ void
 scsi_pt_win32_direct(int state_direct)
 {
     spt_direct = state_direct;
+}
+
+/* Returns current SPT interface state, 1 for direct, 0 for indirect */
+int
+scsi_pt_win32_spt_state(void)
+{
+    return spt_direct;
 }
 
 
