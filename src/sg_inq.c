@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.96 20110110";    /* SPC-4 rev 28 */
+static char * version_str = "0.97 20110210";    /* SPC-4 rev 28 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1586,7 +1586,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     }
     printf("  LUN WWN: ");
     for (k = 0; k < 16; ++k)
-        printf("%02hhx", buff[10 + k]);
+        printf("%02x", buff[10 + k]);
     printf("\n");
     printf("  Array Serial Number: ");
     dStrRaw((const char *)&buff[50], buff[49]);
@@ -1594,20 +1594,20 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 
     printf("  LUN State: ");
     if (buff[4] > 0x02)
-           printf("Unknown (%hhx)\n", buff[4]);
+           printf("Unknown (%x)\n", buff[4]);
     else
            printf("%s\n", lun_state_arr[buff[4]]);
 
     printf("  This path connects to: ");
     if (buff[8] > 0x01)
-           printf("Unknown SP (%hhx)", buff[8]);
+           printf("Unknown SP (%x)", buff[8]);
     else
            printf("%s", sp_arr[buff[8]]);
     printf(", Port Number: %u\n", buff[7]);
 
     printf("  Default Owner: ");
     if (buff[5] > 0x01)
-           printf("Unknown (%hhx)\n", buff[5]);
+           printf("Unknown (%x)\n", buff[5]);
     else
            printf("%s\n", sp_arr[buff[5]]);
 
@@ -1624,7 +1624,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     else {
         printf("  SP IPv6 address: ");
         for (k = 0; k < 16; ++k)
-            printf("%02hhx", buff[32 + k]);
+            printf("%02x", buff[32 + k]);
         printf("\n");
     }
 
@@ -1632,7 +1632,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     vpp80 = buff[30] & 0x08;
     lun_z = buff[30] & 0x04;
 
-    printf("  System Type: %hhx, Failover mode: %s\n",
+    printf("  System Type: %x, Failover mode: %s\n",
                    buff[27],
                    failover_mode == 4 ? "Set to 1" : "Unknown");
 
