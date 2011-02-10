@@ -167,16 +167,16 @@ scsi_pt_open_flags(const char * device_name,
     else
         off = 0;
     if (len > (off + 2)) {
-        buff[0] = toupper(device_name[off + 0]);
-        buff[1] = toupper(device_name[off + 1]);
+        buff[0] = toupper((int)device_name[off + 0]);
+        buff[1] = toupper((int)device_name[off + 1]);
         if (0 == strncmp("PD", buff, 2)) {
             num = sscanf(device_name + off + 2, "%d", &pd_num);
             if (1 == num)
                 got_pd_name = 1;
         }
         if (0 == got_pd_name) {
-            buff[2] = toupper(device_name[off + 2]);
-            buff[3] = toupper(device_name[off + 3]);
+            buff[2] = toupper((int)device_name[off + 2]);
+            buff[3] = toupper((int)device_name[off + 3]);
             if (0 == strncmp("SCSI", buff, 4)) {
                 num = sscanf(device_name + off + 4, "%d:%d,%d,%d",
                              &adapter_num, &bus, &target, &lun);

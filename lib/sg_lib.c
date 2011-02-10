@@ -1497,7 +1497,7 @@ sg_get_num(const char * buf)
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%x", &unum);
         num = unum;
-    } else if ('H' == toupper(buf[len - 1])) {
+    } else if ('H' == toupper((int)buf[len - 1])) {
         res = sscanf(buf, "%x", &unum);
         num = unum;
     } else
@@ -1508,10 +1508,10 @@ sg_get_num(const char * buf)
         return num;
     else {
         if (res > 2)
-            c2 = toupper(c2);
+            c2 = toupper((int)c2);
         if (res > 3)
-            c3 = toupper(c3);
-        switch (toupper(c)) {
+            c3 = toupper((int)c3);
+        switch (toupper((int)c)) {
         case 'C':
             return num;
         case 'W':
@@ -1579,10 +1579,10 @@ sg_get_num_nomult(const char * buf)
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%x", &unum);
         num = unum;
-    } else if (commap && ('H' == toupper(*(commap - 1)))) {
+    } else if (commap && ('H' == toupper((int)*(commap - 1)))) {
         res = sscanf(buf, "%x", &unum);
         num = unum;
-    } else if ((NULL == commap) && ('H' == toupper(buf[len - 1]))) {
+    } else if ((NULL == commap) && ('H' == toupper((int)buf[len - 1]))) {
         res = sscanf(buf, "%x", &unum);
         num = unum;
     } else
@@ -1613,7 +1613,7 @@ sg_get_llnum(const char * buf)
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%" SCNx64 "", &unum);
         num = unum;
-    } else if ('H' == toupper(buf[len - 1])) {
+    } else if ('H' == toupper((int)buf[len - 1])) {
         res = sscanf(buf, "%" SCNx64 "", &unum);
         num = unum;
     } else
@@ -1624,10 +1624,10 @@ sg_get_llnum(const char * buf)
         return num;
     else {
         if (res > 2)
-            c2 = toupper(c2);
+            c2 = toupper((int)c2);
         if (res > 3)
-            c3 = toupper(c3);
-        switch (toupper(c)) {
+            c3 = toupper((int)c3);
+        switch (toupper((int)c)) {
         case 'C':
             return num;
         case 'W':
