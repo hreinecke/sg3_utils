@@ -24,7 +24,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.02 20110208";
+static char * version_str = "1.02 20110209";
 
 #define MAX_SENSE_LEN (256 + 8) /* max descriptor format currently */
 
@@ -60,13 +60,13 @@ usage()
   fprintf(stderr, "Usage: "
           "sg_decode_sense [--binary=FN] [--file=FN] [--help] [--status=SS]\n"
           "                       [--verbose] [--version] [--write=WFN] "
-          "H1 H2 H3 ...\n"
+          "[H1 H2 H3 ...]\n"
           "  where:\n"
           "    --binary=FN|-b FN     FN is a file name to read sense "
           "data in\n"
           "                          binary from. If FN is '-' then read "
           "from stdin\n"
-          "    --file=FN|-H FN       FN is a file name from which to read "
+          "    --file=FN|-f FN       FN is a file name from which to read "
           "sense data\n"
           "                          in ASCII hexadecimal. Interpret '-' "
           "as stdin\n"

@@ -1,9 +1,9 @@
-.TH SG_DECODE_SENSE "8" "December 2010" "sg3_utils\-1.31" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense data
 .SH SYNOPSIS
 .B sg_decode_sense
-[\fI\-\-binary=FN\fR] [\fI\-\-help\fR] [\fI\-\-hex=FN\fR]
+[\fI\-\-binary=FN\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR] 
 [\fI\-\-status=SS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 [\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
 .SH DESCRIPTION
@@ -11,11 +11,12 @@ sg_decode_sense \- decode SCSI sense data
 This utility takes SCSI sense data in binary or as a sequence of
 ASCII hexadecimal bytes and decodes it. The primary reference for the
 decoding is SPC\-3 ANSI INCITS 408-2005 and the most recent draft
-SPC\-4 revision 28 which can be found at http://www.t10.org .
+SPC\-4 revision 29 which can be found at http://www.t10.org and other
+locations on the internet.
 .PP
 SCSI sense data is often found in kernel log files as a result of
 something going wrong but may just be informative. It is often shown as
-a sequence of hexadecimal bytes, starting with 70, 71, 72 or 73.
+a sequence of hexadecimal bytes, starting with 70, 71, 72, 73, f0 or f1.
 Sense data could be up to 252 bytes long but typically is much shorter
 than that, 18 bytes long is often seen and is usually associated with
 the older "fixed" format sense data.
@@ -37,7 +38,7 @@ the sense data is read in binary from a file called \fIFN\fR.
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
-\fB\-H\fR, \fB\-\-in\fR=\fIFN\fR
+\fB\-f\fR, \fB\-\-file\fR=\fIFN\fR
 the sense data is read in ASCII hexadecimal from a file called \fIFN\fR.
 The sense data should appear as a sequence of bytes separated by space,
 comma, tab or newline. Everything from and including a hash symbol to the
@@ -62,7 +63,33 @@ representation of sense data into the equivalent binary.
 .SH NOTES
 Unlike most utilities in this package, this utility does not access a
 SCSI device (logical unit). This utility accesses a library associated
-with this package. Amongst other things the library decodes sense data.
+with this package. Amongst other things the library decodes SCSI sense
+data.
+.SH EXAMPLES
+Sense data is often printed out in kernel logs and sometimes on the
+command line when verbose or debug flags are given. It will be at least
+8 bytes long, often 18 bytes long but may be longer. A sense data string
+might look like this:
+.PP
+f0 00 03 00 00 12 34 0a  00 00 00 00 11 00 00 00    
+.br
+00 00
+.PP
+Cut and paste it after the sg_decode_sense command:
+.PP
+  sg_decode_sense f0 00 03 00 00 12 34 0a 00 00 00 00 11 00 00 00 00 00
+.PP
+and for this sense data the output should look like this:
+.PP
+ Fixed format, current;  Sense key: Medium Error
+.br
+ Additional sense: Unrecovered read error
+.br
+  Info fld=0x1234 [4660]
+.PP
+For a medium error the Info field is the logical block address (LBA)
+of the lowest numbered block that the associated SCSI command was not
+able to read (verify or write).
 .SH EXIT STATUS
 The exit status of sg_decode_sense is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.
