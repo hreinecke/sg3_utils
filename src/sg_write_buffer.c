@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2011 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static char * version_str = "1.07 20100312";    /* spc4r08 */
+static char * version_str = "1.08 20110211";    /* spc4r08 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -45,7 +45,9 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr, "Usage: "
           "sg_write_buffer [--help] [--id=ID] [--in=FILE] "
@@ -121,7 +123,8 @@ static struct mode_s {
 
 #define NUM_MODES       ((int)(sizeof(modes)/sizeof(modes[0])))
 
-static void print_modes(void)
+static void
+print_modes(void)
 {
     int k;
 
@@ -134,7 +137,8 @@ static void print_modes(void)
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, infd, res, c, len, k, got_stdin;
     int do_help = 0;
@@ -262,6 +266,15 @@ int main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
+
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (verbose > 4)
+        fprintf(stderr, "Initial win32 SPT interface state: %s\n",
+                scsi_pt_win32_spt_state() ? "direct" : "indirect");
+    scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
+#endif
+#endif
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
