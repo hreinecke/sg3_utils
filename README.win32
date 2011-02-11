@@ -103,12 +103,18 @@ The package can be built using the direct variant with:
 rather than:
    ./configure
 prior to the 'make' call.
+
 In sg3_utils version 1.31 runtime selection of the direct or indirect
 interface was added with the scsi_pt_win32_direct(int state_direct)
 function declared in sg_pt.h. The default is indirect unless
 './configure --enable-win32-spt-direct' was used in the build. If
 'state_direct' is 1 then the direct interface is used and if it is 0
 the indirect interface is used.
+
+Both sg_read_buffer and sg_write_buffer can transfer buffers larger
+than 16 KB. So in sg3_utils version 1.31, they use this new function
+to set direct interface mode. This is regardless of whether or
+not "--enable-win32-spt-direct" is given to ./configure .
 
 Details
 =======
@@ -203,4 +209,4 @@ mode" with the setmode() Windows command.
 
 
 Doug Gilbert
-6th February 2011
+11th February 2011
