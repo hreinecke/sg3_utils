@@ -25,7 +25,7 @@
 #include "sg_io_linux.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2009 D. Gilbert
+ *  Copyright (C) 1999-2011 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@
 #endif
 
 
-static char * version_str = "4.88 20090908";
+static char * version_str = "4.89 20110211";
 
 static struct option long_options[] = {
         {"buffer", 1, 0, 'b'},
@@ -82,7 +82,9 @@ struct opts_t {
     int opt_new;
 };
 
-static void usage()
+
+static void
+usage()
 {
     fprintf(stderr, "Usage: sg_rbuf [--buffer=EACH] [--dio] [--help] "
             "[--mmap] [--quick]\n"
@@ -104,7 +106,8 @@ static void usage()
             "repeatedly\n");
 }
 
-static void usage_old()
+static void
+usage_old()
 {
     printf("Usage: sg_rbuf [-b=EACH_KIB] [-d] [-m] [-q] [-s=OVERALL_MIB] "
            "[-t] [-v] [-V]\n               DEVICE\n");
@@ -123,7 +126,8 @@ static void usage_old()
            "repeatedly\n");
 }
 
-static void usage_for(const struct opts_t * optsp)
+static void
+usage_for(const struct opts_t * optsp)
 {
     if (optsp->opt_new)
         usage();
@@ -131,7 +135,8 @@ static void usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n;
     int64_t nn;
@@ -214,7 +219,8 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     int64_t nn;
@@ -301,7 +307,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -322,7 +329,8 @@ static int process_cl(struct opts_t * optsp, int argc, char * argv[])
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, j;
     unsigned int k, num;

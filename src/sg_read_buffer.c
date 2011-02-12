@@ -299,7 +299,7 @@ main(int argc, char * argv[])
         if (do_raw)
             dStrRaw((const char *)resp, rb_len);
         else if (do_hex || (rb_len < 4))
-            dStrHex((const char *)resp, rb_len, 1);
+            dStrHex((const char *)resp, rb_len, ((do_hex > 1) ? 0 : 1));
         else {
             switch (rb_mode) {
             case MODE_DESCRIPTOR:
