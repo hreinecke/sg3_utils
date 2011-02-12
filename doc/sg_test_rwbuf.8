@@ -1,4 +1,4 @@
-.TH SG_TEST_RWBUF "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_TEST_RWBUF "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_test_rwbuf \- Tests the SCSI host adapter by issuing write and read
 operations on a device's buffer and calculating checksums.
@@ -42,8 +42,8 @@ buffer length and offset, print them out then exit (without testing
 with write/read sequences).
 .TP
 \fB\-s\fR, \fB\-\-size\fR=\fISZ\fR
-where \fISZ\fRis teh size of buffer in bytes to be written then read and
-checked. This number needs to be less than on equal to the size of the
+where \fISZ\fR is the size of buffer in bytes to be written then read and
+checked. This number needs to be less than or equal to the size of the
 device's data buffer which can be seen from the \fI\-\-quick\fR option.
 Either this option or the \fI\-\-quick\fR option should be given.
 .TP
@@ -79,7 +79,7 @@ the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert and K. Garloff
 .SH COPYRIGHT
-Copyright \(co 2000\-2006 Douglas Gilbert, Kurt Garloff
+Copyright \(co 2000\-2011 Douglas Gilbert, Kurt Garloff
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
