@@ -19,12 +19,13 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
 /*
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.06 20110211";
+static char * version_str = "1.07 20110216";
 
 
 static struct option long_options[] = {
