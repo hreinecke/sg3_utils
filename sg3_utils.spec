@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* The Feb 17 2011 - dgilbert at interlog dot com
+* Fri Feb 25 2011 - dgilbert at interlog dot com
 - xxxxxxxxxxxxxxxxxx
   * sg3_utils-1.32
 

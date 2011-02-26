@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2010 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2011 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.2 (2010-09-15)"
+#define SG_RAW_VERSION "0.4.3 (2011-02-25)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -272,10 +272,10 @@ skip(int fd, off_t offset)
         done = read(fd, buffer, amount);
         if (done < 0) {
             perror("Error reading input data");
-            return SG_LIB_CAT_OTHER;
+            return SG_LIB_FILE_ERROR;
         } else if (done == 0) {
             fprintf(stderr, "EOF on input file/stream\n");
-            return SG_LIB_CAT_OTHER;
+            return SG_LIB_FILE_ERROR;
         } else {
             remain -= done;
         }
@@ -344,7 +344,7 @@ bail:
 static int
 write_dataout(const char *filename, unsigned char *buf, int len)
 {
-    int ret = SG_LIB_CAT_OTHER;
+    int ret = SG_LIB_FILE_ERROR;
     int fd;
 
     if ((filename == NULL) ||
@@ -363,7 +363,7 @@ write_dataout(const char *filename, unsigned char *buf, int len)
     }
 
     if (write(fd, buf, len) != len) {
-        perror(filename? filename : "stdout");
+        perror(filename ? filename : "stdout");
         goto bail;
     }
 
@@ -379,9 +379,7 @@ int
 main(int argc, char *argv[])
 {
     int ret = 0;
-    int res_cat;
-    int slen;
-    int k;
+    int res_cat, slen, k, ret2;
     struct opts_t opts;
     int sg_fd = -1;
     struct sg_pt_base *ptvp = NULL;
@@ -415,6 +413,7 @@ main(int argc, char *argv[])
     ptvp = construct_scsi_pt_obj();
     if (ptvp == NULL) {
         fprintf(stderr, "out of memory\n");
+        ret = SG_LIB_CAT_OTHER;
         goto done;
     }
     if (opts.do_verbose) {
@@ -473,7 +472,7 @@ main(int argc, char *argv[])
     fprintf(stderr, "SCSI Status: ");
     sg_print_scsi_status(get_scsi_pt_status_response(ptvp));
     fprintf(stderr, "\n\n");
-    if (!opts.no_sense) {
+    if (! opts.no_sense) {
         fprintf(stderr, "Sense Information:\n");
         sg_print_sense(NULL, sense_buffer, slen, (opts.do_verbose > 0));
         fprintf(stderr, "\n");
@@ -496,10 +495,13 @@ main(int argc, char *argv[])
                     cp = opts.datain_file;
                 fprintf(stderr, "Writing %d bytes of data to %s\n", data_len,
                         cp);
-                ret = write_dataout(opts.datain_file, dxfer_buffer_in,
-                                    data_len);
-                if (ret != 0)
+                ret2 = write_dataout(opts.datain_file, dxfer_buffer_in,
+                                     data_len);
+                if (0 != ret2) {
+                    if (0 == ret)
+                        ret = ret2;
                     goto done;
+                }
             }
         }
     }

@@ -78,6 +78,11 @@ In FreeBSD disks have block names like '/dev/da0' with a corresponding
 pass-through device name like '/dev/pass0'. Use this command
 "camcontrol devlist" to see that SCSI devices available.
 
+kFreeBSD
+========
+sg3_utils can be built into a Debian package for kFreeBSD using the
+./build_debian.sh script in the top level directory. This has been tested
+with Debian 6.0 release.
 
 Details
 =======
@@ -99,10 +104,18 @@ viewed with the "camcontrol devlist" command. To access ATAPI devices (e.g.
 ATAPI DVD drives) the kernel may need to be configured with the "atapicam"
 device.
 
-FreeBSD 8.0 is the most recent version of FreeBSD tested with these
+Attempts to send SCSI commands with data-in or data-out buffers around 64 KB
+and larger failed on a FreeBSD 7.0 with an "argument list too long" error
+message. There is an associated kernel message (viewable with dmesg) that an
+attempt has been made to map <n> bytes which is greater than
+DFLTPHYS(65536). Still a problem in FreeBSD 8.1 . Due to CAM overhead the
+largest power of 2 that can fit through with one command is 32768 bytes (32
+KB).
+
+FreeBSD 8.1 is the most recent version of FreeBSD tested with these
 utilities.
 
 
 
 Doug Gilbert
-5th December 2010
+25th February 2011
