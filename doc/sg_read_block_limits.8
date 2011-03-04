@@ -31,6 +31,18 @@ print the version string and then exit.
 .SH EXIT STATUS
 The exit status of sg_read_block_limits is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.
+.SH EXAMPLES
+It is usually okay to use no options. Here is an invocation (on the first
+line following the "#" command prompt) followed by some typical output:
+.PP
+   # sg_read_block_limits /dev/st0
+.br
+Read Block Limits results:
+.br
+	Minimum block size: 1 byte(s)
+.br
+	Maximum block size: 16777215 byte(s), 16383 KB, 15 MB
+.br
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

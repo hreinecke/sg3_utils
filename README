@@ -192,6 +192,11 @@ Any well implemented "SCSI" device should react sensibly when a utility in
 sg3_utils sends a SCSI command that it doesn't support. Unfortunately this
 cannot be guaranteed.
 
+Prior to lk 2.6.29 USB mass storage limited sense data to 18 bytes which
+caused problems for certain types of descriptor based sense data. An
+example of this is the SCSI ATA PASS-THROUGH command with the CK_COND bit
+set.
+
 
 Utilities
 =========
@@ -348,4 +353,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-25th February 2011
+2nd March 2011

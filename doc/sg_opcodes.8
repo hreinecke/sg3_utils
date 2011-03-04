@@ -1,17 +1,17 @@
-.TH SG_OPCODES "8" "August 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_OPCODES "8" "March 2011" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
 sg_opcodes \- reports information on supported SCSI commands or
 task management functions
 .SH SYNOPSIS
 .B sg_opcodes
-[\fI\-\-alpha\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-opcode=OP\fR]
-[\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR] [\fI\-\-sa=SA\fR]
-[\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-alpha\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-no-inquiry\fR]
+[\fI\-\-opcode=OP\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR]
+[\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_opcodes
-[\fI\-a\fR] [\fI\-o=OP\fR] [\fI\-q\fR] [\fI\-R\fR] [\fI\-s=SA\fR] [\fI\-t\fR]
-[\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
+[\fI\-a\fR] [\fI\-n\fR] [\fI\-o=OP\fR] [\fI\-q\fR] [\fI\-R\fR] [\fI\-s=SA\fR]
+[\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -54,6 +54,15 @@ then exits. Ignores \fIDEVICE\fR if given.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 outputs the response in ASCII hexadecimal to stdout.
+.TP
+\fB\-n\fR, \fB\-\-no-inquiry\fR
+Prior to calling a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT
+SUPPORTED TASK MANAGEMENT FUNCTIONS command, a SCSI INQUIRY command
+is performed. The reason is to determine the peripheral device type (pdt)
+of the \fIDEVICE\fR as this is helpful in translating operation codes
+to the command names. By default this utility prints a summary of INQUIRY
+command response on stdout. If this option (or the \fI\-\-raw\fR option)
+is given then that summary is not printed on stdout.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
@@ -133,6 +142,9 @@ or using '\-\-old' (or '\-O) as the first option.
 sort command alphabetically. Equivalent to \fI\-\-alpha\fR in main
 description.
 .TP
+\fB\-n\fR
+don't print a summary of the SCSI INQUIRY response on stdout.
+.TP
 \fB\-N\fR
 switch to the newer style options.
 .TP
@@ -174,12 +186,48 @@ print out version string then exit.
 .TP
 \fB\-?\fR
 output usage message. Ignore all other parameters.
+.SH EXAMPLES
+The examples in this page use Linux device names. For suitable device
+names in other supported Operating Systems see the sg3_utils(8) man page.
+.PP
+To see the information about a specific command give its operation
+code to the '\-\-op=' option. A command line invocation is shown first
+followed by a typical response:
+.PP
+   # sg_opcodes --op=93h /dev/sdb
+.PP
+  Opcode=0x93
+.br
+  Command_name: Write same(16)
+.br
+  Command supported [conforming to SCSI standard]
+.br
+  Usage data: 93 e2 00 00 00 00 ff ff ff ff 00 00 ff ff 00 00
+.PP
+The next example shows the supported task management functions:
+.PP
+   # sg_opcodes --tmf -n /dev/sdb
+.PP
+Task Management Functions supported by device:
+.br
+    Abort task
+.br
+    Abort task set
+.br
+    Clear ACA
+.br
+    Clear task set
+.br
+    Logical unit reset
+.br
+    Query task
+.br
 .SH AUTHOR
 Written by Doug Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2010 Douglas Gilbert
+Copyright \(co 2004\-2011 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
