@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.47 20110125";    /* spc4r29 + sbc3r26+ */
+static char * version_str = "0.48 20110128";    /* spc4r29 + sbc3r26+ */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1666,7 +1666,7 @@ static int
 svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                 int do_raw, int do_long, int do_quiet, int verbose)
 {
-    int len, pdt, num, k;
+    int len, pdt, num, k, pn;
     char buff[48];
     const struct svpd_values_name_t * vnp;
     int res = 0;
@@ -1723,11 +1723,16 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                 if (num > (len - 4))
                     num = (len - 4);
                 for (k = 0; k < num; ++k) {
-                    vnp = sdp_get_vpd_detail(rsp_buff[4 + k], -1, pdt);
-                    if (vnp)
-                        printf("  %s [%s]\n", vnp->name, vnp->acron);
-                    else
-                        printf("  0x%x\n", rsp_buff[4 + k]);
+                    pn = rsp_buff[4 + k];
+                    vnp = sdp_get_vpd_detail(pn, -1, pdt);
+                    if (vnp) {
+                        if (do_long)
+                            printf("  0x%02x  %s [%s]\n", pn, vnp->name,
+                                   vnp->acron);
+                        else
+                            printf("  %s [%s]\n", vnp->name, vnp->acron);
+                    } else
+                        printf("  0x%x\n", pn);
                 }
             }
             return 0;
