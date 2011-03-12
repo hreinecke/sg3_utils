@@ -1,11 +1,11 @@
-.TH SG_DECODE_SENSE "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "March 2011" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense data
 .SH SYNOPSIS
 .B sg_decode_sense
 [\fI\-\-binary=FN\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR] 
-[\fI\-\-status=SS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
+[\fI\-\-nospace\fR] [\fI\-\-status=SS\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This utility takes SCSI sense data in binary or as a sequence of
@@ -44,6 +44,13 @@ The sense data should appear as a sequence of bytes separated by space,
 comma, tab or newline. Everything from and including a hash symbol to the
 end of that line is ignored.
 .TP
+\fB\-n\fR, \fB\-\-nospace\fR
+expect ASCII hexadecimal to be a string of hexadecimal digits with no
+spaces between them. Bytes are decoded by taking two hexadecimal digits
+at a time, so an even number of digits is expected. The string of
+hexadecimal digits may be on the command line (replacing "H1 H2 H3")
+or spread across multiple lines the \fIFN\fR given to \fI\-\-file=\fR.
+.TP
 \fB\-s\fR, \fB\-\-status\fR=\fISS\fR
 where \fISS\fR is a SCSI status byte value, given in hexadecimal. The
 SCSI status byte is related to but distinct from sense data.
@@ -59,7 +66,8 @@ writes the sense data out in binary to a file called \fIWFN\fR. If
 necessary \fIWFN\fR is created. If \fIWFN\fR exists then it is
 truncated prior to writing the sense data to it. This option is
 a convenience and may be helpful in converting the ASCII hexadecimal
-representation of sense data into the equivalent binary.
+representation of sense data (or anything else) into the equivalent
+binary.
 .SH NOTES
 Unlike most utilities in this package, this utility does not access a
 SCSI device (logical unit). This utility accesses a library associated
