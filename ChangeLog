@@ -2,9 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.32 [20110310] [svn: r391]
+Changelog for sg3_utils-1.32 [20110316] [svn: r392]
   - sg_raw: exit status corrections
-  - sg_decode_sense: add --nospace option
+  - sg_decode_sense: add --nospace and --hex options
 
 Changelog for sg3_utils-1.31 [20110216] [svn: r386]
   - sg_decode_sense: new utility to decode sense data
