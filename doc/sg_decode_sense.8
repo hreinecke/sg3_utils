@@ -4,8 +4,9 @@ sg_decode_sense \- decode SCSI sense data
 .SH SYNOPSIS
 .B sg_decode_sense
 [\fI\-\-binary=FN\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR] 
-[\fI\-\-nospace\fR] [\fI\-\-status=SS\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
+[\fI\-\-hex\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write=WFN\fR]
+[H1 H2 H3 ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This utility takes SCSI sense data in binary or as a sequence of
@@ -38,6 +39,12 @@ the sense data is read in binary from a file called \fIFN\fR.
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
+\fB\-H\fR, \fB\-\-hex\fR
+this option is used in conjunction with \fI\-\-write=WFN\fR in order to
+change the output written to \fIWFN\fR to lines of ASCII hex bytes suitable
+for a C language compiler. Each line contains up to 16 bytes (e.g. a line
+starting with "0x3b,0x07,0x00,0xff").
+.TP
 \fB\-f\fR, \fB\-\-file\fR=\fIFN\fR
 the sense data is read in ASCII hexadecimal from a file called \fIFN\fR.
 The sense data should appear as a sequence of bytes separated by space,
@@ -62,12 +69,14 @@ increase the degree of verbosity (debug messages).
 output version string then exit.
 .TP
 \fB\-w\fR, \fB\-\-write\fR=\fIWFN\fR
-writes the sense data out in binary to a file called \fIWFN\fR. If
-necessary \fIWFN\fR is created. If \fIWFN\fR exists then it is
-truncated prior to writing the sense data to it. This option is
-a convenience and may be helpful in converting the ASCII hexadecimal
-representation of sense data (or anything else) into the equivalent
-binary.
+writes the sense data out to a file called \fIWFN\fR. If necessary \fIWFN\fR
+is created. If \fIWFN\fR exists then it is truncated prior to writing the
+sense data to it. If the \fI\-\-hex\fR option is also given then ASCII hex
+is written to \fIWFN\fR (see the \fI\-\-hex\fR option description);
+otherwise binary is written to \fIWFN\fR. This option is a convenience and
+may be helpful in converting the ASCII hexadecimal representation of sense
+data (or anything else) into the equivalent binary or a compilable ASCII
+hex form.
 .SH NOTES
 Unlike most utilities in this package, this utility does not access a
 SCSI device (logical unit). This utility accesses a library associated

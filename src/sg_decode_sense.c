@@ -33,6 +33,7 @@ static struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
     {"file", required_argument, 0, 'f'},
     {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
     {"nospace", no_argument, 0, 'n'},
     {"status", required_argument, 0, 's'},
     {"verbose", no_argument, 0, 'v'},
@@ -46,6 +47,7 @@ struct opts_t {
     const char * fname;
     int do_file;
     int do_help;
+    int do_hex;
     int no_space;
     int do_status;
     int sstatus;
@@ -62,7 +64,8 @@ static void
 usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_decode_sense [--binary=FN] [--file=FN] [--help] [--nospace]\n"
+          "sg_decode_sense [--binary=FN] [--file=FN] [--help] [--hex] "
+          "[--nospace]\n"
           "                       [--status=SS] [--verbose] [--version] "
           "[--write=WFN]\n"
           "                       [H1 H2 H3 ...]\n"
@@ -76,6 +79,10 @@ usage()
           "                          in ASCII hexadecimal. Interpret '-' "
           "as stdin\n"
           "    --help|-h             print out usage message\n"
+          "    --hex|-H              used together with --write=WFN, to "
+          "write out\n"
+          "                          C language style ASCII hex (instead "
+          "of binary)\n"
           "    --nospace|-n          no spaces or other separators between "
           "pairs of\n"
           "                          hex digits (e.g. '3132330A')\n"
@@ -103,7 +110,7 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
     long val;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:f:hns:vVw:", long_options, NULL);
+        c = getopt_long(argc, argv, "b:f:hHns:vVw:", long_options, NULL);
         if (c == -1)
             break;
 
@@ -130,6 +137,9 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
         case '?':
             optsp->do_help = 1;
             return 0;
+        case 'H':
+            ++optsp->do_hex;
+            break;
         case 'n':
             ++optsp->no_space;
             break;
@@ -298,6 +308,34 @@ bad:
     return 1;
 }
 
+static void
+write2wfn(FILE * fp, struct opts_t * optsp)
+{
+    int k, n;
+    size_t s;
+    char b[128];
+
+    if (optsp->do_hex) {
+        for (k = 0, n = 0; k < optsp->sense_len; ++k) {
+            n += sprintf(b + n, "0x%02x,", optsp->sense[k]);
+            if (15 == (k % 16)) {
+                b[n] = '\n';
+                s = fwrite(b, 1, n + 1, fp);
+                n = 0;
+            }
+        }
+        if (n > 0) { 
+            b[n] = '\n';
+            s = fwrite(b, 1, n + 1, fp);
+        }
+    } else {
+        s = fwrite(optsp->sense, 1, optsp->sense_len, fp);
+        if ((int)s != optsp->sense_len)
+            fprintf(stderr, "only able to write %d of %d bytes to "
+                    "%s\n", s, optsp->sense_len, optsp->wfname);
+    }
+}
+
 
 int
 main(int argc, char *argv[])
@@ -387,10 +425,7 @@ main(int argc, char *argv[])
     if (opts.sense_len) {
         if (opts.wfname) {
             if ((fp = fopen(opts.wfname, "w"))) {
-                s = fwrite(opts.sense, 1, opts.sense_len, fp);
-                if ((int)s != opts.sense_len)
-                    fprintf(stderr, "only able to write %d of %d bytes to "
-                            "%s\n", s, opts.sense_len, opts.wfname);
+                write2wfn(fp, &opts);
                 fclose(fp);
             } else {
                 perror("open");
