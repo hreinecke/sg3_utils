@@ -1189,6 +1189,15 @@ sg_get_opcode_name(unsigned char cmd_byte0, int peri_type, int buff_len,
     }
 }
 
+/* Iterates to next designation descriptor in the device identification
+ * VPD page. The 'initial_desig_desc' should point to start of first
+ * descriptor with 'page_len' being the number of valid bytes in that
+ * and following descriptors. To start, 'off' should point to a negative
+ * value, thereafter it should point to the value yielded by the previous
+ * call. If 0 returned then 'initial_desig_desc + *off' should be a valid
+ * descriptor; returns -1 if normal end condition and -2 for an abnormal
+ * termination. Matches association, designator_type and/or code_set when
+ * any of those values are greater than or equal to zero. */
 int
 sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
                    int * off, int m_assoc, int m_desig_type, int m_code_set)

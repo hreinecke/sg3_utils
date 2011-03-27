@@ -1,3 +1,20 @@
+/* A utility program originally written for the Linux OS SCSI subsystem.
+*  Copyright (C) 2000-2011 D. Gilbert
+*  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2, or (at your option)
+*  any later version.
+
+   This program outputs information provided by a SCSI INQUIRY command.
+   It is mainly based on the SCSI SPC-4 document at http://www.t10.org .
+
+   Acknowledgment:
+      - Martin Schwenke <martin at meltin dot net> added the raw switch and
+        other improvements [20020814]
+      - Lars Marowsky-Bree <lmb at suse dot de> contributed Unit Path Report
+        VPD page decoding for EMC CLARiiON devices [20041016]
+*/
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -21,23 +38,6 @@
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
-
-/* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2011 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program outputs information provided by a SCSI INQUIRY command.
-   It is mainly based on the SCSI SPC-4 document at http://www.t10.org .
-
-   Acknowledgment:
-      - Martin Schwenke <martin at meltin dot net> added the raw switch and
-        other improvements [20020814]
-      - Lars Marowsky-Bree <lmb at suse dot de> contributed Unit Path Report
-        VPD page decoding for EMC CLARiiON devices [20041016]
-*/
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "0.97 20110210";    /* SPC-4 rev 28 */
+static char * version_str = "0.98 20110325";    /* SPC-4 rev 28 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -897,7 +897,7 @@ static const char * desig_type_arr[] =
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
-/* These are target port, device server (i.e. target) and lu identifiers */
+/* These are target port, device server (i.e. target) and LU identifiers */
 static void
 decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
 {
@@ -1812,10 +1812,10 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
                 printf("standard INQUIRY:\n");
             else if (1 == pqual)
                 printf("standard INQUIRY: [qualifier indicates no connected "
-                       "lu]\n");
+                       "LU]\n");
             else if (3 == pqual)
                 printf("standard INQUIRY: [qualifier indicates not capable "
-                       "of supporting lu]\n");
+                       "of supporting LU]\n");
             else
                 printf("standard INQUIRY: [reserved or vendor specific "
                        "qualifier [%d]\n", pqual);
