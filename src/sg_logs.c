@@ -15,7 +15,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2010 D. Gilbert
+*  Copyright (C) 2000-2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.98 20101102";    /* spc4r27 + sbc3r25 */
+static char * version_str = "0.99 20110322";    /* spc4r27 + sbc3r25 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1693,11 +1693,11 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 
 /* from sas2r15 */
 static void
-show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
+show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
 {
     unsigned int u;
 
-    switch (peis) {
+    switch (pes) {
     case 0:
         printf("     No event\n");
         break;
@@ -1819,6 +1819,8 @@ show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
         printf("     Received SMP frame error count: %u\n", val);
         break;
     default:
+        printf("     Unknown phy event source: %d, val=%u, thresh_val=%u\n",
+               pes, val, thresh_val);
         break;
     }
 }
@@ -1982,7 +1984,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("    Phy reset problem = %u\n", ui);
         }
         if (spld_len > 51) {
-            int num_ped, peis;
+            int num_ped, pes;
             unsigned char * xcp;
             unsigned int pvdt;
 
@@ -2000,12 +2002,12 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             }
             xcp = vcp + 52;
             for (m = 0; m < (num_ped * 12); m += 12, xcp += 12) {
-                peis = xcp[3];
+                pes = xcp[3];
                 ui = (xcp[4] << 24) | (xcp[5] << 16) | (xcp[6] << 8) |
                      xcp[7];
                 pvdt = (xcp[8] << 24) | (xcp[9] << 16) | (xcp[10] << 8) |
                        xcp[11];
-                show_sas_phy_event_info(peis, ui, pvdt);
+                show_sas_phy_event_info(pes, ui, pvdt);
             }
         } else if (optsp->do_verbose)
            printf("    <<No phy event descriptors>>\n");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2010 Douglas Gilbert.
+ * Copyright (c) 2007-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -1091,9 +1091,9 @@ const char * sg_lib_transport_proto_strs[] =
     "IEEE 1394 (SBP-3)",
     "Remote Direct Memory Access (RDMA)",
     "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI (SAS)",
+    "Serial Attached SCSI (SPL)",
     "Automation/Drive Interface (ADT-2)",
-    "ATA Packet Interface (ATA/ATAPI-7)",
+    "ATA Packet Interface (ACS-2)",
     "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"
 };
