@@ -49,7 +49,9 @@ starting with "0x3b,0x07,0x00,0xff").
 the sense data is read in ASCII hexadecimal from a file called \fIFN\fR.
 The sense data should appear as a sequence of bytes separated by space,
 comma, tab or newline. Everything from and including a hash symbol to the
-end of that line is ignored.
+end of that line is ignored. If \fI\-\-nospace\fR is set then no separator
+is required between the ASCII hexadecimal digits in \fIFN\fR with bytes
+decoded from pairs of ASCII hexadecimal digits.
 .TP
 \fB\-n\fR, \fB\-\-nospace\fR
 expect ASCII hexadecimal to be a string of hexadecimal digits with no

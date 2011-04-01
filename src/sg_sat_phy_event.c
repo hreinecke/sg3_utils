@@ -20,16 +20,23 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
+/* This program uses a ATA PASS-THROUGH SCSI command. This usage is
+ * defined in the SCSI to ATA Translation (SAT) drafts and standards.
+ * See http://www.t10.org for drafts. SAT is a standard: SAT ANSI INCITS
+ * 431-2007 (draft prior to that is sat-r09.pdf). SAT-2 is also a
+ * standard: SAT-2 ANSI INCITS 465-2010 and the draft prior to that is
+ * sat2r09.pdf . The SAT-3 project has started and the most recent draft
+ * is sat3r01.pdf .
+ */
+
 /* This program uses a ATA PASS-THROUGH (16 or 12) SCSI command defined
-   by SAT to package an ATA READ LOG EXT (2Fh) command to fetch
-   log page 11h. That page contains SATA phy event counters.
-   For SAT see http://www.t10.org [draft prior to standard: sat-r09.pdf]
-   For ATA READ LOG EXT command see ATA-8/ACS at www.t13.org .
-   For SATA phy counter definitions see SATA 2.5 .
-
-   Invocation: sg_sat_phy_event [-v] [-V] <device>
-
-*/
+ * by SAT to package an ATA READ LOG EXT (2Fh) command to fetch
+ * log page 11h. That page contains SATA phy event counters.
+ * For ATA READ LOG EXT command see ATA-8/ACS at www.t13.org .
+ * For SATA phy counter definitions see SATA 2.5 .
+ *
+ * Invocation: see the usage() function below
+ */
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
@@ -46,7 +53,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.03 20110303";
+static char * version_str = "1.03 20110401";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},

@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.03 20110310";
+static char * version_str = "1.03 20110331";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -197,14 +197,14 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
     return 0;
 }
 
-/* Read hex numbers from file ('-' taken as stdin).
- * There should be either one entry per line, a comma separated list or
- * space separated list. If no_space is set then a string of hex digits
- * is expected, 2 per byte. Everything from and including a '#' on a line
- * is ignored.  Returns 0 if ok, or 1 if error. */
+/* Read ASCII hex bytes from fname (a file named '-' taken as stdin).
+ * There should be either one entry per line or a comma, space or tab
+ * separated list of bytes. If no_space is set then a string of ACSII hex
+ * digits is expected, 2 per byte. Everything from and including a '#'
+ * on a line is ignored.  Returns 0 if ok, or 1 if error. */
 static int
-file2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
-             int * mp_arr_len, int max_arr_len)
+f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
+          int * mp_arr_len, int max_arr_len)
 {
     int fn_len, in_len, k, j, m;
     unsigned int h;
@@ -250,16 +250,20 @@ file2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
         if ((k < in_len) && ('#' != lcp[k])) {
-            fprintf(stderr, "build_mode_page: syntax error at "
-                    "line %d, pos %d\n", j + 1, m + k + 1);
+            fprintf(stderr, "f2hex_arr: syntax error at line %d, pos %d\n",
+                    j + 1, m + k + 1);
             goto bad;
         }
         if (no_space) {
             for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
                  ++k, lcp += 2) {
                 if (1 != sscanf(lcp, "%2x", &h)) {
-                    fprintf(stderr, "build_mode_page: bad hex number in li"
-                            "ne %d, pos %d\n", j + 1, (int)(lcp - line + 1));
+                    fprintf(stderr, "f2hex_arr: bad hex number in line %d, "
+                            "pos %d\n", j + 1, (int)(lcp - line + 1));
+                    goto bad;
+                }
+                if ((off + k) >= max_arr_len) {
+                    fprintf(stderr, "f2hex_arr: array length exceeded\n");
                     goto bad;
                 }
                 mp_arr[off + k] = h;
@@ -269,14 +273,13 @@ file2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
-                        fprintf(stderr, "build_mode_page: hex number "
-                                "larger than 0xff in line %d, pos %d\n",
-                                j + 1, (int)(lcp - line + 1));
+                        fprintf(stderr, "f2hex_arr: hex number larger than "
+                                "0xff in line %d, pos %d\n", j + 1,
+                                (int)(lcp - line + 1));
                         goto bad;
                     }
                     if ((off + k) >= max_arr_len) {
-                        fprintf(stderr, "build_mode_page: array length "
-                                "exceeded\n");
+                        fprintf(stderr, "f2hex_arr: array length exceeded\n");
                         goto bad;
                     }
                     mp_arr[off + k] = h;
@@ -291,9 +294,8 @@ file2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
                         --k;
                         break;
                     }
-                    fprintf(stderr, "build_mode_page: error in "
-                            "line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    fprintf(stderr, "f2hex_arr: error in line %d, at pos "
+                            "%d\n", j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
             }
@@ -413,8 +415,8 @@ main(int argc, char *argv[])
         }
         opts.sense_len = s;
     } else if (opts.do_file) {
-        ret = file2hex_arr(opts.fname, opts.no_space, opts.sense,
-                           &opts.sense_len, MAX_SENSE_LEN);
+        ret = f2hex_arr(opts.fname, opts.no_space, opts.sense,
+                        &opts.sense_len, MAX_SENSE_LEN);
         if (ret) {
             fprintf(stderr, "unable to decode ASCII hex from file: %s\n",
                     opts.fname);
