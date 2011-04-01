@@ -39,7 +39,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 28 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 30 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -183,6 +183,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x4e0, "MMC-6 (no version claimed)"},
     {0x4e3, "MMC-6 T10/1836-D revision 2b"},
     {0x4e5, "MMC-6 T10/1836-D revision 02g"},
+    {0x4e6, "MMC-6 MMC-6 ANSI INCITS 468-2010"},
     {0x500, "ADC-3 (no version claimed)"},
     {0x502,  "ADC-3 T10/1895-D revision 04"},
     {0x520, "SSC-4 (no version claimed)"},
@@ -238,9 +239,11 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa20, "ADT-2 (no version claimed)"},
     {0xa22, "ADT-2 T10/1742-D revision 06"},
     {0xa27, "ADT-2 T10/1742-D revision 08"},
+    {0xa28, "ADT-2 T10/1742-D revision 09"},
     {0xa40, "FCP-4 (no version claimed)"},
     {0xa42, "FCP-4 T10/1828-D revision 01"},
     {0xa44, "FCP-4 T10/1828-D revision 02"},
+    {0xa45, "FCP-4 T10/1828-D revision 02b"},
     {0xaa0, "SPI (no version claimed)"},
     {0xab9, "SPI T10/0855-D revision 15a"},
     {0xaba, "SPI ANSI INCITS 253-1995"},
@@ -290,6 +293,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc40, "SAS-2.1 (no version claimed)"},
     {0xc48, "SAS-2.1 T10/2125-D revision 04"},
     {0xc4a, "SAS-2.1 T10/2125-D revision 06"},
+    {0xc4b, "SAS-2.1 T10/2125-D revision 07"},
     {0xc60, "SAS-3 (no version claimed)"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
@@ -348,10 +352,12 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xf27, "FC-PI-5 T11/2118-D revision 2.00"},
     {0xf28, "FC-PI-5 T11/2118-D revision 3.00"},
     {0xf2a, "FC-PI-5 T11/2118-D revision 6.00"},
+    {0xf2b, "FC-PI-5 T11/2118-D revision 6.10"},
     {0xf40, "FC-PI-6 (no version claimed)"},
     {0x12a0, "FC-SCM (no version claimed)"},
     {0x12a3, "FC-SCM T11/1824DT revision 1.0"},
     {0x12a5, "FC-SCM T11/1824DT revision 1.1"},
+    {0x12a7, "FC-SCM T11/1824DT revision 1.4"},
     {0x12c0, "FC-DA-2 (no version claimed)"},
     {0x12c3, "FC-DA-2 T11/1870DT revision 1.04"},
     {0x12e0, "FC-DA (no version claimed)"},
@@ -396,6 +402,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1740, "UAS (no version claimed)"},    /* USB attached SCSI */
     {0x1743, "UAS T10/2095-D revision 02"},
     {0x1747, "UAS T10/2095-D revision 04"},
+    {0x1748, "UAS ANSI INCITS 471-2010"},
     {0x1780, "UAS-2 (no version claimed)"},
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
@@ -404,6 +411,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1ec0, "SAT-2 (no version claimed)"},
     {0x1ec4, "SAT-2 T10/1826-D revision 06"},
     {0x1ec8, "SAT-2 T10/1826-D revision 09"},
+    {0x1eca, "SAT-2 ANSI INCITS 465-2010"},
     {0x1ee0, "SAT-3 (no version claimed)"},
     {0x20a0, "SPL (no version claimed)"},
     {0x20a3, "SPL T10/2124-D revision 6a"},

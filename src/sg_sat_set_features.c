@@ -20,13 +20,20 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
+/* This program uses a ATA PASS-THROUGH SCSI command. This usage is
+ * defined in the SCSI to ATA Translation (SAT) drafts and standards.
+ * See http://www.t10.org for drafts. SAT is a standard: SAT ANSI INCITS
+ * 431-2007 (draft prior to that is sat-r09.pdf). SAT-2 is also a
+ * standard: SAT-2 ANSI INCITS 465-2010 and the draft prior to that is
+ * sat2r09.pdf . The SAT-3 project has started and the most recent draft
+ * is sat3r01.pdf .
+ */
+
 /* This program performs a ATA PASS-THROUGH (16) SCSI command in order
-   to perform an ATA SET FEATURES command. See http://www.t10.org
-   SAT draft at time of writing: sat-r09.pdf
-
-   See man page (sg_sat_set_features.8) for details.
-
-*/
+ * to perform an ATA SET FEATURES command.
+ *
+ * See man page (sg_sat_set_features.8) for details.
+ */
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
@@ -39,7 +46,7 @@
 
 #define DEF_TIMEOUT 20
 
-static char * version_str = "1.05 20110303";
+static char * version_str = "1.05 20110401";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},

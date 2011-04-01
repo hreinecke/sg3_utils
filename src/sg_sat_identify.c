@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,12 +19,14 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* This program uses a ATA PASS-THROUGH SCSI command to package
-   an ATA IDENTIFY (PACKAGE) DEVICE command. See http://www.t10.org
-   for the most recent SAT: sat-r09.pdf . SAT is now a standard:
-   SAT ANSI INCITS 431-2007.
-
-*/
+/* This program uses a ATA PASS-THROUGH SCSI command to package an
+ * ATA IDENTIFY (PACKAGE) DEVICE command. It is based on the SCSI to
+ * ATA Translation (SAT) drafts and standards. See http://www.t10.org
+ * for drafts. SAT is a standard: SAT ANSI INCITS 431-2007 (draft prior
+ * to that is sat-r09.pdf). SAT-2 is also a standard: SAT-2 ANSI INCITS
+ * 465-2010 and the draft prior to that is sat2r09.pdf . The SAT-3
+ * project has started and the most recent draft is sat3r01.pdf .
+ */
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
@@ -41,7 +43,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.06 20100312";
+static char * version_str = "1.07 20110401";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
