@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.51 20110207";
+static char * version_str = "1.52 20110510";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -145,8 +145,9 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
         if (mx_di_len > 0) {
             got = mx_di_len - resid;
             if (verbose && (resid > 0))
-                fprintf(sg_warnings_strm, "    %s: requested %d bytes but "
-                        "got %d bytes\n", leadin, mx_di_len, got);
+                fprintf(sg_warnings_strm, "    %s: pass-through requested "
+                        "%d bytes but got %d bytes\n", leadin, mx_di_len,
+                        got);
             return got;
         } else
             return 0;
@@ -183,8 +184,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
             if ((mx_di_len > 0) && (resid > 0)) {
                 got = mx_di_len - resid;
                 if ((verbose > 2) || check_data_in || (got > 0))
-                    fprintf(sg_warnings_strm, "    requested %d bytes but "
-                            "got %d bytes\n", mx_di_len, got);
+                    fprintf(sg_warnings_strm, "    pass-through requested "
+                            "%d bytes but got %d bytes\n", mx_di_len, got);
             }
         }
         if (o_sense_cat)
@@ -1324,8 +1325,14 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((mx_resp_len > 3) && (ret < 4)) {
+            /* resid indicates LOG SENSE response length bad, so zero it */
+            resp[2] = 0;
+            resp[3] = 0;
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }

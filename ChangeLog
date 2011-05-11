@@ -2,10 +2,13 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.32 [20110401] [svn: r394]
+Changelog for sg3_utils-1.32 [20110510] [svn: r395]
   - sg_raw: exit status corrections
   - sg_decode_sense: add --nospace and --hex options
+  - sg_logs: fix bug with large --maxlen
+    - zero response length when resid implies it is invalid
   - sg_inq: sync version descriptors with spc4r30
+  - add README.iscsi
 
 Changelog for sg3_utils-1.31 [20110216] [svn: r386]
   - sg_decode_sense: new utility to decode sense data

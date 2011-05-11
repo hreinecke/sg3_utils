@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.99 20110322";    /* spc4r27 + sbc3r25 */
+static char * version_str = "1.02 20110510";    /* spc4r27 + sbc3r25 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -61,7 +61,7 @@ static char * version_str = "0.99 20110322";    /* spc4r27 + sbc3r25 */
 
 #define LOG_SENSE_PROBE_ALLOC_LEN 4
 
-static unsigned char rsp_buff[MX_ALLOC_LEN];
+static unsigned char rsp_buff[MX_ALLOC_LEN + 4];
 
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
@@ -276,8 +276,9 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'm':
             n = sg_get_num(optarg);
-            if ((n < 0) || (1 == n)) {
-                fprintf(stderr, "bad argument to '--maxlen='\n");
+            if ((n < 0) || (1 == n) || (n > 0xffff)) {
+                fprintf(stderr, "bad argument to '--maxlen=', from 2 to "
+                        "65535 (inclusive) expected\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -568,10 +569,10 @@ static int
 do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
         const struct opts_t * optsp)
 {
-    int actual_len;
-    int res;
+    int actual_len, res, vb;
 
     memset(resp, 0, mx_resp_len);
+    vb = optsp->do_verbose;
     if (optsp->maxlen > 1)
         actual_len = mx_resp_len;
     else {
@@ -579,7 +580,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
                                    optsp->page_control, optsp->pg_code,
                                    optsp->subpg_code, optsp->paramp,
                                    resp, LOG_SENSE_PROBE_ALLOC_LEN,
-                                   noisy, optsp->do_verbose))) {
+                                   noisy, vb))) {
             switch (res) {
             case SG_LIB_CAT_NOT_READY:
             case SG_LIB_CAT_INVALID_OP:
@@ -592,11 +593,22 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
             }
         }
         actual_len = (resp[2] << 8) + resp[3] + 4;
-        if ((0 == optsp->do_raw) && (optsp->do_verbose > 1)) {
+        if ((0 == optsp->do_raw) && (vb > 1)) {
             fprintf(stderr, "  Log sense (find length) response:\n");
             dStrHex((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
             fprintf(stderr, "  hence calculated response length=%d\n",
                     actual_len);
+        }
+        if (optsp->pg_code != (0x3f & resp[0])) {
+            if (vb)
+                fprintf(stderr, "Page code does not appear in first byte "
+                        "of response so it's suspect\n");
+            if (actual_len > 0x40) {
+                actual_len = 0x40;
+                if (vb)
+                    fprintf(stderr, "Trim response length to 64 bytes due "
+                            "to suspect response format\n");
+            }
         }
         /* Some HBAs don't like odd transfer lengths */
         if (actual_len % 2)
@@ -607,7 +619,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
     if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
                                optsp->page_control, optsp->pg_code,
                                optsp->subpg_code, optsp->paramp,
-                               resp, actual_len, noisy, optsp->do_verbose))) {
+                               resp, actual_len, noisy, vb))) {
         switch (res) {
         case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_INVALID_OP:
@@ -619,7 +631,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
             return -1;
         }
     }
-    if ((0 == optsp->do_raw) && (optsp->do_verbose > 1)) {
+    if ((0 == optsp->do_raw) && (vb > 1)) {
         fprintf(stderr, "  Log sense response:\n");
         dStrHex((const char *)resp, actual_len, 1);
     }
@@ -1898,6 +1910,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
+	    /* attached device type. In SAS-1.1 case 2 was an edge expander;
+	     * in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "end device"); break;
@@ -3766,7 +3780,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
         if (optsp->do_raw)
             dStrRaw((const char *)resp, len);
         else if (optsp->do_hex)
-            dStrHex((const char *)resp, len, 1);
+            dStrHex((const char *)resp, len, (1 == optsp->do_hex));
         else
             show_temperature_page(resp, len, optsp->do_pcb, 0, 0);
     }else if (SG_LIB_CAT_NOT_READY == res)
@@ -3779,7 +3793,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
             if (optsp->do_raw)
                 dStrRaw((const char *)resp, len);
             else if (optsp->do_hex)
-                dStrHex((const char *)resp, len, 1);
+                dStrHex((const char *)resp, len, (1 == optsp->do_hex));
             else
                 show_ie_page(resp, len, 0, 0);
         } else
@@ -3912,7 +3926,7 @@ main(int argc, char * argv[])
         if (opts.do_raw)
             dStrRaw((const char *)rsp_buff, pg_len + 4);
         else if (opts.do_hex > 1)
-            dStrHex((const char *)rsp_buff, pg_len + 4, 1);
+            dStrHex((const char *)rsp_buff, pg_len + 4, (2 == opts.do_hex));
         else if (pg_len > 1) {
             if (opts.do_hex) {
                 if (rsp_buff[0] & 0x40)
@@ -3962,7 +3976,8 @@ main(int argc, char * argv[])
                 if (opts.do_raw)
                     dStrRaw((const char *)rsp_buff, pg_len + 4);
                 else if (opts.do_hex > 1)
-                    dStrHex((const char *)rsp_buff, pg_len + 4, 1);
+                    dStrHex((const char *)rsp_buff, pg_len + 4,
+                            (2 == opts.do_hex));
                 else if (opts.do_hex) {
                     if (rsp_buff[0] & 0x40)
                         printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"
