@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.48 20100610";    /* ses3r02 */
+static char * version_str = "1.49 20110511";    /* ses3r02 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1151,8 +1151,8 @@ truncated:
 static char * sas_device_type[] = {
     "no device attached",
     "end device",
-    "edge expander device",
-    "fanout expander device",
+    "expander device",  /* in SAS-1.1 this was a "edge expander device */
+    "expander device (fanout, SAS-1.1)",  /* marked obsolete in SAS-2 */
     "reserved [4]", "reserved [5]", "reserved [6]", "reserved [7]"
 };
 
