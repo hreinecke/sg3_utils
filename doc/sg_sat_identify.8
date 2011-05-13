@@ -1,12 +1,12 @@
-.TH SG_SAT_IDENTIFY "8" "March 2011" "sg3_utils\-1.32" SG3_UTILS
+.TH SG_SAT_IDENTIFY "8" "May 2011" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
 sg_sat_identify \- sends a ATA IDENTIFY (PACKET) DEVICE command via a
 SCSI to ATA Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_identify
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-len=\fR16|12] [\fI\-\-packet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-indent\fR] [\fI\-\-len=\fR16|12] [\fI\-\-packet\fR] [\fI\-\-raw\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -53,6 +53,12 @@ is in hex, grouped in 16 bit words, the same as the default but without
 a header. When given thrice (i.e. '\-HHH') the output is in hex, grouped in
 16 bit words, in a format that is acceptable for 'hdparm \-\-Istdin' to
 process.
+.TP
+\fB\-i\fR, \fB\-\-indent\fR
+outputs the World Wide Name (WWN) of the device. This should be a NAA-5
+64 bit number. It is output in hex prefixed with "0x". If not available
+then "0x0000000000000000" is output. The equivalent for a SCSI disk (i.e. its
+logical unit name) can be found with "sg_vpd -ii".
 .TP
 \fB\-l\fR, \fB\-\-len\fR=16 | 12
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
