@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "1.02 20110510";    /* spc4r27 + sbc3r25 */
+static char * version_str = "1.02 20110517";    /* spc4r27 + sbc3r25 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -228,6 +228,8 @@ usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
+/* Processes command line options according to new option format. Returns
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
 process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -377,6 +379,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
+/* Processes command line options according to old option format. Returns
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
 process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -527,6 +531,12 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
+/* Process command line options. First check using new option format unless
+ * the SG3_UTILS_OLD_OPTS environment variable is defined which causes the
+ * old option format to be checked first. Both new and old format can be
+ * countermanded by a '-O' and '-N' options respectively. As soon as either
+ * of these options is detected (when processing the other format), processing
+ * stops and is restarted using the other format. Clear? */
 static int
 process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -1910,8 +1920,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
-	    /* attached device type. In SAS-1.1 case 2 was an edge expander;
-	     * in SAS-2 case 3 is marked as obsolete. */
+            /* attached device type. In SAS-1.1 case 2 was an edge expander;
+             * in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "end device"); break;

@@ -152,8 +152,14 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    get LBA status: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -217,8 +223,14 @@ sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len, int noisy,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    report target port group: "
+                    "response%s\n", (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -360,8 +372,14 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg, void * resp,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    report referrals: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -502,8 +520,14 @@ sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    receive diagnostic results: "
+                    "response%s\n", (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -1193,8 +1217,14 @@ sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read long(10): response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -1292,8 +1322,14 @@ sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read long(16): response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -2125,9 +2161,14 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read block limits: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
-

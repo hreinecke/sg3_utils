@@ -85,6 +85,10 @@ Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
 Peter Allworth <linsol at zeta dot org dot au> original dd clone design used
         by sg3_utils's dd variants (e.g. sg_dd).
 
+Ronnie Sahlberg <ronniesahlberg at gmail dot com> has written libiscsi and a
+        set of external patches to add direct iSCSI support to this package.
+        See README.iscsi [20110518]
+
 Saeed Bishara contributed sg_write_long
 
 Thomas Kolbe <tkolbe at partnersdata dot com>
@@ -101,4 +105,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Doug Gilbert
-6th September 2010
+18th May 2011
