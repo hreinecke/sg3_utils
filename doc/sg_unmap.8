@@ -1,4 +1,4 @@
-.TH SG_UNMAP "8" "March 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_UNMAP "8" "October 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_unmap \- sends a SCSI UNMAP command
 .SH SYNOPSIS
@@ -11,11 +11,10 @@ sg_unmap \- sends a SCSI UNMAP command
 .PP
 Send a SCSI UNMAP command to \fIDEVICE\fR to unmap one or more logical
 blocks. This command was introduced in SBC\-3 revision 18 under the broad
-heading of "logical block provisioning" or more specifically "thin
-provisioning".
-Logical blocks may also be unmapped by the SCSI WRITE SAME (16 and 32
-byte cdbs); see sg_write_same. The unmap capability is closely related to
-the ATA DATA SET MANAGEMENT command with the "Trim" bit set.
+heading of "logical block provisioning".
+Logical blocks may also be unmapped by the SCSI WRITE SAME command; see
+sg_write_same. The unmap capability is closely related to the ATA DATA SET
+MANAGEMENT command with the "Trim" bit set.
 .PP
 Logical blocks to be unmapped can be specified in one of two ways to this
 utility. One way is by supplying the (start) LBAs to the '\-\-lba=' option
@@ -99,8 +98,8 @@ period is 60 seconds. If all the logical blocks on a logical unit (e.g.
 a disk drive) are to be unmapped then the FORMAT UNIT SCSI command (see
 the sg_format utility) may be considered as an alternative.
 .PP
-Support for thin provisioning is indicated by the TPE bit in the response
-to the SCSI READ CAPACITY (16) command (see the sg_readcap utility).
+Support for logical block provisioning is indicated by the LBPME bit in the
+response to the SCSI READ CAPACITY (16) command (see the sg_readcap utility).
 .PP
 In the examples directory of the sg3_utils package there is a
 sg_unmap_example.txt file that shows the format that the '\-\-in='

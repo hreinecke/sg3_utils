@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -227,7 +227,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     }
     printf("  LUN WWN: ");
     for (k = 0; k < 16; ++k)
-        printf("%02hhx", buff[10 + k]);
+        printf("%02x", buff[10 + k]);
     printf("\n");
     printf("  Array Serial Number: ");
     dStrRaw((const char *)&buff[50], buff[49]);
@@ -235,20 +235,20 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 
     printf("  LUN State: ");
     if (buff[4] > 0x02)
-           printf("Unknown (%hhx)\n", buff[4]);
+           printf("Unknown (%x)\n", buff[4]);
     else
            printf("%s\n", lun_state_arr[buff[4]]);
 
     printf("  This path connects to: ");
     if (buff[8] > 0x01)
-           printf("Unknown SP (%hhx)", buff[8]);
+           printf("Unknown SP (%x)", buff[8]);
     else
            printf("%s", sp_arr[buff[8]]);
     printf(", Port Number: %u\n", buff[7]);
 
     printf("  Default Owner: ");
     if (buff[5] > 0x01)
-           printf("Unknown (%hhx)\n", buff[5]);
+           printf("Unknown (%x)\n", buff[5]);
     else
            printf("%s\n", sp_arr[buff[5]]);
 
@@ -265,7 +265,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     else {
         printf("  SP IPv6 address: ");
         for (k = 0; k < 16; ++k)
-            printf("%02hhx", buff[32 + k]);
+            printf("%02x", buff[32 + k]);
         printf("\n");
     }
 
@@ -273,7 +273,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     vpp80 = buff[30] & 0x08;
     lun_z = buff[30] & 0x04;
 
-    printf("  System Type: %hhx, ", buff[27]);
+    printf("  System Type: %x, ", buff[27]);
     switch (failover_mode) {
         case 4:
             printf("Failover mode: 1 (Linux)\n");
@@ -312,8 +312,8 @@ decode_rdac_vpd_c2(unsigned char * buff, int len)
                 "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
         return;
     }
-    printf("  Software Version: %d.%d.%d\n", buff[8], buff[9], buff[10]);
-    printf("  Software Date: %02x/%02x/%02x\n", buff[11], buff[12], buff[13]);
+    printf("  Software Version: %x.%x.%x\n", buff[8], buff[9], buff[10]);
+    printf("  Software Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
     printf("  Features:");
     if (buff[14] & 0x01)
         printf(" Dual Active,");
@@ -464,7 +464,8 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
 #endif
     memset(label, 0, 61);
     label_len = buff[28];
-    memcpy(label, &buff[29], label_len);
+    for(i = 0; i < (label_len - 1); ++i)
+        *(label + i) = buff[29 + (2 * i) + 1];
     printf("  Volume User Label: %s\n", label);
 
     uuid_len = buff[89];
@@ -477,7 +478,8 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
     printf("  Storage Array Unique Identifier: %s\n", uuid);
     memset(label, 0, 61);
     label_len = buff[106];
-    memcpy(label, &buff[107], label_len);
+    for(i = 0; i < (label_len - 1); ++i)
+        *(label + i) = buff[107 + (2 * i) + 1];
     printf("  Storage Array User Label: %s\n", label);
 
     for (i = 0, c = uuid; i < 8; i++) {

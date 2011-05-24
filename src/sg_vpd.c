@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.41 20100331";    /* spc4r23 + sbc3r22 */
+static char * version_str = "0.47 20110125";    /* spc4r29 + sbc3r26+ */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -63,7 +63,7 @@ extern const struct svpd_values_name_t *
 #define VPD_MAN_ASS_SN 0xb1     /* SSC-3, ADC-2 */
 #define VPD_SECURITY_TOKEN 0xb1 /* OSD */
 #define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
-#define VPD_THIN_PROVISIONING 0xb2   /* SBC-3 */
+#define VPD_LB_PROVISIONING 0xb2   /* SBC-3 */
 #define VPD_REFERRALS 0xb3   /* SBC-3 */
 #define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
@@ -148,6 +148,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
     {VPD_IMP_OP_DEF, 0, -1, 0, "iod",
      "Implemented operating definition (obsolete)"},
+    {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv",
+     "Logical block provisioning (SBC)"},
     {VPD_MAN_ASS_SN, 0, 1, 0, "mas",
      "Manufacturer assigned serial number (SSC)"},
     {VPD_MAN_ASS_SN, 0, 0x12, 0, "masa",
@@ -168,7 +170,6 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SECURITY_TOKEN, 0, 0x11, 0, "st", "Security token (OSD)"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, 0, "tas", "TapeAlert supported flags (SSC)"},
-    {VPD_THIN_PROVISIONING, 0, 0, 0, "thpv", "Thin provisioning (SBC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
 
@@ -327,6 +328,7 @@ static const char * network_service_type_arr[] =
     "reserved[0x1e]", "reserved[0x1f]",
 };
 
+/* VPD_MAN_NET_ADDR */
 static void
 decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -373,6 +375,7 @@ static const char * mode_page_policy_arr[] =
     "per I_T nexus",
 };
 
+/* VPD_MODE_PG_POLICY */
 static void
 decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -411,6 +414,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_SCSI_PORTS */
 static void
 decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
                       int do_quiet)
@@ -1060,6 +1064,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
     }
 }
 
+/* VPD_EXT_INQ */
 static void
 decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1086,8 +1091,11 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            !!(buff[7] & 0x10), !!(buff[7] & 0x1),
            !!(buff[8] & 0x10), !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
+    printf("  Extended self-test completion minutes=%d\n",
+           (buff[10] << 8) + buff[11]);    /* spc4r27 */
 }
 
+/* VPD_SOFTW_INF_ID */
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
@@ -1107,6 +1115,7 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_ATA_INFO */
 static void
 decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
 {
@@ -1169,6 +1178,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
         dWordHex((const unsigned short *)(buff + 60), 256, 0, is_be);
 }
 
+/* VPD_POWER_CONDITION */
 static void
 decode_power_condition(unsigned char * buff, int len, int do_hex)
 {
@@ -1198,6 +1208,7 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
             (buff[16] << 8) + buff[17]);
 }
 
+/* VPD_PROTO_LU */
 static void
 decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1248,6 +1259,7 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_PROTO_PORT */
 static void
 decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1294,6 +1306,9 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_BLOCK_LIMITS sbc */
+/* VPD_SA_DEV_CAP ssc */
+/* VPD_OSD_INFO osd */
 static void
 decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1310,6 +1325,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                     "short=%d\n", len);
             return;
         }
+        printf("  Write same no zero (WSNZ): %d\n", !!(buff[4] & 0x1));
         printf("  Maximum compare and write length: %u blocks\n",
                buff[5]);
         u = (buff[6] << 8) | buff[7];
@@ -1335,6 +1351,9 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Maximum unmap block descriptor count: %u\n", u);
         }
         if (len > 35) {     /* added in sbc3r19 */
+            int m;
+            uint64_t mwsl;
+
             u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
                 (buff[30] << 8) | buff[31];
             printf("  Optimal unmap granularity: %u\n", u);
@@ -1343,6 +1362,15 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             u = ((unsigned int)(buff[32] & 0x7f) << 24) | (buff[33] << 16) |
                 (buff[34] << 8) | buff[35];
             printf("  Unmap granularity alignment: %u\n", u);
+            /* added in sbc3r26 */
+            mwsl = 0;
+            for (m = 0; m < 8; ++m) {
+                if (m > 0)
+                    mwsl <<= 8;
+                mwsl |= buff[36 + m];
+            }
+            printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
+                   mwsl);
         }
         break;
     case 1: case 8:
@@ -1356,6 +1384,9 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_BLOCK_DEV_CHARS sbc */
+/* VPD_MAN_ASS_SN ssc */
+/* VPD_SECURITY_TOKEN osd */
 static void
 decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1418,33 +1449,30 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_LB_PROVISIONING */
 static int
-decode_block_thin_prov_vpd(unsigned char * b, int len)
+decode_block_lb_prov_vpd(unsigned char * b, int len)
 {
-    int dp, anc_sup;
+    int dp;
 
     if (len < 4) {
-        fprintf(stderr, "Thin provisioning page too short=%d\n",
+        fprintf(stderr, "Logical block provisioning page too short=%d\n",
                 len);
         return SG_LIB_CAT_MALFORMED;
     }
-    printf("  Unmap supported (TPU): %d\n", !!(0x80 & b[5]));
-    printf("  Write same with unmap supported (TPWS): %d\n", !!(0x40 & b[5]));
-    anc_sup = (b[5] >> 1) & 0x7;
-    switch (anc_sup) {
-    case 0:
-        printf("  Anchored LBAs not supported\n");
-        break;
-    case 1:
-        printf("  Anchored LBAs supported\n");
-        break;
-    default:
-        printf("  Anchored LBAs support reserved [%d]\n", anc_sup);
-        break;
-    }
+    printf("  Unmap command supported (LBPU): %d\n", !!(0x80 & b[5]));
+    printf("  Write same (16) with unmap bit supported (LBWS): %d\n",
+           !!(0x40 & b[5]));
+    printf("  Write same (10) with unmap bit supported (LBWS10): %d\n",
+           !!(0x20 & b[5]));
+    printf("  Anchored LBAs supported (ANC_SUP): %d\n", !!(0x2 & b[5]));
     dp = !!(b[5] & 0x1);
     printf("  Threshold exponent: %d\n", b[4]);
     printf("  Descriptor present (DP): %d\n", dp);
+    // sbc3r26 overlooked placing the 'provisioning type' field in the VPD
+    // definition (table 181). Technical editor says it is in byte 6,
+    // bits 2 to 0.
+    printf("  Provisioning type: %d\n", b[6] & 0x7);
     if (dp) {
         const unsigned char * ucp;
         int i_len;
@@ -1452,8 +1480,8 @@ decode_block_thin_prov_vpd(unsigned char * b, int len)
         ucp = b + 8;
         i_len = ucp[3];
         if (0 == i_len) {
-            fprintf(stderr, "Thin provisioning page provisioning group "
-                    "descriptor too short=%d\n", i_len);
+            fprintf(stderr, "Logical block provisioning page provisioning "
+                    "group descriptor too short=%d\n", i_len);
             return 0;
         }
         printf("  Provisioning group descriptor\n");
@@ -1462,6 +1490,7 @@ decode_block_thin_prov_vpd(unsigned char * b, int len)
     return 0;
 }
 
+/* VPD_TA_SUPPORTED */
 static int
 decode_tapealert_supported_vpd(unsigned char * b, int len)
 {
@@ -1505,6 +1534,8 @@ decode_tapealert_supported_vpd(unsigned char * b, int len)
     return 0;
 }
 
+/* VPD_LB_PROVISIONING sbc */
+/* VPD_TA_SUPPORTED ssc */
 static void
 decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -1514,7 +1545,7 @@ decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
     switch (pdt) {
     case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-        decode_block_thin_prov_vpd(buff, len);
+        decode_block_lb_prov_vpd(buff, len);
         break;
     case PDT_TAPE: case PDT_MCHANGER:
         decode_tapealert_supported_vpd(buff, len);
@@ -1526,6 +1557,8 @@ decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_REFERRALS sbc */
+/* VPD_AUTOMATION_DEV_SN ssc */
 static void
 decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
 {
@@ -1651,7 +1684,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -1706,7 +1739,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -1803,7 +1836,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = rsp_buff[3] + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -1886,7 +1919,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;   /* spc4r25 */
             if (num_vpd != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -2325,7 +2358,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             if ((! do_raw) && (! do_quiet)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-                    printf("Thin provisioning VPD page (SBC):\n");
+                    printf("Logical block provisioning VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
                     printf("TapeAlert supported flags VPD page (SSC):\n");

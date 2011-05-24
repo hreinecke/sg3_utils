@@ -1,11 +1,11 @@
-.TH SG_READ_LONG "8" "March 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_READ_LONG "8" "April 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_read_long \- send a SCSI READ LONG command
 .SH SYNOPSIS
 .B sg_read_long
 [\fI\-\-16\fR] [\fI\-\-correct\fR] [\fI\-\-help\fR] [\fI\-\-lba=LBA\fR]
-[\fI\-\-out=OF\fR] [\fI\-\-pblock\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-xfer_len=BTL\fR] \fIDEVICE\fR
+[\fI\-\-out=OF\fR] [\fI\-\-pblock\fR] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-xfer_len=BTL\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -49,6 +49,12 @@ physical block (plus ECC data) containing the requested logical block
 address is read. The default is to leave the 'PBLOCK' bit clear in
 which case the logical block (plus any ECC data) is read.
 .TP
+\fB\-r\fR, \fB\-\-readonly\fR
+opens the DEVICE read\-only rather than read\-write which is the
+default. The Linux sg driver needs read\-write access for the SCSI
+READ LONG command but other access methods may require read\-only
+access.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
@@ -83,7 +89,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2007 Douglas Gilbert
+Copyright \(co 2004\-2010 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

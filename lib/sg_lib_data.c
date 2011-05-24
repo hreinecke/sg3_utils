@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.58 20100329";    /* spc-4 rev 23 */
+const char * sg_lib_version_str = "1.65 20101205";    /* spc-4 rev 28 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -283,6 +283,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xb, 0, "Write(32)"},
     {0xc, 0, "Write an verify(32)"},
     {0xd, 0, "Write same(32)"},
+    {0xe, 0, "Orwrite(32)"},    /* added sbc3r25 */
     {0x1800, 0, "Receive credential"},
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},
@@ -379,6 +380,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x00,0x1c,"Verify operation in progress"},
     {0x00,0x1d,"ATA pass through information available"},
     {0x00,0x1e,"Conflicting SA creation request"},
+    {0x00,0x1f,"Logical unit transitioning to another power condition"},
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},
@@ -415,6 +417,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x17,"Logical unit not ready, calibration required"},
     {0x04,0x18,"Logical unit not ready, a door is open"},
     {0x04,0x19,"Logical unit not ready, operating in sequential mode"},
+    {0x04,0x1a,"Logical unit not ready, start stop unit command in progress"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -467,6 +470,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x10,0x01,"Logical block guard check failed"},
     {0x10,0x02,"Logical block application tag check failed"},
     {0x10,0x03,"Logical block reference tag check failed"},
+    {0x10,0x04,"Logical block protection error on recover buffered data"},
+    {0x10,0x05,"Logical block protection method error"},
     {0x11,0x00,"Unrecovered read error"},
     {0x11,0x01,"Read retries exhausted"},
     {0x11,0x02,"Error too long to correct"},
@@ -637,6 +642,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x09,"Previous reservation conflict status"},
     {0x2C,0x0A,"Partition or collection contains user objects"},
     {0x2C,0x0B,"Not reserved"},
+    {0x2C,0x0C,"ORWRITE generation does not match"},
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2F,0x00,"Commands cleared by another initiator"},
@@ -793,6 +799,10 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x53,0x02,"Medium removal prevented"},
     {0x53,0x03,"Medium removal prevented by data transfer element"},
     {0x53,0x04,"Medium thread or unthread failure"},
+    {0x53,0x05,"Volume identifier invalid"},
+    {0x53,0x06,"Volume identifier missing"},
+    {0x53,0x07,"Duplicate volume identifier"},
+    {0x53,0x08,"Element status unknown"},
     {0x54,0x00,"SCSI to host system interface failure"},
     {0x55,0x00,"System resource failure"},
     {0x55,0x01,"System buffer full"},
@@ -1053,12 +1063,12 @@ const char * sg_lib_pdt_strs[] = {
     "processor",        /* often SAF-TE (seldom scanner) device */
     "write once optical disk",
     /* 5 */ "cd/dvd",
-    "scanner",
+    "scanner",                  /* obsolete */
     "optical memory device",
     "medium changer",
-    "communications",
-    /* 0xa */ "graphics [0xa]",
-    "graphics [0xb]",
+    "communications",           /* obsolete */
+    /* 0xa */ "graphics [0xa]", /* obsolete */
+    "graphics [0xb]",           /* obsolete */
     "storage array controller",
     "enclosure services device",
     "simplified direct access device",

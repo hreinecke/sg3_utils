@@ -29,7 +29,7 @@
  * SCSI device.
  */
 
-static char * version_str = "1.02 20100806";    /* sbc3r24 */
+static char * version_str = "1.03 20100813";    /* sbc3r24 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -92,9 +92,9 @@ usage()
 {
     fprintf(stderr, "Usage: "
             "sg_referrals  [--help] [--hex] [--lba=LBA] [--maxlen=LEN]\n"
-            "                          [--one-segment] [--raw] [--verbose] "
+            "                     [--one-segment] [--raw] [--verbose] "
             "[--version]\n"
-            "                          DEVICE\n"
+            "                     DEVICE\n"
             "  where:\n"
             "    --help|-h         print out usage message\n"
             "    --hex|-H          output in hexadecimal\n"
@@ -105,8 +105,8 @@ usage()
             "                           (def: 0 -> %d bytes)\n",
             DEF_REFER_BUFF_LEN );
     fprintf(stderr,
-            "    --one-segment|-s  return information about the specified\n"
-            "                      segment only\n"
+            "    --one-segment|-s    return information about the specified "
+            "segment only\n"
             "    --raw|-r          output in binary\n"
             "    --verbose|-v      increase verbosity\n"
             "    --version|-V      print version string and exit\n\n"
@@ -247,7 +247,7 @@ main(int argc, char * argv[])
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        fprintf(stderr, "No DEVICE argument given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.95 20100331";
+static char * version_str = "0.98 20101104";
 
 
 #define ME "sg_write_same: "
@@ -39,6 +39,7 @@ static char * version_str = "0.95 20100331";
 #define WRITE_SAME10_LEN 10
 #define WRITE_SAME16_LEN 16
 #define WRITE_SAME32_LEN 32
+#define RCAP10_RESP_LEN 8
 #define RCAP16_RESP_LEN 32
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT_SECS 60
@@ -48,6 +49,7 @@ static char * version_str = "0.95 20100331";
 #define EBUFF_SZ 256
 
 static struct option long_options[] = {
+    {"10", no_argument, 0, 'R'},
     {"16", no_argument, 0, 'S'},
     {"32", no_argument, 0, 'T'},
     {"anchor", no_argument, 0, 'a'},
@@ -81,6 +83,7 @@ struct opts_t {
     int wrprotect;
     int xfer_len;
     int pref_cdb_size;
+    int want_ws10;
 };
 
 
@@ -89,14 +92,16 @@ static void
 usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_write_same [--16] [--32] [--anchor] [--grpnum=GN] [--help] "
-          "[--in=IF]\n"
-          "                     [--lba=LBA] [--lbdata] [--num=NUM] "
-          "[--pbdata]\n"
+          "sg_write_same [--10] [--16] [--32] [--anchor] [--grpnum=GN] "
+          "[--help]\n"
+          "                     [--in=IF] [--lba=LBA] [--lbdata] "
+          "[--num=NUM] [--pbdata]\n"
           "                     [--timeout=TO] [--unmap] [--verbose] "
           "[--version]\n"
           "                     [--wrprotect=WRP] [xferlen=LEN] DEVICE\n"
           "  where:\n"
+          "    --10|-R              do WRITE SAME(10) (even if '--unmap' "
+          "is given)\n"
           "    --16|-S              do WRITE SAME(16) (def: 10 unless "
           "'--unmap' given\n"
           "                         or LBA+NUM needs more than 32 bits)\n"
@@ -144,7 +149,7 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     if (WRITE_SAME10_LEN == cdb_len) {
         llba = optsp->lba + optsp->numblocks;
         if ((optsp->numblocks > 0xffff) || (llba > ULONG_MAX) ||
-            optsp->unmap) {
+            (optsp->unmap && (0 == optsp->want_ws10))) {
             cdb_len = WRITE_SAME16_LEN;
             if (optsp->verbose)
                 fprintf(stderr, "do_write_same: use WRITE SAME(16) instead "
@@ -158,6 +163,12 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     case WRITE_SAME10_LEN:
         wsCmdBlk[0] = WRITE_SAME10_OP;
         wsCmdBlk[1] = ((optsp->wrprotect & 0x7) << 5);
+        /* ANCHOR + UNMAP not allowed for WRITE_SAME10 in sbc3r24+r25 but
+         * a proposal has been made to allow it. Anticipate approval. */
+        if (optsp->anchor)
+            wsCmdBlk[1] |= 0x10;
+        if (optsp->unmap)
+            wsCmdBlk[1] |= 0x8;
         if (optsp->pbdata)
             wsCmdBlk[1] |= 0x4;
         if (optsp->lbdata)
@@ -313,7 +324,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ag:hi:l:Ln:PSt:TUvVw:x:", long_options,
+        c = getopt_long(argc, argv, "ag:hi:l:Ln:PRSt:TUvVw:x:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -360,7 +371,15 @@ main(int argc, char * argv[])
         case 'P':
             ++opts.pbdata;
             break;
+        case 'R':
+            ++opts.want_ws10;
+            break;
         case 'S':
+            if (DEF_WS_CDB_SIZE != opts.pref_cdb_size) {
+                fprintf(stderr, "only one '--10', '--16' or '--32' "
+                        "please\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             opts.pref_cdb_size = 16;
             break;
         case 't':
@@ -371,6 +390,11 @@ main(int argc, char * argv[])
             }
             break;
         case 'T':
+            if (DEF_WS_CDB_SIZE != opts.pref_cdb_size) {
+                fprintf(stderr, "only one '--10', '--16' or '--32' "
+                        "please\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             opts.pref_cdb_size = 32;
             break;
         case 'U':
@@ -414,6 +438,10 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+    if (opts.want_ws10 && (DEF_WS_CDB_SIZE != opts.pref_cdb_size)) {
+        fprintf(stderr, "only one '--10', '--16' or '--32' please\n");
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
@@ -461,8 +489,25 @@ main(int argc, char * argv[])
                           resp_buff[11]);
             prot_en = !!(resp_buff[12] & 0x1);
             opts.xfer_len = block_size + (prot_en ? 8 : 0);
+        } else if ((SG_LIB_CAT_INVALID_OP == res) ||
+                   (SG_LIB_CAT_ILLEGAL_REQ == res)) {
+            if (vb)
+                fprintf(stderr, "Read capacity(16) not supported, try Read "
+                        "capacity(10)\n");
+            res = sg_ll_readcap_10(sg_fd, 0 /* pmi */, 0 /* lba */, resp_buff,
+                                   RCAP10_RESP_LEN, 0, (vb ? (vb - 1): 0));
+            if (0 == res) {
+                block_size = ((resp_buff[4] << 24) |
+                              (resp_buff[5] << 16) |
+                              (resp_buff[6] << 8) |
+                              resp_buff[7]);
+                opts.xfer_len = block_size;
+            }
         } else if (vb)
             fprintf(stderr, "Read capacity(16) failed. Unable to calculate "
+                    "block size\n");
+        if (res)
+            fprintf(stderr, "Read capacity(10) failed. Unable to calculate "
                     "block size\n");
     }
     if (opts.xfer_len < 1) {
@@ -518,7 +563,7 @@ main(int argc, char * argv[])
             close(infd);
     } else {
         if (vb)
-            fprintf(stderr, "Default data-out buffer to %d zeroes\n",
+            fprintf(stderr, "Default data-out buffer set to %d zeros\n",
                     opts.xfer_len);
         if (prot_en) { /* default for protection is 0xff, rest get 0x0 */
             memset(wBuff + opts.xfer_len - 8, 0xff, 8);

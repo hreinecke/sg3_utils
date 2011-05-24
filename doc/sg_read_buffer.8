@@ -1,4 +1,4 @@
-.TH SG_READ_BUFFER "8" "January 2007" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_READ_BUFFER "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_read_buffer \- send a SCSI READ BUFFER command
 .SH SYNOPSIS
@@ -23,7 +23,9 @@ output the usage message then exit. If used multiple times also prints
 the mode names and their acronyms.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-output the response in hexadecimal.
+output the response in hexadecimal. When given twice the response is
+output in hex with the corresponding representation in ASCII to the
+right of each line.
 .TP
 \fB\-i\fR, \fB\-\-id\fR=\fIID\fR
 this option sets the buffer id field in the cdb. \fIID\fR is a value between
@@ -37,8 +39,9 @@ respond with less bytes.
 \fB\-m\fR, \fB\-\-mode\fR=\fIMO\fR
 this option sets the mode field in the cdb. \fIMO\fR is a value between
 0 (default) and 31 inclusive. Alternatively an abbreviation can be given.
-To list the available mode abbreviations given an invalid
-one (e.g. '\-\-mode=xxx').
+To list the available mode abbreviations use an invalid
+one (e.g. '\-\-mode=xxx'). As an example, to fetch the read buffer
+descriptor give '\-\-mode=desc' .
 .TP
 \fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
 this option sets the buffer offset field in the cdb. \fIOFF\fR is a value
@@ -64,7 +67,7 @@ Written by Luben Tuikov and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2007 Luben Tuikov and Douglas Gilbert
+Copyright \(co 2006\-2011 Luben Tuikov and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

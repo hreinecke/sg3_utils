@@ -1,4 +1,4 @@
-.TH SG_GET_LBA_STATUS "8" "March 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_GET_LBA_STATUS "8" "October 2010" "sg3_utils\-1.30" SG3_UTILS
 .SH NAME
 sg_get_lba_status \- send the SCSI GET LBA STATUS command
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ sg_get_lba_status \- send the SCSI GET LBA STATUS command
 .PP
 Send the SCSI GET LBA STATUS command to the \fIDEVICE\fR and outputs the
 response. This command was introduced in (draft) SBC\-3 revision 20 and
-devices that support thin provisioning should support this command.
+devices that support logical block provisioning should support this command.
 .PP
 The default action is to decode the response into one LBA status descriptor
 per line output to stdout. The descriptor LBA is output in hex (prefixed
@@ -62,7 +62,7 @@ caused by this option is sent to stderr.
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
 .SH NOTES
-For a discussion of thin provisioning see section 4.6.3 of sbcr22.pdf
+For a discussion of logical block provisioning see section 4.7 of sbcr27.pdf
 at http://www.t10.org (or the corresponding section of a later draft).
 .SH EXIT STATUS
 The exit status of sg_get_lba_status is 0 when it is successful. Otherwise

@@ -1,13 +1,17 @@
 Introduction
 ============
-The Solaris port of sg3_utils contains those utilities that are _not_
-specific to Linux. In some cases a utility could be ported but
-requires more work. An example is sg_dd which needs more work
-beyond the SCSI command pass through mechanism.
+The Solaris port of sg3_utils contains those utilities that are
+_not_ specific to Linux.
+
+The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
+Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+contains a utility with similar functionality to sg_dd and is available
+for Solaris.
 
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
+    sg_decode_sense
     sg_format
     sg_get_config
     sg_get_lba_status
@@ -26,6 +30,7 @@ Here is a list of utilities that have been ported:
     sg_read_long
     sg_readcap
     sg_reassign
+    sg_referrals
     sg_requests
     sg_rmsn
     sg_rtpg
@@ -56,31 +61,78 @@ http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 
-See the INSTALL file (at the end) for instructions on how to build
-sg3_utils on FreeBSD. Some man pages have examples which use linux
-device names which hopefully will not confuse the FreeBSD users.
+The executables and library can be built from the source code in
+the tarball and installed with the familiar
+"./configure ; make ; make install" sequence. If this fails try
+running the "./autogen.sh" script prior to that sequence. There
+are generic instruction on configure and friend in the INSTALL file.
 
+Some man pages have examples which use linux device names which
+hopefully will not confuse the Solaris users.
+
+Device naming
+=============
+In Solaris, SCSI device names below the '/dev' directory have a
+form like: c5t4d3s2 where the number following "c" is the controller
+(HBA) number, the number following "t" is the target number (from
+the SCSI parallel interface days) and the number following "d" is
+the LUN. Following the "s" is the slice number which is related to
+a partition and by convention "s2" is the whole disk.
+
+OpenSolaris also has a c5t4d3p2 form where the number following
+the "p" is the partition number apart from "p0" which is the whole
+disk. So a whole disk may be referred to as either:
+  - c5t4d3
+  - c5t4d3s2
+  - c5t4d3p0
+
+And these device names are duplicated in the /dev/dsk and /dev/rdsk
+directories. The former is the block device name and the latter
+is for "raw" (or char device) access which is what sg3_utils needs.
+So in openSolaris something of the form:
+   sg_inq /dev/rdsk/c5t4d3p0
+should work. If it doesn't add a '-vvv' option. If that is attempted
+on the /dev/dsk/c5t4d3p0 variant an inappropriate ioctl for device
+error will result.
+
+The device names within the /dev directory are typically symbolic
+links to much longer topological names in the /device directory.
+
+In Solaris cd/dvd/bd players seem to be treated as disks and so are
+found in the /dev/rdsk directory. Tape drives appear in the /dev/rmt
+directory.
+
+There is also a sgen (SCSI generic) driver which by default does not
+attach to any device. See the /kernel/drv/sgen.conf file to control
+what is attached. Any attached device will have a device name of
+the form /dev/scsi/c5t4d3 .
+
+Listing available SCSI devices in Solaris seems to be a challenge.
+"Use the 'format' command" advice works but seems a very dangerous
+way to list devices. [It does prompt again before doing any damage.]
+'devfsadm -Cv' cleans out the clutter in the /dev/rdsk directory,
+only leaving what is "live". The "cfgadm -v" command looks promising.
 
 Details
 =======
 The ported utilities listed above, all use SCSI command functions
 declared in sg_cmds_basic.h and sg_cmds_extra.h . Those SCSI command
 functions are implemented in the corresponding ".c" files. The ".c"
-files pass SCSI commands to the host operating system via
-an interface declared in sg_pt.h . There are currently four
-implementations of that interface depending on the host operating
-system:
+files pass SCSI commands to the host operating system via an interface
+declared in sg_pt.h . There are currently five implementations of that
+interface depending on the host operating system:
   - sg_pt_linux.c
   - sg_pt_freebsd.c
   - sg_pt_osf1.c  [Tru64]
   - sg_pt_solaris.c
   - sg_pt_win32.c
 
-The sg_pt_solaris.c file uses the "uscsi" SCSI pass through
-mechanism.
-
-See the Solaris section in the INSTALL file for install directions.
+The sg_pt_solaris.c file uses the "uscsi" SCSI pass through mechanism. There
+seems to be no corresponding ATA pass through and recent SATA disks do not
+seem to have a SAT layer in front of them (within Solaris). If SAT is
+present (perhaps externally or within a HBA) then that would allow SATA
+disks to accept SCSI commands including the SCSI ATA PASS THROUGH commands.
 
 
 Doug Gilbert
-20th September 2009
+5th December 2010

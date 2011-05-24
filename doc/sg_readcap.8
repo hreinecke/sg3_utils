@@ -1,4 +1,4 @@
-.TH SG_READCAP "8" "September 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_READCAP "8" "January 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_readcap \- sends a SCSI READ CAPACITY command
 .SH SYNOPSIS
@@ -23,12 +23,12 @@ are counted origin zero (i.e. starting at block zero)). This is the source
 of many "off by one" errors.
 .PP
 The READ CAPACITY(16) response provides additional information not found in
-the READ CAPACITY(10) response. This includes protection and thin provisioning
-information, plus the number of logical blocks per physical block. So even
-though the media size may not exceed what READ CAPACITY(10) can show, it may
-still be useful to examine the response to READ CAPACITY(16). Sadly there
-are horrible SCSI command set implementations in the wild that crash when
-the READ CAPACITY(16) command is sent to them.
+the READ CAPACITY(10) response. This includes protection and logical block
+provisioning information, plus the number of logical blocks per physical
+block. So even though the media size may not exceed what READ CAPACITY(10)
+can show, it may still be useful to examine the response to READ
+CAPACITY(16). Sadly there are horrible SCSI command set implementations in
+the wild that crash when the READ CAPACITY(16) command is sent to them.
 .PP
 Device capacity is the product of the number of blocks by the block size.
 This utility outputs this figure in bytes, MiB (1048576 bytes per MiB)
@@ -66,6 +66,7 @@ will yield the last block address after \fILBA\fR prior to a delay. For a
 disk, given a \fILBA\fR it yields the highest numbered block on the same
 cylinder (i.e. before the heads need to move). \fILBA\fR is assumed to be
 decimal unless prefixed by "0x" or it has a trailing "h". Defaults to 0.
+This option was made obsolete in SBC\-3 revision 26.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 Use the 16 byte cdb variant of the READ CAPACITY command. The default
@@ -75,7 +76,7 @@ is used on a device whose size is too large then a last block address
 of 0xffffffff is returned (if the device complies with SBC\-2).
 .TP
 \fB\-\-16\fR
-Use the 16 byte cdb variant of the READ CAPACITY command. See the '--long'
+Use the 16 byte cdb variant of the READ CAPACITY command. See the '\-\-long'
 option.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
@@ -85,7 +86,8 @@ switch to older style options.
 partial medium indicator: for finding the next block address prior to
 some delay (e.g. head movement). In the absence of this option, the
 total number of blocks and the block size of the device are output.
-Used in conjunction with the \fI\-\-lba=LBA\fR option.
+Used in conjunction with the \fI\-\-lba=LBA\fR option. This option was
+made obsolete in SBC\-3 revision 26.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary to stdout.
@@ -155,7 +157,7 @@ outputs version string then exits.
 .SH AUTHORS
 Written by Douglas Gilbert
 .SH COPYRIGHT
-Copyright \(co 1999\-2009 Douglas Gilbert
+Copyright \(co 1999\-2011 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

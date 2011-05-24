@@ -24,7 +24,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.10 20100312";
+static char * version_str = "1.10 20100423";
 
 #define ME "sg_wr_mode: "
 
@@ -497,7 +497,7 @@ int main(int argc, char * argv[])
         if (! force) {
             if ((! (ref_md[off] & 0x80)) && save) {
                 fprintf(stderr, "PS bit in existing mode page indicates that "
-                        "it is not savable\n    but '--save' option given\n");
+                        "it is not saveable\n    but '--save' option given\n");
                 goto err_out;
             }
             read_in[0] &= 0x7f; /* mask out PS bit, reserved in mode select */

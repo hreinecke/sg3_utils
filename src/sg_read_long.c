@@ -16,7 +16,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2008 D. Gilbert
+   *  Copyright (C) 2004-2010 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
    the sector data and the ECC bytes.
 */
 
-static char * version_str = "1.16 20080510";
+static char * version_str = "1.18 20101215";
 
 #define MAX_XFER_LEN 10000
 
@@ -45,6 +45,7 @@ static struct option long_options[] = {
         {"lba", 1, 0, 'l'},
         {"out", 1, 0, 'o'},
         {"pblock", 0, 0, 'p'},
+        {"readonly", 0, 0, 'r'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {"xfer_len", 1, 0, 'x'},
@@ -57,9 +58,9 @@ usage()
     fprintf(stderr, "Usage: "
           "sg_read_long [--16] [--correct] [--help] [--lba=LBA] "
           "[--out=OF]\n"
-          "                    [--pblock] [--verbose] [--version] "
-          "[--xfer_len=BTL]\n"
-          "                    DEVICE\n"
+          "                    [--pblock] [--readonly] [--verbose] "
+          "[--version]\n"
+          "                    [--xfer_len=BTL] DEVICE\n"
           "  where:\n"
           "    --16|-S              do READ LONG(16) (default: "
           "READ LONG(10))\n"
@@ -70,12 +71,15 @@ usage()
           " (default: 0)\n"
           "    --out=OF|-o OF       output in binary to file named OF\n"
           "    --pblock|-p          fetch physical block containing LBA\n"
+          "    --readonly|-r        open DEVICE read-only (def: open it "
+          "read-write)\n"
           "    --verbose|-v         increase verbosity\n"
           "    --version|-V         print version string and"
           " exit\n"
           "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000)"
           " default 520\n\n"
-          "Perform a SCSI READ LONG (10 or 16) command\n"
+          "Perform a SCSI READ LONG (10 or 16) command. Reads a single "
+          "block with\nassociated ECC data. User data could be scrambled.\n"
           );
 }
 
@@ -140,6 +144,7 @@ main(int argc, char * argv[])
     int do_16 = 0;
     int pblock = 0;
     uint64_t llba = 0;
+    int readonly = 0;
     int verbose = 0;
     int64_t ll;
     int got_stdout;
@@ -152,7 +157,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "chl:o:pSvVx:", long_options,
+        c = getopt_long(argc, argv, "chl:o:prSvVx:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -178,6 +183,9 @@ main(int argc, char * argv[])
             break;
         case 'p':
             pblock = 1;
+            break;
+        case 'r':
+            ++readonly;
             break;
         case 'S':
             do_16 = 1;
@@ -226,7 +234,7 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

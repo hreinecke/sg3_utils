@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.11 20100321 */
+/* sg_pt_win32 version 1.13 20110207 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,7 +40,9 @@
  *
  * This code will default to indirect (i.e. double buffered) access
  * unless the WIN32_SPT_DIRECT preprocessor constant is defined in
- * config.h .
+ * config.h . In version 1.12 runtime selection of direct and indirect
+ * access was added; the default is still determined by the
+ * WIN32_SPT_DIRECT preprocessor constant.
  */
 
 #define DEF_TIMEOUT 60       /* 60 seconds */
@@ -69,12 +71,11 @@ struct sg_pt_win32_scsi {
     int in_err;
     int os_err;                 /* pseudo unix error */
     int transport_err;          /* windows error number */
-#ifdef WIN32_SPT_DIRECT
-    SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb;
-#else
-    /* Last entry in structure so data buffer can be extended */
-    SCSI_PASS_THROUGH_WITH_BUFFERS swb;
-#endif
+    union {
+        SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb_d;
+        /* Last entry in structure so data buffer can be extended */
+        SCSI_PASS_THROUGH_WITH_BUFFERS swb_i;
+    };
 };
 
 /* embed pointer so can change on fly if (non-direct) data buffer
@@ -82,6 +83,28 @@ struct sg_pt_win32_scsi {
 struct sg_pt_base {
     struct sg_pt_win32_scsi * implp;
 };
+
+#ifdef WIN32_SPT_DIRECT
+static int spt_direct = 1;
+#else
+static int spt_direct = 0;
+#endif
+
+
+/* Request SPT direct interface when state_direct is 1, state_direct set
+ * to 0 for the SPT indirect interface. */
+void
+scsi_pt_win32_direct(int state_direct)
+{
+    spt_direct = state_direct;
+}
+
+/* Returns current SPT interface state, 1 for direct, 0 for indirect */
+int
+scsi_pt_win32_spt_state(void)
+{
+    return spt_direct;
+}
 
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
@@ -144,16 +167,16 @@ scsi_pt_open_flags(const char * device_name,
     else
         off = 0;
     if (len > (off + 2)) {
-        buff[0] = toupper(device_name[off + 0]);
-        buff[1] = toupper(device_name[off + 1]);
+        buff[0] = toupper((int)device_name[off + 0]);
+        buff[1] = toupper((int)device_name[off + 1]);
         if (0 == strncmp("PD", buff, 2)) {
             num = sscanf(device_name + off + 2, "%d", &pd_num);
             if (1 == num)
                 got_pd_name = 1;
         }
         if (0 == got_pd_name) {
-            buff[2] = toupper(device_name[off + 2]);
-            buff[3] = toupper(device_name[off + 3]);
+            buff[2] = toupper((int)device_name[off + 2]);
+            buff[3] = toupper((int)device_name[off + 3]);
             if (0 == strncmp("SCSI", buff, 4)) {
                 num = sscanf(device_name + off + 4, "%d:%d,%d,%d",
                              &adapter_num, &bus, &target, &lun);
@@ -226,11 +249,19 @@ construct_scsi_pt_obj()
     psp = (struct sg_pt_win32_scsi *)calloc(sizeof(struct sg_pt_win32_scsi),
                                             1);
     if (psp) {
-        psp->swb.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
-        psp->swb.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
-        psp->swb.spt.SenseInfoOffset =
+        if (spt_direct) {
+            psp->swb_d.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+            psp->swb_d.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
+            psp->swb_d.spt.SenseInfoOffset =
                 offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
-        psp->swb.spt.TimeOutValue = DEF_TIMEOUT;
+            psp->swb_d.spt.TimeOutValue = DEF_TIMEOUT;
+        } else {
+            psp->swb_i.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+            psp->swb_i.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
+            psp->swb_i.spt.SenseInfoOffset =
+                offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
+            psp->swb_i.spt.TimeOutValue = DEF_TIMEOUT;
+        }
         vp = malloc(sizeof(struct sg_pt_win32_scsi *)); // yes a pointer
         if (vp)
             vp->implp = psp;
@@ -260,11 +291,19 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 
     if (psp) {
         memset(psp, 0, sizeof(struct sg_pt_win32_scsi));
-        psp->swb.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
-        psp->swb.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
-        psp->swb.spt.SenseInfoOffset =
+        if (spt_direct) {
+            psp->swb_d.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+            psp->swb_d.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
+            psp->swb_d.spt.SenseInfoOffset =
                 offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
-        psp->swb.spt.TimeOutValue = DEF_TIMEOUT;
+            psp->swb_d.spt.TimeOutValue = DEF_TIMEOUT;
+        } else {
+            psp->swb_i.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+            psp->swb_i.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
+            psp->swb_i.spt.SenseInfoOffset =
+                offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
+            psp->swb_i.spt.TimeOutValue = DEF_TIMEOUT;
+        }
     }
 }
 
@@ -274,14 +313,25 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
 {
     struct sg_pt_win32_scsi * psp = vp->implp;
 
-    if (psp->swb.spt.CdbLength > 0)
-        ++psp->in_err;
-    if (cdb_len > (int)sizeof(psp->swb.spt.Cdb)) {
-        ++psp->in_err;
-        return;
+    if (spt_direct) {
+        if (psp->swb_d.spt.CdbLength > 0)
+            ++psp->in_err;
+        if (cdb_len > (int)sizeof(psp->swb_d.spt.Cdb)) {
+            ++psp->in_err;
+            return;
+        }
+        memcpy(psp->swb_d.spt.Cdb, cdb, cdb_len);
+        psp->swb_d.spt.CdbLength = cdb_len;
+    } else {
+        if (psp->swb_i.spt.CdbLength > 0)
+            ++psp->in_err;
+        if (cdb_len > (int)sizeof(psp->swb_i.spt.Cdb)) {
+            ++psp->in_err;
+            return;
+        }
+        memcpy(psp->swb_i.spt.Cdb, cdb, cdb_len);
+        psp->swb_i.spt.CdbLength = cdb_len;
     }
-    memcpy(psp->swb.spt.Cdb, cdb, cdb_len);
-    psp->swb.spt.CdbLength = cdb_len;
 }
 
 void
@@ -309,7 +359,10 @@ set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
     if (dxfer_len > 0) {
         psp->dxferp = dxferp;
         psp->dxfer_len = dxfer_len;
-        psp->swb.spt.DataIn = SCSI_IOCTL_DATA_IN;
+        if (spt_direct)
+            psp->swb_d.spt.DataIn = SCSI_IOCTL_DATA_IN;
+        else
+            psp->swb_i.spt.DataIn = SCSI_IOCTL_DATA_IN;
     }
 }
 
@@ -325,7 +378,10 @@ set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
     if (dxfer_len > 0) {
         psp->dxferp = (unsigned char *)dxferp;
         psp->dxfer_len = dxfer_len;
-        psp->swb.spt.DataIn = SCSI_IOCTL_DATA_OUT;
+        if (spt_direct)
+            psp->swb_d.spt.DataIn = SCSI_IOCTL_DATA_OUT;
+        else
+            psp->swb_i.spt.DataIn = SCSI_IOCTL_DATA_OUT;
     }
 }
 
@@ -370,11 +426,12 @@ set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
     flags = flags;
 }
 
-/* Executes SCSI command (or at least forwards it to lower layers).
- * Clears os_err field prior to active call (whose result may set it
- * again). */
+/* Executes SCSI command (or at least forwards it to lower layers)
+ * using direct interface. Clears os_err field prior to active call (whose
+ * result may set it again). */
 int
-do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
+do_scsi_pt_direct(struct sg_pt_base * vp, int device_fd, int time_secs,
+                  int verbose)
 {
     int index = device_fd - WIN32_FDOFFSET;
     struct sg_pt_win32_scsi * psp = vp->implp;
@@ -390,7 +447,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
             fprintf(sg_warnings_strm, "Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
-    if (0 == psp->swb.spt.CdbLength) {
+    if (0 == psp->swb_d.spt.CdbLength) {
         if (verbose)
             fprintf(sg_warnings_strm, "No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
@@ -410,17 +467,110 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         psp->os_err = ENODEV;
         return -psp->os_err;
     }
-#ifdef WIN32_SPT_DIRECT
-    psp->swb.spt.Length = sizeof (SCSI_PASS_THROUGH_DIRECT);
-#else
-    if (psp->dxfer_len > (int)sizeof(psp->swb.ucDataBuf)) {
-        int extra = psp->dxfer_len - (int)sizeof(psp->swb.ucDataBuf);
+    psp->swb_d.spt.Length = sizeof (SCSI_PASS_THROUGH_DIRECT);
+    psp->swb_d.spt.PathId = shp->bus;
+    psp->swb_d.spt.TargetId = shp->target;
+    psp->swb_d.spt.Lun = shp->lun;
+    psp->swb_d.spt.TimeOutValue = time_secs;
+    psp->swb_d.spt.DataTransferLength = psp->dxfer_len;
+    if (verbose > 4) {
+        fprintf(stderr, " spt_direct, adapter: %s  Length=%d ScsiStatus=%d "
+                "PathId=%d TargetId=%d Lun=%d\n", shp->adapter,
+                (int)psp->swb_d.spt.Length,
+                (int)psp->swb_d.spt.ScsiStatus, (int)psp->swb_d.spt.PathId,
+                (int)psp->swb_d.spt.TargetId, (int)psp->swb_d.spt.Lun);
+        fprintf(stderr, "    CdbLength=%d SenseInfoLength=%d DataIn=%d "
+                "DataTransferLength=%lu\n",
+                (int)psp->swb_d.spt.CdbLength,
+                (int)psp->swb_d.spt.SenseInfoLength,
+                (int)psp->swb_d.spt.DataIn,
+                psp->swb_d.spt.DataTransferLength);
+        fprintf(stderr, "    TimeOutValue=%lu SenseInfoOffset=%lu\n",
+                psp->swb_d.spt.TimeOutValue, psp->swb_d.spt.SenseInfoOffset);
+    }
+    psp->swb_d.spt.DataBuffer = psp->dxferp;
+    status = DeviceIoControl(shp->fh, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+                            &psp->swb_d,
+                            sizeof(psp->swb_d),
+                            &psp->swb_d,
+                            sizeof(psp->swb_d),
+                            &returned,
+                            NULL);
+    if (! status) {
+        psp->transport_err = GetLastError();
+        if (verbose)
+            fprintf(sg_warnings_strm, "Windows DeviceIoControl error=%d\n",
+                    psp->transport_err);
+        psp->os_err = EIO;
+        return 0;       /* let app find transport error */
+    }
+
+    psp->scsi_status = psp->swb_d.spt.ScsiStatus;
+    if ((SAM_STAT_CHECK_CONDITION == psp->scsi_status) ||
+        (SAM_STAT_COMMAND_TERMINATED == psp->scsi_status))
+        memcpy(psp->sensep, psp->swb_d.ucSenseBuf, psp->sense_len);
+    else
+        psp->sense_len = 0;
+    psp->sense_resid = 0;
+    if ((psp->dxfer_len > 0) && (psp->swb_d.spt.DataTransferLength > 0))
+        psp->resid = psp->dxfer_len - psp->swb_d.spt.DataTransferLength;
+    else
+        psp->resid = 0;
+
+    return 0;
+}
+
+/* Executes SCSI command (or at least forwards it to lower layers) using
+ * indirect interface. Clears os_err field prior to active call (whose
+ * result may set it again). */
+static int
+do_scsi_pt_indirect(struct sg_pt_base * vp, int device_fd, int time_secs,
+                    int verbose)
+{
+    int index = device_fd - WIN32_FDOFFSET;
+    struct sg_pt_win32_scsi * psp = vp->implp;
+    struct sg_pt_handle * shp;
+    BOOL status;
+    ULONG returned;
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    psp->os_err = 0;
+    if (psp->in_err) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "Replicated or unused "
+                    "set_scsi_pt...\n");
+        return SCSI_PT_DO_BAD_PARAMS;
+    }
+    if (0 == psp->swb_i.spt.CdbLength) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "No command (cdb) given\n");
+        return SCSI_PT_DO_BAD_PARAMS;
+    }
+
+    index = device_fd - WIN32_FDOFFSET;
+    if ((index < 0) || (index >= WIN32_FDOFFSET)) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "Bad file descriptor\n");
+        psp->os_err = ENODEV;
+        return -psp->os_err;
+    }
+    shp = handle_arr + index;
+    if (0 == shp->in_use) {
+        if (verbose)
+            fprintf(sg_warnings_strm, "File descriptor closed??\n");
+        psp->os_err = ENODEV;
+        return -psp->os_err;
+    }
+    if (psp->dxfer_len > (int)sizeof(psp->swb_i.ucDataBuf)) {
+        int extra = psp->dxfer_len - (int)sizeof(psp->swb_i.ucDataBuf);
         struct sg_pt_win32_scsi * epsp;
 
         if (verbose > 4)
-            fprintf(sg_warnings_strm, "dxfer_len (%d) too large for initial "
-                    "data buffer (%d bytes), try enlarging\n", psp->dxfer_len,
-                    sizeof(psp->swb.ucDataBuf));
+            fprintf(sg_warnings_strm, "spt_indirect: dxfer_len (%d) too "
+                    "large for initial data\n  buffer (%d bytes), try "
+                    "enlarging\n", psp->dxfer_len,
+                    sizeof(psp->swb_i.ucDataBuf));
         epsp = (struct sg_pt_win32_scsi *)
                calloc(sizeof(struct sg_pt_win32_scsi) + extra, 1);
         if (NULL == epsp) {
@@ -434,54 +584,41 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         vp->implp = epsp;
         psp = epsp;
     }
-    psp->swb.spt.Length = sizeof (SCSI_PASS_THROUGH);
-    psp->swb.spt.DataBufferOffset =
+    psp->swb_i.spt.Length = sizeof (SCSI_PASS_THROUGH);
+    psp->swb_i.spt.DataBufferOffset =
                 offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucDataBuf);
-#endif
-    psp->swb.spt.PathId = shp->bus;
-    psp->swb.spt.TargetId = shp->target;
-    psp->swb.spt.Lun = shp->lun;
-    psp->swb.spt.TimeOutValue = time_secs;
-    psp->swb.spt.DataTransferLength = psp->dxfer_len;
+    psp->swb_i.spt.PathId = shp->bus;
+    psp->swb_i.spt.TargetId = shp->target;
+    psp->swb_i.spt.Lun = shp->lun;
+    psp->swb_i.spt.TimeOutValue = time_secs;
+    psp->swb_i.spt.DataTransferLength = psp->dxfer_len;
     if (verbose > 4) {
-        fprintf(stderr, " spt:: adapter: %s  Length=%d ScsiStatus=%d "
+        fprintf(stderr, " spt_indirect, adapter: %s  Length=%d ScsiStatus=%d "
                 "PathId=%d TargetId=%d Lun=%d\n", shp->adapter,
-                (int)psp->swb.spt.Length,
-                (int)psp->swb.spt.ScsiStatus, (int)psp->swb.spt.PathId,
-                (int)psp->swb.spt.TargetId, (int)psp->swb.spt.Lun);
+                (int)psp->swb_i.spt.Length,
+                (int)psp->swb_i.spt.ScsiStatus, (int)psp->swb_i.spt.PathId,
+                (int)psp->swb_i.spt.TargetId, (int)psp->swb_i.spt.Lun);
         fprintf(stderr, "    CdbLength=%d SenseInfoLength=%d DataIn=%d "
                 "DataTransferLength=%lu\n",
-                (int)psp->swb.spt.CdbLength, (int)psp->swb.spt.SenseInfoLength,
-                (int)psp->swb.spt.DataIn, psp->swb.spt.DataTransferLength);
-#ifdef WIN32_SPT_DIRECT
-        fprintf(stderr, "    TimeOutValue=%lu SenseInfoOffset=%lu\n",
-                psp->swb.spt.TimeOutValue, psp->swb.spt.SenseInfoOffset);
-#else
+                (int)psp->swb_i.spt.CdbLength,
+                (int)psp->swb_i.spt.SenseInfoLength,
+                (int)psp->swb_i.spt.DataIn,
+                psp->swb_i.spt.DataTransferLength);
         fprintf(stderr, "    TimeOutValue=%lu DataBufferOffset=%lu "
-                "SenseInfoOffset=%lu\n", psp->swb.spt.TimeOutValue,
-                psp->swb.spt.DataBufferOffset, psp->swb.spt.SenseInfoOffset);
-#endif
+                "SenseInfoOffset=%lu\n", psp->swb_i.spt.TimeOutValue,
+                psp->swb_i.spt.DataBufferOffset,
+                psp->swb_i.spt.SenseInfoOffset);
     }
-#ifdef WIN32_SPT_DIRECT
-    psp->swb.spt.DataBuffer = psp->dxferp;
-    status = DeviceIoControl(shp->fh, IOCTL_SCSI_PASS_THROUGH_DIRECT,
-                            &psp->swb,
-                            sizeof(psp->swb),
-                            &psp->swb,
-                            sizeof(psp->swb),
-                            &returned,
-                            NULL);
-#else
-    if ((psp->dxfer_len > 0) && (SCSI_IOCTL_DATA_OUT == psp->swb.spt.DataIn))
-        memcpy(psp->swb.ucDataBuf, psp->dxferp, psp->dxfer_len);
+    if ((psp->dxfer_len > 0) &&
+        (SCSI_IOCTL_DATA_OUT == psp->swb_i.spt.DataIn))
+        memcpy(psp->swb_i.ucDataBuf, psp->dxferp, psp->dxfer_len);
     status = DeviceIoControl(shp->fh, IOCTL_SCSI_PASS_THROUGH,
-                            &psp->swb,
-                            sizeof(psp->swb),
-                            &psp->swb,
-                            sizeof(psp->swb),
+                            &psp->swb_i,
+                            sizeof(psp->swb_i),
+                            &psp->swb_i,
+                            sizeof(psp->swb_i),
                             &returned,
                             NULL);
-#endif
     if (! status) {
         psp->transport_err = GetLastError();
         if (verbose)
@@ -490,24 +627,34 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         psp->os_err = EIO;
         return 0;       /* let app find transport error */
     }
-#ifndef WIN32_SPT_DIRECT
-    if ((psp->dxfer_len > 0) && (SCSI_IOCTL_DATA_IN == psp->swb.spt.DataIn))
-        memcpy(psp->dxferp, psp->swb.ucDataBuf, psp->dxfer_len);
-#endif
+    if ((psp->dxfer_len > 0) && (SCSI_IOCTL_DATA_IN == psp->swb_i.spt.DataIn))
+        memcpy(psp->dxferp, psp->swb_i.ucDataBuf, psp->dxfer_len);
 
-    psp->scsi_status = psp->swb.spt.ScsiStatus;
+    psp->scsi_status = psp->swb_i.spt.ScsiStatus;
     if ((SAM_STAT_CHECK_CONDITION == psp->scsi_status) ||
         (SAM_STAT_COMMAND_TERMINATED == psp->scsi_status))
-        memcpy(psp->sensep, psp->swb.ucSenseBuf, psp->sense_len);
+        memcpy(psp->sensep, psp->swb_i.ucSenseBuf, psp->sense_len);
     else
         psp->sense_len = 0;
     psp->sense_resid = 0;
-    if ((psp->dxfer_len > 0) && (psp->swb.spt.DataTransferLength > 0))
-        psp->resid = psp->dxfer_len - psp->swb.spt.DataTransferLength;
+    if ((psp->dxfer_len > 0) && (psp->swb_i.spt.DataTransferLength > 0))
+        psp->resid = psp->dxfer_len - psp->swb_i.spt.DataTransferLength;
     else
         psp->resid = 0;
 
     return 0;
+}
+
+/* Executes SCSI command (or at least forwards it to lower layers).
+ * Clears os_err field prior to active call (whose result may set it
+ * again). */
+int
+do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
+{
+    if (spt_direct)
+        return do_scsi_pt_direct(vp, device_fd, time_secs, verbose);
+    else
+        return do_scsi_pt_indirect(vp, device_fd, time_secs, verbose);
 }
 
 int

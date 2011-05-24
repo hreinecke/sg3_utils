@@ -9,7 +9,7 @@
 
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2010 D. Gilbert
+*  Copyright (C) 2000-2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -23,13 +23,13 @@
 const char * sg_ansi_version_arr[] =
 {
     "no conformance claimed",
-    "SCSI-1",
-    "SCSI-2",
-    "SPC",
+    "SCSI-1",           /* obsolete */
+    "SCSI-2",           /* obsolete */
+    "SPC",              /* withdrawn */
     "SPC-2",
     "SPC-3",
     "SPC-4",
-    "ANSI version: 7",
+    "reserved [7h]",
 };
 
 
@@ -39,7 +39,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 26 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 28 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -174,6 +174,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x462, "SPC-4 T10/1731-D revision 18"},
     {0x463, "SPC-4 T10/1731-D revision 23"},
     {0x480, "SMC-3 (no version claimed)"},
+    {0x482, "SMC-3 T10/1730-D revision 15"},
     {0x4a0, "ADC-2 (no version claimed)"},
     {0x4a7, "ADC-2 T10/1741-D revision 7"},
     {0x4aa, "ADC-2 T10/1741-D revision 8"},
@@ -183,6 +184,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x4e3, "MMC-6 T10/1836-D revision 2b"},
     {0x4e5, "MMC-6 T10/1836-D revision 02g"},
     {0x500, "ADC-3 (no version claimed)"},
+    {0x502,  "ADC-3 T10/1895-D revision 04"},
     {0x520, "SSC-4 (no version claimed)"},
     {0x560, "OSD-3 (no version claimed)"},
     {0x580, "SES-3 (no version claimed)"},
@@ -214,11 +216,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x917, "FCP-2 ANSI INCITS 350-2003"},
     {0x918, "FCP-2 T10/1144-D revision 8"},
     {0x920, "SST (no version claimed)"},
-    {0x935, "SST T10/1380-D revision 8b"},
-    {0x940, "SRP (no version claimed)"},
-    {0x954, "SRP T10/1415-D revision 10"},
-    {0x955, "SRP T10/1415-D revision 16a"},
-    {0x95c, "SRP ANSI INCITS 365-2002"},
+    {0x935, "SST T10/1380-D revision 8b"}, {0x940, "SRP (no version claimed)"}, {0x954, "SRP T10/1415-D revision 10"}, {0x955, "SRP T10/1415-D revision 16a"}, {0x95c, "SRP ANSI INCITS 365-2002"},
     {0x960, "iSCSI (no version claimed)"},
     {0x980, "SBP-3 (no version claimed)"},
     {0x982, "SBP-3 T10/1467-D revision 1f"},
@@ -242,6 +240,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa27, "ADT-2 T10/1742-D revision 08"},
     {0xa40, "FCP-4 (no version claimed)"},
     {0xa42, "FCP-4 T10/1828-D revision 01"},
+    {0xa44, "FCP-4 T10/1828-D revision 02"},
     {0xaa0, "SPI (no version claimed)"},
     {0xab9, "SPI T10/0855-D revision 15a"},
     {0xaba, "SPI ANSI INCITS 253-1995"},
@@ -290,6 +289,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc2a, "SAS-2 ANSI INCITS 457-2010"},
     {0xc40, "SAS-2.1 (no version claimed)"},
     {0xc48, "SAS-2.1 T10/2125-D revision 04"},
+    {0xc4a, "SAS-2.1 T10/2125-D revision 06"},
+    {0xc60, "SAS-3 (no version claimed)"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
     {0xd3c, "FC-PH ANSI INCITS 230-1994 with Amnd 1 ANSI INCITS "
@@ -346,6 +347,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xf20, "FC-PI-5 (no version claimed)"},
     {0xf27, "FC-PI-5 T11/2118-D revision 2.00"},
     {0xf28, "FC-PI-5 T11/2118-D revision 3.00"},
+    {0xf2a, "FC-PI-5 T11/2118-D revision 6.00"},
     {0xf40, "FC-PI-6 (no version claimed)"},
     {0x12a0, "FC-SCM (no version claimed)"},
     {0x12a3, "FC-SCM T11/1824DT revision 1.0"},
@@ -394,6 +396,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1740, "UAS (no version claimed)"},    /* USB attached SCSI */
     {0x1743, "UAS T10/2095-D revision 02"},
     {0x1747, "UAS T10/2095-D revision 04"},
+    {0x1780, "UAS-2 (no version claimed)"},
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
     {0x1eab, "SAT T10/1711-D rev 9"},
@@ -405,6 +408,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x20a0, "SPL (no version claimed)"},
     {0x20a3, "SPL T10/2124-D revision 6a"},
     {0x20a5, "SPL T10/2124-D revision 7"},
+    {0x20c0, "SPL-2 (no version claimed)"},
     {0xffc0, "IEEE 1667 (no version claimed)"},
     {0xffc1, "IEEE 1667-2006"},
     {0xffc2, "IEEE 1667-2009"},

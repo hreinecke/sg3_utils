@@ -1,9 +1,10 @@
-.TH SG_RMSN "8" "April 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_RMSN "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg_rmsn \- sends a SCSI READ MEDIA SERIAL NUMBER command
 .SH SYNOPSIS
 .B sg_rmsn
-[\fI\-\-help\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-help\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -27,6 +28,12 @@ at the end so its length is a multiple of 4). The default action is
 to print the serial number out in ASCII\-HEX with ASCII characters to
 the right. All error messages are sent to stderr.
 .TP
+\fB\-R\fR, \fB\-\-readonly\fR
+opens the DEVICE read\-only rather than read\-write which is the
+default. The Linux sg driver needs read\-write access for the SCSI
+READ MEDIA SERIAL NUMBER command but other access methods may require
+read\-only access.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
@@ -49,7 +56,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2008 Douglas Gilbert
+Copyright \(co 2005\-2011 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -128,6 +128,19 @@ extern int get_scsi_pt_duration_ms(const struct sg_pt_base * objp);
  * order to clean up resources. For ever successful construct_scsi_pt_obj()
  * call there should be one destruct_scsi_pt_obj().  */
 extern void destruct_scsi_pt_obj(struct sg_pt_base * objp);
+
+#ifdef SG_LIB_WIN32
+#define SG_LIB_WIN32_DIRECT 1
+
+/* Request SPT direct interface when state_direct is 1, state_direct set
+ * to 0 for the SPT indirect interface. Default setting selected by build
+ * (i.e. library compile time) and is usually indirect. */
+extern void scsi_pt_win32_direct(int state_direct);
+
+/* Returns current SPT interface state, 1 for direct, 0 for indirect */
+extern int scsi_pt_win32_spt_state(void);
+
+#endif
 
 #ifdef __cplusplus
 }

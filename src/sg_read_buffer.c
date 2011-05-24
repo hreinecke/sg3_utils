@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2011 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,12 +19,13 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
 /*
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.05 20100312";
+static char * version_str = "1.07 20110216";
 
 
 static struct option long_options[] = {
@@ -39,6 +40,7 @@ static struct option long_options[] = {
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
 };
+
 
 static void
 usage()
@@ -254,6 +256,15 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (verbose > 4)
+        fprintf(stderr, "Initial win32 SPT interface state: %s\n",
+                scsi_pt_win32_spt_state() ? "direct" : "indirect");
+    scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
+#endif
+#endif
+
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
@@ -289,7 +300,7 @@ main(int argc, char * argv[])
         if (do_raw)
             dStrRaw((const char *)resp, rb_len);
         else if (do_hex || (rb_len < 4))
-            dStrHex((const char *)resp, rb_len, 1);
+            dStrHex((const char *)resp, rb_len, ((do_hex > 1) ? 0 : 1));
         else {
             switch (rb_mode) {
             case MODE_DESCRIPTOR:

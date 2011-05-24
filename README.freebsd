@@ -13,6 +13,7 @@ for FreeBSD.
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
+    sg_decode_sense
     sg_format
     sg_get_config
     sg_get_lba_status
@@ -31,6 +32,7 @@ Here is a list of utilities that have been ported:
     sg_read_long
     sg_readcap
     sg_reassign
+    sg_referrals
     sg_requests
     sg_rmsn
     sg_rtpg
@@ -61,41 +63,46 @@ http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 
-See the INSTALL file (at the end) for instructions on how to build
-sg3_utils on FreeBSD. If the "./configure ; make" sequence fails, try
-running "./autogen.sh" first. Some man pages have examples which use
-linux device names which hopefully will not confuse the FreeBSD users.
+The executables and library can be built from the source code in
+the tarball and installed with the familiar
+"./configure ; make ; make install" sequence. If this fails try
+running the "./autogen.sh" script prior to that sequence. There
+are generic instruction on configure and friend in the INSTALL file.
+
+Some man pages have examples which use linux device names which
+hopefully will not confuse the FreeBSD users.
+
+Device naming
+=============
+In FreeBSD disks have block names like '/dev/da0' with a corresponding
+pass-through device name like '/dev/pass0'. Use this command
+"camcontrol devlist" to see that SCSI devices available.
 
 
 Details
 =======
-The ported utilities listed above, all use SCSI command functions
-declared in sg_cmds_basic.h and sg_cmds_extra.h . Those SCSI command
-functions are implemented in the corresponding ".c" files. The ".c"
-files pass SCSI commands to the host operating system via
-an interface declared in sg_pt.h . There are currently four
-implementations of that interface depending on the host operating
-system:
+Most of the ported utilities listed above use SCSI command functions
+declared in sg_cmds_*.h headers . Those SCSI command functions are
+implemented in the corresponding ".c" files. The ".c" files pass SCSI
+commands to the host operating system via an interface declared in sg_pt.h .
+There are currently five implementations of that interface depending on
+the host operating system:
   - sg_pt_linux.c
   - sg_pt_freebsd.c
   - sg_pt_osf1.c  [Tru64]
   - sg_pt_win32.c
+  - sg_pt_solaris.c
 
-The sg_pt_freebsd.c file uses the FreeBSD CAM SCSI pass through
-mechanism. Hence only FreeBSD device nodes that support CAM can
-be used. These can be viewed with the "camcontrol devlist"
-command. To access ATAPI devices (e.g. ATAPI DVD drives) the
-kernel may need to be configured with the "atapicam" device.
+The sg_pt_freebsd.c file uses the FreeBSD CAM SCSI pass through mechanism.
+Hence only FreeBSD device nodes that support CAM can be used. These can be
+viewed with the "camcontrol devlist" command. To access ATAPI devices (e.g.
+ATAPI DVD drives) the kernel may need to be configured with the "atapicam"
+device.
 
-Disks is FreeBSD have names like '/dev/da0' while the corresponding
-pass-through device may be '/dev/pass0'.
+FreeBSD 8.0 is the most recent version of FreeBSD tested with these
+utilities.
 
-At the present time these utilities have been lightly tested on a
-FreeBSD version 7.0 system with some SCSI disks, a SCSI tape
-drive and an ATAPI CD drive.
-
-See the FreeBSD section in the INSTALL file for install directions.
 
 
 Doug Gilbert
-20th September 2009
+5th December 2010

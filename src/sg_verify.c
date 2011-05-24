@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2008 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * This program issues the SCSI VERIFY command to the given SCSI block device.
  */
 
-static char * version_str = "1.13 20100312";
+static char * version_str = "1.15 20110206";
 
 #define ME "sg_verify: "
 
@@ -37,6 +37,7 @@ static struct option long_options[] = {
         {"dpo", 0, 0, 'd'},
         {"help", 0, 0, 'h'},
         {"lba", 1, 0, 'l'},
+        {"readonly", 0, 0, 'r'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {"vrprotect", 1, 0, 'P'},
@@ -49,8 +50,9 @@ usage()
     fprintf(stderr, "Usage: "
           "sg_verify [--bpc=BPC] [--count=COUNT] [--dpo] [--help] "
           "[--lba=LBA]\n"
-          "                 [--verbose] [--version] [--vrprotect=VRP] "
-          "DEVICE\n"
+          "                 [--readonly] [--verbose] [--version] "
+          "[--vrprotect=VRP]\n"
+          "                 DEVICE\n"
           "  where:\n"
           "    --bpc=BPC|-b BPC    max blocks per verify command "
           "(def 128)\n"
@@ -61,6 +63,8 @@ usage()
           "    --help|-h           print out usage message\n"
           "    --lba=LBA|-l LBA    logical block address to start "
           "verify (def 0)\n"
+          "    --readonly|-r       open DEVICE read-only (def: open it "
+          "read-write)\n"
           "    --verbose|-v        increase verbosity\n"
           "    --version|-V        print version string and exit\n"
           "    --vrprotect=VRP|-P VRP    set vrprotect field to VRP "
@@ -82,6 +86,7 @@ main(int argc, char * argv[])
     int bpc = 128;
     uint64_t lba = 0;
     uint64_t orig_lba;
+    int readonly = 0;
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
@@ -90,7 +95,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:c:dhl:P:vV", long_options,
+        c = getopt_long(argc, argv, "b:c:dhl:P:rvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -137,6 +142,9 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
+        case 'r':
+            ++readonly;
+            break;
         case 'v':
             ++verbose;
             break;
@@ -180,7 +188,7 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
@@ -217,7 +225,7 @@ main(int argc, char * argv[])
                 break;
             case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
                 fprintf(stderr, "medium or hardware error, reported "
-                        "lba=0x%u\n", info);
+                        "lba=0x%x\n", info);
                 break;
             default:
                 fprintf(stderr, "Verify(10) failed near lba=%" PRIu64

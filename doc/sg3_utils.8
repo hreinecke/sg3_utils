@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG3_UTILS "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -25,7 +25,7 @@ http://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
 of the diagram. SCSI commands in common with all device types can be found
 in SPC of which SPC\-4 is the latest major version. Block device specific
 commands (e.g. as used by disks) are in SBC, those for tape drives in SSC
-and those for CD/DVD/HD_DVD/BD drives in MMC.
+and those for CD/DVD/BD drives in MMC.
 .PP
 It is becoming more common to control ATA disks with the SCSI command set.
 This involves the translation of SCSI commands to their corresponding
@@ -87,7 +87,7 @@ a running system.
 .PP
 There is also a SCSI device driver which offers alternate generic access
 to SCSI devices. It uses names of the form /dev/sg<num> where <num> starts
-at zero. The "lsscsi -g" command may be useful in finding these and which
+at zero. The "lsscsi \-g" command may be useful in finding these and which
 generic name corresponds to a device type name (e.g. /dev/sg2 may
 correspond to /dev/sda). In the lk 2.6 series a block SCSI generic
 driver was introduced and its names are of the form 
@@ -98,50 +98,6 @@ and alternate device names.
 Prior to the Linux kernel 2.6 series these utilities could only use
 generic device names (e.g. /dev/sg1 ). In almost all cases in the Linux
 kernel 2.6 series, any device name can be used by these utilities.
-.SH FREEBSD DEVICE NAMING
-SCSI disks have block names of the form /dev/da<num> where <num> is an
-integer starting at zero. The "da" is replaced by "sa" for SCSI tape
-drives and "cd" for SCSI CD/DVD/BD drives. Each SCSI device has a
-corresponding pass-through device name of the form /dev/pass<num>
-where <num> is an integer starting at zero. The "camcontrol devlist"
-command may be useful for finding out which SCSI device names are
-available and the correspondence between between class and pass-through
-names.
-.SH SOLARIS DEVICE NAMING
-SCSI device names below the /dev directory have a form like: c5t4d3s2
-where the number following "c" is the controller (HBA) number, the number
-following "t" is the target number (from the SCSI parallel interface days)
-and the number following "d" is the LUN. Following the "s" is the slice
-number which is related to a partition and by convention "s2" is the whole
-disk.
-.PP
-OpenSolaris also has a c5t4d3p2 form where the number following the "p" is
-the partition number apart from "p0" which is the whole disk. So a whole
-disk may be referred to as either c5t4d3, c5t4d3s2 or c5t4d3p0 .
-.PP
-And these device names are duplicated in the /dev/dsk and /dev/rdsk
-directories. The former is the block device name and the latter is
-for "raw" (or char device) access which is what sg3_utils needs. So in
-OpenSolaris something of the form 'sg_inq /dev/rdsk/c5t4d3p0' should work.
-If it doesn't work then add a '-vvv' option for more debug information.
-Trying this form 'sg_inq /dev/dsk/c5t4d3p0' (note "rdsk" changed to "dsk")
-will result in an "inappropriate ioctl for device" error.
-.PP
-The device names within the /dev directory are typically symbolic links to
-much longer topological names in the /device directory. In Solaris cd/dvd/bd
-drives seem to be treated as disks and so are found in the /dev/rdsk
-directory. Tape drives appear in the /dev/rmt directory.
-.PP
-There is also a sgen (SCSI generic) driver which by default does not attach
-to any device. See the /kernel/drv/sgen.conf file to control what is
-attached. Any attached device will have a device name of the
-form /dev/scsi/c5t4d3 .
-.PP
-Listing available SCSI devices in Solaris seems to be a challenge. "Use
-the 'format' command" advice works but seems a very dangerous way to list
-devices. [It does prompt again before doing any damage.] 'devfsadm -Cv'
-cleans out the clutter in the /dev/rdsk directory, only leaving what
-is "live". The "cfgadm -v" command looks promising.
 .SH WINDOWS DEVICE NAMING
 Storage and related devices can have several device names in Windows.
 Probably the most common in the volume name (e.g. "D:"). There are also
@@ -183,6 +139,50 @@ each backslash may need to be typed twice.
 .PP
 The sg_scan utility lists out Windows device names in forms that are
 suitable for other utilities in this package to use.
+.SH FREEBSD DEVICE NAMING
+SCSI disks have block names of the form /dev/da<num> where <num> is an
+integer starting at zero. The "da" is replaced by "sa" for SCSI tape
+drives and "cd" for SCSI CD/DVD/BD drives. Each SCSI device has a
+corresponding pass-through device name of the form /dev/pass<num>
+where <num> is an integer starting at zero. The "camcontrol devlist"
+command may be useful for finding out which SCSI device names are
+available and the correspondence between between class and pass-through
+names.
+.SH SOLARIS DEVICE NAMING
+SCSI device names below the /dev directory have a form like: c5t4d3s2
+where the number following "c" is the controller (HBA) number, the number
+following "t" is the target number (from the SCSI parallel interface days)
+and the number following "d" is the LUN. Following the "s" is the slice
+number which is related to a partition and by convention "s2" is the whole
+disk.
+.PP
+OpenSolaris also has a c5t4d3p2 form where the number following the "p" is
+the partition number apart from "p0" which is the whole disk. So a whole
+disk may be referred to as either c5t4d3, c5t4d3s2 or c5t4d3p0 .
+.PP
+And these device names are duplicated in the /dev/dsk and /dev/rdsk
+directories. The former is the block device name and the latter is
+for "raw" (or char device) access which is what sg3_utils needs. So in
+OpenSolaris something of the form 'sg_inq /dev/rdsk/c5t4d3p0' should work.
+If it doesn't work then add a '\-vvv' option for more debug information.
+Trying this form 'sg_inq /dev/dsk/c5t4d3p0' (note "rdsk" changed to "dsk")
+will result in an "inappropriate ioctl for device" error.
+.PP
+The device names within the /dev directory are typically symbolic links to
+much longer topological names in the /device directory. In Solaris cd/dvd/bd
+drives seem to be treated as disks and so are found in the /dev/rdsk
+directory. Tape drives appear in the /dev/rmt directory.
+.PP
+There is also a sgen (SCSI generic) driver which by default does not attach
+to any device. See the /kernel/drv/sgen.conf file to control what is
+attached. Any attached device will have a device name of the
+form /dev/scsi/c5t4d3 .
+.PP
+Listing available SCSI devices in Solaris seems to be a challenge. "Use
+the 'format' command" advice works but seems a very dangerous way to list
+devices. [It does prompt again before doing any damage.] 'devfsadm \-Cv'
+cleans out the clutter in the /dev/rdsk directory, only leaving what
+is "live". The "cfgadm \-v" command looks promising.
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
@@ -382,14 +382,16 @@ Some utilities that the author has found useful have been placed in
 the 'utils' subdirectory.
 .SH WEB SITE
 There is a web page discussing this package at 
-http://sg.danny.cz/sg/sg3_utils.html .
+http://sg.danny.cz/sg/sg3_utils.html . The device naming used by this
+package on various operating system is discussed in the page:
+http://sg.danny.cz/sg/device_name.html .
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 1999\-2010 Douglas Gilbert
+Copyright \(co 1999\-2011 Douglas Gilbert
 .br
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files
