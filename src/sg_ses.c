@@ -24,11 +24,12 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.50 20110517";    /* ses3r02 */
+static char * version_str = "1.50 20110526";    /* ses3r02 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
+#define MX_JOIN_ROWS 260
 
 #define TEMPERATURE_OFFSET 20   /* 8 bits represents -19 C to +235 C */
                                 /* value of 0 (would imply -20 C) reserved */
@@ -52,6 +53,7 @@ static char * version_str = "1.50 20110517";    /* ses3r02 */
 #define DPC_SUBENC_NICKNAME 0xf
 
 /* Element Type codes */
+#define UNSPECIFIED_ETC 0x0
 #define DEVICE_ETC 0x1
 #define POWER_SUPPLY_ETC 0x2
 #define COOLING_ETC 0x3
@@ -79,23 +81,6 @@ static char * version_str = "1.50 20110517";    /* ses3r02 */
 #define SAS_CONNECTOR_ETC 0x19
 
 
-static struct option long_options[] = {
-        {"byte1", 1, 0, 'b'},
-        {"control", 0, 0, 'c'},
-        {"data", 1, 0, 'd'},
-        {"filter", 0, 0, 'f'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"inner-hex", 0, 0, 'i'},
-        {"list", 0, 0, 'l'},
-        {"page", 1, 0, 'p'},
-        {"raw", 0, 0, 'r'},
-        {"status", 0, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {0, 0, 0, 0},
-};
-
 struct opts_t {
     int byte1;
     int do_control;
@@ -103,9 +88,14 @@ struct opts_t {
     int do_filter;
     int do_help;
     int do_hex;
+    int index_given;    /* 1 -> index_elem; 2 -> index_overall */
+    int index_elem;
+    int index_overall;
     int inner_hex;
+    int do_join;
     int do_list;
     int page_code;
+    int page_code_given;
     int do_raw;
     int do_status;
     int verbose;
@@ -115,7 +105,64 @@ struct opts_t {
     const char * device_name;
 };
 
+struct diag_page_code {
+        int page_code;
+        const char * desc;
+};
+
+struct element_type_t {
+        int elem_type_code;
+        const char * desc;
+};
+
+struct type_desc_hdr_t {
+    unsigned char etype;        /* element type code (0: unspecified) */
+    unsigned char num_elements; /* number of possible elements, excluding
+                                 * overall element */
+    unsigned char se_id;        /* subenclosure id (0 for main enclosure) */
+    unsigned char unused;       /* type descriptor text length; not needed */
+};
+
+struct join_row_t {
+    short el_ov_ind;            /* element index 0 to 1023, overall index
+                                 * offset by 1024. So 1024 is ov_ind 0 */
+    unsigned char etype;
+    unsigned char se_id;        /* subenclosure id (0 for main enclosure) */
+    /* following point into Element Descriptor, Enclosure Status, Threshold
+     * In and Additional element status diagnostic pages. Can be NULL
+     * apart from enc-statp . */
+    unsigned char * elem_descp;
+    unsigned char * enc_statp;
+    unsigned char * thresh_inp;
+    unsigned char * add_elem_statp;
+};
+
+static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
+
+static struct join_row_t join_arr[MX_JOIN_ROWS];
+
+static struct option long_options[] = {
+        {"byte1", 1, 0, 'b'},
+        {"control", 0, 0, 'c'},
+        {"data", 1, 0, 'd'},
+        {"filter", 0, 0, 'f'},
+        {"help", 0, 0, 'h'},
+        {"hex", 0, 0, 'H'},
+        {"inner-hex", 0, 0, 'i'},
+        {"index", 1, 0, 'I'},
+        {"join", 0, 0, 'j'},
+        {"list", 0, 0, 'l'},
+        {"page", 1, 0, 'p'},
+        {"raw", 0, 0, 'r'},
+        {"status", 0, 0, 's'},
+        {"verbose", 0, 0, 'v'},
+        {"version", 0, 0, 'V'},
+        {0, 0, 0, 0},
+};
+
 static int read_hex(const char * inp, unsigned char * arr, int * arr_len);
+
+static const char * find_in_diag_page_desc(int page_num);
 
 
 static void
@@ -124,9 +171,11 @@ usage()
     fprintf(stderr, "Usage: "
           "sg_ses [--byte1=B1] [--control] [--data=H,H...] [--filter] "
           "[--help]\n"
-          "              [--hex] [--inner-hex] [--list] [--page=PG] [--raw] "
-          "[--status]\n"
-          "              [--verbose] [--version] DEVICE\n"
+          "              [--hex] [--index=IND] [--inner-hex] [--join] "
+          "[--list]\n"
+          "              [--page=PG] [--raw] [--status] [--verbose] "
+          "[--version]\n"
+          "              DEVICE\n"
           "  where:\n"
           "    --byte1=B1|-b B1  byte 1 (2nd byte) for some control "
           "pages\n"
@@ -140,8 +189,18 @@ usage()
           "flags\n"
           "    --help|-h           print out usage message\n"
           "    --hex|-H            print status response in hex\n"
+          "    --index=IND|-I IND    only output element index IND, "
+          "[0,1023] or overall\n"
+          "                          index where IND is offset by 1024. "
+          "Default:\n"
+          "                          output all indexes\n"
           "    --inner-hex|-i      print innermost level of a"
           " status page in hex\n"
+          "    --join|-j           group enclosure status, element "
+          "descriptor\n"
+          "                        and additional element status. Use "
+          "twice to\n"
+          "                        add threshold in\n"
           "    --list|-l           list known pages and elements (ignore"
           " DEVICE)\n"
           "    --page=PG|-p PG     SES page code PG (prefix with '0x' "
@@ -162,12 +221,12 @@ usage()
 static int
 process_cl(struct opts_t *op, int argc, char *argv[])
 {
-    int c;
+    int c, n;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:cd:fhHilp:rsvV", long_options,
+        c = getopt_long(argc, argv, "b:cd:fhHiI:jlp:rsvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -205,6 +264,23 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         case 'i':
             ++op->inner_hex;
             break;
+        case 'I':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 2047)) {
+                fprintf(stderr, "bad argument to '--index' (0 to 2047 "
+                        "inclusive)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            ++op->index_given;
+            if (n > 1023) {
+                op->index_overall = n - 1024;
+                ++op->index_given;
+            } else
+                op->index_elem = n;
+            break;
+        case 'j':
+            ++op->do_join;
+            break;
         case 'l':
             ++op->do_list;
             break;
@@ -215,6 +291,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                         "inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            ++op->page_code_given;
             break;
         case 'r':
             ++op->do_raw;
@@ -246,6 +323,12 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+    if (op->do_join && (op->do_control || op->page_code_given)) {
+        fprintf(stderr, "cannot have '--join' and  either '--control' or "
+                "'--page'\n");
+        usage();
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_list)
         return 0;
@@ -284,10 +367,77 @@ do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
                            noisy, verbose);
 }
 
-struct diag_page_code {
-        int page_code;
-        const char * desc;
-};
+/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> command not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -2 -> unexpected response, -1 -> other failure */
+static int
+do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
+            int rsp_buff_size, struct opts_t * op, int * rsp_lenp)
+{
+    int rsp_len, res;
+    const char * cp;
+
+    memset(rsp_buff, 0, rsp_buff_size);
+    if (rsp_lenp)
+        *rsp_lenp = 0;
+    cp = find_in_diag_page_desc(page_code);
+    res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
+                             rsp_buff_size, 1, op->verbose);
+    if (0 == res) {
+        rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
+        if (rsp_len > rsp_buff_size) {
+            fprintf(stderr, "<<< warning response buffer too small "
+                    "[%d but need %d]>>>\n", rsp_buff_size, rsp_len);
+            rsp_len = rsp_buff_size;
+        }
+        if (rsp_lenp)
+            *rsp_lenp = rsp_len;
+        if (page_code != rsp_buff[0]) {
+            if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
+                fprintf(stderr, "Enclosure busy, try again later\n");
+                if (op->do_hex)
+                    dStrHex((const char *)rsp_buff, rsp_len, 0);
+            } else if (0x8 == rsp_buff[0]) {
+                fprintf(stderr, "Enclosure only supports Short Enclosure "
+                        "status: 0x%x\n", rsp_buff[1]);
+            } else {
+                fprintf(stderr, "Invalid response, wanted page code: 0x%x "
+                        "but got 0x%x\n", page_code, rsp_buff[0]);
+                dStrHex((const char *)rsp_buff, rsp_len, 0);
+            }
+            return -2;
+        }
+        return 0;
+    } else {
+        if (cp)
+            fprintf(stderr, "Attempt to fetch %s diagnostic page failed\n",
+                    cp);
+        else
+            fprintf(stderr, "Attempt to fetch status diagnostic page "
+                    "[0x%x] failed\n", page_code);
+        switch (res) {
+        case SG_LIB_CAT_NOT_READY:
+            fprintf(stderr, "    device no ready\n");
+            break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            fprintf(stderr, "    aborted command\n");
+            break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            fprintf(stderr, "    unit attention\n");
+            break;
+        case SG_LIB_CAT_INVALID_OP:
+            fprintf(stderr, "    Receive diagnostic results command not "
+                    "supported\n");
+            break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            fprintf(stderr, "    Receive diagnostic results command, "
+                    "bad field in cdb\n");
+            break;
+        }
+    }
+    return res;
+}
 
 static struct diag_page_code dpc_arr[] = {
         {DPC_SUPPORTED, "Supported diagnostic pages"},  /* 0 */
@@ -364,12 +514,8 @@ find_in_diag_page_desc(int page_num)
     return NULL;
 }
 
-struct element_type_t {
-        int elem_type_code;
-        const char * desc;
-};
 static struct element_type_t element_type_arr[] = {
-        {0x0, "Unspecified"},
+        {UNSPECIFIED_ETC, "Unspecified"},
         {DEVICE_ETC, "Device"},
         {POWER_SUPPLY_ETC, "Power supply"},
         {COOLING_ETC, "Cooling"},
@@ -430,15 +576,6 @@ get_element_type_desc(int elem_type_code, int b_len, char * b)
 }
 #endif
 
-struct type_desc_hdr_t {
-    unsigned char etype;
-    unsigned char num_elements;
-    unsigned char se_id;
-    unsigned char unused;       /* type descriptor text length; not needed */
-};
-
-static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
-
 static void
 dStrRaw(const char* str, int len)
 {
@@ -448,6 +585,7 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
+/* Display Configuration diagnostic page [DPC_CONFIGURATION]. */
 static void
 ses_configuration_sdg(const unsigned char * resp, int resp_len)
 {
@@ -476,7 +614,8 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
             goto truncated;
         el = ucp[3] + 4;
         sum_elem_types += ucp[2];
-        printf("    Subenclosure identifier: %d\n", ucp[1]);
+        printf("    Subenclosure identifier: %d%s\n", ucp[1],
+               (ucp[1] ? "" : " (primary)"));
         printf("      relative ES process id: %d, number of ES processes"
                ": %d\n", ((ucp[0] & 0x70) >> 4), (ucp[0] & 0x7));
         printf("      number of type descriptor headers: %d\n", ucp[2]);
@@ -525,73 +664,55 @@ truncated:
    a problem */
 static int
 populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
-                         unsigned int * generationp, int verbose)
+                           unsigned int * generationp, struct opts_t * op)
 {
     int resp_len, k, el, num_subs, sum_elem_types, res;
     unsigned int gen_code;
     unsigned char resp[MX_ALLOC_LEN];
-    int rsp_buff_size = MX_ALLOC_LEN;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
-    res = sg_ll_receive_diag(fd, 1 /* pcv */, DPC_CONFIGURATION, resp,
-                             rsp_buff_size, 1, verbose);
-    if (0 == res) {
-        resp_len = (resp[2] << 8) + resp[3] + 4;
-        if (resp_len > rsp_buff_size) {
-            fprintf(stderr, "<<< warning: response buffer too small "
-                    "[%d but need %d]>>>\n", rsp_buff_size, resp_len);
-            resp_len = rsp_buff_size;
-        }
-        if (DPC_CONFIGURATION != resp[0]) {
-            if ((0x9 == resp[0]) && (1 & resp[1]))
-                printf("Enclosure busy, try again later\n");
-            else if (0x8 == resp[0])
-                printf("Enclosure only supports Short Enclosure status: "
-                       "0x%x\n", resp[1]);
-            else
-                printf("Invalid response, wanted page code: 0x%x but got "
-                       "0x%x\n", 1, resp[0]);
-            return -1;
-        }
-        if (resp_len < 4)
-            return -1;
-        num_subs = resp[1] + 1;
-        sum_elem_types = 0;
-        last_ucp = resp + resp_len - 1;
-        gen_code = (resp[4] << 24) | (resp[5] << 16) |
-                   (resp[6] << 8) | resp[7];
-        if (generationp)
-            *generationp = gen_code;
-        ucp = resp + 8;
-        for (k = 0; k < num_subs; ++k, ucp += el) {
-            if ((ucp + 3) > last_ucp)
-                goto p_truncated;
-            el = ucp[3] + 4;
-            sum_elem_types += ucp[2];
-            if (el < 40) {
-                fprintf(stderr, "populate: short enc descriptor len=%d ??\n",
-                        el);
-                continue;
-            }
-        }
-        for (k = 0; k < sum_elem_types; ++k, ucp += 4) {
-            if ((ucp + 3) > last_ucp)
-                goto p_truncated;
-            if (k >= MX_ELEM_HDR) {
-                fprintf(stderr, "populate: too many elements\n");
-                return -1;
-            }
-            tdhp[k].etype = ucp[0];
-            tdhp[k].num_elements = ucp[1];
-            tdhp[k].se_id = ucp[2];
-            tdhp[k].unused = 0;    /* actually type descriptor text length */
-        }
-        return sum_elem_types;
-    } else {
+    res = do_rec_diag(fd, DPC_CONFIGURATION, resp, sizeof(resp), op,
+                      &resp_len);
+    if (res) {
         fprintf(stderr, "populate: couldn't read config page, res=%d\n", res);
         return -1;
     }
+    if (resp_len < 4)
+        return -1;
+    num_subs = resp[1] + 1;
+    sum_elem_types = 0;
+    last_ucp = resp + resp_len - 1;
+    gen_code = (resp[4] << 24) | (resp[5] << 16) |
+               (resp[6] << 8) | resp[7];
+    if (generationp)
+        *generationp = gen_code;
+    ucp = resp + 8;
+    for (k = 0; k < num_subs; ++k, ucp += el) {
+        if ((ucp + 3) > last_ucp)
+            goto p_truncated;
+        el = ucp[3] + 4;
+        sum_elem_types += ucp[2];
+        if (el < 40) {
+            fprintf(stderr, "populate: short enc descriptor len=%d ??\n",
+                    el);
+            continue;
+        }
+    }
+    for (k = 0; k < sum_elem_types; ++k, ucp += 4) {
+        if ((ucp + 3) > last_ucp)
+            goto p_truncated;
+        if (k >= MX_ELEM_HDR) {
+            fprintf(stderr, "populate: too many elements\n");
+            return -1;
+        }
+        tdhp[k].etype = ucp[0];
+        tdhp[k].num_elements = ucp[1];
+        tdhp[k].se_id = ucp[2];
+        tdhp[k].unused = 0;    /* actually type descriptor text length */
+    }
+    return sum_elem_types;
+
 p_truncated:
     fprintf(stderr, "populate: config too short\n");
     return -1;
@@ -732,18 +853,20 @@ static const char * invop_type_desc[] = {
 
 static void
 print_element_status(const char * pad, const unsigned char * statp, int etype,
-                     int filter)
+                     struct opts_t * op)
 {
     int res, a, b;
     char buff[128];
+    int filter = op->do_filter;
 
     printf("%sPredicted failure=%d, Disabled=%d, Swap=%d, status: %s\n",
            pad, !!(statp[0] & 0x40), !!(statp[0] & 0x20),
            !!(statp[0] & 0x10), elem_status_code_desc[statp[0] & 0xf]);
     switch (etype) { /* element types */
-    case 0:     /* unspecified */
-        printf("%sstatus in hex: %02x %02x %02x %02x\n",
-               pad, statp[0], statp[1], statp[2], statp[3]);
+    case UNSPECIFIED_ETC:
+        if (op->verbose)
+            printf("%sstatus in hex: %02x %02x %02x %02x\n",
+                   pad, statp[0], statp[1], statp[2], statp[3]);
         break;
     case DEVICE_ETC:
         printf("%sSlot address: %d\n", pad, statp[1]);
@@ -1025,10 +1148,11 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
     }
 }
 
+/* Display enclosure status [DPC_ENC_STATUS] diagnostic page. */
 static void
 ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
-                  int resp_len,  struct opts_t * op)
+                  int resp_len, struct opts_t * op)
 {
     int j, k, elem_ind;
     unsigned int gen_code;
@@ -1066,12 +1190,11 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: [0x%x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
         if (op->inner_hex)
-            printf("      Overall descriptor(hex): %02x %02x %02x %02x\n", ucp[0],
-                   ucp[1], ucp[2], ucp[3]);
+            printf("      Overall %d descriptor(hex): %02x %02x %02x %02x\n",
+                   k, ucp[0], ucp[1], ucp[2], ucp[3]);
         else {
-            printf("      Overall descriptor:\n");
-            print_element_status("        ", ucp, tdhp[k].etype,
-                                 op->do_filter);
+            printf("      Overall %d descriptor:\n", k);
+            print_element_status("        ", ucp, tdhp[k].etype, op);
         }
         for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
             if (op->inner_hex)
@@ -1079,8 +1202,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
                        "%02x\n", elem_ind++, ucp[0], ucp[1], ucp[2], ucp[3]);
             else {
                 printf("      Element %d descriptor:\n", elem_ind++);
-                print_element_status("        ", ucp, tdhp[k].etype,
-                                     op->do_filter);
+                print_element_status("        ", ucp, tdhp[k].etype, op);
             }
         }
     }
@@ -1111,7 +1233,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
     char b2[128];
 
     if (p_num < 0)
-        strcpy (buff, "Overall descriptor");
+        snprintf(buff, sizeof(buff) - 1, "Overall %d descriptor", -1 - p_num);
     else
         snprintf(buff, sizeof(buff) - 1, "Element %d descriptor", p_num);
     if (inner_hex) {
@@ -1169,7 +1291,8 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         break;
     default:
         if (verbose)
-            printf("%s<< no thresholds for this element type >>\n", pad);
+            printf("%s%s: << no thresholds for this element type >>\n", pad,
+                   buff);
         break;
     }
 }
@@ -1212,8 +1335,8 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
         else
             printf("    Element type: [0x%x], subenclosure id: %d\n",
                    tdhp[k].etype, tdhp[k].se_id);
-        ses_threshold_helper("      ", ucp, tdhp[k].etype, -1, op->inner_hex,
-                             op->verbose);
+        ses_threshold_helper("      ", ucp, tdhp[k].etype, -1 - k,
+                             op->inner_hex, op->verbose);
         for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
             ses_threshold_helper("      ", ucp, tdhp[k].etype, j,
                                  op->inner_hex, op->verbose);
@@ -1264,10 +1387,12 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                    tdhp[k].etype, tdhp[k].se_id);
         desc_len = (ucp[2] << 8) + ucp[3] + 4;
         if (desc_len > 4)
-            printf("      Overall descriptor: %.*s\n", desc_len - 4, ucp + 4);
+            printf("      Overall %d descriptor: %.*s\n", k, desc_len - 4,
+                   ucp + 4);
         else
-            printf("      Overall descriptor: <empty>\n");
-        for (ucp += desc_len, j = 0; j < tdhp[k].num_elements; ++j, ucp += desc_len) {
+            printf("      Overall %d descriptor: <empty>\n", k);
+        for (ucp += desc_len, j = 0; j < tdhp[k].num_elements;
+             ++j, ucp += desc_len) {
             desc_len = (ucp[2] << 8) + ucp[3] + 4;
             if (desc_len > 4)
                 printf("      Element %d descriptor: %.*s\n", j,
@@ -1757,164 +1882,117 @@ ses_process_status(int sg_fd, struct opts_t * op)
     int rsp_len, res;
     unsigned int ref_gen_code;
     unsigned char rsp_buff[MX_ALLOC_LEN];
-    int rsp_buff_size = MX_ALLOC_LEN;
     const char * cp;
 
-    memset(rsp_buff, 0, rsp_buff_size);
     cp = find_in_diag_page_desc(op->page_code);
-    res = sg_ll_receive_diag(sg_fd, 1, op->page_code, rsp_buff,
-                             rsp_buff_size, 1, op->verbose);
-    if (0 == res) {
-        rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
-        if (rsp_len > rsp_buff_size) {
-            fprintf(stderr, "<<< warning response buffer too small "
-                    "[%d but need %d]>>>\n", rsp_buff_size, rsp_len);
-            rsp_len = rsp_buff_size;
+    res = do_rec_diag(sg_fd, op->page_code, rsp_buff, sizeof(rsp_buff),
+                      op, &rsp_len);
+    if (res)
+        return res;
+    if (op->do_raw) {
+        if (1 == op->do_raw)
+            dStrHex((const char *)rsp_buff + 4, rsp_len - 4, -1);
+        else {
+            if (sg_set_binary_mode(STDOUT_FILENO) < 0)
+                perror("sg_set_binary_mode");
+            dStrRaw((const char *)rsp_buff, rsp_len);
         }
-        if (op->page_code != rsp_buff[0]) {
-            if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
-                fprintf(stderr, "Enclosure busy, try again later\n");
-                if (op->do_hex)
-                    dStrHex((const char *)rsp_buff, rsp_len, 0);
-            } else if (0x8 == rsp_buff[0]) {
-                fprintf(stderr, "Enclosure only supports Short Enclosure "
-                        "status: 0x%x\n", rsp_buff[1]);
-            } else {
-                fprintf(stderr, "Invalid response, wanted page code: 0x%x "
-                        "but got 0x%x\n", op->page_code, rsp_buff[0]);
-                dStrHex((const char *)rsp_buff, rsp_len, 0);
-            }
-        } else if (op->do_raw) {
-            if (1 == op->do_raw)
-                dStrHex((const char *)rsp_buff + 4, rsp_len - 4, -1);
-            else {
-                if (sg_set_binary_mode(STDOUT_FILENO) < 0)
-                    perror("sg_set_binary_mode");
-                dStrRaw((const char *)rsp_buff, rsp_len);
-            }
-        } else if (op->do_hex) {
-            if (cp)
-                printf("Response in hex from diagnostic page: %s\n", cp);
-            else
-                printf("Response in hex from unknown diagnostic page "
-                       "[0x%x]\n", op->page_code);
-            dStrHex((const char *)rsp_buff, rsp_len, 0);
-        } else {
-            switch (op->page_code) {
-            case DPC_SUPPORTED:
-                ses_supported_pages_sdg("Supported diagnostic pages",
-                                        rsp_buff, rsp_len);
-                break;
-            case DPC_CONFIGURATION:
-                ses_configuration_sdg(rsp_buff, rsp_len);
-                break;
-            case DPC_ENC_STATUS:
-                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 &ref_gen_code, op->verbose);
-                if (res < 0)
-                    break;
-                ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
-                                  rsp_buff, rsp_len, op);
-                break;
-            case DPC_HELP_TEXT:
-                printf("Help text diagnostic page (for primary "
-                       "subenclosure):\n");
-                if (rsp_len > 4)
-                    printf("  %.*s\n", rsp_len - 4, rsp_buff + 4);
-                else
-                    printf("  <empty>\n");
-                break;
-            case DPC_STRING:
-                printf("String In diagnostic page (for primary "
-                       "subenclosure):\n");
-                if (rsp_len > 4)
-                    dStrHex((const char *)(rsp_buff + 4), rsp_len - 4, 0);
-                else
-                    printf("  <empty>\n");
-                break;
-            case DPC_THRESHOLD:
-                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 &ref_gen_code, op->verbose);
-                if (res < 0)
-                    break;
-                ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                  rsp_buff, rsp_len, op);
-                break;
-            case DPC_ELEM_DESC:
-                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 &ref_gen_code, op->verbose);
-                if (res < 0)
-                    break;
-                ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                     rsp_buff, rsp_len);
-                break;
-            case DPC_SHORT_ENC_STATUS:
-                printf("Short enclosure status diagnostic page, "
-                       "status=0x%x\n", rsp_buff[1]);
-                break;
-            case DPC_ENC_BUSY:
-                printf("Enclosure busy diagnostic page, "
-                       "busy=%d [vendor specific=0x%x]\n",
-                       rsp_buff[1] & 1, (rsp_buff[1] >> 1) & 0xff);
-                break;
-            case DPC_ADD_ELEM_STATUS:
-                res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 &ref_gen_code, op->verbose);
-                if (res < 0)
-                    break;
-                ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                        rsp_buff, rsp_len, op);
-                break;
-            case DPC_SUBENC_HELP_TEXT:
-                ses_subenc_help_sdg(rsp_buff, rsp_len);
-                break;
-            case DPC_SUBENC_STRING:
-                ses_subenc_string_sdg(rsp_buff, rsp_len);
-                break;
-            case DPC_SUPPORTED_SES:
-                ses_supported_pages_sdg("Supported SES diagnostic pages",
-                                        rsp_buff, rsp_len);
-                break;
-            case DPC_DOWNLOAD_MICROCODE:
-                ses_download_code_sdg(rsp_buff, rsp_len);
-                break;
-            case DPC_SUBENC_NICKNAME:
-                ses_subenc_nickname_sdg(rsp_buff, rsp_len);
-                break;
-            default:
-                printf("Cannot decode response from diagnostic "
-                       "page: %s\n", (cp ? cp : "<unknown>"));
-                dStrHex((const char *)rsp_buff, rsp_len, 0);
-            }
-        }
-    } else {
+    } else if (op->do_hex) {
         if (cp)
-            fprintf(stderr, "Attempt to fetch %s diagnostic page failed\n",
-                    cp);
+            printf("Response in hex from diagnostic page: %s\n", cp);
         else
-            fprintf(stderr, "Attempt to fetch status diagnostic page "
-                    "[0x%x] failed\n", op->page_code);
-        switch (res) {
-        case SG_LIB_CAT_NOT_READY:
-            fprintf(stderr, "    device no ready\n");
+            printf("Response in hex from unknown diagnostic page "
+                   "[0x%x]\n", op->page_code);
+        dStrHex((const char *)rsp_buff, rsp_len, 0);
+    } else {
+        switch (op->page_code) {
+        case DPC_SUPPORTED:
+            ses_supported_pages_sdg("Supported diagnostic pages",
+                                    rsp_buff, rsp_len);
             break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            fprintf(stderr, "    aborted command\n");
+        case DPC_CONFIGURATION:
+            ses_configuration_sdg(rsp_buff, rsp_len);
             break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            fprintf(stderr, "    unit attention\n");
+        case DPC_ENC_STATUS:
+            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                             &ref_gen_code, op);
+            if (res < 0)
+                break;
+            ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
+                              rsp_buff, rsp_len, op);
             break;
-        case SG_LIB_CAT_INVALID_OP:
-            fprintf(stderr, "    Receive diagnostic results command not "
-                    "supported\n");
+        case DPC_HELP_TEXT:
+            printf("Help text diagnostic page (for primary "
+                   "subenclosure):\n");
+            if (rsp_len > 4)
+                printf("  %.*s\n", rsp_len - 4, rsp_buff + 4);
+            else
+                printf("  <empty>\n");
             break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            fprintf(stderr, "    Receive diagnostic results command, "
-                    "bad field in cdb\n");
+        case DPC_STRING:
+            printf("String In diagnostic page (for primary "
+                   "subenclosure):\n");
+            if (rsp_len > 4)
+                dStrHex((const char *)(rsp_buff + 4), rsp_len - 4, 0);
+            else
+                printf("  <empty>\n");
             break;
+        case DPC_THRESHOLD:
+            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                             &ref_gen_code, op);
+            if (res < 0)
+                break;
+            ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
+                              rsp_buff, rsp_len, op);
+            break;
+        case DPC_ELEM_DESC:
+            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                             &ref_gen_code, op);
+            if (res < 0)
+                break;
+            ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
+                                 rsp_buff, rsp_len);
+            break;
+        case DPC_SHORT_ENC_STATUS:
+            printf("Short enclosure status diagnostic page, "
+                   "status=0x%x\n", rsp_buff[1]);
+            break;
+        case DPC_ENC_BUSY:
+            printf("Enclosure busy diagnostic page, "
+                   "busy=%d [vendor specific=0x%x]\n",
+                   rsp_buff[1] & 1, (rsp_buff[1] >> 1) & 0xff);
+            break;
+        case DPC_ADD_ELEM_STATUS:
+            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                             &ref_gen_code, op);
+            if (res < 0)
+                break;
+            ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
+                                    rsp_buff, rsp_len, op);
+            break;
+        case DPC_SUBENC_HELP_TEXT:
+            ses_subenc_help_sdg(rsp_buff, rsp_len);
+            break;
+        case DPC_SUBENC_STRING:
+            ses_subenc_string_sdg(rsp_buff, rsp_len);
+            break;
+        case DPC_SUPPORTED_SES:
+            ses_supported_pages_sdg("Supported SES diagnostic pages",
+                                    rsp_buff, rsp_len);
+            break;
+        case DPC_DOWNLOAD_MICROCODE:
+            ses_download_code_sdg(rsp_buff, rsp_len);
+            break;
+        case DPC_SUBENC_NICKNAME:
+            ses_subenc_nickname_sdg(rsp_buff, rsp_len);
+            break;
+        default:
+            printf("Cannot decode response from diagnostic "
+                   "page: %s\n", (cp ? cp : "<unknown>"));
+            dStrHex((const char *)rsp_buff, rsp_len, 0);
         }
     }
-    return res;
+    return 0;
 }
 
 
