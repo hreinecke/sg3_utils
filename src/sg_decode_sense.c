@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.03 20110331";
+static char * version_str = "1.03 20110524";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -333,8 +333,8 @@ write2wfn(FILE * fp, struct opts_t * optsp)
     } else {
         s = fwrite(optsp->sense, 1, optsp->sense_len, fp);
         if ((int)s != optsp->sense_len)
-            fprintf(stderr, "only able to write %d of %d bytes to "
-                    "%s\n", s, optsp->sense_len, optsp->wfname);
+            fprintf(stderr, "only able to write %d of %d bytes to %s\n",
+                    (int)s, optsp->sense_len, optsp->wfname);
     }
 }
 
