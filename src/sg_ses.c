@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <getopt.h>
 
 #ifdef HAVE_CONFIG_H
@@ -24,7 +25,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.50 20110526";    /* ses3r02 */
+static char * version_str = "1.50 20110530";    /* ses3r02 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -89,8 +90,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int index_given;    /* 1 -> index_elem; 2 -> index_overall */
-    int index_elem;
-    int index_overall;
+    int index_elem_ov;
     int inner_hex;
     int do_join;
     int do_list;
@@ -124,22 +124,23 @@ struct type_desc_hdr_t {
 };
 
 struct join_row_t {
-    short el_ov_ind;            /* element index 0 to 1023, overall index
-                                 * offset by 1024. So 1024 is ov_ind 0 */
-    unsigned char etype;
+    short el_ov_ind;            /* element index 0 to 999, overall index
+                                 * offset by 1000. So 1000 is ov_ind 0 */
+    unsigned char etype;        /* element type */
     unsigned char se_id;        /* subenclosure id (0 for main enclosure) */
     /* following point into Element Descriptor, Enclosure Status, Threshold
-     * In and Additional element status diagnostic pages. Can be NULL
-     * apart from enc-statp . */
-    unsigned char * elem_descp;
-    unsigned char * enc_statp;
-    unsigned char * thresh_inp;
-    unsigned char * add_elem_statp;
+     * In and Additional element status diagnostic pages. enc_statp only
+     * NULL past last, other pointers can be NULL . */
+    const unsigned char * elem_descp;
+    const unsigned char * enc_statp;    /* NULL indicates past last */
+    const unsigned char * thresh_inp;
+    const unsigned char * add_elem_statp;
 };
 
 static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
 
 static struct join_row_t join_arr[MX_JOIN_ROWS];
+static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 
 static struct option long_options[] = {
         {"byte1", 1, 0, 'b'},
@@ -190,17 +191,18 @@ usage()
           "    --help|-h           print out usage message\n"
           "    --hex|-H            print status response in hex\n"
           "    --index=IND|-I IND    only output element index IND, "
-          "[0,1023] or overall\n"
-          "                          index where IND is offset by 1024. "
-          "Default:\n"
-          "                          output all indexes\n"
+          "[0,999] or overall\n"
+          "                          index where IND is either preceded by "
+          "'ov' or\n"
+          "                          offset by 1000. Default: output all "
+          "indexes\n"
           "    --inner-hex|-i      print innermost level of a"
           " status page in hex\n"
           "    --join|-j           group enclosure status, element "
           "descriptor\n"
-          "                        and additional element status. Use "
-          "twice to\n"
-          "                        add threshold in\n"
+          "                        and additional element status pages. "
+          "Use twice\n"
+          "                        to add threshold in page\n"
           "    --list|-l           list known pages and elements (ignore"
           " DEVICE)\n"
           "    --page=PG|-p PG     SES page code PG (prefix with '0x' "
@@ -218,6 +220,7 @@ usage()
 }
 
 
+/* process command line options and argument. Returns 0 if ok. */
 static int
 process_cl(struct opts_t *op, int argc, char *argv[])
 {
@@ -256,7 +259,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             break;
         case 'h':
         case '?':
-            usage();
+            ++op->do_help;
             return 0;
         case 'H':
             ++op->do_hex;
@@ -265,18 +268,36 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             ++op->inner_hex;
             break;
         case 'I':
+            if (! isdigit(optarg[0])) {
+                if (('O' != toupper(optarg[0])) ||
+                    ('V' != toupper(optarg[1]))) {
+                    fprintf(stderr, "bad argument to '--index', expect "
+                            "'ov' leadin to number\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                n = sg_get_num(optarg + 2);
+                if ((n < 0) || (n > 999)) {
+                    fprintf(stderr, "bad argument to '--index', after 'ov' "
+                            "expect 0 to 999\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->index_elem_ov = n;
+                op->index_given = 2;
+                break;
+            }
             n = sg_get_num(optarg);
-            if ((n < 0) || (n > 2047)) {
-                fprintf(stderr, "bad argument to '--index' (0 to 2047 "
+            if ((n < 0) || (n > 1999)) {
+                fprintf(stderr, "bad argument to '--index' (0 to 1999 "
                         "inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->index_given;
-            if (n > 1023) {
-                op->index_overall = n - 1024;
-                ++op->index_given;
-            } else
-                op->index_elem = n;
+            if (n > 999) {
+                op->index_elem_ov = n - 1000;
+                op->index_given = 2;
+            } else {
+                op->index_elem_ov = n;
+                op->index_given = 1;
+            }
             break;
         case 'j':
             ++op->do_join;
@@ -303,7 +324,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             ++op->verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            ++op->do_version;
             return 0;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
@@ -409,7 +430,7 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
             return -2;
         }
         return 0;
-    } else {
+    } else if (op->verbose) {
         if (cp)
             fprintf(stderr, "Attempt to fetch %s diagnostic page failed\n",
                     cp);
@@ -559,23 +580,6 @@ find_element_desc(int elem_type_code)
     return NULL;
 }
 
-#if 0
-static const char *
-get_element_type_desc(int elem_type_code, int b_len, char * b)
-{
-    const char * elem_desc;
-
-    if (b_len > 0)
-        b[b_len - 1] = '\0';
-    elem_desc = find_element_desc(elem_type_code);
-    if (elem_desc)
-        snprintf(b, b_len - 1, "%s", elem_desc);
-    else
-        snprintf(b, b_len - 1, "unknown element type code=0x%x", elem_type_code);
-    return b;
-}
-#endif
-
 static void
 dStrRaw(const char* str, int len)
 {
@@ -660,13 +664,13 @@ truncated:
     return;
 }
 
-/* Returns number of elements written to 'tdhp' or -1 if there is
-   a problem */
+/* Returns total number of type descriptor headers written to 'tdhp' or -1
+ * if there is a problem */
 static int
 populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                            unsigned int * generationp, struct opts_t * op)
 {
-    int resp_len, k, el, num_subs, sum_elem_types, res;
+    int resp_len, k, el, num_subs, sum_type_dheaders, res;
     unsigned int gen_code;
     unsigned char resp[MX_ALLOC_LEN];
     const unsigned char * ucp;
@@ -681,7 +685,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
     if (resp_len < 4)
         return -1;
     num_subs = resp[1] + 1;
-    sum_elem_types = 0;
+    sum_type_dheaders = 0;
     last_ucp = resp + resp_len - 1;
     gen_code = (resp[4] << 24) | (resp[5] << 16) |
                (resp[6] << 8) | resp[7];
@@ -692,14 +696,14 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         if ((ucp + 3) > last_ucp)
             goto p_truncated;
         el = ucp[3] + 4;
-        sum_elem_types += ucp[2];
+        sum_type_dheaders += ucp[2];
         if (el < 40) {
             fprintf(stderr, "populate: short enc descriptor len=%d ??\n",
                     el);
             continue;
         }
     }
-    for (k = 0; k < sum_elem_types; ++k, ucp += 4) {
+    for (k = 0; k < sum_type_dheaders; ++k, ucp += 4) {
         if ((ucp + 3) > last_ucp)
             goto p_truncated;
         if (k >= MX_ELEM_HDR) {
@@ -711,7 +715,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         tdhp[k].se_id = ucp[2];
         tdhp[k].unused = 0;    /* actually type descriptor text length */
     }
-    return sum_elem_types;
+    return sum_type_dheaders;
 
 p_truncated:
     fprintf(stderr, "populate: config too short\n");
@@ -852,8 +856,8 @@ static const char * invop_type_desc[] = {
 };
 
 static void
-print_element_status(const char * pad, const unsigned char * statp, int etype,
-                     struct opts_t * op)
+enc_status_helper(const char * pad, const unsigned char * statp, int etype,
+                  const struct opts_t * op)
 {
     int res, a, b;
     char buff[128];
@@ -946,7 +950,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
                    "Unrecov=%d\n", pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case ESC_ELECTRONICS_ETC:     /* enclosure services controller electronics */
+    case ESC_ELECTRONICS_ETC: /* enclosure services controller electronics */
         if ((! filter) || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
             (0x80 & statp[3]))
             printf("%sIdent=%d, Fail=%d, Report=%d, Hot swap=%d\n", pad,
@@ -1152,7 +1156,7 @@ print_element_status(const char * pad, const unsigned char * statp, int etype,
 static void
 ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
-                  int resp_len, struct opts_t * op)
+                  int resp_len, const struct opts_t * op)
 {
     int j, k, elem_ind;
     unsigned int gen_code;
@@ -1179,30 +1183,37 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  status descriptor list\n");
     ucp = resp + 8;
-    for (k = 0, elem_ind = 0; k < num_telems; ++k) {
+    for (k = 0, elem_ind = 0; k < num_telems; ++k, ++tdhp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        cp = find_element_desc(tdhp[k].etype);
-        if (cp)
-            printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, tdhp[k].se_id);
-        else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   tdhp[k].etype, tdhp[k].se_id);
-        if (op->inner_hex)
-            printf("      Overall %d descriptor(hex): %02x %02x %02x %02x\n",
-                   k, ucp[0], ucp[1], ucp[2], ucp[3]);
-        else {
-            printf("      Overall %d descriptor:\n", k);
-            print_element_status("        ", ucp, tdhp[k].etype, op);
+        if ((! op->index_given) ||
+            ((2 == op->index_given) && (k == op->index_elem_ov))) {
+            cp = find_element_desc(tdhp->etype);
+            if (cp)
+                printf("    Element type: %s, subenclosure id: %d\n",
+                       cp, tdhp->se_id);
+            else
+                printf("    Element type: [0x%x], subenclosure id: %d\n",
+                       tdhp->etype, tdhp->se_id);
+            if (op->inner_hex)
+                printf("      Overall %d descriptor(hex): %02x %02x %02x %02x\n",
+                       k, ucp[0], ucp[1], ucp[2], ucp[3]);
+            else {
+                printf("      Overall %d descriptor:\n", k);
+                enc_status_helper("        ", ucp, tdhp->etype, op);
+            }
         }
-        for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
+        for (ucp += 4, j = 0; j < tdhp->num_elements;
+             ++j, ucp += 4, ++elem_ind) {
+            if ((2 == op->index_given) ||
+                ((1 == op->index_given) && (elem_ind != op->index_elem_ov)))
+                continue;
             if (op->inner_hex)
                 printf("      Element %d descriptor(hex): %02x %02x %02x "
-                       "%02x\n", elem_ind++, ucp[0], ucp[1], ucp[2], ucp[3]);
+                       "%02x\n", elem_ind, ucp[0], ucp[1], ucp[2], ucp[3]);
             else {
-                printf("      Element %d descriptor:\n", elem_ind++);
-                print_element_status("        ", ucp, tdhp[k].etype, op);
+                printf("      Element %d descriptor:\n", elem_ind);
+                enc_status_helper("        ", ucp, tdhp->etype, op);
             }
         }
     }
@@ -1226,7 +1237,7 @@ reserved_or_num(char * buff, int buff_len, int num, int reserve_num)
 
 static void
 ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
-                     int p_num, int inner_hex, int verbose)
+                     int p_num, const struct opts_t * op)
 {
     char buff[128];
     char b[128];
@@ -1236,7 +1247,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         snprintf(buff, sizeof(buff) - 1, "Overall %d descriptor", -1 - p_num);
     else
         snprintf(buff, sizeof(buff) - 1, "Element %d descriptor", p_num);
-    if (inner_hex) {
+    if (op->inner_hex) {
         printf("%s%s (in hex): %02x %02x %02x %02x\n", pad, buff,
                tp[0], tp[1], tp[2], tp[3]);
         return;
@@ -1248,9 +1259,9 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
                                      -TEMPERATURE_OFFSET),
                reserved_or_num(b2, 128, tp[1] - TEMPERATURE_OFFSET,
                                -TEMPERATURE_OFFSET));
-        printf("%s  low warning=%s, low critical=%s (in degrees Celsius)\n", pad,
-               reserved_or_num(b, 128, tp[2] - TEMPERATURE_OFFSET,
-                               -TEMPERATURE_OFFSET),
+        printf("%s  low warning=%s, low critical=%s (in degrees Celsius)\n",
+               pad, reserved_or_num(b, 128, tp[2] - TEMPERATURE_OFFSET,
+                                    -TEMPERATURE_OFFSET),
                reserved_or_num(b2, 128, tp[3] - TEMPERATURE_OFFSET,
                                -TEMPERATURE_OFFSET));
         break;
@@ -1290,7 +1301,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         printf("%s  (above nominal current)\n", pad);
         break;
     default:
-        if (verbose)
+        if (op->verbose)
             printf("%s%s: << no thresholds for this element type >>\n", pad,
                    buff);
         break;
@@ -1300,13 +1311,14 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
 static void
 ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
-                  int resp_len, struct opts_t * op)
+                  int resp_len, const struct opts_t * op)
 {
-    int j, k;
+    int j, k, elem_ind;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const char * cp;
+    const struct type_desc_hdr_t * tp;
 
     printf("Threshold In diagnostic page:\n");
     if (resp_len < 4)
@@ -1325,21 +1337,26 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  threshold status descriptor list\n");
     ucp = resp + 8;
-    for (k = 0; k < num_telems; ++k) {
+    for (k = 0, tp = tdhp, elem_ind = 0; k < num_telems; ++k, ++tp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        cp = find_element_desc(tdhp[k].etype);
-        if (cp)
-            printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, tdhp[k].se_id);
-        else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   tdhp[k].etype, tdhp[k].se_id);
-        ses_threshold_helper("      ", ucp, tdhp[k].etype, -1 - k,
-                             op->inner_hex, op->verbose);
-        for (ucp += 4, j = 0; j < tdhp[k].num_elements; ++j, ucp += 4) {
-            ses_threshold_helper("      ", ucp, tdhp[k].etype, j,
-                                 op->inner_hex, op->verbose);
+        if ((! op->index_given) ||
+            ((2 == op->index_given) && (k == op->index_elem_ov))) {
+            cp = find_element_desc(tp->etype);
+            if (cp)
+                printf("    Element type: %s, subenclosure id: %d\n",
+                       cp, tp->se_id);
+            else
+                printf("    Element type: [0x%x], subenclosure id: %d\n",
+                       tp->etype, tp->se_id);
+            ses_threshold_helper("      ", ucp, tp->etype, -1 - k, op);
+        }
+        for (ucp += 4, j = 0; j < tp->num_elements;
+             ++j, ucp += 4, ++elem_ind) {
+            if ((2 == op->index_given) ||
+                ((1 == op->index_given) && (elem_ind != op->index_elem_ov)))
+                continue;
+            ses_threshold_helper("      ", ucp, tp->etype, j, op);
         }
     }
     return;
@@ -1348,16 +1365,19 @@ truncated:
     return;
 }
 
+/* This page essentially contains names of overall and individual
+ * elements. */
 static void
 ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                      unsigned int ref_gen_code, const unsigned char * resp,
-                     int resp_len)
+                     int resp_len, const struct opts_t * op)
 {
-    int j, k, desc_len;
+    int j, k, desc_len, elem_ind;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const char * cp;
+    const struct type_desc_hdr_t * tp;
 
     printf("Element descriptor In diagnostic page:\n");
     if (resp_len < 4)
@@ -1375,25 +1395,31 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  element descriptor by type list\n");
     ucp = resp + 8;
-    for (k = 0; k < num_telems; ++k) {
+    for (k = 0, tp = tdhp, elem_ind = 0; k < num_telems; ++k, ++tp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        cp = find_element_desc(tdhp[k].etype);
-        if (cp)
-            printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, tdhp[k].se_id);
-        else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   tdhp[k].etype, tdhp[k].se_id);
         desc_len = (ucp[2] << 8) + ucp[3] + 4;
-        if (desc_len > 4)
-            printf("      Overall %d descriptor: %.*s\n", k, desc_len - 4,
-                   ucp + 4);
-        else
-            printf("      Overall %d descriptor: <empty>\n", k);
-        for (ucp += desc_len, j = 0; j < tdhp[k].num_elements;
-             ++j, ucp += desc_len) {
+        if ((! op->index_given) ||
+            ((2 == op->index_given) && (k == op->index_elem_ov))) {
+            cp = find_element_desc(tp->etype);
+            if (cp)
+                printf("    Element type: %s, subenclosure id: %d\n",
+                       cp, tp->se_id);
+            else
+                printf("    Element type: [0x%x], subenclosure id: %d\n",
+                       tp->etype, tp->se_id);
+            if (desc_len > 4)
+                printf("      Overall %d descriptor: %.*s\n", k, desc_len - 4,
+                       ucp + 4);
+            else
+                printf("      Overall %d descriptor: <empty>\n", k);
+        }
+        for (ucp += desc_len, j = 0; j < tp->num_elements;
+             ++j, ucp += desc_len, ++elem_ind) {
             desc_len = (ucp[2] << 8) + ucp[3] + 4;
+            if ((2 == op->index_given) ||
+                ((1 == op->index_given) && (elem_ind != op->index_elem_ov)))
+                continue;
             if (desc_len > 4)
                 printf("      Element %d descriptor: %.*s\n", j,
                        desc_len - 4, ucp + 4);
@@ -1417,8 +1443,8 @@ static char * sas_device_type[] = {
 };
 
 static void
-ses_additional_elem_each(const char * pad, const unsigned char * ucp, int len,
-                         int elem_num, int elem_type)
+additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
+                       int elem_type, const struct opts_t * op)
 {
     int ports, phys, j, m, desc_type, eip_offset;
     const unsigned char * per_ucp;
@@ -1429,9 +1455,6 @@ ses_additional_elem_each(const char * pad, const unsigned char * ucp, int len,
     case TPROTO_FCP:
         ports = ucp[2 + eip_offset];
         printf("%sTransport protocol: FCP\n", pad);
-#if 0
-        printf("%s element\n", get_element_desc(elem_type, sizeof(b), b));
-#endif
         printf("%snumber of ports: %d\n", pad, ports);
         printf("%snode_name: ", pad);
         for (m = 0; m < 8; ++m)
@@ -1455,9 +1478,6 @@ ses_additional_elem_each(const char * pad, const unsigned char * ucp, int len,
     case TPROTO_SAS:
         desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
         printf("%sTransport protocol: SAS\n", pad);
-#if 0
-        printf("%s element\n", get_element_desc(elem_type, sizeof(b), b));
-#endif
         if (0 == desc_type) {
             phys = ucp[2 + eip_offset];
             printf("%snumber of phys: %d, not all phys: %d", pad, phys,
@@ -1535,10 +1555,10 @@ ses_additional_elem_each(const char * pad, const unsigned char * ucp, int len,
             printf("%sunrecognised descriptor type [%d]\n", pad, desc_type);
         break;
     default:
-        printf("%s[%d] Transport protocol: %s not decoded, in hex:\n", pad,
-               elem_num + 1,
+        printf("%sTransport protocol: %s not decoded\n", pad,
                sg_get_trans_proto_str((0xf & ucp[0]), sizeof(b), b));
-        dStrHex((const char *)ucp, len, 0);
+        if (op->verbose)
+            dStrHex((const char *)ucp, len, 0);
         break;
     }
 }
@@ -1548,13 +1568,14 @@ ses_additional_elem_each(const char * pad, const unsigned char * ucp, int len,
 static void
 ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                         unsigned int ref_gen_code, const unsigned char * resp,
-                        int resp_len, struct opts_t * op)
+                        int resp_len, const struct opts_t * op)
 {
-    int j, k, desc_len, elem_type, invalid;
+    int j, k, desc_len, elem_type, invalid, el_num, eip, ind;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const char * cp;
+    const struct type_desc_hdr_t * tp;
 
     printf("Additional element status diagnostic page:\n");
     if (resp_len < 4)
@@ -1570,8 +1591,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  additional element status descriptor list\n");
     ucp = resp + 8;
-    for (k = 0; k < num_telems; ++k) {
-        elem_type = tdhp[k].etype;
+    for (k = 0, el_num = 0, tp = tdhp; k < num_telems; ++k, ++tp) {
+        elem_type = tp->etype;
         if (! ((DEVICE_ETC == elem_type) ||
                (SCSI_TPORT_ETC == elem_type) ||
                (SCSI_IPORT_ETC == elem_type) ||
@@ -1581,26 +1602,35 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             continue;   /* skip if not one of above element types */
         if ((ucp + 1) > last_ucp)
             goto truncated;
-        cp = find_element_desc(elem_type);
-        if (cp)
-            printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, tdhp[k].se_id);
-        else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   tdhp[k].etype, tdhp[k].se_id);
-        for (j = 0; j < tdhp[k].num_elements; ++j, ucp += desc_len) {
-            invalid = !!(ucp[0] & 0x80);
-            if (ucp[0] & 0x10)  /* eip=1 */
-                printf("      Element index: %d\n", ucp[3]);
+        if (op->index_given) {
+            cp = find_element_desc(elem_type);
+            if (cp)
+                printf("    Element type: %s, subenclosure id: %d\n", cp,
+                       tp->se_id);
             else
-                printf("      Element %d descriptor\n", j);
+                printf("    Element type: [0x%x], subenclosure id: %d\n",
+                       tp->etype, tp->se_id);
+        }
+        for (j = 0; j < tp->num_elements; ++j, ucp += desc_len, ++el_num) {
+            invalid = !!(ucp[0] & 0x80);
             desc_len = ucp[1] + 2;
+            eip = ucp[0] & 0x10;
+            ind = eip ? ucp[3] : el_num;
+            if ((2 == op->index_given) ||
+                ((1 == op->index_given) && (ind != op->index_elem_ov)))
+                continue;
+            if (eip)
+                printf("      Element index: %d\n", ind);
+            else
+                printf("      Element %d descriptor\n", ind);
             if (op->inner_hex)
                 dStrHex((const char *)ucp + 4, desc_len, 0);
             else if (invalid)
-                printf("        flagged as invalid (no further information)\n");
+                printf("        flagged as invalid (no further "
+                       "information)\n");
             else
-                ses_additional_elem_each("        ", ucp, desc_len, j, elem_type);
+                additional_elem_helper("        ", ucp, desc_len, elem_type,
+                                       op);
         }
     }
     return;
@@ -1876,6 +1906,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
     return 0;
 }
 
+/* Return 0 for success. */
 static int
 ses_process_status(int sg_fd, struct opts_t * op)
 {
@@ -1917,7 +1948,7 @@ ses_process_status(int sg_fd, struct opts_t * op)
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, op);
             if (res < 0)
-                break;
+                return res;
             ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
                               rsp_buff, rsp_len, op);
             break;
@@ -1941,7 +1972,7 @@ ses_process_status(int sg_fd, struct opts_t * op)
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, op);
             if (res < 0)
-                break;
+                return res;
             ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
                               rsp_buff, rsp_len, op);
             break;
@@ -1949,9 +1980,9 @@ ses_process_status(int sg_fd, struct opts_t * op)
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, op);
             if (res < 0)
-                break;
+                return res;
             ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                 rsp_buff, rsp_len);
+                                 rsp_buff, rsp_len, op);
             break;
         case DPC_SHORT_ENC_STATUS:
             printf("Short enclosure status diagnostic page, "
@@ -1966,7 +1997,7 @@ ses_process_status(int sg_fd, struct opts_t * op)
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, op);
             if (res < 0)
-                break;
+                return res;
             ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                     rsp_buff, rsp_len, op);
             break;
@@ -1995,6 +2026,271 @@ ses_process_status(int sg_fd, struct opts_t * op)
     return 0;
 }
 
+static int
+ses_join(int sg_fd, struct opts_t * op)
+{
+    int k, j, enc_stat_rsp_len, elem_desc_rsp_len, add_elem_rsp_len, ind;
+    int threshold_rsp_len, res, num_t_hdrs, elem_ind, ei, get_out, ov;
+    int desc_len;
+    unsigned int ref_gen_code, gen_code;
+    unsigned char enc_stat_rsp[MX_ALLOC_LEN];
+    unsigned char elem_desc_rsp[MX_ALLOC_LEN];
+    unsigned char add_elem_rsp[MX_ALLOC_LEN];
+    unsigned char threshold_rsp[MX_ALLOC_LEN];
+    struct join_row_t * jrp;
+    const unsigned char * es_ucp;
+    const unsigned char * ed_ucp;
+    const unsigned char * ae_ucp;
+    const unsigned char * t_ucp;
+    const unsigned char * es_last_ucp;
+    const unsigned char * ed_last_ucp;
+    const unsigned char * ae_last_ucp;
+    const unsigned char * t_last_ucp;
+    const char * cp;
+    const char * enc_state_changed = "  <<state of enclosure changed, "
+                                     "please try again>>\n";
+    const struct type_desc_hdr_t * tdhp;
+    char b[16];
+
+    num_t_hdrs = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                            &ref_gen_code, op);
+    if (num_t_hdrs < 0)
+        return num_t_hdrs;
+    res = do_rec_diag(sg_fd, DPC_ENC_STATUS, enc_stat_rsp,
+                      sizeof(enc_stat_rsp), op, &enc_stat_rsp_len);
+    if (res)
+        return res;
+    if (enc_stat_rsp_len < 8) {
+        fprintf(stderr, "Enclosure status response too short\n");
+        return -1;
+    }
+    gen_code = (enc_stat_rsp[4] << 24) | (enc_stat_rsp[5] << 16) |
+               (enc_stat_rsp[6] << 8) | enc_stat_rsp[7];
+    if (ref_gen_code != gen_code) {
+        fprintf(stderr, "%s", enc_state_changed);
+        return -1;
+    }
+    es_ucp = enc_stat_rsp + 8;
+    es_last_ucp = enc_stat_rsp + enc_stat_rsp_len - 1;
+
+    res = do_rec_diag(sg_fd, DPC_ELEM_DESC, elem_desc_rsp,
+                      sizeof(elem_desc_rsp), op, &elem_desc_rsp_len);
+    if (0 == res) {
+        if (elem_desc_rsp_len < 8) {
+            fprintf(stderr, "Element descriptor response too short\n");
+            return -1;
+        }
+        gen_code = (elem_desc_rsp[4] << 24) | (elem_desc_rsp[5] << 16) |
+                   (elem_desc_rsp[6] << 8) | elem_desc_rsp[7];
+        if (ref_gen_code != gen_code) {
+            fprintf(stderr, "%s", enc_state_changed);
+            return -1;
+        }
+        ed_ucp = elem_desc_rsp + 8;
+        ed_last_ucp = elem_desc_rsp + elem_desc_rsp_len - 1;
+    } else {
+        elem_desc_rsp_len = 0;
+        ed_ucp = NULL;
+        res = 0;
+        if (op->verbose)
+            fprintf(stderr, "  Element descriptor page not "
+                    "available\n");
+    }
+
+    res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp,
+                      sizeof(add_elem_rsp), op, &add_elem_rsp_len);
+    if (0 == res) {
+        if (add_elem_rsp_len < 8) {
+            fprintf(stderr, "Additional element status response too short\n");
+            return -1;
+        }
+        gen_code = (add_elem_rsp[4] << 24) | (add_elem_rsp[5] << 16) |
+                   (add_elem_rsp[6] << 8) | add_elem_rsp[7];
+        if (ref_gen_code != gen_code) {
+            fprintf(stderr, "%s", enc_state_changed);
+            return -1;
+        }
+        ae_ucp = add_elem_rsp + 8;
+        ae_last_ucp = add_elem_rsp + add_elem_rsp_len - 1;
+    } else {
+        add_elem_rsp_len = 0;
+        ae_ucp = NULL;
+        res = 0;
+        if (op->verbose)
+            fprintf(stderr, "  Additional element status page not "
+                    "available\n");
+    }
+
+    if (op->do_join > 1) {
+        res = do_rec_diag(sg_fd, DPC_THRESHOLD, threshold_rsp,
+                          sizeof(threshold_rsp), op, &threshold_rsp_len);
+        if (0 == res) {
+            if (threshold_rsp_len < 8) {
+                fprintf(stderr, "Additional element status response too "
+                        "short\n");
+                return -1;
+            }
+            gen_code = (threshold_rsp[4] << 24) | (threshold_rsp[5] << 16) |
+                       (threshold_rsp[6] << 8) | threshold_rsp[7];
+            if (ref_gen_code != gen_code) {
+                fprintf(stderr, "%s", enc_state_changed);
+                return -1;
+            }
+            t_ucp = threshold_rsp + 8;
+            t_last_ucp = threshold_rsp + threshold_rsp_len - 1;
+        } else {
+            threshold_rsp_len = 0;
+            t_ucp = NULL;
+            res = 0;
+            if (op->verbose)
+                fprintf(stderr, "  Threshold in page not available\n");
+        }
+    } else {
+        threshold_rsp_len = 0;
+        t_ucp = NULL;
+    }
+
+    jrp = join_arr;
+    tdhp = type_desc_hdr_arr;
+    for (k = 0, elem_ind = 0; k < num_t_hdrs; ++k, ++tdhp) {
+        jrp->el_ov_ind = 1000 + k;
+        jrp->etype = tdhp->etype;
+        jrp->se_id = tdhp->se_id;
+        /* check es_ucp < es_last_ucp still in range */
+        jrp->enc_statp = es_ucp;
+        es_ucp += 4;
+        jrp->elem_descp = ed_ucp;
+        if (ed_ucp)
+            ed_ucp += (ed_ucp[2] << 8) + ed_ucp[3] + 4;
+        jrp->add_elem_statp = NULL;
+        jrp->thresh_inp = t_ucp;
+        if (t_ucp)
+            t_ucp += 4;
+        ++jrp;
+        for (j = 0; j < tdhp->num_elements; ++j, ++jrp, ++elem_ind) {
+            if (jrp >= join_arr_lastp)
+                break;
+            jrp->el_ov_ind = elem_ind;
+            jrp->etype = tdhp->etype;
+            jrp->se_id = tdhp->se_id;
+            jrp->enc_statp = es_ucp;
+            es_ucp += 4;
+            jrp->elem_descp = ed_ucp;
+            if (ed_ucp)
+                ed_ucp += (ed_ucp[2] << 8) + ed_ucp[3] + 4;
+            jrp->thresh_inp = t_ucp;
+            if (t_ucp)
+                t_ucp += 4;
+            jrp->add_elem_statp = NULL;
+        }
+        if (jrp >= join_arr_lastp)
+            break;      /* leave last row all zeros */
+    }
+
+    if (ae_ucp) {
+        get_out = 0;
+        jrp = join_arr;
+        tdhp = type_desc_hdr_arr;
+        for (k = 0; k < num_t_hdrs; ++k, ++tdhp) {
+            if ((DEVICE_ETC == tdhp->etype) ||
+                (SCSI_TPORT_ETC == tdhp->etype) ||
+                (SCSI_IPORT_ETC == tdhp->etype) ||
+                (ARRAY_DEV_ETC == tdhp->etype) ||
+                (SAS_EXPANDER_ETC == tdhp->etype) ||
+                (ESC_ELECTRONICS_ETC == tdhp->etype)) {
+                for (j = 0; j < tdhp->num_elements; ++j) {
+                    if ((ae_ucp + 1) > ae_last_ucp) {
+                        get_out = 1;
+                        if (op->verbose)
+                            fprintf(stderr, "ses_join: off end of ae page\n");
+                        break;
+                    }
+                    if (ae_ucp[0] & 0x10) {     /* EIP bit */
+                        ei = ae_ucp[3];
+                        for (jrp = join_arr; jrp->enc_statp; ++jrp) {
+                            if (ei == jrp->el_ov_ind) {
+                                jrp->add_elem_statp = ae_ucp;
+                                break;
+                            }
+                        }
+                        if (NULL == jrp->enc_statp) {
+                            get_out = 1;
+                            fprintf(stderr, "ses_join: ei=%d not in "
+                                    "join_arr\n", ei);
+                            break;
+                        }
+                    } else {
+                        while (jrp->enc_statp && ((jrp->el_ov_ind > 999) ||
+                                                  jrp->add_elem_statp))
+                            ++jrp;
+                        if (NULL == jrp->enc_statp) {
+                            get_out = 1;
+                            fprintf(stderr, "ses_join: join_arr has no "
+                                    "space for ae\n");
+                            break;
+                        }
+                        jrp->add_elem_statp = ae_ucp;
+                    }
+                    ae_ucp += ae_ucp[1] + 2;
+                }
+            }
+            if (get_out)
+                break;
+        }
+    }
+
+    if (op->verbose > 3) {
+        jrp = join_arr;
+        for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
+            fprintf(stderr, "el_ov_ind=%d etype=%d se_id=%d  enc_statp=%p "
+                    "elem_descp=%p add_elem_statp=%p thresh_inp=%p\n",
+                    jrp->el_ov_ind, jrp->etype, jrp->se_id, jrp->enc_statp,
+                    jrp->elem_descp, jrp->add_elem_statp, jrp->thresh_inp);
+        }
+    }
+
+    for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
+         ++k, ++jrp) {
+        ov = (jrp->el_ov_ind > 999);
+        ind = ov ? jrp->el_ov_ind - 1000 : jrp->el_ov_ind;
+        if (op->index_given) {
+            if ((2 == op->index_given) != ov)
+                continue;
+            if (ind != op->index_elem_ov)
+                continue;
+        }
+        ed_ucp = jrp->elem_descp;
+        cp = find_element_desc(jrp->etype);
+        if (NULL == cp) {
+            snprintf(b, sizeof(b) - 1, "%d", jrp->etype);
+            b[sizeof(b) - 1] = '\0';
+            cp = b;
+        }
+        if (ed_ucp) {
+            desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
+            printf("%.*s [%s%d]  Element type: %s\n", desc_len - 4,
+                   ed_ucp + 4, (ov ? "ov" : ""), ind, cp);
+        } else
+            printf("%s index %d  Element type: %s\n",
+                   (ov ? "Overall" : "Element"), ind, cp);
+        printf("  Enclosure status:\n");
+        enc_status_helper("    ", jrp->enc_statp, jrp->etype, op);
+        if (jrp->add_elem_statp) {
+            printf("  Additional element status:\n");
+            ae_ucp = jrp->add_elem_statp;
+            desc_len = ae_ucp[1] + 2;
+            additional_elem_helper("    ",  ae_ucp, desc_len, jrp->etype, op);
+        }
+        if (jrp->thresh_inp) {
+            printf("  Threshold in:\n");
+            t_ucp = jrp->thresh_inp;
+            ses_threshold_helper("    ", t_ucp, jrp->etype,
+                                 (op ? (-1 - ind) : ind), op);
+        }
+    }
+    return res;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -2011,6 +2307,14 @@ main(int argc, char * argv[])
     res = process_cl(&opts, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
+    if (opts.do_version) {
+        fprintf(stderr, "version: %s\n", version_str);
+        return 0;
+    }
+    if (opts.do_help) {
+        usage();
+        return 0;
+    }
 
     if (opts.do_list) {
         int k;
@@ -2054,9 +2358,11 @@ main(int argc, char * argv[])
                 printf("    %s device (not an enclosure)\n", cp);
         }
     }
-    if (opts.do_status) {
+    if (opts.do_join)
+        ret = ses_join(sg_fd, &opts);
+    else if (opts.do_status)
         ret = ses_process_status(sg_fd, &opts);
-    } else { /* control page requested */
+    else { /* control page requested */
         opts.data_arr[0] = opts.page_code;
         opts.data_arr[1] = opts.byte1;
         opts.data_arr[2] = (opts.arr_len >> 8) & 0xff;
@@ -2144,6 +2450,9 @@ err_out:
             break;
         }
     }
+    if (ret && (0 == opts.verbose))
+        fprintf(stderr, "Problem detected, try again with --verbose option "
+                "for more information\n");
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));

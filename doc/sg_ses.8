@@ -1,13 +1,14 @@
-.TH SG_SES "8" "February 2011" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_SES "8" "May 2011" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-control\fR] [\fI\-\-data=H,H...\fR]
-[\fI\-\-filter\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inner\-hex\fR]
-[\fI\-\-list\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-filter\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-index=IND\fR]
+[\fI\-\-inner\-hex\fR] [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -23,12 +24,12 @@ diagnostic pages supported by the device (including SES pages)
 are listed.
 .PP
 The most recent reference for this utility is the draft SCSI Enclosure
-Services 3 document T10/2149-D Revision 2 at http://ww.t10.org . Existing
+Services 3 document T10/2149\-D Revision 2 at http://ww.t10.org . Existing
 standards for SES and SES\-2 are ANSI INCITS 305\-1998 and ANSI INCITS
 448\-2008 respectively.
 .PP
 A tutorial on SES can be found here:
-http://www.snia.org/events/storage-developer2008/presentations/monday/RajendraDivecha_SCSI_SES.pdf .
+http://www.snia.org/events/storage\-developer2008/presentations/monday/RajendraDivecha_SCSI_SES.pdf .
 It contains both an overview and in depth information suitable for decoding
 the contents of some diagnostic pages used by SES.
 .SH OPTIONS
@@ -76,6 +77,25 @@ the outer levels of a status diagnostic page are decoded and printed out
 but the innermost level (e.g. the element status descriptor) is output in
 hex. Implemented for the more complex diagnostic pages.
 .TP
+\fB\-I\fR, \fB\-\-index\fR=\fIIND\fR
+where \fIIND\fR is either an element index or an overall index (both are
+origin 0). If \fIIND\fR is between 0 and 999 then it refers to a non\-overall
+element. If \fIIND\fR is between 1000 and 1999, or starts with the
+string 'ov' followed by 0 to 999, then it refers to an overall element. With
+this option 1 element will be output if an index match is found, otherwise no
+element is output. The default action (i.e. without this option) is to list
+all elements. Useful with the enclosure status, element descriptor, threshold
+in and additional element status pages, plus with the \fI\-\-join\fR option.
+See the INDEXES section below.
+.TP
+\fB\-j\fR, \fB\-\-join\fR
+group elements from the element descriptor, enclosure status and additional
+element status pages. If this option is given twice then elements from
+the threshold in page are also grouped. The order is dictated by the
+configuration page. All elements are output unless the \fI\-\-index=IND\fR
+option is given, in which case only the matching element is output, or
+no element is output if there is no match. See the INDEXES section below.
+.TP
 \fB\-l\fR, \fB\-\-list\fR
 list all known diagnostic page names and SES elements. \fIDEVICE\fR
 is ignored and utility exits.
@@ -102,10 +122,40 @@ increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
-.SH NOTES
-Currently all status pages, control pages and element types defined in
-SES\-2 revision 17 (14th May 2007) are decoded.
+.SH INDEXES
+An enclosure can have information about its disk and tape drives plus
+other supporting components like power supplies spread across several
+diagnostic pages. Keeping this information "in sync" is relatively
+complicated.
 .PP
+The Configuration page is key: it contains a list of "type headers",
+each of which contains an element type (e.g. array element), a
+sub\-enclosure identifier (0 for the main enclosure) and a number of
+possible elements. Corresponding to each type header, the enclosure
+status page has one "overall" element plus "number of possible
+elements" elements and all those elements are of the given element type.
+For many element types the "number of possible elements" will be 0 so
+the enclosure status page has one "overall" element corresponding
+to that type header. The element descriptor page and the threshold (in)
+page follow the same pattern as the enclosure status page.
+.PP
+The additional element status page is a bit more complicated. It has
+entries for "number of possible elements" of certain element types. It
+does not have entries corresponding to the "overall" elements. To make
+the correspondence a little clearer each descriptor in this page optionally
+contains an "Element Index Present" indicator. And that element index
+refers to the order that elements appear in the status enclosure page (and
+friends) starting at 0 and excluding all overall elements.
+.PP
+To fit in with this pattern the \fI\-\-index=IND\fR option refers to one
+of two indexing schemes. The first is for all elements, excluding overall
+elements, starting at 0 and in the order they appear in the enclosure status
+page. The second indexing scheme is for overall elements only, starting at
+0. If \fIIND\fR is a value between 0 and 999 then it refers to the
+non\-overall elements. If \fIIND\fR is a value between 1000 and 1999, or
+starts with the string 'ov' followed by 0 to 999, then it refers to the
+overall elements.
+.SH NOTES
 This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
 pages (using the SCSI READ DIAGNOSTIC command). To this end the
 \fI\-\-page=PG\fR and \fI\-\-hex\fR options would be appropriate. Arbitrary
