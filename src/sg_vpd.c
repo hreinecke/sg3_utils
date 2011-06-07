@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.48 20110128";    /* spc4r29 + sbc3r26+ */
+static char * version_str = "0.49 20110603";    /* spc4r30 + sbc3r27 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1465,13 +1465,12 @@ decode_block_lb_prov_vpd(unsigned char * b, int len)
            !!(0x40 & b[5]));
     printf("  Write same (10) with unmap bit supported (LBWS10): %d\n",
            !!(0x20 & b[5]));
+    printf("  Logical block provisioning read zeros (LBPRZ): %d\n",
+           !!(0x4 & b[5]));
     printf("  Anchored LBAs supported (ANC_SUP): %d\n", !!(0x2 & b[5]));
     dp = !!(b[5] & 0x1);
     printf("  Threshold exponent: %d\n", b[4]);
     printf("  Descriptor present (DP): %d\n", dp);
-    // sbc3r26 overlooked placing the 'provisioning type' field in the VPD
-    // definition (table 181). Technical editor says it is in byte 6,
-    // bits 2 to 0.
     printf("  Provisioning type: %d\n", b[6] & 0x7);
     if (dp) {
         const unsigned char * ucp;
