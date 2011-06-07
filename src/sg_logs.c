@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "1.02 20110517";    /* spc4r27 + sbc3r25 */
+static char * version_str = "1.03 20110603";    /* spc4r30 + sbc3r27 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2664,7 +2664,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LB_PROV_LPAGE */
+/* LB_PROV_LPAGE [0xc] */
 static void
 show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2694,6 +2694,15 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
             }
             j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
             printf(" %d\n", j);
+            if (pl > 8) {
+                switch (ucp[8] & 0x3) {
+                case 0: cp = "not reported"; break;
+                case 1: cp = "dedicated to lu"; break;
+                case 2: cp = "not dedicated to lu"; break;
+                case 3: cp = "reserved"; break;
+                }
+                printf("    Scope: %s\n", cp);
+            }
         } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
             printf("  Vendor specific [0x%x]:", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);

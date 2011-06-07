@@ -1,14 +1,15 @@
-.TH SG_SES "8" "May 2011" "sg3_utils\-1.32" SG3_UTILS
+.TH SG_SES "8" "June 2011" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
 sg_ses \- send controls and fetch status from a SCSI Enclosure
 Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
-[\fI\-\-byte1=B1\fR] [\fI\-\-control\fR] [\fI\-\-data=H,H...\fR]
-[\fI\-\-filter\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-index=IND\fR]
+[\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
+[\fI\-\-data=H,H...\fR] [\fI\-\-filter\fR] [\fI\-\-get=STR\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-index=IND\fR]
 [\fI\-\-inner\-hex\fR] [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-raw\fR] [\fI\-\-set=STR\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -49,6 +50,9 @@ DIAGNOSTIC command. Cannot give both this option and \fI\-\-status\fR.
 The Enclosure control, String Out, Threshold Out, Array control (obsolete
 in SES\-2) and Subenclosure String Out diagnostic pages can be set currently.
 .TP
+\fB\-C\fR, \fB\-\-clear\fR=\fISTR\fR
+TODO
+.TP
 \fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
 permits a string of comma separated (ASCII) hex bytes to be specified (limit
 1024). A (single) space separated string of hex bytes is also allowed but
@@ -65,6 +69,9 @@ cuts down on the amount of output from the enclosure status diagnostic
 page. When this option is given, any line which has all its binary flags
 cleared (i.e. 0) is filtered out (i.e. ignored). If a line has some other
 value on it (e.g. a temperature) then it is output.
+.TP
+\fB\-G\fR, \fB\-\-get\fR=\fISTR\fR
+TODO
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -117,6 +124,9 @@ will fetch status diagnostic page from the \fIDEVICE\fR via a SCSI RECEIVE
 DIAGNOSTIC RESULTS command. If this option is not given and
 \fI\-\-control\fR is not given then \fI\-\-status\fR is assumed.
 .TP
+\fB\-S\fR, \fB\-\-set\fR=\fISTR\fR
+TODO
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
@@ -155,6 +165,10 @@ page. The second indexing scheme is for overall elements only, starting at
 non\-overall elements. If \fIIND\fR is a value between 1000 and 1999, or
 starts with the string 'ov' followed by 0 to 999, then it refers to the
 overall elements.
+.SH STR FORMAT
+The \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options
+have the same format in their \fISTR\fR argument.
+TODO
 .SH NOTES
 This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
 pages (using the SCSI READ DIAGNOSTIC command). To this end the

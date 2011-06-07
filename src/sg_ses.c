@@ -12,6 +12,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -25,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.50 20110530";    /* ses3r02 */
+static char * version_str = "1.51 20110606";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -102,6 +104,9 @@ struct opts_t {
     int do_version;
     int arr_len;
     unsigned char data_arr[MX_DATA_IN + 16];
+    const char * clear_str;
+    const char * get_str;
+    const char * set_str;
     const char * device_name;
 };
 
@@ -131,22 +136,63 @@ struct join_row_t {
     /* following point into Element Descriptor, Enclosure Status, Threshold
      * In and Additional element status diagnostic pages. enc_statp only
      * NULL past last, other pointers can be NULL . */
-    const unsigned char * elem_descp;
-    const unsigned char * enc_statp;    /* NULL indicates past last */
-    const unsigned char * thresh_inp;
-    const unsigned char * add_elem_statp;
+    unsigned char * elem_descp;
+    unsigned char * enc_statp;    /* NULL indicates past last */
+    unsigned char * thresh_inp;
+    unsigned char * add_elem_statp;
 };
+
+struct tuple_acronym_val {
+    const char * acron;
+    const char * val_str;
+    int start_byte;     /* -1 indicates no start_byte */
+    int start_bit;
+    int num_bits;
+    int64_t val;
+};
+
+struct acronym2tuple {
+    const char * acron;         /* NULL for past end */
+    int etype;
+    int start_byte;
+    int start_bit;
+    int num_bits;
+};
+
 
 static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
 
 static struct join_row_t join_arr[MX_JOIN_ROWS];
 static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 
+static unsigned char enc_stat_rsp[MX_ALLOC_LEN];
+static unsigned char elem_desc_rsp[MX_ALLOC_LEN];
+static unsigned char add_elem_rsp[MX_ALLOC_LEN];
+static unsigned char threshold_rsp[MX_ALLOC_LEN];
+static int enc_stat_rsp_len;
+static int elem_desc_rsp_len;
+static int add_elem_rsp_len;
+static int threshold_rsp_len;
+
+static struct acronym2tuple a2t_arr[] = {
+   {"ident", DEVICE_ETC, 2, 1, 1},
+   {"ident", ARRAY_DEV_ETC, 2, 1, 1},
+   {"locate", DEVICE_ETC, 2, 1, 1},
+   {"locate", ARRAY_DEV_ETC, 2, 1, 1},
+   {"fault", DEVICE_ETC, 3, 5, 1},
+   {"fault", ARRAY_DEV_ETC, 3, 5, 1},
+   {"active", DEVICE_ETC, 2, 7, 1},
+   {"active", ARRAY_DEV_ETC, 2, 7, 1},
+   {NULL, 0, 0, 0, 0},
+};
+
 static struct option long_options[] = {
         {"byte1", 1, 0, 'b'},
         {"control", 0, 0, 'c'},
+        {"clear", 1, 0, 'C'},
         {"data", 1, 0, 'd'},
         {"filter", 0, 0, 'f'},
+        {"get", 1, 0, 'G'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"inner-hex", 0, 0, 'i'},
@@ -156,6 +202,7 @@ static struct option long_options[] = {
         {"page", 1, 0, 'p'},
         {"raw", 0, 0, 'r'},
         {"status", 0, 0, 's'},
+        {"set", 1, 0, 'S'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -170,16 +217,17 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_ses [--byte1=B1] [--control] [--data=H,H...] [--filter] "
-          "[--help]\n"
-          "              [--hex] [--index=IND] [--inner-hex] [--join] "
-          "[--list]\n"
-          "              [--page=PG] [--raw] [--status] [--verbose] "
-          "[--version]\n"
+          "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
+          "              [--filter] [--get=STR] [--help] [--hex] "
+          "[--index=IND]\n"
+          "              [--inner-hex] [--join] [--list] [--page=PG] "
+          "[--raw]\n"
+          "              [--set=STR] [--status] [--verbose] [--version]\n"
           "              DEVICE\n"
           "  where:\n"
           "    --byte1=B1|-b B1  byte 1 (2nd byte) for some control "
           "pages\n"
+          "    --clear=STR|-C STR    clear field by acronym or position\n"
           "    --control|-c        send control information (def: fetch "
           "status)\n"
           "    --data=H,H...|-d H,H...    string of ASCII hex bytes for "
@@ -188,6 +236,8 @@ usage()
           "stdin\n"
           "    --filter|-f         filter out enclosure status clear "
           "flags\n"
+          "    --get=STR|-G STR    get value of field by acronym or "
+          "position\n"
           "    --help|-h           print out usage message\n"
           "    --hex|-H            print status response in hex\n"
           "    --index=IND|-I IND    only output element index IND, "
@@ -195,7 +245,8 @@ usage()
           "                          index where IND is either preceded by "
           "'ov' or\n"
           "                          offset by 1000. Default: output all "
-          "indexes\n"
+          "indexes\n");
+    fprintf(stderr,
           "    --inner-hex|-i      print innermost level of a"
           " status page in hex\n"
           "    --join|-j           group enclosure status, element "
@@ -211,11 +262,15 @@ usage()
           "for '-d';\n"
           "                        when used twice outputs page in binary "
           "to stdout\n"
+          "    --set=STR|-G STR    set value of field by acronym or "
+          "position\n"
           "    --status|-s         fetch status information (default "
           "action)\n"
           "    --verbose|-v        increase verbosity\n"
           "    --version|-V        print version string and exit\n\n"
-          "Fetches status or sends control data to a SCSI enclosure\n"
+          "Fetches status or sends control data to a SCSI enclosure. STR "
+          "can be\n'<acronym>[=val]' or '<start_byte>:<start_bit>"
+          "[:<num_bits>][=<val]'.\n"
           );
 }
 
@@ -229,7 +284,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:cd:fhHiI:jlp:rsvV", long_options,
+        c = getopt_long(argc, argv, "b:cC:d:fG:hHiI:jlp:rsS:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -246,6 +301,9 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         case 'c':
             ++op->do_control;
             break;
+        case 'C':
+            op->clear_str = optarg;
+            break;
         case 'd':
             memset(op->data_arr, 0, sizeof(op->data_arr));
             if (read_hex(optarg, op->data_arr + 4, &op->arr_len)) {
@@ -256,6 +314,9 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             break;
         case 'f':
             op->do_filter = 1;
+            break;
+        case 'G':
+            op->get_str = optarg;
             break;
         case 'h':
         case '?':
@@ -320,6 +381,9 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         case 's':
             ++op->do_status;
             break;
+        case 'S':
+            op->set_str = optarg;
+            break;
         case 'v':
             ++op->verbose;
             break;
@@ -351,6 +415,11 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (((!! op->clear_str) + (!! op->get_str) + (!! op->set_str)) > 1) {
+        fprintf(stderr, "can only be one of '--clear', '--get' and "
+                "'--set'\n");
+        return SG_LIB_SYNTAX_ERROR;
+    }
     if (op->do_list)
         return 0;
     if (op->do_control && op->do_status) {
@@ -374,6 +443,105 @@ process_cl(struct opts_t *op, int argc, char *argv[])
     return 0;
 }
 
+/* Returns 64 bit signed integer given in either decimal or in hex. The
+ * hex number is either preceded by "0x" or followed by "h". Returns -1
+ * on error (so check for "-1" string before using this function). */
+static int64_t
+get_llnum(const char * buf)
+{
+    int res, len;
+    int64_t num;
+    uint64_t unum;
+
+    if ((NULL == buf) || ('\0' == buf[0]))
+        return -1;
+    len = strlen(buf);
+    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
+        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
+        num = unum;
+    } else if ('H' == toupper(buf[len - 1])) {
+        res = sscanf(buf, "%" SCNx64 "", &unum);
+        num = unum;
+    } else
+        res = sscanf(buf, "%" SCNd64 "", &num);
+    return (1 == res) ? num : -1;
+}
+
+/* Parse clear/get/set string. Uses 'buff' for scratch area. Returns 0
+ * on success, else -1. */
+static int
+parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
+{
+    char * esp;
+    char * colp;
+    char * cp;
+    unsigned int ui;
+
+    tavp->acron = NULL;
+    tavp->val_str = NULL;
+    tavp->start_byte = -1;
+    tavp->num_bits = 1;
+    if ((esp = strchr(buff, '='))) {
+        tavp->val_str = esp + 1;
+        *esp = '\0';
+        if (0 == strcmp("-1", esp + 1))
+            tavp->val = -1;
+        else {
+            tavp->val = get_llnum(esp + 1);
+            if (-1 == tavp->val) {
+                fprintf(stderr, "unable to decode: %s value\n", esp + 1);
+                fprintf(stderr, "    expected: <acronym>[=<val>]\n");
+                return -1;
+            }
+        }
+    }
+    if (isalpha(buff[0]))
+        tavp->acron = buff;
+    else {
+        colp = strchr(buff, ':');
+        if ((NULL == colp) || (buff == colp))
+            return -1;
+        *colp = '\0';
+        if (('0' == buff[0]) && ('X' == toupper(buff[1]))) {
+            if (1 != sscanf(buff + 2, "%x", &ui))
+                return -1;
+            tavp->start_byte = ui;
+        } else if ('H' == toupper(*(colp - 1))) {
+            if (1 != sscanf(buff, "%x", &ui))
+                return -1;
+            tavp->start_byte = ui;
+        } else {
+            if (1 != sscanf(buff, "%d", &tavp->start_byte))
+                return -1;
+        }
+        if ((tavp->start_byte < 0) || (tavp->start_byte > 127)) {
+            fprintf(stderr, "<start_byte> needs to be between 0 and 127\n");
+            return -1;
+        }
+        cp = colp + 1;
+        colp = strchr(cp, ':');
+        if (cp == colp)
+            return -1;
+        if (colp)
+            *colp = '\0';
+        if (1 != sscanf(cp, "%d", &tavp->start_bit))
+            return -1;
+        if ((tavp->start_bit < 0) || (tavp->start_bit > 7)) {
+            fprintf(stderr, "<start_bit> needs to be between 0 and 7\n");
+            return -1;
+        }
+        if (colp) {
+            if (1 != sscanf(colp + 1, "%d", &tavp->num_bits))
+                return -1;
+        }
+        if ((tavp->num_bits < 1) || (tavp->num_bits > 63)) {
+            fprintf(stderr, "<num_bits> needs to be between 1 and 63\n");
+            return -1;
+        }
+    }
+    return 0;
+}
+        
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
  * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
@@ -394,7 +562,7 @@ do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
  * -2 -> unexpected response, -1 -> other failure */
 static int
 do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
-            int rsp_buff_size, struct opts_t * op, int * rsp_lenp)
+            int rsp_buff_size, const struct opts_t * op, int * rsp_lenp)
 {
     int rsp_len, res;
     const char * cp;
@@ -668,7 +836,8 @@ truncated:
  * if there is a problem */
 static int
 populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
-                           unsigned int * generationp, struct opts_t * op)
+                           unsigned int * generationp,
+                           const struct opts_t * op)
 {
     int resp_len, k, el, num_subs, sum_type_dheaders, res;
     unsigned int gen_code;
@@ -1908,7 +2077,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
 
 /* Return 0 for success. */
 static int
-ses_process_status(int sg_fd, struct opts_t * op)
+ses_process_status(int sg_fd, const struct opts_t * op)
 {
     int rsp_len, res;
     unsigned int ref_gen_code;
@@ -2026,22 +2195,21 @@ ses_process_status(int sg_fd, struct opts_t * op)
     return 0;
 }
 
+/* Fetch configuration, enclosure status, element descriptor, additional
+ * element status and optionally threshold in pages, place in static arrays.
+ * Collate (join) overall and individual elements into the static join_arr[].
+ * Returns 0 for success, any other return value is an error. */
 static int
-ses_join(int sg_fd, struct opts_t * op)
+ses_join(int sg_fd, const struct opts_t * op, int display)
 {
-    int k, j, enc_stat_rsp_len, elem_desc_rsp_len, add_elem_rsp_len, ind;
-    int threshold_rsp_len, res, num_t_hdrs, elem_ind, ei, get_out, ov;
+    int k, j, ind, res, num_t_hdrs, elem_ind, ei, get_out, ov, ind_ov;
     int desc_len;
     unsigned int ref_gen_code, gen_code;
-    unsigned char enc_stat_rsp[MX_ALLOC_LEN];
-    unsigned char elem_desc_rsp[MX_ALLOC_LEN];
-    unsigned char add_elem_rsp[MX_ALLOC_LEN];
-    unsigned char threshold_rsp[MX_ALLOC_LEN];
     struct join_row_t * jrp;
-    const unsigned char * es_ucp;
-    const unsigned char * ed_ucp;
-    const unsigned char * ae_ucp;
-    const unsigned char * t_ucp;
+    unsigned char * es_ucp;
+    unsigned char * ed_ucp;
+    unsigned char * ae_ucp;
+    unsigned char * t_ucp;
     const unsigned char * es_last_ucp;
     const unsigned char * ed_last_ucp;
     const unsigned char * ae_last_ucp;
@@ -2097,28 +2265,35 @@ ses_join(int sg_fd, struct opts_t * op)
                     "available\n");
     }
 
-    res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp,
-                      sizeof(add_elem_rsp), op, &add_elem_rsp_len);
-    if (0 == res) {
-        if (add_elem_rsp_len < 8) {
-            fprintf(stderr, "Additional element status response too short\n");
-            return -1;
+    if (display) {
+        res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp,
+                          sizeof(add_elem_rsp), op, &add_elem_rsp_len);
+        if (0 == res) {
+            if (add_elem_rsp_len < 8) {
+                fprintf(stderr, "Additional element status response too "
+                        "short\n");
+                return -1;
+            }
+            gen_code = (add_elem_rsp[4] << 24) | (add_elem_rsp[5] << 16) |
+                       (add_elem_rsp[6] << 8) | add_elem_rsp[7];
+            if (ref_gen_code != gen_code) {
+                fprintf(stderr, "%s", enc_state_changed);
+                return -1;
+            }
+            ae_ucp = add_elem_rsp + 8;
+            ae_last_ucp = add_elem_rsp + add_elem_rsp_len - 1;
+        } else {
+            add_elem_rsp_len = 0;
+            ae_ucp = NULL;
+            ae_last_ucp = NULL;
+            res = 0;
+            if (op->verbose)
+                fprintf(stderr, "  Additional element status page not "
+                        "available\n");
         }
-        gen_code = (add_elem_rsp[4] << 24) | (add_elem_rsp[5] << 16) |
-                   (add_elem_rsp[6] << 8) | add_elem_rsp[7];
-        if (ref_gen_code != gen_code) {
-            fprintf(stderr, "%s", enc_state_changed);
-            return -1;
-        }
-        ae_ucp = add_elem_rsp + 8;
-        ae_last_ucp = add_elem_rsp + add_elem_rsp_len - 1;
     } else {
-        add_elem_rsp_len = 0;
         ae_ucp = NULL;
-        res = 0;
-        if (op->verbose)
-            fprintf(stderr, "  Additional element status page not "
-                    "available\n");
+        ae_last_ucp = NULL;
     }
 
     if (op->do_join > 1) {
@@ -2248,13 +2423,16 @@ ses_join(int sg_fd, struct opts_t * op)
                     jrp->elem_descp, jrp->add_elem_statp, jrp->thresh_inp);
         }
     }
+    if (! display)      /* probably wanted join_arr[] built only */
+        return 0;
 
+    ind_ov = (2 == op->index_given);
     for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
          ++k, ++jrp) {
         ov = (jrp->el_ov_ind > 999);
         ind = ov ? jrp->el_ov_ind - 1000 : jrp->el_ov_ind;
         if (op->index_given) {
-            if ((2 == op->index_given) != ov)
+            if (ind_ov != ov)
                 continue;
             if (ind != op->index_elem_ov)
                 continue;
@@ -2291,17 +2469,154 @@ ses_join(int sg_fd, struct opts_t * op)
     return res;
 }
 
+static uint64_t
+get_big_endian(const unsigned char * from, int start_bit, int num_bits)
+{
+    uint64_t res;
+    int sbit_o1 = start_bit + 1;
+
+    res = (*from++ & ((1 << sbit_o1) - 1));
+    num_bits -= sbit_o1;
+    while (num_bits > 0) {
+        res <<= 8;
+        res |= *from++;
+        num_bits -= 8;
+    }
+    if (num_bits < 0)
+        res >>= (-num_bits);
+    return res;
+}
+
+static void
+set_big_endian(uint64_t val, unsigned char * to, int start_bit, int num_bits)
+{
+    int sbit_o1 = start_bit + 1;
+    int mask, num, k, x;
+
+    mask = (8 != sbit_o1) ? ((1 << sbit_o1) - 1) : 0xff;
+    k = start_bit - ((num_bits - 1) % 8);
+    if (0 != k)
+        val <<= ((k > 0) ? k : (8 + k));
+    num = (num_bits + 15 - sbit_o1) / 8;
+    for (k = 0; k < num; ++k) {
+        if ((sbit_o1 - num_bits) > 0)
+            mask &= ~((1 << (sbit_o1 - num_bits)) - 1);
+        if (k < (num - 1))
+            x = (val >> ((num - k - 1) * 8)) & 0xff;
+        else
+            x = val & 0xff;
+        to[k] = (to[k] & ~mask) | (x & mask);
+        mask = 0xff;
+        num_bits -= sbit_o1;
+        sbit_o1 = 8;
+    }
+}
+
+/* Returns 1 if strings equal (same length, characters same or only differ
+ * by case), else returns 0. Assumes 7 bit ASCII (English alphabet). */
+static int
+strcase_eq(const char * s1p, const char * s2p)
+{
+    int c1, c2;
+
+    do {
+        c1 = *s1p++;
+        c2 = *s2p++;
+        if (c1 != c2) {
+            if (c2 >= 'a')
+                c2 = toupper(c2);
+            else if (c1 >= 'a')
+                c1 = toupper(c1);
+            else
+                return 0;
+            if (c1 != c2)
+                return 0;
+        }
+    } while (c1);
+    return 1;
+}
+
+/* Do --clear, --get or --set .
+ * Returns 0 for success, any other return value is an error. */
+static int
+ses_cgs(int sg_fd, struct tuple_acronym_val * tavp, const struct opts_t * op)
+{
+    int ret, k, ov, ind_ov, ind, len, s_byte, s_bit, n_bits;
+    struct join_row_t * jrp;
+    struct acronym2tuple * a2tp;
+    uint64_t ui;
+
+    ret = ses_join(sg_fd, op, 0);
+    if (ret)
+        return ret;
+    if (NULL == tavp->acron) {
+        s_byte = tavp->start_byte;
+        s_bit = tavp->start_bit;
+        n_bits = tavp->num_bits;
+    }
+    ind_ov = (2 == op->index_given);
+    for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
+         ++k, ++jrp) {
+        ov = (jrp->el_ov_ind > 999);
+        ind = ov ? jrp->el_ov_ind - 1000 : jrp->el_ov_ind;
+        if (ind_ov != ov)
+            continue;
+        if (ind != op->index_elem_ov)
+            continue;
+        if (tavp->acron) {
+            for (a2tp = a2t_arr; a2tp->acron; ++ a2tp) {
+                if ((jrp->etype == a2tp->etype) && strcase_eq(tavp->acron, a2tp->acron))
+                    break;
+            }
+            if (a2tp->acron) {
+                s_byte = a2tp->start_byte;
+                s_bit = a2tp->start_bit;
+                n_bits = a2tp->num_bits;
+            } else {
+                fprintf(stderr, "acroynm %s not found\n", tavp->acron);
+                return -1;
+            }
+        }
+        if (op->get_str) {
+            ui = get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
+            printf("%" PRId64 "\n", (int64_t)ui);
+        } else {
+            jrp->enc_statp[0] &= 0x40;  /* keep PRDFAIL bit in byte 0 */
+            set_big_endian((uint64_t)tavp->val,
+                           jrp->enc_statp + s_byte, s_bit, n_bits);
+            jrp->enc_statp[0] |= 0x80;  /* set SELECT bit */
+            len = (enc_stat_rsp[2] << 8) + enc_stat_rsp[3] + 4;
+            ret = do_senddiag(sg_fd, 1, enc_stat_rsp, len, 1, op->verbose);
+            if (ret) {
+                fprintf(stderr, "couldn't send Enclosure control page\n");
+                return -1;
+            }
+        }
+        break;
+// xxxxxxxxxx
+    }
+    if ((NULL == jrp->enc_statp) || (k >= MX_JOIN_ROWS)) {
+        fprintf(stderr, "index: %s%d not found\n", (ind_ov ? "ov" : ""),
+                op->index_elem_ov);
+        return -1;
+    }
+
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
 {
     int sg_fd, res;
-    char buff[48];
+    char buff[128];
     int pd_type = 0;
+    int have_cgs = 0;
     int ret = 0;
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
     struct opts_t opts;
+    struct tuple_acronym_val tav;
 
     memset(&opts, 0, sizeof(opts));
     res = process_cl(&opts, argc, argv);
@@ -2332,6 +2647,38 @@ main(int argc, char * argv[])
             printf("    %s  [0x%x]\n", etp->desc, etp->elem_type_code);
         return 0;
     }
+    if (opts.clear_str || opts.get_str || opts.set_str) {
+        have_cgs = 1;
+        cp = opts.clear_str ? opts.clear_str :
+             (opts.get_str ? opts.get_str : opts.set_str);
+        strncpy(buff, cp, sizeof(buff) - 1);
+        buff[sizeof(buff) - 1] = '\0';
+        if (parse_cgs_str(buff, &tav)) {
+            fprintf(stderr, "unable to decode STR argument to --clear, "
+                    "--get or --set\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        fprintf(stderr, "cgs parse: acron=%s val_str=%s start_byte=%d\n",
+                tav.acron ? tav.acron : "(nil)",
+                tav.val_str ? tav.val_str : "(nil)", tav.start_byte);
+        fprintf(stderr, "  start_bit=%d num_bits=%d val=%" PRId64 "\n",
+                tav.start_bit, tav.num_bits, tav.val);
+        if (opts.get_str && tav.val_str) {
+            fprintf(stderr, "for --get don't want STR with =val\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (0 == opts.index_given) {
+            fprintf(stderr, "--index option required with either --clear, "
+                    "--get or --set\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (NULL == tav.val_str) {
+            if (opts.clear_str)
+                tav.val = 0;
+            if (opts.set_str)
+                tav.val = 1;
+        }
+    }
 
     sg_fd = sg_cmds_open_device(opts.device_name, 0 /* rw */, opts.verbose);
     if (sg_fd < 0) {
@@ -2339,7 +2686,7 @@ main(int argc, char * argv[])
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (! opts.do_raw) {
+    if (! (opts.do_raw || have_cgs)) {
         if (sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.verbose)) {
             fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
                     opts.device_name);
@@ -2358,8 +2705,10 @@ main(int argc, char * argv[])
                 printf("    %s device (not an enclosure)\n", cp);
         }
     }
-    if (opts.do_join)
-        ret = ses_join(sg_fd, &opts);
+    if (have_cgs)
+        ret = ses_cgs(sg_fd, &tav, &opts);
+    else if (opts.do_join)
+        ret = ses_join(sg_fd, &opts, 1);
     else if (opts.do_status)
         ret = ses_process_status(sg_fd, &opts);
     else { /* control page requested */
