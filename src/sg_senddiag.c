@@ -14,7 +14,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2009 D. Gilbert
+*  Copyright (C) 2003-2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
 */
 
-static char * version_str = "0.36 20090617";
+static char * version_str = "0.37 20110607";
 
 #define ME "sg_senddiag: "
 
@@ -591,6 +591,10 @@ int main(int argc, char * argv[])
     }
 
     if (NULL == opts.device_name) {
+        if (opts.do_list) {
+            list_page_codes();
+            return 0;
+        }
         fprintf(stderr, "No DEVICE argument given\n");
         if (opts.opt_new)
             usage();
@@ -654,18 +658,6 @@ int main(int argc, char * argv[])
                 printf(">>> warning, '-pf' probably should be used with "
                        "'-raw='\n");
         }
-    }
-    if (NULL == opts.device_name) {
-        if (opts.do_list) {
-            list_page_codes();
-            return 0;
-        }
-        fprintf(stderr, "No DEVICE argument given\n");
-        if (opts.opt_new)
-            usage();
-        else
-            usage_old();
-        return SG_LIB_SYNTAX_ERROR;
     }
 
     if ((sg_fd = sg_cmds_open_device(opts.device_name, 0 /* rw */,
