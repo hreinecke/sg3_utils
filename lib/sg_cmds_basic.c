@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.53 20110518";
+static char * version_str = "1.54 20110608";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -106,7 +106,8 @@ sg_cmds_close_device(int device_fd)
 }
 
 
-/* This is a helper function used by all sg_cmds_* implementations.
+/* This is a helper function used by sg_cmds_* implementations after
+ * the call to the pass-through. pt_res is returned from do_scsi_pt().
  * If valid sense data is found it is decoded and output to sg_warnings_strm
  * (def: stderr); depending on the 'noisy' and 'verbose' settings.
  * Returns -2 for sense data (may not be fatal), -1 for failed, or the
@@ -115,8 +116,8 @@ sg_cmds_close_device(int device_fd)
  * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
  * categories also have data in bytes received; -2 is still returned. */
 int
-sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
-                     int mx_di_len, const unsigned char * sense_b,
+sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
+                     int pt_res, int mx_di_len, const unsigned char * sbp,
                      int noisy, int verbose, int * o_sense_cat)
 {
     int got, cat, duration, slen, scat, n, resid;
@@ -125,23 +126,30 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
 
     if (NULL == leadin)
         leadin = "";
-    if (res < 0) {
+    if (pt_res < 0) {
         if (noisy || verbose)
             fprintf(sg_warnings_strm, "%s: pass through os error: %s\n",
-                    leadin, safe_strerror(-res));
+                    leadin, safe_strerror(-pt_res));
         return -1;
-    } else if (SCSI_PT_DO_BAD_PARAMS == res) {
+    } else if (SCSI_PT_DO_BAD_PARAMS == pt_res) {
         fprintf(sg_warnings_strm, "%s: bad pass through setup\n", leadin);
         return -1;
-    } else if (SCSI_PT_DO_TIMEOUT == res) {
+    } else if (SCSI_PT_DO_TIMEOUT == pt_res) {
         fprintf(sg_warnings_strm, "%s: pass through timeout\n", leadin);
         return -1;
     }
     if ((verbose > 2) && ((duration = get_scsi_pt_duration_ms(ptvp)) >= 0))
         fprintf(sg_warnings_strm, "      duration=%d ms\n", duration);
     resid = (mx_di_len > 0) ? get_scsi_pt_resid(ptvp) : 0;
+    slen = get_scsi_pt_sense_len(ptvp);
     switch ((cat = get_scsi_pt_result_category(ptvp))) {
     case SCSI_PT_RESULT_GOOD:
+        if ((slen > 7) && (sbp[0] >= 0x70)) {
+            /* SBC referrals can have status=GOOD and sense_key=COMPLETED */
+            if (((sbp[0] < 0x72) && (SPC_SK_NO_SENSE != (0xf & sbp[2]))) ||
+                ((sbp[0] < 0x74) && (SPC_SK_NO_SENSE != (0xf & sbp[1]))))
+                sg_err_category_sense(sbp, slen);
+        }
         if (mx_di_len > 0) {
             got = mx_di_len - resid;
             if (verbose && (resid > 0))
@@ -159,8 +167,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
         }
         return -1;
     case SCSI_PT_RESULT_SENSE:
-        slen = get_scsi_pt_sense_len(ptvp);
-        scat = sg_err_category_sense(sense_b, slen);
+        scat = sg_err_category_sense(sbp, slen);
         switch (scat) {
         case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -178,7 +185,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin, int res,
             break;
         }
         if (verbose || n) {
-            sg_get_sense_str(leadin, sense_b, slen, (verbose > 1),
+            sg_get_sense_str(leadin, sbp, slen, (verbose > 1),
                              sizeof(b), b);
             fprintf(sg_warnings_strm, "%s", b);
             if ((mx_di_len > 0) && (resid > 0)) {

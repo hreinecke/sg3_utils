@@ -232,7 +232,8 @@ extern const char * sg_cmds_version();
 
 struct sg_pt_base;
 
-/* This is a helper function used by all sg_cmds_* implementations.
+/* This is a helper function used by sg_cmds_* implementations after
+ * the call to the pass-through. pt_res is returned from do_scsi_pt().
  * If valid sense data is found it is decoded and output to sg_warnings_strm
  * (def: stderr); depending on the 'noisy' and 'verbose' settings.
  * Returns -2 for sense data (may not be fatal), -1 for failed or the
@@ -241,7 +242,7 @@ struct sg_pt_base;
  * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
  * categories also have data in bytes received; -2 is still returned. */
 extern int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
-                                int res, int mx_di_len,
+                                int pt_res, int mx_di_len,
                                 const unsigned char * sense_b, int noisy,
                                 int verbose, int * o_sense_cat);
 
