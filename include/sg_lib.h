@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -88,6 +88,7 @@ extern "C" {
 #define SPC_SK_ABORTED_COMMAND 0xb
 #define SPC_SK_VOLUME_OVERFLOW 0xd
 #define SPC_SK_MISCOMPARE 0xe
+#define SPC_SK_COMPLETED 0xf
 
 /* Transport protocol identifiers */
 #define TPROTO_FCP 0
@@ -251,6 +252,8 @@ extern void sg_print_scsi_status(int scsi_status);
 #define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
                                 /* (e.g. a transport or driver error) */
 
+/* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
+ * common sense key then return SG_LIB_CAT_SENSE .*/
 extern int sg_err_category_sense(const unsigned char * sense_buffer,
                                  int sb_len);
 

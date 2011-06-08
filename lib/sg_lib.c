@@ -22,21 +22,9 @@
  *    found at http://www.t10.org with the "SCSI Primary Commands-4" (SPC-4)
  *    being the central point of reference.
  *
- *    Other contributions:
- *      Version 0.91 (20031116)
- *          sense key specific field (bytes 15-17) decoding [Trent Piepho]
+ *    Contributions:
+ *      sense key specific field decoding [Trent Piepho 20031116]
  *
- * CHANGELOG (changes prior to v0.97 removed):
- *      v0.97 (20040830)
- *        safe_strerror(), rename sg_decode_sense() to sg_normalize_sense()
- *        decode descriptor sense data format in full
- *      v0.98 (20040924) [SPC-3 rev 21]
- *        renamed from sg_err.c to sg_lib.c
- *        factor out sg_get_num() and sg_get_llnum() into this file
- *        add 'no_ascii<0' variant to dStrHex for ASCII-hex output only
- *      v1.00 (20041012)
- *        renamed from sg_err.c to sg_lib.c
- *        change GPL to FreeBSD license
  */
 
 #include <stdio.h>
@@ -991,6 +979,8 @@ sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
     return 1;
 }
 
+/* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
+ * common sense key then return SG_LIB_CAT_SENSE .*/
 int
 sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
 {
@@ -1020,6 +1010,8 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             break;
         case SPC_SK_ABORTED_COMMAND:
             return SG_LIB_CAT_ABORTED_COMMAND;
+	default:
+	    ;	/* drop through (SPC_SK_COMPLETED amongst others) */
         }
     }
     return SG_LIB_CAT_SENSE;

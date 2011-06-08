@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -943,7 +943,6 @@ int
 do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
-    void * p;
 
     if (! bsg_major_checked) {
         bsg_major_checked = 1;
@@ -989,10 +988,15 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     /* io_hdr.timeout is in milliseconds */
     ptp->io_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) :
                                              DEF_TIMEOUT);
+#if 0
+    /* sense buffer already zeroed */
     if (ptp->io_hdr.response && (ptp->io_hdr.max_response_len > 0)) {
+        void * p;
+
         p = (void *)(long)ptp->io_hdr.response;
         memset(p, 0, ptp->io_hdr.max_response_len);
     }
+#endif
     if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
         ptp->os_err = errno;
         if (verbose > 1)
