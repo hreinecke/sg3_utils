@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.51 20110606";    /* ses3r03 */
+static char * version_str = "1.51 20110608";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -86,6 +86,7 @@ static char * version_str = "1.51 20110606";    /* ses3r03 */
 
 struct opts_t {
     int byte1;
+    int byte1_given;
     int do_control;
     int do_data;
     int do_filter;
@@ -105,6 +106,7 @@ struct opts_t {
     int arr_len;
     unsigned char data_arr[MX_DATA_IN + 16];
     const char * clear_str;
+    const char * desc_name;
     const char * get_str;
     const char * set_str;
     const char * device_name;
@@ -191,6 +193,7 @@ static struct option long_options[] = {
         {"control", 0, 0, 'c'},
         {"clear", 1, 0, 'C'},
         {"data", 1, 0, 'd'},
+        {"descriptor", 1, 0, 'D'},
         {"filter", 0, 0, 'f'},
         {"get", 1, 0, 'G'},
         {"help", 0, 0, 'h'},
@@ -218,15 +221,16 @@ usage()
 {
     fprintf(stderr, "Usage: "
           "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
-          "              [--filter] [--get=STR] [--help] [--hex] "
-          "[--index=IND]\n"
-          "              [--inner-hex] [--join] [--list] [--page=PG] "
-          "[--raw]\n"
-          "              [--set=STR] [--status] [--verbose] [--version]\n"
+          "              [--descriptor=DN] [--filter] [--get=STR] [--help] "
+          "[--hex]\n"
+          "              [--index=IND] [--inner-hex] [--join] [--list] "
+          "[--page=PG]\n"
+          "              [--raw] [--set=STR] [--status] [--verbose] "
+          "[--version]\n"
           "              DEVICE\n"
           "  where:\n"
-          "    --byte1=B1|-b B1  byte 1 (2nd byte) for some control "
-          "pages\n"
+          "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
+          "to B1\n"
           "    --clear=STR|-C STR    clear field by acronym or position\n"
           "    --control|-c        send control information (def: fetch "
           "status)\n"
@@ -234,6 +238,8 @@ usage()
           "control pages\n"
           "    --data=- | -d -     fetch string of ASCII hex bytes from "
           "stdin\n"
+          "    --descriptor=DN|-D DN    descriptor name, alternative to "
+          "--index=IND\n"
           "    --filter|-f         filter out enclosure status clear "
           "flags\n"
           "    --get=STR|-G STR    get value of field by acronym or "
@@ -270,7 +276,7 @@ usage()
           "    --version|-V        print version string and exit\n\n"
           "Fetches status or sends control data to a SCSI enclosure. STR "
           "can be\n'<acronym>[=val]' or '<start_byte>:<start_bit>"
-          "[:<num_bits>][=<val]'.\n"
+          "[:<num_bits>][=<val>]'.\n"
           );
 }
 
@@ -284,8 +290,8 @@ process_cl(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:cC:d:fG:hHiI:jlp:rsS:vV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "b:cC:d:D:fG:hHiI:jlp:rsS:vV",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
@@ -297,6 +303,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                         "inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            ++op->byte1_given;
             break;
         case 'c':
             ++op->do_control;
@@ -311,6 +318,9 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->do_data = 1;
+            break;
+        case 'D':
+            op->desc_name = optarg;
             break;
         case 'f':
             op->do_filter = 1;
@@ -418,6 +428,11 @@ process_cl(struct opts_t *op, int argc, char *argv[])
     if (((!! op->clear_str) + (!! op->get_str) + (!! op->set_str)) > 1) {
         fprintf(stderr, "can only be one of '--clear', '--get' and "
                 "'--set'\n");
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if (op->desc_name && op->index_given) {
+        fprintf(stderr, "can have either --descriptor or --index but "
+                "not both\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_list)
@@ -571,6 +586,14 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
     if (rsp_lenp)
         *rsp_lenp = 0;
     cp = find_in_diag_page_desc(page_code);
+    if (op->verbose > 1) {
+        if (cp)
+            fprintf(stderr, "    Receive diagnostic results cmd for %s "
+                    "page\n", cp);
+        else
+            fprintf(stderr, "    Receive diagnostic results cmd for "
+                    "page 0x%x\n", page_code);
+    }
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
                              rsp_buff_size, 1, op->verbose);
     if (0 == res) {
@@ -2203,7 +2226,7 @@ static int
 ses_join(int sg_fd, const struct opts_t * op, int display)
 {
     int k, j, ind, res, num_t_hdrs, elem_ind, ei, get_out, ov, ind_ov;
-    int desc_len;
+    int desc_len, dn_len;
     unsigned int ref_gen_code, gen_code;
     struct join_row_t * jrp;
     unsigned char * es_ucp;
@@ -2426,6 +2449,7 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
     if (! display)      /* probably wanted join_arr[] built only */
         return 0;
 
+    dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
     ind_ov = (2 == op->index_given);
     for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
          ++k, ++jrp) {
@@ -2438,6 +2462,16 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
                 continue;
         }
         ed_ucp = jrp->elem_descp;
+        if (op->desc_name) {
+            if (NULL == ed_ucp)
+                continue;
+            desc_len = (ed_ucp[2] << 8) + ed_ucp[3];
+            if (desc_len != dn_len)
+                continue;
+            if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),
+                             desc_len))
+                continue;
+        }
         cp = find_element_desc(jrp->etype);
         if (NULL == cp) {
             snprintf(b, sizeof(b) - 1, "%d", jrp->etype);
@@ -2447,7 +2481,7 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
             printf("%.*s [%s%d]  Element type: %s\n", desc_len - 4,
-                   ed_ucp + 4, (ov ? "ov" : ""), ind, cp);
+                   (const char *)(ed_ucp + 4), (ov ? "ov" : ""), ind, cp);
         } else
             printf("%s index %d  Element type: %s\n",
                    (ov ? "Overall" : "Element"), ind, cp);
@@ -2541,9 +2575,10 @@ strcase_eq(const char * s1p, const char * s2p)
 static int
 ses_cgs(int sg_fd, struct tuple_acronym_val * tavp, const struct opts_t * op)
 {
-    int ret, k, ov, ind_ov, ind, len, s_byte, s_bit, n_bits;
+    int ret, k, ov, ind_ov, ind, len, s_byte, s_bit, n_bits, desc_len, dn_len;
     struct join_row_t * jrp;
     struct acronym2tuple * a2tp;
+    const unsigned char * ed_ucp;
     uint64_t ui;
 
     ret = ses_join(sg_fd, op, 0);
@@ -2554,15 +2589,28 @@ ses_cgs(int sg_fd, struct tuple_acronym_val * tavp, const struct opts_t * op)
         s_bit = tavp->start_bit;
         n_bits = tavp->num_bits;
     }
+    dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
     ind_ov = (2 == op->index_given);
     for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
          ++k, ++jrp) {
         ov = (jrp->el_ov_ind > 999);
         ind = ov ? jrp->el_ov_ind - 1000 : jrp->el_ov_ind;
-        if (ind_ov != ov)
-            continue;
-        if (ind != op->index_elem_ov)
-            continue;
+        if (op->index_given) {
+            if (ind_ov != ov)
+                continue;
+            if (ind != op->index_elem_ov)
+                continue;
+        } else if (op->desc_name) {
+            ed_ucp = jrp->elem_descp;
+            if (NULL == ed_ucp)
+                continue;
+            desc_len = (ed_ucp[2] << 8) + ed_ucp[3];
+            if (desc_len != dn_len)
+                continue;
+            if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),
+                             desc_len))
+                continue;
+        }
         if (tavp->acron) {
             for (a2tp = a2t_arr; a2tp->acron; ++ a2tp) {
                 if ((jrp->etype == a2tp->etype) && strcase_eq(tavp->acron, a2tp->acron))
@@ -2585,6 +2633,8 @@ ses_cgs(int sg_fd, struct tuple_acronym_val * tavp, const struct opts_t * op)
             set_big_endian((uint64_t)tavp->val,
                            jrp->enc_statp + s_byte, s_bit, n_bits);
             jrp->enc_statp[0] |= 0x80;  /* set SELECT bit */
+            if (op->byte1_given)
+                enc_stat_rsp[1] = op->byte1;
             len = (enc_stat_rsp[2] << 8) + enc_stat_rsp[3] + 4;
             ret = do_senddiag(sg_fd, 1, enc_stat_rsp, len, 1, op->verbose);
             if (ret) {
@@ -2593,11 +2643,13 @@ ses_cgs(int sg_fd, struct tuple_acronym_val * tavp, const struct opts_t * op)
             }
         }
         break;
-// xxxxxxxxxx
     }
     if ((NULL == jrp->enc_statp) || (k >= MX_JOIN_ROWS)) {
-        fprintf(stderr, "index: %s%d not found\n", (ind_ov ? "ov" : ""),
-                op->index_elem_ov);
+        if (op->desc_name)
+            fprintf(stderr, "descriptor name: %s not found\n", op->desc_name);
+        else
+            fprintf(stderr, "index: %s%d not found\n", (ind_ov ? "ov" : ""),
+                    op->index_elem_ov);
         return -1;
     }
 
@@ -2658,18 +2710,19 @@ main(int argc, char * argv[])
                     "--get or --set\n");
             return SG_LIB_SYNTAX_ERROR;
         }
+#if 0
         fprintf(stderr, "cgs parse: acron=%s val_str=%s start_byte=%d\n",
                 tav.acron ? tav.acron : "(nil)",
                 tav.val_str ? tav.val_str : "(nil)", tav.start_byte);
         fprintf(stderr, "  start_bit=%d num_bits=%d val=%" PRId64 "\n",
                 tav.start_bit, tav.num_bits, tav.val);
-        if (opts.get_str && tav.val_str) {
-            fprintf(stderr, "for --get don't want STR with =val\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (0 == opts.index_given) {
-            fprintf(stderr, "--index option required with either --clear, "
-                    "--get or --set\n");
+#endif
+        if (opts.get_str && tav.val_str)
+            fprintf(stderr, "eith --get option ignoring =<val> at the end "
+                    "of STR argument\n");
+        if ((0 == opts.index_given) && (! opts.desc_name)) {
+            fprintf(stderr, "with --clear, --get or --set option need "
+                    "either --index or --descriptor\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if (NULL == tav.val_str) {

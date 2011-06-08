@@ -5,27 +5,30 @@ Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
-[\fI\-\-data=H,H...\fR] [\fI\-\-filter\fR] [\fI\-\-get=STR\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-index=IND\fR]
+[\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR] [\fI\-\-filter\fR]
+[\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-index=IND\fR]
 [\fI\-\-inner\-hex\fR] [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-page=PG\fR]
 [\fI\-\-raw\fR] [\fI\-\-set=STR\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send controls to a SES device (via a SCSI SEND DIAGNOSTIC command)
-or fetches status (via a SCSI RECEIVE DIAGNOSTIC RESULTS command).
-The \fIDEVICE\fR should be a SES device which may be a dedicated
-enclosure services processor (INQUIRY peripheral device type 0xd) or
-attached to another type of SCSI device (e.g. a disk) in which case
-the EncServ bit set in its INQUIRY response.
+Fetches status from a SCSI Enclosure Service (SES) device (via a SCSI RECEIVE
+DIAGNOSTIC RESULTS command). This utility can also send controls to a SES
+device (via a SCSI SEND DIAGNOSTIC command). The \fIDEVICE\fR should be a SES
+device which may be a dedicated enclosure services processor (INQUIRY
+peripheral device type 0xd) or attached to another type of SCSI device (e.g.
+a disk) in which case the EncServ bit is set in its INQUIRY response.
 .PP
-If no options are given (only the \fIDEVICE\fR argument) then all
-diagnostic pages supported by the device (including SES pages)
-are listed.
+If no options are given (only the \fIDEVICE\fR argument) then all diagnostic
+pages supported by the device (including SES pages) are listed.
+.PP
+Changing the state of an enclosure (e.g. requesting the "ident" (locate) LED
+to flash on a disk carrier in an array) is typically done using a
+read\-modify\-write cycle. See the section on CHANGING STATE below.
 .PP
 The most recent reference for this utility is the draft SCSI Enclosure
-Services 3 document T10/2149\-D Revision 2 at http://ww.t10.org . Existing
+Services 3 document T10/2149\-D Revision 3 at http://www.t10.org . Existing
 standards for SES and SES\-2 are ANSI INCITS 305\-1998 and ANSI INCITS
 448\-2008 respectively.
 .PP
@@ -39,10 +42,13 @@ The options are arranged in alphabetical order based on the long
 option name.
 .TP
 \fB\-b\fR, \fB\-\-byte1\fR=\fIB1\fR
-some control pages need byte 1 (i.e. the second byte) of the cdb set.
-Only required in rare cases when the \fI\-\-control\fR option is also set.
-Default is 0; \fIB1\fR is in decimal unless it is prefixed by '0x'
-or '0X' (or has a trailing 'h' or 'H').
+some control pages need byte 1 (i.e. the second byte) set. In the enclosure
+control diagnostic page byte 1 contains the INFO, NON\-CRIT, CRIT and UNRECOV
+bits. If \fI\-\-control\fR and \fI\-\-data=H,H...\fR options are used then
+the default value is 0. If the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR or
+\fI\-\-set=STR\fR option is used the default value is what was in byte 1
+when the status page was read. \fIB1\fR is in decimal unless it is prefixed
+by '0x' or '0X' (or has a trailing 'h' or 'H').
 .TP
 \fB\-c\fR, \fB\-\-control\fR
 will send control information to the \fIDEVICE\fR via a SCSI SEND
@@ -51,7 +57,10 @@ The Enclosure control, String Out, Threshold Out, Array control (obsolete
 in SES\-2) and Subenclosure String Out diagnostic pages can be set currently.
 .TP
 \fB\-C\fR, \fB\-\-clear\fR=\fISTR\fR
-TODO
+Used to clear a field in a control element. Must be used together with
+a \fI\-\-descriptor=DN\fR or \fI\-\-index=IND\fR option to specify which
+element is to be changed. By default the enclosure control page is modified.
+See the STR FORMAT section below. 
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
 permits a string of comma separated (ASCII) hex bytes to be specified (limit
@@ -64,6 +73,13 @@ first 4 bytes (i.e. page code and length). See next entry for using stdin.
 reads a data string from stdin, limit 1024 bytes. Spaces, tabs and line feeds
 additionally are permitted as separators.
 .TP
+\fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
+where \fIDN\fR is a descriptor name (string) as found in the element
+descriptor diagnostic page. If that page is supported then \fIDN\fR is
+an alternative for \fIIND\fR (in the \fI\-\-index=IND\fR option) in some
+cases. Useful with the \fI\-\-join\fR option as well as the
+\fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options.
+.TP
 \fB\-f\fR, \fB\-\-filter\fR
 cuts down on the amount of output from the enclosure status diagnostic
 page. When this option is given, any line which has all its binary flags
@@ -71,7 +87,11 @@ cleared (i.e. 0) is filtered out (i.e. ignored). If a line has some other
 value on it (e.g. a temperature) then it is output.
 .TP
 \fB\-G\fR, \fB\-\-get\fR=\fISTR\fR
-TODO
+Used to read a field in a status element. Must be used together with
+a \fI\-\-descriptor=DN\fR or \fI\-\-index=IND\fR option to specify which
+element is to be read. By default the enclosure status page is read.
+If a value is found it is output in decimal to stdout. See the STR FORMAT
+section below. 
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -91,9 +111,9 @@ element. If \fIIND\fR is between 1000 and 1999, or starts with the
 string 'ov' followed by 0 to 999, then it refers to an overall element. With
 this option 1 element will be output if an index match is found, otherwise no
 element is output. The default action (i.e. without this option) is to list
-all elements. Useful with the enclosure status, element descriptor, threshold
-in and additional element status pages, plus with the \fI\-\-join\fR option.
-See the INDEXES section below.
+all elements. Can be used with the enclosure status, element descriptor,
+threshold in and additional element status pages, plus with the \fI\-\-join\fR
+option. See the INDEXES section below.
 .TP
 \fB\-j\fR, \fB\-\-join\fR
 group elements from the element descriptor, enclosure status and additional
@@ -125,7 +145,10 @@ DIAGNOSTIC RESULTS command. If this option is not given and
 \fI\-\-control\fR is not given then \fI\-\-status\fR is assumed.
 .TP
 \fB\-S\fR, \fB\-\-set\fR=\fISTR\fR
-TODO
+Used to set a field in a control element. Must be used together with
+a \fI\-\-descriptor=DN\fR or \fI\-\-index=IND\fR option to specify which
+element is to be changed. By default the enclosure control page is modified.
+See the STR FORMAT section below. 
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -166,9 +189,48 @@ non\-overall elements. If \fIIND\fR is a value between 1000 and 1999, or
 starts with the string 'ov' followed by 0 to 999, then it refers to the
 overall elements.
 .SH STR FORMAT
-The \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options
-have the same format in their \fISTR\fR argument.
-TODO
+The \fISTR\fR arguments of the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and
+\fI\-\-set=STR\fR options all have the same structure. There are two forms:
+.br
+      <acronym>[=<value>]
+.br
+      <start_byte>:<start_bit>[:<num_bits>][=<value>]
+.PP
+The <acronym> is one of a list of common fields (e.g. "ident" and "fault")
+that the utilty converts internally into the second form. The <start_byte>
+is usually in the range 0 to 3, the <start_bit> must be in the range 0 to
+7 and the <num_bits> must be in the range 1 to 64 (default 1). The
+number of bits are read in the left to right sense of the element tables
+shown in the various SES draft documents. For example the 8 bits of
+byte 2 would be represented as 2:7:8 with the most significant bit being
+2:7 and the LSB being 2:0 .
+.PP
+The <value> is optional but is ignored if provided to \fI\-\-get=STR\fR.
+For \fI\-\-set=STR\fR the default <value> is 1 while for \fI\-\-clear=STR\fR
+the default value is 0 .
+.SH CHANGING STATE
+This utility has various techniques for changing the state of a SES device.
+As noted above this is typically a read\-modify\-write type operation.
+Most modifiable pages have a "status" (or "in") page that can be read, and
+a corresponding "control" (or "out") page that can be written back to change
+the state of the enclosure.
+.PP
+The lowest level technique provided by the utility involves outputting
+a "status" page in hex with \fI\-\-raw\fR. Then a text editor can be used
+to edit the hex (e.g. to change an enclosure control descriptor the SELECT
+bit needs to be set). Next the control page data can fed back with the
+\fI\-\-data=H,H...\fR option together with the \fI\-\-control\fR option;
+the \fI\-\-byte1=B1\fR option may need to be given as well.
+.PP
+Changes to the enclosure control page (and the threshold out page) can be
+done at a higher level. This involves choosing a page (the default in this
+case is the enclosure control page). Next choose an individual or overall
+element index (or naming it with its element descriptor string). Then give
+the element's name (e.g. "ident" for RQST IDENT) or its position within that
+element (e.g. in an array device slot control element RQST IDENT is byte 2,
+bit 1 and 1 bit long ("2:1:1")). Finally a value can be given, if not the
+value for \fI\-\-set=STR\fR defaults to 1 and for \fI\-\-clear=STR\fR
+defaults to 0.
 .SH NOTES
 This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
 pages (using the SCSI READ DIAGNOSTIC command). To this end the
@@ -206,8 +268,8 @@ in hex (suitable for editing) with:
 .PP
    sg_ses \-\-page=5 \-\-raw /dev/sda > t
 .PP
-Then with the aid of the SES\-2 document (in revision 9: section 6.1.8)
-use your favourite editor to change t. The change can be sent to the
+Then with the aid of the SES\-3 document (in revision 3: section 6.1.8)
+use your favourite editor to change t. The changes can be sent to the
 device with:
 .PP
    sg_ses \-\-control \-\-page=5 \-\-data=\- /dev/sda < t
@@ -218,6 +280,31 @@ check try:
    sg_ses \-\-page=5 /dev/sda
 .PP
 again.
+.PP
+Fields in the various elements of the enclosure control diagnostic page
+can be changed with a higher level syntax. The following example looks
+at flashing the "ident" LED (also called "locate") on "ArrayDevice07"
+which is a disk (or more precisely the carrier drawer the disk is in):
+.PP
+   sg_ses \-\-index=7 \-\-set=2:1:1 /dev/sg3
+.PP
+If the element descriptor diagnostic page shows that "ArrayDevice07" is
+the descriptor name associated with element index 7 then this invocation
+is equivalent to the last one:
+.PP
+   sg_ses \-\-descriptor=ArrayDevice07 \-\-set=2:1:1 /dev/sg3
+.PP
+Further the byte 2, bit 1 (for 1 bit) field in the array slot control
+element is RQST INDENT for asking a disk carrier to flash a LED so it can
+be located. In this case "ident" (or "locate") is accepted as an acronym
+for that field:
+.PP
+   sg_ses \-\-descriptor=ArrayDevice07 \-\-set=ident /dev/sg3
+.PP
+To turn off that LED:
+.PP
+   sg_ses \-\-descriptor=ArrayDevice07 \-\-clear=ident /dev/sg3
+.PP
 .SH EXIT STATUS
 The exit status of sg_ses is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
