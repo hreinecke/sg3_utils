@@ -27,14 +27,14 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.51 20110608";    /* ses3r03 */
+static char * version_str = "1.52 20110609";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260
 
-#define TEMPERATURE_OFFSET 20   /* 8 bits represents -19 C to +235 C */
+#define TEMPERAT_OFF 20         /* 8 bits represents -19 C to +235 C */
                                 /* value of 0 (would imply -20 C) reserved */
 
 /* Send Diagnostic and Receive Diagnostic Results page codes */
@@ -728,10 +728,10 @@ find_in_diag_page_desc(int page_num)
 
 static struct element_type_t element_type_arr[] = {
         {UNSPECIFIED_ETC, "Unspecified"},
-        {DEVICE_ETC, "Device"},
+        {DEVICE_ETC, "Device slot"},
         {POWER_SUPPLY_ETC, "Power supply"},
         {COOLING_ETC, "Cooling"},
-        {TEMPERATURE_ETC, "Temperature sense"},
+        {TEMPERATURE_ETC, "Temperature sensor"},
         {DOOR_LOCK_ETC, "Door lock"},
         {AUD_ALARM_ETC, "Audible alarm"},
         {ESC_ELECTRONICS_ETC, "Enclosure services controller electronics"},
@@ -750,7 +750,7 @@ static struct element_type_t element_type_arr[] = {
         {SCSI_TPORT_ETC, "SCSI target port"},
         {SCSI_IPORT_ETC, "SCSI initiator port"},
         {SIMPLE_SUBENC_ETC, "Simple subenclosure"},
-        {ARRAY_DEV_ETC, "Array device"},
+        {ARRAY_DEV_ETC, "Array device slot"},
         {SAS_EXPANDER_ETC, "SAS expander"},
         {SAS_CONNECTOR_ETC, "SAS connector"},
 };
@@ -1055,6 +1055,11 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
     char buff[128];
     int filter = op->do_filter;
 
+    if (op->inner_hex) {
+        printf("%s%02x %02x %02x %02x\n", pad, statp[0], statp[1], statp[2],
+               statp[3]);
+        return;
+    }
     printf("%sPredicted failure=%d, Disabled=%d, Swap=%d, status: %s\n",
            pad, !!(statp[0] & 0x40), !!(statp[0] & 0x20),
            !!(statp[0] & 0x10), elem_status_code_desc[statp[0] & 0xf]);
@@ -1121,7 +1126,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         }
         if (statp[2])
             printf("%sTemperature=%d C\n", pad,
-                   (int)statp[2] - TEMPERATURE_OFFSET);
+                   (int)statp[2] - TEMPERAT_OFF);
         else
             printf("%sTemperature: <reserved>\n", pad);
         break;
@@ -1387,26 +1392,16 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
             else
                 printf("    Element type: [0x%x], subenclosure id: %d\n",
                        tdhp->etype, tdhp->se_id);
-            if (op->inner_hex)
-                printf("      Overall %d descriptor(hex): %02x %02x %02x %02x\n",
-                       k, ucp[0], ucp[1], ucp[2], ucp[3]);
-            else {
-                printf("      Overall %d descriptor:\n", k);
-                enc_status_helper("        ", ucp, tdhp->etype, op);
-            }
+            printf("      Overall %d descriptor:\n", k);
+            enc_status_helper("        ", ucp, tdhp->etype, op);
         }
         for (ucp += 4, j = 0; j < tdhp->num_elements;
              ++j, ucp += 4, ++elem_ind) {
             if ((2 == op->index_given) ||
                 ((1 == op->index_given) && (elem_ind != op->index_elem_ov)))
                 continue;
-            if (op->inner_hex)
-                printf("      Element %d descriptor(hex): %02x %02x %02x "
-                       "%02x\n", elem_ind, ucp[0], ucp[1], ucp[2], ucp[3]);
-            else {
-                printf("      Element %d descriptor:\n", elem_ind);
-                enc_status_helper("        ", ucp, tdhp->etype, op);
-            }
+            printf("      Element %d descriptor:\n", elem_ind);
+            enc_status_helper("        ", ucp, tdhp->etype, op);
         }
     }
     return;
@@ -1429,40 +1424,30 @@ reserved_or_num(char * buff, int buff_len, int num, int reserve_num)
 
 static void
 ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
-                     int p_num, const struct opts_t * op)
+                     const struct opts_t * op)
 {
-    char buff[128];
     char b[128];
     char b2[128];
 
-    if (p_num < 0)
-        snprintf(buff, sizeof(buff) - 1, "Overall %d descriptor", -1 - p_num);
-    else
-        snprintf(buff, sizeof(buff) - 1, "Element %d descriptor", p_num);
     if (op->inner_hex) {
-        printf("%s%s (in hex): %02x %02x %02x %02x\n", pad, buff,
-               tp[0], tp[1], tp[2], tp[3]);
+        printf("%s%02x %02x %02x %02x\n", pad, tp[0], tp[1], tp[2], tp[3]);
         return;
     }
     switch (etype) {
     case 0x4:  /*temperature */
-        printf("%s%s: high critical=%s, high warning=%s\n", pad,
-               buff, reserved_or_num(b, 128, tp[0] - TEMPERATURE_OFFSET,
-                                     -TEMPERATURE_OFFSET),
-               reserved_or_num(b2, 128, tp[1] - TEMPERATURE_OFFSET,
-                               -TEMPERATURE_OFFSET));
-        printf("%s  low warning=%s, low critical=%s (in degrees Celsius)\n",
-               pad, reserved_or_num(b, 128, tp[2] - TEMPERATURE_OFFSET,
-                                    -TEMPERATURE_OFFSET),
-               reserved_or_num(b2, 128, tp[3] - TEMPERATURE_OFFSET,
-                               -TEMPERATURE_OFFSET));
+        printf("%shigh critical=%s, high warning=%s\n", pad,
+               reserved_or_num(b, 128, tp[0] - TEMPERAT_OFF, -TEMPERAT_OFF),
+               reserved_or_num(b2, 128, tp[1] - TEMPERAT_OFF, -TEMPERAT_OFF));
+        printf("%slow warning=%s, low critical=%s (in Celsius)\n", pad,
+               reserved_or_num(b, 128, tp[2] - TEMPERAT_OFF, -TEMPERAT_OFF),
+               reserved_or_num(b2, 128, tp[3] - TEMPERAT_OFF, -TEMPERAT_OFF));
         break;
     case 0xb:  /* UPS */
         if (0 == tp[2])
             strcpy(b, "<vendor>");
         else
             snprintf(b, sizeof(b), "%d", tp[2]);
-        printf("%s%s: low warning=%s, ", pad, buff, b);
+        printf("%slow warning=%s, ", pad, b);
         if (0 == tp[3])
             strcpy(b, "<vendor>");
         else
@@ -1471,31 +1456,30 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         break;
     case 0x12: /* voltage */
 #ifdef SG_LIB_MINGW
-        printf("%s%s: high critical=%g %%, high warning=%g %%\n", pad,
-               buff, 0.5 * tp[0], 0.5 * tp[1]);
-        printf("%s  low warning=%g %%, low critical=%g %% (from nominal "
+        printf("%shigh critical=%g %%, high warning=%g %%\n", pad,
+               0.5 * tp[0], 0.5 * tp[1]);
+        printf("%slow warning=%g %%, low critical=%g %% (from nominal "
                "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
 #else
-        printf("%s%s: high critical=%.1f %%, high warning=%.1f %%\n", pad,
-               buff, 0.5 * tp[0], 0.5 * tp[1]);
-        printf("%s  low warning=%.1f %%, low critical=%.1f %% (from nominal "
+        printf("%shigh critical=%.1f %%, high warning=%.1f %%\n", pad,
+               0.5 * tp[0], 0.5 * tp[1]);
+        printf("%slow warning=%.1f %%, low critical=%.1f %% (from nominal "
                "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
 #endif
         break;
     case 0x13: /* current */
 #ifdef SG_LIB_MINGW
-        printf("%s%s: high critical=%g %%, high warning=%g %%\n", pad,
-               buff, 0.5 * tp[0], 0.5 * tp[1]);
+        printf("%shigh critical=%g %%, high warning=%g %%", pad,
+               0.5 * tp[0], 0.5 * tp[1]);
 #else
-        printf("%s%s: high critical=%.1f %%, high warning=%.1f %%\n", pad,
-               buff, 0.5 * tp[0], 0.5 * tp[1]);
+        printf("%shigh critical=%.1f %%, high warning=%.1f %%", pad,
+               0.5 * tp[0], 0.5 * tp[1]);
 #endif
-        printf("%s  (above nominal current)\n", pad);
+        printf(" (above nominal current)\n");
         break;
     default:
         if (op->verbose)
-            printf("%s%s: << no thresholds for this element type >>\n", pad,
-                   buff);
+            printf("%s<< no thresholds for this element type >>\n", pad);
         break;
     }
 }
@@ -1510,7 +1494,6 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const char * cp;
-    const struct type_desc_hdr_t * tp;
 
     printf("Threshold In diagnostic page:\n");
     if (resp_len < 4)
@@ -1529,26 +1512,28 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  threshold status descriptor list\n");
     ucp = resp + 8;
-    for (k = 0, tp = tdhp, elem_ind = 0; k < num_telems; ++k, ++tp) {
+    for (k = 0, elem_ind = 0; k < num_telems; ++k, ++tdhp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
         if ((! op->index_given) ||
             ((2 == op->index_given) && (k == op->index_elem_ov))) {
-            cp = find_element_desc(tp->etype);
+            cp = find_element_desc(tdhp->etype);
             if (cp)
                 printf("    Element type: %s, subenclosure id: %d\n",
-                       cp, tp->se_id);
+                       cp, tdhp->se_id);
             else
                 printf("    Element type: [0x%x], subenclosure id: %d\n",
-                       tp->etype, tp->se_id);
-            ses_threshold_helper("      ", ucp, tp->etype, -1 - k, op);
+                       tdhp->etype, tdhp->se_id);
+            printf("      Overall %d descriptor:\n", k);
+            ses_threshold_helper("        ", ucp, tdhp->etype, op);
         }
-        for (ucp += 4, j = 0; j < tp->num_elements;
+        for (ucp += 4, j = 0; j < tdhp->num_elements;
              ++j, ucp += 4, ++elem_ind) {
             if ((2 == op->index_given) ||
                 ((1 == op->index_given) && (elem_ind != op->index_elem_ov)))
                 continue;
-            ses_threshold_helper("      ", ucp, tp->etype, j, op);
+            printf("      Element %d descriptor:\n", elem_ind);
+            ses_threshold_helper("        ", ucp, tdhp->etype, op);
         }
     }
     return;
@@ -1642,6 +1627,15 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
     const unsigned char * per_ucp;
     char b[64];
 
+    if (op->inner_hex) {
+        for (j = 0; j < len; ++j) {
+            if (0 == (j % 16))
+                printf("%s%s", ((0 == j) ? "" : "\n"), pad);
+            printf("%02x ", ucp[j]);
+        }
+        printf("\n");
+        return;
+    }
     eip_offset = (0x10 & ucp[0]) ? 2 : 0;
     switch (0xf & ucp[0]) {
     case TPROTO_FCP:
@@ -1652,7 +1646,7 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
         for (m = 0; m < 8; ++m)
             printf("%02x", ucp[6 + eip_offset + m]);
         if (eip_offset)
-            printf(", bay number: %d", ucp[5 + eip_offset]);
+            printf(", device slot number: %d", ucp[5 + eip_offset]);
         printf("\n");
         per_ucp = ucp + 14 + eip_offset;
         for (j = 0; j < ports; ++j, per_ucp += 16) {
@@ -1675,7 +1669,7 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
             printf("%snumber of phys: %d, not all phys: %d", pad, phys,
                    ucp[3 + eip_offset] & 1);
             if (eip_offset)
-                printf(", bay number: %d", ucp[5 + eip_offset]);
+                printf(", device slot number: %d", ucp[5 + eip_offset]);
             printf("\n");
             per_ucp = ucp + 4 + eip_offset + eip_offset;
             for (j = 0; j < phys; ++j, per_ucp += 28) {
@@ -1815,9 +1809,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                 printf("      Element index: %d\n", ind);
             else
                 printf("      Element %d descriptor\n", ind);
-            if (op->inner_hex)
-                dStrHex((const char *)ucp + 4, desc_len, 0);
-            else if (invalid)
+            if (invalid && (0 == op->inner_hex))
                 printf("        flagged as invalid (no further "
                        "information)\n");
             else
@@ -2496,8 +2488,7 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
         if (jrp->thresh_inp) {
             printf("  Threshold in:\n");
             t_ucp = jrp->thresh_inp;
-            ses_threshold_helper("    ", t_ucp, jrp->etype,
-                                 (op ? (-1 - ind) : ind), op);
+            ses_threshold_helper("    ", t_ucp, jrp->etype, op);
         }
     }
     return res;
