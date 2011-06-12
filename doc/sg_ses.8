@@ -55,12 +55,14 @@ will send control information to the \fIDEVICE\fR via a SCSI SEND
 DIAGNOSTIC command. Cannot give both this option and \fI\-\-status\fR.
 The Enclosure control, String Out, Threshold Out, Array control (obsolete
 in SES\-2) and Subenclosure String Out diagnostic pages can be set currently.
+Not needed with the \fI\-\-clear=STR\fR and \fI\-\-set=STR\fR options.
 .TP
 \fB\-C\fR, \fB\-\-clear\fR=\fISTR\fR
 Used to clear a field in a control element. Must be used together with
 a \fI\-\-descriptor=DN\fR or \fI\-\-index=IND\fR option to specify which
-element is to be changed. By default the enclosure control page is modified.
-See the STR FORMAT section below. 
+element is to be changed. By default the enclosure control page is modified,
+the only other page that can be modified is the threshold out page. See the
+STR FORMAT section below. 
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
 permits a string of comma separated (ASCII) hex bytes to be specified (limit
@@ -75,10 +77,11 @@ additionally are permitted as separators.
 .TP
 \fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
 where \fIDN\fR is a descriptor name (string) as found in the element
-descriptor diagnostic page. If that page is supported then \fIDN\fR is
-an alternative for \fIIND\fR (in the \fI\-\-index=IND\fR option) in some
-cases. Useful with the \fI\-\-join\fR option as well as the
-\fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options.
+descriptor diagnostic page. If that page is supported then \fIDN\fR may
+be alternative for \fIIND\fR (in the \fI\-\-index=IND\fR option). Some
+elements (e.g. overall elements) may not have descriptor names. Useful with
+the \fI\-\-join\fR option as well as the \fI\-\-clear=STR\fR,
+\fI\-\-get=STR\fR and \fI\-\-set=STR\fR options.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR
 cuts down on the amount of output from the enclosure status diagnostic
@@ -89,15 +92,19 @@ value on it (e.g. a temperature) then it is output.
 \fB\-G\fR, \fB\-\-get\fR=\fISTR\fR
 Used to read a field in a status element. Must be used together with
 a \fI\-\-descriptor=DN\fR or \fI\-\-index=IND\fR option to specify which
-element is to be read. By default the enclosure status page is read.
-If a value is found it is output in decimal to stdout. See the STR FORMAT
-section below. 
+element is to be read. By default the enclosure status page is read, the
+only other pages that can be read are the threshold in and additional
+element status pages. If a value is found it is output in decimal to
+stdout (by default) or in hexidecimal prededed by "0x" if the \fI\-\-hex\fR
+option is given. See the STR FORMAT section below. 
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-output the response in hexadecimal.
+If the \fI\-\-get=STR\fR option is given then output the value found (if
+any) in hexadecimal, with a leading "0x". Otherwise output the response
+in hexadecimal. Ignored with some options (e.g. \fI\-\-join\fR).
 .TP
 \fB\-i\fR, \fB\-\-inner\-hex\fR
 the outer levels of a status diagnostic page are decoded and printed out
@@ -124,8 +131,11 @@ option is given, in which case only the matching element is output, or
 no element is output if there is no match. See the INDEXES section below.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
-list all known diagnostic page names and SES elements. \fIDEVICE\fR
-is ignored and utility exits.
+list all known diagnostic page names and SES elements when \fI\-\-list\fR
+is given once. If \fI\-\-list\fR is given twice, then the recognized acronyms
+for the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options
+are listed. The utility exits after listing this information (so most
+other options and \fIDEVICE\fR are ignored).
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 where \fIPG\fR is a page code. Assumed to be in decimal unless prefixed by
@@ -147,8 +157,9 @@ DIAGNOSTIC RESULTS command. If this option is not given and
 \fB\-S\fR, \fB\-\-set\fR=\fISTR\fR
 Used to set a field in a control element. Must be used together with
 a \fI\-\-descriptor=DN\fR or \fI\-\-index=IND\fR option to specify which
-element is to be changed. By default the enclosure control page is modified.
-See the STR FORMAT section below. 
+element is to be changed. By default the enclosure control page is modified,
+the only other page that can be modified is the threshold out page. See the
+STR FORMAT section below. 
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -162,7 +173,7 @@ diagnostic pages. Keeping this information "in sync" is relatively
 complicated.
 .PP
 The Configuration page is key: it contains a list of "type headers",
-each of which contains an element type (e.g. array element), a
+each of which contains an element type (e.g. array device slot), a
 sub\-enclosure identifier (0 for the main enclosure) and a number of
 possible elements. Corresponding to each type header, the enclosure
 status page has one "overall" element plus "number of possible
@@ -304,6 +315,10 @@ for that field:
 To turn off that LED:
 .PP
    sg_ses \-\-descriptor=ArrayDevice07 \-\-clear=ident /dev/sg3
+.PP
+To get the SAS address of that device (which is held in the additional
+element sense page (page 10)) printed on hex:
+   sg_ses \-p 10 \-D ArrayDevice07 \-G at_sas_addr \-H /dev/sg3
 .PP
 .SH EXIT STATUS
 The exit status of sg_ses is 0 when it is successful. Otherwise see
