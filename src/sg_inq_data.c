@@ -39,7 +39,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 30 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 31 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -169,6 +169,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x440, "OSD-2 (no version claimed)"},
     {0x444, "OSD-2 T10/1729-D revision 4"},
     {0x446, "OSD-2 T10/1729-D revision 5"},
+    {0x448, "OSD-2 ANSI INCITS 458-2011"},
     {0x460, "SPC-4 (no version claimed)"},
     {0x461, "SPC-4 T10/1731-D revision 16"},
     {0x462, "SPC-4 T10/1731-D revision 18"},
@@ -354,12 +355,15 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xf2a, "FC-PI-5 T11/2118-D revision 6.00"},
     {0xf2b, "FC-PI-5 T11/2118-D revision 6.10"},
     {0xf40, "FC-PI-6 (no version claimed)"},
+    {0xf60, "FC-FS-4 (no version claimed)"},
+    {0xf80, "FC-LS-3 (no version claimed)"},
     {0x12a0, "FC-SCM (no version claimed)"},
     {0x12a3, "FC-SCM T11/1824DT revision 1.0"},
     {0x12a5, "FC-SCM T11/1824DT revision 1.1"},
     {0x12a7, "FC-SCM T11/1824DT revision 1.4"},
     {0x12c0, "FC-DA-2 (no version claimed)"},
     {0x12c3, "FC-DA-2 T11/1870DT revision 1.04"},
+    {0x12c5, "FC-DA-2 T11/1870DT revision 1.06"},
     {0x12e0, "FC-DA (no version claimed)"},
     {0x12e2, "FC-DA T11/1513-DT revision 3.1"},
     {0x12e8, "FC-DA ANSI INCITS TR-36 2004"},
@@ -417,6 +421,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x20a3, "SPL T10/2124-D revision 6a"},
     {0x20a5, "SPL T10/2124-D revision 7"},
     {0x20c0, "SPL-2 (no version claimed)"},
+    {0x21e0, "SOP (no version claimed)"},
+    {0x2200, "PQI (no version claimed)"},
     {0xffc0, "IEEE 1667 (no version claimed)"},
     {0xffc1, "IEEE 1667-2006"},
     {0xffc2, "IEEE 1667-2009"},
