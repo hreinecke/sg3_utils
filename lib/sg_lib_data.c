@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.67 20110608";  /* spc4r30, sbc3r27 */
+const char * sg_lib_version_str = "1.68 20110613";  /* spc4r31, sbc3r27 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -419,6 +419,9 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x18,"Logical unit not ready, a door is open"},
     {0x04,0x19,"Logical unit not ready, operating in sequential mode"},
     {0x04,0x1a,"Logical unit not ready, start stop unit command in progress"},
+    {0x04,0x1b,"Logical unit not ready, sanitize in progress"},
+    {0x04,0x1c,"Logical unit not ready, additional power use not yet "
+                "granted"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -562,6 +565,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x21,0x02,"Invalid address for write"},
     {0x21,0x03,"Invalid write crossing layer jump"},
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
+    {0x23,0x00,"Invalid token operation, cause not reportable"},
     {0x24,0x00,"Invalid field in cdb"},
     {0x24,0x01,"CDB decryption error"},
     {0x24,0x02,"Invalid cdb field while in explicit block model (obs)"},
@@ -670,6 +674,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x31,0x00,"Medium format corrupted"},
     {0x31,0x01,"Format command failed"},
     {0x31,0x02,"Zoned formatting failed due to spare linking"},
+    {0x31,0x03,"Sanitize command failed"},
     {0x32,0x00,"No defect spare location available"},
     {0x32,0x01,"Defect list update failure"},
     {0x33,0x00,"Tape length error"},
