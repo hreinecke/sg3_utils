@@ -78,10 +78,12 @@ additionally are permitted as separators.
 \fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
 where \fIDN\fR is a descriptor name (string) as found in the element
 descriptor diagnostic page. If that page is supported then \fIDN\fR may
-be alternative for \fIIND\fR (in the \fI\-\-index=IND\fR option). Some
-elements (e.g. overall elements) may not have descriptor names. Useful with
-the \fI\-\-join\fR option as well as the \fI\-\-clear=STR\fR,
-\fI\-\-get=STR\fR and \fI\-\-set=STR\fR options.
+be alternative for \fIIND\fR (in the \fI\-\-index=IND\fR option). If the
+descriptor name contains a space then \fIDN\fR needs to be surrounded by
+quotes (single or double) or the space escaped (e.g. preceded by a
+backslash). Some elements (e.g. overall elements) may not have descriptor
+names. Useful with the \fI\-\-join\fR option as well as the
+\fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR
 cuts down on the amount of output from the enclosure status diagnostic

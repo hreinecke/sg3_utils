@@ -185,7 +185,8 @@ extern int sg_get_sense_filemark_eom_ili(const unsigned char * sensep,
                                          int sb_len, int * filemark_p,
                                          int * eom_p, int * ili_p);
 
-/* Returns 1 if sense key is NO_SENSE or NOT_READY and SKSV is set. Places
+/* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
+ * returns 1 if progress indication sense data descriptor found. Places
  * progress field from sense data where progress_outp points. If progress
  * field is not available returns 0. Handles both fixed and descriptor
  * sense formats. N.B. App should multiply by 100 and divide by 65536

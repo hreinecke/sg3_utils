@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static char * version_str = "1.22 20100312";
+static char * version_str = "1.22 20110614";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -238,6 +238,7 @@ main(int argc, char * argv[])
                 }
                 break;
             }
+	    /* "Additional sense length" same in descriptor and fixed */
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
                 fprintf(stderr, "Parameter data in hex\n");

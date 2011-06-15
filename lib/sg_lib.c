@@ -300,6 +300,12 @@ sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
     }
 }
 
+/* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
+ * returns 1 if progress indication sense data descriptor found. Places
+ * progress field from sense data where progress_outp points. If progress
+ * field is not available returns 0. Handles both fixed and descriptor
+ * sense formats. N.B. App should multiply by 100 and divide by 65536
+ * to get percentage completion from given value. */
 int
 sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
                           int * progress_outp)
@@ -316,7 +322,7 @@ sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
         if ((sb_len < 18) ||
             ((SPC_SK_NO_SENSE != sk) && (SPC_SK_NOT_READY != sk)))
             return 0;
-        if (sensep[15] & 0x80) {
+        if (sensep[15] & 0x80) {        /* SKSV bit set */
             if (progress_outp)
                 *progress_outp = (sensep[16] << 8) + sensep[17];
             return 1;
@@ -1010,8 +1016,8 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             break;
         case SPC_SK_ABORTED_COMMAND:
             return SG_LIB_CAT_ABORTED_COMMAND;
-	default:
-	    ;	/* drop through (SPC_SK_COMPLETED amongst others) */
+        default:
+            ;   /* drop through (SPC_SK_COMPLETED amongst others) */
         }
     }
     return SG_LIB_CAT_SENSE;
