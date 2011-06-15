@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.53 20110612";    /* ses3r03 */
+static char * version_str = "1.55 20110615";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1378,7 +1378,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                    !!(statp[1] & 0x4), !!(statp[1] & 0x2),
                    !!(statp[1] & 0x1));
         if ((! filter) || (0xf0 & statp[2]))
-            printf("%sApp client bypass A=%d, Don't remove=%d, Enc bypass "
+            printf("%sApp client bypass A=%d, Do not remove=%d, Enc bypass "
                    "A=%d, Enc bypass B=%d\n", pad, !!(statp[2] & 0x80),
                    !!(statp[2] & 0x40), !!(statp[2] & 0x20),
                    !!(statp[2] & 0x10));
@@ -2280,7 +2280,7 @@ ses_process_status(int sg_fd, const struct opts_t * op)
  * Collate (join) overall and individual elements into the static join_arr[].
  * Returns 0 for success, any other return value is an error. */
 static int
-ses_join(int sg_fd, const struct opts_t * op, int display)
+process_join(int sg_fd, const struct opts_t * op, int display)
 {
     int k, j, ind, res, num_t_hdrs, elem_ind, ei, get_out, ov, ind_ov;
     int desc_len, dn_len;
@@ -2458,7 +2458,8 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
                     if ((ae_ucp + 1) > ae_last_ucp) {
                         get_out = 1;
                         if (op->verbose)
-                            fprintf(stderr, "ses_join: off end of ae page\n");
+                            fprintf(stderr, "process_join: off end of ae "
+                                    "page\n");
                         break;
                     }
                     if (ae_ucp[0] & 0x10) {     /* EIP bit */
@@ -2471,7 +2472,7 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
                         }
                         if (NULL == jrp->enc_statp) {
                             get_out = 1;
-                            fprintf(stderr, "ses_join: ei=%d not in "
+                            fprintf(stderr, "process_join: ei=%d not in "
                                     "join_arr\n", ei);
                             break;
                         }
@@ -2481,7 +2482,7 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
                             ++jrp;
                         if (NULL == jrp->enc_statp) {
                             get_out = 1;
-                            fprintf(stderr, "ses_join: join_arr has no "
+                            fprintf(stderr, "process_join: join_arr has no "
                                     "space for ae\n");
                             break;
                         }
@@ -2540,8 +2541,12 @@ ses_join(int sg_fd, const struct opts_t * op, int display)
         }
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
-            printf("%.*s [%s%d]  Element type: %s\n", desc_len - 4,
-                   (const char *)(ed_ucp + 4), (ov ? "ov" : ""), ind, cp);
+            if (desc_len > 4)
+                printf("%.*s [%s%d]  Element type: %s\n", desc_len - 4,
+                       (const char *)(ed_ucp + 4), (ov ? "ov" : ""), ind, cp);
+            else
+                printf("[%s%d]  Element type: %s\n", (ov ? "ov" : ""), ind,
+                       cp);
         } else
             printf("%s index %d  Element type: %s\n",
                    (ov ? "Overall" : "Element"), ind, cp);
@@ -2801,7 +2806,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     const struct join_row_t * jrp;
     const unsigned char * ed_ucp;
 
-    ret = ses_join(sg_fd, op, 0);
+    ret = process_join(sg_fd, op, 0);
     if (ret)
         return ret;
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
@@ -2990,7 +2995,7 @@ main(int argc, char * argv[])
     if (have_cgs)
         ret = ses_cgs(sg_fd, &tav, &opts);
     else if (opts.do_join)
-        ret = ses_join(sg_fd, &opts, 1);
+        ret = process_join(sg_fd, &opts, 1);
     else if (opts.do_status)
         ret = ses_process_status(sg_fd, &opts);
     else { /* control page requested */
