@@ -58,6 +58,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_safte$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sanitize$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_phy_event$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_set_features$(EXEEXT) \
@@ -99,6 +100,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_safte$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sanitize$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_phy_event$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_set_features$(EXEEXT) \
@@ -140,6 +142,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_safte$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sanitize$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_phy_event$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_set_features$(EXEEXT) \
@@ -180,6 +183,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_safte$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sanitize$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_phy_event$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_set_features$(EXEEXT) \
@@ -230,6 +234,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_safte$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sanitize$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_phy_event$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_set_features$(EXEEXT) \
@@ -261,7 +266,7 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@	sg_reassign$(EXEEXT) sg_referrals$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_requests$(EXEEXT) sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_rtpg$(EXEEXT) sg_safte$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sat_identify$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_sanitize$(EXEEXT) sg_sat_identify$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_sat_phy_event$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
@@ -376,6 +381,9 @@ sg_rtpg_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_safte_OBJECTS = sg_safte.$(OBJEXT)
 sg_safte_OBJECTS = $(am_sg_safte_OBJECTS)
 sg_safte_DEPENDENCIES = ../lib/libsgutils2.la
+am_sg_sanitize_OBJECTS = sg_sanitize.$(OBJEXT)
+sg_sanitize_OBJECTS = $(am_sg_sanitize_OBJECTS)
+sg_sanitize_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_sat_identify_OBJECTS = sg_sat_identify.$(OBJEXT)
 sg_sat_identify_OBJECTS = $(am_sg_sat_identify_OBJECTS)
 sg_sat_identify_DEPENDENCIES = ../lib/libsgutils2.la
@@ -464,7 +472,7 @@ SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
 	$(sg_requests_SOURCES) $(sg_reset_SOURCES) $(sg_rmsn_SOURCES) \
-	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) \
+	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
 	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
 	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) $(sg_start_SOURCES) \
@@ -486,7 +494,7 @@ DIST_SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
 	$(sg_requests_SOURCES) $(sg_reset_SOURCES) $(sg_rmsn_SOURCES) \
-	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) \
+	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
 	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
 	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) $(sg_start_SOURCES) \
@@ -683,6 +691,8 @@ sg_rtpg_SOURCES = sg_rtpg.c
 sg_rtpg_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_safte_SOURCES = sg_safte.c
 sg_safte_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_sanitize_SOURCES = sg_sanitize.c
+sg_sanitize_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_sat_identify_SOURCES = sg_sat_identify.c
 sg_sat_identify_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_sat_phy_event_SOURCES = sg_sat_phy_event.c
@@ -889,6 +899,9 @@ sg_rtpg$(EXEEXT): $(sg_rtpg_OBJECTS) $(sg_rtpg_DEPENDENCIES)
 sg_safte$(EXEEXT): $(sg_safte_OBJECTS) $(sg_safte_DEPENDENCIES) 
 	@rm -f sg_safte$(EXEEXT)
 	$(LINK) $(sg_safte_OBJECTS) $(sg_safte_LDADD) $(LIBS)
+sg_sanitize$(EXEEXT): $(sg_sanitize_OBJECTS) $(sg_sanitize_DEPENDENCIES) 
+	@rm -f sg_sanitize$(EXEEXT)
+	$(LINK) $(sg_sanitize_OBJECTS) $(sg_sanitize_LDADD) $(LIBS)
 sg_sat_identify$(EXEEXT): $(sg_sat_identify_OBJECTS) $(sg_sat_identify_DEPENDENCIES) 
 	@rm -f sg_sat_identify$(EXEEXT)
 	$(LINK) $(sg_sat_identify_OBJECTS) $(sg_sat_identify_LDADD) $(LIBS)
@@ -991,6 +1004,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rmsn.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rtpg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_safte.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sanitize.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_identify.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_phy_event.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_set_features.Po@am__quote@

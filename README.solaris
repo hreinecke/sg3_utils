@@ -35,6 +35,7 @@ Here is a list of utilities that have been ported:
     sg_rmsn
     sg_rtpg
     sg_safte
+    sg_sanitize
     sg_sat_identify
     sg_sat_phy_event
     sg_sat_set_features
@@ -135,4 +136,4 @@ disks to accept SCSI commands including the SCSI ATA PASS THROUGH commands.
 
 
 Doug Gilbert
-5th December 2010
+21st June 2011

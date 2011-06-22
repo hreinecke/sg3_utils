@@ -53,6 +53,7 @@ REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg ++
 REQUEST SENSE       sg_requests, ++
+SANITIZE            sg_sanitize
 SEND DIAGNOSTIC     sg_senddiag, sg_ses, ++
 SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
 SET TARGET PORT GROUPS       sg_stpg, ++
@@ -95,4 +96,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Doug Gilbert
-6th September 2010
+21st June 2011
