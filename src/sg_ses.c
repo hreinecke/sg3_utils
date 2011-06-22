@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.55 20110615";    /* ses3r03 */
+static char * version_str = "1.56 20110622";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -485,7 +485,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                 if (('O' != toupper(optarg[0])) ||
                     ('V' != toupper(optarg[1]))) {
                     fprintf(stderr, "bad argument to '--index', expect "
-                            "'ov' leadin to number\n");
+                            "number or 'ov' prefix to number\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 n = sg_get_num(optarg + 2);
@@ -1676,6 +1676,17 @@ truncated:
     return;
 }
 
+static int
+sas_addr_non_zero(const unsigned char * ucp)
+{
+    int k;
+
+    for (k = 0; k < 8; ++k) {
+        if (ucp[k])
+            return 1;
+    }
+    return 0;
+}
 
 static char * sas_device_type[] = {
     "no device attached",
@@ -1689,8 +1700,9 @@ static void
 additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                        int elem_type, const struct opts_t * op)
 {
-    int ports, phys, j, m, desc_type, eip_offset;
+    int ports, phys, j, m, desc_type, eip_offset, print_sas_addr;
     const unsigned char * per_ucp;
+    int filter = op->do_filter;
     char b[64];
 
     if (op->inner_hex) {
@@ -1742,23 +1754,33 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                 printf("%sphy index: %d\n", pad, j);
                 printf("%s  device type: %s\n", pad,
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
-                printf("%s  initiator port for:%s%s%s\n", pad,
-                       ((per_ucp[2] & 8) ? " SSP" : ""),
-                       ((per_ucp[2] & 4) ? " STP" : ""),
-                       ((per_ucp[2] & 2) ? " SMP" : ""));
-                printf("%s  target port for:%s%s%s%s%s\n", pad,
-                       ((per_ucp[3] & 0x80) ? " SATA_port_selector" : ""),
-                       ((per_ucp[3] & 8) ? " SSP" : ""),
-                       ((per_ucp[3] & 4) ? " STP" : ""),
-                       ((per_ucp[3] & 2) ? " SMP" : ""),
-                       ((per_ucp[3] & 1) ? " SATA_device" : ""));
-                printf("%s  attached SAS address: 0x", pad);
-                for (m = 0; m < 8; ++m)
-                    printf("%02x", per_ucp[4 + m]);
-                printf("\n%s  SAS address: 0x", pad);
-                for (m = 0; m < 8; ++m)
-                    printf("%02x", per_ucp[12 + m]);
-                printf("\n%s  phy identifier: 0x%x\n", pad, per_ucp[20]);
+                if ((! filter) || (0xe & per_ucp[2]))
+                    printf("%s  initiator port for:%s%s%s\n", pad,
+                           ((per_ucp[2] & 8) ? " SSP" : ""),
+                           ((per_ucp[2] & 4) ? " STP" : ""),
+                           ((per_ucp[2] & 2) ? " SMP" : ""));
+                if ((! filter) || (0x8f & per_ucp[3]))
+                    printf("%s  target port for:%s%s%s%s%s\n", pad,
+                           ((per_ucp[3] & 0x80) ? " SATA_port_selector" : ""),
+                           ((per_ucp[3] & 8) ? " SSP" : ""),
+                           ((per_ucp[3] & 4) ? " STP" : ""),
+                           ((per_ucp[3] & 2) ? " SMP" : ""),
+                           ((per_ucp[3] & 1) ? " SATA_device" : ""));
+                print_sas_addr = 0;
+                if ((! filter) || sas_addr_non_zero(per_ucp + 4)) {
+                    ++print_sas_addr;
+                    printf("%s  attached SAS address: 0x", pad);
+                    for (m = 0; m < 8; ++m)
+                        printf("%02x", per_ucp[4 + m]);
+                }
+                if ((! filter) || sas_addr_non_zero(per_ucp + 12)) {
+                    ++print_sas_addr;
+                    printf("\n%s  SAS address: 0x", pad);
+                    for (m = 0; m < 8; ++m)
+                        printf("%02x", per_ucp[12 + m]);
+                }
+                if (print_sas_addr)
+                    printf("\n%s  phy identifier: 0x%x\n", pad, per_ucp[20]);
             }
         } else if (1 == desc_type) {
             phys = ucp[2 + eip_offset];
@@ -2662,7 +2684,7 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
             n_bits = a2tp->num_bits;
         } else {
             fprintf(stderr, "acroynm %s not found for Enclosure "
-                    "Control/Status page\n", tavp->acron);
+                    "Control/Status page (try '-ll' option)\n", tavp->acron);
             return -1;
         }
     }
@@ -2721,7 +2743,7 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
             n_bits = a2tp->num_bits;
         } else {
             fprintf(stderr, "acroynm %s not found for Threshold In/Out "
-                    "page\n", tavp->acron);
+                    "page (try '-ll' option)\n", tavp->acron);
             return -1;
         }
     }
@@ -2778,7 +2800,7 @@ cgs_additional_el(const struct join_row_t * jrp,
             n_bits = a2tp->num_bits;
         } else {
             fprintf(stderr, "acroynm %s not found for Additional element "
-                    "status page\n", tavp->acron);
+                    "status page (try '-ll' option)\n", tavp->acron);
             return -1;
         }
     }
@@ -2848,7 +2870,8 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     }
     if ((NULL == jrp->enc_statp) || (k >= MX_JOIN_ROWS)) {
         if (op->desc_name)
-            fprintf(stderr, "descriptor name: %s not found\n", op->desc_name);
+            fprintf(stderr, "descriptor name: %s not found (check page "
+                    "7)\n", op->desc_name);
         else
             fprintf(stderr, "index: %s%d not found\n", (ind_ov ? "ov" : ""),
                     op->index_elem_ov);

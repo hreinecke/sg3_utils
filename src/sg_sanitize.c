@@ -165,6 +165,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         fprintf(stderr, "    Sanitize cmd: ");
         for (k = 0; k < SANITIZE_OP_LEN; ++k)
             fprintf(stderr, "%02x ", sanCmdBlk[k]);
+        fprintf(stderr, "\n");
     }
     if ((op->verbose > 2) && (param_lst_len > 0)) {
         fprintf(stderr, "    Parameter list contents:\n");

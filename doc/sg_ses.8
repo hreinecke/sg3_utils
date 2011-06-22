@@ -1,7 +1,6 @@
 .TH SG_SES "8" "June 2011" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
-sg_ses \- send controls and fetch status from a SCSI Enclosure
-Services (SES) device
+sg_ses \- fetch status from a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
@@ -77,7 +76,7 @@ additionally are permitted as separators.
 .TP
 \fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
 where \fIDN\fR is a descriptor name (string) as found in the element
-descriptor diagnostic page. If that page is supported then \fIDN\fR may
+descriptor diagnostic page (i.e. page 7). If that page is supported then \fIDN\fR may
 be alternative for \fIIND\fR (in the \fI\-\-index=IND\fR option). If the
 descriptor name contains a space then \fIDN\fR needs to be surrounded by
 quotes (single or double) or the space escaped (e.g. preceded by a
@@ -87,9 +86,10 @@ names. Useful with the \fI\-\-join\fR option as well as the
 .TP
 \fB\-f\fR, \fB\-\-filter\fR
 cuts down on the amount of output from the enclosure status diagnostic
-page. When this option is given, any line which has all its binary flags
-cleared (i.e. 0) is filtered out (i.e. ignored). If a line has some other
-value on it (e.g. a temperature) then it is output.
+page and the additional element status page. When this option is given, any
+line which has all its binary flags cleared (i.e. 0) is filtered out (i.e.
+ignored). If a line has some other value on it (e.g. a temperature) then
+it is output.
 .TP
 \fB\-G\fR, \fB\-\-get\fR=\fISTR\fR
 Used to read a field in a status element. Must be used together with
@@ -179,28 +179,28 @@ each of which contains an element type (e.g. array device slot), a
 sub\-enclosure identifier (0 for the main enclosure) and a number of
 possible elements. Corresponding to each type header, the enclosure
 status page has one "overall" element plus "number of possible
-elements" elements and all those elements are of the given element type.
-For many element types the "number of possible elements" will be 0 so
+elements" individual elements all of which have the given element type.
+For some element types the "number of possible elements" will be 0 so
 the enclosure status page has one "overall" element corresponding
-to that type header. The element descriptor page and the threshold (in)
-page follow the same pattern as the enclosure status page.
+to that type header. The element descriptor page and the threshold (in
+and out) page follow the same pattern as the enclosure status page.
 .PP
 The additional element status page is a bit more complicated. It has
 entries for "number of possible elements" of certain element types. It
 does not have entries corresponding to the "overall" elements. To make
 the correspondence a little clearer each descriptor in this page optionally
-contains an "Element Index Present" indicator. And that element index
+contains an "Element Index Present" indicator. If so that element index
 refers to the order that elements appear in the status enclosure page (and
 friends) starting at 0 and excluding all overall elements.
 .PP
 To fit in with this pattern the \fI\-\-index=IND\fR option refers to one
-of two indexing schemes. The first is for all elements, excluding overall
-elements, starting at 0 and in the order they appear in the enclosure status
-page. The second indexing scheme is for overall elements only, starting at
-0. If \fIIND\fR is a value between 0 and 999 then it refers to the
-non\-overall elements. If \fIIND\fR is a value between 1000 and 1999, or
-starts with the string 'ov' followed by 0 to 999, then it refers to the
-overall elements.
+of two indexing schemes. The first is for all individual elements,
+excluding overall elements, starting at 0 and in the order they appear in
+the enclosure status page. The second indexing scheme is for overall
+elements only, starting at 0. If \fIIND\fR is a value between 0 and 999
+then it refers to the individual elements. If \fIIND\fR is a value
+between 1000 and 1999, or starts with the string 'ov' followed by 0 to
+999, then it refers to the overall elements.
 .SH STR FORMAT
 The \fISTR\fR arguments of the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and
 \fI\-\-set=STR\fR options all have the same structure. There are two forms:
@@ -221,6 +221,9 @@ byte 2 would be represented as 2:7:8 with the most significant bit being
 The <value> is optional but is ignored if provided to \fI\-\-get=STR\fR.
 For \fI\-\-set=STR\fR the default <value> is 1 while for \fI\-\-clear=STR\fR
 the default value is 0 .
+.PP
+The supported list of <acronym>s can be viewed by using the \fI\-\-list\fR
+option twice (or "\-ll").
 .SH CHANGING STATE
 This utility has various techniques for changing the state of a SES device.
 As noted above this is typically a read\-modify\-write type operation.
@@ -228,9 +231,9 @@ Most modifiable pages have a "status" (or "in") page that can be read, and
 a corresponding "control" (or "out") page that can be written back to change
 the state of the enclosure.
 .PP
-The lowest level technique provided by the utility involves outputting
+The lowest level technique provided by this utility involves outputting
 a "status" page in hex with \fI\-\-raw\fR. Then a text editor can be used
-to edit the hex (e.g. to change an enclosure control descriptor the SELECT
+to edit the hex (note: to change an enclosure control descriptor the SELECT
 bit needs to be set). Next the control page data can fed back with the
 \fI\-\-data=H,H...\fR option together with the \fI\-\-control\fR option;
 the \fI\-\-byte1=B1\fR option may need to be given as well.
@@ -238,7 +241,7 @@ the \fI\-\-byte1=B1\fR option may need to be given as well.
 Changes to the enclosure control page (and the threshold out page) can be
 done at a higher level. This involves choosing a page (the default in this
 case is the enclosure control page). Next choose an individual or overall
-element index (or naming it with its element descriptor string). Then give
+element index (or name it with its element descriptor string). Then give
 the element's name (e.g. "ident" for RQST IDENT) or its position within that
 element (e.g. in an array device slot control element RQST IDENT is byte 2,
 bit 1 and 1 bit long ("2:1:1")). Finally a value can be given, if not the
@@ -320,7 +323,18 @@ To turn off that LED:
 .PP
 To get the SAS address of that device (which is held in the additional
 element sense page (page 10)) printed on hex:
+.PP
    sg_ses \-p 10 \-D ArrayDevice07 \-G at_sas_addr \-H /dev/sg3
+.PP
+To collate the information in the enclosure status, element descriptor
+and additional element status pages the \fI\-\-join\fR option can be used:
+.PP
+   sg_ses \-\-join /dev/sg3
+.PP
+This will produce a lot of output. To filter out lines that don't contain
+much information add the \fI\-\-filter\fR option:
+.PP
+   sg_ses \-\-join \-\-filter /dev/sg3
 .PP
 .SH EXIT STATUS
 The exit status of sg_ses is 0 when it is successful. Otherwise see
