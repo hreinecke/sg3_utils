@@ -37,6 +37,7 @@ Here is a list of utilities that have been ported:
     sg_rmsn
     sg_rtpg
     sg_safte
+    sg_sanitize
     sg_sat_identify
     sg_sat_phy_event
     sg_sat_set_features
@@ -118,4 +119,4 @@ utilities.
 
 
 Doug Gilbert
-25th February 2011
+21st June 2011

@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_FORMAT "8" "June 2011" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
@@ -118,7 +118,7 @@ bit is set, the FOV bit must also be set hence sg_format does that.
 .TP
 \fB\-e\fR, \fB\-\-early\fR
 this option is active when \fI\-\-format\fR is given. The default action of
-this utility is to poll the disk every 30 seconds to determine the progress
+this utility is to poll the disk every 60 seconds to determine the progress
 of the format operation until it is finished. When this option is given this
 utility will exit "early" as soon as the format has commenced. Then the
 user can monitor the progress of the ongoing format operation with other
@@ -262,7 +262,7 @@ When the \fI\-\-format\fR option is given without the \fI\-\-wait\fR option
 then the SCSI FORMAT UNIT command is issued with the IMMED bit set which
 causes the SCSI command to return after it has started the format operation.
 The \fI\-\-early\fR option will cause sg_format to exit at that point.
-Otherwise the \fIDEVICE\fR is polled every 30 seconds with TEST UNIT READY
+Otherwise the \fIDEVICE\fR is polled every 60 seconds with TEST UNIT READY
 commands until it reports an "all clear" (i.e. the format operation has
 completed). Normally these polling commands will result in a progress
 indicator (expressed as a percentage) being output to the screen. If the user
@@ -334,7 +334,7 @@ are made:
 .PP
 Now a simple format, leaving the block count and size as they were previously.
 The FORMAT UNIT command is executed in IMMED mode and the device is polled
-every 30 seconds to print out a progress indication:
+every 60 seconds to print out a progress indication:
 .PP
    sg_format \-\-format /dev/sdm
 .PP
@@ -372,7 +372,7 @@ Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2010 Grant Grundler, James Bottomley and Douglas Gilbert
+Copyright \(co 2005\-2011 Grant Grundler, James Bottomley and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

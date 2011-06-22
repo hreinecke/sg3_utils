@@ -1,0 +1,186 @@
+.TH SG_SANITIZE "8" "June 2011" "sg3_utils\-1.32" SG3_UTILS
+.SH NAME
+sg_sanitize \- remove all use data from a SCSI disk
+.SH SYNOPSIS
+.B sg_sanitize
+[\fI\-\-block\fR] [\fI\-\-count=OC\fR] [\fI\-\-crypto\fR] [\fI\-\-early\fR]
+[\fI\-\-help\fR] [\fI\-\-invert\fR] [\fI\-\-ipl=LEN\fR] [\fI\-\-overwrite\fR]
+[\fI\-\-pattern=PF\fR] [\fI\-\-quick\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wait\fR]
+\fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility invokes the SCSI SANITIZE command. This command was first
+introduced in the SBC\-3 revision 27 draft. The purpose of the sanitize
+operation is to alter the information in the cache and on the medium of a
+logical unit (e.g. a disk) so that the recovery of user data is not
+possible. If that user data cannot be erased, or is in the process of
+being erased, then the sanitize operation prevents access to that user
+data.
+.PP
+Once a SCSI SANITIZE command has successfully started, then user data from
+that disk is no longer available. Even if the disk is power cycled, the
+sanitize operation will continue after power is re\-instated until it is
+complete. 
+.PP
+This utility requires either the \fI\-\-block\fR, \fI\-\-crypto\fR or
+\fI\-\-overwrite\fR option. If the \fI\-\-quick\fR option is not given
+then the user if given 15 seconds to reconsider whether they wish to
+erase all the data on a disk. The disk's INQUIRY response strings
+are printed out just in case the wrong \fIDEVICE\fR has been given.
+.PP
+If the \fI\-\-early\fR option is given this utility will exit soon
+after starting the SANITIZE command with the IMMED bit set. The user can
+monitor the progress of the sanitize operation with
+the "sg_request \-\-num=9999 \-\-progress" which sends a REQUEST SENSE
+command every 30 seconds. Otherwise if the \fI\-\-wait\fR option is given
+then this utility will wait until the SANITIZE command completes (or fails)
+and that can be many hours.
+.PP
+If neither the \fI\-\-early\fR nor \fI\-\-wait\fR option is given then
+the SANITIZE command is started with the IMMED bit set. After that this
+utility sends a REQUEST SENSE command every 60 seconds until there are
+no more progress indications.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
+.TP
+\fB\-B\fR, \fB\-\-block\fR
+perform a "block erase" sanitize operation.
+.TP
+\fB\-c\fR, \fB\-\-count\fR=\fIOC\fR
+where \fIOC\fR is the "overwrite count" associated with the "overwrite"
+sanitize operation. \fIOC\fR can be a value between 1 and 31 and 1 is
+the default.
+.TP
+\fB\-C\fR, \fB\-\-crypto\fR
+perform a "cryptographic erase" sanitize operation.
+.TP
+\fB\-e\fR, \fB\-\-early\fR
+the default action of this utility is to poll the disk every 60 seconds to
+fetch the progress indication until the sanitize is finished. When this
+option is given this utility will exit "early" as soon as the sanitize
+has commenced. This option and \fI\-\-wait\fR cannot both be given.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage information then exit.
+.TP
+\fB\-i\fR, \fB\-\-ipl\fR=\fILEN\fR
+set the initialization pattern length to \fILEN\fR bytes. By default it is
+set to the length of the pattern file (\fIPF\fR). Only active when the
+\fI\-\-overwrite\fR option is also given. It is the number of bytes from
+the \fIPF\fR file that will be used as the initialization pattern. The
+minimum size is 1 byte and the maximum is the logical block size of the
+\fIDEVICE\fR (and not to exceed 65535). If \fILEN\fR exceeds the \fIPF\fR
+file size then the initialization pattern is padded with zeros.
+.TP
+\fB\-I\fR, \fB\-\-invert\fR
+set the INVERT bit in the overwrite service action parameter list. This
+only affects the "overwrite" sanitize operation. The default is a clear
+INVERT bit. When the INVERT bit is set then the initialization pattern
+is inverted between consecutive overwrite passes.
+.TP
+\fB\-O\fR, \fB\-\-overwrite\fR
+perform an "overwrite" sanitize operation. When this option is given
+then the \fI\-\-pattern=PF\fR option is required.
+.TP
+\fB\-p\fR, \fB\-\-pattern\fR=\fIPF\fR
+where \fIPF\fR is the filename of a file containing the initialization
+pattern required by an "overwrite" sanitize operation. The length of
+this file will be used as the length of the initialization pattern unless
+the \fI\-\-ipl=LEN\fR option is given. The length of the initialization
+pattern must be from 1 to the logical block size of the \fIDEVICE\fR.
+.TP
+\fB\-Q\fR, \fB\-\-quick\fR
+the default action (i.e. when the option is not given) is to give the user
+15 seconds to reconsider doing a sanitize operation on the \fIDEVICE\fR. 
+When this option is given that step (i.e. the 15 second warning period)
+is skipped.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.TP
+\fB\-w\fR, \fB\-\-wait\fR
+the default action (i.e. without this option and the \fI\-\-early\fR option)
+is to start the SANITIZE command with the IMMED bit set then poll for the
+progress indication with the REQUEST SENSE command until the sanitize
+operation is complete (or fails). When this option is given (and the
+\fI\-\-early\fR option is not given) then the SANITIZE command is started
+with the IMMED bit clear. For a large disk this might take hours. [A
+cryptographic erase operation could potentially be very quick.]
+.SH NOTES
+The SCSI SANITIZE command is closely related to the ATA SANITIZE command,
+both are relatively new with the ATA command being the first one defined.
+It is likely that a SCSI to ATA Translation (SAT) definition will soon
+appear for the SCSI SANITIZE command (most likely in SAT\-3).
+.PP
+The SCSI SANITIZE command is related to the SCSI FORMAT UNIT command. It
+is likely that a block erase sanitize operation would take a similar
+amount of time as a format on the same disk (e.g. 9 hours for a 2 Terabyte
+disk). The primary goal of a format is the configuration of the disk at
+the end of a format (e.g. different logical block size or protection
+information added). Removal of user data is only a side effect of a format.
+With the SCSI SANITIZE command, removal of user data is the primary goal.
+If a sanitize operation is interrupted (e.g. the disk is power cycled)
+then after power up any remaining user data will not be available and the
+sanitize operation will continue. When a format is interrupted (e.g. the
+disk is power cycled) the drafts say very little about the state of the
+disk. In practice some of the original user data may remain and the format
+may need to be restarted. 
+.SH EXAMPLES
+These examples use Linux device names. For suitable device names in
+other supported Operating Systems see the sg3_utils(8) man page.
+.PP
+As a precaution if this utility is called with no options then apart from
+printing a usage message, nothing happens:
+.PP
+   sg_sanitize /dev/sdm
+.PP
+To do a "block erase" sanitize the \fI\-\-block\fR option is required.
+The user will be given a 15 second period to reconsider, the SCSI SANITIZE
+command will be started with the IMMED bit set, then this utility will
+poll for a progress indication with a REQUEST SENSE command until the
+sanitize operation is finished:
+.PP
+   sg_sanitize \-\-block /dev/sdm
+.PP
+To start a "block erase" sanitize and return from this utility once it is
+started (but not yet completed) use the \fI\-\-early\fR option:
+.PP
+   sg_sanitize \-\-block \-\-early /dev/sdm
+.PP
+If the 15 second reconsideration time is not required add the
+\fI\-\-quick\fR option:
+.PP
+   sg_sanitize \-\-block \-\-quick \-\-early /dev/sdm
+.PP
+To do an "overwrite" sanitize a pattern file is required:
+.PP
+   sg_sanitize \-\-overwrite \-\-pattern=rand.img /dev/sdm
+.PP
+If the length of that "rand.img" is 512 bytes (a typically logical block
+size) then to use only the first 17 bytes (repeatedly) in the "overwrite"
+sanitize operation:
+.PP
+   sg_sanitize \-\-overwrite \-\-pattern=rand.img \-\-ipl=17 /dev/sdm
+.PP
+.SH EXIT STATUS
+The exit status of sg_sanitize is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the
+exit status may not reflect the success of otherwise of the format.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2011 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_requests(8), sg_format(8)

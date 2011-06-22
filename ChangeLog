@@ -2,7 +2,8 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.32 [20110615] [svn: r406]
+Changelog for sg3_utils-1.32 [20110622] [svn: r407]
+  - sg_sanitize: new utility for command added in sb3r27
   - sg_sat_identify: add '--ident' to output WWN
   - sg_ses: major rework of descriptor output
     - add --index, --descriptor and --join options
