@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.49 20110603";    /* spc4r30 + sbc3r27 */
+static char * version_str = "0.50 20110624";    /* spc4r31 + sbc3r27 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -54,6 +54,7 @@ extern const struct svpd_values_name_t *
 #define VPD_ATA_INFO 0x89
 #define VPD_POWER_CONDITION 0x8a
 #define VPD_DEVICE_CONSTITUENTS 0x8b
+#define VPD_CFA_PROFILE_INFO 0x8c
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
@@ -133,6 +134,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
     {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc", "Block device characteristics "
      "(SBC)"},
+    {VPD_CFA_PROFILE_INFO, 0, 0, 0, "cfa", "CFA profile information"},
     {VPD_DEVICE_CONSTITUENTS, 0, 1, 0, "dc", "Device constituents"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "

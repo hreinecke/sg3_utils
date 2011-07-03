@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.00 20110613";    /* SPC-4 rev 31 */
+static char * version_str = "1.01 20110624";    /* SPC-4 rev 31 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -79,6 +79,8 @@ static char * version_str = "1.00 20110613";    /* SPC-4 rev 31 */
 #define VPD_SCSI_PORTS  0x88
 #define VPD_ATA_INFO  0x89
 #define VPD_POWER_CONDITION  0x8a
+#define VPD_DEVICE_CONSTITUENTS 0x8b
+#define VPD_CFA_PROFILE_INFO  0x8c
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0
@@ -652,9 +654,10 @@ struct vpd_name {
     char * name;
 };
 
+/* In numerical order */
 static struct vpd_name vpd_name_arr[] = {
-    {VPD_SUPPORTED_VPDS, 0, "Supported VPD pages"},
-    {VPD_UNIT_SERIAL_NUM, 0, "Unit serial number"},
+    {VPD_SUPPORTED_VPDS, 0, "Supported VPD pages"},             /* 0x0 */
+    {VPD_UNIT_SERIAL_NUM, 0, "Unit serial number"},             /* 0x80 */
     {0x81, 0, "Implemented operating definitions (obsolete)"},
     {0x82, 0, "ASCII implemented operating definition (obsolete)"},
     {VPD_DEVICE_ID, 0, "Device identification"},
@@ -665,7 +668,10 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_SCSI_PORTS, 0, "SCSI ports"},
     {VPD_ATA_INFO, 0, "ATA information"},
     {VPD_POWER_CONDITION, 0, "Power condition"},
-    {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},
+    {VPD_DEVICE_CONSTITUENTS, 0, "Device constituents"},
+    {VPD_CFA_PROFILE_INFO, 0, "CFA profile information"},       /* 0x8c */
+    /* 0xb0 to 0xbf are per peripheral device type */
+    {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},               /* 0xb0 */
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
     {VPD_LB_PROVISIONING, 0, "Logical block provisioning (sbc3)"},
     {VPD_REFERRALS, 0, "Referrals (sbc3)"},
@@ -673,6 +679,7 @@ static struct vpd_name vpd_name_arr[] = {
     {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},
     {0xb0, PDT_OSD, "OSD information (osd)"},
     {0xb1, PDT_OSD, "Security token (osd)"},
+    /* 0xc0 to 0xff are vendor specific */
     {0xc0, 0, "vendor: Firmware numbers (seagate); Unit path report (EMC)"},
     {0xc1, 0, "vendor: Date code (seagate)"},
     {0xc2, 0, "vendor: Jumper settings (seagate); Software version (RDAC)"},
