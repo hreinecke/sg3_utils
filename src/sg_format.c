@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2009  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2011  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.19 20101203";
+static char * version_str = "1.19 20110730";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -535,9 +535,10 @@ main(int argc, char **argv)
                 printf("      << supports protection information>>\n");
 
         if ((0 != inq_out.peripheral_type) &&
+            (7 != inq_out.peripheral_type) &&
             (0xe != inq_out.peripheral_type)) {
                 fprintf(stderr, "This format is only defined for disks "
-                        "(using SBC-2 or RBC)\n");
+                        "(using SBC-2 or RBC) and MO media\n");
                 ret = SG_LIB_CAT_MALFORMED;
                 goto out;
         }

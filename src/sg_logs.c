@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "1.03 20110603";    /* spc4r30 + sbc3r27 */
+static char * version_str = "1.04 20110731";    /* spc4r30 + sbc3r27 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1982,6 +1982,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             case 8: snprintf(s, sz, "phy enabled; 1.5 Gbps"); break;
             case 9: snprintf(s, sz, "phy enabled; 3 Gbps"); break;
             case 0xa: snprintf(s, sz, "phy enabled; 6 Gbps"); break;
+            case 0xb: snprintf(s, sz, "phy enabled; 12 Gbps"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
             printf("    negotiated logical link rate: %s\n", s);
