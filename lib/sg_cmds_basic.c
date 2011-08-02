@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.54 20110608";
+static char * version_str = "1.55 20110730";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -120,7 +120,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, int mx_di_len, const unsigned char * sbp,
                      int noisy, int verbose, int * o_sense_cat)
 {
-    int got, cat, duration, slen, scat, n, resid;
+    int got, cat, duration, slen, scat, n, resid, resp_code;
     int check_data_in = 0;
     char b[1024];
 
@@ -144,11 +144,18 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     slen = get_scsi_pt_sense_len(ptvp);
     switch ((cat = get_scsi_pt_result_category(ptvp))) {
     case SCSI_PT_RESULT_GOOD:
-        if ((slen > 7) && (sbp[0] >= 0x70)) {
+        if (slen > 7) {
+            resp_code = sbp[0] & 0x7f;
             /* SBC referrals can have status=GOOD and sense_key=COMPLETED */
-            if (((sbp[0] < 0x72) && (SPC_SK_NO_SENSE != (0xf & sbp[2]))) ||
-                ((sbp[0] < 0x74) && (SPC_SK_NO_SENSE != (0xf & sbp[1]))))
-                sg_err_category_sense(sbp, slen);
+            if (resp_code >= 0x70) {
+                if (resp_code < 0x72) {
+                    if (SPC_SK_NO_SENSE != (0xf & sbp[2]))
+                        sg_err_category_sense(sbp, slen);
+                } else if (resp_code < 0x74) {
+                    if (SPC_SK_NO_SENSE != (0xf & sbp[1]))
+                        sg_err_category_sense(sbp, slen);
+                }
+            }
         }
         if (mx_di_len > 0) {
             got = mx_di_len - resid;

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.32 [20110624] [svn: r409]
+Changelog for sg3_utils-1.32 [20110730] [svn: r410]
   - sg_sanitize: new utility for command added in sb3r27
   - sg_sat_identify: add '--ident' to output WWN
   - sg_ses: major rework of descriptor output
@@ -16,6 +16,7 @@ Changelog for sg3_utils-1.32 [20110624] [svn: r409]
   - sg_inq: sync version descriptors with spc4r31
   - sg_lib_data: sync asc/ascq codes with spc4r31
   - sg_vpd: add LBPRZ field in LB provisioning VPD page
+  - sg_format: allow format of pdt 7 (some MO drives)
   - sg_cmd_basic: sg_cmds_process_resp() handle status good
     with a sense key other than no_sense (e.g. completed)
   - add README.iscsi
