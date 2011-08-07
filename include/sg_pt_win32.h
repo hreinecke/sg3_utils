@@ -27,7 +27,7 @@ typedef struct {
         UCHAR           DataIn;
         ULONG           DataTransferLength;
         ULONG           TimeOutValue;
-        ULONG           DataBufferOffset;
+        ULONG_PTR       DataBufferOffset;  /* was ULONG; problem in 64 bit */
         ULONG           SenseInfoOffset;
         UCHAR           Cdb[SCSI_MAX_CDB_LEN];
 } SCSI_PASS_THROUGH, *PSCSI_PASS_THROUGH;
