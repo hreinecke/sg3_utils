@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "June 2011" "sg3_utils\-1.32" SG3_UTILS
+.TH SG_FORMAT "8" "August 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
@@ -44,7 +44,7 @@ user is invited (twice 5 seconds apart) to abort sg_format. This occurs just
 prior the SCSI FORMAT UNIT command being issued. See the NOTES section for
 more information.
 .PP
-Recent SBC\-3 drafts add several "protection types" to the "protection
+SBC\-3 drafts have added several "protection types" to the "protection
 information" introduced in the SBC\-2 standard. See the "protection
 information" section (section 4.18 in draft SBC\-3 rev 18). 8 bytes of
 protection information are added to each block (a 2 byte "logical block
@@ -321,6 +321,12 @@ disks whose firmware is of that vintage.
 The \fICOUNT\fR numeric argument may include a multiplicative suffix or be
 given in hexadecimal. See the "NUMERIC ARGUMENTS" section in the
 sg3_utils(8) man page.
+.PP
+The SCSI SANITIZE command was introduced in SBC\-3 revision 27. It is
+closely related to the ATA SANITIZE command and can be used to remove
+all existing data from a disk. This is more likely to be implemented
+than FORMAT UNIT's security initialization feature (see the
+\fI\-\-security\fR option) and in some cases much faster.
 .SH EXAMPLES
 These examples use Linux device names. For suitable device names in
 other supported Operating Systems see the sg3_utils(8) man page.
@@ -378,5 +384,6 @@ This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg_turs(8), sg_requests(8), sg_inq(8), sg_modes(8), sg_vpd(8),
-.B sg_reassign(8), sg_readcap(8), sg3_utils(8) [all in sg3_utils],
+.B sg_reassign(8), sg_readcap(8), sg3_utils(8),
+.B sg_sanitize(8) [all in sg3_utils],
 .B sdparm(8), scsiformat (old), hdparm(8)

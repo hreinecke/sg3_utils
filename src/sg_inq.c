@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.01 20110624";    /* SPC-4 rev 31 */
+static char * version_str = "1.02 20110825";    /* SPC-4 rev 32 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1314,6 +1314,8 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
            (buff[10] << 8) + buff[11]);     /* spc4r27 */
+    printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
+           !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20));
 }
 
 /* VPD_SOFTW_INF_ID */
@@ -1801,7 +1803,7 @@ extern const char * sg_ansi_version_arr[];
 static const char *
 get_ansi_version_str(int version, char * buff, int buff_len)
 {
-    version &= 0x7;
+    version &= 0xf;
     buff[buff_len - 1] = '\0';
     strncpy(buff, sg_ansi_version_arr[version], buff_len - 1);
     return buff;

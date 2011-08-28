@@ -25,12 +25,16 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static char * version_str = "1.09 20110216";    /* spc4r08 */
+static char * version_str = "1.10 20110825";    /* spc4r32 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
 #define EBUFF_SZ 256
 
+#define WRITE_BUFFER_CMD 0x3b
+#define WRITE_BUFFER_CMDLEN 10
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
+#define DEF_PT_TIMEOUT 60       /* 60 seconds */
 
 static struct option long_options[] = {
         {"help", 0, 0, 'h'},
@@ -41,6 +45,7 @@ static struct option long_options[] = {
         {"offset", 1, 0, 'o'},
         {"raw", 0, 0, 'r'},
         {"skip", 1, 0, 's'},
+        {"specific", 1, 0, 'S'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -55,7 +60,8 @@ usage()
           "[--length=LEN]\n"
           "                       [--mode=MO] [--offset=OFF] [--raw] "
           "[--skip=SKIP]\n"
-          "                       [--verbose] [--version] DEVICE\n"
+          "                       [--specific=MS] [--verbose] [--version] "
+          "DEVICE\n"
           "  where:\n"
           "    --help|-h              print out usage message then exit\n"
           "    --id=ID|-i ID          buffer identifier (0 (default) to "
@@ -70,6 +76,8 @@ usage()
           "    --raw|-r               read from stdin (same as '-I -')\n"
           "    --skip=SKIP|-s SKIP    bytes in file FILE to skip before "
           "reading\n"
+          "    --specific=MS|-S MS    mode specific value; 3 bit field "
+          "(0 to 7)\n"
           "    --verbose|-v           increase verbosity\n"
           "    --version|-V           print version string and exit\n\n"
           "  Numbers given in options are decimal unless they have a "
@@ -87,6 +95,7 @@ usage()
 #define MODE_DNLD_MC_OFFS       6
 #define MODE_DNLD_MC_OFFS_SAVE  7
 #define MODE_ECHO_BUFFER        0x0A
+#define MODE_DNLD_MC_EV_OFFS_DEFER 0x0D
 #define MODE_DNLD_MC_OFFS_DEFER 0x0E
 #define MODE_ACTIVATE_MC        0x0F
 #define MODE_EN_EX_ECHO         0x1A
@@ -108,18 +117,20 @@ static struct mode_s {
         { "dmc_offs",   MODE_DNLD_MC_OFFS, "download microcode with offsets "
                 "and activate"},
         { "dmc_offs_save", MODE_DNLD_MC_OFFS_SAVE, "download microcode with "
-                "offsets, save and activate"},
-        { "echo",       MODE_ECHO_BUFFER, "echo (spc-2)"},
+                "offsets, save and\n\t\t\t\tactivate"},
+        { "echo",       MODE_ECHO_BUFFER, "write data to echo buffer"},
+        { "dmc_offs_ev_defer", MODE_DNLD_MC_EV_OFFS_DEFER, "download "
+                "microcode with offsets, select\n\t\t\t\tactivation event, "
+                "save and defer activation"},
         { "dmc_offs_defer", MODE_DNLD_MC_OFFS_DEFER, "download microcode "
-                "with offsets, save and defer activation (spc-4)"},
+                "with offsets, save and defer\n\t\t\t\tactivation"},
         { "activate_mc", MODE_ACTIVATE_MC,
-                "Activate deferred microcode (spc-4)"},
+                "activate deferred microcode"},
         { "en_ex",      MODE_EN_EX_ECHO, "enable expander communications "
-                "protocol and echo buffer (spc-3)"},
+                "protocol and echo\n\t\t\t\tbuffer"},
         { "dis_ex",     MODE_DIS_EX, "disable expander communications "
-                "protocol (spc-3)"},
-        { "deh",        MODE_DNLD_ERR_HISTORY, "Download error history "
-                "(spc-4)"},
+                "protocol"},
+        { "deh",        MODE_DNLD_ERR_HISTORY, "download error history "},
 };
 
 #define NUM_MODES       ((int)(sizeof(modes)/sizeof(modes[0])))
@@ -132,9 +143,87 @@ print_modes(void)
     fprintf(stderr, "The modes parameter argument can be numeric "
                 "(hex or decimal)\nor symbolic:\n");
     for (k = 0; k < NUM_MODES; k++) {
-        fprintf(stderr, " %2d (0x%02x)  %-16s%s\n", modes[k].mode,
+        fprintf(stderr, " %2d (0x%02x)  %-18s%s\n", modes[k].mode,
                 modes[k].mode, modes[k].mode_string, modes[k].comment);
     }
+}
+
+/* <<<< This function will be moved to the library in the future >>> */
+/* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
+ * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+static int
+sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
+                      int buffer_offset, void * paramp, int param_len,
+                      int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char wbufCmdBlk[WRITE_BUFFER_CMDLEN] =
+        {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    wbufCmdBlk[1] = (unsigned char)(mode & 0x1f);
+    wbufCmdBlk[1] |= (unsigned char)((m_specific & 0x7) << 5);
+    wbufCmdBlk[2] = (unsigned char)(buffer_id & 0xff);
+    wbufCmdBlk[3] = (unsigned char)((buffer_offset >> 16) & 0xff);
+    wbufCmdBlk[4] = (unsigned char)((buffer_offset >> 8) & 0xff);
+    wbufCmdBlk[5] = (unsigned char)(buffer_offset & 0xff);
+    wbufCmdBlk[6] = (unsigned char)((param_len >> 16) & 0xff);
+    wbufCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
+    wbufCmdBlk[8] = (unsigned char)(param_len & 0xff);
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Write buffer cmd: ");
+        for (k = 0; k < WRITE_BUFFER_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", wbufCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_strm, "    Write buffer parameter list%s:\n",
+                    ((param_len > 256) ? " (first 256 bytes)" : ""));
+            dStrHex((const char *)paramp,
+                    ((param_len > 256) ? 256 : param_len), -1);
+        }
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "write buffer: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, wbufCmdBlk, sizeof(wbufCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "write buffer", res, 0, sense_b,
+                               noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 
@@ -149,6 +238,7 @@ main(int argc, char * argv[])
     int wb_mode = 0;
     int wb_offset = 0;
     int wb_skip = 0;
+    int wb_mspec = 0;
     int verbose = 0;
     const char * device_name = NULL;
     const char * file_name = NULL;
@@ -159,7 +249,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hi:I:l:m:o:rs:vV", long_options,
+        c = getopt_long(argc, argv, "hi:I:l:m:o:rs:S:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -224,6 +314,14 @@ main(int argc, char * argv[])
            wb_skip = sg_get_num(optarg);
            if (wb_skip < 0) {
                 fprintf(stderr, "bad argument to '--skip'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
+        case 'S':
+           wb_mspec = sg_get_num(optarg);
+           if ((wb_mspec < 0) || (wb_mspec > 7)) {
+                fprintf(stderr, "expected argument to '--specific' to be "
+                        "0 to 7\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -350,8 +448,8 @@ main(int argc, char * argv[])
         }
     }
 
-    res = sg_ll_write_buffer(sg_fd, wb_mode, wb_id, wb_offset, dop,
-                            wb_len, 1, verbose);
+    res = sg_ll_write_buffer_v2(sg_fd, wb_mode, wb_mspec, wb_id, wb_offset,
+                                dop, wb_len, 1, verbose);
     if (0 != res) {
         ret = res;
         switch (res) {
