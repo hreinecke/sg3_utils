@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.50 20110624";    /* spc4r31 + sbc3r27 */
+static char * version_str = "0.51 20110825";    /* spc4r32 + sbc3r27 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1095,6 +1095,8 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
            (buff[10] << 8) + buff[11]);    /* spc4r27 */
+    printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
+           !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20));
 }
 
 /* VPD_SOFTW_INF_ID */

@@ -30,7 +30,7 @@
 static char * version_str = "1.55 20110730";
 
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define EBUFF_SZ 256
 
 #define DEF_PT_TIMEOUT 60       /* 60 seconds */

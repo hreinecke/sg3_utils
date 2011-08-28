@@ -20,16 +20,25 @@
 
 */
 
+/* Assume index is less than 16 */
 const char * sg_ansi_version_arr[] =
 {
     "no conformance claimed",
-    "SCSI-1",           /* obsolete */
-    "SCSI-2",           /* obsolete */
+    "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
+    "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
     "SPC",              /* withdrawn */
     "SPC-2",
     "SPC-3",
     "SPC-4",
     "reserved [7h]",
+    "ecma=1, [8h]",
+    "ecma=1, [9h]",
+    "ecma=1, [Ah]",
+    "ecma=1, [Bh]",
+    "reserved [Ch]",
+    "reserved [Dh]",
+    "reserved [Eh]",
+    "reserved [Fh]",
 };
 
 
@@ -39,7 +48,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 31 [sorted numerically (from Annex D.8)] */
+/* table from SPC-4 revision 32 [sorted numerically (from Annex D.8)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
@@ -161,6 +170,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x400, "SSC-3 (no version claimed)"},
     {0x403, "SSC-3 T10/1611-D revision 04a"},
     {0x407, "SSC-3 T10/1611-D revision 05"},
+    {0x409, "SSC-3 ANSI INCITS 467-2011"},
     {0x420, "MMC-5 (no version claimed)"},
     {0x42f, "MMC-5 T10/1675-D revision 03"},
     {0x431, "MMC-5 T10/1675-D revision 03b"},
@@ -245,6 +255,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa22, "ADT-2 T10/1742-D revision 06"},
     {0xa27, "ADT-2 T10/1742-D revision 08"},
     {0xa28, "ADT-2 T10/1742-D revision 09"},
+    {0xa2b, "ADT-2 ANSI INCITS 472-2011"},
     {0xa40, "FCP-4 (no version claimed)"},
     {0xa42, "FCP-4 T10/1828-D revision 01"},
     {0xa44, "FCP-4 T10/1828-D revision 02"},
@@ -338,6 +349,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xe62, "FC-PI-3 T11/1625-D revision 2.0"},
     {0xe68, "FC-PI-3 T11/1625-D revision 2.1"},
     {0xe6a, "FC-PI-3 T11/1625-D revision 4.0"},
+    {0xe6e, "FC-PI-3 ANSI INCITS 460-2011"},
     {0xe80, "FC-PI-4 (no version claimed)"},
     {0xe82, "FC-PI-4 T11/1647-D revision 8.0"},
     {0xea0, "FC 10GFC (no version claimed)"},
@@ -424,6 +436,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x20a0, "SPL (no version claimed)"},
     {0x20a3, "SPL T10/2124-D revision 6a"},
     {0x20a5, "SPL T10/2124-D revision 7"},
+    {0x20a7, "SPL SPL ANSI INCITS 476-2011"},
     {0x20c0, "SPL-2 (no version claimed)"},
     {0x21e0, "SOP (no version claimed)"},
     {0x2200, "PQI (no version claimed)"},

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * This program issues the SCSI REPORT LUNS command to the given SCSI device.
  */
 
-static char * version_str = "1.15 20100312";
+static char * version_str = "1.16 20110825";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -338,7 +338,7 @@ main(int argc, char * argv[])
         for (k = 0, off = 8; k < luns; ++k) {
             if (0 == do_quiet) {
                 if (0 == k)
-                    printf("Report luns [select_report=%d]:\n", select_rep);
+                    printf("Report luns [select_report=0x%x]:\n", select_rep);
                 printf("    ");
             }
             for (m = 0; m < 8; ++m, ++off)

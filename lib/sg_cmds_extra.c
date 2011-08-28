@@ -22,7 +22,7 @@
 #endif
 
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 #define DEF_PT_TIMEOUT 60       /* 60 seconds */
 #define LONG_PT_TIMEOUT 7200    /* 7,200 seconds == 120 minutes */
