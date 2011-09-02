@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2010 Douglas Gilbert.
+ * Copyright (c) 2009-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * logical blocks.
  */
 
-static char * version_str = "1.01 20100331";
+static char * version_str = "1.02 20110831";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -54,22 +54,23 @@ usage()
 {
     fprintf(stderr, "Usage: "
           "sg_unmap [--anchor] [--grpnum=GN] [--help] [--in=FILE]\n"
-          "                [--lba=LBA,LBA..] [--num=NUM,NUM...] "
+          "                [--lba=LBA,LBA...] [--num=NUM,NUM...] "
           "[--timeout=TO]\n"
           "                [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --anchor|-a          set anchor field in cdb\n"
           "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
           "    --help|-h            print out usage message\n"
-          "    --in=FILE|-I FILE      read LBA, NUM pairs in ASCII hex "
-          "from FILE\n"
-          "                           ('-I -' means read from stdin)\n"
-          "    --lba=LBA,LBA...|-l LBA,LBA...     LBA is the logical block "
-          "address to\n"
-          "                                       start NUM unmaps\n"
-          "    --num=NUM,NUM...|-n NUM,NUM...     NUM is number of logical "
+          "    --in=FILE|-I FILE    read LBA, NUM pairs from FILE (if "
+          "FILE is '-'\n"
+          "                         then stdin is read)\n"
+          "    --lba=LBA,LBA...|-l LBA,LBA...    LBA is the logical block "
+          "address\n"
+          "                                      to start NUM unmaps\n"
+          "    --num=NUM,NUM...|-n NUM,NUM...    NUM is number of logical "
           "blocks to\n"
-          "                                       unmap\n"
+          "                                      unmap starting at "
+          "corresponding LBA\n"
           "    --timeout=TO|-t TO    command timeout (unit: seconds) "
           "(def: 60)\n"
           "    --verbose|-v         increase verbosity\n"

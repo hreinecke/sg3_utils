@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.56 20110622";    /* ses3r03 */
+static char * version_str = "1.56 20110901";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -410,7 +410,7 @@ usage()
             "for '-d';\n"
             "                        when used twice outputs page in binary "
             "to stdout\n"
-            "    --set=STR|-G STR    set value of field by acronym or "
+            "    --set=STR|-S STR    set value of field by acronym or "
             "position\n"
             "    --status|-s         fetch status information (default "
             "action)\n"
