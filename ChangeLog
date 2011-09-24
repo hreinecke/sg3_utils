@@ -2,13 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.33 [20110901] [svn: r413]
+Changelog for sg3_utils-1.33 [20110924] [svn: r414]
   - win: change DataBufferOffset type per MSDN; caused
     problem with 64 bit machines (buffered interface)
   - sg_inq, sg_vpd: sync with spc4r32
   - sg_luns: tweak documentation for vendor specific reports
   - sg_write_buffer: new --specific option for mode specific
     field; new mode 13 (spc4r32)
+  - sg_vpd: add hp/3par volume info vendor VPD page
 
 Changelog for sg3_utils-1.32 [20110730] [svn: r410]
   - sg_sanitize: new utility for command added in sb3r27
@@ -975,7 +976,7 @@ Changelog for sg3_utils-0.90
     'seek' arguments. [This change is significant for raw devices and
     normal files since sg devices already use 31 bit block addressing.]
   - rename sg_s3_inq to sg_inq. This utility allows the INQUIRY response
-    to be decoded as per SCSI 3 and 4. Also can probe EVPD and CmdDt pages.
+    to be decoded as per SCSI 3 and 4. Also can probe VPD and CmdDt pages.
   - change multiplier suffixes on sg_dd, sgp_dd and sg_turs so lower case
     "k, m, g" are powers of 2 while "K, M, G" are powers of 10. This idea
     borrowed from lmdd (lmbench suite)
