@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #ifndef SG_LIB_MINGW
 #include <time.h>
@@ -34,10 +36,14 @@
         VPD page decoding for EMC CLARiiON devices [20041016]
       - Hannes Reinecke <hare at suse dot de> contributed RDAC vendor
         specific VPD pages [20060421]
+      - Jonathan McDowell <noodles at hp dot com> contributed HP/3PAR InServ
+        VPD page [0xc0] containing volume information [20110922]
+
 */
 
 
 /* vendor VPD pages */
+#define VPD_V_3PAR 0xc0
 #define VPD_V_FIRM_SEA  0xc0
 #define VPD_V_UPR_EMC  0xc0
 #define VPD_V_DATC_SEA  0xc1
@@ -72,9 +78,10 @@ static unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 
 
 /* Supported vendor specific VPD pages */
-/* 'subvalue' used to disambiguate, 'vendor' should be set */
+/* 'subvalue' used to disambiguate; 'vendor' flag should be set */
 /* Arrange in alphabetical order by acronym */
 static struct svpd_values_name_t vendor_vpd_pg[] = {
+    {VPD_V_3PAR, 2, -1, 1, "3par", "Volume information (HP/3PAR)"},
     {VPD_V_DATC_SEA, 0, -1, 1, "datc", "Date code (Seagate)"},
     {VPD_V_DEV_BEH_SEA, 0, -1, 1, "devb", "Device behavior (Seagate)"},
     {VPD_V_EDID_RDAC, 0, -1, 1, "edid", "Extended device identification "
@@ -175,6 +182,81 @@ static const char * lun_op_arr[] =
     "Normal operations",
     "I/O Operations being rejected, SP reboot or NDU in progress",
 };
+
+static void
+decode_vpd_c0_3par(unsigned char * buff, int len)
+{
+    int rev;
+    long offset;
+
+    if (len < 24) {
+        fprintf(stderr, "HP/3PAR vendor specific VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+
+    rev = buff[4];
+    printf("  Page revision: %d\n", rev);
+
+    printf("  Volume type: %s\n", (buff[5] & 0x01) ? "tpvv" :
+            (buff[5] & 0x02) ? "snap" : "base");
+    printf("  Reclaim supported: %s\n", (buff[5] & 0x04) ? "yes" : "no");
+    printf("  ATS supported: %s\n", (buff[5] & 0x10) ? "yes" : "no");
+    printf("  XCopy supported: %s\n", (buff[5] & 0x20) ? "yes" : "no");
+
+    if (rev > 3) {
+        printf("  VV ID: %" PRIu64 "\n", ((uint64_t) buff[28] << 56) +
+                ((uint64_t) buff[29] << 48) + ((uint64_t) buff[30] << 40) +
+                ((uint64_t) buff[31] << 32) + ((uint64_t) buff[32] << 24) +
+                (buff[33] << 16) + (buff[34] << 8) + buff[35]);
+
+        offset = 44;
+        printf("  Volume name: %s\n", &buff[offset]);
+
+        printf("  Domain ID: %d\n", (buff[36] << 24) +  (buff[37] << 16) +
+                (buff[38] << 8) + buff[39]);
+
+        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
+                (buff[offset - 2] << 8) + buff[offset - 1] + 4;
+        printf("  Domain Name: %s\n", &buff[offset]);
+
+        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
+                (buff[offset - 2] << 8) + buff[offset - 1] + 4;
+        printf("  User CPG: %s\n", &buff[offset]);
+
+        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
+                (buff[offset - 2] << 8) + buff[offset - 1] + 4;
+        printf("  Snap CPG: %s\n", &buff[offset]);
+
+        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
+                (buff[offset - 2] << 8) + buff[offset - 1];
+
+        printf("  VV policies: %s,%s,%s,%s\n",
+                (buff[offset + 3] & 0x01) ? "stale_ss" : "no_stale_ss",
+                (buff[offset + 3] & 0x02) ? "one_host" : "no_one_host",
+                (buff[offset + 3] & 0x04) ? "tp_bzero" : "no_tp_bzero",
+                (buff[offset + 3] & 0x08) ? "zero_detect" : "no_zero_detect");
+
+    }
+
+    if (buff[5] & 0x04) {
+        printf("  Allocation unit: %d\n", (buff[8] << 24) +  (buff[9] << 16) +
+                (buff[10] << 8) + buff[11]);
+
+        printf("  Data pool size: %" PRIu64 "\n", (((uint64_t) buff[12]) << 56) +
+                (((uint64_t) buff[13]) << 48) + (((uint64_t) buff[14]) << 40) +
+                (((uint64_t) buff[15]) << 32) + ((uint64_t) buff[16] << 24) +
+                (buff[17] << 16) + (buff[18] << 8) + buff[19]);
+
+        printf("  Space allocated: %" PRIu64 "\n", ((uint64_t) buff[20] << 56) +
+                ((uint64_t) buff[21] << 48) + ((uint64_t) buff[22] << 40) +
+                ((uint64_t) buff[23] << 32) + ((uint64_t) buff[24] << 24) +
+                (buff[25] << 16) + (buff[26] << 8) + buff[27]);
+    }
+
+    return;
+}
+
 
 static void
 decode_firm_vpd_c0_sea(unsigned char * buff, int len)
@@ -596,6 +678,8 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 decode_firm_vpd_c0_sea(rsp_buff, len);
             else if (1 == subvalue)
                 decode_upr_vpd_c0_emc(rsp_buff, len);
+            else if (2 == subvalue)
+                decode_vpd_c0_3par(rsp_buff, len);
             else
                 dStrHex((const char *)rsp_buff, len, 0);
             return 0;
