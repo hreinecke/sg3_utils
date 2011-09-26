@@ -43,7 +43,7 @@
 
 
 /* vendor VPD pages */
-#define VPD_V_3PAR 0xc0
+#define VPD_V_HP3PAR 0xc0
 #define VPD_V_FIRM_SEA  0xc0
 #define VPD_V_UPR_EMC  0xc0
 #define VPD_V_DATC_SEA  0xc1
@@ -81,13 +81,13 @@ static unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 /* 'subvalue' used to disambiguate; 'vendor' flag should be set */
 /* Arrange in alphabetical order by acronym */
 static struct svpd_values_name_t vendor_vpd_pg[] = {
-    {VPD_V_3PAR, 2, -1, 1, "3par", "Volume information (HP/3PAR)"},
     {VPD_V_DATC_SEA, 0, -1, 1, "datc", "Date code (Seagate)"},
     {VPD_V_DEV_BEH_SEA, 0, -1, 1, "devb", "Device behavior (Seagate)"},
     {VPD_V_EDID_RDAC, 0, -1, 1, "edid", "Extended device identification "
      "(RDAC)"},
     {VPD_V_FEAT_RDAC, 1, -1, 1, "feat", "Feature Parameters (RDAC)"},
     {VPD_V_FIRM_SEA, 0, -1, 1, "firm", "Firmware numbers (Seagate)"},
+    {VPD_V_HP3PAR, 2, -1, 1, "hp3par", "Volume information (HP/3PAR)"},
     {VPD_V_JUMP_SEA, 0, -1, 1, "jump", "Jump setting (Seagate)"},
     {VPD_V_SUBS_RDAC, 0, -1, 1, "sub", "Subsystem identifier (RDAC)"},
     {VPD_V_SVER_RDAC, 1, -1, 1, "sver", "Software version (RDAC)"},
@@ -184,7 +184,7 @@ static const char * lun_op_arr[] =
 };
 
 static void
-decode_vpd_c0_3par(unsigned char * buff, int len)
+decode_vpd_c0_hp3par(unsigned char * buff, int len)
 {
     int rev;
     long offset;
@@ -679,7 +679,7 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
             else if (1 == subvalue)
                 decode_upr_vpd_c0_emc(rsp_buff, len);
             else if (2 == subvalue)
-                decode_vpd_c0_3par(rsp_buff, len);
+                decode_vpd_c0_hp3par(rsp_buff, len);
             else
                 dStrHex((const char *)rsp_buff, len, 0);
             return 0;
