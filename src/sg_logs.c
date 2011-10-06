@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "1.04 20110731";    /* spc4r30 + sbc3r27 */
+static char * version_str = "1.05 20111020";    /* spc4r30 + sbc3r28 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2681,9 +2681,28 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
-        if ((pc >= 0x1) && (pc <= 0x2)) {
-            cp = (0x1 == pc)? "Available" : "Used";
-            printf("  %s LBA mapping threshold resource count:", cp);
+        switch (pc) {
+        case 0x1:
+            cp = "  Available LBA mapping threshold";
+            break;
+        case 0x2:
+            cp = "  Used LBA mapping threshold";
+            break;
+        case 0x100:
+            cp = "  De-duplicated LBA";
+            break;
+        case 0x101:
+            cp = "  Compressed LBA";
+            break;
+        case 0x102:
+            cp = "  Total efficiency LBA";
+            break;
+        default:
+            cp = NULL;
+            break;
+        }
+        if (cp) {
+            printf("  %s resource count:", cp);
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     fprintf(stderr, "\n    truncated by response length, "
