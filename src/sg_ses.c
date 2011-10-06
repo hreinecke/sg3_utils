@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.56 20110901";    /* ses3r03 */
+static char * version_str = "1.57 20111004";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -1118,7 +1118,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                   const struct opts_t * op)
 {
     int res, a, b;
-    char buff[128];
+    char bb[128];
     int filter = op->do_filter;
 
     if (op->inner_hex) {
@@ -1326,7 +1326,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                    "Crit Over=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[1] & 0x8),
                    !!(statp[1] & 0x4), !!(statp[1] & 0x2));
-            printf("Crit Under=%d\n", !!(statp[1] & 0x1));
+            printf("%sCrit Under=%d\n", pad, !!(statp[1] & 0x1));
         }
 #ifdef SG_LIB_MINGW
         printf("%sVoltage: %g volts\n", pad,
@@ -1402,11 +1402,10 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                !!(statp[1] & 0x40));
         break;
     case SAS_CONNECTOR_ETC:
-        printf("%sIdent=%d, %s, Connector physical "
-               "link=0x%x\n", pad, !!(statp[1] & 0x80),
-               find_sas_connector_type((statp[1] & 0x7f), buff, sizeof(buff)),
-               statp[2]);
-        printf("%sFail=%d\n", pad, !!(statp[3] & 0x40));
+        printf("%sIdent=%d, %s\n", pad, !!(statp[1] & 0x80),
+               find_sas_connector_type((statp[1] & 0x7f), bb, sizeof(bb)));
+        printf("%sConnector physical link=0x%x, Fail=%d\n", pad, statp[2],
+               !!(statp[3] & 0x40));
         break;
     default:
         printf("%sUnknown element type, status in hex: %02x %02x %02x %02x\n",
@@ -1876,7 +1875,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             continue;   /* skip if not one of above element types */
         if ((ucp + 1) > last_ucp)
             goto truncated;
-        if (op->index_given) {
+        if ((! op->index_given) ||
+            ((2 == op->index_given) && (k == op->index_elem_ov))) {
             cp = find_element_tname(elem_type);
             if (cp)
                 printf("    Element type: %s, subenclosure id: %d\n", cp,
@@ -2511,6 +2511,16 @@ process_join(int sg_fd, const struct opts_t * op, int display)
                         jrp->add_elem_statp = ae_ucp;
                     }
                     ae_ucp += ae_ucp[1] + 2;
+                }
+            } else {    /* element type not relevant to ae status */
+                // step over overall and individual elements in case eip==0
+                for (j = 0; j <= tdhp->num_elements; ++j, ++jrp) {
+                    if (NULL == jrp->enc_statp) {
+                        get_out = 1;
+                        fprintf(stderr, "process_join: join_arr has no "
+                                "space\n");
+                        break;
+                    }
                 }
             }
             if (get_out)

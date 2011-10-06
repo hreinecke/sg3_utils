@@ -13,7 +13,7 @@
 #include "sg_cmds_basic.h"
 
 /*
-*  Copyright (C) 2000-2010 D. Gilbert
+*  Copyright (C) 2000-2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.35 20110517";
+static char * version_str = "1.36 20111002";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -532,7 +532,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x5, 0x0, "Flexible geometry (obsolete)"},
     {0x7, 0x0, "Verify error recovery"},
     {0x8, 0x0, "Caching"},
-    {0xa, 0xf0, "Application tag"},
+    {0xa, 0x02, "Application tag"},
     {0xa, 0xf1, "Parallel ATA control (SAT)"},
     {0xa, 0xf2, "Reserved (SATA control) (SAT)"},
     {0xb, 0x0, "Medium types supported (obsolete)"},
