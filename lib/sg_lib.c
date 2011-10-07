@@ -701,8 +701,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             }
             break;
         default:
-            n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
-                    descp[0]);
+            if (descp[0] >= 0x80)
+                n += sprintf(b + n, "Vendor specific [0x%x]\n", descp[0]);
+            else
+                n += sprintf(b + n, "Unknown [0x%x]\n", descp[0]);
             processed = 0;
             break;
         }

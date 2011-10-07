@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.53 20110926";    /* spc4r32 + sbc3r27 */
+static char * version_str = "0.54 20111007";    /* spc4r32 + sbc3r29 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -2012,7 +2012,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
     case VPD_SCSI_PORTS:        /* 0x88 */
         if ((! do_raw) && (! do_quiet))
             printf("SCSI Ports VPD page:\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, maxlen, 1,
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
             len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
