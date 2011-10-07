@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.33 [20111002] [svn: r416]
+Changelog for sg3_utils-1.33 [20111007] [svn: r417]
   - win: change DataBufferOffset type per MSDN; caused
     problem with 64 bit machines (buffered interface)
   - sg_inq, sg_vpd: sync with spc4r32
@@ -10,6 +10,7 @@ Changelog for sg3_utils-1.33 [20111002] [svn: r416]
   - sg_write_buffer: new --specific option for mode specific
     field; new mode 13 (spc4r32)
   - sg_vpd: add hp3par volume info vendor VPD page
+    - fix 'scsi ports' [0x88] page problem
   - sg_ses: small cleanup and join fix
   - sg_logs: LB provision lpage extra (sbc3r28)
   - sg_modes: application tag mpage subcode 0xf0->0x2
