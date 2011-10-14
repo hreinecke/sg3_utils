@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.54 20111007";    /* spc4r32 + sbc3r29 */
+static char * version_str = "0.55 20111014";    /* spc4r32 + sbc3r29 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1605,10 +1605,10 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
                       int do_hex, int do_raw, int do_long, int do_quiet,
                       int verbose)
 {
-    int len, t, res;
+    int len, res;
     int alloc_len = maxlen;
 
-    t = do_quiet;       /* suppress warning */
+    do_quiet = do_quiet;       /* suppress warning */
     if ((! do_hex) && (! do_raw))
         printf("Only hex output supported\n");
     if (!do_raw) {
@@ -2544,7 +2544,6 @@ main(int argc, char * argv[])
     int do_raw = 0;
     int do_verbose = 0;
     int ret = 0;
-    int req_pdt = -1;
     int subvalue = 0;
 
     while (1) {
@@ -2635,7 +2634,6 @@ main(int argc, char * argv[])
             }
             num_vpd = vnp->value;
             subvalue = vnp->subvalue;
-            req_pdt = vnp->pdt;
         } else {
             cp = strchr(page_str, ',');
             num_vpd = sg_get_num_nomult(page_str);
@@ -2664,7 +2662,6 @@ main(int argc, char * argv[])
     }
     if (do_ident) {
         num_vpd = VPD_DEVICE_ID;
-        req_pdt = -1;
         if (do_ident > 1) {
             if (0 == do_long)
                 ++do_quiet;

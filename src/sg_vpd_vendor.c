@@ -629,12 +629,12 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                    int do_hex, int do_raw, int do_long, int do_quiet,
                    int verbose)
 {
-    int len, t, res;
+    int len, res;
     char name[64];
     const struct svpd_values_name_t * vnp;
     int alloc_len = maxlen;
 
-    t = do_long;        /* suppress warning */
+    do_long = do_long;        /* suppress warning */
     vnp = svpd_get_v_detail(num_vpd, subvalue, -1);
     if (vnp && vnp->name)
         strcpy(name, vnp->name);

@@ -163,8 +163,10 @@ int main(int argc, char * argv[])
             sn_len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) +
                      ucp[3];
             if (raw) {
-                if (sn_len > 0)
+                if (sn_len > 0) {
                     n = fwrite(ucp + 4, 1, sn_len, stdout);
+                    n = n;      /* suppress warning */
+                }
             } else {
                 printf("Serial number:\n");
                 if (sn_len > 0)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2011 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.14 20100312";
+static char * version_str = "1.15 20111014";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -151,7 +151,7 @@ static void decode_tpgs_state(const int st)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, j, off, res, c, report_len, tgt_port_count, trunc;
+    int sg_fd, k, j, off, res, c, report_len, tgt_port_count;
     unsigned char reportTgtGrpBuff[REPORT_TGT_GRP_BUFF_LEN];
     unsigned char * ucp;
     int decode = 0;
@@ -229,7 +229,7 @@ int main(int argc, char * argv[])
     }
 
     memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
-    trunc = 0;
+    /* trunc = 0; */
 
 #ifndef TEST_CODE
     res = sg_ll_report_tgt_prt_grp(sg_fd, reportTgtGrpBuff,
@@ -245,7 +245,7 @@ int main(int argc, char * argv[])
                      (reportTgtGrpBuff[2] << 8) +
                      reportTgtGrpBuff[3] + 4;
         if (report_len > (int)sizeof(reportTgtGrpBuff)) {
-            trunc = 1;
+            /* trunc = 1; */
             fprintf(stderr, "  <<report too long for internal buffer,"
                     " output truncated\n");
             report_len = (int)sizeof(reportTgtGrpBuff);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static char * version_str = "1.08 20100312";
+static char * version_str = "1.09 20111014";
 
 #define ME "sg_ident: "
 
@@ -61,6 +61,7 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
             n = write(STDOUT_FILENO, iip, ii_len);
 #endif
         }
+        n = n;  /* suppress warning */
         return;
     }
     if (0x7f == itype) {  /* list of available information types */

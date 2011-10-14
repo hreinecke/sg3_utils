@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.58 20111012";    /* ses3r03 */
+static char * version_str = "1.59 20111014";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -2405,10 +2405,10 @@ process_join(int sg_fd, struct opts_t * op, int display)
     unsigned char * ed_ucp;
     unsigned char * ae_ucp;
     unsigned char * t_ucp;
-    const unsigned char * es_last_ucp;
-    const unsigned char * ed_last_ucp;
+    /* const unsigned char * es_last_ucp; */
+    /* const unsigned char * ed_last_ucp; */
     const unsigned char * ae_last_ucp;
-    const unsigned char * t_last_ucp;
+    /* const unsigned char * t_last_ucp; */
     const char * cp;
     const char * enc_state_changed = "  <<state of enclosure changed, "
                                      "please try again>>\n";
@@ -2434,7 +2434,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
         return -1;
     }
     es_ucp = enc_stat_rsp + 8;
-    es_last_ucp = enc_stat_rsp + enc_stat_rsp_len - 1;
+    /* es_last_ucp = enc_stat_rsp + enc_stat_rsp_len - 1; */
 
     res = do_rec_diag(sg_fd, DPC_ELEM_DESC, elem_desc_rsp,
                       sizeof(elem_desc_rsp), op, &elem_desc_rsp_len);
@@ -2450,7 +2450,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
             return -1;
         }
         ed_ucp = elem_desc_rsp + 8;
-        ed_last_ucp = elem_desc_rsp + elem_desc_rsp_len - 1;
+        /* ed_last_ucp = elem_desc_rsp + elem_desc_rsp_len - 1; */
     } else {
         elem_desc_rsp_len = 0;
         ed_ucp = NULL;
@@ -2508,7 +2508,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
                 return -1;
             }
             t_ucp = threshold_rsp + 8;
-            t_last_ucp = threshold_rsp + threshold_rsp_len - 1;
+            /* t_last_ucp = threshold_rsp + threshold_rsp_len - 1; */
         } else {
             threshold_rsp_len = 0;
             t_ucp = NULL;
@@ -2641,6 +2641,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
     if (! display)      /* probably wanted join_arr[] built only */
         return 0;
 
+    /* Display contents of join_arr */
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
     for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
          ++k, ++jrp) {
