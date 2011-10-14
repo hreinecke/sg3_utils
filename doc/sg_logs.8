@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "April 2011" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_LOGS "8" "October 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -205,7 +205,7 @@ the leading "0x", or as their decimal equivalents.]:
 .br
 0xb       Last n deferred errors or asynchronous events
 .br
-0xc       Sequential access device (ssc\-2)
+0xc       Logical block provisioning (sbc\-3) or Sequential access device (ssc\-2)
 .br
 0xd       Temperature
 .br
@@ -213,13 +213,19 @@ the leading "0x", or as their decimal equivalents.]:
 .br
 0x10      Self\-test results
 .br
+0x11      Solid state media
+.br
 0x15      Background scan results (sbc\-3)
+.br
+0x16      ATA pass\-through results (sat\-3)
 .br
 0x17      Non\-volatile cache (sbc\-3)
 .br
 0x18      Protocol specific port (SAS transport)
 .br
 0x19      General statistics and performance
+.br
+0x1a      Power condition transitions
 .br
 0x2f      Informational exceptions
 .br
