@@ -273,6 +273,13 @@ pages (using the SCSI READ DIAGNOSTIC command). To this end the
 \fI\-\-page=PG\fR and \fI\-\-hex\fR options would be appropriate. Arbitrary
 diagnostic pages can be sent to a device with the sg_senddiag utility.
 .PP
+The most troublesome part of the join operation is associating Additional
+Element Status descriptors correctly. At least one SES device vendor has
+misinterpreted the SES\-2 standard with its "element index" field. The
+code in this utility interprets the "element index" field per the SES\-2
+standard and if that yields an inappropriate element type, adjusts its
+indexing to follow that vendor's misinterpretation. 
+.PP
 There is a related command set called SAF\-TE (SCSI attached fault\-tolerant
 enclosure) for enclosure (including RAID) status and control. SCSI devices
 that support SAF\-TE report "Processor" peripheral device type (0x3) in their

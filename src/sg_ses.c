@@ -27,12 +27,13 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.59 20111014";    /* ses3r03 */
+static char * version_str = "1.60 20111016";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260
+#define NUM_ACTIVE_ET_AESP_ARR 32
 
 #define TEMPERAT_OFF 20         /* 8 bits represents -19 C to +235 C */
                                 /* value of 0 (would imply -20 C) reserved */
@@ -147,6 +148,10 @@ struct join_row_t {
                                  * instance, otherwise origin 0 */
     unsigned char etype;        /* element type */
     unsigned char se_id;        /* subenclosure id (0 for main enclosure) */
+    int ei_asc;                 /* element index used by Additional Element
+                                 * Status page, -1 for not applicable */
+    int ei_asc2;                /* some vendors get ei_asc wrong, this is
+                                 * their broken version */
     /* following point into Element Descriptor, Enclosure Status, Threshold
      * In and Additional element status diagnostic pages. enc_statp only
      * NULL past last, other pointers can be NULL . */
@@ -330,6 +335,15 @@ static struct acronym2tuple ae_sas_a2t_arr[] = {
    {"stp_init", -1, 10, 2, 1},
    {"stp_targ", -1, 11, 2, 1},
    {NULL, 0, 0, 0, 0},
+};
+
+/* Boolean array of element types of interest to the Additional Element
+ * Status page. Indexed by element type (0 <= et <= 32). */
+static int active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
+    0, 1 /* dev */, 0, 0,  0, 0, 0, 1 /* esce */,
+    0, 0, 0, 0,  0, 0, 0, 0,
+    0, 0, 0, 0,  1 /* starg */, 1 /* sinit */, 0, 1 /* arr */,
+    1 /* sas exp */, 0, 0, 0,  0, 0, 0, 0,
 };
 
 /* Command line long option names with corresponding short letter. */
@@ -815,6 +829,17 @@ find_element_tname(int elem_type_code)
             return NULL;
     }
     return NULL;
+}
+
+/* Returns 1 if el_type (element type) is of interest to the Additional
+ * Element Sense page. Otherwise return 0. */
+static int
+active_et_aesp(int el_type)
+{
+    if ((el_type >= 0) && (el_type < NUM_ACTIVE_ET_AESP_ARR))
+        return active_et_aesp_arr[el_type];
+    else
+        return 0;
 }
 
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> command not supported,
@@ -1805,8 +1830,10 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
     eip_offset = (0x10 & ucp[0]) ? 2 : 0;
     switch (0xf & ucp[0]) {
     case TPROTO_FCP:
-        ports = ucp[2 + eip_offset];
         printf("%sTransport protocol: FCP\n", pad);
+        if (len < (12 + eip_offset))
+            break;
+        ports = ucp[2 + eip_offset];
         printf("%snumber of ports: %d\n", pad, ports);
         printf("%snode_name: ", pad);
         for (m = 0; m < 8; ++m)
@@ -1828,8 +1855,10 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
         }
         break;
     case TPROTO_SAS:
-        desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
         printf("%sTransport protocol: SAS\n", pad);
+        if (len < (4 + eip_offset))
+            break;
+        desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
         if (0 == desc_type) {
             phys = ucp[2 + eip_offset];
             printf("%snumber of phys: %d, not all phys: %d", pad, phys,
@@ -1955,13 +1984,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     ucp = resp + 8;
     for (k = 0, tp = tdhp; k < num_telems; ++k, ++tp) {
         elem_type = tp->etype;
-        if (! ((DEVICE_ETC == elem_type) ||
-               (SCSI_TPORT_ETC == elem_type) ||
-               (SCSI_IPORT_ETC == elem_type) ||
-               (ARRAY_DEV_ETC == elem_type) ||
-               (SAS_EXPANDER_ETC == elem_type) ||
-               (ESC_ELECTRONICS_ETC == elem_type)))
-            continue;   /* skip if not one of above element types */
+        if (! active_et_aesp(elem_type))
+            continue;   /* skip if not element type of interest */
         if ((ucp + 1) > last_ucp)
             goto truncated;
         match_ind_ov = (op->ind_given && (k == op->ind_ov));
@@ -2397,7 +2421,7 @@ static int
 process_join(int sg_fd, struct opts_t * op, int display)
 {
     int k, j, res, num_t_hdrs, elem_ind, ei, get_out, overall;
-    int desc_len, dn_len;
+    int desc_len, dn_len, broken_ei, ei2;
     unsigned int ref_gen_code, gen_code;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
@@ -2523,10 +2547,13 @@ process_join(int sg_fd, struct opts_t * op, int display)
 
     jrp = join_arr;
     tdhp = type_desc_hdr_arr;
-    for (k = 0; k < num_t_hdrs; ++k, ++tdhp) {
+    for (k = 0, ei = 0, ei2 = 0; k < num_t_hdrs; ++k, ++tdhp) {
         jrp->el_ind_ov = k;
         jrp->el_ind_indiv = -1;
         jrp->etype = tdhp->etype;
+        jrp->ei_asc = -1;
+        broken_ei = active_et_aesp(tdhp->etype);
+        jrp->ei_asc2 = -1;
         jrp->se_id = tdhp->se_id;
         /* check es_ucp < es_last_ucp still in range */
         jrp->enc_statp = es_ucp;
@@ -2545,6 +2572,11 @@ process_join(int sg_fd, struct opts_t * op, int display)
                 break;
             jrp->el_ind_ov = k;
             jrp->el_ind_indiv = elem_ind;
+            jrp->ei_asc = ei++;
+            if (broken_ei)
+                jrp->ei_asc2 = ei2++;
+            else
+                jrp->ei_asc2 = -1;
             jrp->etype = tdhp->etype;
             jrp->se_id = tdhp->se_id;
             jrp->enc_statp = es_ucp;
@@ -2561,17 +2593,13 @@ process_join(int sg_fd, struct opts_t * op, int display)
             break;      /* leave last row all zeros */
     }
 
+    broken_ei = 0;
     if (ae_ucp) {
         get_out = 0;
         jrp = join_arr;
         tdhp = type_desc_hdr_arr;
         for (k = 0; k < num_t_hdrs; ++k, ++tdhp) {
-            if ((DEVICE_ETC == tdhp->etype) ||
-                (SCSI_TPORT_ETC == tdhp->etype) ||
-                (SCSI_IPORT_ETC == tdhp->etype) ||
-                (ARRAY_DEV_ETC == tdhp->etype) ||
-                (SAS_EXPANDER_ETC == tdhp->etype) ||
-                (ESC_ELECTRONICS_ETC == tdhp->etype)) {
+            if (active_et_aesp(tdhp->etype)) {
                 for (j = 0; j < tdhp->num_elements; ++j) {
                     if ((ae_ucp + 1) > ae_last_ucp) {
                         get_out = 1;
@@ -2580,21 +2608,31 @@ process_join(int sg_fd, struct opts_t * op, int display)
                                     "page\n");
                         break;
                     }
-                    if (ae_ucp[0] & 0x10) {     /* EIP bit */
+                    if (ae_ucp[0] & 0x10) {     /* EIP bit set */
                         ei = ae_ucp[3];
+try_again:
                         for (jr2p = join_arr; jr2p->enc_statp; ++jr2p) {
-                            if ((k == jr2p->el_ind_ov) &&
-                                (ei == jr2p->el_ind_indiv)) {
-                                jr2p->add_elem_statp = ae_ucp;
-                                break;
+                            if (broken_ei) {
+                                if (ei == jr2p->ei_asc2)
+                                    break;
+                            } else {
+                                if (ei == jr2p->ei_asc)
+                                    break;
                             }
                         }
                         if (NULL == jr2p->enc_statp) {
                             get_out = 1;
-                            fprintf(stderr, "process_join: oi=%d, ei=%d not "
-                                    "in join_arr\n", k, ei);
+                            fprintf(stderr, "process_join: oi=%d, ei=%d "
+                                    "(broken_ei=%d) not in join_arr\n", k,
+                                    ei, broken_ei);
                             break;
                         }
+                        if (! active_et_aesp(jr2p->etype)) {
+                            /* broken_ei must be 0 for that to be false */
+                            ++broken_ei;
+                            goto try_again;
+                        }
+                        jr2p->add_elem_statp = ae_ucp;
                     } else {
                         while (jrp->enc_statp && ((-1 == jrp->el_ind_indiv) ||
                                                   jrp->add_elem_statp))
@@ -2630,13 +2668,15 @@ process_join(int sg_fd, struct opts_t * op, int display)
         jrp = join_arr;
         for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
             fprintf(stderr, "el_ind_ov=%d el_ind_indiv=%d etype=%d "
-                    "se_id=%d %s %s %s %s\n", jrp->el_ind_ov,
-                    jrp->el_ind_indiv, jrp->etype, jrp->se_id,
-                    (jrp->enc_statp ? "enc_statp" : ""),
+                    "se_id=%d ei=%d ei2=%d %s %s %s %s\n", jrp->el_ind_ov,
+                    jrp->el_ind_indiv, jrp->etype, jrp->se_id, jrp->ei_asc,
+                    jrp->ei_asc2, (jrp->enc_statp ? "enc_statp" : ""),
                     (jrp->elem_descp ? "elem_descp" : ""),
                     (jrp->add_elem_statp ? "add_elem_statp" : ""),
                     (jrp->thresh_inp ? "thresh_inp" : ""));
         }
+        fprintf(stderr, ">> elements in join_arr: %d, broken_ei=%d\n", k,
+                broken_ei);
     }
     if (! display)      /* probably wanted join_arr[] built only */
         return 0;
