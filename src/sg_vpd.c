@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.55 20111014";    /* spc4r32 + sbc3r29 */
+static char * version_str = "0.56 20111023";    /* spc4r32 + sbc3r29 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -68,6 +68,7 @@ extern const struct svpd_values_name_t *
 #define VPD_REFERRALS 0xb3   /* SBC-3 */
 #define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
+#define VPD_NOT_STD_INQ -2      /* request for standard inquiry */
 
 /* Device identification VPD page associations */
 #define VPD_ASSOC_LU 0
@@ -167,6 +168,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SA_DEV_CAP, 0, 1, 0, "sad",
      "Sequential access device capabilities (SSC)"},
     {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
+    {VPD_NOT_STD_INQ, 0, -1, 0, "sinq", "Standard inquiry response"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, 0, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
     {VPD_SECURITY_TOKEN, 0, 0x11, 0, "st", "Security token (OSD)"},
@@ -249,9 +251,13 @@ enumerate_vpds(int standard, int vendor)
 
     if (standard) {
         for (vnp = standard_vpd_pg; vnp->acron; ++vnp) {
-            if (vnp->name && (0 == vnp->vendor))
-                printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
+            if (vnp->name && (0 == vnp->vendor)) {
+                if (vnp->value < 0)
+                    printf("  %-10s -1        %s\n", vnp->acron, vnp->name);
+                else
+                    printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
                        vnp->name);
+            }
         }
     }
     if (vendor)
@@ -265,6 +271,81 @@ dStrRaw(const char * str, int len)
 
     for (k = 0 ; k < len; ++k)
         printf("%c", str[k]);
+}
+
+/* Assume index is less than 16 */
+const char * sg_ansi_version_arr[] =
+{
+    "no conformance claimed",
+    "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
+    "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
+    "SPC",              /* withdrawn */
+    "SPC-2",
+    "SPC-3",
+    "SPC-4",
+    "reserved [7h]",
+    "ecma=1, [8h]",
+    "ecma=1, [9h]",
+    "ecma=1, [Ah]",
+    "ecma=1, [Bh]",
+    "reserved [Ch]",
+    "reserved [Dh]",
+    "reserved [Eh]",
+    "reserved [Fh]",
+};
+
+static void
+decode_std_inq(unsigned char * b, int len, int verbose)
+{
+    int pqual, n;
+
+    if (len < 4)
+        return;
+    pqual = (b[0] & 0xe0) >> 5;
+    if (0 == pqual)
+        printf("standard INQUIRY:\n");
+    else if (1 == pqual)
+        printf("standard INQUIRY: [qualifier indicates no connected "
+               "LU]\n");
+    else if (3 == pqual)
+        printf("standard INQUIRY: [qualifier indicates not capable "
+               "of supporting LU]\n");
+    else
+        printf("standard INQUIRY: [reserved or vendor specific "
+                       "qualifier [%d]]\n", pqual);
+    printf("  PQual=%d  Device_type=%d  RMB=%d  version=0x%02x ",
+           pqual, b[0] & 0x1f, !!(b[1] & 0x80), (unsigned int)b[2]);
+    printf(" [%s]\n", sg_ansi_version_arr[b[2] & 0xf]);
+    printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
+           " Resp_data_format=%d\n",
+           !!(b[3] & 0x80), !!(b[3] & 0x40), !!(b[3] & 0x20),
+           !!(b[3] & 0x10), b[3] & 0x0f);
+    if (len < 5)
+        return;
+    n = b[4] + 5;
+    if (verbose)
+        fprintf(stderr, ">> requested %d bytes, %d bytes available\n",
+                len, n);
+    printf("  SCCS=%d  ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
+           !!(b[5] & 0x80), !!(b[5] & 0x40), ((b[5] & 0x30) >> 4),
+           !!(b[5] & 0x08), !!(b[5] & 0x01));
+    printf(" BQue=%d\n  EncServ=%d  ", !!(b[6] & 0x80), !!(b[6] & 0x40));
+    if (b[6] & 0x10)
+        printf("MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
+    else
+        printf("MultiP=0  ");
+    printf("[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
+           !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01),
+           !!(b[7] & 0x80));
+    printf("WBus16=%d  Sync=%d  Linked=%d  [TranDis=%d]  ",
+           !!(b[7] & 0x20), !!(b[7] & 0x10), !!(b[7] & 0x08),
+           !!(b[7] & 0x04));
+    printf("CmdQue=%d\n", !!(b[7] & 0x02));
+    if (len < 36)
+        return;
+    printf("  Vendor_identification: %.8s\n", b + 8);
+    printf("  Product_identification: %.16s\n", b + 16);
+    printf("  Product_revision_level: %.4s\n", b + 32);
 }
 
 static const char * assoc_arr[] =
@@ -1066,37 +1147,103 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
     }
 }
 
-/* VPD_EXT_INQ */
+/* VPD_EXT_INQ    Extended Inquiry VPD */
 static void
-decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
+decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
+                 int protect)
 {
+    int n;
+
     if (len < 7) {
         fprintf(stderr, "Extended INQUIRY data VPD page length too "
                 "short=%d\n", len);
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)b, len, 0);
+        return;
+    }
+    if (do_long) {
+        n = (b[4] >> 6) & 0x3;
+        printf("  ACTIVATE_MICROCODE=%d", n);
+        if (1 == n)
+            printf(" [before final WRITE BUFFER]\n");
+        else if (2 == n)
+            printf(" [after power on or hard reset]\n");
+        else
+            printf("\n");
+        n = (b[4] >> 3) & 0x7;
+        printf("  SPT=%d", n);
+        if (protect) {
+            switch (n)
+            {
+            case 0:
+                printf(" [protection type 1 supported]\n");
+                break;
+            case 1:
+                printf(" [protection types 1 and 2 supported]\n");
+                break;
+            case 2:
+                printf(" [protection type 2 supported]\n");
+                break;
+            case 3:
+                printf(" [protection types 1 and 3 supported]\n");
+                break;
+            case 4:
+                printf(" [protection type 3 supported]\n");
+                break;
+            case 5:
+                printf(" [protection types 2 and 3 supported]\n");
+                break;
+            case 7:
+                printf(" [protection types 1, 2 and 3 supported]\n");
+                break;
+            default:
+                printf("\n");
+                break;
+            }
+        } else
+            printf("\n");
+        printf("  GRD_CHK=%d\n", !!(b[4] & 0x4));
+        printf("  APP_CHK=%d\n", !!(b[4] & 0x2));
+        printf("  REF_CHK=%d\n", !!(b[4] & 0x1));
+        printf("  UASK_SUP=%d\n", !!(b[5] & 0x20));
+        printf("  GROUP_SUP=%d\n", !!(b[5] & 0x10));
+        printf("  PRIOR_SUP=%d\n", !!(b[5] & 0x8));
+        printf("  HEADSUP=%d\n", !!(b[5] & 0x4));
+        printf("  ORDSUP=%d\n", !!(b[5] & 0x2));
+        printf("  SIMPSUP=%d\n", !!(b[5] & 0x1));
+        printf("  WU_SUP=%d\n", !!(b[6] & 0x8));
+        printf("  CRD_SUP=%d\n", !!(b[6] & 0x4));
+        printf("  NV_SUP=%d\n", !!(b[6] & 0x2));
+        printf("  V_SUP=%d\n", !!(b[6] & 0x1));
+        printf("  P_I_I_SUP=%d\n", !!(b[7] & 0x10));
+        printf("  LUICLR=%d\n", !!(b[7] & 0x1));
+        printf("  R_SUP=%d\n", !!(b[8] & 0x10));
+        printf("  CBCS=%d\n", !!(b[8] & 0x1));
+        printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
+        printf("  Extended self-test completion minutes=%d\n",
+               (b[10] << 8) + b[11]);
+        printf("  POA_SUP=%d\n", !!(b[12] & 0x80));     /* spc4r32 */
+        printf("  HRA_SUP=%d\n", !!(b[12] & 0x40));     /* spc4r32 */
+        printf("  VSA_SUP=%d\n", !!(b[12] & 0x20));     /* spc4r32 */
         return;
     }
     printf("  ACTIVATE_MICROCODE=%d SPT=%d GRD_CHK=%d APP_CHK=%d "
-           "REF_CHK=%d\n", ((buff[4] >> 6) & 0x3), ((buff[4] >> 3) & 0x7),
-           !!(buff[4] & 0x4), !!(buff[4] & 0x2), !!(buff[4] & 0x1));
+           "REF_CHK=%d\n", ((b[4] >> 6) & 0x3), ((b[4] >> 3) & 0x7),
+           !!(b[4] & 0x4), !!(b[4] & 0x2), !!(b[4] & 0x1));
     printf("  UASK_SUP=%d GROUP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d "
-           "SIMPSUP=%d\n", !!(buff[5] & 0x20), !!(buff[5] & 0x10),
-           !!(buff[5] & 0x8), !!(buff[5] & 0x4), !!(buff[5] & 0x2),
-           !!(buff[5] & 0x1));
+           "SIMPSUP=%d\n", !!(b[5] & 0x20), !!(b[5] & 0x10), !!(b[5] & 0x8),
+           !!(b[5] & 0x4), !!(b[5] & 0x2), !!(b[5] & 0x1));
     printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
-           !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
-           !!(buff[6] & 0x1));
+           !!(b[6] & 0x8), !!(b[6] & 0x4), !!(b[6] & 0x2), !!(b[6] & 0x1));
     printf("  P_I_I_SUP=%d LUICLR=%d R_SUP=%d CBCS=%d\n",
-           !!(buff[7] & 0x10), !!(buff[7] & 0x1),
-           !!(buff[8] & 0x10), !!(buff[8] & 0x1));
-    printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
+           !!(b[7] & 0x10), !!(b[7] & 0x1), !!(b[8] & 0x10), !!(b[8] & 0x1));
+    printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
-           (buff[10] << 8) + buff[11]);    /* spc4r27 */
+           (b[10] << 8) + b[11]);    /* spc4r27 */
     printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
-           !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20));
+           !!(b[12] & 0x80), !!(b[12] & 0x40), !!(b[12] & 0x20));
 }
 
 /* VPD_SOFTW_INF_ID */
@@ -1615,8 +1762,10 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
         if (subvalue)
             printf("VPD page code=0x%.2x, subvalue=0x%.2x:\n", num_vpd,
                    subvalue);
-        else
+        else if (num_vpd >= 0)
             printf("VPD page code=0x%.2x:\n", num_vpd);
+        else
+            printf("VPD page code=%d:\n", num_vpd);
     }
     if (0 == alloc_len)
         alloc_len = DEF_ALLOC_LEN;
@@ -1658,8 +1807,11 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
         }
         return 0;
     } else {
-        fprintf(stderr,
-                "fetching VPD page code=0x%.2x: failed\n", num_vpd);
+        if (num_vpd >= 0)
+            fprintf(stderr, "fetching VPD page code=0x%.2x: failed\n",
+                    num_vpd);
+        else
+            fprintf(stderr, "fetching VPD page code=%d: failed\n", num_vpd);
         return res;
     }
 }
@@ -1681,6 +1833,25 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         alloc_len = (VPD_ATA_INFO == num_vpd) ?
                     VPD_ATA_INFO_LEN : DEF_ALLOC_LEN;
     switch(num_vpd) {
+    case VPD_NOT_STD_INQ:         /* -2 (want standard inquiry response) */
+        if (do_long)
+            alloc_len = DEF_ALLOC_LEN;
+        else if (0 == maxlen)
+            alloc_len = 36;
+        res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, alloc_len, 1,
+                            verbose);
+        if (0 == res) {
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, alloc_len);
+            else if (do_hex) {
+                if (! do_quiet)
+                    printf("Standard Inquiry reponse:\n");
+                dStrHex((const char *)rsp_buff, alloc_len, 0);
+            } else
+                decode_std_inq(rsp_buff, alloc_len, verbose);
+            return 0;
+        }
+        break;
     case VPD_SUPPORTED_VPDS:    /* 0x0 */
         if ((! do_raw) && (! do_quiet))
             printf("Supported VPD pages VPD page:\n");
@@ -1955,12 +2126,21 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else {
+                int protect = 0;
+                struct sg_simple_inquiry_resp sir;
+
+                if (do_long) {
+                    res = sg_simple_inquiry(sg_fd, &sir, 0, verbose);
+                    if (res)
+                        break;
+                    protect = sir.byte_5 & 0x1;     /* SPC-3 and later */
+                }
                 pdt = rsp_buff[0] & 0x1f;
-                if (verbose || do_long)
+                if (verbose)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
-                decode_x_inq_vpd(rsp_buff, len, do_hex);
+                decode_x_inq_vpd(rsp_buff, len, do_hex, do_long, protect);
             }
             return 0;
         }
@@ -2620,7 +2800,9 @@ main(int argc, char * argv[])
         }
     }
     if (page_str) {
-        if (isalpha(page_str[0])) {
+        if ((0 == strcmp("-1", page_str)) || (0 == strcmp("-2", page_str)))
+            num_vpd = VPD_NOT_STD_INQ;
+        else if (isalpha(page_str[0])) {
             vnp = sdp_find_vpd_by_acron(page_str);
             if (NULL == vnp) {
                 vnp = svpd_find_vendor_by_acron(page_str);

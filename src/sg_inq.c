@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.02 20110825";    /* SPC-4 rev 32 */
+static char * version_str = "1.02 20111025";    /* SPC-4 rev 32 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1285,7 +1285,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
     }
 }
 
-/* VPD_EXT_INQ */
+/* VPD_EXT_INQ   Extended Inquiry */
 static void
 decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -1837,7 +1837,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
                        "of supporting LU]\n");
             else
                 printf("standard INQUIRY: [reserved or vendor specific "
-                       "qualifier [%d]\n", pqual);
+                       "qualifier [%d]]\n", pqual);
         }
         len = rsp_buff[4] + 5;
         /* N.B. rsp_buff[2] full byte is 'version' in SPC-2,3,4 but in SPC
