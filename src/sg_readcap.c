@@ -28,7 +28,7 @@
 
 */
 
-static char * version_str = "3.86 20110121";
+static char * version_str = "3.87 20111023";
 
 #define ME "sg_readcap: "
 
@@ -88,7 +88,7 @@ static void usage()
             "    --pmi|-p        partial medium indicator (without this "
             "option shows\n"
             "                    total disk capacity) [made obsolete in "
-	    "sbc3r26]\n"
+            "sbc3r26]\n"
             "    --raw|-r        output response in binary to stdout\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"
@@ -341,7 +341,7 @@ static void dStrRaw(const char* str, int len)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, res;
+    int sg_fd, k, res, prot_en, p_type;
     uint64_t llast_blk_addr;
     int ret = 0;
     unsigned int last_blk_addr, block_size;
@@ -486,10 +486,15 @@ int main(int argc, char * argv[])
                 printf("0x%" PRIx64 " 0x%x\n", llast_blk_addr + 1, block_size);
                 goto good;
             }
+            prot_en = !!(resp_buff[12] & 0x1);
+            p_type = ((resp_buff[12] >> 1) & 0x7);
             printf("Read Capacity results:\n");
-            printf("   Protection: prot_en=%d, p_type=%d, p_i_exponent=%d\n",
-                   !!(resp_buff[12] & 0x1), ((resp_buff[12] >> 1) & 0x7),
-                   ((resp_buff[13] >> 4) & 0xf));
+            printf("   Protection: prot_en=%d, p_type=%d, p_i_exponent=%d",
+                   prot_en, p_type, ((resp_buff[13] >> 4) & 0xf));
+            if (prot_en)
+                printf(" [type %d protection]\n", p_type + 1);
+            else
+                printf("\n");
             printf("   Logical block provisioning: lbpme=%d, lbprz=%d\n",
                    !!(resp_buff[14] & 0x80), !!(resp_buff[14] & 0x40));
             if (opts.do_pmi)
