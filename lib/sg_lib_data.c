@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.70 20111075";  /* spc4r32, sbc3r29 */
+const char * sg_lib_version_str = "1.71 20111025";  /* spc4r33, sbc3r29 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -1091,15 +1091,16 @@ const char * sg_lib_pdt_strs[] = {
 
 const char * sg_lib_transport_proto_strs[] =
 {
-    "Fibre Channel (FCP-2)",
-    "Parallel SCSI (SPI-5)",
-    "SSA (SSA-S3P)",
-    "IEEE 1394 (SBP-3)",
-    "Remote Direct Memory Access (RDMA)",
+    "Fibre Channel Protocol for SCSI (FCP-2)",
+    "SCSI Parallel Interface (SPI-5)",
+    "Serial Storage Architecture SCSI-3 Protocol (SSA-S3P)",
+    "Serial Bus Protocol for IEEE 1394 (SBP-3)",
+    "SCSI RDMA Protocol (SRP)",
     "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI (SPL)",
-    "Automation/Drive Interface (ADT-2)",
-    "ATA Packet Interface (ACS-2)",
-    "Ox9", "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
+    "Serial Attached SCSI Protocol (SPL-2)",
+    "Automation/Drive Interface Transport (ADT-2)",
+    "AT Attachment Interface (ACS-2)",
+    "USB Attached SCSI (UAS-2)",
+    "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"
 };
