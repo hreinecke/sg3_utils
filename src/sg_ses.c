@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.60 20111016";    /* ses3r03 */
+static char * version_str = "1.61 20111028";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -96,6 +96,7 @@ struct opts_t {
     int byte1_given;
     int do_control;
     int do_data;
+    int do_enumerate;
     int do_filter;
     int do_help;
     int do_hex;
@@ -245,6 +246,30 @@ static struct diag_page_code in_dpc_arr[] = {
     {-1, NULL},
 };
 
+/* Diagnostic page names, for control (or out) pages */
+static struct diag_page_code out_dpc_arr[] = {
+    {DPC_SUPPORTED, "?? [Supported diagnostic pages]"},  /* 0 */
+    {DPC_CONFIGURATION, "?? [Configuration (SES)]"},
+    {DPC_ENC_CONTROL, "Enclosure control (SES)"},
+    {DPC_HELP_TEXT, "Help text (SES)"},
+    {DPC_STRING, "String Out (SES)"},
+    {DPC_THRESHOLD, "Threshold Out (SES)"},
+    {0x6, "Array Control (SES, obsolete)"},
+    {DPC_ELEM_DESC, "?? [Element descriptor (SES)]"},
+    {DPC_SHORT_ENC_STATUS, "?? [Short enclosure status (SES)]"},  /* 8 */
+    {DPC_ENC_BUSY, "?? [Enclosure busy (SES-2)]"},
+    {DPC_ADD_ELEM_STATUS, "?? [Additional element status (SES-2)]"},
+    {DPC_SUBENC_HELP_TEXT, "?? [Subenclosure help text (SES-2)]"},
+    {DPC_SUBENC_STRING, "Subenclosure string Out (SES-2)"},
+    {DPC_SUPPORTED_SES, "?? [Supported SES diagnostic pages (SES-2)]"},
+    {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
+    {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
+    {0x3f, "Protocol specific (SAS transport)"},
+    {0x40, "Translate address (SBC)"},
+    {0x41, "Device status (SBC)"},
+    {-1, NULL},
+};
+
 /* Names of element types used by the Enclosure Control/Status diagnostic
  * page. */
 static struct element_type_t element_type_arr[] = {
@@ -353,6 +378,7 @@ static struct option long_options[] = {
     {"clear", 1, 0, 'C'},
     {"data", 1, 0, 'd'},
     {"descriptor", 1, 0, 'D'},
+    {"enumerate", 0, 0, 'e'},
     {"filter", 0, 0, 'f'},
     {"get", 1, 0, 'G'},
     {"help", 0, 0, 'h'},
@@ -379,13 +405,13 @@ usage()
 {
     fprintf(stderr, "Usage: "
             "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
-            "              [--descriptor=DN] [--filter] [--get=STR] [--help] "
-            "[--hex]\n"
-            "              [--index=IIE | --index=OIE,II] [--inner-hex] "
-            "[--join]\n"
-            "              [--list] [--page=PG] [--raw] [--set=STR] "
-            "[--status]\n"
-            "              [--verbose] [--version] DEVICE\n"
+            "              [--descriptor=DN] [--enumerate] [--filter] "
+            "[--get=STR]\n"
+            "              [--help] [--hex] [--index=IIE | --index=OIE,II]\n"
+            "              [--inner-hex] [--join] [--list] [--page=PG] "
+            "[--raw]\n"
+            "              [--set=STR] [--status] [--verbose] [--version]\n"
+            "              DEVICE\n"
             "  where:\n"
             "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
             "to B1\n"
@@ -398,12 +424,16 @@ usage()
             "stdin\n"
             "    --descriptor=DN|-D DN    descriptor name, alternative to "
             "--index=IND\n"
+            "    --enumerate|-e      enumerate page names + element types "
+            "(ignore\n"
+            "                        DEVICE), use twice for clear,get,set "
+            "acronyms\n"
             "    --filter|-f         filter out enclosure status clear "
             "flags\n"
             "    --get=STR|-G STR    get value of field by acronym or "
             "position\n"
             "    --help|-h           print out usage message\n"
-            "    --hex|-H            print status response in hex\n"
+            "    --hex|-H            print page response in hex\n"
             "    --index=IIE|-I IIE    individual index ('-1' for overall) "
             "or element\n"
             "                          type abbreviation (e.g. 'arr')\n"
@@ -422,12 +452,10 @@ usage()
             "                        and additional element status pages. "
             "Use twice\n"
             "                        to add threshold in page\n"
-            "    --list|-l           list page names + element types (ignore"
-            " DEVICE)\n"
-            "                        use twice to list clear,get,set "
-            "acronyms\n"
+            "    --list|-l           same as '--enumerate' option\n"
             "    --page=PG|-p PG     SES page code PG (prefix with '0x' "
-            "for hex; def: 0)\n"
+            "for hex)\n"
+            "                        (def: 0 (supported diagnostic pages))\n"
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
             "                        when used twice outputs page in binary "
@@ -438,8 +466,9 @@ usage()
             "action)\n"
             "    --verbose|-v        increase verbosity\n"
             "    --version|-V        print version string and exit\n\n"
-            "Fetches status or sends control data to a SCSI enclosure. STR "
-            "can be\n'<acronym>[=val]' or '<start_byte>:<start_bit>"
+            "Fetches status or sends control data to a SCSI enclosure. If "
+            "no options\ngiven outputs DEVICE's supported diagnostic pages. "
+            "STR can be\n'<acronym>[=val]' or '<start_byte>:<start_bit>"
             "[:<num_bits>][=<val>]'.\nElement type abbreviations may be "
             "followed by a number (e.g. 'ps1' is the\nsecond power supply "
             "element type).\n"
@@ -458,7 +487,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:cC:d:D:fG:hHiI:jlp:rsS:vV",
+        c = getopt_long(argc, argv, "b:cC:d:D:efG:hHiI:jlp:rsS:vV",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -489,6 +518,9 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             break;
         case 'D':
             op->desc_name = optarg;
+            break;
+        case 'e':
+            ++op->do_enumerate;
             break;
         case 'f':
             op->do_filter = 1;
@@ -568,7 +600,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                 }
                 if (NULL == etp->desc) {
                     fprintf(stderr, "bad element type abbreviation [%s] for "
-                            "'--index'\nuse '--list' to see possibles\n", b);
+                            "'--index'\nuse '--enumerate' to see possibles\n", b);
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 if ((int)strlen(b) > n) {
@@ -649,7 +681,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                 "not both\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (op->do_list)
+    if (op->do_list || op->do_enumerate)
         return 0;
     if (op->do_control && op->do_status) {
         fprintf(stderr, "cannot have both '--control' and '--status'\n");
@@ -770,6 +802,21 @@ parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
     }
     return 0;
 }
+
+/* Fetch diagnostic page name (control or out). Returns NULL if not found. */
+static const char *
+find_out_diag_page_desc(int page_num)
+{
+    const struct diag_page_code * pcdp;
+
+    for (pcdp = out_dpc_arr; pcdp->desc; ++pcdp) {
+        if (page_num == pcdp->page_code)
+            return pcdp->desc;
+        else if (page_num < pcdp->page_code)
+            return NULL;
+    }
+    return NULL;
+}
         
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
  * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
@@ -779,6 +826,18 @@ static int
 do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
             int noisy, int verbose)
 {
+    const char * cp;
+    int page_num;
+
+    if (outgoing_pg && (verbose > 2)) {
+        page_num = ((const char *)outgoing_pg)[0];
+        cp = find_out_diag_page_desc(page_num);
+        if (cp)
+            fprintf(stderr, "    Send diagnostic cmd name: %s\n", cp);
+        else
+            fprintf(stderr, "    Send diagnostic cmd number: 0x%x\n",
+                    page_num);
+    }
     return sg_ll_send_diag(sg_fd, 0 /* sf_code */, pf_bit, 0 /* sf_bit */,
                            0 /* devofl_bit */, 0 /* unitofl_bit */,
                            0 /* long_duration */, outgoing_pg, outgoing_len,
@@ -2806,8 +2865,44 @@ strcase_eq(const char * s1p, const char * s2p)
     return 1;
 }
 
+static int
+is_acronym_in_status_ctl(const struct tuple_acronym_val * tavp)
+{ 
+    const struct acronym2tuple * a2tp;
+
+    for (a2tp = ecs_a2t_arr; a2tp->acron; ++ a2tp) {
+        if (strcase_eq(tavp->acron, a2tp->acron))
+            break;
+    }
+    return (a2tp->acron ? 1 : 0);
+}
+
+static int
+is_acronym_in_threshold(const struct tuple_acronym_val * tavp)
+{ 
+    const struct acronym2tuple * a2tp;
+
+    for (a2tp = th_a2t_arr; a2tp->acron; ++ a2tp) {
+        if (strcase_eq(tavp->acron, a2tp->acron))
+            break;
+    }
+    return (a2tp->acron ? 1 : 0);
+}
+
+static int
+is_acronym_in_additional(const struct tuple_acronym_val * tavp)
+{ 
+    const struct acronym2tuple * a2tp;
+
+    for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++ a2tp) {
+        if (strcase_eq(tavp->acron, a2tp->acron))
+            break;
+    }
+    return (a2tp->acron ? 1 : 0);
+}
+
 /* Do clear/get/set (cgs) on Enclosure Control/Status page. Return 0 for ok
- * else -1 . */
+ * -2 for acronym not found, else -1 . */
 static int
 cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
                  const struct tuple_acronym_val * tavp,
@@ -2832,11 +2927,8 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
             s_byte = a2tp->start_byte;
             s_bit = a2tp->start_bit;
             n_bits = a2tp->num_bits;
-        } else {
-            fprintf(stderr, "acroynm %s not found for Enclosure "
-                    "Control/Status page (try '-ll' option)\n", tavp->acron);
-            return -1;
-        }
+        } else
+            return -2;
     }
     if (op->get_str) {
         ui = get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
@@ -2861,8 +2953,8 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
     return 0;
 }
 
-/* Do clear/get/set (cgs) on Threshold In/Out page. Return 0 for ok else
- * -1 . */
+/* Do clear/get/set (cgs) on Threshold In/Out page. Return 0 for ok,
+ * -2 for acronym not found, else -1 . */
 static int
 cgs_threshold(int sg_fd, const struct join_row_t * jrp,
               const struct tuple_acronym_val * tavp,
@@ -2891,11 +2983,8 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
             s_byte = a2tp->start_byte;
             s_bit = a2tp->start_bit;
             n_bits = a2tp->num_bits;
-        } else {
-            fprintf(stderr, "acroynm %s not found for Threshold In/Out "
-                    "page (try '-ll' option)\n", tavp->acron);
-            return -1;
-        }
+        } else
+            return -2;
     }
     if (op->get_str) {
         ui = get_big_endian(jrp->thresh_inp + s_byte, s_bit, n_bits);
@@ -2918,8 +3007,8 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
     return 0;
 }
 
-/* Do clear/get/set (cgs) on Additional element status page. Return 0 for
- * ok else -1 . */
+/* Do get (cgs) on Additional element status page. Return 0 for ok,
+ * -2 for acronym not found, else -1 . */
 static int
 cgs_additional_el(const struct join_row_t * jrp,
                   const struct tuple_acronym_val * tavp,
@@ -2948,11 +3037,8 @@ cgs_additional_el(const struct join_row_t * jrp,
             s_byte = a2tp->start_byte;
             s_bit = a2tp->start_bit;
             n_bits = a2tp->num_bits;
-        } else {
-            fprintf(stderr, "acroynm %s not found for Additional element "
-                    "status page (try '-ll' option)\n", tavp->acron);
-            return -1;
-        }
+        } else
+            return -2;
     }
     if (op->get_str) {
         ui = get_big_endian(jrp->add_elem_statp + s_byte, s_bit, n_bits);
@@ -2974,10 +3060,26 @@ static int
 ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
         struct opts_t * op)
 {
-    int ret, k, desc_len, dn_len;
+    int ret, k, desc_len, dn_len, in_page;
     const struct join_row_t * jrp;
     const unsigned char * ed_ucp;
 
+    in_page = 0;
+    if (is_acronym_in_status_ctl(tavp)) {
+        in_page = DPC_ENC_STATUS;
+        op->page_code = DPC_ENC_CONTROL;
+    } else if (is_acronym_in_threshold(tavp)) {
+        in_page = DPC_THRESHOLD;
+        op->page_code = DPC_THRESHOLD;
+    } else if (is_acronym_in_additional(tavp)) {
+        in_page = DPC_ADD_ELEM_STATUS;
+        op->page_code = DPC_ADD_ELEM_STATUS;
+    }
+    if (0 == in_page) {
+        fprintf(stderr, "acroynm %s not found (try '-ee' option)\n",
+                tavp->acron);
+        return -1;
+    }
     ret = process_join(sg_fd, op, 0);
     if (ret)
         return ret;
@@ -3000,7 +3102,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
                              desc_len))
                 continue;
         }
-        if ((0 == op->page_code_given) || (DPC_ENC_CONTROL == op->page_code))
+        if (DPC_ENC_CONTROL == op->page_code)
             ret = cgs_enc_ctl_stat(sg_fd, jrp, tavp, op);
         else if (DPC_THRESHOLD == op->page_code)
             ret = cgs_threshold(sg_fd, jrp, tavp, op);
@@ -3027,19 +3129,22 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     return 0;
 }
 
-/* Output from --list option. Note it is different when given twice. */
+/* Output from --enumerate or --list option. Note that the output is
+ * different when the option is given twice. */
 static void
-process_do_list(const struct opts_t * op)
+process_do_enumerate(const struct opts_t * op)
 {
+    int num;
     const struct diag_page_code * pcdp;
     const struct element_type_t * etp;
     const struct acronym2tuple * a2tp;
     const char * cp;
 
     if (op->device_name)
-        printf(">>> DEVICE %s ignored when --list option given.\n",
-               op->device_name);
-    if (op->do_list < 2) {
+        printf(">>> DEVICE %s ignored when --%s option given.\n",
+               op->device_name, (op->do_list ? "list" : "enumerate"));
+    num = op->do_enumerate + op->do_list;
+    if (num < 2) {
         printf("Diagnostic pages (followed by page code):\n");
         for (pcdp = dpc_arr; pcdp->desc; ++pcdp)
             printf("    %s  [0x%x]\n", pcdp->desc, pcdp->page_code);
@@ -3049,22 +3154,23 @@ process_do_list(const struct opts_t * op)
             printf("    %s  [%s] [0x%x]\n", etp->desc, etp->abbrev,
                    etp->elem_type_code);
     } else {
+        /* command line has multiple --enumerate and/or --list options */
         printf("--clear, --get, --set acronyms for enclosure status/control "
-               "page:\n");
+               "[0x2] page:\n");
         for (a2tp = ecs_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" : find_element_tname(a2tp->etype);
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
         printf("\n--clear, --get, --set acronyms for threshold in/out "
-               "page:\n");
+               "[0x5] page:\n");
         for (a2tp = th_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" : find_element_tname(a2tp->etype);
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
-        printf("\n--clear, --get, --set acronyms for additional element "
-               "status page (SAS EIP=1):\n");
+        printf("\n--get acronyms for additional element status [0xa] page "
+               "(SAS EIP=1):\n");
         for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" : find_element_tname(a2tp->etype);
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
@@ -3099,8 +3205,8 @@ main(int argc, char * argv[])
         usage();
         return 0;
     }
-    if (opts.do_list) {
-        process_do_list(&opts);
+    if (opts.do_enumerate || opts.do_list) {
+        process_do_enumerate(&opts);
         return 0;
     }
     if (opts.clear_str || opts.get_str || opts.set_str) {
@@ -3115,7 +3221,7 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         if (opts.get_str && tav.val_str)
-            fprintf(stderr, "eith --get option ignoring =<val> at the end "
+            fprintf(stderr, "--get option ignoring =<val> at the end "
                     "of STR argument\n");
         if ((0 == opts.ind_given) && (! opts.desc_name)) {
             fprintf(stderr, "with --clear, --get or --set option need "

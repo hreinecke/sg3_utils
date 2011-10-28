@@ -4,8 +4,8 @@ sg_ses \- fetch status from a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
-[\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR] [\fI\-\-filter\fR]
-[\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR] [\fI\-\-enumerate\fR]
+[\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-index=IIE\fR | \fI\-\-index=OIE,II\fR] [\fI\-\-inner\-hex\fR]
 [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
 [\fI\-\-set=STR\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR]
@@ -85,6 +85,13 @@ by a backslash). Some elements (e.g. overall elements) may not have
 descriptor names. Useful with the \fI\-\-join\fR option as well as the
 \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options.
 .TP
+\fB\-e\fR, \fB\-\-enumerate\fR
+enumerate all known diagnostic page names and SES elements when this option
+is given once. If \fI\-\-enumerate\fR is given twice, then the recognized
+acronyms for the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR
+options are listed. The utility exits after listing this information (so most
+other options and \fIDEVICE\fR are ignored).
+.TP
 \fB\-f\fR, \fB\-\-filter\fR
 cuts down on the amount of output from the enclosure status diagnostic
 page and the additional element status page. When this option is given, any
@@ -112,32 +119,31 @@ in hexadecimal. Ignored with some options (e.g. \fI\-\-join\fR).
 \fB\-i\fR, \fB\-\-inner\-hex\fR
 the outer levels of a status diagnostic page are decoded and printed out
 but the innermost level (e.g. the element status descriptor) is output in
-hex. Implemented for the more complex diagnostic pages.
+hex. Also active with the additional element descriptor and threshold in
+pages. Can be used with \fI\-\-index=...\fR and/or \fI\-\-join\fR options.
 .TP
 \fB\-I\fR, \fB\-\-index\fR=\fIIIE\fR
 where \fIIIE\fR is either an individual index or an element type abbreviation.
-See the INDEXES section below. To list the available element type
-abbreviations use the \fI\-\-list\fR option.
+See the INDEXES section below. Useful with the \fI\-\-join\fR or
+\fI\-\-page=PG\fR option. To enumerate the available element type
+abbreviations use the \fI\-\-enumerate\fR option.
 .TP
 \fB\-I\fR, \fB\-\-index\fR=\fIOIE,II\fR
 where \fIOIE,II\fR is an overall index (or element type abbreviation)
-followed by an individual index. See the INDEXES section below. To list the
-available element type abbreviations use the \fI\-\-list\fR option.
+followed by an individual index. See the INDEXES section below. Useful with
+the \fI\-\-join\fR or \fI\-\-page=PG\fR option. To enumerate the available
+element type abbreviations use the \fI\-\-enumerate\fR option.
 .TP
 \fB\-j\fR, \fB\-\-join\fR
 group elements from the element descriptor, enclosure status and additional
 element status pages. If this option is given twice then elements from
 the threshold in page are also grouped. The order is dictated by the
-configuration page. All elements are output unless the \fI\-\-index=IND\fR
+configuration page. All elements are output unless the \fI\-\-index=\fR
 option is given, in which case only the matching element is output, or
 no element is output if there is no match. See the INDEXES section below.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
-list all known diagnostic page names and SES elements when \fI\-\-list\fR
-is given once. If \fI\-\-list\fR is given twice, then the recognized acronyms
-for the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options
-are listed. The utility exits after listing this information (so most
-other options and \fIDEVICE\fR are ignored).
+This option is equivalent to \fI\-\-enumerate\fR. See that option.
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 where \fIPG\fR is a page code. Assumed to be in decimal unless prefixed by
@@ -206,17 +212,19 @@ can be given.
 .PP
 One of two command lines variants can be used to specify indexes:
 \fI\-\-index=OIE,II\fR where \fIOIE\fR is either an overall index (OI) or
-an element type abbreviation (e.g. "ps" or "ps1"). \fIII\fR is the sub\-index
-and is either an individual index or "-1" to specify the overall element.
-The second variant is \fI\-\-index=IIE\fR where \fIIIE\fR is either an
-individual index (II) that is equivalent to \fI\-\-index=0,II\fR or an
-element type abbreviation that is equivalent to \fI\-\-index=E,-1\fR.
+an element type abbreviation (E) (e.g. "ps" or "ps1"). \fIII\fR is the
+sub\-index and is either an individual index or "-1" to specify the overall
+element.  The second variant is \fI\-\-index=IIE\fR where \fIIIE\fR is
+either an individual index (II) or an element type abbreviation (E). When
+\fIIIE\fR is an individual index then the option is equivalent to
+\fI\-\-index=0,II\fR. When \fIIIE\fR is an element type abbreviation then
+the option is equivalent to \fI\-\-index=E,-1\fR.
 .PP
 For example if the first type header in the Configuration page has array
 device slot element type then \fI\-\-index=0,-1\fR is equivalent to
 \fI\-\-index=arr\fR. Also \fI\-\-index=arr,3\fR is equivalent to
-\fI\-\-index=3\fR. In the latter case if the "number of possible elements"
-is less than 4 then nothing is addressed.
+\fI\-\-index=3\fR. In the latter case, if the "number of possible elements"
+is less than 4 then nothing is addressed (since 3 would be out of bounds).
 .PP
 Note that if the element descriptor page is available then the 
 \fI\-\-descriptor=DN\fR option may be an alternative to the
@@ -242,8 +250,8 @@ The <value> is optional but is ignored if provided to \fI\-\-get=STR\fR.
 For \fI\-\-set=STR\fR the default <value> is 1 while for \fI\-\-clear=STR\fR
 the default value is 0 .
 .PP
-The supported list of <acronym>s can be viewed by using the \fI\-\-list\fR
-option twice (or "\-ll").
+The supported list of <acronym>s can be viewed by using the
+\fI\-\-enumerate\fR option twice (or "\-ee").
 .SH CHANGING STATE
 This utility has various techniques for changing the state of a SES device.
 As noted above this is typically a read\-modify\-write type operation.
