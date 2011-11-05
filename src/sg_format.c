@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.20 20111103";
+static char * version_str = "1.20 20111105";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -461,7 +461,7 @@ main(int argc, char **argv)
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:Def:FhlpP:q:rRs:SvVwx6",
+                c = getopt_long(argc, argv, "c:C:Def:FhlpP:q:rRs:SvVwx:6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -559,7 +559,7 @@ main(int argc, char **argv)
                         fwait = 1;
                         break;
                 case 'x':
-                        pt++;
+                        pt = !!sg_get_num(optarg);
                         break;
                 case '6':
                         mode6 = 1;
