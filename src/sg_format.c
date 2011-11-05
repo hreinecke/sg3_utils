@@ -28,6 +28,8 @@
  *      ST318304FC      35145034  (Factory spec is 35885167 sectors)
  *      ST336605FC      ???
  *      ST336753FC      71132960  (Factory spec is 71687372 sectors)
+ *  and a newer one:
+ *      ST33000650SS    5860533168 (3 TB SAS disk)
  */
 
 #include <stdio.h>
@@ -45,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.19 20110730";
+static char * version_str = "1.20 20111103";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -58,6 +60,7 @@ static char * version_str = "1.19 20110730";
                         /* Seagate ST32000444SS 2TB disk takes 9.5 hours */
 
 #define POLL_DURATION_SECS 60
+#define DEF_POLL_TYPE 0
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -87,9 +90,10 @@ static struct option long_options[] = {
         {"pinfo", no_argument, 0, 'p'},
         {"pfu", required_argument, 0, 'P'},
         {"pie", required_argument, 0, 'q'},
+        {"poll", required_argument, 0, 'x'},
         {"resize", no_argument, 0, 'r'},
         {"rto_req", no_argument, 0, 'R'},
-        {"security", no_argument, 0, 'X'},
+        {"security", no_argument, 0, 'S'},
         {"six", no_argument, 0, '6'},
         {"size", required_argument, 0, 's'},
         {"verbose", no_argument, 0, 'v'},
@@ -106,11 +110,11 @@ usage()
                "[--early]\n"
                "                 [--fmtpinfo=FPI] [--format] [--help] "
                "[--long] [--pfu=PFU]\n"
-               "                 [--pie=PIE] [--pinfo] [--resize] "
-               "[--rto_req] [--security]\n"
-               "                 [--six] [--size=SIZE] [--verbose] "
-               "[--version] [--wait]\n"
-               "                 DEVICE\n"
+               "                 [--pie=PIE] [--pinfo] [--poll=PT] "
+               "[--resize] [--rto_req]\n"
+               "                 [--security] [--six] [--size=SIZE] "
+               "[--verbose] [--version]\n"
+               "                 [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -136,7 +140,11 @@ usage()
                "(default: 0)\n"
                "    --pinfo|-p      set upper bit of FMTPINFO field\n"
                "                    (deprecated use '--fmtpinfo=FPI' "
-               "instead)\n");
+               "instead)\n"
+               "    --poll=PT|-x PT    PT is poll type, 0 for test unit "
+               "ready\n"
+               "                       1 for request sense (def: 0 (will "
+               "be 1))\n");
         printf("    --resize|-r     resize (rather than format) to COUNT "
                "value\n"
                "    --rto_req|-R    set lower bit of FMTPINFO field\n"
@@ -167,13 +175,15 @@ usage()
 /* Return 0 on success, else see sg_ll_format_unit() */
 static int
 scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
-            int dcrt, int pie, int si, int early, int verbose)
+            int dcrt, int pie, int si, int early, int pt, int verbose)
 {
         int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
+        int resp_len;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
         unsigned char fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
+        unsigned char reqSense[MAX_BUFF_SZ];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
         longlist = (pie > 0);
@@ -237,25 +247,103 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
         }
 
         verb = (verbose > 1) ? (verbose - 1) : 0;
-        for(;;) {
-                sleep_for(POLL_DURATION_SECS);
-                progress = -1;
-                res = sg_ll_test_unit_ready_progress(fd, 0, &progress, 0,
-                                                     verb);
-                if (progress >= 0) {
-                        pr = (progress * 100) / 65536;
-                        rem = ((progress * 100) % 65536) / 655;
-                        printf("Format in progress, %d.%02d%% done\n",
-                               pr, rem);
-                } else
-                        break;
+        if (0 == pt) {
+                for(;;) {
+                        sleep_for(POLL_DURATION_SECS);
+                        progress = -1;
+                        res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
+                                                             0, verb);
+                        if (progress >= 0) {
+                                pr = (progress * 100) / 65536;
+                                rem = ((progress * 100) % 65536) / 655;
+                                printf("Format in progress, %d.%02d%% done\n",
+                                       pr, rem);
+                        } else
+                                break;
+                }
         }
+        if (pt || (SG_LIB_CAT_NOT_READY == res)) {
+                for(;;) {
+                        sleep_for(POLL_DURATION_SECS);
+                        memset(reqSense, 0x0, sizeof(reqSense));
+                        res = sg_ll_request_sense(fd, 0, reqSense,
+                                                  sizeof(reqSense), 0, verb);
+                        if (res) {
+                                fprintf(stderr, "polling with Request Sense "
+                                        "command failed [res=%d]\n", res);
+                                break;
+                        }
+                        resp_len = reqSense[7] + 8;
+                        if (verb) {
+                                fprintf(stderr, "Parameter data in hex:\n");
+                                dStrHex((const char *)reqSense, resp_len, 1);
+                        }
+                        progress = -1;
+                        sg_get_sense_progress_fld(reqSense, resp_len,
+                                                  &progress);
+                        if (progress >= 0) {
+                                pr = (progress * 100) / 65536;
+                                rem = ((progress * 100) % 65536) / 655;
+                                printf("Format in progress, %d.%02d%% done\n",
+                                       pr, rem);
+                        } else
+                                break;
+                }
+        }
+#if 0
+        for (k = 0; k < num_rs; ++k) {
+            if (k > 0)
+                sleep_for(30);
+            memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
+            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
+                                      1, verbose);
+            if (res) {
+                ret = res;
+                if (SG_LIB_CAT_INVALID_OP == res)
+                    fprintf(stderr, "Request Sense command not supported\n");
+                else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                    fprintf(stderr, "bad field in Request Sense cdb\n");
+                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                    fprintf(stderr, "Request Sense, aborted command\n");
+                else {
+                    fprintf(stderr, "Request Sense command unexpectedly "
+                            "failed\n");
+                    if (0 == verbose)
+                        fprintf(stderr, "    try the '-v' option for "
+                                "more information\n");
+                }
+                break;
+            }
+            /* "Additional sense length" same in descriptor and fixed */
+            resp_len = requestSenseBuff[7] + 8;
+            if (verbose > 1) {
+                fprintf(stderr, "Parameter data in hex\n");
+                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+            }
+            progress = -1;
+            sg_get_sense_progress_fld(requestSenseBuff, resp_len,
+                                      &progress);
+            if (progress < 0) {
+                ret = res;
+                if (verbose > 1)
+                     fprintf(stderr, "No progress indication found, "
+                             "iteration %d\n", k + 1);
+                /* N.B. exits first time there isn't a progress indication */
+                break;
+            } else
+                printf("Progress indication: %d.%02d%% done\n",
+                       (progress * 100) / 65536,
+                       ((progress * 100) % 65536) / 655);
+        }
+#endif
         printf("FORMAT Complete\n");
         return 0;
 }
 
 #define RCAP_REPLY_LEN 32
 
+/* Returns block size or -2 if do_16==0 and the number of blocks is too
+ * big, or returns -1 for other error. */
 static int
 print_read_cap(int fd, int do_16, int verbose)
 {
@@ -277,15 +365,22 @@ print_read_cap(int fd, int do_16, int verbose)
                                       (resp_buff[10] << 8) |
                                       resp_buff[11]);
                         printf("Read Capacity (16) results:\n");
-                        printf("   Protection: prot_en=%d, p_type=%d\n",
+                        printf("   Protection: prot_en=%d, p_type=%d, "
+                               "p_i_exponent=%d\n",
                                !!(resp_buff[12] & 0x1),
-                               ((resp_buff[12] >> 1) & 0x7));
+                               ((resp_buff[12] >> 1) & 0x7),
+                               ((resp_buff[13] >> 4) & 0xf));
                         printf("   Logical block provisioning: lbpme=%d, "
                                "lbprz=%d\n", !!(resp_buff[14] & 0x80),
                                !!(resp_buff[14] & 0x40));
-                        printf("   Number of blocks=%" PRIu64 "\n",
+                        printf("   Logical blocks per physical block "
+                               "exponent=%d\n", resp_buff[13] & 0xf);
+                        printf("   Lowest aligned logical block address=%d\n",
+                               ((resp_buff[14] & 0x3f) << 8) + resp_buff[15]);
+                        printf("   Number of logical blocks=%" PRIu64 "\n",
                                llast_blk_addr + 1);
-                        printf("   Block size=%u bytes\n", block_size);
+                        printf("   Logical block size=%u bytes\n",
+                               block_size);
                         return (int)block_size;
                 }
         } else {
@@ -300,10 +395,18 @@ print_read_cap(int fd, int do_16, int verbose)
                                       (resp_buff[5] << 16) |
                                       (resp_buff[6] << 8) |
                                       resp_buff[7]);
+                        if (0xffffffff == last_blk_addr) {
+                            if (verbose)
+                                printf("Read Capacity (10) reponse "
+                                       "indicates that Read Capacity (16) "
+                                       "is required\n");
+                            return -2;
+                        }
                         printf("Read Capacity (10) results:\n");
-                        printf("   Number of blocks=%u\n",
+                        printf("   Number of logical blocks=%u\n",
                                last_blk_addr + 1);
-                        printf("   Block size=%u bytes\n", block_size);
+                        printf("   Logical block size=%u bytes\n",
+                               block_size);
                         return (int)block_size;
                 }
         }
@@ -341,6 +444,7 @@ main(int argc, char **argv)
         int pinfo = 0;          /* deprecated, prefer fmtpinfo */
         int pie = 0;
         int pfu = 0;
+        int pt = DEF_POLL_TYPE;
         int rto_req = 0;        /* deprecated, prefer fmtpinfo */
         int cmplst = 1;
         int do_rcap16 = 0;
@@ -357,7 +461,7 @@ main(int argc, char **argv)
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:Def:FhlpP:q:rRs:SvVw6",
+                c = getopt_long(argc, argv, "c:C:Def:FhlpP:q:rRs:SvVwx6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -454,6 +558,9 @@ main(int argc, char **argv)
                 case 'w':
                         fwait = 1;
                         break;
+                case 'x':
+                        pt++;
+                        break;
                 case '6':
                         mode6 = 1;
                         break;
@@ -543,6 +650,7 @@ main(int argc, char **argv)
                 goto out;
         }
 
+again_with_long_lba:
         memset(dbuff, 0, MAX_BUFF_SZ);
         if (mode6)
                 res = sg_ll_mode_sense6(fd, 0 /* DBD */, 0 /* current */,
@@ -622,6 +730,15 @@ main(int argc, char **argv)
                         if (j > 0)
                                 ull <<= 8;
                         ull |= dbuff[offset + j];
+                }
+                if ((0 == long_lba) && (0xffffffff == ull)) {
+                        if (verbose)
+                                fprintf(stderr, "Mode sense number of "
+                                        "blocks maxed out, set longlba\n");
+                        long_lba = 1;
+                        mode6 = 0;
+                        do_rcap16 = 1;
+                        goto again_with_long_lba;
                 }
                 if (long_lba)
                         bd_blk_len = (dbuff[offset + 12] << 24) +
@@ -751,6 +868,10 @@ main(int argc, char **argv)
         }
         else if (! format) {
                 res = print_read_cap(fd, do_rcap16, verbose);
+                if (-2 == res) {
+                        do_rcap16 = 1;
+                        res = print_read_cap(fd, do_rcap16, verbose);
+                }
                 if (res < 0)
                         ret = -1;
                 if ((res > 0) && (bd_blk_len > 0) &&
@@ -776,7 +897,7 @@ main(int argc, char **argv)
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
                 res = scsi_format(fd, fmtpinfo, cmplst, pfu, ! fwait, dcrt,
-                                  pie, do_si, early, verbose);
+                                  pie, do_si, early, pt, verbose);
                 ret = res;
                 if (res) {
                         fprintf(stderr, "FORMAT failed\n");

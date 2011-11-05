@@ -25,7 +25,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static char * version_str = "1.22 20110614";
+static char * version_str = "1.23 20111101";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -238,7 +238,7 @@ main(int argc, char * argv[])
                 }
                 break;
             }
-	    /* "Additional sense length" same in descriptor and fixed */
+            /* "Additional sense length" same in descriptor and fixed */
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
                 fprintf(stderr, "Parameter data in hex\n");
@@ -255,8 +255,9 @@ main(int argc, char * argv[])
                 /* N.B. exits first time there isn't a progress indication */
                 break;
             } else
-                printf("Progress indication: %d%% done\n",
-                       (progress * 100) / 65536);
+                printf("Progress indication: %d.%02d%% done\n",
+                       (progress * 100) / 65536,
+                       ((progress * 100) % 65536) / 655);
         }
         goto finish;
     }
