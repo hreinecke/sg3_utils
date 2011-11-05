@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.33 [20111028] [svn: r422]
+Changelog for sg3_utils-1.33 [20111104] [svn: r423]
   - win: change DataBufferOffset type per MSDN; caused
     problem with 64 bit machines (buffered interface)
   - sg_inq, sg_vpd: sync with spc4r32
@@ -15,6 +15,8 @@ Changelog for sg3_utils-1.33 [20111028] [svn: r422]
   - sg_ses: rework indexes, now two level
   - sg_logs: LB provision lpage extra (sbc3r28)
   - sg_modes: application tag mpage subcode 0xf0->0x2
+  - sg_format: add --poll=PT option for request sense polling
+    - improve handling of disks > 2 TB and DIF (protection)
 
 Changelog for sg3_utils-1.32 [20110730] [svn: r410]
   - sg_sanitize: new utility for command added in sb3r27
