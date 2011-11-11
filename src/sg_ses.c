@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.61 20111028";    /* ses3r03 */
+static char * version_str = "1.62 20111111";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -113,6 +113,7 @@ struct opts_t {
     int do_status;
     int verbose;
     int do_version;
+    int num_cgs;
     int arr_len;
     unsigned char data_arr[MX_DATA_IN + 16];
     const char * clear_str;
@@ -507,6 +508,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             break;
         case 'C':
             op->clear_str = optarg;
+            ++op->num_cgs;
             break;
         case 'd':
             memset(op->data_arr, 0, sizeof(op->data_arr));
@@ -527,6 +529,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             break;
         case 'G':
             op->get_str = optarg;
+            ++op->num_cgs;
             break;
         case 'h':
         case '?':
@@ -641,6 +644,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             break;
         case 'S':
             op->set_str = optarg;
+            ++op->num_cgs;
             break;
         case 'v':
             ++op->verbose;
@@ -671,15 +675,32 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         fprintf(stderr, "cannot have '--join' and '--control'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (((!! op->clear_str) + (!! op->get_str) + (!! op->set_str)) > 1) {
+    if (op->num_cgs > 1) {
         fprintf(stderr, "can only be one of '--clear', '--get' and "
                 "'--set'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (op->desc_name && op->ind_given) {
-        fprintf(stderr, "can have either --descriptor or --index but "
-                "not both\n");
-        return SG_LIB_SYNTAX_ERROR;
+    if (op->desc_name) {
+        if (op->ind_given) {
+            fprintf(stderr, "can have either --descriptor or --index but "
+                    "not both\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if ((0 == op->do_join) && (0 == op->do_control) &&
+            (0 == op->num_cgs) && (0 == op->page_code_given)) {
+            ++op->do_join;      /* implicit --join */
+            if (op->verbose)
+                fprintf(stderr, "assume --join option is set\n");
+        }
+    }
+    if (op->ind_given) {
+        if ((0 == op->do_join) && (0 == op->do_control) &&
+            (0 == op->num_cgs) && (0 == op->page_code_given)) {
+            ++op->page_code_given;
+            op->page_code = 2;  /* implicit status page */
+            if (op->verbose)
+                fprintf(stderr, "assume --page=2 option is set\n");
+        }
     }
     if (op->do_list || op->do_enumerate)
         return 0;
@@ -697,7 +718,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         op->do_status = 1;  /* default to receiving status pages */
 
     if (NULL == op->device_name) {
-        fprintf(stderr, "missing device name!\n");
+        fprintf(stderr, "missing DEVICE name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -3209,7 +3230,7 @@ main(int argc, char * argv[])
         process_do_enumerate(&opts);
         return 0;
     }
-    if (opts.clear_str || opts.get_str || opts.set_str) {
+    if (opts.num_cgs) {
         have_cgs = 1;
         cp = opts.clear_str ? opts.clear_str :
              (opts.get_str ? opts.get_str : opts.set_str);

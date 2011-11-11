@@ -163,6 +163,8 @@ calls over OS specific calls.
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
 this: 'rpmbuild -ba sg3_utils.spec' in a rpmbuild tree SPECS directory.
+To cross build or make a more widely distibutable package then the --target
+option may be useful: 'rpmbuild --target=i386 -ba sg3_utils.spec' .
 
 The 'build_debian.sh' script should build several "deb" packages and place
 them in the parent directory. In debian based systems doing
@@ -354,4 +356,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-28th October 2011
+11th November 2011

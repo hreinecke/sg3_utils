@@ -1,4 +1,4 @@
-.TH SG_SES "8" "October 2011" "sg3_utils\-1.33" SG3_UTILS
+.TH SG_SES "8" "November 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_ses \- fetch status from a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -83,7 +83,8 @@ option). If the descriptor name contains a space then \fIDN\fR needs to be
 surrounded by quotes (single or double) or the space escaped (e.g. preceded
 by a backslash). Some elements (e.g. overall elements) may not have
 descriptor names. Useful with the \fI\-\-join\fR option as well as the
-\fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options.
+\fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options. If
+no other options are given then the \fI\-\-join\fR option is assumed.
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 enumerate all known diagnostic page names and SES elements when this option
@@ -125,13 +126,15 @@ pages. Can be used with \fI\-\-index=...\fR and/or \fI\-\-join\fR options.
 \fB\-I\fR, \fB\-\-index\fR=\fIIIE\fR
 where \fIIIE\fR is either an individual index or an element type abbreviation.
 See the INDEXES section below. Useful with the \fI\-\-join\fR or
-\fI\-\-page=PG\fR option. To enumerate the available element type
+\fI\-\-page=PG\fR option. If no other options are given then the
+\fI\-\-page=2\fR option is assumed. To enumerate the available element type
 abbreviations use the \fI\-\-enumerate\fR option.
 .TP
 \fB\-I\fR, \fB\-\-index\fR=\fIOIE,II\fR
 where \fIOIE,II\fR is an overall index (or element type abbreviation)
 followed by an individual index. See the INDEXES section below. Useful with
-the \fI\-\-join\fR or \fI\-\-page=PG\fR option. To enumerate the available
+the \fI\-\-join\fR or \fI\-\-page=PG\fR option. If no other options are given
+then the \fI\-\-page=2\fR option is assumed. To enumerate the available
 element type abbreviations use the \fI\-\-enumerate\fR option.
 .TP
 \fB\-j\fR, \fB\-\-join\fR
