@@ -152,7 +152,7 @@ usage()
                "instead)\n"
                "    --security|-S    set security initialization (SI) bit\n"
                "    --six|-6        use 6 byte MODE SENSE/SELECT to probe "
-               "device\n"
+               "disk\n"
                "                    (def: use 10 byte MODE SENSE/SELECT)\n"
                "    --size=SIZE|-s SIZE    bytes per block, defaults to "
                "DEVICE's current\n"
@@ -583,7 +583,7 @@ main(int argc, char **argv)
                 return SG_LIB_SYNTAX_ERROR;
         }
         if (NULL == device_name) {
-                fprintf(stderr, "no device name given\n");
+                fprintf(stderr, "no DEVICE name given\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
