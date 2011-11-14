@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.02 20111025";    /* SPC-4 rev 33 */
+static char * version_str = "1.03 20111113";    /* SPC-4 rev 33 */
 
 
 #define VPD_SUPPORTED_VPDS 0x0
@@ -81,6 +81,7 @@ static char * version_str = "1.02 20111025";    /* SPC-4 rev 33 */
 #define VPD_POWER_CONDITION  0x8a
 #define VPD_DEVICE_CONSTITUENTS 0x8b
 #define VPD_CFA_PROFILE_INFO  0x8c
+#define VPD_POWER_CONSUMPTION  0x8d
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0
@@ -154,6 +155,7 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv", "Logical block provisioning "
      "(SBC)"},
     {VPD_POWER_CONDITION, 0, -1, 0, "po", "Power condition"},
+    {VPD_POWER_CONSUMPTION, 0, -1, 0, "psm", "Power consumption"},
     {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
      "information"},
     {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
@@ -670,6 +672,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_POWER_CONDITION, 0, "Power condition"},
     {VPD_DEVICE_CONSTITUENTS, 0, "Device constituents"},
     {VPD_CFA_PROFILE_INFO, 0, "CFA profile information"},       /* 0x8c */
+    {VPD_POWER_CONSUMPTION, 0, "Power consumption"},            /* 0x8d */
     /* 0xb0 to 0xbf are per peripheral device type */
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},               /* 0xb0 */
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},

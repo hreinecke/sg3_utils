@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.36 20111002";
+static char * version_str = "1.37 20111113";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -520,6 +520,7 @@ static struct page_code_desc pc_desc_common[] = {
     {0x18, 0x0, "Protocol specific lu"},
     {0x19, 0x0, "Protocol specific port"},
     {0x1a, 0x0, "Power condition"},
+    {0x1a, 0x1, "Power consumption"},
     {0x1c, 0x0, "Informational exceptions control"},
     {PG_CODE_ALL, 0x0, "[yields all supported pages]"},
     {PG_CODE_ALL, SPG_CODE_ALL, "[yields all supported pages and subpages]"},

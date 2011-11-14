@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.56 20111023";    /* spc4r32 + sbc3r29 */
+static char * version_str = "0.57 20111112";    /* spc4r33 + sbc3r29 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -55,6 +55,7 @@ extern const struct svpd_values_name_t *
 #define VPD_POWER_CONDITION 0x8a
 #define VPD_DEVICE_CONSTITUENTS 0x8b
 #define VPD_CFA_PROFILE_INFO 0x8c
+#define VPD_POWER_CONSUMPTION  0x8d
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
@@ -160,7 +161,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
     {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
     {VPD_OSD_INFO, 0, 0x11, 0, "oi", "OSD information"},
-    {VPD_POWER_CONDITION, 0, -1, 0, "po", "Power condition"},
+    {VPD_POWER_CONDITION, 0, -1, 0, "pc", "Power condition"},
+    {VPD_POWER_CONSUMPTION, 0, -1, 0, "psm", "Power consumption"},
     {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
      "information"},
     {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
@@ -1359,6 +1361,53 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
             (buff[16] << 8) + buff[17]);
 }
 
+static const char * power_unit_arr[] =
+{
+    "Gigawatts",
+    "Megawatts",
+    "Kilowatts",
+    "Watts",
+    "Milliwatts",
+    "Microwatts",
+    "Unit reserved",
+    "Unit reserved",
+};
+
+/* VPD_POWER_CONSUMPTION */
+static void
+decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
+{
+    int k, bump;
+    unsigned char * ucp;
+
+    if (1 == do_hex) {
+        dStrHex((const char *)buff, len, 1);
+        return;
+    }
+    if (len < 4) {
+        fprintf(stderr, "Power consumption VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    len -= 4;
+    ucp = buff + 4;
+    for (k = 0; k < len; k += bump, ucp += bump) {
+        bump = 4;
+        if ((k + bump) > len) {
+            fprintf(stderr, "Power consumption VPD page, short "
+                    "descriptor length=%d, left=%d\n", bump, (len - k));
+            return;
+        }
+        if (do_hex > 1)
+            dStrHex((const char *)ucp, 4, 1);
+        else {
+            printf("  Power consumption identifier: 0x%x", ucp[0]);
+            printf("    Maximum power consumption: %d %s\n",
+                   (ucp[2] << 8) + ucp[3], power_unit_arr[ucp[1] & 0x7]);
+        }
+    }
+}
+
 /* VPD_PROTO_LU */
 static void
 decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
@@ -2320,6 +2369,50 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                            (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_power_condition(rsp_buff, len, do_hex);
+            }
+            return 0;
+        }
+        break;
+    case VPD_POWER_CONSUMPTION:    /* 0x8d */
+        if ((! do_raw) && (! do_quiet))
+            printf("Power consumption VPD page:\n");
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
+        if (0 == res) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            if (num_vpd != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                if (verbose) {
+                    fprintf(stderr, "First 32 bytes of bad response\n");
+                        dStrHex((const char *)rsp_buff, 32, 0);
+                }
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching Power consumption page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
+            }
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else {
+                pdt = rsp_buff[0] & 0x1f;
+                if (verbose || do_long)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rsp_buff[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(buff), buff));
+                decode_power_consumption_vpd(rsp_buff, len, do_hex);
             }
             return 0;
         }
