@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2010 Douglas Gilbert.
+ * Copyright (c) 2009-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.98 20101104";
+static char * version_str = "0.99 20111117";
 
 
 #define ME "sg_write_same: "
@@ -483,12 +483,16 @@ main(int argc, char * argv[])
         res = sg_ll_readcap_16(sg_fd, 0 /* pmi */, 0 /* llba */, resp_buff,
                                RCAP16_RESP_LEN, 0, (vb ? (vb - 1): 0));
         if (0 == res) {
+            if (vb > 3)
+                dStrHex((const char *)resp_buff, RCAP16_RESP_LEN, 1);
             block_size = ((resp_buff[8] << 24) |
                           (resp_buff[9] << 16) |
                           (resp_buff[10] << 8) |
                           resp_buff[11]);
             prot_en = !!(resp_buff[12] & 0x1);
-            opts.xfer_len = block_size + (prot_en ? 8 : 0);
+            opts.xfer_len = block_size;
+            if (prot_en && (opts.wrprotect > 0))
+                opts.xfer_len += 8;
         } else if ((SG_LIB_CAT_INVALID_OP == res) ||
                    (SG_LIB_CAT_ILLEGAL_REQ == res)) {
             if (vb)
@@ -497,6 +501,8 @@ main(int argc, char * argv[])
             res = sg_ll_readcap_10(sg_fd, 0 /* pmi */, 0 /* lba */, resp_buff,
                                    RCAP10_RESP_LEN, 0, (vb ? (vb - 1): 0));
             if (0 == res) {
+                if (vb > 3)
+                    dStrHex((const char *)resp_buff, RCAP10_RESP_LEN, 1);
                 block_size = ((resp_buff[4] << 24) |
                               (resp_buff[5] << 16) |
                               (resp_buff[6] << 8) |
@@ -565,7 +571,8 @@ main(int argc, char * argv[])
         if (vb)
             fprintf(stderr, "Default data-out buffer set to %d zeros\n",
                     opts.xfer_len);
-        if (prot_en) { /* default for protection is 0xff, rest get 0x0 */
+        if (prot_en && (opts.wrprotect > 0)) {
+           /* default for protection is 0xff, rest get 0x0 */
             memset(wBuff + opts.xfer_len - 8, 0xff, 8);
             if (vb)
                 fprintf(stderr, " ... apart from last 8 bytes which are set "

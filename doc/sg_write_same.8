@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "May 2011" "sg3_utils\-1.32" SG3_UTILS
+.TH SG_WRITE_SAME "8" "November 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_write_same \- send the SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -133,15 +133,19 @@ output version string then exit.
 \fB\-w\fR, \fB\-\-wrprotect\fR=\fIWPR\fR
 sets the "Write protect" field in the WRITE SAME cdb to \fIWPR\fR. The
 default value is zero. \fIWPR\fR should be a value between 0 and 7.
+When \fIWPR\fR is 1 or greater, and the disk's protection type is 1 or
+greater, then 8 extra bytes of protection information are expected or
+generated (to place in the commmand's data-out buffer).
 .TP
 \fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
 where \fILEN\fR is the data out buffer length. Defaults to the length of
 the \fIIF\fR file or, if that is not given, then the READ CAPACITY(16 or 10)
-command is called on the \fIDEVICE\fR and the 'Logical block length in
-bytes' and the PROT_EN bit in the response are used to determine the
-data out buffer length. If both this option and the \fIIF\fR option are
-given and \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR
-is the data out buffer length with zeroes used as pad bytes.
+command is used to find the 'Logical block length in bytes'. That figure
+may be increased by 8 bytes if the \fIDEVICE\fR's protection type is 1 or
+greater and the WRPROTECT field (see \fI\-\-wrprotect=WPR\fR) is 1 or
+greater. If both this option and the \fIIF\fR option are given and
+\fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR is the
+data out buffer length with zeroes used as pad bytes.
 .SH UNMAP
 Logical block provisioning is a new term introduced in SBC\-3 revision
 25 for the ability to mark blocks as unused. It is closely related to the
