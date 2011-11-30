@@ -139,12 +139,12 @@ usage()
                "    --pie=PIE|-q PIE    Protection Information Exponent "
                "(default: 0)\n"
                "    --pinfo|-p      set upper bit of FMTPINFO field\n"
-               "                    (deprecated use '--fmtpinfo=FPI' "
+               "                    (deprecated, use '--fmtpinfo=FPI' "
                "instead)\n"
                "    --poll=PT|-x PT    PT is poll type, 0 for test unit "
                "ready\n"
-               "                       1 for request sense (def: 0 (will "
-               "be 1))\n");
+               "                       1 for request sense (def: 0 (in "
+               "future will be 1))\n");
         printf("    --resize|-r     resize (rather than format) to COUNT "
                "value\n"
                "    --rto_req|-R    set lower bit of FMTPINFO field\n"
@@ -166,7 +166,7 @@ usage()
                "                    (default: set IMMED=1 and poll with "
                "Test Unit Ready)\n\n"
                "\tExample: sg_format --format /dev/sdc\n\n"
-               "This utility formats or resizes SCSI disks.\n");
+               "This utility formats or resizes a SCSI disk.\n");
         printf("WARNING: This utility will destroy all the data on "
                "DEVICE when\n\t '--format' is given. Check that you "
                "have the correct DEVICE.\n");
