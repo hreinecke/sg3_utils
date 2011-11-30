@@ -20,9 +20,9 @@ the \fILEN\fR argument, or the length of the given input file \fIIF\fR,
 or by calling READ CAPACITY(16) on \fIDEVICE\fR. The contents of the
 block to be written are obtained from the input file \fIIF\fR or
 zeroes are used. If READ CAPACITY(16) is called (which implies \fIIF\fR
-was not given) and the PROT_EN bit is set then the last 8 bytes are
-set to 0xff. If READ CAPACITY(16) fails then READ CAPACITY(10) is
-used to determine the block size.
+was not given) and the PROT_EN bit is set then an extra 8 bytes (i.e.
+more than the logical block size) of 0xff are sent. If READ CAPACITY(16)
+fails then READ CAPACITY(10) is used to determine the block size.
 .PP
 If neither \fI\-\-10\fR, \fI\-\-16\fR nor \fI\-\-32\fR is given then
 WRITE SAME(10) is sent unless one of the following conditions is met.
@@ -46,7 +46,7 @@ time, potentially as long as a FORMAT UNIT command. In such situations
 the command timeout value \fITO\fR may need to be increased from its
 default value of 60 seconds. In SBC\-3 revision 26 the WSNZ (write same
 no zero) bit was added to the Block Limits VPD page [0xB0]. If set the
-WRITE SAME commands will not accepts a \fINUM\fR of zero. The same
+WRITE SAME commands will not accept a \fINUM\fR of zero. The same
 SBC\-3 revision added the "Maximum Write Same Length" field to the Block
 Limits VPD page.
 .PP
@@ -165,7 +165,13 @@ fields in the Block Limits VPD page should both be greater than zero. The
 READ CAPACITY(16) command response also contains a LBPRZ bit which if set
 means that if unmapped blocks are read then zeroes will be returned for the
 data (and if protection information is active, 0xff bytes are returned for
-that).
+that). In SBC\-3 revision 27 the same LBPRZ bit was added to the Logical
+Block Provisioning VPD page.
+.PP
+In SBC\-3 revision 25 the LBPU and ANC_SUP bits where added to the
+Logical Block Provisioning VPD page. When LBPU is set it indicates that
+the device supports the UNMAP command (see the sg_unmap utility). When the
+ANC_SUP bit is set it indicates the device supports anchored LBAs.
 .PP
 When the UNMAP bit is set in the cdb then the data out buffer is also sent.
 Additionally the data section of that data out buffer should be full of 0x0
@@ -209,6 +215,66 @@ Note that if the LBPRZ bit in the READ CAPACITY(16) response is set (i.e.
 LPPRZ is an acronym for logical block provisioning read zeroes) then these
 two examples do the same thing, at least seen from the point of view of
 subsequent reads.
+.PP
+This utility can also be used to write protection information (PI) on disks
+formatted with a protection type greater than zero. PI is 8 bytes of extra
+data appended to the user data of a logical block: the first two bytes are a
+CRC (the "guard"), the next two bytes are the "application tag" and the last
+four bytes are the "reference tag". With protection types 1 and 2 if the
+application tag is 0xffff then the guard should not be checked (against the
+user data).
+.PP
+In this example we assume the logical block size (of the user data) is 512
+bytes and the disk has been formatted with protection type 1. Since we are
+going to modify LBA 2468 then we take a copy of it first:
+.PP
+  dd if=/dev/sdb skip=2468 bs=512 of=2468.bin count=1
+.PP
+The following command line sets the user data to zeroes and the PI to 8
+0xFF bytes on LBA 2468:
+.PP
+  sg_write_same --lba=2468 /dev/sdb
+.PP
+Reading back that block should be successful because the application tag
+is 0xffff which suppresses the guard (CRC) check (which would otherwise be
+wrong):
+.PP
+  dd if=/dev/sdb skip=2468 bs=512 of=/dev/null count=1
+.PP
+Now an attempt is made to create a binary file with zeroes in the user data,
+0x0000 in the appliction tag and 0xff bytes in the other two PI fields. It
+is awkward to create 0xff bytes in a file (in Unix) as the "tr" command
+below shows:
+.PP
+  dd if=/dev/zero bs=1 count=512 of=ud.bin
+.br
+  tr "\\000" "\\377" < /dev/zero | dd bs=1 of=ff_s.bin count=8
+.br
+  cat ud.bin ff_s.bin > lb.bin
+.br
+  dd if=/dev/zero bs=1 count=2 seek=514 conv=notrunc of=lb.bin
+.PP
+The resulting file can be viewed with 'hexdump -C lb.bin' and should
+contain 520 bytes. Now that file can be written to LBA 2468 as follows:
+.PP
+  sg_write_same --lba=2468 wrprotect=3 --in=lb.bin /dev/sdb
+.PP
+Note the \fI\-\-wrprotect=3\fR rather than being set to 1, since we want
+the WRITE SAME command to succeed even though the PI data now indicates
+the user data is corrupted. When an attempt is made to read the LBA, an
+erro should occur:
+.PP
+  dd if=/dev/sdb skip=2468 bs=512 of=/dev/null count=1
+.PP
+dd errors are not very expressive, if dmesg is checked there should be
+a line something like this: "[sdb]  Add. Sense: Logical block guard check
+failed". The block can be corrected by doing a "sg_write_same --lba=1234
+/dev/sdb" again or restoring the original contents of that LBA:
+.PP
+  dd if=2468.bin bs=512 seek=2468 of=/dev/sdb conv=notrunc count=1
+.PP
+Hopefully the dd command would never try to truncate the output file when
+it is a block device.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
@@ -219,4 +285,4 @@ Copyright \(co 2009\-2011 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_format,sg_get_lba_status,sg_readcap,sg_unmap(sg3_utils)
+.B sg_format,sg_get_lba_status,sg_readcap,sg_vpd,sg_unmap(sg3_utils)
