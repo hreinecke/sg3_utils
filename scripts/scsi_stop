@@ -50,6 +50,9 @@ done
 
 for i
 do
-        echo "sg_start $immediate 0 $verbose $i"
-        sg_start $immediate 0 $verbose $i
+# Use '-r' (read-only) otherwise using a block device node
+# (e.g. 'sg_start 0 /dev/sdb') can result in a change of state
+# event causing the disk to spin up again immediately.
+        echo "sg_start -r $immediate 0 $verbose $i"
+        sg_start -r $immediate 0 $verbose $i
 done

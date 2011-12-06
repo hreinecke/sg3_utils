@@ -1,0 +1,103 @@
+.TH SCSI_LOGGING_LEVEL "8" "December 2011" "sg3_utils\-1.33" SG3_UTILS
+.SH NAME
+scsi_logging_level \- access Linux SCSI logging level information
+.SH SYNOPSIS
+.B scsi_logging_level
+[\fI\-\-all=LEV\fR] [\fI\-\-create\fR] [\fI\-\-error=LEV\fR] [\fI\-\-get\fR]
+[\fI\-\-help\fR] [\fI\-\-highlevel=LEV\fR] [\fI\-\-hlcomplete=LEV\fR]
+[\fI\-\-hlqueue=LEV\fR] [\fI\-\-ioctl=LEV\fR] [\fI\-\-llcomplete=LEV\fR]
+[\fI\-\-llqueue=LEV\fR] [\fI\-\-lowlevel=LEV\fR] [\fI\-\-midlevel=LEV\fR]
+[\fI\-\-mlcomplete=LEV\fR] [\fI\-\-mlqueue=LEV\fR] [\fI\-\-scan=LEV\fR]
+[\fI\-\-set\fR] [\fI\-\-timeout=LEV\fR] [\fI\-\-version\fR]
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This bourne shell script accesses the Linux SCSI subsystem logging
+level. The current values can be shown (e.g. with \fI\-\-get\fR)
+or changed (e.g. with \fI\-\-set\fR). Superuser permissions will
+typically be required to set the logging level.
+.PP
+One of these options: \fI\-\-create\fR, \fI\-\-get\fR or \fI\-\-set\fR
+is required. Only one can be given.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-a\fR, \fB\-\-all\fR=\fILEV\fR
+\fILEV\fR is used for all SCSI_LOG fields.
+.TP
+\fB\-c\fR, \fB\-\-create\fR
+Options are parsed and placed in internal fields that are displayed but
+no logging levels are changed within the Linux kernel.
+.TP
+\fB\-E\fR, \fB\-\-error\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_ERROR field.
+.TP
+\fB\-g\fR, \fB\-\-get\fR
+Fetches the current SCSI logging levels from the Linux kernel and
+displays them.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-highlevel\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_HLQUEUE and SCSI_LOG_HLCOMPLETE fields.
+.TP
+\fB\-\-hlcomplete\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_HLCOMPLETE field.
+.TP
+\fB\-\-hlqueue\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_HLQUEUE field.
+.TP
+\fB\-I\fR, \fB\-\-ioctl\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_IOCTL field.
+.TP
+\fB\-\-llcomplete\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_LLCOMPLETE field.
+.TP
+\fB\-\-llqueue\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_LLQUEUE field.
+.TP
+\fB\-L\fR, \fB\-\-lowlevel\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_LLQUEUE and SCSI_LOG_LLCOMPLETE fields.
+.TP
+\fB\-M\fR, \fB\-\-midlevel\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_MLQUEUE and SCSI_LOG_MLCOMPLETE fields.
+.TP
+\fB\-\-mlcomplete\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_MLCOMPLETE field.
+.TP
+\fB\-\-mlqueue\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_MLQUEUE field.
+.TP
+\fB\-S\fR, \fB\-\-scan\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_SCAN field.
+.TP
+\fB\-s\fR, \fB\-\-set\fR
+Uses the fields specified in this command's options and attempts to
+apply them to the Linux SCSI subsystem logging levels. Typically superuser
+permissions will be required to do this.
+.TP
+\fB\-T\fR, \fB\-\-timeout\fR=\fILEV\fR
+\fILEV\fR is placed in the SCSI_LOG_TIMEOUT field.
+.TP
+\fB\-v\fR, \fB\-\-version\fR
+Outputs the version information and then exits.
+.SH NOTES
+The \fI\-\-get\fR and \fI\-\-set\fR options access the
+/proc/sys/dev/scsi/logging_level pseudo file.
+.SH EXIT STATUS
+The exit status of this script is 0 when it is successful. Any other
+exit status indicates that an error has occurred.
+.SH AUTHORS
+Written by IBM. Small alterations by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co IBM Corp. 2006
+.br
+This software is distributed under the GPL version 2. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.PP
+The software was obtained from an IBM package called s390\-tools\-1.6.2
+found on that company's "developerworks" site. The most recent version of
+that package at this time is 1.8.3 .
