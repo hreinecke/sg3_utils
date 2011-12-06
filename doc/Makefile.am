@@ -8,8 +8,9 @@ if OS_LINUX
 # sg_scan is shared by Linux and Win32
 
 man_MANS = \
-	sg3_utils.8 sg_decode_sense.8 \
-	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+	sg3_utils.8 sg_decode_sense.8 scsi_logging_level.8 \
+	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
+	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
 	sg_dd.8 sg_emc_trespass.8 sg_format.8 sg_get_config.8 \
 	sg_get_lba_status.8 sg_ident.8 sginfo.8 sg_inq.8 sg_logs.8 \
 	sg_luns.8 sg_map26.8 sg_map.8 sgm_dd.8 sg_modes.8 sg_opcodes.8 \
@@ -35,7 +36,8 @@ if OS_WIN32_MINGW
 
 man_MANS = \
 	sg3_utils.8 sg_decode_sense.8 \
-	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
+	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
 	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 sg_modes.8 sg_opcodes.8 sg_persist.8 \
 	sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
@@ -59,7 +61,8 @@ if OS_WIN32_CYGWIN
 
 man_MANS = \
 	sg3_utils.8 sg_decode_sense.8 \
-	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
+	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
 	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 sg_modes.8 sg_opcodes.8 \
 	sg_persist.8 sg_prevent.8 sg_raw.8 sg_rdac.8 sg_readcap.8 \
@@ -83,7 +86,8 @@ if OS_FREEBSD
 
 man_MANS = \
 	sg3_utils.8 sg_decode_sense.8 \
-	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
+	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
 	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
@@ -102,7 +106,8 @@ if OS_SOLARIS
 
 man_MANS = \
 	sg3_utils.8 sg_decode_sense.8 \
-	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
+	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
 	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \
@@ -121,7 +126,8 @@ if OS_OSF
 
 man_MANS = \
 	sg3_utils.8 sg_decode_sense.8 \
-	scsi_readcap.8  scsi_ready.8  scsi_start.8  scsi_stop.8 \
+	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
+	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
 	sg_format.8 sg_get_config.8 sg_get_lba_status.8 sg_ident.8 \
 	sg_inq.8 sg_logs.8 sg_luns.8 \
 	sg_modes.8 sg_opcodes.8 sg_persist.8 sg_prevent.8 sg_raw.8 \

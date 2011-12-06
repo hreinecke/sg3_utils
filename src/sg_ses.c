@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.62 20111111";    /* ses3r03 */
+static char * version_str = "1.63 20111203";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -897,18 +897,33 @@ find_in_diag_page_desc(int page_num)
 }
 
 /* Fetch element type name. Returns NULL if not found. */
-static const char *
-find_element_tname(int elem_type_code)
+static char *
+find_element_tname(int elem_type_code, char * b, int mlen_b)
 {
     const struct element_type_t * etp;
+    int len;
 
+    if ((NULL == b) || (mlen_b < 1))
+        return b;
     for (etp = element_type_arr; etp->desc; ++etp) {
-        if (elem_type_code == etp->elem_type_code)
-            return etp->desc;
-        else if (elem_type_code < etp->elem_type_code)
-            return NULL;
+        if (elem_type_code == etp->elem_type_code) {
+            len = strlen(etp->desc);
+            if (len < mlen_b)
+                strcpy(b, etp->desc);
+            else {
+                strncpy(b, etp->desc, mlen_b - 1);
+                b[mlen_b - 1] = '\0';
+            }
+            return b;
+        } else if (elem_type_code < etp->elem_type_code)
+            break;
     }
-    return NULL;
+    if (elem_type_code < 0x80)
+        snprintf(b, mlen_b - 1, "[0x%x]", elem_type_code);
+    else
+        snprintf(b, mlen_b - 1, "vendor specific [0x%x]", elem_type_code);
+    b[mlen_b - 1] = '\0';
+    return b;
 }
 
 /* Returns 1 if el_type (element type) is of interest to the Additional
@@ -1020,7 +1035,7 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const unsigned char * text_ucp;
-    const char * cp;
+    char b[64];
 
     printf("Configuration diagnostic page:\n");
     if (resp_len < 4)
@@ -1065,13 +1080,8 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
     for (k = 0; k < sum_elem_types; ++k, ucp += 4) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        cp = find_element_tname(ucp[0]);
-        if (cp)
-            printf("    Element type: %s, subenclosure id: %d\n",
-                   cp, ucp[2]);
-        else
-            printf("    Element type: [0x%x], subenclosure id: %d\n",
-                   ucp[0], ucp[2]);
+        printf("    Element type: %s, subenclosure id: %d\n",
+               find_element_tname(ucp[0], b, sizeof(b)), ucp[2]);
         printf("      number of possible elements: %d\n", ucp[1]);
         if (ucp[3] > 0) {
             if (text_ucp > last_ucp)
@@ -1596,8 +1606,13 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                !!(statp[3] & 0x40));
         break;
     default:
-        printf("%sUnknown element type, status in hex: %02x %02x %02x %02x\n",
-               pad, statp[0], statp[1], statp[2], statp[3]);
+        if (etype < 0x80)
+            printf("%sUnknown element type, status in hex: %02x %02x %02x "
+                   "%02x\n", pad, statp[0], statp[1], statp[2], statp[3]);
+        else
+            printf("%sVendor specific element type, status in hex: %02x "
+                   "%02x %02x %02x\n", pad, statp[0], statp[1], statp[2],
+                   statp[3]);
         break;
     }
 }
@@ -1612,7 +1627,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
-    const char * cp;
+    char b[64];
 
     printf("Enclosure status diagnostic page:\n");
     if (resp_len < 4)
@@ -1638,13 +1653,9 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
             goto truncated;
         match_ind_ov = (op->ind_given && (k == op->ind_ov));
         if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            cp = find_element_tname(tdhp->etype);
-            if (cp)
-                printf("    Element type: %s, subenclosure id: %d\n",
-                       cp, tdhp->se_id);
-            else
-                printf("    Element type: [0x%x], subenclosure id: %d\n",
-                       tdhp->etype, tdhp->se_id);
+            printf("    Element type: %s, subenclosure id: %d\n",
+                   find_element_tname(tdhp->etype, b, sizeof(b)),
+                   tdhp->se_id);
             printf("      Overall %d descriptor:\n", k);
             enc_status_helper("        ", ucp, tdhp->etype, op);
         }
@@ -1748,7 +1759,7 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
-    const char * cp;
+    char b[64];
 
     printf("Threshold In diagnostic page:\n");
     if (resp_len < 4)
@@ -1772,13 +1783,9 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             goto truncated;
         match_ind_ov = (op->ind_given && (k == op->ind_ov));
         if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            cp = find_element_tname(tdhp->etype);
-            if (cp)
-                printf("    Element type: %s, subenclosure id: %d\n",
-                       cp, tdhp->se_id);
-            else
-                printf("    Element type: [0x%x], subenclosure id: %d\n",
-                       tdhp->etype, tdhp->se_id);
+            printf("    Element type: %s, subenclosure id: %d\n",
+                   find_element_tname(tdhp->etype, b, sizeof(b)),
+                   tdhp->se_id);
             printf("      Overall %d descriptor:\n", k);
             ses_threshold_helper("        ", ucp, tdhp->etype, op);
         }
@@ -1810,8 +1817,8 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
-    const char * cp;
     const struct type_desc_hdr_t * tp;
+    char b[64];
 
     printf("Element descriptor In diagnostic page:\n");
     if (resp_len < 4)
@@ -1835,13 +1842,8 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
         desc_len = (ucp[2] << 8) + ucp[3] + 4;
         match_ind_ov = (op->ind_given && (k == op->ind_ov));
         if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            cp = find_element_tname(tp->etype);
-            if (cp)
-                printf("    Element type: %s, subenclosure id: %d\n",
-                       cp, tp->se_id);
-            else
-                printf("    Element type: [0x%x], subenclosure id: %d\n",
-                       tp->etype, tp->se_id);
+            printf("    Element type: %s, subenclosure id: %d\n",
+                   find_element_tname(tp->etype, b, sizeof(b)), tp->se_id);
             if (desc_len > 4)
                 printf("      Overall %d descriptor: %.*s\n", k, desc_len - 4,
                        ucp + 4);
@@ -2045,8 +2047,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
-    const char * cp;
     const struct type_desc_hdr_t * tp;
+    char b[64];
 
     printf("Additional element status diagnostic page:\n");
     if (resp_len < 4)
@@ -2070,13 +2072,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             goto truncated;
         match_ind_ov = (op->ind_given && (k == op->ind_ov));
         if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            cp = find_element_tname(elem_type);
-            if (cp)
-                printf("    Element type: %s, subenclosure id: %d\n", cp,
-                       tp->se_id);
-            else
-                printf("    Element type: [0x%x], subenclosure id: %d\n",
-                       tp->etype, tp->se_id);
+            printf("    Element type: %s, subenclosure id: %d\n",
+                   find_element_tname(elem_type, b, sizeof(b)), tp->se_id);
         }
         for (j = 0, el_num = 0; j < tp->num_elements;
              ++j, ucp += desc_len, ++el_num) {
@@ -2517,7 +2514,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
     const char * enc_state_changed = "  <<state of enclosure changed, "
                                      "please try again>>\n";
     const struct type_desc_hdr_t * tdhp;
-    char b[16];
+    char b[64];
 
     num_t_hdrs = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                             &ref_gen_code, op);
@@ -2783,12 +2780,7 @@ try_again:
                              desc_len))
                 continue;
         }
-        cp = find_element_tname(jrp->etype);
-        if (NULL == cp) {
-            snprintf(b, sizeof(b) - 1, "%d", jrp->etype);
-            b[sizeof(b) - 1] = '\0';
-            cp = b;
-        }
+        cp = find_element_tname(jrp->etype, b, sizeof(b));
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
             if (desc_len > 4)
@@ -3084,6 +3076,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     int ret, k, desc_len, dn_len, in_page;
     const struct join_row_t * jrp;
     const unsigned char * ed_ucp;
+    char b[64];
 
     in_page = 0;
     if (is_acronym_in_status_ctl(tavp)) {
@@ -3131,7 +3124,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
             ret = cgs_additional_el(jrp, tavp, op);
         else {
             fprintf(stderr, "page %s not supported for cgs\n",
-                    find_element_tname(op->page_code));
+                    find_element_tname(op->page_code, b, sizeof(b)));
             ret = -1;
         }
         if (ret)
@@ -3159,6 +3152,7 @@ process_do_enumerate(const struct opts_t * op)
     const struct diag_page_code * pcdp;
     const struct element_type_t * etp;
     const struct acronym2tuple * a2tp;
+    char b[64];
     const char * cp;
 
     if (op->device_name)
@@ -3179,21 +3173,24 @@ process_do_enumerate(const struct opts_t * op)
         printf("--clear, --get, --set acronyms for enclosure status/control "
                "[0x2] page:\n");
         for (a2tp = ecs_a2t_arr; a2tp->acron; ++a2tp) {
-            cp = (a2tp->etype < 0) ? "*" : find_element_tname(a2tp->etype);
+            cp = (a2tp->etype < 0) ? "*" :
+                         find_element_tname(a2tp->etype, b, sizeof(b));
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
         printf("\n--clear, --get, --set acronyms for threshold in/out "
                "[0x5] page:\n");
         for (a2tp = th_a2t_arr; a2tp->acron; ++a2tp) {
-            cp = (a2tp->etype < 0) ? "*" : find_element_tname(a2tp->etype);
+            cp = (a2tp->etype < 0) ? "*" :
+                         find_element_tname(a2tp->etype, b, sizeof(b));
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
         printf("\n--get acronyms for additional element status [0xa] page "
                "(SAS EIP=1):\n");
         for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++a2tp) {
-            cp = (a2tp->etype < 0) ? "*" : find_element_tname(a2tp->etype);
+            cp = (a2tp->etype < 0) ? "*" :
+                        find_element_tname(a2tp->etype, b, sizeof(b));
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }

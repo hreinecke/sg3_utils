@@ -17,7 +17,7 @@
 # This script uses utilities frim sg3_utils package (version
 # 1.21 or later) and sdparm (version 0.99 or later)
 #
-# Douglas Gilbert 20091005
+# Douglas Gilbert 20111206
 
 
 log=0
@@ -41,7 +41,7 @@ total_err=0
 
 usage()
 {
-  echo "Usage: scsi_mandat [-h] [-L] [-q] <device>"
+  echo "Usage: scsi_mandat [-h] [-L] [-q] [-v] <device>"
   echo "  where:  -h    print usage message"
   echo "          -L, --log        append stderr to 'scsi_mandat.err'"
   echo "          -q    suppress some output"
