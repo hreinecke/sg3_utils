@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.57 20111112";    /* spc4r33 + sbc3r29 */
+static char * version_str = "0.58 20111209";    /* spc4r33 + sbc3r29 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1379,6 +1379,7 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump;
     unsigned char * ucp;
+    unsigned int value;
 
     if (1 == do_hex) {
         dStrHex((const char *)buff, len, 1);
@@ -1401,9 +1402,15 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
         if (do_hex > 1)
             dStrHex((const char *)ucp, 4, 1);
         else {
+            value = (ucp[2] << 8) + ucp[3];
             printf("  Power consumption identifier: 0x%x", ucp[0]);
-            printf("    Maximum power consumption: %d %s\n",
-                   (ucp[2] << 8) + ucp[3], power_unit_arr[ucp[1] & 0x7]);
+            if (value >= 1000 && (ucp[1] & 0x7) > 0)
+                printf("    Maximum power consumption: %d.%03d %s\n",
+                       value / 1000, value % 1000,
+                       power_unit_arr[(ucp[1] & 0x7) - 1]);
+            else
+                printf("    Maximum power consumption: %d %s\n",
+                       value, power_unit_arr[ucp[1] & 0x7]);
         }
     }
 }
