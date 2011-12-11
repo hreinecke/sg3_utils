@@ -1,4 +1,4 @@
-.TH SG_SES "8" "November 2011" "sg3_utils\-1.33" SG3_UTILS
+.TH SG_SES "8" "December 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_ses \- fetch status from a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -6,7 +6,7 @@ sg_ses \- fetch status from a SCSI Enclosure Services (SES) device
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
 [\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR] [\fI\-\-enumerate\fR]
 [\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-index=IIE\fR | \fI\-\-index=OIE,II\fR] [\fI\-\-inner\-hex\fR]
+[\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
 [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
 [\fI\-\-set=STR\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] \fIDEVICE\fR
@@ -21,7 +21,8 @@ peripheral device type 0xd) or attached to another type of SCSI device (e.g.
 a disk) in which case the EncServ bit is set in its INQUIRY response.
 .PP
 If no options are given (only the \fIDEVICE\fR argument) then all diagnostic
-pages supported by the device (including SES pages) are listed.
+pages supported by the device are listed. Most, but not necessarily all, of
+the listed diagnostic pages are defined in the SES standards and drafts.
 .PP
 Changing the state of an enclosure (e.g. requesting the "ident" (locate) LED
 to flash on a disk carrier in an array) is typically done using a
@@ -78,7 +79,7 @@ additionally are permitted as separators.
 \fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
 where \fIDN\fR is a descriptor name (string) as found in the element
 descriptor diagnostic page (i.e. page 7). If that page is supported then
-\fIDN\fR may be alternative for \fIOIE,II\fR (in the \fI\-\-index=OIE,II\fR
+\fIDN\fR may be alternative for \fITIA,II\fR (in the \fI\-\-index=TIA,II\fR
 option). If the descriptor name contains a space then \fIDN\fR needs to be
 surrounded by quotes (single or double) or the space escaped (e.g. preceded
 by a backslash). Some elements (e.g. overall elements) may not have
@@ -123,15 +124,15 @@ but the innermost level (e.g. the element status descriptor) is output in
 hex. Also active with the additional element descriptor and threshold in
 pages. Can be used with \fI\-\-index=...\fR and/or \fI\-\-join\fR options.
 .TP
-\fB\-I\fR, \fB\-\-index\fR=\fIIIE\fR
-where \fIIIE\fR is either an individual index or an element type abbreviation.
+\fB\-I\fR, \fB\-\-index\fR=\fIIIA\fR
+where \fIIIA\fR is either an individual index or an element type abbreviation.
 See the INDEXES section below. Useful with the \fI\-\-join\fR or
 \fI\-\-page=PG\fR option. If no other options are given then the
 \fI\-\-page=2\fR option is assumed. To enumerate the available element type
 abbreviations use the \fI\-\-enumerate\fR option.
 .TP
-\fB\-I\fR, \fB\-\-index\fR=\fIOIE,II\fR
-where \fIOIE,II\fR is an overall index (or element type abbreviation)
+\fB\-I\fR, \fB\-\-index\fR=\fITIA,II\fR
+where \fITIA,II\fR is an type header index (or element type abbreviation)
 followed by an individual index. See the INDEXES section below. Useful with
 the \fI\-\-join\fR or \fI\-\-page=PG\fR option. If no other options are given
 then the \fI\-\-page=2\fR option is assumed. To enumerate the available
@@ -178,58 +179,60 @@ increase the level of verbosity, (i.e. debug output).
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
 .SH INDEXES
-An enclosure can have information about its disk and tape drives plus
-other supporting components like power supplies spread across several
-diagnostic pages. Addressing a specific element (overall or individual)
-is complicated.
+An enclosure can have information about its disk and tape drives plus other
+supporting components like power supplies spread across several diagnostic
+pages. Addressing a specific element (overall or individual) is complicated.
 .PP
-The Configuration page is key: it contains a list of "type headers",
-each of which contains an element type (e.g. array device slot), a
-sub\-enclosure identifier (0 for the main enclosure) and a number of
-possible elements. Corresponding to each type header, the enclosure
-status page has one "overall" element plus "number of possible
-elements" individual elements all of which have the given element type.
-For some element types the "number of possible elements" will be 0 so
-the enclosure status page has only one "overall" element corresponding
-to that type header. The element descriptor page and the threshold (in
-and out) page follow the same pattern as the enclosure status page.
+The Configuration page is key: it contains a list of "type headers", each
+of which contains an element type (e.g. Array Device Slot), a sub\-enclosure
+identifier (0 for the main enclosure) and a "Number of possible elements".
+Corresponding to each type header, the Enclosure Status page has one "overall"
+element plus "Number of possible elements" individual elements all of which
+have the given element type. For some element types the "Number of possible
+elements" will be 0 so the Enclosure Status page has only one "overall"
+element corresponding to that type header. The Element Descriptor page and
+the Threshold (In and Out) page follow the same pattern as the Enclosure
+Status page.
 .PP
-The additional element status page is a bit more complicated. It has
-entries for "number of possible elements" of certain element types. It
+The Additional Element Status page is a bit more complicated. It has
+entries for "Number of possible elements" of certain element types. It
 does not have entries corresponding to the "overall" elements. To make
 the correspondence a little clearer each descriptor in this page optionally
-contains an "Element Index Present" indicator. If so that element index
-refers to the order that elements appear in the status enclosure page (and
-friends) starting at 0 for each element type and excluding all overall
-elements.
+contains an "Element Index Present" indicator. If so each element's "Element
+Index" field refers to the position of the corresponding element in the
+Enclosure Status page.
 .PP
-Addressing a single overall element or a single individual element is
-done with two indexes: OI and II. Both are origin 0. OI=0 corresponds to
-the first type header entry which must be a device slot or array device
-slot element type (according to the SES\-2 standard). To address the
-corresponding overall instance, II is set to -1, otherwise II can be
-set to the individual instance index. As an alternative to the overall
-index (OI), an element type abbreviation (e.g. "ps") optionally followed
-by a number (e.g. "ps1" refers to the second power supply element type)
-can be given.
+Addressing a single overall element or a single individual element is done
+with two indexes: TI and II. Both are origin 0. TI=0 corresponds to the
+first type header entry which must be a device slot or array device slot
+element type (according to the SES\-2 standard). To address the corresponding
+overall instance, II is set to -1, otherwise II can be set to the individual
+instance index. As an alternative to the type header index (TI), an element
+type abbreviation (e.g. "ps") optionally followed by a number (e.g. "ps1"
+refers to the second Power Supply element type) can be given.
 .PP
 One of two command lines variants can be used to specify indexes:
-\fI\-\-index=OIE,II\fR where \fIOIE\fR is either an overall index (OI) or
-an element type abbreviation (E) (e.g. "ps" or "ps1"). \fIII\fR is the
-sub\-index and is either an individual index or "-1" to specify the overall
-element.  The second variant is \fI\-\-index=IIE\fR where \fIIIE\fR is
-either an individual index (II) or an element type abbreviation (E). When
-\fIIIE\fR is an individual index then the option is equivalent to
-\fI\-\-index=0,II\fR. When \fIIIE\fR is an element type abbreviation then
-the option is equivalent to \fI\-\-index=E,-1\fR.
+\fI\-\-index=TIA,II\fR where \fITIA\fR is either an type header index (TI)
+or an element type abbreviation (A) (e.g. "ps" or "ps1"). \fIII\fR is
+is either an individual index or "-1" to specify the overall element. The
+second variant is \fI\-\-index=IIA\fR where \fIIIA\fR is either an individual
+index (II) or an element type abbreviation (A). When \fIIIA\fR is an
+individual index then the option is equivalent to \fI\-\-index=0,II\fR. When
+\fIIIA\fR is an element type abbreviation then the option is equivalent to
+\fI\-\-index=A,-1\fR.
 .PP
-For example if the first type header in the Configuration page has array
-device slot element type then \fI\-\-index=0,-1\fR is equivalent to
+To cope with vendor specific element types (which should be in the range 128
+to 255) the element type can be given as a number with a leading underscore.
+For example these are equivalent: \fI\-\-index=arr\fR and
+\fI\-\-index=_23\fR since the Array Device Slot element type value is 23.
+Also \fI\-\-index=ps1\fR and \fI\-\-index=_2_1\fR are equivalent.
+.PP
+For example if the first type header in the Configuration page has Array
+Device Slot element type then \fI\-\-index=0,-1\fR is equivalent to
 \fI\-\-index=arr\fR. Also \fI\-\-index=arr,3\fR is equivalent to
-\fI\-\-index=3\fR. In the latter case, if the "number of possible elements"
-is less than 4 then nothing is addressed (since 3 would be out of bounds).
+\fI\-\-index=3\fR.
 .PP
-Note that if the element descriptor page is available then the 
+Note that if the Element Descriptor page is available then the 
 \fI\-\-descriptor=DN\fR option may be an alternative to the
 \fI\-\-index=...\fR option.
 .SH STR FORMAT
@@ -387,5 +390,10 @@ Copyright \(co 2004\-2011 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
+There is a web page discussing this utility at
+http://sg.danny.cz/sg/sg_ses.html .
+.PP
+Also see these related utilties:
+.PP
 .B sg_inq, sg_safte, sg_senddiag, sg3_utils (in sg3_utils package);
 .B safte\-monitor (internet)

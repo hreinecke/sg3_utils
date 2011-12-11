@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.63 20111203";    /* ses3r03 */
+static char * version_str = "1.64 20111211";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -46,6 +46,8 @@ static char * version_str = "1.63 20111203";    /* ses3r03 */
 #define DPC_HELP_TEXT 0x3
 #define DPC_STRING 0x4
 #define DPC_THRESHOLD 0x5
+#define DPC_ARRAY_CONTROL 0x6   /* obsolete */
+#define DPC_ARRAY_STATUS 0x6    /* obsolete */
 #define DPC_ELEM_DESC 0x7
 #define DPC_SHORT_ENC_STATUS 0x8
 #define DPC_ENC_BUSY 0x9
@@ -87,7 +89,7 @@ static char * version_str = "1.63 20111203";    /* ses3r03 */
 
 struct element_type_t {
     int elem_type_code;
-    const char * abbrev;
+    char * abbrev;      /* non-const so can hook char array for writing */
     const char * desc;
 };
 
@@ -101,7 +103,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int ind_given;
-    int ind_ov;
+    int ind_th;
     int ind_indiv;
     int ind_etp_num;
     int inner_hex;
@@ -121,12 +123,18 @@ struct opts_t {
     const char * get_str;
     const char * set_str;
     const char * device_name;
+    const char * index_str;
     const struct element_type_t * ind_etp;
 };
 
 struct diag_page_code {
     int page_code;
     const char * desc;
+};
+
+struct diag_page_abbrev {
+    const char * abbrev;
+    int page_code;
 };
 
 /* The Configuration diagnostic page contains one or more of these. The
@@ -138,14 +146,14 @@ struct type_desc_hdr_t {
     unsigned char num_elements; /* number of possible elements, excluding
                                  * overall element */
     unsigned char se_id;        /* subenclosure id (0 for main enclosure) */
-    unsigned char unused;       /* type descriptor text length; not needed */
+    unsigned char txt_len;      /* type descriptor text length; (unused) */
 };
 
 /* A SQL-like join of the Enclosure status, Threshold in and Additional
  * element status pages based of the format indicated in the Configuration
  * page. */
 struct join_row_t {
-    int el_ind_ov;              /* overall element index (origin 0) */
+    int el_ind_th;              /* type header index (origin 0) */
     int el_ind_indiv;           /* individual element index, -1 for overall
                                  * instance, otherwise origin 0 */
     unsigned char etype;        /* element type */
@@ -207,7 +215,7 @@ static struct diag_page_code dpc_arr[] = {
     {DPC_HELP_TEXT, "Help text (SES)"},
     {DPC_STRING, "String In/Out (SES)"},
     {DPC_THRESHOLD, "Threshold In/Out (SES)"},
-    {0x6, "Array Status/Control (SES, obsolete)"},
+    {DPC_ARRAY_STATUS, "Array Status/Control (SES, obsolete)"},
     {DPC_ELEM_DESC, "Element descriptor (SES)"},
     {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
     {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
@@ -231,7 +239,7 @@ static struct diag_page_code in_dpc_arr[] = {
     {DPC_HELP_TEXT, "Help text (SES)"},
     {DPC_STRING, "String In (SES)"},
     {DPC_THRESHOLD, "Threshold In (SES)"},
-    {0x6, "Array Status (SES, obsolete)"},
+    {DPC_ARRAY_STATUS, "Array Status (SES, obsolete)"},
     {DPC_ELEM_DESC, "Element descriptor (SES)"},
     {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
     {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
@@ -255,7 +263,7 @@ static struct diag_page_code out_dpc_arr[] = {
     {DPC_HELP_TEXT, "Help text (SES)"},
     {DPC_STRING, "String Out (SES)"},
     {DPC_THRESHOLD, "Threshold Out (SES)"},
-    {0x6, "Array Control (SES, obsolete)"},
+    {DPC_ARRAY_CONTROL, "Array Control (SES, obsolete)"},
     {DPC_ELEM_DESC, "?? [Element descriptor (SES)]"},
     {DPC_SHORT_ENC_STATUS, "?? [Short enclosure status (SES)]"},  /* 8 */
     {DPC_ENC_BUSY, "?? [Enclosure busy (SES-2)]"},
@@ -269,6 +277,28 @@ static struct diag_page_code out_dpc_arr[] = {
     {0x40, "Translate address (SBC)"},
     {0x41, "Device status (SBC)"},
     {-1, NULL},
+};
+
+static struct diag_page_abbrev dp_abbrev[] = {
+    {"ac", DPC_ARRAY_CONTROL},
+    {"aes", DPC_ADD_ELEM_STATUS},
+    {"as", DPC_ARRAY_STATUS},
+    {"cf", DPC_CONFIGURATION},
+    {"dm", DPC_DOWNLOAD_MICROCODE},
+    {"eb", DPC_ENC_BUSY},
+    {"ec", DPC_ENC_CONTROL},
+    {"ed", DPC_ELEM_DESC},
+    {"es", DPC_ENC_STATUS},
+    {"ht", DPC_HELP_TEXT},
+    {"sdp", DPC_SUPPORTED},
+    {"ses", DPC_SHORT_ENC_STATUS},
+    {"sht", DPC_SUBENC_HELP_TEXT},
+    {"snic", DPC_SUBENC_NICKNAME},
+    {"ssp", DPC_SUPPORTED_SES},
+    {"sstr", DPC_SUBENC_STRING},
+    {"str", DPC_STRING},
+    {"th", DPC_THRESHOLD},
+    {NULL, -1},
 };
 
 /* Names of element types used by the Enclosure Control/Status diagnostic
@@ -302,6 +332,11 @@ static struct element_type_t element_type_arr[] = {
     {SAS_CONNECTOR_ETC, "ssc", "SAS connector"},
     {-1, NULL, NULL},
 };
+
+static char abbrev_arr[8];
+
+static struct element_type_t element_type_by_code =
+    {0, abbrev_arr, "element type code form"};
 
 /* Many control element names below have "RQST" in front in drafts.
    These are for the Enclosure control/status diagnostic page */
@@ -398,6 +433,8 @@ static struct option long_options[] = {
 };
 
 static int read_hex(const char * inp, unsigned char * arr, int * arr_len);
+static int strcase_eq(const char * s1p, const char * s2p);
+static void enumerate_diag_pages(void);
 
 
 
@@ -408,7 +445,7 @@ usage()
             "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
             "              [--descriptor=DN] [--enumerate] [--filter] "
             "[--get=STR]\n"
-            "              [--help] [--hex] [--index=IIE | --index=OIE,II]\n"
+            "              [--help] [--hex] [--index=IIA | --index=TIA,II]\n"
             "              [--inner-hex] [--join] [--list] [--page=PG] "
             "[--raw]\n"
             "              [--set=STR] [--status] [--verbose] [--version]\n"
@@ -435,11 +472,11 @@ usage()
             "position\n"
             "    --help|-h           print out usage message\n"
             "    --hex|-H            print page response in hex\n"
-            "    --index=IIE|-I IIE    individual index ('-1' for overall) "
+            "    --index=IIA|-I IIA    individual index ('-1' for overall) "
             "or element\n"
             "                          type abbreviation (e.g. 'arr')\n"
-            "    --index=OIE,II|-I OIE,II    comma separated pair: OIE is "
-            "overall\n"
+            "    --index=TIA,II|-I TIA,II    comma separated pair: TIA is "
+            "type header\n"
             "                                index or element type "
             "abbreviation;\n"
             "                                II is individual index ('-1' "
@@ -454,9 +491,10 @@ usage()
             "Use twice\n"
             "                        to add threshold in page\n"
             "    --list|-l           same as '--enumerate' option\n"
-            "    --page=PG|-p PG     SES page code PG (prefix with '0x' "
-            "for hex)\n"
-            "                        (def: 0 (supported diagnostic pages))\n"
+            "    --page=PG|-p PG     diagnostic page code (abbreviation "
+            "or number)\n"
+            "                        (def: 'ssp' [0x0] (supported diagnostic "
+            "pages))\n"
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
             "                        when used twice outputs page in binary "
@@ -476,14 +514,135 @@ usage()
             );
 }
 
+/* Return 0 for okay, else an error */
+static int
+parse_index(struct opts_t *op)
+{
+    int n;
+    const char * cp;
+    char * c2p;
+    const struct element_type_t * etp;
+    char b[64];
+
+    if ((cp = strchr(op->index_str, ','))) {
+        if (0 == strcmp("-1", cp + 1))
+            n = -1;
+        else {
+            n = sg_get_num(cp + 1);
+            if ((n < 0) || (n > 255)) {
+                fprintf(stderr, "bad argument to '--index', after "
+                        "comma expect number from -1 to 255\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        }
+        op->ind_indiv = n;
+        n = cp - op->index_str;
+        if (n >= (int)sizeof(b)) {
+            fprintf(stderr, "bad argument to '--index', string "
+                    "prior to comma too long\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    } else {
+        n = strlen(op->index_str);
+        if (n >= (int)sizeof(b)) {
+            fprintf(stderr, "bad argument to '--index', string "
+                    "too long\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    strncpy(b, op->index_str, n);
+    b[n] = '\0';
+    if (0 == strcmp("-1", b)) {
+        if (cp) {
+            fprintf(stderr, "bad argument to '--index', "
+                    "unexpected '-1' type header index\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        op->ind_th = 0;
+        op->ind_indiv = -1;
+        op->ind_given = 1;
+    } else if (isdigit(b[0])) {
+        n = sg_get_num(b);
+        if ((n < 0) || (n > 255)) {
+            fprintf(stderr, "bad numeric argument to '--index', "
+                    "expect number from 0 to 255\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (cp)
+            op->ind_th = n;
+        else {
+            op->ind_th = 0;
+            op->ind_indiv = n;
+        }
+        op->ind_given = 1;
+    } else if ('_' == b[0]) {
+        if ((c2p = strchr(b + 1, '_')))
+            *c2p = '\0';
+        n = sg_get_num(b + 1);
+        if ((n < 0) || (n > 255)) {
+            fprintf(stderr, "bad element type code for '--index', "
+                    "expect value from 0 to 255\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        element_type_by_code.elem_type_code = n;
+        element_type_by_code.abbrev[0] = '_';
+        snprintf(element_type_by_code.abbrev + 1, 6, "%d", n);
+        if (c2p) {
+            n = sg_get_num(c2p + 1);
+            if ((n < 0) || (n > 255)) {
+                fprintf(stderr, "bad element type code <num> "
+                                "for '--index', expect <num> from 0 to 255\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->ind_etp_num = n;
+        }
+        op->ind_etp = &element_type_by_code;
+        if (NULL == cp)
+            op->ind_indiv = -1;
+        op->ind_given = 1;
+    } else { /* element type abbreviation perhaps followed by <num> */
+        for (etp = element_type_arr; etp->desc; ++etp) {
+            n = strlen(etp->abbrev);
+            if (0 == strncmp(b, etp->abbrev, n))
+                break;
+        }
+        if (NULL == etp->desc) {
+            fprintf(stderr, "bad element type abbreviation [%s] for "
+                    "'--index'\nuse '--enumerate' to see possibles\n", b);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if ((int)strlen(b) > n) {
+            n = sg_get_num(b + n);
+            if ((n < 0) || (n > 255)) {
+                fprintf(stderr, "bad element type abbreviation <num> "
+                        "for '--index', expect <num> from 0 to 255\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->ind_etp_num = n;
+        }
+        op->ind_etp = etp;
+        if (NULL == cp)
+            op->ind_indiv = -1;
+        op->ind_given = 1;
+    }
+    if (op->ind_given && (op->verbose > 1)) {
+        if (op->ind_etp)
+            fprintf(stderr, "   element type abbreviation: %s, etp_num=%d, "
+                    "individual index=%d\n", op->ind_etp->abbrev,
+                    op->ind_etp_num, op->ind_indiv);
+        else
+            fprintf(stderr, "   type header index=%d, individual "
+                    "index=%d\n", op->ind_th, op->ind_indiv);
+    }
+    return 0;
+}
+
 
 /* process command line options and argument. Returns 0 if ok. */
 static int
 process_cl(struct opts_t *op, int argc, char *argv[])
 {
-    int c, n;
-    const char * cp;
-    char b[64];
+    int c, ret;
 
     while (1) {
         int option_index = 0;
@@ -542,84 +701,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             ++op->inner_hex;
             break;
         case 'I':
-            if ((cp = strchr(optarg, ','))) {
-                if (0 == strcmp("-1", cp + 1))
-                    n = -1;
-                else {
-                    n = sg_get_num(cp + 1);
-                    if ((n < 0) || (n > 255)) {
-                        fprintf(stderr, "bad argument to '--index', after "
-                                "comma expect number from -1 to 255\n");
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                }
-                op->ind_indiv = n;
-                n = cp - optarg;
-                if (n >= (int)sizeof(b)) {
-                    fprintf(stderr, "bad argument to '--index', string "
-                            "prior to comma too long\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-            } else {
-                n = strlen(optarg);
-                if (n >= (int)sizeof(b)) {
-                    fprintf(stderr, "bad argument to '--index', string "
-                            "too long\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-            }
-            strncpy(b, optarg, n);
-            b[n] = '\0';
-            if (0 == strcmp("-1", b)) {
-                if (cp) {
-                    fprintf(stderr, "bad argument to '--index', "
-                            "unexpected '-1' overall index\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                } else {
-                    op->ind_ov = 0;
-                    op->ind_indiv = -1;
-                }
-            } else if (isdigit(b[0])) {
-                n = sg_get_num(b);
-                if ((n < 0) || (n > 255)) {
-                    fprintf(stderr, "bad numeric argument to '--index', "
-                            "expect number from 0 to 255\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                if (cp)
-                    op->ind_ov = n;
-                else {
-                    op->ind_ov = 0;
-                    op->ind_indiv = n;
-                }
-                op->ind_given = 1;
-            } else { /* element type abbreviation perhaps followed by <num> */
-                const struct element_type_t * etp;
-
-                for (etp = element_type_arr; etp->desc; ++etp) {
-                    n = strlen(etp->abbrev);
-                    if (0 == strncmp(b, etp->abbrev, n))
-                        break;
-                }
-                if (NULL == etp->desc) {
-                    fprintf(stderr, "bad element type abbreviation [%s] for "
-                            "'--index'\nuse '--enumerate' to see possibles\n", b);
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                if ((int)strlen(b) > n) {
-                    n = sg_get_num(b + n);
-                    if ((n < 0) || (n > 255)) {
-                        fprintf(stderr, "bad element type abbreviation <num> "
-                                "for '--index', expect <num> from 0 to 255\n");
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                    op->ind_etp_num = n;
-                }
-                op->ind_etp = etp;
-                if (NULL == cp)
-                    op->ind_indiv = -1;
-                op->ind_given = 1;
-            }
+            op->index_str = optarg;
             break;
         case 'j':
             ++op->do_join;
@@ -628,11 +710,28 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             ++op->do_list;
             break;
         case 'p':
-            op->page_code = sg_get_num(optarg);
-            if ((op->page_code < 0) || (op->page_code > 255)) {
-                fprintf(stderr, "bad argument to '--page' (0 to 255 "
-                        "inclusive)\n");
-                return SG_LIB_SYNTAX_ERROR;
+            if (isdigit(optarg[0])) {
+                op->page_code = sg_get_num(optarg);
+                if ((op->page_code < 0) || (op->page_code > 255)) {
+                    fprintf(stderr, "bad argument to '--page' (0 to 255 "
+                            "inclusive)\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            } else {
+                const struct diag_page_abbrev * ap;
+
+                for (ap = dp_abbrev; ap->abbrev; ++ap) {
+                    if (strcase_eq(ap->abbrev, optarg)) {
+                        op->page_code = ap->page_code;
+                        break;
+                    }
+                }
+                if (NULL == ap->abbrev) {
+                    fprintf(stderr, "'--page' abbreviation %s not "
+                            "found\nHere are the choices:\n", optarg);
+                    enumerate_diag_pages();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
             }
             ++op->page_code_given;
             break;
@@ -654,7 +753,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             return 0;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
-            usage();
+            fprintf(stderr, "  For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -667,23 +766,33 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             for (; optind < argc; ++optind)
                 fprintf(stderr, "Unexpected extra argument: %s\n",
                         argv[optind]);
-            usage();
+            fprintf(stderr, "  For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (op->do_join && (op->do_control)) {
         fprintf(stderr, "cannot have '--join' and '--control'\n");
+        fprintf(stderr, "  For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->num_cgs > 1) {
         fprintf(stderr, "can only be one of '--clear', '--get' and "
                 "'--set'\n");
+        fprintf(stderr, "  For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
+    }
+    if (op->index_str) {
+        ret = parse_index(op);
+        if (ret) {
+            fprintf(stderr, "  For more information use '--help'\n");
+            return ret;
+        }
     }
     if (op->desc_name) {
         if (op->ind_given) {
             fprintf(stderr, "can have either --descriptor or --index but "
                     "not both\n");
+            fprintf(stderr, "  For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if ((0 == op->do_join) && (0 == op->do_control) &&
@@ -706,12 +815,12 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         return 0;
     if (op->do_control && op->do_status) {
         fprintf(stderr, "cannot have both '--control' and '--status'\n");
-        usage();
+        fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     } else if (op->do_control) {
         if (! op->do_data) {
             fprintf(stderr, "need to give '--data' in control mode\n");
-            usage();
+            fprintf(stderr, "For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     } else if (0 == op->do_status)
@@ -719,7 +828,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
 
     if (NULL == op->device_name) {
         fprintf(stderr, "missing DEVICE name!\n");
-        usage();
+        fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     return 0;
@@ -1026,7 +1135,8 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-/* Display Configuration diagnostic page [DPC_CONFIGURATION]. */
+/* DPC_CONFIGURATION
+ * Display Configuration diagnostic page. */
 static void
 ses_configuration_sdg(const unsigned char * resp, int resp_len)
 {
@@ -1064,14 +1174,18 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
             fprintf(stderr, "      enc descriptor len=%d ??\n", el);
             continue;
         }
-        printf("      logical identifier (hex): ");
+        printf("      enclosure logical identifier (hex): ");
         for (j = 0; j < 8; ++j)
             printf("%02x", ucp[4 + j]);
-        printf("\n      vendor: %.8s  product: %.16s  rev: %.4s\n",
+        printf("\n      enclosure vendor: %.8s  product: %.16s  rev: %.4s\n",
                ucp + 12, ucp + 20, ucp + 36);
         if (el > 40) {
             printf("      vendor-specific data:\n");
-            dStrHex((const char *)(ucp + 40), el - 40, 0);
+            /* dStrHex((const char *)(ucp + 40), el - 40, 0); */
+            printf("        ");
+            for (j = 0; j < (el - 40); ++j)
+                printf("%02x ", *(ucp + 40 + j));
+            printf("\n");
         }
     }
     /* printf("\n"); */
@@ -1146,20 +1260,20 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         tdhp[k].etype = ucp[0];
         tdhp[k].num_elements = ucp[1];
         tdhp[k].se_id = ucp[2];
-        tdhp[k].unused = 0;    /* actually type descriptor text length */
+        tdhp[k].txt_len = ucp[3];
     }
     if (op->ind_given && op->ind_etp) {
         n = op->ind_etp_num;
         for (k = 0; k < sum_type_dheaders; ++k) {
             if (op->ind_etp->elem_type_code == tdhp[k].etype) {
-            if (0 == n)
-                break;
-            else
-                --n;
+                if (0 == n)
+                    break;
+                else
+                    --n;
             }
         }
         if (k < sum_type_dheaders)
-            op->ind_ov = k;
+            op->ind_th = k;
         else {
             if (op->ind_etp_num)
                 fprintf(stderr, "populate: unable to find element type "
@@ -1617,13 +1731,14 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
     }
 }
 
-/* Display enclosure status [DPC_ENC_STATUS] diagnostic page. */
+/* DPC_ENC_STATUS
+ * Display enclosure status diagnostic page. */
 static void
 ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
                   int resp_len, const struct opts_t * op)
 {
-    int j, k, elem_ind, match_ind_ov;
+    int j, k, elem_ind, match_ind_th, got1;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -1648,28 +1763,33 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  status descriptor list\n");
     ucp = resp + 8;
-    for (k = 0; k < num_telems; ++k, ++tdhp) {
+    for (k = 0, got1 = 0; k < num_telems; ++k, ++tdhp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        match_ind_ov = (op->ind_given && (k == op->ind_ov));
-        if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d\n",
+        match_ind_th = (op->ind_given && (k == op->ind_th));
+        if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
+            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
                    find_element_tname(tdhp->etype, b, sizeof(b)),
-                   tdhp->se_id);
-            printf("      Overall %d descriptor:\n", k);
+                   tdhp->se_id, k);
+            printf("      Overall descriptor:\n");
             enc_status_helper("        ", ucp, tdhp->etype, op);
+            ++got1;
         }
         for (ucp += 4, j = 0, elem_ind = 0; j < tdhp->num_elements;
              ++j, ucp += 4, ++elem_ind) {
             if (op->ind_given) {
-                if ((! match_ind_ov) || (-1 == op->ind_indiv) ||
+                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (elem_ind != op->ind_indiv))
                     continue;
             }
             printf("      Element %d descriptor:\n", elem_ind);
             enc_status_helper("        ", ucp, tdhp->etype, op);
+            ++got1;
         }
     }
+    if (op->ind_given && (0 == got1))
+        printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+               op->ind_indiv);
     return;
 truncated:
     fprintf(stderr, "    <<<enc: response too short>>>\n");
@@ -1750,12 +1870,13 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
     }
 }
 
+/* DPC_THRESHOLD */
 static void
 ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
                   int resp_len, const struct opts_t * op)
 {
-    int j, k, elem_ind, match_ind_ov;
+    int j, k, elem_ind, match_ind_th, got1;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -1778,42 +1899,48 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  threshold status descriptor list\n");
     ucp = resp + 8;
-    for (k = 0; k < num_telems; ++k, ++tdhp) {
+    for (k = 0, got1 = 0; k < num_telems; ++k, ++tdhp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        match_ind_ov = (op->ind_given && (k == op->ind_ov));
-        if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d\n",
+        match_ind_th = (op->ind_given && (k == op->ind_th));
+        if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
+            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
                    find_element_tname(tdhp->etype, b, sizeof(b)),
-                   tdhp->se_id);
-            printf("      Overall %d descriptor:\n", k);
+                   tdhp->se_id, k);
+            printf("      Overall descriptor:\n");
             ses_threshold_helper("        ", ucp, tdhp->etype, op);
+            ++got1;
         }
         for (ucp += 4, j = 0, elem_ind = 0; j < tdhp->num_elements;
              ++j, ucp += 4, ++elem_ind) {
             if (op->ind_given) {
-                if ((! match_ind_ov) || (-1 == op->ind_indiv) ||
+                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (elem_ind != op->ind_indiv))
                     continue;
             }
             printf("      Element %d descriptor:\n", elem_ind);
             ses_threshold_helper("        ", ucp, tdhp->etype, op);
+            ++got1;
         }
     }
+    if (op->ind_given && (0 == got1))
+        printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+               op->ind_indiv);
     return;
 truncated:
     fprintf(stderr, "    <<<thresh: response too short>>>\n");
     return;
 }
 
-/* This page essentially contains names of overall and individual
+/* DPC_ELEM_DESC
+ * This page essentially contains names of overall and individual
  * elements. */
 static void
 ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                      unsigned int ref_gen_code, const unsigned char * resp,
                      int resp_len, const struct opts_t * op)
 {
-    int j, k, desc_len, elem_ind, match_ind_ov;
+    int j, k, desc_len, elem_ind, match_ind_th, got1;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -1836,25 +1963,26 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  element descriptor by type list\n");
     ucp = resp + 8;
-    for (k = 0, tp = tdhp; k < num_telems; ++k, ++tp) {
+    for (k = 0, got1 = 0, tp = tdhp; k < num_telems; ++k, ++tp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
         desc_len = (ucp[2] << 8) + ucp[3] + 4;
-        match_ind_ov = (op->ind_given && (k == op->ind_ov));
-        if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d\n",
-                   find_element_tname(tp->etype, b, sizeof(b)), tp->se_id);
+        match_ind_th = (op->ind_given && (k == op->ind_th));
+        if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
+            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
+                   find_element_tname(tp->etype, b, sizeof(b)), tp->se_id, k);
             if (desc_len > 4)
-                printf("      Overall %d descriptor: %.*s\n", k, desc_len - 4,
+                printf("      Overall descriptor: %.*s\n", desc_len - 4,
                        ucp + 4);
             else
-                printf("      Overall %d descriptor: <empty>\n", k);
+                printf("      Overall descriptor: <empty>\n");
+            ++got1;
         }
         for (ucp += desc_len, j = 0, elem_ind = 0; j < tp->num_elements;
              ++j, ucp += desc_len, ++elem_ind) {
             desc_len = (ucp[2] << 8) + ucp[3] + 4;
             if (op->ind_given) {
-                if ((! match_ind_ov) || (-1 == op->ind_indiv) ||
+                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (elem_ind != op->ind_indiv))
                     continue;
             }
@@ -1863,8 +1991,12 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                        desc_len - 4, ucp + 4);
             else
                 printf("      Element %d descriptor: <empty>\n", j);
+            ++got1;
         }
     }
+    if (op->ind_given && (0 == got1))
+        printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+               op->ind_indiv);
     return;
 truncated:
     fprintf(stderr, "    <<<element: response too short>>>\n");
@@ -2036,14 +2168,15 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
     }
 }
 
-/* Previously called "Device element status descriptor". Changed "device"
-   to "additional" to allow for SAS expander and SATA devices */
+/* DPC_ADD_ELEM_STATUS
+ * Previously called "Device element status descriptor". Changed "device"
+ * to "additional" to allow for SAS expander and SATA devices */
 static void
 ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                         unsigned int ref_gen_code, const unsigned char * resp,
                         int resp_len, const struct opts_t * op)
 {
-    int j, k, desc_len, elem_type, invalid, el_num, eip, ind, match_ind_ov;
+    int j, k, desc_len, elem_type, invalid, el_num, eip, ind, match_ind_th;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -2070,10 +2203,10 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             continue;   /* skip if not element type of interest */
         if ((ucp + 1) > last_ucp)
             goto truncated;
-        match_ind_ov = (op->ind_given && (k == op->ind_ov));
-        if ((! op->ind_given) || (match_ind_ov && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d\n",
-                   find_element_tname(elem_type, b, sizeof(b)), tp->se_id);
+        match_ind_th = (op->ind_given && (k == op->ind_th));
+        if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
+            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
+                   find_element_tname(elem_type, b, sizeof(b)), tp->se_id, k);
         }
         for (j = 0, el_num = 0; j < tp->num_elements;
              ++j, ucp += desc_len, ++el_num) {
@@ -2082,7 +2215,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             eip = ucp[0] & 0x10;
             ind = eip ? ucp[3] : el_num;
             if (op->ind_given) {
-                if ((! match_ind_ov) || (-1 == op->ind_indiv) ||
+                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (el_num != op->ind_indiv))
                     continue;
             }
@@ -2104,6 +2237,7 @@ truncated:
     return;
 }
 
+/* DPC_SUBENC_HELP_TEXT */
 static void
 ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
 {
@@ -2139,10 +2273,11 @@ truncated:
     return;
 }
 
+/* DPC_SUBENC_STRING */
 static void
 ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
 {
-    int k, el, num_subs;
+    int k, j, el, num_subs;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -2163,9 +2298,13 @@ ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
             goto truncated;
         el = (ucp[2] << 8) + ucp[3] + 4;
         printf("   subenclosure identifier: %d\n", ucp[1]);
-        if (el > 4)
-            dStrHex((const char *)(ucp + 4), el - 4, 0);
-        else
+        if (el > 4) {
+            /* dStrHex((const char *)(ucp + 4), el - 4, 0); */
+            printf("    ");
+            for (j = 0; j < (el - 4); ++j)
+                printf("%02x ", *(ucp + 4 + j));
+            printf("\n");
+        } else
             printf("    <empty>\n");
     }
     return;
@@ -2174,6 +2313,7 @@ truncated:
     return;
 }
 
+/* DPC_SUBENC_NICKNAME */
 static void
 ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
 {
@@ -2201,7 +2341,7 @@ ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
         printf("   nickname status: 0x%x\n", ucp[2]);
         printf("   nickname additional status: 0x%x\n", ucp[3]);
         printf("   nickname language code: %.2s\n", ucp + 6);
-        printf("   nickname: %s\n", ucp + 8);
+        printf("   nickname: %.*s\n", 32, ucp + 8);
     }
     return;
 truncated:
@@ -2209,12 +2349,14 @@ truncated:
     return;
 }
 
+/* DPC_SUPPORTED_SES */
 static void
 ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
                         int resp_len)
 {
-    int k, code, prev;
+    int k, code, prev, got1;
     const char * cp;
+    const struct diag_page_abbrev * ap;
 
     printf("%s:\n", leadin);
     for (k = 0, prev = 0; k < (resp_len - 4); ++k, prev = code) {
@@ -2222,10 +2364,21 @@ ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
         if (code < prev)
             break;      /* assume to be padding at end */
         cp = find_diag_page_desc(code);
-        printf("  %s [0x%x]\n", (cp ? cp : "<unknown>"), code);
+        if (cp) {
+            printf("  %s [", cp);
+            for (ap = dp_abbrev, got1 = 0; ap->abbrev; ++ap) {
+                if (ap->page_code == code) {
+                    printf("%s%s", (got1 ? "," : ""), ap->abbrev);
+                    ++got1;
+                }
+            }
+            printf("] [0x%x]\n", code);
+        } else
+            printf("  <unknown> [0x%x]\n", code);
     }
 }
 
+/* DPC_DOWNLOAD_MICROCODE */
 static void
 ses_download_code_sdg(const unsigned char * resp, int resp_len)
 {
@@ -2370,9 +2523,9 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
     return 0;
 }
 
-/* Return 0 for success. */
+/* Display "status" page (op->page_code). Return 0 for success. */
 static int
-ses_process_status(int sg_fd, struct opts_t * op)
+ses_process_status_page(int sg_fd, struct opts_t * op)
 {
     int rsp_len, res;
     unsigned int ref_gen_code;
@@ -2427,9 +2580,18 @@ ses_process_status(int sg_fd, struct opts_t * op)
         case DPC_STRING:
             printf("String In diagnostic page (for primary "
                    "subenclosure):\n");
-            if (rsp_len > 4)
+            if (rsp_len > 4) {
+#if 1
                 dStrHex((const char *)(rsp_buff + 4), rsp_len - 4, 0);
-            else
+#else
+                int j;
+
+                printf("  ");
+                for (j = 0; j < (rsp_len - 4); ++j)
+                    printf("%02x ", *(rsp_buff + 4 + j));
+                printf("\n");
+#endif
+            } else
                 printf("  <empty>\n");
             break;
         case DPC_THRESHOLD:
@@ -2497,7 +2659,7 @@ ses_process_status(int sg_fd, struct opts_t * op)
 static int
 process_join(int sg_fd, struct opts_t * op, int display)
 {
-    int k, j, res, num_t_hdrs, elem_ind, ei, get_out, overall;
+    int k, j, res, num_t_hdrs, elem_ind, ei, get_out;
     int desc_len, dn_len, broken_ei, ei2;
     unsigned int ref_gen_code, gen_code;
     struct join_row_t * jrp;
@@ -2625,7 +2787,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
     jrp = join_arr;
     tdhp = type_desc_hdr_arr;
     for (k = 0, ei = 0, ei2 = 0; k < num_t_hdrs; ++k, ++tdhp) {
-        jrp->el_ind_ov = k;
+        jrp->el_ind_th = k;
         jrp->el_ind_indiv = -1;
         jrp->etype = tdhp->etype;
         jrp->ei_asc = -1;
@@ -2647,7 +2809,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
              ++j, ++jrp, ++elem_ind) {
             if (jrp >= join_arr_lastp)
                 break;
-            jrp->el_ind_ov = k;
+            jrp->el_ind_th = k;
             jrp->el_ind_indiv = elem_ind;
             jrp->ei_asc = ei++;
             if (broken_ei)
@@ -2744,8 +2906,8 @@ try_again:
     if (op->verbose > 3) {
         jrp = join_arr;
         for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-            fprintf(stderr, "el_ind_ov=%d el_ind_indiv=%d etype=%d "
-                    "se_id=%d ei=%d ei2=%d %s %s %s %s\n", jrp->el_ind_ov,
+            fprintf(stderr, "el_ind_th=%d el_ind_indiv=%d etype=%d "
+                    "se_id=%d ei=%d ei2=%d %s %s %s %s\n", jrp->el_ind_th,
                     jrp->el_ind_indiv, jrp->etype, jrp->se_id, jrp->ei_asc,
                     jrp->ei_asc2, (jrp->enc_statp ? "enc_statp" : ""),
                     (jrp->elem_descp ? "elem_descp" : ""),
@@ -2763,12 +2925,11 @@ try_again:
     for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
          ++k, ++jrp) {
         if (op->ind_given) {
-            if (op->ind_ov != jrp->el_ind_ov)
+            if (op->ind_th != jrp->el_ind_th)
                 continue;
             if (op->ind_indiv != jrp->el_ind_indiv)
                 continue;
         }
-        overall = (-1 == jrp->el_ind_indiv);
         ed_ucp = jrp->elem_descp;
         if (op->desc_name) {
             if (NULL == ed_ucp)
@@ -2785,15 +2946,14 @@ try_again:
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
             if (desc_len > 4)
                 printf("%.*s [%d,%d]  Element type: %s\n", desc_len - 4,
-                       (const char *)(ed_ucp + 4), jrp->el_ind_ov,
+                       (const char *)(ed_ucp + 4), jrp->el_ind_th,
                        jrp->el_ind_indiv, cp);
             else
-                printf("[%d,%d]  Element type: %s\n", jrp->el_ind_ov,
+                printf("[%d,%d]  Element type: %s\n", jrp->el_ind_th,
                        jrp->el_ind_indiv, cp);
         } else
-            printf("%s index %d  Element type: %s\n",
-                   (overall ? "Overall" : " Element"),
-                   (overall ? jrp->el_ind_ov : jrp->el_ind_indiv), cp);
+            printf("[%d,%d]  Element type: %s\n", jrp->el_ind_th,
+                   jrp->el_ind_indiv, cp);
         printf("  Enclosure status:\n");
         enc_status_helper("    ", jrp->enc_statp, jrp->etype, op);
         if (jrp->add_elem_statp) {
@@ -2914,7 +3074,8 @@ is_acronym_in_additional(const struct tuple_acronym_val * tavp)
     return (a2tp->acron ? 1 : 0);
 }
 
-/* Do clear/get/set (cgs) on Enclosure Control/Status page. Return 0 for ok
+/* DPC_ENC_STATUS  DPC_ENC_CONTROL
+ * Do clear/get/set (cgs) on Enclosure Control/Status page. Return 0 for ok
  * -2 for acronym not found, else -1 . */
 static int
 cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
@@ -2943,6 +3104,8 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
         } else
             return -2;
     }
+    if (op->verbose > 1)
+        fprintf(stderr, "  s_byte=%d, s_bit=%d, n_bits=%d\n", s_byte, s_bit, n_bits);
     if (op->get_str) {
         ui = get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
         if (op->do_hex)
@@ -2966,7 +3129,8 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
     return 0;
 }
 
-/* Do clear/get/set (cgs) on Threshold In/Out page. Return 0 for ok,
+/* DPC_THRESHOLD
+ * Do clear/get/set (cgs) on Threshold In/Out page. Return 0 for ok,
  * -2 for acronym not found, else -1 . */
 static int
 cgs_threshold(int sg_fd, const struct join_row_t * jrp,
@@ -3020,7 +3184,8 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
     return 0;
 }
 
-/* Do get (cgs) on Additional element status page. Return 0 for ok,
+/* DPC_ADD_ELEM_STATUS
+ * Do get (cgs) on Additional element status page. Return 0 for ok,
  * -2 for acronym not found, else -1 . */
 static int
 cgs_additional_el(const struct join_row_t * jrp,
@@ -3079,7 +3244,11 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     char b[64];
 
     in_page = 0;
-    if (is_acronym_in_status_ctl(tavp)) {
+    if (NULL == tavp->acron) {  
+        /* assume tuple refers to status/control page */
+        in_page = DPC_ENC_STATUS;
+        op->page_code = DPC_ENC_CONTROL;
+    } else if (is_acronym_in_status_ctl(tavp)) {
         in_page = DPC_ENC_STATUS;
         op->page_code = DPC_ENC_CONTROL;
     } else if (is_acronym_in_threshold(tavp)) {
@@ -3101,7 +3270,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
          ++k, ++jrp) {
         if (op->ind_given) {
-            if (op->ind_ov != jrp->el_ind_ov)
+            if (op->ind_th != jrp->el_ind_th)
                 continue;
             if (op->ind_indiv != jrp->el_ind_indiv)
                 continue;
@@ -3136,11 +3305,31 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
             fprintf(stderr, "descriptor name: %s not found (check page "
                     "7)\n", op->desc_name);
         else
-            fprintf(stderr, "index: %d,%d not found\n", op->ind_ov,
+            fprintf(stderr, "index: %d,%d not found\n", op->ind_th,
                     op->ind_indiv);
         return -1;
     }
     return 0;
+}
+
+static void
+enumerate_diag_pages(void)
+{
+    const struct diag_page_code * pcdp;
+    const struct diag_page_abbrev * ap;
+    int got1;
+
+    printf("Diagnostic pages, followed by abbreviation(s) then page code:\n");
+    for (pcdp = dpc_arr; pcdp->desc; ++pcdp) {
+        printf("    %s  [", pcdp->desc);
+        for (ap = dp_abbrev, got1 = 0; ap->abbrev; ++ap) {
+            if (ap->page_code == pcdp->page_code) {
+                printf("%s%s", (got1 ? "," : ""), ap->abbrev);
+                ++got1;
+            }
+        }
+        printf("] [0x%x]\n", pcdp->page_code);
+    }
 }
 
 /* Output from --enumerate or --list option. Note that the output is
@@ -3149,7 +3338,6 @@ static void
 process_do_enumerate(const struct opts_t * op)
 {
     int num;
-    const struct diag_page_code * pcdp;
     const struct element_type_t * etp;
     const struct acronym2tuple * a2tp;
     char b[64];
@@ -3160,9 +3348,7 @@ process_do_enumerate(const struct opts_t * op)
                op->device_name, (op->do_list ? "list" : "enumerate"));
     num = op->do_enumerate + op->do_list;
     if (num < 2) {
-        printf("Diagnostic pages (followed by page code):\n");
-        for (pcdp = dpc_arr; pcdp->desc; ++pcdp)
-            printf("    %s  [0x%x]\n", pcdp->desc, pcdp->page_code);
+        enumerate_diag_pages();
         printf("\nSES element type names, followed by abbreviation and "
                "element type code:\n");
         for (etp = element_type_arr; etp->desc; ++etp)
@@ -3292,14 +3478,14 @@ main(int argc, char * argv[])
     else if (opts.do_join)
         ret = process_join(sg_fd, &opts, 1);
     else if (opts.do_status)
-        ret = ses_process_status(sg_fd, &opts);
+        ret = ses_process_status_page(sg_fd, &opts);
     else { /* control page requested */
         opts.data_arr[0] = opts.page_code;
         opts.data_arr[1] = opts.byte1;
         opts.data_arr[2] = (opts.arr_len >> 8) & 0xff;
         opts.data_arr[3] = opts.arr_len & 0xff;
         switch (opts.page_code) {
-        case 0x2:       /* Enclosure control diagnostic page */
+        case DPC_ENC_CONTROL:  /* Enclosure control diagnostic page [0x2] */
             printf("Sending Enclosure control [0x%x] page, with page "
                    "length=%d bytes\n", opts.page_code, opts.arr_len);
             ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
@@ -3309,7 +3495,7 @@ main(int argc, char * argv[])
                 goto err_out;
             }
             break;
-        case 0x4:       /* String Out diagnostic page */
+        case DPC_STRING:       /* String Out diagnostic page [0x4] */
             printf("Sending String Out [0x%x] page, with page length=%d "
                    "bytes\n", opts.page_code, opts.arr_len);
             ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
@@ -3319,7 +3505,7 @@ main(int argc, char * argv[])
                 goto err_out;
             }
             break;
-        case 0x5:       /* Threshold Out diagnostic page */
+        case DPC_THRESHOLD:       /* Threshold Out diagnostic page [0x5] */
             printf("Sending Threshold Out [0x%x] page, with page length=%d "
                    "bytes\n", opts.page_code, opts.arr_len);
             ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
@@ -3329,7 +3515,7 @@ main(int argc, char * argv[])
                 goto err_out;
             }
             break;
-        case 0x6:       /* Array control diagnostic page (obsolete) */
+        case DPC_ARRAY_CONTROL:   /* Array control diagnostic page [0x6] */
             printf("Sending Array control [0x%x] page, with page "
                    "length=%d bytes\n", opts.page_code, opts.arr_len);
             ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
@@ -3339,7 +3525,7 @@ main(int argc, char * argv[])
                 goto err_out;
             }
             break;
-        case 0xc:       /* Subenclosure String Out diagnostic page */
+        case DPC_SUBENC_STRING: /* Subenclosure String Out page [0xc] */
             printf("Sending Subenclosure String Out [0x%x] page, with page "
                    "length=%d bytes\n", opts.page_code, opts.arr_len);
             ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
