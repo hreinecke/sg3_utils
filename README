@@ -95,6 +95,15 @@ as the API of libsgutils and are commented with that in mind. The SCSI
 pass-through code for the supported operating systems is found in the lib
 subdirectory with names like sg_pt_linux.c and sg_pt_win32.c .
 
+Various distributions (of Linux mainly) distribute sg3_utils as 3
+installable packages. One is a package containing the shared library
+discussed above (e.g. libsgutils2-2_1.33-0.1_i386.deb). A second package
+contains the utilities (e.g. sg3-utils_1.33-0.1_i386.deb) and depends on the
+first package). Finally there is an optional package that contains header
+files and a static library (e.g. libsgutils2-dev_1.33-0.1_i386.deb). This
+final package is only needed to build other packages (e.g. sdparm) that
+wish to use the sg3_utils shared library.
+
 All the utilities in the src subdirectory have "man" pages that are
 placed in the doc subdirectory. There is also a sg3_utils (8) man page that
 summarizes common facilities including exit statuses. Additional
@@ -356,4 +365,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-10th December 2011
+17th December 2011

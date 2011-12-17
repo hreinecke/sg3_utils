@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.64 20111216";    /* ses3r03 */
+static char * version_str = "1.64 20111217";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -2741,6 +2741,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
     struct enclosure_info primary_info;
     char b[64];
 
+    memset(&primary_info, 0, sizeof(primary_info));
     num_t_hdrs = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                             &ref_gen_code, &primary_info,
                                             op);

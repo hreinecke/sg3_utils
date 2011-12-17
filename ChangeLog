@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.33 [20111216] [svn: r431]
+Changelog for sg3_utils-1.33 [20111217] [svn: r432]
   - win: change DataBufferOffset type per MSDN; caused
     problem with 64 bit machines (buffered interface)
   - sg_inq, sg_vpd: sync with spc4r33
