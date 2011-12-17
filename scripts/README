@@ -7,7 +7,7 @@ more utilities from the sg3_utils package. They assume the sg3_utils
 package utilities are on the PATH of the user.
 
 scsi_logging_level is written by Andreas Herrmann <aherrman at de dot ibm
-dot com>. It sets the logging level of the SCSI subsystem in the linux
+dot com>. It sets the logging level of the SCSI subsystem in the Linux
 2.6 series kernels. See that file for more information.
 
 The other scripts are written by the author. Some do testing while others

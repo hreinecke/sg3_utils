@@ -4,7 +4,7 @@ The Solaris port of sg3_utils contains those utilities that are
 _not_ specific to Linux.
 
 The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
-Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+Linux idiosyncrasies to be easily ported. A new package called 'ddpt'
 contains a utility with similar functionality to sg_dd and is available
 for Solaris.
 
@@ -68,7 +68,7 @@ the tarball and installed with the familiar
 running the "./autogen.sh" script prior to that sequence. There
 are generic instruction on configure and friend in the INSTALL file.
 
-Some man pages have examples which use linux device names which
+Some man pages have examples which use Linux device names which
 hopefully will not confuse the Solaris users.
 
 Device naming
@@ -90,7 +90,7 @@ disk. So a whole disk may be referred to as either:
 And these device names are duplicated in the /dev/dsk and /dev/rdsk
 directories. The former is the block device name and the latter
 is for "raw" (or char device) access which is what sg3_utils needs.
-So in openSolaris something of the form:
+So in OpenSolaris something of the form:
    sg_inq /dev/rdsk/c5t4d3p0
 should work. If it doesn't add a '-vvv' option. If that is attempted
 on the /dev/dsk/c5t4d3p0 variant an inappropriate ioctl for device

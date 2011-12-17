@@ -135,7 +135,7 @@ sets the "Write protect" field in the WRITE SAME cdb to \fIWPR\fR. The
 default value is zero. \fIWPR\fR should be a value between 0 and 7.
 When \fIWPR\fR is 1 or greater, and the disk's protection type is 1 or
 greater, then 8 extra bytes of protection information are expected or
-generated (to place in the commmand's data-out buffer).
+generated (to place in the commmand's data out buffer).
 .TP
 \fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
 where \fILEN\fR is the data out buffer length. Defaults to the length of
@@ -242,7 +242,7 @@ wrong):
   dd if=/dev/sdb skip=2468 bs=512 of=/dev/null count=1
 .PP
 Now an attempt is made to create a binary file with zeroes in the user data,
-0x0000 in the appliction tag and 0xff bytes in the other two PI fields. It
+0x0000 in the application tag and 0xff bytes in the other two PI fields. It
 is awkward to create 0xff bytes in a file (in Unix) as the "tr" command
 below shows:
 .PP
@@ -262,7 +262,7 @@ contain 520 bytes. Now that file can be written to LBA 2468 as follows:
 Note the \fI\-\-wrprotect=3\fR rather than being set to 1, since we want
 the WRITE SAME command to succeed even though the PI data now indicates
 the user data is corrupted. When an attempt is made to read the LBA, an
-erro should occur:
+error should occur:
 .PP
   dd if=/dev/sdb skip=2468 bs=512 of=/dev/null count=1
 .PP

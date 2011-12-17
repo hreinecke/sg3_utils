@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.64 20111211";    /* ses3r03 */
+static char * version_str = "1.64 20111216";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -145,7 +145,7 @@ struct type_desc_hdr_t {
     unsigned char etype;        /* element type code (0: unspecified) */
     unsigned char num_elements; /* number of possible elements, excluding
                                  * overall element */
-    unsigned char se_id;        /* subenclosure id (0 for main enclosure) */
+    unsigned char se_id;        /* subenclosure id (0 for primary enclosure) */
     unsigned char txt_len;      /* type descriptor text length; (unused) */
 };
 
@@ -157,7 +157,7 @@ struct join_row_t {
     int el_ind_indiv;           /* individual element index, -1 for overall
                                  * instance, otherwise origin 0 */
     unsigned char etype;        /* element type */
-    unsigned char se_id;        /* subenclosure id (0 for main enclosure) */
+    unsigned char se_id;        /* subenclosure id (0 for primary enclosure) */
     int ei_asc;                 /* element index used by Additional Element
                                  * Status page, -1 for not applicable */
     int ei_asc2;                /* some vendors get ei_asc wrong, this is
@@ -190,6 +190,18 @@ struct acronym2tuple {
     int start_byte;
     int start_bit;
     int num_bits;
+};
+
+/* Structure for holding (sub-)enclosure information found in the
+ * Configuration diagnostic page. */
+struct enclosure_info {
+    int have_info;
+    int rel_esp_id;     /* relative enclosure services process id (origin 1) */
+    int num_esp;        /* number of enclosure services processes */
+    unsigned char enc_log_id[8];        /* 8 byte NAA */
+    unsigned char enc_vendor_id[8];     /* may differ from INQUIRY response */
+    unsigned char product_id[16];       /* may differ from INQUIRY response */
+    unsigned char product_rev_level[4]; /* may differ from INQUIRY response */
 };
 
 
@@ -1183,8 +1195,11 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
             printf("      vendor-specific data:\n");
             /* dStrHex((const char *)(ucp + 40), el - 40, 0); */
             printf("        ");
-            for (j = 0; j < (el - 40); ++j)
+            for (j = 0; j < (el - 40); ++j) {
+                if ((j > 0) && (0 == (j % 16)))
+                    printf("\n        ");
                 printf("%02x ", *(ucp + 40 + j));
+            }
             printf("\n");
         }
     }
@@ -1210,11 +1225,13 @@ truncated:
     return;
 }
 
-/* Returns total number of type descriptor headers written to 'tdhp' or -1
+/* DPC_CONFIGURATION
+ * Returns total number of type descriptor headers written to 'tdhp' or -1
  * if there is a problem */
 static int
 populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                            unsigned int * generationp,
+                           struct enclosure_info * primary_ip,
                            struct opts_t * op)
 {
     int resp_len, k, el, num_subs, sum_type_dheaders, res, n;
@@ -1248,6 +1265,15 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
             fprintf(stderr, "populate: short enc descriptor len=%d ??\n",
                     el);
             continue;
+        }
+        if ((0 == k) && primary_ip) {
+            ++primary_ip->have_info;
+            primary_ip->rel_esp_id = (ucp[0] & 0x70) >> 4;
+            primary_ip->num_esp = (ucp[0] & 0x7);
+            memcpy(primary_ip->enc_log_id, ucp + 4, 8);
+            memcpy(primary_ip->enc_vendor_id, ucp + 12, 8);
+            memcpy(primary_ip->product_id, ucp + 20, 16);
+            memcpy(primary_ip->product_rev_level, ucp + 36, 4);
         }
     }
     for (k = 0; k < sum_type_dheaders; ++k, ucp += 4) {
@@ -2301,8 +2327,11 @@ ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
         if (el > 4) {
             /* dStrHex((const char *)(ucp + 4), el - 4, 0); */
             printf("    ");
-            for (j = 0; j < (el - 4); ++j)
+            for (j = 0; j < (el - 4); ++j) {
+                if ((j > 0) && (0 == (j % 16)))
+                    printf("\n    ");
                 printf("%02x ", *(ucp + 4 + j));
+            }
             printf("\n");
         } else
             printf("    <empty>\n");
@@ -2527,10 +2556,11 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
 static int
 ses_process_status_page(int sg_fd, struct opts_t * op)
 {
-    int rsp_len, res;
+    int j, rsp_len, res;
     unsigned int ref_gen_code;
     unsigned char rsp_buff[MX_ALLOC_LEN];
     const char * cp;
+    struct enclosure_info primary_info;
 
     cp = find_in_diag_page_desc(op->page_code);
     res = do_rec_diag(sg_fd, op->page_code, rsp_buff, sizeof(rsp_buff),
@@ -2553,6 +2583,7 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
                    "[0x%x]\n", op->page_code);
         dStrHex((const char *)rsp_buff, rsp_len, 0);
     } else {
+        memset(&primary_info, 0, sizeof(primary_info));
         switch (op->page_code) {
         case DPC_SUPPORTED:
             ses_supported_pages_sdg("Supported diagnostic pages",
@@ -2563,9 +2594,16 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
             break;
         case DPC_ENC_STATUS:
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, op);
+                                             &ref_gen_code, &primary_info,
+                                             op);
             if (res < 0)
                 return res;
+            if (primary_info.have_info) {
+                printf("  Primary enclosure logical identifier (hex): ");
+                for (j = 0; j < 8; ++j)
+                    printf("%02x", primary_info.enc_log_id[j]);
+                printf("\n");
+            }
             ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
                               rsp_buff, rsp_len, op);
             break;
@@ -2587,8 +2625,11 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
                 int j;
 
                 printf("  ");
-                for (j = 0; j < (rsp_len - 4); ++j)
+                for (j = 0; j < (rsp_len - 4); ++j) {
+                    if ((j > 0) && (0 == (j % 16)))
+                        printf("\n  ");
                     printf("%02x ", *(rsp_buff + 4 + j));
+                }
                 printf("\n");
 #endif
             } else
@@ -2596,17 +2637,31 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
             break;
         case DPC_THRESHOLD:
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, op);
+                                             &ref_gen_code, &primary_info,
+                                             op);
             if (res < 0)
                 return res;
+            if (primary_info.have_info) {
+                printf("  Primary enclosure logical identifier (hex): ");
+                for (j = 0; j < 8; ++j)
+                    printf("%02x", primary_info.enc_log_id[j]);
+                printf("\n");
+            }
             ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
                               rsp_buff, rsp_len, op);
             break;
         case DPC_ELEM_DESC:
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, op);
+                                             &ref_gen_code, &primary_info,
+                                             op);
             if (res < 0)
                 return res;
+            if (primary_info.have_info) {
+                printf("  Primary enclosure logical identifier (hex): ");
+                for (j = 0; j < 8; ++j)
+                    printf("%02x", primary_info.enc_log_id[j]);
+                printf("\n");
+            }
             ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                  rsp_buff, rsp_len, op);
             break;
@@ -2621,9 +2676,16 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
             break;
         case DPC_ADD_ELEM_STATUS:
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, op);
+                                             &ref_gen_code, &primary_info,
+                                             op);
             if (res < 0)
                 return res;
+            if (primary_info.have_info) {
+                printf("  Primary enclosure logical identifier (hex): ");
+                for (j = 0; j < 8; ++j)
+                    printf("%02x", primary_info.enc_log_id[j]);
+                printf("\n");
+            }
             ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
                                     rsp_buff, rsp_len, op);
             break;
@@ -2676,12 +2738,20 @@ process_join(int sg_fd, struct opts_t * op, int display)
     const char * enc_state_changed = "  <<state of enclosure changed, "
                                      "please try again>>\n";
     const struct type_desc_hdr_t * tdhp;
+    struct enclosure_info primary_info;
     char b[64];
 
     num_t_hdrs = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                            &ref_gen_code, op);
+                                            &ref_gen_code, &primary_info,
+                                            op);
     if (num_t_hdrs < 0)
         return num_t_hdrs;
+    if (display && primary_info.have_info) {
+        printf("  Primary enclosure logical identifier (hex): ");
+        for (j = 0; j < 8; ++j)
+            printf("%02x", primary_info.enc_log_id[j]);
+        printf("\n");
+    }
     res = do_rec_diag(sg_fd, DPC_ENC_STATUS, enc_stat_rsp,
                       sizeof(enc_stat_rsp), op, &enc_stat_rsp_len);
     if (res)
@@ -3302,8 +3372,8 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     }
     if ((NULL == jrp->enc_statp) || (k >= MX_JOIN_ROWS)) {
         if (op->desc_name)
-            fprintf(stderr, "descriptor name: %s not found (check page "
-                    "7)\n", op->desc_name);
+            fprintf(stderr, "descriptor name: %s not found (check the 'ed' "
+                    "page [0x7])\n", op->desc_name);
         else
             fprintf(stderr, "index: %d,%d not found\n", op->ind_th,
                     op->ind_indiv);
@@ -3357,7 +3427,7 @@ process_do_enumerate(const struct opts_t * op)
     } else {
         /* command line has multiple --enumerate and/or --list options */
         printf("--clear, --get, --set acronyms for enclosure status/control "
-               "[0x2] page:\n");
+               "['es' or 'ec'] page:\n");
         for (a2tp = ecs_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" :
                          find_element_tname(a2tp->etype, b, sizeof(b));
@@ -3365,14 +3435,14 @@ process_do_enumerate(const struct opts_t * op)
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
         printf("\n--clear, --get, --set acronyms for threshold in/out "
-               "[0x5] page:\n");
+               "['th'] page:\n");
         for (a2tp = th_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" :
                          find_element_tname(a2tp->etype, b, sizeof(b));
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
-        printf("\n--get acronyms for additional element status [0xa] page "
+        printf("\n--get acronyms for additional element status ['aes'] page "
                "(SAS EIP=1):\n");
         for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" :
@@ -3465,9 +3535,10 @@ main(int argc, char * argv[])
                    inq_resp.product, inq_resp.revision);
             pd_type = inq_resp.peripheral_type;
             cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
-            if (0xd == pd_type)
-                printf("    enclosure services device\n");
-            else if (0x40 & inq_resp.byte_6)
+            if (0xd == pd_type) {
+                if (opts.verbose)
+                    printf("    enclosure services device\n");
+            } else if (0x40 & inq_resp.byte_6)
                 printf("    %s device has EncServ bit set\n", cp);
             else
                 printf("    %s device (not an enclosure)\n", cp);

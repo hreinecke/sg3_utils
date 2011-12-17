@@ -29,7 +29,7 @@ option name.
 \fB\-e\fR, \fB\-\-enumerate\fR
 list the names of the known VPD pages, first the standard pages, then the
 vendor specific pages. Each group is sorted in abbreviation order. The
-\fIDEVICE\fR and other options are ignored and this utility exits afte
+\fIDEVICE\fR and other options are ignored and this utility exits after
 listing the VPD page names.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -73,7 +73,7 @@ numbers are given the second number indicates which vendor specific VPD page
 to decode when several pages share the same VPD page number. If this option
 is not given (nor '\-i', '\-l' nor '\-V') then the "Supported VPD pages" (0x0)
 VPD page is fetched and decoded. If \fIPG\fR is '\-1' or 'sinq' then the
-standard inquiry response is output.
+standard INQUIRY response is output.
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 suppress the amount of decoding output.
@@ -107,10 +107,10 @@ a SATA disk behind a SAT layer then this
 command: 'sg_vpd \-p ai \-HHH /dev/sdb | hdparm \-\-Istdin'
 should decode the ATA IDENTIFY (PACKET) DEVICE response.
 .SH NOTES
-Since some VPD pages (e.g. the Extended Inquiry page) depend on settings
+Since some VPD pages (e.g. the Extended INQUIRY page) depend on settings
 in the standard INQUIRY response, then the standard INQUIRY response is
 output as a pseudo VPD page when \fIPG\fR is set to '\-1' or 'sinq'. Also
-the decoding of some fields (e.g. the Extended Inquiry page's SPT field)
+the decoding of some fields (e.g. the Extended INQUIRY page's SPT field)
 is expanded when the '\-\-long' option is given using the standard INQUIRY
 response information (e.g. the PDT and the PROTECT fields). 
 .PP
