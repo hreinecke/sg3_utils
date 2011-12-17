@@ -6,7 +6,7 @@ similar functionality; for example 'sg_map' is similar to
 'camcontrol devlist'.
 
 The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
-Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+Linux idiosyncrasies to be easily ported. A new package called 'ddpt'
 contains a utility with similar functionality to sg_dd and ddpt is available
 for FreeBSD.
 
@@ -70,7 +70,7 @@ the tarball and installed with the familiar
 running the "./autogen.sh" script prior to that sequence. There
 are generic instruction on configure and friend in the INSTALL file.
 
-Some man pages have examples which use linux device names which
+Some man pages have examples which use Linux device names which
 hopefully will not confuse the FreeBSD users.
 
 Device naming

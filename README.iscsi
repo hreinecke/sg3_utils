@@ -1,7 +1,7 @@
 iSCSI support for sg3-utils is available from external patches.
 
 To build sg3-utils from sources and activate built-in iSCSI support
-you need both sg3-utils and the external userspace iSCSI library hosted at :
+you need both sg3-utils and the external user-space iSCSI library hosted at :
 
 https://github.com/sahlberg/libiscsi
 

@@ -20,7 +20,7 @@ For example the sg_inq utility issues a SCSI INQUIRY command and decodes the
 response. The COVERAGE file has a table containing a row for each SCSI
 command issued by this package; to the right of each row is the utility
 (sometimes more than one) that issue that SCSI command. The COVERAGE file
-has a second table for ATA commands issude.
+has a second table for ATA commands usage.
 
 Some utilities interface at a slightly higher level, for example: sg_dd,
 sgm_dd and sgp_dd. These are closely related to the Unix dd command and
@@ -59,7 +59,7 @@ series.
 In sg3_utils version 1.27 support has been added for the Linux bsg driver
 which use the sg version 4 interface. There seems no point in renaming
 this package sg4_utils. The existing utilities just silently support either.
-Cuurently the source build must be able to see the /usr/include/linux/bsg.h
+Currently the source build must be able to see the /usr/include/linux/bsg.h
 file. Then at run time the /proc/devices pseudo file needs to have an entry
 for the bsg driver (appeared around lk 2.6.28). With this in place each
 utility at run time checks the device it has been given and if it is a char
@@ -124,7 +124,7 @@ scsi tape driver (st) in lk 2.6.6 .
 
 In the src directory the bulk of the utilities are written in relatively
 clean POSIX compliant C code with Linux specific system calls and structures
-removed and placed in linux specific files in the lib directory. A small
+removed and placed in Linux specific files in the lib directory. A small
 number of utilities in the src directory do contain Linux specific logic
 and are not ported to other OSes (e.g. sg_dd). One utility, sg_scan, has
 two separate implementations, one for Linux (sg_scan.c.linux) and one for
@@ -163,7 +163,7 @@ calls over OS specific calls.
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
 this: 'rpmbuild -ba sg3_utils.spec' in a rpmbuild tree SPECS directory.
-To cross build or make a more widely distibutable package then the --target
+To cross build or make a more widely distributable package then the --target
 option may be useful: 'rpmbuild --target=i386 -ba sg3_utils.spec' .
 
 The 'build_debian.sh' script should build several "deb" packages and place
@@ -255,7 +255,7 @@ checks it against the asc/ascq text strings held in sg_lib_data.c .
 The 'doc' subdirectory contains a README file containing the urls of
 various related documents.
 
-The 'scripts' subdirectory contains some bourne (bash) shell scripts that
+The 'scripts' subdirectory contains some Bourne (bash) shell scripts that
 rely on utilities in the main directory. One script uses the sdparm utility.
 These scripts are described in the scripts/README file and have usage
 messages.
