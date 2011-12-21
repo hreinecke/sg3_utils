@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.64 20111219";    /* ses3r03 */
+static char * version_str = "1.64 20111220";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -138,7 +138,7 @@ struct diag_page_abbrev {
 };
 
 /* The Configuration diagnostic page contains one or more of these. The
- * elements of the Enclosure control/status and threshold in/page follow
+ * elements of the Enclosure Control/Status and Threshold In/ Out page follow
  * this format. The additional element status page is closely related to
  * this format (with some element types and all overall elements excluded). */
 struct type_desc_hdr_t {
@@ -149,8 +149,8 @@ struct type_desc_hdr_t {
     unsigned char txt_len;      /* type descriptor text length; (unused) */
 };
 
-/* A SQL-like join of the Enclosure status, Threshold in and Additional
- * element status pages based of the format indicated in the Configuration
+/* A SQL-like join of the Enclosure Status, Threshold In and Additional
+ * Element Status pages based of the format indicated in the Configuration
  * page. */
 struct join_row_t {
     int el_ind_th;              /* type header index (origin 0) */
@@ -221,73 +221,73 @@ static int threshold_rsp_len;
 
 /* Diagnostic page names, control and/or status (in and/or out) */
 static struct diag_page_code dpc_arr[] = {
-    {DPC_SUPPORTED, "Supported diagnostic pages"},  /* 0 */
+    {DPC_SUPPORTED, "Supported Diagnostic Pages"},  /* 0 */
     {DPC_CONFIGURATION, "Configuration (SES)"},
-    {DPC_ENC_STATUS, "Enclosure status/control (SES)"},
-    {DPC_HELP_TEXT, "Help text (SES)"},
+    {DPC_ENC_STATUS, "Enclosure Status/Control (SES)"},
+    {DPC_HELP_TEXT, "Help Text (SES)"},
     {DPC_STRING, "String In/Out (SES)"},
     {DPC_THRESHOLD, "Threshold In/Out (SES)"},
     {DPC_ARRAY_STATUS, "Array Status/Control (SES, obsolete)"},
-    {DPC_ELEM_DESC, "Element descriptor (SES)"},
-    {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
-    {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
-    {DPC_ADD_ELEM_STATUS, "Additional element status (SES-2)"},
-    {DPC_SUBENC_HELP_TEXT, "Subenclosure help text (SES-2)"},
-    {DPC_SUBENC_STRING, "Subenclosure string In/Out (SES-2)"},
-    {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
-    {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
-    {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
-    {0x3f, "Protocol specific (SAS transport)"},
-    {0x40, "Translate address (SBC)"},
-    {0x41, "Device status (SBC)"},
+    {DPC_ELEM_DESC, "Element Descriptor (SES)"},
+    {DPC_SHORT_ENC_STATUS, "Short Enclosure Status (SES)"},  /* 8 */
+    {DPC_ENC_BUSY, "Enclosure Busy (SES-2)"},
+    {DPC_ADD_ELEM_STATUS, "Additional Element Status (SES-2)"},
+    {DPC_SUBENC_HELP_TEXT, "Subenclosure Help Text (SES-2)"},
+    {DPC_SUBENC_STRING, "Subenclosure String In/Out (SES-2)"},
+    {DPC_SUPPORTED_SES, "Supported SES Diagnostic Pages (SES-2)"},
+    {DPC_DOWNLOAD_MICROCODE, "Download Microcode (SES-2)"},
+    {DPC_SUBENC_NICKNAME, "Subenclosure Nickname (SES-2)"},
+    {0x3f, "Protocol Specific (SAS transport)"},
+    {0x40, "Translate Address (SBC)"},
+    {0x41, "Device Status (SBC)"},
     {-1, NULL},
 };
 
 /* Diagnostic page names, for status (or in) pages */
 static struct diag_page_code in_dpc_arr[] = {
-    {DPC_SUPPORTED, "Supported diagnostic pages"},  /* 0 */
+    {DPC_SUPPORTED, "Supported Diagnostic Pages"},  /* 0 */
     {DPC_CONFIGURATION, "Configuration (SES)"},
-    {DPC_ENC_STATUS, "Enclosure status (SES)"},
-    {DPC_HELP_TEXT, "Help text (SES)"},
+    {DPC_ENC_STATUS, "Enclosure Status (SES)"},
+    {DPC_HELP_TEXT, "Help Text (SES)"},
     {DPC_STRING, "String In (SES)"},
     {DPC_THRESHOLD, "Threshold In (SES)"},
     {DPC_ARRAY_STATUS, "Array Status (SES, obsolete)"},
-    {DPC_ELEM_DESC, "Element descriptor (SES)"},
-    {DPC_SHORT_ENC_STATUS, "Short enclosure status (SES)"},  /* 8 */
-    {DPC_ENC_BUSY, "Enclosure busy (SES-2)"},
-    {DPC_ADD_ELEM_STATUS, "Additional element status (SES-2)"},
-    {DPC_SUBENC_HELP_TEXT, "Subenclosure help text (SES-2)"},
-    {DPC_SUBENC_STRING, "Subenclosure string In (SES-2)"},
-    {DPC_SUPPORTED_SES, "Supported SES diagnostic pages (SES-2)"},
-    {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
-    {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
-    {0x3f, "Protocol specific (SAS transport)"},
-    {0x40, "Translate address (SBC)"},
-    {0x41, "Device status (SBC)"},
+    {DPC_ELEM_DESC, "Element Descriptor (SES)"},
+    {DPC_SHORT_ENC_STATUS, "Short Enclosure Status (SES)"},  /* 8 */
+    {DPC_ENC_BUSY, "Enclosure Busy (SES-2)"},
+    {DPC_ADD_ELEM_STATUS, "Additional Element Status (SES-2)"},
+    {DPC_SUBENC_HELP_TEXT, "Subenclosure Help Text (SES-2)"},
+    {DPC_SUBENC_STRING, "Subenclosure String In (SES-2)"},
+    {DPC_SUPPORTED_SES, "Supported SES Diagnostic Pages (SES-2)"},
+    {DPC_DOWNLOAD_MICROCODE, "Download Microcode (SES-2)"},
+    {DPC_SUBENC_NICKNAME, "Subenclosure Nickname (SES-2)"},
+    {0x3f, "Protocol Specific (SAS transport)"},
+    {0x40, "Translate Address (SBC)"},
+    {0x41, "Device Status (SBC)"},
     {-1, NULL},
 };
 
 /* Diagnostic page names, for control (or out) pages */
 static struct diag_page_code out_dpc_arr[] = {
-    {DPC_SUPPORTED, "?? [Supported diagnostic pages]"},  /* 0 */
+    {DPC_SUPPORTED, "?? [Supported Diagnostic Pages]"},  /* 0 */
     {DPC_CONFIGURATION, "?? [Configuration (SES)]"},
-    {DPC_ENC_CONTROL, "Enclosure control (SES)"},
-    {DPC_HELP_TEXT, "Help text (SES)"},
+    {DPC_ENC_CONTROL, "Enclosure Control (SES)"},
+    {DPC_HELP_TEXT, "Help Text (SES)"},
     {DPC_STRING, "String Out (SES)"},
     {DPC_THRESHOLD, "Threshold Out (SES)"},
     {DPC_ARRAY_CONTROL, "Array Control (SES, obsolete)"},
-    {DPC_ELEM_DESC, "?? [Element descriptor (SES)]"},
-    {DPC_SHORT_ENC_STATUS, "?? [Short enclosure status (SES)]"},  /* 8 */
-    {DPC_ENC_BUSY, "?? [Enclosure busy (SES-2)]"},
-    {DPC_ADD_ELEM_STATUS, "?? [Additional element status (SES-2)]"},
-    {DPC_SUBENC_HELP_TEXT, "?? [Subenclosure help text (SES-2)]"},
-    {DPC_SUBENC_STRING, "Subenclosure string Out (SES-2)"},
-    {DPC_SUPPORTED_SES, "?? [Supported SES diagnostic pages (SES-2)]"},
-    {DPC_DOWNLOAD_MICROCODE, "Download microcode (SES-2)"},
-    {DPC_SUBENC_NICKNAME, "Subenclosure nickname (SES-2)"},
-    {0x3f, "Protocol specific (SAS transport)"},
-    {0x40, "Translate address (SBC)"},
-    {0x41, "Device status (SBC)"},
+    {DPC_ELEM_DESC, "?? [Element Descriptor (SES)]"},
+    {DPC_SHORT_ENC_STATUS, "?? [Short Enclosure Status (SES)]"},  /* 8 */
+    {DPC_ENC_BUSY, "?? [Enclosure Busy (SES-2)]"},
+    {DPC_ADD_ELEM_STATUS, "?? [Additional Element Status (SES-2)]"},
+    {DPC_SUBENC_HELP_TEXT, "?? [Subenclosure Help Text (SES-2)]"},
+    {DPC_SUBENC_STRING, "Subenclosure String Out (SES-2)"},
+    {DPC_SUPPORTED_SES, "?? [Supported SES Diagnostic Pages (SES-2)]"},
+    {DPC_DOWNLOAD_MICROCODE, "Download Microcode (SES-2)"},
+    {DPC_SUBENC_NICKNAME, "Subenclosure Nickname (SES-2)"},
+    {0x3f, "Protocol Specific (SAS transport)"},
+    {0x40, "Translate Address (SBC)"},
+    {0x41, "Device Status (SBC)"},
     {-1, NULL},
 };
 
@@ -351,7 +351,7 @@ static struct element_type_t element_type_by_code =
     {0, abbrev_arr, "element type code form"};
 
 /* Many control element names below have "RQST" in front in drafts.
-   These are for the Enclosure control/status diagnostic page */
+   These are for the Enclosure Control/Status diagnostic page */
 static struct acronym2tuple ecs_a2t_arr[] = {
    {"active", DEVICE_ETC, 2, 7, 1},
    {"active", ARRAY_DEV_ETC, 2, 7, 1},
@@ -501,7 +501,7 @@ usage()
             "descriptor\n"
             "                        and additional element status pages. "
             "Use twice\n"
-            "                        to add threshold in page\n"
+            "                        to add Threshold In page\n"
             "    --list|-l           same as '--enumerate' option\n"
             "    --page=PG|-p PG     diagnostic page code (abbreviation "
             "or number)\n"
@@ -536,6 +536,7 @@ parse_index(struct opts_t *op)
     const struct element_type_t * etp;
     char b[64];
 
+    op->ind_given = 1;
     if ((cp = strchr(op->index_str, ','))) {
         if (0 == strcmp("-1", cp + 1))
             n = -1;
@@ -572,7 +573,6 @@ parse_index(struct opts_t *op)
         }
         op->ind_th = 0;
         op->ind_indiv = -1;
-        op->ind_given = 1;
     } else if (isdigit(b[0])) {
         n = sg_get_num(b);
         if ((n < 0) || (n > 255)) {
@@ -586,7 +586,6 @@ parse_index(struct opts_t *op)
             op->ind_th = 0;
             op->ind_indiv = n;
         }
-        op->ind_given = 1;
     } else if ('_' == b[0]) {
         if ((c2p = strchr(b + 1, '_')))
             *c2p = '\0';
@@ -611,7 +610,6 @@ parse_index(struct opts_t *op)
         op->ind_etp = &element_type_by_code;
         if (NULL == cp)
             op->ind_indiv = -1;
-        op->ind_given = 1;
     } else { /* element type abbreviation perhaps followed by <num> */
         for (etp = element_type_arr; etp->desc; ++etp) {
             n = strlen(etp->abbrev);
@@ -635,9 +633,8 @@ parse_index(struct opts_t *op)
         op->ind_etp = etp;
         if (NULL == cp)
             op->ind_indiv = -1;
-        op->ind_given = 1;
     }
-    if (op->ind_given && (op->verbose > 1)) {
+    if (op->verbose > 1) {
         if (op->ind_etp)
             fprintf(stderr, "   element type abbreviation: %s, etp_num=%d, "
                     "individual index=%d\n", op->ind_etp->abbrev,
@@ -820,7 +817,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             ++op->page_code_given;
             op->page_code = 2;  /* implicit status page */
             if (op->verbose)
-                fprintf(stderr, "assume --page=2 option is set\n");
+                fprintf(stderr, "assume --page=2 (es) option is set\n");
         }
     }
     if (op->do_list || op->do_enumerate)
@@ -1048,7 +1045,7 @@ find_element_tname(int elem_type_code, char * b, int mlen_b)
 }
 
 /* Returns 1 if el_type (element type) is of interest to the Additional
- * Element Sense page. Otherwise return 0. */
+ * Element Status page. Otherwise return 0. */
 static int
 active_et_aesp(int el_type)
 {
@@ -1099,7 +1096,7 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
                     dStrHex((const char *)rsp_buff, rsp_len, 0);
             } else if (0x8 == rsp_buff[0]) {
                 fprintf(stderr, "Enclosure only supports Short Enclosure "
-                        "status: 0x%x\n", rsp_buff[1]);
+                        "Status: 0x%x\n", rsp_buff[1]);
             } else {
                 fprintf(stderr, "Invalid response, wanted page code: 0x%x "
                         "but got 0x%x\n", page_code, rsp_buff[0]);
@@ -1770,7 +1767,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
     const unsigned char * last_ucp;
     char b[64];
 
-    printf("Enclosure status diagnostic page:\n");
+    printf("Enclosure Status diagnostic page:\n");
     if (resp_len < 4)
         goto truncated;
     printf("  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
@@ -1923,7 +1920,7 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                 "again>>\n");
         return;
     }
-    printf("  threshold status descriptor list\n");
+    printf("  Threshold status descriptor list\n");
     ucp = resp + 8;
     for (k = 0, got1 = 0; k < num_telems; ++k, ++tdhp) {
         if ((ucp + 3) > last_ucp)
@@ -1973,7 +1970,7 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     const struct type_desc_hdr_t * tp;
     char b[64];
 
-    printf("Element descriptor In diagnostic page:\n");
+    printf("Element Descriptor In diagnostic page:\n");
     if (resp_len < 4)
         goto truncated;
     last_ucp = resp + resp_len - 1;
@@ -2670,7 +2667,7 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
                    "status=0x%x\n", rsp_buff[1]);
             break;
         case DPC_ENC_BUSY:
-            printf("Enclosure busy diagnostic page, "
+            printf("Enclosure Busy diagnostic page, "
                    "busy=%d [vendor specific=0x%x]\n",
                    rsp_buff[1] & 1, (rsp_buff[1] >> 1) & 0xff);
             break;
@@ -2714,15 +2711,15 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
     return 0;
 }
 
-/* Fetch configuration, enclosure status, element descriptor, additional
- * element status and optionally threshold in pages, place in static arrays.
+/* Fetch Configuration, Enclosure Status, Element Descriptor, Additional
+ * Element Status and optionally Threshold In pages, place in static arrays.
  * Collate (join) overall and individual elements into the static join_arr[].
  * Returns 0 for success, any other return value is an error. */
 static int
-process_join(int sg_fd, struct opts_t * op, int display)
+join_work(int sg_fd, struct opts_t * op, int display)
 {
     int k, j, res, num_t_hdrs, elem_ind, ei, get_out;
-    int desc_len, dn_len, broken_ei, ei2;
+    int desc_len, dn_len, broken_ei, ei2, got1;
     unsigned int ref_gen_code, gen_code;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
@@ -2758,7 +2755,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
     if (res)
         return res;
     if (enc_stat_rsp_len < 8) {
-        fprintf(stderr, "Enclosure status response too short\n");
+        fprintf(stderr, "Enclosure Status response too short\n");
         return -1;
     }
     gen_code = (enc_stat_rsp[4] << 24) | (enc_stat_rsp[5] << 16) |
@@ -2774,7 +2771,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
                       sizeof(elem_desc_rsp), op, &elem_desc_rsp_len);
     if (0 == res) {
         if (elem_desc_rsp_len < 8) {
-            fprintf(stderr, "Element descriptor response too short\n");
+            fprintf(stderr, "Element Descriptor response too short\n");
             return -1;
         }
         gen_code = (elem_desc_rsp[4] << 24) | (elem_desc_rsp[5] << 16) |
@@ -2790,7 +2787,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
         ed_ucp = NULL;
         res = 0;
         if (op->verbose)
-            fprintf(stderr, "  Element descriptor page not "
+            fprintf(stderr, "  Element Descriptor page not "
                     "available\n");
     }
 
@@ -2799,7 +2796,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
                           sizeof(add_elem_rsp), op, &add_elem_rsp_len);
         if (0 == res) {
             if (add_elem_rsp_len < 8) {
-                fprintf(stderr, "Additional element status response too "
+                fprintf(stderr, "Additional Element Status response too "
                         "short\n");
                 return -1;
             }
@@ -2817,7 +2814,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
             ae_last_ucp = NULL;
             res = 0;
             if (op->verbose)
-                fprintf(stderr, "  Additional element status page not "
+                fprintf(stderr, "  Additional Element Status page not "
                         "available\n");
         }
     } else {
@@ -2831,7 +2828,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
                           sizeof(threshold_rsp), op, &threshold_rsp_len);
         if (0 == res) {
             if (threshold_rsp_len < 8) {
-                fprintf(stderr, "Additional element status response too "
+                fprintf(stderr, "Additional Element Status response too "
                         "short\n");
                 return -1;
             }
@@ -2848,7 +2845,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
             t_ucp = NULL;
             res = 0;
             if (op->verbose)
-                fprintf(stderr, "  Threshold in page not available\n");
+                fprintf(stderr, "  Threshold In page not available\n");
         }
     } else {
         threshold_rsp_len = 0;
@@ -2914,7 +2911,7 @@ process_join(int sg_fd, struct opts_t * op, int display)
                     if ((ae_ucp + 1) > ae_last_ucp) {
                         get_out = 1;
                         if (op->verbose)
-                            fprintf(stderr, "process_join: off end of ae "
+                            fprintf(stderr, "join_work: off end of ae "
                                     "page\n");
                         break;
                     }
@@ -2932,7 +2929,7 @@ try_again:
                         }
                         if (NULL == jr2p->enc_statp) {
                             get_out = 1;
-                            fprintf(stderr, "process_join: oi=%d, ei=%d "
+                            fprintf(stderr, "join_work: oi=%d, ei=%d "
                                     "(broken_ei=%d) not in join_arr\n", k,
                                     ei, broken_ei);
                             break;
@@ -2949,7 +2946,7 @@ try_again:
                             ++jrp;
                         if (NULL == jrp->enc_statp) {
                             get_out = 1;
-                            fprintf(stderr, "process_join: join_arr has no "
+                            fprintf(stderr, "join_work: join_arr has no "
                                     "space for ae\n");
                             break;
                         }
@@ -2963,7 +2960,7 @@ try_again:
                 for (j = 0; j <= tdhp->num_elements; ++j, ++jrp) {
                     if (NULL == jrp->enc_statp) {
                         get_out = 1;
-                        fprintf(stderr, "process_join: join_arr has no "
+                        fprintf(stderr, "join_work: join_arr has no "
                                 "space\n");
                         break;
                     }
@@ -2993,8 +2990,8 @@ try_again:
 
     /* Display contents of join_arr */
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
-    for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
-         ++k, ++jrp) {
+    for (k = 0, jrp = join_arr, got1 = 0;
+         ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
         if (op->ind_given) {
             if (op->ind_th != jrp->el_ind_th)
                 continue;
@@ -3012,6 +3009,7 @@ try_again:
                              desc_len))
                 continue;
         }
+        ++got1;
         cp = find_element_tname(jrp->etype, b, sizeof(b));
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
@@ -3025,19 +3023,26 @@ try_again:
         } else
             printf("[%d,%d]  Element type: %s\n", jrp->el_ind_th,
                    jrp->el_ind_indiv, cp);
-        printf("  Enclosure status:\n");
+        printf("  Enclosure Status:\n");
         enc_status_helper("    ", jrp->enc_statp, jrp->etype, op);
         if (jrp->add_elem_statp) {
-            printf("  Additional element status:\n");
+            printf("  Additional Element Status:\n");
             ae_ucp = jrp->add_elem_statp;
             desc_len = ae_ucp[1] + 2;
             additional_elem_helper("    ",  ae_ucp, desc_len, jrp->etype, op);
         }
         if (jrp->thresh_inp) {
-            printf("  Threshold in:\n");
+            printf("  Threshold In:\n");
             t_ucp = jrp->thresh_inp;
             ses_threshold_helper("    ", t_ucp, jrp->etype, op);
         }
+    }
+    if (0 == got1) {
+        if (op->ind_given) 
+            printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+                   op->ind_indiv);
+        if (op->desc_name)
+            printf("      >>> no match on --descriptor=%s\n", op->desc_name);
     }
     return res;
 }
@@ -3193,7 +3198,7 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
         len = (enc_stat_rsp[2] << 8) + enc_stat_rsp[3] + 4;
         ret = do_senddiag(sg_fd, 1, enc_stat_rsp, len, 1, op->verbose);
         if (ret) {
-            fprintf(stderr, "couldn't send Enclosure control page\n");
+            fprintf(stderr, "couldn't send Enclosure Control page\n");
             return -1;
         }
     }
@@ -3213,7 +3218,7 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
     const struct acronym2tuple * a2tp;
 
     if (NULL == jrp->thresh_inp) {
-        fprintf(stderr, "No threshold In/Out element available\n");
+        fprintf(stderr, "No Threshold In/Out element available\n");
         return -1;
     }
     if (NULL == tavp->acron) {
@@ -3309,32 +3314,32 @@ static int
 ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
         struct opts_t * op)
 {
-    int ret, k, desc_len, dn_len, in_page;
+    int ret, k, desc_len, dn_len, found;
     const struct join_row_t * jrp;
     const unsigned char * ed_ucp;
     char b[64];
 
-    in_page = 0;
+    found = 0;
     if (NULL == tavp->acron) {  
-        /* assume tuple refers to status/control page */
-        in_page = DPC_ENC_STATUS;
-        op->page_code = DPC_ENC_CONTROL;
+        if (! op->page_code_given)
+            op->page_code = DPC_ENC_CONTROL;
+        ++found;
     } else if (is_acronym_in_status_ctl(tavp)) {
-        in_page = DPC_ENC_STATUS;
         op->page_code = DPC_ENC_CONTROL;
+        ++found;
     } else if (is_acronym_in_threshold(tavp)) {
-        in_page = DPC_THRESHOLD;
         op->page_code = DPC_THRESHOLD;
+        ++found;
     } else if (is_acronym_in_additional(tavp)) {
-        in_page = DPC_ADD_ELEM_STATUS;
         op->page_code = DPC_ADD_ELEM_STATUS;
+        ++found;
     }
-    if (0 == in_page) {
+    if (! found) {
         fprintf(stderr, "acroynm %s not found (try '-ee' option)\n",
                 tavp->acron);
         return -1;
     }
-    ret = process_join(sg_fd, op, 0);
+    ret = join_work(sg_fd, op, 0);
     if (ret)
         return ret;
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
@@ -3406,7 +3411,7 @@ enumerate_diag_pages(void)
 /* Output from --enumerate or --list option. Note that the output is
  * different when the option is given twice. */
 static void
-process_do_enumerate(const struct opts_t * op)
+enumerate_work(const struct opts_t * op)
 {
     int num;
     const struct element_type_t * etp;
@@ -3427,7 +3432,7 @@ process_do_enumerate(const struct opts_t * op)
                    etp->elem_type_code);
     } else {
         /* command line has multiple --enumerate and/or --list options */
-        printf("--clear, --get, --set acronyms for enclosure status/control "
+        printf("--clear, --get, --set acronyms for Enclosure Status/Control "
                "['es' or 'ec'] page:\n");
         for (a2tp = ecs_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" :
@@ -3435,7 +3440,7 @@ process_do_enumerate(const struct opts_t * op)
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
-        printf("\n--clear, --get, --set acronyms for threshold in/out "
+        printf("\n--clear, --get, --set acronyms for Threshold In/Out "
                "['th'] page:\n");
         for (a2tp = th_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" :
@@ -3443,7 +3448,7 @@ process_do_enumerate(const struct opts_t * op)
             printf("    %s  [%s] [%d:%d:%d]\n", a2tp->acron, (cp ? cp : "??"),
                    a2tp->start_byte, a2tp->start_bit, a2tp->num_bits);
         }
-        printf("\n--get acronyms for additional element status ['aes'] page "
+        printf("\n--get acronyms for Additional Element Status ['aes'] page "
                "(SAS EIP=1):\n");
         for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++a2tp) {
             cp = (a2tp->etype < 0) ? "*" :
@@ -3481,7 +3486,7 @@ main(int argc, char * argv[])
         return 0;
     }
     if (opts.do_enumerate || opts.do_list) {
-        process_do_enumerate(&opts);
+        enumerate_work(&opts);
         return 0;
     }
     if (opts.num_cgs) {
@@ -3548,7 +3553,7 @@ main(int argc, char * argv[])
     if (have_cgs)
         ret = ses_cgs(sg_fd, &tav, &opts);
     else if (opts.do_join)
-        ret = process_join(sg_fd, &opts, 1);
+        ret = join_work(sg_fd, &opts, 1);
     else if (opts.do_status)
         ret = ses_process_status_page(sg_fd, &opts);
     else { /* control page requested */
@@ -3557,13 +3562,13 @@ main(int argc, char * argv[])
         opts.data_arr[2] = (opts.arr_len >> 8) & 0xff;
         opts.data_arr[3] = opts.arr_len & 0xff;
         switch (opts.page_code) {
-        case DPC_ENC_CONTROL:  /* Enclosure control diagnostic page [0x2] */
-            printf("Sending Enclosure control [0x%x] page, with page "
+        case DPC_ENC_CONTROL:  /* Enclosure Control diagnostic page [0x2] */
+            printf("Sending Enclosure Control [0x%x] page, with page "
                    "length=%d bytes\n", opts.page_code, opts.arr_len);
             ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
                               opts.verbose);
             if (ret) {
-                fprintf(stderr, "couldn't send Enclosure control page\n");
+                fprintf(stderr, "couldn't send Enclosure Control page\n");
                 goto err_out;
             }
             break;
@@ -3588,12 +3593,12 @@ main(int argc, char * argv[])
             }
             break;
         case DPC_ARRAY_CONTROL:   /* Array control diagnostic page [0x6] */
-            printf("Sending Array control [0x%x] page, with page "
+            printf("Sending Array Control [0x%x] page, with page "
                    "length=%d bytes\n", opts.page_code, opts.arr_len);
             ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
                               opts.verbose);
             if (ret) {
-                fprintf(stderr, "couldn't send Array control page\n");
+                fprintf(stderr, "couldn't send Array Control page\n");
                 goto err_out;
             }
             break;
@@ -3605,6 +3610,28 @@ main(int argc, char * argv[])
             if (ret) {
                 fprintf(stderr, "couldn't send Subenclosure String Out "
                         "page\n");
+                goto err_out;
+            }
+            break;
+        case DPC_DOWNLOAD_MICROCODE: /* Download Microcode Control [0xe] */
+            printf("Sending Download Microcode Control [0x%x] page, with "
+                   "page length=%d bytes\n", opts.page_code, opts.arr_len);
+            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
+                              opts.verbose);
+            if (ret) {
+                fprintf(stderr, "couldn't send Download Microcode Control "
+                        "page\n");
+                goto err_out;
+            }
+            break;
+        case DPC_SUBENC_NICKNAME: /* Subenclosure Nickname Control [0xf] */
+            printf("Sending Subenclosure Nickname Control [0x%x] page, with "
+                   "page length=%d bytes\n", opts.page_code, opts.arr_len);
+            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
+                              opts.verbose);
+            if (ret) {
+                fprintf(stderr, "couldn't send Subenclosure Nickname "
+                        "Control page\n");
                 goto err_out;
             }
             break;
