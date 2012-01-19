@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2011 Douglas Gilbert.
+ * Copyright (c) 2009-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * This program issues the SCSI GET LBA STATUS command to the given SCSI device.
  */
 
-static char * version_str = "1.03 20110204";    /* sbc2r22 */
+static char * version_str = "1.04 20120118";    /* sbc2r29 */
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
@@ -232,9 +232,11 @@ main(int argc, char * argv[])
                                verbose);
     ret = res;
     if (0 == res) {
+        /* in sbc3r25 offset for calculating the 'parameter data length'
+         * (rlen variable below) was reduced from 8 to 4. */
         if (maxlen >= 4)
             rlen = (glbasBuffp[0] << 24) + (glbasBuffp[1] << 16) +
-                   (glbasBuffp[2] << 8) + glbasBuffp[3] + 8;
+                   (glbasBuffp[2] << 8) + glbasBuffp[3] + 4;
         else
             rlen = maxlen;
         k = (rlen > maxlen) ? maxlen : rlen;
