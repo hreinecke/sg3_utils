@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2011 Douglas Gilbert.
+ * Copyright (c) 2004-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.64 20111220";    /* ses3r03 */
+static char * version_str = "1.64 20120118";    /* ses3r03 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
@@ -473,17 +473,17 @@ usage()
             "    --data=- | -d -     fetch string of ASCII hex bytes from "
             "stdin\n"
             "    --descriptor=DN|-D DN    descriptor name, alternative to "
-            "--index=IND\n"
+            "--index=...\n"
             "    --enumerate|-e      enumerate page names + element types "
             "(ignore\n"
-            "                        DEVICE), use twice for clear,get,set "
+            "                        DEVICE). Use twice for clear,get,set "
             "acronyms\n"
-            "    --filter|-f         filter out enclosure status clear "
-            "flags\n"
+            "    --filter|-f         filter out enclosure status flags that "
+            "are clear\n"
             "    --get=STR|-G STR    get value of field by acronym or "
             "position\n"
             "    --help|-h           print out usage message\n"
-            "    --hex|-H            print page response in hex\n"
+            "    --hex|-H            print page response (or field) in hex\n"
             "    --index=IIA|-I IIA    individual index ('-1' for overall) "
             "or element\n"
             "                          type abbreviation (e.g. 'arr')\n"
@@ -497,9 +497,9 @@ usage()
     fprintf(stderr,
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
-            "    --join|-j           group enclosure status, element "
-            "descriptor\n"
-            "                        and additional element status pages. "
+            "    --join|-j           group Enclosure Status, Element "
+            "Descriptor\n"
+            "                        and Additional Element Status pages. "
             "Use twice\n"
             "                        to add Threshold In page\n"
             "    --list|-l           same as '--enumerate' option\n"
@@ -762,7 +762,8 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             return 0;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
-            fprintf(stderr, "  For more information use '--help'\n");
+            fprintf(stderr, "  For command line usage information use the "
+                    "'--help' option\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }

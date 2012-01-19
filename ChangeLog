@@ -2,25 +2,27 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.33 [20111220] [svn: r434]
-  - win: change DataBufferOffset type per MSDN; caused
-    problem with 64 bit machines (buffered interface)
-  - sg_inq, sg_vpd: sync with spc4r33
-  - sg_luns: tweak documentation for vendor specific reports
+Changelog for sg3_utils-1.33 [20120118] [svn: r435]
+  - sg_ses: major rework of indexes (again), now two level
   - sg_write_buffer: new --specific option for mode specific
     field; new mode 13 (spc4r32)
   - sg_vpd: add hp3par volume info vendor VPD page
     - fix 'scsi ports' [0x88] page problem
     - add 'sinq' pseudo page for standard inquiry response
     - add power consumption page
-  - sg_ses: rework indexes, now two level
+  - sg_format: add --poll= option for request sense polling
+    - improve handling of disks > 2 TB and DIF (protection)
   - sg_logs: LB provision lpage extra (sbc3r28)
   - sg_modes: application tag mpage subcode 0xf0->0x2
-  - sg_format: add --poll=PT option for request sense polling
-    - improve handling of disks > 2 TB and DIF (protection)
   - sg_write_same: no prot fields when wrprotect=0
-  - man pages for scsi_loging_level, scsi_mandat, scsi_satl
-    and scsi_temperature
+  - sg_get_lba_status: reflect change in sbc3r25 to Parameter
+    Data Length response field (offset reduced from 8 to 4)
+  - sg_inq, sg_vpd: sync with spc4r33
+  - win32: change DataBufferOffset type per MSDN; caused
+    problem with 64 bit machines (with buffered interface)
+  - sg_luns: tweak documentation for vendor specific reports
+  - add man pages for scsi_loging_level, scsi_mandat,
+    scsi_satl and scsi_temperature
 
 Changelog for sg3_utils-1.32 [20110730] [svn: r410]
   - sg_sanitize: new utility for command added in sb3r27

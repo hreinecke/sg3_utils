@@ -2,18 +2,23 @@
                       ====================
 Introduction
 ============
-This package contains low level utilities for devices that use a SCSI
-command set. Apart from SCSI parallel interface (SPI) devices, the SCSI
-command set is used by ATAPI devices (CD/DVDs and tapes), USB mass storage
-devices, Fibre Channel disks, IEEE 1394 storage devices (that use the
-"SBP" protocol), SAS, iSCSI and FCoE devices (amongst others).
+This package contains low level utilities for devices that use the SCSI
+command set. Originally the SCSI command set was associated exclusively
+with the SCSI Parallel Interface (SPI) transport. SPI has now almost
+been completely replaced by the Serial Attached SCSI (SAS) transport which
+also accepts the SCSI command set. Additionally many other storage related
+transports use the SCSI command set (amongst others); examples are ATAPI
+devices (CD/DVDs and tapes), USB mass storage devices (including those
+using the newer UAS[P]), Fibre Channel disks, IEEE 1394 storage devices (SBP
+protocol), iSCSI, FCoE and SOP devices.
 
 This package originally targeted the Linux SCSI subsystem. Since most
 operating systems contain a SCSI command pass-through mechanism, many
 utilities within this package have been ported. This README mainly
 concentrates on Linux: see the README.freebsd file for the FreeBSD port,
 README.solaris for the Solaris port, the README.tru64 file for the Tru64
-(OSF) port and README.win32 for the Windows ports (of which there are two).
+(OSF) port and README.win32 for the Windows ports (of which there are two
+variants).
 
 Most utilities within the sg3_utils package work at the SCSI command level.
 For example the sg_inq utility issues a SCSI INQUIRY command and decodes the
@@ -350,7 +355,7 @@ Dangerous code
 ==============
 This code:
     unsigned char uc = 0x80;
-    unsigned long long = ull;
+    unsigned long long ull;
     ull = (uc << 24);
 Gives an unexpected result because the 'unary conversion' of uc to a (32 bit
 signed) 'int' before the shift. The resultant type from the shift is also
@@ -365,4 +370,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Doug Gilbert
-17th December 2011
+18th January 2012

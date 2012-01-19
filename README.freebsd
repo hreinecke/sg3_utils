@@ -79,6 +79,21 @@ In FreeBSD disks have block names like '/dev/da0' with a corresponding
 pass-through device name like '/dev/pass0'. Use this command
 "camcontrol devlist" to see that SCSI devices available.
 
+FreeBSD installation
+====================
+The traditional './configure ; make ; make install' sequence from the
+top level of the unpacked tarball will work on FreeBSD. But the man pages
+will be placed under the /usr/local/share/man directory which unfortunately
+is not on the standard manpath. One solution is to add this path by
+creating a file with a name like local_share.conf in the
+/usr/local/etc/man.d/ directory and placing this line in it:
+    MANPATH /usr/local/share/man
+
+FreeBSD 9.0 has a "ports" entry for sg3_utils under the
+/usr/ports/sysutils directory. It points to version 1.28 of sg3_utils
+which is now a bit dated. It could be used as a template to point
+to more recent versions.
+
 kFreeBSD
 ========
 sg3_utils can be built into a Debian package for kFreeBSD using the
@@ -113,10 +128,10 @@ DFLTPHYS(65536). Still a problem in FreeBSD 8.1 . Due to CAM overhead the
 largest power of 2 that can fit through with one command is 32768 bytes (32
 KB).
 
-FreeBSD 8.1 is the most recent version of FreeBSD tested with these
+FreeBSD 9.0 is the most recent version of FreeBSD tested with these
 utilities.
 
 
 
 Doug Gilbert
-21st June 2011
+17th January 2012
