@@ -1,11 +1,12 @@
 /*
- * Copyright (c) 2005-2011 Douglas Gilbert.
+ * Copyright (c) 2005-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.15 20100827 */
+/* sg_pt_linux version 1.16 20120125 */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +34,10 @@ static const char * linux_host_bytes[] = {
     "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT",
     "DID_BAD_TARGET", "DID_ABORT", "DID_PARITY", "DID_ERROR",
     "DID_RESET", "DID_BAD_INTR", "DID_PASSTHROUGH", "DID_SOFT_ERROR",
-    "DID_IMM_RETRY", "DID_REQUEUE"
+    "DID_IMM_RETRY", "DID_REQUEUE" /* 0xd */,
+    "DID_TRANSPORT_DISRUPTED", "DID_TRANSPORT_FAILFAST",
+    "DID_TARGET_FAILURE" /* 0x10 */,
+    "DID_NEXUS_FAILURE (reservation conflict)",
 };
 
 #define LINUX_HOST_BYTES_SZ \
@@ -413,14 +417,14 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     int n, m;
     char * cp = b;
     int driv, sugg;
-    const char * driv_cp = "invalid";
-    const char * sugg_cp = "invalid";
+    const char * driv_cp = "unknown";
+    const char * sugg_cp = "unknown";
 
     m = max_b_len;
     n = 0;
     if (hs) {
         if ((hs < 0) || (hs >= LINUX_HOST_BYTES_SZ))
-            n = snprintf(cp, m, "Host_status=0x%02x is invalid\n", hs);
+            n = snprintf(cp, m, "Host_status=0x%02x is unknown\n", hs);
         else
             n = snprintf(cp, m, "Host_status=0x%02x [%s]\n", hs,
                          linux_host_bytes[hs]);
