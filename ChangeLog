@@ -2,8 +2,8 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.34 [20120119] [svn: r436]
-  - xxxxx
+Changelog for sg3_utils-1.34 [20120125] [svn: r437]
+  - sg_pt_linux: expand DID_ (host_byte) codes
 
 Changelog for sg3_utils-1.33 [20120118] [svn: r435]
   - sg_ses: major rework of indexes (again), now two level
