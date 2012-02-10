@@ -92,5 +92,5 @@ function "getopt_long()" has been placed in the "getopt_long"
 subdirectory. Currently only the Tru64 port uses it.
 
 
-Doug Gilbert
+Douglas Gilbert
 21st June 2011

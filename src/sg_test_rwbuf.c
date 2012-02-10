@@ -8,8 +8,8 @@
  * serious data corruption, if the device is accessed by
  * somebody else in the meantime.
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
- * heavily based on Doug Gilbert's sg_rbuf program.
- * (c) 1999-2008 Doug Gilbert
+ * heavily based on Douglas Gilbert's sg_rbuf program.
+ * (c) 1999-2008 Douglas Gilbert
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
