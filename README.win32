@@ -9,6 +9,11 @@ Linux idiosyncrasies to be easily ported. A new package called 'ddpt'
 contains a utility with similar functionality to sg_dd and is available
 for Windows.
 
+The Windows port uses the Microsoft SCSI Pass Through (SPT) interface.
+It has two variants: "SPT" where data is double buffered; and "SPTD"
+where data pointers to the user space are passed to the OS. Only Windows
+2000 and later (i.e. not 95, 98 or ME) support SPT.
+
 Two build environments are catered for: cygwin (see www.cygwin.com) and
 MinGW ("Minimalist GNU for Windows", see www.mingw.org). Both are based in
 the gcc compiler (although other C compilers should have little problem with
@@ -209,5 +214,5 @@ problem by changing what it knows to be binary output files to "binary
 mode" with the setmode() Windows command.
 
 
-Doug Gilbert
-21st June 2011
+Douglas Gilbert
+4th February 2012

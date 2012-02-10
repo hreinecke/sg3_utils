@@ -25,5 +25,5 @@ is to execute './configure' in the main directory then 'cd lib ; make '.
 Then return to this directory and do 'make sg_chk_asc'.
 
 
-Doug Gilbert
+Douglas Gilbert
 30th March 2010 

@@ -135,5 +135,5 @@ present (perhaps externally or within a HBA) then that would allow SATA
 disks to accept SCSI commands including the SCSI ATA PASS THROUGH commands.
 
 
-Doug Gilbert
+Douglas Gilbert
 21st June 2011

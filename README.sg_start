@@ -34,4 +34,5 @@ Postscript
 sg_start has been reworked to allow a block device (e.g. /dev/sda) in
 addition to the sg device name (e.g. /dev/sg0) in the lk 2.6 series.
 sg_start now has more command line options, see its man page.
-	Doug Gilbert <dgilbert at interlog dot com> 2004/5/8
+
+	Douglas Gilbert <dgilbert at interlog dot com> 2004/5/8
