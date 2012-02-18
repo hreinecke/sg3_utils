@@ -1,9 +1,9 @@
-.TH SG_SYNC "8" "March 2009" "sg3_utils\-1.27" SG3_UTILS
+.TH SG_SYNC "8" "February 2012" "sg3_utils\-1.34" SG3_UTILS
 .SH NAME
 sg_sync \- send the scsi command synchronize cache
 .SH SYNOPSIS
 .B sg_sync
-[\fI\-\-count=COUNT\fR] [\fI\-\-group=GROUP\fR] [\fI\-\-help\fR]
+[\fI\-\-count=COUNT\fR] [\fI\-\-group=GN\fR] [\fI\-\-help\fR]
 [\fI\-\-immed\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-sync\-nv\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -33,8 +33,8 @@ where \fICOUNT\fR is the number of blocks to synchronize from and including
 from and including \fILBA\fR argument to the highest block address are
 synchronized.
 .TP
-\fB\-g\fR, \fB\-\-group\fR=\fIGROUP\fR
-where \fIGROUP\fR is the group number which can be between 0 and 31 inclusive.
+\fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
+where \fIGN\fR is the group number which can be between 0 and 31 inclusive.
 The default value is 0 . Group numbers are used to segregate data collected
 within the device. This is a new feature in SBC\-2 and can probably be
 ignored for the time being.
@@ -76,7 +76,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2009 Douglas Gilbert
+Copyright \(co 2004\-2012 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
