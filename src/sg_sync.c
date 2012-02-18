@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -23,7 +23,7 @@
  * (e.g. disks).
  */
 
-static char * version_str = "1.08 20100312";
+static char * version_str = "1.09 20120217";
 
 
 static struct option long_options[] = {
@@ -41,14 +41,14 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sync    [--count=COUNT] [--group=GROUP] [--help] [--immed]\n"
+          "sg_sync    [--count=COUNT] [--group=GN] [--help] [--immed]\n"
           "                  [--lba=LBA] [--sync-nv] [--verbose] [--version] "
           "DEVICE\n"
           "  where:\n"
           "    --count=COUNT|-c COUNT    number of blocks to sync (def: 0 "
           "which implies\n"
           "                              rest of device)\n"
-          "    --group=GROUP|-g GROUP  set group number (def: 0)\n"
+          "    --group=GN|-g GN    set group number field to GN (def: 0)\n"
           "    --help|-h           print out usage message\n"
           "    --immed|-i          command returns immediately when set "
           "else wait\n"

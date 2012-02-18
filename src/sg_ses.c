@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.64 20120118";    /* ses3r03 */
+static char * version_str = "1.65 20120214";    /* ses3r04 */
 
 #define MX_ALLOC_LEN 4096
 #define MX_ELEM_HDR 1024
