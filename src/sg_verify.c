@@ -27,7 +27,7 @@
  * SCSI block device.
  */
 
-static char * version_str = "1.16 20120217";
+static char * version_str = "1.17 20120220";
 
 #define ME "sg_verify: "
 
@@ -55,40 +55,42 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_verify [--16] [--bpc=BPC] [--bytchk=N] [--count=COUNT] "
+          "sg_verify [--16] [--bpc=BPC] [--bytchk=NDO] [--count=COUNT] "
           "[--dpo]\n"
           "                 [--group=GN] [--help] [--in=IF] [--lba=LBA] "
           "[--readonly]\n"
           "                 [--verbose] [--version] [--vrprotect=VRP] "
           "DEVICE\n"
           "  where:\n"
-          "    --16|-S             use VERIFY(16) (default: use "
+          "    --16|-S             use VERIFY(16) (def: use "
           "VERIFY(10) )\n"
           "    --bpc=BPC|-b BPC    max blocks per verify command "
-          "(def 128)\n"
-          "    --bytchk=N|-B       set BYTCHK (byte check) bit, N is "
+          "(def: 128)\n"
+          "    --bytchk=NDO|-B NDO    set BYTCHK (byte check) bit, NDO is "
           "number of\n"
-          "                        bytes fetched from IF (or stdin) "
-          "to verify the\n"
-          "                        device data against. Forces "
+          "                           bytes placed in data-out buffer. "
+          "These are\n"
+          "                           fetched from IF (or stdin) and used "
+          "to verify\n"
+          "                           the device data against. Forces "
           "--bpc=COUNT\n"
           "    --count=COUNT|-c COUNT    count of blocks to verify "
-          "(def 1)\n"
+          "(def: 1)\n"
           "    --dpo|-d            disable page out (cache retention "
           "priority)\n"
           "    --group=GN|-g GN    set group number field to GN (def: 0)\n"
           "    --help|-h           print out usage message\n"
-          "    --in=IF|-i IF       input from file called IF (default: "
+          "    --in=IF|-i IF       input from file called IF (def: "
           "stdin)\n"
           "                        only active if --bytchk=N given\n"
           "    --lba=LBA|-l LBA    logical block address to start "
-          "verify (def 0)\n"
+          "verify (def: 0)\n"
           "    --readonly|-r       open DEVICE read-only (def: open it "
           "read-write)\n"
           "    --verbose|-v        increase verbosity\n"
           "    --version|-V        print version string and exit\n"
           "    --vrprotect=VRP|-P VRP    set vrprotect field to VRP "
-          "(def 0)\n"
+          "(def: 0)\n"
           "Performs one or more SCSI VERIFY(10) or SCSI VERIFY(16) "
           "commands\n"
           );
@@ -100,7 +102,7 @@ main(int argc, char * argv[])
     int sg_fd, res, c, num, nread, infd;
     int64_t ll;
     int dpo = 0;
-    int bytchk = -1;
+    int bytchk = 0;
     char *ref_data = NULL;
     int vrprotect = 0;
     int64_t count = 1;
@@ -141,7 +143,7 @@ main(int argc, char * argv[])
             break;
         case 'B':
             bytchk = sg_get_num(optarg);
-            if (-1 == bytchk) {
+            if (bytchk < 1) {
                 fprintf(stderr, "bad argument to '--bytchk'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -235,7 +237,7 @@ main(int argc, char * argv[])
                 (bytchk > 0) ? "count" : "bpc");
         ++verify16;
     }
-    if ((lba > 0xffffffffLLU) && (0 == verify16)) {
+    if (((lba + count - 1) > 0xffffffffLLU) && (0 == verify16)) {
         fprintf(stderr, "'lba' exceed 32 bits, so use VERIFY(16)\n");
         ++verify16;
     }
@@ -267,6 +269,8 @@ main(int argc, char * argv[])
             } else if (sg_set_binary_mode(infd) < 0)
                 perror("sg_set_binary_mode");
         }
+        if (verbose && got_stdin)
+                fprintf(stderr, "about to wait on STDIN\n");
         for (nread = 0; nread < bytchk; nread += res) {
             res = read(infd, ref_data + nread, bytchk - nread);
             if (res <= 0) {
@@ -278,8 +282,7 @@ main(int argc, char * argv[])
         }
         if (! got_stdin)
             close(infd);
-    } else
-        bytchk = 0;
+    }
 
     if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
@@ -299,11 +302,11 @@ main(int argc, char * argv[])
     for (; count > 0; count -= bpc, lba +=bpc) {
         num = (count > bpc) ? bpc : count;
         if (verify16)
-            res = sg_ll_verify16(sg_fd, vrprotect, dpo, bytchk >= 0,
+            res = sg_ll_verify16(sg_fd, vrprotect, dpo, bytchk > 0,
                                  lba, num, group, ref_data,
                                  bytchk, &info64, 1, verbose);
         else
-            res = sg_ll_verify10(sg_fd, vrprotect, dpo, bytchk >= 0,
+            res = sg_ll_verify10(sg_fd, vrprotect, dpo, bytchk > 0,
                                  (unsigned int)lba, num, ref_data,
                                  bytchk, &info, 1, verbose);
         if (0 != res) {
