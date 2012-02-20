@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2011 Douglas Gilbert.
+ * Copyright (c) 2007-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.71 20111025";  /* spc4r33, sbc3r29 */
+const char * sg_lib_version_str = "1.72 20120218";  /* spc4r33, sbc3r29 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -344,7 +344,8 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 };
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
- * corresponding text can be found at: www.t10.org/lists/asc-num.txt */
+ * corresponding text can be found at: www.t10.org/lists/asc-num.txt
+ * The following should match asc-num.txt dated 20111222 */
 
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
 {
@@ -382,6 +383,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x00,0x1d,"ATA pass through information available"},
     {0x00,0x1e,"Conflicting SA creation request"},
     {0x00,0x1f,"Logical unit transitioning to another power condition"},
+    {0x00,0x20,"Extended copy information available"},
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},
@@ -566,6 +568,16 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x21,0x03,"Invalid write crossing layer jump"},
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
     {0x23,0x00,"Invalid token operation, cause not reportable"},
+    {0x23,0x01,"Invalid token operation, unsupported token type"},
+    {0x23,0x02,"Invalid token operation, remote token usage not supported"},
+    {0x23,0x03,"invalid token operation, remote rod token creation not "
+               "supported"},
+    {0x23,0x04,"Invalid token operation, token unknown"},
+    {0x23,0x05,"Invalid token operation, token corrupt"},
+    {0x23,0x06,"Invalid token operation, token revoked"},
+    {0x23,0x07,"Invalid token operation, token expired"},
+    {0x23,0x08,"Invalid token operation, token cancelled"},
+    {0x23,0x09,"Invalid token operation, token deleted"},
     {0x24,0x00,"Invalid field in cdb"},
     {0x24,0x01,"CDB decryption error"},
     {0x24,0x02,"Invalid cdb field while in explicit block model (obs)"},
@@ -634,6 +646,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2A,0x0a,"Error history i_t nexus cleared"},
     {0x2A,0x0b,"Error history snapshot released"},
     {0x2A,0x14,"SA creation capabilities data has changed"},
+    {0x2A,0x15,"Medium removal prevention preempted"},
     {0x2B,0x00,"Copy cannot execute since host cannot disconnect"},
     {0x2C,0x00,"Command sequence error"},
     {0x2C,0x01,"Too many windows specified"},
@@ -822,6 +835,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x09,"Medium auxiliary memory not accessible"},
     {0x55,0x0a,"Data currently unavailable"},
     {0x55,0x0b,"Insufficient power for operation"},
+    {0x55,0x0c,"Insufficient resources to create rod"},
+    {0x55,0x0d,"Insufficient resources to create rod token"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
