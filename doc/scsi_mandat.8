@@ -1,0 +1,44 @@
+.TH SCSI_MANDAT "8" "December 2011" "sg3_utils\-1.33" SG3_UTILS
+.SH NAME
+scsi_mandat \- check SCSI device support for mandatory commands
+.SH SYNOPSIS
+.B scsi_mandat
+[\fI\-\-help\fR] [\fI\-\-log\fR] [\fI\-\-quiet\fR] [\fI\-\-verbose\fR]
+\fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This Bourne shell script calls several SCSI commands on the given
+\fIDEVICE\fR. These SCSI commands are considered mandatory (although
+that varies a little depending on which standard/draft the \fIDEVICE\fR
+complies with). The results of each test and a pass/fail count are
+output.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print out the usage message then exit.
+.TP
+\fB\-L\fR, \fB\-\-log\fR
+the output to stderr (from each SCSI command executed) is appended to
+a file called 'scsi_mandat.err' in the current working directory.
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+the amount of output is reduced and typically only the pass/fail
+count is output.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase level or verbosity.
+.SH EXIT STATUS
+The exit status of this script is the number of "bad" errors found.
+So an exit status of 0 means all mandatory SCSI commands worked as
+expected.
+.SH AUTHORS
+Written by D. Gilbert
+.SH COPYRIGHT
+Copyright \(co 2011 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_inq,sg_luns,sg_turs,sg_requests,sg_vpd,sg_senddiag (sg3_utils)

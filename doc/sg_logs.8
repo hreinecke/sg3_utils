@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "April 2007" "sg3_utils\-1.24" SG3_UTILS
+.TH SG_LOGS "8" "October 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -30,7 +30,7 @@ LOG SELECT command. At the same time a page code field was introduced to the
 to the LOG SELECT command. The log subpage code can range from 0 to 255 (0xff)
 inclusive. The subpage code value 255 can be thought of as a wildcard.
 .PP
-This utility supports two command line syntaxes, the preferred one is shown
+This utility supports two command line surtaxes, the preferred one is shown
 first in the synopsis and explained in this section. A later section on the
 old command line syntax outlines the second group of options.
 .SH OPTIONS
@@ -79,9 +79,10 @@ sets the "allocation length" field in the LOG SENSE cdb. The is the maximum
 length in bytes that the response will be. Without this option (or \fILEN\fR
 equal to 0) this utility first fetches the 4 byte response then does a second
 access with the length indicated in the first (4 byte) response. Negative
-values and 1 for \fILEN\fR are not accepted. Responses can be quite
-large (e.g. the background scan results log page) and this option can be
-used to limit the amount of information returned.
+values and 1 for \fILEN\fR are not accepted. \fILEN\fR cannot exceed
+65535 (0xffff).  Responses can be quite large (e.g. the background scan
+results log page) and this option can be used to limit the amount of
+information returned.
 .TP
 \fB\-n\fR, \fB\-\-name\fR
 decode some log pages into 'name=value' entries, one per line. The name
@@ -204,7 +205,7 @@ the leading "0x", or as their decimal equivalents.]:
 .br
 0xb       Last n deferred errors or asynchronous events
 .br
-0xc       Sequential access device (ssc\-2)
+0xc       Logical block provisioning (sbc\-3) or Sequential access device (ssc\-2)
 .br
 0xd       Temperature
 .br
@@ -212,13 +213,19 @@ the leading "0x", or as their decimal equivalents.]:
 .br
 0x10      Self\-test results
 .br
+0x11      Solid state media
+.br
 0x15      Background scan results (sbc\-3)
+.br
+0x16      ATA pass\-through results (sat\-3)
 .br
 0x17      Non\-volatile cache (sbc\-3)
 .br
 0x18      Protocol specific port (SAS transport)
 .br
 0x19      General statistics and performance
+.br
+0x1a      Power condition transitions
 .br
 0x2f      Informational exceptions
 .br
@@ -327,11 +334,11 @@ print out version string then exit.
 \fB\-?\fR
 output usage message then exit.
 .SH AUTHOR
-Written by Doug Gilbert
+Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2007 Douglas Gilbert
+Copyright \(co 2002\-2011 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

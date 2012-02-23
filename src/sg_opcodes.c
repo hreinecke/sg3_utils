@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2010 D. Gilbert
+ *  Copyright (C) 2004-2011 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static char * version_str = "0.36 20100819";    /* spc4r26 */
+static char * version_str = "0.37 20110303";    /* spc4r26 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -55,6 +55,7 @@ static struct option long_options[] = {
         {"alpha", 0, 0, 'a'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
+        {"no-inquiry", 0, 0, 'n'},
         {"new", 0, 0, 'N'},
         {"opcode", 1, 0, 'o'},
         {"old", 0, 0, 'O'},
@@ -73,6 +74,7 @@ struct opts_t {
     int do_alpha;
     int do_help;
     int do_hex;
+    int no_inquiry;
     int do_opcode;
     int do_raw;
     int do_rctd;
@@ -92,15 +94,17 @@ usage()
 {
     fprintf(stderr,
             "Usage:  sg_opcodes [--alpha] [--help] [--hex] "
-            "[--opcode=OP[,SA]] [--raw]\n"
-            "                   [--rctd] [--repd] [--sa=SA] [--tmf] "
-            "[--unsorted]\n"
-            "                   [--verbose] [--version] DEVICE\n"
+            "[--no-inquiry]\n"
+            "                   [--opcode=OP[,SA]] [--raw] [--rctd] "
+            "[--repd] [--sa=SA]\n"
+            "                   [--tmf] [--unsorted] [--verbose] "
+            "[--version] DEVICE\n"
             "  where:\n"
             "    --alpha|-a      output list of operation codes sorted "
             "alphabetically\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
+            "    --no-inquiry|-n    don't output INQUIRY information\n"
             "    --opcode=OP|-o OP    first byte of command to query\n"
             "                         (decimal, prefix with '0x' for hex)\n"
             "    --opcode=OP,SA|-o OP,SA    opcode (OP) and service action "
@@ -110,8 +114,8 @@ usage()
             "    --raw|-r        output response in binary to stdout\n"
             "    --rctd|-R       set RCTD (return command timeout "
             "descriptor) bit\n"
-            "    --repd|-q       set REPD (report extended parameter data) "
-            "for tmf_s\n"
+            "    --repd|-q       set Report Extended Parameter Data bit, "
+            "with --tmf\n"
             "    --sa=SA|-s SA    service action in addition to opcode\n"
             "                     (decimal, prefix with '0x' for hex)\n"
             "    --tmf|-t        output list of supported task management "
@@ -121,7 +125,7 @@ usage()
             "action))\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string then exit\n\n"
-            "Performs a SCSI REPORT SUPPORTED OPERATION CODES or REPORT "
+            "Performs a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT "
             "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command\n");
 }
 
@@ -129,13 +133,14 @@ static void
 usage_old()
 {
     fprintf(stderr,
-            "Usage:  sg_opcodes [-a] [-H] [-o=OP] [-q] [-r] [-R] [-s=SA]"
-            " [-t]\n"
-            "                   [-u] [-v] [-V] DEVICE\n"
+            "Usage:  sg_opcodes [-a] [-H] [-n] [-o=OP] [-q] [-r] [-R] "
+            "[-s=SA]\n"
+            "                   [-t] [-u] [-v] [-V] DEVICE\n"
             "  where:\n"
             "    -a    output list of operation codes sorted "
             "alphabetically\n"
             "    -H    print response in hex\n"
+            "    -n    don't output INQUIRY information\n"
             "    -o=OP    first byte of command to query (in hex)\n"
             "    -q    set REPD bit for tmf_s\n"
             "    -r    output response in binary to stdout\n"
@@ -147,7 +152,7 @@ usage_old()
             "    -v    verbose\n"
             "    -V    output version string\n"
             "    -?    output this usage message\n\n"
-            "Performs a SCSI REPORT SUPPORTED OPERATION CODES (or REPORT "
+            "Performs a SCSI REPORT SUPPORTED OPERATION CODES (or a REPORT "
             "TASK MANAGEMENT\nFUNCTIONS) command\n");
 }
 
@@ -161,7 +166,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ahHNo:OqrRs:tuvV", long_options,
+        c = getopt_long(argc, argv, "ahHnNo:OqrRs:tuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -176,6 +181,9 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'H':
             ++optsp->do_hex;
+            break;
+        case 'n':
+            ++optsp->no_inquiry;
             break;
         case 'N':
             break;      /* ignore */
@@ -287,6 +295,9 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     break;
                 case 'H':
                     ++optsp->do_hex;
+                    break;
+                case 'n':
+                    ++optsp->no_inquiry;
                     break;
                 case 'N':
                     optsp->opt_new = 1;
@@ -695,7 +706,7 @@ main(int argc, char * argv[])
         }
         if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.do_verbose)) {
             peri_type = inq_resp.peripheral_type;
-            if (0 == opts.do_raw) {
+            if (! (opts.do_raw || opts.no_inquiry)) {
                 printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
                        inq_resp.product, inq_resp.revision);
                 cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);

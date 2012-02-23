@@ -243,6 +243,8 @@ extern int sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk,
 extern int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id,
                               int buffer_offset, void * paramp,
                               int param_len, int noisy, int verbose);
+/* Need a sg_ll_write_buffer_v2() function because SPC-4 rev32 has added
+ * a "mode specific" field. Wait for next rev change of this library */
 
 /* Invokes a SCSI WRITE LONG (10) command (SBC). Note that 'xfer_len'
  * is in bytes. Returns 0 -> success,

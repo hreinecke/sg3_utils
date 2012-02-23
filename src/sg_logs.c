@@ -15,7 +15,7 @@
 #include "sg_cmds_basic.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2010 D. Gilbert
+*  Copyright (C) 2000-2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 
 */
 
-static char * version_str = "0.98 20101102";    /* spc4r27 + sbc3r25 */
+static char * version_str = "1.05 20111020";    /* spc4r30 + sbc3r28 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -61,7 +61,7 @@ static char * version_str = "0.98 20101102";    /* spc4r27 + sbc3r25 */
 
 #define LOG_SENSE_PROBE_ALLOC_LEN 4
 
-static unsigned char rsp_buff[MX_ALLOC_LEN];
+static unsigned char rsp_buff[MX_ALLOC_LEN + 4];
 
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
@@ -228,6 +228,8 @@ usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
+/* Processes command line options according to new option format. Returns
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
 process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -276,8 +278,9 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'm':
             n = sg_get_num(optarg);
-            if ((n < 0) || (1 == n)) {
-                fprintf(stderr, "bad argument to '--maxlen='\n");
+            if ((n < 0) || (1 == n) || (n > 0xffff)) {
+                fprintf(stderr, "bad argument to '--maxlen=', from 2 to "
+                        "65535 (inclusive) expected\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -376,6 +379,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
+/* Processes command line options according to old option format. Returns
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
 process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -526,6 +531,12 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
+/* Process command line options. First check using new option format unless
+ * the SG3_UTILS_OLD_OPTS environment variable is defined which causes the
+ * old option format to be checked first. Both new and old format can be
+ * countermanded by a '-O' and '-N' options respectively. As soon as either
+ * of these options is detected (when processing the other format), processing
+ * stops and is restarted using the other format. Clear? */
 static int
 process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -568,10 +579,10 @@ static int
 do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
         const struct opts_t * optsp)
 {
-    int actual_len;
-    int res;
+    int actual_len, res, vb;
 
     memset(resp, 0, mx_resp_len);
+    vb = optsp->do_verbose;
     if (optsp->maxlen > 1)
         actual_len = mx_resp_len;
     else {
@@ -579,7 +590,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
                                    optsp->page_control, optsp->pg_code,
                                    optsp->subpg_code, optsp->paramp,
                                    resp, LOG_SENSE_PROBE_ALLOC_LEN,
-                                   noisy, optsp->do_verbose))) {
+                                   noisy, vb))) {
             switch (res) {
             case SG_LIB_CAT_NOT_READY:
             case SG_LIB_CAT_INVALID_OP:
@@ -592,11 +603,22 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
             }
         }
         actual_len = (resp[2] << 8) + resp[3] + 4;
-        if ((0 == optsp->do_raw) && (optsp->do_verbose > 1)) {
+        if ((0 == optsp->do_raw) && (vb > 1)) {
             fprintf(stderr, "  Log sense (find length) response:\n");
             dStrHex((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
             fprintf(stderr, "  hence calculated response length=%d\n",
                     actual_len);
+        }
+        if (optsp->pg_code != (0x3f & resp[0])) {
+            if (vb)
+                fprintf(stderr, "Page code does not appear in first byte "
+                        "of response so it's suspect\n");
+            if (actual_len > 0x40) {
+                actual_len = 0x40;
+                if (vb)
+                    fprintf(stderr, "Trim response length to 64 bytes due "
+                            "to suspect response format\n");
+            }
         }
         /* Some HBAs don't like odd transfer lengths */
         if (actual_len % 2)
@@ -607,7 +629,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
     if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
                                optsp->page_control, optsp->pg_code,
                                optsp->subpg_code, optsp->paramp,
-                               resp, actual_len, noisy, optsp->do_verbose))) {
+                               resp, actual_len, noisy, vb))) {
         switch (res) {
         case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_INVALID_OP:
@@ -619,7 +641,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
             return -1;
         }
     }
-    if ((0 == optsp->do_raw) && (optsp->do_verbose > 1)) {
+    if ((0 == optsp->do_raw) && (vb > 1)) {
         fprintf(stderr, "  Log sense response:\n");
         dStrHex((const char *)resp, actual_len, 1);
     }
@@ -1693,11 +1715,11 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 
 /* from sas2r15 */
 static void
-show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
+show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
 {
     unsigned int u;
 
-    switch (peis) {
+    switch (pes) {
     case 0:
         printf("     No event\n");
         break;
@@ -1819,6 +1841,8 @@ show_sas_phy_event_info(int peis, unsigned int val, unsigned thresh_val)
         printf("     Received SMP frame error count: %u\n", val);
         break;
     default:
+        printf("     Unknown phy event source: %d, val=%u, thresh_val=%u\n",
+               pes, val, thresh_val);
         break;
     }
 }
@@ -1896,6 +1920,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
+            /* attached device type. In SAS-1.1 case 2 was an edge expander;
+             * in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "end device"); break;
@@ -1956,6 +1982,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             case 8: snprintf(s, sz, "phy enabled; 1.5 Gbps"); break;
             case 9: snprintf(s, sz, "phy enabled; 3 Gbps"); break;
             case 0xa: snprintf(s, sz, "phy enabled; 6 Gbps"); break;
+            case 0xb: snprintf(s, sz, "phy enabled; 12 Gbps"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
             printf("    negotiated logical link rate: %s\n", s);
@@ -1982,7 +2009,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("    Phy reset problem = %u\n", ui);
         }
         if (spld_len > 51) {
-            int num_ped, peis;
+            int num_ped, pes;
             unsigned char * xcp;
             unsigned int pvdt;
 
@@ -2000,12 +2027,12 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             }
             xcp = vcp + 52;
             for (m = 0; m < (num_ped * 12); m += 12, xcp += 12) {
-                peis = xcp[3];
+                pes = xcp[3];
                 ui = (xcp[4] << 24) | (xcp[5] << 16) | (xcp[6] << 8) |
                      xcp[7];
                 pvdt = (xcp[8] << 24) | (xcp[9] << 16) | (xcp[10] << 8) |
                        xcp[11];
-                show_sas_phy_event_info(peis, ui, pvdt);
+                show_sas_phy_event_info(pes, ui, pvdt);
             }
         } else if (optsp->do_verbose)
            printf("    <<No phy event descriptors>>\n");
@@ -2638,7 +2665,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LB_PROV_LPAGE */
+/* LB_PROV_LPAGE [0xc] */
 static void
 show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2654,9 +2681,28 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
-        if ((pc >= 0x1) && (pc <= 0x2)) {
-            cp = (0x1 == pc)? "Available" : "Used";
-            printf("  %s LBA mapping threshold resource count:", cp);
+        switch (pc) {
+        case 0x1:
+            cp = "  Available LBA mapping threshold";
+            break;
+        case 0x2:
+            cp = "  Used LBA mapping threshold";
+            break;
+        case 0x100:
+            cp = "  De-duplicated LBA";
+            break;
+        case 0x101:
+            cp = "  Compressed LBA";
+            break;
+        case 0x102:
+            cp = "  Total efficiency LBA";
+            break;
+        default:
+            cp = NULL;
+            break;
+        }
+        if (cp) {
+            printf("  %s resource count:", cp);
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     fprintf(stderr, "\n    truncated by response length, "
@@ -2668,6 +2714,15 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
             }
             j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
             printf(" %d\n", j);
+            if (pl > 8) {
+                switch (ucp[8] & 0x3) {
+                case 0: cp = "not reported"; break;
+                case 1: cp = "dedicated to lu"; break;
+                case 2: cp = "not dedicated to lu"; break;
+                case 3: cp = "reserved"; break;
+                }
+                printf("    Scope: %s\n", cp);
+            }
         } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
             printf("  Vendor specific [0x%x]:", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
@@ -3764,7 +3819,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
         if (optsp->do_raw)
             dStrRaw((const char *)resp, len);
         else if (optsp->do_hex)
-            dStrHex((const char *)resp, len, 1);
+            dStrHex((const char *)resp, len, (1 == optsp->do_hex));
         else
             show_temperature_page(resp, len, optsp->do_pcb, 0, 0);
     }else if (SG_LIB_CAT_NOT_READY == res)
@@ -3777,7 +3832,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
             if (optsp->do_raw)
                 dStrRaw((const char *)resp, len);
             else if (optsp->do_hex)
-                dStrHex((const char *)resp, len, 1);
+                dStrHex((const char *)resp, len, (1 == optsp->do_hex));
             else
                 show_ie_page(resp, len, 0, 0);
         } else
@@ -3910,7 +3965,7 @@ main(int argc, char * argv[])
         if (opts.do_raw)
             dStrRaw((const char *)rsp_buff, pg_len + 4);
         else if (opts.do_hex > 1)
-            dStrHex((const char *)rsp_buff, pg_len + 4, 1);
+            dStrHex((const char *)rsp_buff, pg_len + 4, (2 == opts.do_hex));
         else if (pg_len > 1) {
             if (opts.do_hex) {
                 if (rsp_buff[0] & 0x40)
@@ -3960,7 +4015,8 @@ main(int argc, char * argv[])
                 if (opts.do_raw)
                     dStrRaw((const char *)rsp_buff, pg_len + 4);
                 else if (opts.do_hex > 1)
-                    dStrHex((const char *)rsp_buff, pg_len + 4, 1);
+                    dStrHex((const char *)rsp_buff, pg_len + 4,
+                            (2 == opts.do_hex));
                 else if (opts.do_hex) {
                     if (rsp_buff[0] & 0x40)
                         printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"

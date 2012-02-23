@@ -5,11 +5,16 @@ to Linux. One utility for listing available devices, sg_scan, has a
 Windows-specific version for this port.
 
 The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
-Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+Linux idiosyncrasies to be easily ported. A new package called 'ddpt'
 contains a utility with similar functionality to sg_dd and is available
 for Windows.
 
-Two build environments are caterered for: cygwin (see www.cygwin.com) and
+The Windows port uses the Microsoft SCSI Pass Through (SPT) interface.
+It has two variants: "SPT" where data is double buffered; and "SPTD"
+where data pointers to the user space are passed to the OS. Only Windows
+2000 and later (i.e. not 95, 98 or ME) support SPT.
+
+Two build environments are catered for: cygwin (see www.cygwin.com) and
 MinGW ("Minimalist GNU for Windows", see www.mingw.org). Both are based in
 the gcc compiler (although other C compilers should have little problem with
 the source code). Cygwin is a more sophisticated, commercial product that
@@ -47,6 +52,7 @@ Here is a list of utilities that have been ported:
     sg_rmsn
     sg_rtpg
     sg_safte
+    sg_sanitize
     sg_sat_identify
     sg_sat_phy_event
     sg_sat_set_features
@@ -74,7 +80,7 @@ file. An overview of sg3_utils can be found at:
 http://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
-Some man pages have examples which use linux device names which hopefully
+Some man pages have examples which use Linux device names which hopefully
 will not confuse Windows users.
 
 Two pass-through variants
@@ -104,7 +110,7 @@ rather than:
    ./configure
 prior to the 'make' call.
 
-In sg3_utils version 1.31 runtime selection of the direct or indirect
+In sg3_utils version 1.31 run-time selection of the direct or indirect
 interface was added with the scsi_pt_win32_direct(int state_direct)
 function declared in sg_pt.h. The default is indirect unless
 './configure --enable-win32-spt-direct' was used in the build. If
@@ -208,5 +214,5 @@ problem by changing what it knows to be binary output files to "binary
 mode" with the setmode() Windows command.
 
 
-Doug Gilbert
-11th February 2011
+Douglas Gilbert
+4th February 2012

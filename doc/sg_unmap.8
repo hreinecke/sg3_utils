@@ -1,4 +1,4 @@
-.TH SG_UNMAP "8" "October 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_UNMAP "8" "November 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_unmap \- sends a SCSI UNMAP command
 .SH SYNOPSIS
@@ -11,31 +11,30 @@ sg_unmap \- sends a SCSI UNMAP command
 .PP
 Send a SCSI UNMAP command to \fIDEVICE\fR to unmap one or more logical
 blocks. This command was introduced in SBC\-3 revision 18 under the broad
-heading of "logical block provisioning".
-Logical blocks may also be unmapped by the SCSI WRITE SAME command; see
-sg_write_same. The unmap capability is closely related to the ATA DATA SET
-MANAGEMENT command with the "Trim" bit set.
+heading of "logical block provisioning". Logical blocks may also be unmapped
+by the SCSI WRITE SAME command; see the sg_write_same utility. The unmap
+capability is closely related to the ATA DATA SET MANAGEMENT command with
+the "Trim" bit set.
 .PP
 Logical blocks to be unmapped can be specified in one of two ways to this
-utility. One way is by supplying the (start) LBAs to the '\-\-lba=' option
+utility. One way is by supplying the start LBAs to the '\-\-lba=' option
 and the corresponding number(s) to unmap to the '\-\-num=' option. The
-other way is by putting (start) LBA and number pairs in a file whose name
-is given to the '\-\-in=' option. All values are assumed to be decimal
+other way is by putting start LBA and number to unmap pairs in a file whose
+name is given to the '\-\-in=' option. All values are assumed to be decimal
 unless prefixed by "0x" (or "0X") or have a trailing "h" (or "H") in which
 case they are interpreted as hexadecimal.
 .PP
-When the '\-\-lba=' option is given then the '\-\-num=' option must
-also be given. If one has a comma separated list as its argument then
-the other must have the same number of elements in its list. The
-arguments can use a single space as a separator but need to be in quotes
-or escaped to not be misinterpreted by the shell.
+When the '\-\-lba=' option is given then the '\-\-num=' option must also be
+given. If one has a comma separated list as its argument then the other must
+have the same number of elements in its list. The arguments can use a single
+space as a separator but need to be in quotes or escaped to not be
+misinterpreted by the shell.
 .PP
-With the '\-\-in=FILE' option an even number of values must be found
-and are interpreted as pairs: the first value in each pair is a
-starting LBA and the second value is the number to unmap from that
-LBA. Everything from and including a "#" on a line is ignored as
-are blank lines. Values may be comma, space and tab separated or appear
-on separate lines.
+With the '\-\-in=FILE' option an even number of values must be found and are
+interpreted as pairs: the first value in each pair is a starting LBA and the
+second value is the number to unmap from that LBA. Everything from and
+including a "#" on a line is ignored as are blank lines. Values may be
+comma, space and tab separated or appear on separate lines.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -101,6 +100,11 @@ the sg_format utility) may be considered as an alternative.
 Support for logical block provisioning is indicated by the LBPME bit in the
 response to the SCSI READ CAPACITY (16) command (see the sg_readcap utility).
 .PP
+In SBC\-3 revision 25 the LBPU and ANC_SUP bits where added to the
+Logical Block Provisioning VPD page. When LBPU is set it indicates that
+the device supports the UNMAP command. When the ANC_SUP bit is set it
+indicates the device supports anchored LBAs.
+.SH EXAMPLES
 In the examples directory of the sg3_utils package there is a
 sg_unmap_example.txt file that shows the format that the '\-\-in='
 option accepts.
@@ -112,9 +116,9 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2010 Douglas Gilbert
+Copyright \(co 2009\-2011 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_format,sg_get_lba_status,sg_readcap,sg_write_same(sg3_utils)
+.B sg_format,sg_get_lba_status,sg_readcap,sg_vpd,sg_write_same(sg3_utils)

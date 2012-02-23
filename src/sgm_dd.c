@@ -33,7 +33,7 @@
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2007 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2011 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -64,9 +64,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static char * version_str = "1.35 20080205 shared_mmap";
+static char * version_str = "1.36 20111014 shared_mmap";
 #else
-static char * version_str = "1.35 20080205";
+static char * version_str = "1.36 20111014";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -843,9 +843,10 @@ main(int argc, char * argv[])
             scsi_cdbsz_in = sg_get_num(buf);
             scsi_cdbsz_out = scsi_cdbsz_in;
             cdbsz_given = 1;
-        } else if (0 == strcmp(key,"coe"))
+        } else if (0 == strcmp(key,"coe")) {
             do_coe = sg_get_num(buf);   /* dummy, just accept + ignore */
-        else if (0 == strcmp(key,"count")) {
+            do_coe = do_coe;    /* suppress warning */
+        } else if (0 == strcmp(key,"count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
                 if (-1LL == dd_count) {

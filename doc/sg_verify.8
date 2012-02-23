@@ -1,39 +1,65 @@
-.TH SG_VERIFY "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
+.TH SG_VERIFY "8" "February 2012" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
 .B sg_verify
-[\fI\-\-bpc=BPC\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR] [\fI\-\-help\fR]
-[\fI\-\-lba=LBA\fR] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-vrprotect=VRP\fR] \fIDEVICE\fR
+[\fI\-\-16\fR] [\fI\-\-bpc=BPC\fR] [\fI\-\-bytchk=NDO\fR]
+[\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR] [\fI\-\-group=GN\fR] [\fI\-\-help\fR]
+[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-readonly\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vrprotect=VRP\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends one or more SCSI VERIFY commands to \fIDEVICE\fR. It is the 10 byte
-VERIFY command defined for block devices (see SBC\-2 at http://www.t10.org).
-Verify starts at the logical block address given by the \fI\-\-lba=LBA\fR
-option and continues for \fI\-\-count=COUNT\fR blocks. No more than
-\fI\-\-bpc=BPC\fR blocks are verified by each VERIFY command so if necessary
-multiple VERIFY commands are sent. No news is good news (i.e. if there are
-no verify errors detected no messages are sent to stderr and the Unix return
-status is 0).
+Sends one or more SCSI VERIFY (10 or 16) commands to \fIDEVICE\fR. These SCSI
+commands are defined in the SBC\-2 (draft) standard at http://www.t10.org and
+SBC\-3 drafts.
+.PP
+When \fI\-\-bytchk=NDO\fR is not given then the verify starts at the logical
+block address given by the \fI\-\-lba=LBA\fR option and continues for
+\fI\-\-count=COUNT\fR blocks. No more than \fI\-\-bpc=BPC\fR blocks are
+verified by each VERIFY command so if necessary multiple VERIFY commands are
+sent. No news is good news (i.e. if there are no verify errors detected no
+messages are sent to stderr and the Unix return status is 0).
+.PP
+When \fI\-\-bytchk=NDO\fR is given then the \fI\-\-bpc=BPC\fR option is
+ignored. A single verify command is issued and it starts at the logical block
+address given by the \fI\-\-lba=LBA\fR option and continues for
+\fI\-\-count=COUNT\fR blocks. The VERIFY command has an associated data\-out
+buffer that is \fINDO\fR bytes long. The contents of the data\-out buffer are
+obtained from the \fIFN\fR file (if \fI\-\-in=FN\fR is given) or from stdin.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
 option name.
 .TP
+\fB\-S\fR, \fB\-\-16\fR
+uses a VERIFY(16) command (default VERIFY(10)). Even without this option,
+using an \fI\-\-lba=LBA\fR which is too large, will cause the utility
+to issue a VERIFY(16) command.
+.TP
 \fB\-b\fR, \fB\-\-bpc\fR=\fIBPC\fR
-where \fIBPC\fR specifies the maximum number of blocks that will be verified
-by a single SCSI VERIFY command. The default value is 128 blocks which
-equates to 64 KB for a disk with 512 byte blocks. If \fIBPC\fR is less than
-\fICOUNT\fR then multiple SCSI VERIFY commands are sent to the device. For
-recent block devices (disks) this value may be constrained by the maximum
-transfer length field in the block limits VPD page.
+this option is ignored if \fI\-\-bytchk=NDO\fR is given. Otherwise \fIBPC\fR
+specifies the maximum number of blocks that will be verified by a single SCSI
+VERIFY command. The default value is 128 blocks which equates to 64 KB for a
+disk with 512 byte blocks. If \fIBPC\fR is less than \fICOUNT\fR then
+multiple SCSI VERIFY commands are sent to the device. For recent block
+devices (disks) this value may be constrained by the maximum transfer length
+field in the block limits VPD page.
+.TP
+\fB\-B\fR, \fB\-\-bytchk\fR=\fINDO\fR
+sets the BYTCHK bit in the VERIFY command. \fINDO\fR is the number of bytes
+to obtain from the \fIFN\fR file (if \fI\-\-in=FN\fR is given) or from stdin.
+Those bytes are placed in the data\-out buffer associated with the SCSI
+VERIFY command. The minimum value for \fINDO\fR is 1 and the maximum value
+is dependant on the OS.
 .TP
 \fB\-c\fR, \fB\-\-count\fR=\fICOUNT\fR
 where \fICOUNT\fR specifies the number of blocks to verify. The default value
 is 1 . If \fICOUNT\fR is greater than \fIBPC\fR (or its default value of 128)
-then multiple SCSI VERIFY commands are sent to the device. The
+and \fINDO\fR is not given, 0 or less then multiple SCSI VERIFY commands are
+sent to the device. Otherwise \fICOUNT\fR becomes the contents of the
+verification length field of the SCSI VERIFY command issued. The
 .B sg_readcap
 utility can be used to find the maximum number of blocks that a block
 device (e.g. a disk) has.
@@ -43,8 +69,19 @@ disable page out changes the cache retention priority of blocks read on
 the device's cache to the lowest priority. This means that blocks read by
 other commands are more likely to remain in the device's cache.
 .TP
+\fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
+where \fIGN\fR becomes the contents of the group number field in the SCSI
+VERIFY(16) command. The default value for \fIGN\fR is 0. Note that this
+option is ignored for the SCSI VERIFY(10) command.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
+.TP
+\fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
+where \fIIF\fR is the name of a file from which \fINDO\fR bytes will be read
+and placed in the data\-out buffer. This is only done when the
+\fI\-\-bytchk=NDO\fR option is given. If this option is not given then stdin
+is read. If \fIIF\fR is "\-" then stdin is also used.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
 where \fILBA\fR specifies the logical block address of the first block to
@@ -66,21 +103,46 @@ print the version string and then exit.
 where \fIVRP\fR is the value in the vrprotect field in the VERIFY command
 cdb. It must be a value between 0 and 7 inclusive. The default value is
 zero.
+.SH BYTCHK
+BYTCHK is the name of a bit field in the VERIFY(10) and VERIFY(16) commands.
+When set it indicates that associated with the SCSI VERIFY command a
+data\-out buffer will be sent for the device (disk) to check. Using the
+\fI\-\-bytchk=NDO\fR option sets the BYTCHK field and \fINDO\fR is the number
+of bytes placed in the data\-out buffer. Those bytes are obtained from stdin
+or \fIIF\fR (from the \fI\-\-in=FN\fR option).
+.PP
+The calculation of \fINDO\fR is left up to the user. Its value depends
+on the logical block size (found with the sg_readcap utility), the
+\fICOUNT\fR and the \fIVRP\fR values. If the \fIVRP\fR is greater than 0
+then each logical block will contain an extra 8 bytes (of protection
+information).
+.PP
+When the BYTCHK field is 0 then the verification process done by the
+device (disk) is vendor specific. It typically involves checking each
+block on the disk against its error correction codes (ECC) which is
+additional data also held on the disk.
+.PP
+Many Operating Systems put limits on the maximum size of the
+data\-out (and data\-in) buffer. For Linux at one time the limit was
+less than 1 MB but has been increased somewhat.
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
 .PP
-The amount of error correction and the number of retries attempted
-before a block is considered defective are controlled in part by the
-Verify Error Recovery mode page.  A note in the SBC\-2 (draft)
-standard advises that to minimize the number of checks (and hence
-have the most "sensitive" verify check) do the following in that
-mode page. Set the EER bit to 0, the PER bit to 1, the DTE bit to 1,
-the DCR bit to 1, the verify retry count to 0 and the verify error
-recovery timeout to 0. Mode pages can be modified with the
-.B sginfo
+The amount of error correction and the number of retries attempted before a
+block is considered defective are controlled in part by the Verify Error
+Recovery mode page. A note in the SBC\-3 draft (rev 29 section 6.4.9 on the
+Verify Error Recovery mode page) advises that to minimize the number of
+checks (and hence have the most "sensitive" verify check) do the following
+in that mode page: set the EER bit to 0, the PER bit to 1, the DTE bit to 1,
+the DCR bit to 1, the verify retry count to 0 and the verify recovery time
+limit to 0. Mode pages can be modified with the
+.B sdparm
 utility.
+.PP
+The SCSI VERIFY(6) command defined in the SSC\-2 standard and later (i.e.
+for tape drive systems) is not supported by this utility.
 .SH EXIT STATUS
 The exit status of sg_verify is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -89,10 +151,10 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2011 Douglas Gilbert
+Copyright \(co 2004\-2012 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sginfo(sg3_utils), sg_modes(sg3_utils), sg_readcap(sg3_utils),
+.B sdparm(sdparm), sg_modes(sg3_utils), sg_readcap(sg3_utils),
 .B sg_inq(sg3_utils)

@@ -1,11 +1,12 @@
-.TH SG_WRITE_BUFFER "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
+.TH SG_WRITE_BUFFER "8" "August 2011" "sg3_utils\-1.33" SG3_UTILS
 .SH NAME
 sg_write_buffer \- send a SCSI WRITE BUFFER command
 .SH SYNOPSIS
 .B sg_write_buffer
 [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR] [\fI\-\-length=LEN\fR]
 [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR] [\fI\-\-raw\fR]
-[\fI\-\-skip=SKIP\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-skip=SKIP\fR] [\fI\-\-specific=MS\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -44,7 +45,6 @@ this option sets the mode field in the cdb. \fIMO\fR is a value between
 0 (default) and 31 inclusive. Alternatively an abbreviation can be given.
 To list the available mode abbreviations give an invalid
 one (e.g. '\-\-mode=xxx') or use the '\-hh' option.
-
 .TP
 \fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
 this option sets the buffer offset field in the cdb. \fIOFF\fR is a value
@@ -61,6 +61,12 @@ this option is only active when \fI\-\-in=FILE\fR is given and
 starting at byte offset \fISKIP\fR to the end of file (or the amount
 given by \fI\-\-length=LEN\fR). If not given the byte offset defaults to
 0 (i.e. the start of the file).
+.TP
+\fB\-S\fR, \fB\-\-specific\fR=\fIMS\fR
+\fIMS\fR is the mode specific field in the cdb. This is a 3-bit field
+so the values 0 to 7 are accepted. This field was introduced in SPC\-4
+revision 32 and can be used to specify additional events that activate
+deferred microcode (when \fIMO\fR is 0xD).
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).

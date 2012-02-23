@@ -6,7 +6,7 @@ similar functionality; for example 'sg_map' is similar to
 'camcontrol devlist'.
 
 The dd variants from the sg3_utils package (e.g. sg_dd) rely on too many
-Linux idiosyncracies to be easily ported. A new package called 'ddpt'
+Linux idiosyncrasies to be easily ported. A new package called 'ddpt'
 contains a utility with similar functionality to sg_dd and ddpt is available
 for FreeBSD.
 
@@ -37,6 +37,7 @@ Here is a list of utilities that have been ported:
     sg_rmsn
     sg_rtpg
     sg_safte
+    sg_sanitize
     sg_sat_identify
     sg_sat_phy_event
     sg_sat_set_features
@@ -69,7 +70,7 @@ the tarball and installed with the familiar
 running the "./autogen.sh" script prior to that sequence. There
 are generic instruction on configure and friend in the INSTALL file.
 
-Some man pages have examples which use linux device names which
+Some man pages have examples which use Linux device names which
 hopefully will not confuse the FreeBSD users.
 
 Device naming
@@ -78,6 +79,26 @@ In FreeBSD disks have block names like '/dev/da0' with a corresponding
 pass-through device name like '/dev/pass0'. Use this command
 "camcontrol devlist" to see that SCSI devices available.
 
+FreeBSD installation
+====================
+The traditional './configure ; make ; make install' sequence from the
+top level of the unpacked tarball will work on FreeBSD. But the man pages
+will be placed under the /usr/local/share/man directory which unfortunately
+is not on the standard manpath. One solution is to add this path by
+creating a file with a name like local_share.conf in the
+/usr/local/etc/man.d/ directory and placing this line in it:
+    MANPATH /usr/local/share/man
+
+FreeBSD 9.0 has a "ports" entry for sg3_utils under the
+/usr/ports/sysutils directory. It points to version 1.28 of sg3_utils
+which is now a bit dated. It could be used as a template to point
+to more recent versions.
+
+kFreeBSD
+========
+sg3_utils can be built into a Debian package for kFreeBSD using the
+./build_debian.sh script in the top level directory. This has been tested
+with Debian 6.0 release.
 
 Details
 =======
@@ -99,10 +120,18 @@ viewed with the "camcontrol devlist" command. To access ATAPI devices (e.g.
 ATAPI DVD drives) the kernel may need to be configured with the "atapicam"
 device.
 
-FreeBSD 8.0 is the most recent version of FreeBSD tested with these
+Attempts to send SCSI commands with data-in or data-out buffers around 64 KB
+and larger failed on a FreeBSD 7.0 with an "argument list too long" error
+message. There is an associated kernel message (viewable with dmesg) that an
+attempt has been made to map <n> bytes which is greater than
+DFLTPHYS(65536). Still a problem in FreeBSD 8.1 . Due to CAM overhead the
+largest power of 2 that can fit through with one command is 32768 bytes (32
+KB).
+
+FreeBSD 9.0 is the most recent version of FreeBSD tested with these
 utilities.
 
 
 
-Doug Gilbert
-5th December 2010
+Douglas Gilbert
+17th January 2012

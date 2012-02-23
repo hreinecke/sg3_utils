@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -88,8 +88,9 @@ extern "C" {
 #define SPC_SK_ABORTED_COMMAND 0xb
 #define SPC_SK_VOLUME_OVERFLOW 0xd
 #define SPC_SK_MISCOMPARE 0xe
+#define SPC_SK_COMPLETED 0xf
 
-/* Transport protocol identifiers */
+/* Transport protocol identifiers or just Protocol identifiers */
 #define TPROTO_FCP 0
 #define TPROTO_SPI 1
 #define TPROTO_SSA 2
@@ -99,6 +100,8 @@ extern "C" {
 #define TPROTO_SAS 6
 #define TPROTO_ADT 7
 #define TPROTO_ATA 8
+#define TPROTO_UAS 9
+#define TPROTO_SOP 0xa
 #define TPROTO_NONE 0xf
 
 
@@ -184,7 +187,8 @@ extern int sg_get_sense_filemark_eom_ili(const unsigned char * sensep,
                                          int sb_len, int * filemark_p,
                                          int * eom_p, int * ili_p);
 
-/* Returns 1 if sense key is NO_SENSE or NOT_READY and SKSV is set. Places
+/* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
+ * returns 1 if progress indication sense data descriptor found. Places
  * progress field from sense data where progress_outp points. If progress
  * field is not available returns 0. Handles both fixed and descriptor
  * sense formats. N.B. App should multiply by 100 and divide by 65536
@@ -251,6 +255,8 @@ extern void sg_print_scsi_status(int scsi_status);
 #define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
                                 /* (e.g. a transport or driver error) */
 
+/* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
+ * common sense key then return SG_LIB_CAT_SENSE .*/
 extern int sg_err_category_sense(const unsigned char * sense_buffer,
                                  int sb_len);
 

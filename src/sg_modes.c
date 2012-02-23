@@ -13,7 +13,7 @@
 #include "sg_cmds_basic.h"
 
 /*
-*  Copyright (C) 2000-2010 D. Gilbert
+*  Copyright (C) 2000-2011 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 */
 
-static char * version_str = "1.34 20101028";
+static char * version_str = "1.37 20111113";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -184,6 +184,8 @@ usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
+/* Processes command line options according to new option format. Returns
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
 process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -317,6 +319,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
+/* Processes command line options according to old option format. Returns
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
 process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -462,6 +466,12 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
+/* Process command line options. First check using new option format unless
+ * the SG3_UTILS_OLD_OPTS environment variable is defined which causes the
+ * old option format to be checked first. Both new and old format can be
+ * countermanded by a '-O' and '-N' options respectively. As soon as either
+ * of these options is detected (when processing the other format), processing
+ * stops and is restarted using the other format. Clear? */
 static int
 process_cl(struct opts_t * optsp, int argc, char * argv[])
 {
@@ -510,6 +520,7 @@ static struct page_code_desc pc_desc_common[] = {
     {0x18, 0x0, "Protocol specific lu"},
     {0x19, 0x0, "Protocol specific port"},
     {0x1a, 0x0, "Power condition"},
+    {0x1a, 0x1, "Power consumption"},
     {0x1c, 0x0, "Informational exceptions control"},
     {PG_CODE_ALL, 0x0, "[yields all supported pages]"},
     {PG_CODE_ALL, SPG_CODE_ALL, "[yields all supported pages and subpages]"},
@@ -522,7 +533,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x5, 0x0, "Flexible geometry (obsolete)"},
     {0x7, 0x0, "Verify error recovery"},
     {0x8, 0x0, "Caching"},
-    {0xa, 0xf0, "Application tag"},
+    {0xa, 0x02, "Application tag"},
     {0xa, 0xf1, "Parallel ATA control (SAT)"},
     {0xa, 0xf2, "Reserved (SATA control) (SAT)"},
     {0xb, 0x0, "Medium types supported (obsolete)"},

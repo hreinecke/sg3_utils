@@ -1,4 +1,4 @@
-.TH SG_VPD "8" "September 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_VPD "8" "February 2012" "sg3_utils\-1.34" SG3_UTILS
 .SH NAME
 sg_vpd \- fetches Vital Product Data (VPD) pages using a SCSI INQUIRY command
 .SH SYNOPSIS
@@ -29,7 +29,7 @@ option name.
 \fB\-e\fR, \fB\-\-enumerate\fR
 list the names of the known VPD pages, first the standard pages, then the
 vendor specific pages. Each group is sorted in abbreviation order. The
-\fIDEVICE\fR and other options are ignored and this utility exits afte
+\fIDEVICE\fR and other options are ignored and this utility exits after
 listing the VPD page names.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -72,7 +72,8 @@ one number is given then it is assumed to be a VPD page number. If two
 numbers are given the second number indicates which vendor specific VPD page
 to decode when several pages share the same VPD page number. If this option
 is not given (nor '\-i', '\-l' nor '\-V') then the "Supported VPD pages" (0x0)
-VPD page is fetched and decoded.
+VPD page is fetched and decoded. If \fIPG\fR is '\-1' or 'sinq' then the
+standard INQUIRY response is output.
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 suppress the amount of decoding output.
@@ -106,6 +107,13 @@ a SATA disk behind a SAT layer then this
 command: 'sg_vpd \-p ai \-HHH /dev/sdb | hdparm \-\-Istdin'
 should decode the ATA IDENTIFY (PACKET) DEVICE response.
 .SH NOTES
+Since some VPD pages (e.g. the Extended INQUIRY page) depend on settings
+in the standard INQUIRY response, then the standard INQUIRY response is
+output as a pseudo VPD page when \fIPG\fR is set to '\-1' or 'sinq'. Also
+the decoding of some fields (e.g. the Extended INQUIRY page's SPT field)
+is expanded when the '\-\-long' option is given using the standard INQUIRY
+response information (e.g. the PDT and the PROTECT fields). 
+.PP
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
@@ -118,14 +126,71 @@ the sg3_utils(8) man page.
 The examples in this page use Linux device names. For suitable device
 names in other supported Operating Systems see the sg3_utils(8) man page.
 .PP
-Further examples can be found on http://sg.danny.cz/sg/sg3_utils.html
+To see the VPD pages that a device supports, use with no options. The
+command line invocation is shown first followed by a typical response:
+.PP
+   # sg_vpd /dev/sdb
+.br
+Supported VPD pages VPD page:
+.br
+  Supported VPD pages [sv]
+.br
+  Unit serial number [sn]
+.br
+  Device identification [di]
+.br
+  Extended inquiry data [ei]
+.br
+  Block limits (SBC) [bl]
+.PP
+To see the VPD page numbers associated with each supported page then
+add the '\-\-long' option to the above command line. To view a
+VPD page either its number or abbreviation can be given to
+the '\-\-page=' option. The page name abbreviations are shown within
+square brackets above. In the next example the Extended inquiry data
+VPD page is listed:
+.PP
+   # sg_vpd \-\-page=ei /dev/sdb
+.br
+extended INQUIRY data VPD page:
+.br
+  ACTIVATE_MICROCODE=0 SPT=0 GRD_CHK=0 APP_CHK=0 REF_CHK=0
+.br
+  UASK_SUP=0 GROUP_SUP=0 PRIOR_SUP=0 HEADSUP=1 ORDSUP=1 SIMPSUP=1
+.br
+  WU_SUP=0 CRD_SUP=0 NV_SUP=0 V_SUP=0
+.br
+  P_I_I_SUP=0 LUICLR=0 R_SUP=0 CBCS=0
+.br
+  Multi I_T nexus microcode download=0
+.br
+  Extended self\-test completion minutes=0
+.br
+  POA_SUP=0 HRA_SUP=0 VSA_SUP=0
+.PP
+To check if any protection types are supported by a disk use the '\-\-long'
+option on the Extended inquiry data VPD page:
+.PP
+   # sg_vpd \-\-page=ei \-\-long /dev/sdb
+.br
+   extended INQUIRY data VPD page:
+.br
+     ACTIVATE_MICROCODE=0
+.br
+     SPT=1 [protection types 1 and 2 supported]
+.br
+     GRD_CHK=1
+.br
+     ....
+.PP
+Further examples can be found on the http://sg.danny.cz/sg/sg3_utils.html
 web page.
 .SH AUTHOR
-Written by Doug Gilbert
+Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2010 Douglas Gilbert
+Copyright \(co 2006\-2012 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

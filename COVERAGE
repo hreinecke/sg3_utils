@@ -53,6 +53,7 @@ REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg ++
 REQUEST SENSE       sg_requests, ++
+SANITIZE            sg_sanitize
 SEND DIAGNOSTIC     sg_senddiag, sg_ses, ++
 SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
 SET TARGET PORT GROUPS       sg_stpg, ++
@@ -61,6 +62,7 @@ SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
 TEST UNIT READY     sg_turs, sg_format, ++
 UNMAP               sg_unmap, ++
 VERIFY(10)          sg_verify, ++
+VERIFY(16)          sg_verify, ++
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
@@ -94,5 +96,5 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 (3) this command was known as SET DEVICE IDENTIFIER prior to spc4r07
 
 
-Doug Gilbert
-6th September 2010
+Douglas Gilbert
+17th February 2012

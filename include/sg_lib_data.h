@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2010 Douglas Gilbert.
+ * Copyright (c) 2007-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,6 +26,8 @@ extern "C" {
 #define SG_MAINTENANCE_OUT 0xa4
 #define SG_PERSISTENT_RESERVE_IN 0x5e
 #define SG_PERSISTENT_RESERVE_OUT 0x5f
+#define SG_EXTENDED_COPY 0x83
+#define SG_RECEIVE_COPY 0x84
 #define SG_SERVICE_ACTION_IN_12 0xab
 #define SG_SERVICE_ACTION_OUT_12 0xa9
 #define SG_SERVICE_ACTION_IN_16 0x9e
@@ -65,6 +67,8 @@ extern struct sg_lib_value_name_t sg_lib_serv_in12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_in16_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out16_arr[];
+extern struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[];
+extern struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_variable_length_arr[];
 extern struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
 extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];

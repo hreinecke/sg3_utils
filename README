@@ -2,25 +2,30 @@
                       ====================
 Introduction
 ============
-This package contains low level utilities for devices that use a SCSI
-command set. Apart from SCSI parallel interface (SPI) devices, the SCSI
-command set is used by ATAPI devices (CD/DVDs and tapes), USB mass storage
-devices, Fibre Channel disks, IEEE 1394 storage devices (that use the
-"SBP" protocol), SAS, iSCSI and FCoE devices (amongst others).
+This package contains low level utilities for devices that use the SCSI
+command set. Originally the SCSI command set was associated exclusively
+with the SCSI Parallel Interface (SPI) transport. SPI has now almost
+been completely replaced by the Serial Attached SCSI (SAS) transport which
+also accepts the SCSI command set. Additionally many other storage related
+transports use the SCSI command set (amongst others); examples are ATAPI
+devices (CD/DVDs and tapes), USB mass storage devices (including those
+using the newer UAS[P]), Fibre Channel disks, IEEE 1394 storage devices (SBP
+protocol), iSCSI, FCoE and SOP devices.
 
 This package originally targeted the Linux SCSI subsystem. Since most
 operating systems contain a SCSI command pass-through mechanism, many
 utilities within this package have been ported. This README mainly
 concentrates on Linux: see the README.freebsd file for the FreeBSD port,
 README.solaris for the Solaris port, the README.tru64 file for the Tru64
-(OSF) port and README.win32 for the Windows ports (of which there are two).
+(OSF) port and README.win32 for the Windows ports (of which there are two
+variants).
 
 Most utilities within the sg3_utils package work at the SCSI command level.
 For example the sg_inq utility issues a SCSI INQUIRY command and decodes the
 response. The COVERAGE file has a table containing a row for each SCSI
 command issued by this package; to the right of each row is the utility
 (sometimes more than one) that issue that SCSI command. The COVERAGE file
-has a second table for ATA commands issude.
+has a second table for ATA commands usage.
 
 Some utilities interface at a slightly higher level, for example: sg_dd,
 sgm_dd and sgp_dd. These are closely related to the Unix dd command and
@@ -59,7 +64,7 @@ series.
 In sg3_utils version 1.27 support has been added for the Linux bsg driver
 which use the sg version 4 interface. There seems no point in renaming
 this package sg4_utils. The existing utilities just silently support either.
-Cuurently the source build must be able to see the /usr/include/linux/bsg.h
+Currently the source build must be able to see the /usr/include/linux/bsg.h
 file. Then at run time the /proc/devices pseudo file needs to have an entry
 for the bsg driver (appeared around lk 2.6.28). With this in place each
 utility at run time checks the device it has been given and if it is a char
@@ -95,6 +100,15 @@ as the API of libsgutils and are commented with that in mind. The SCSI
 pass-through code for the supported operating systems is found in the lib
 subdirectory with names like sg_pt_linux.c and sg_pt_win32.c .
 
+Various distributions (of Linux mainly) distribute sg3_utils as 3
+installable packages. One is a package containing the shared library
+discussed above (e.g. libsgutils2-2_1.33-0.1_i386.deb). A second package
+contains the utilities (e.g. sg3-utils_1.33-0.1_i386.deb) and depends on the
+first package). Finally there is an optional package that contains header
+files and a static library (e.g. libsgutils2-dev_1.33-0.1_i386.deb). This
+final package is only needed to build other packages (e.g. sdparm) that
+wish to use the sg3_utils shared library.
+
 All the utilities in the src subdirectory have "man" pages that are
 placed in the doc subdirectory. There is also a sg3_utils (8) man page that
 summarizes common facilities including exit statuses. Additional
@@ -124,7 +138,7 @@ scsi tape driver (st) in lk 2.6.6 .
 
 In the src directory the bulk of the utilities are written in relatively
 clean POSIX compliant C code with Linux specific system calls and structures
-removed and placed in linux specific files in the lib directory. A small
+removed and placed in Linux specific files in the lib directory. A small
 number of utilities in the src directory do contain Linux specific logic
 and are not ported to other OSes (e.g. sg_dd). One utility, sg_scan, has
 two separate implementations, one for Linux (sg_scan.c.linux) and one for
@@ -163,6 +177,8 @@ calls over OS specific calls.
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
 this: 'rpmbuild -ba sg3_utils.spec' in a rpmbuild tree SPECS directory.
+To cross build or make a more widely distributable package then the --target
+option may be useful: 'rpmbuild --target=i386 -ba sg3_utils.spec' .
 
 The 'build_debian.sh' script should build several "deb" packages and place
 them in the parent directory. In debian based systems doing
@@ -192,20 +208,25 @@ Any well implemented "SCSI" device should react sensibly when a utility in
 sg3_utils sends a SCSI command that it doesn't support. Unfortunately this
 cannot be guaranteed.
 
+Prior to lk 2.6.29 USB mass storage limited sense data to 18 bytes which
+caused problems for certain types of descriptor based sense data. An
+example of this is the SCSI ATA PASS-THROUGH command with the CK_COND bit
+set.
+
 
 Utilities
 =========
 Here is list in alphabetical order of utilities found in the 'src'
 subdirectory of the sg3_utils package:
-  - sginfo, sgm_dd, sgp_dd, sg_dd, sg_decode_sense, sg_emc_trespass,
-  - sg_format, sg_get_config, sg_get_lba_status, sg_ident, sg_inq, sg_logs,
-  - sg_luns, sg_map, sg_map26, sg_modes, sg_opcodes, sg_persist, sg_prevent,
-  - sg_raw, sg_rbuf, sg_rdac, sg_read, sg_readcap, sg_read_block_limits,
-  - sg_read_buffer, sg_read_long, sg_reassign, sg_referrals, sg_request,
-  - sg_reset, sg_rmsn, sg_rtpg, sg_safte, sg_sat_identify, sg_sat_phy_event,
-    sg_sat_set_features, sg_scan, sg_senddiag, sg_ses, sg_start, sg_stpg,
-    sg_sync, sg_test_rwbuff, sg_turs, sg_unmap, sg_verify, sg_vpd,
-    sg_write_buffer, sg_write_long, sg_write_same, sg_wr_mode
+    sginfo, sgm_dd, sgp_dd, sg_dd, sg_decode_sense, sg_emc_trespass,
+    sg_format, sg_get_config, sg_get_lba_status, sg_ident, sg_inq, sg_logs,
+    sg_luns, sg_map, sg_map26, sg_modes, sg_opcodes, sg_persist, sg_prevent,
+    sg_raw, sg_rbuf, sg_rdac, sg_read, sg_readcap, sg_read_block_limits,
+    sg_read_buffer, sg_read_long, sg_reassign, sg_referrals, sg_request,
+    sg_reset, sg_rmsn, sg_rtpg, sg_safte, sg_sanitize, sg_sat_identify,
+    sg_sat_phy_event, sg_sat_set_features, sg_scan, sg_senddiag, sg_ses,
+    sg_start, sg_stpg, sg_sync, sg_test_rwbuff, sg_turs, sg_unmap, sg_verify,
+    sg_vpd, sg_write_buffer, sg_write_long, sg_write_same, sg_wr_mode
 
 Each of the above utilities depends on header files found in the 'include'
 subdirectory and library code found in the 'lib' subdirectory. Associated
@@ -248,7 +269,7 @@ checks it against the asc/ascq text strings held in sg_lib_data.c .
 The 'doc' subdirectory contains a README file containing the urls of
 various related documents.
 
-The 'scripts' subdirectory contains some bourne (bash) shell scripts that
+The 'scripts' subdirectory contains some Bourne (bash) shell scripts that
 rely on utilities in the main directory. One script uses the sdparm utility.
 These scripts are described in the scripts/README file and have usage
 messages.
@@ -324,16 +345,17 @@ The more recent utilities that use "getopt_long" only are:
   - sg_decode_sense, sg_format sg_get_config sg_get_lba_status sg_ident
     sg_luns sg_map26 sg_persist sg_prevent sg_raw sg_read_block_limits
     sg_read_buffer sg_read_long sg_reassign sg_referrals sg_requests sg_rmsn
-    sg_rtpg sg_safte sg_sat_identify sg_sat_phy_event sg_sat_set_features
-    sg_scan(w) sg_ses sg_stpg sg_sync sg_test_rwbuf sg_unmap sg_verify
-    sg_vpd sg_write_buffer sg_write_long sg_write_same sg_wr_mode
+    sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event
+    sg_sat_set_features sg_scan(w) sg_ses sg_stpg sg_sync sg_test_rwbuf
+    sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long sg_write_same
+    sg_wr_mode
 
 
 Dangerous code
 ==============
 This code:
     unsigned char uc = 0x80;
-    unsigned long long = ull;
+    unsigned long long ull;
     ull = (uc << 24);
 Gives an unexpected result because the 'unary conversion' of uc to a (32 bit
 signed) 'int' before the shift. The resultant type from the shift is also
@@ -347,5 +369,5 @@ Other SCSI and storage tools
 See http://sg.danny.cz/sg/tools.html
 
 
-Doug Gilbert
-16th February 2011
+Douglas Gilbert
+17th February 2012

@@ -22,21 +22,9 @@
  *    found at http://www.t10.org with the "SCSI Primary Commands-4" (SPC-4)
  *    being the central point of reference.
  *
- *    Other contributions:
- *      Version 0.91 (20031116)
- *          sense key specific field (bytes 15-17) decoding [Trent Piepho]
+ *    Contributions:
+ *      sense key specific field decoding [Trent Piepho 20031116]
  *
- * CHANGELOG (changes prior to v0.97 removed):
- *      v0.97 (20040830)
- *        safe_strerror(), rename sg_decode_sense() to sg_normalize_sense()
- *        decode descriptor sense data format in full
- *      v0.98 (20040924) [SPC-3 rev 21]
- *        renamed from sg_err.c to sg_lib.c
- *        factor out sg_get_num() and sg_get_llnum() into this file
- *        add 'no_ascii<0' variant to dStrHex for ASCII-hex output only
- *      v1.00 (20041012)
- *        renamed from sg_err.c to sg_lib.c
- *        change GPL to FreeBSD license
  */
 
 #include <stdio.h>
@@ -312,6 +300,12 @@ sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
     }
 }
 
+/* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
+ * returns 1 if progress indication sense data descriptor found. Places
+ * progress field from sense data where progress_outp points. If progress
+ * field is not available returns 0. Handles both fixed and descriptor
+ * sense formats. N.B. App should multiply by 100 and divide by 65536
+ * to get percentage completion from given value. */
 int
 sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
                           int * progress_outp)
@@ -328,7 +322,7 @@ sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
         if ((sb_len < 18) ||
             ((SPC_SK_NO_SENSE != sk) && (SPC_SK_NOT_READY != sk)))
             return 0;
-        if (sensep[15] & 0x80) {
+        if (sensep[15] & 0x80) {        /* SKSV bit set */
             if (progress_outp)
                 *progress_outp = (sensep[16] << 8) + sensep[17];
             return 1;
@@ -707,8 +701,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             }
             break;
         default:
-            n += sprintf(b + n, "Unknown or vendor specific [0x%x]\n",
-                    descp[0]);
+            if (descp[0] >= 0x80)
+                n += sprintf(b + n, "Vendor specific [0x%x]\n", descp[0]);
+            else
+                n += sprintf(b + n, "Unknown [0x%x]\n", descp[0]);
             processed = 0;
             break;
         }
@@ -991,6 +987,8 @@ sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
     return 1;
 }
 
+/* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
+ * common sense key then return SG_LIB_CAT_SENSE .*/
 int
 sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
 {
@@ -1020,6 +1018,8 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             break;
         case SPC_SK_ABORTED_COMMAND:
             return SG_LIB_CAT_ABORTED_COMMAND;
+        default:
+            ;   /* drop through (SPC_SK_COMPLETED amongst others) */
         }
     }
     return SG_LIB_CAT_SENSE;
@@ -1057,7 +1057,7 @@ sg_get_command_name(const unsigned char * cmdp, int peri_type, int buff_len,
         return;
     }
     service_action = (SG_VARIABLE_LENGTH_CMD == cmdp[0]) ?
-                     (cmdp[1] & 0x1f) : ((cmdp[8] << 8) | cmdp[9]);
+                     ((cmdp[8] << 8) | cmdp[9]) : (cmdp[1] & 0x1f);
     sg_get_opcode_sa_name(cmdp[0], service_action, peri_type, buff_len, buff);
 }
 
@@ -1144,6 +1144,23 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
             snprintf(buff, buff_len, "Persistent reserve out, service "
                      "action=0x%x", service_action);
         break;
+    case SG_EXTENDED_COPY:
+        vnp = get_value_name(sg_lib_xcopy_sa_arr, service_action, peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Extended copy, service action=0x%x",
+                     service_action);
+        break;
+    case SG_RECEIVE_COPY:
+        vnp = get_value_name(sg_lib_rec_copy_sa_arr, service_action,
+                             peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Receive copy, service action=0x%x",
+                     service_action);
+        break;
     default:
         sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
         break;
@@ -1189,6 +1206,15 @@ sg_get_opcode_name(unsigned char cmd_byte0, int peri_type, int buff_len,
     }
 }
 
+/* Iterates to next designation descriptor in the device identification
+ * VPD page. The 'initial_desig_desc' should point to start of first
+ * descriptor with 'page_len' being the number of valid bytes in that
+ * and following descriptors. To start, 'off' should point to a negative
+ * value, thereafter it should point to the value yielded by the previous
+ * call. If 0 returned then 'initial_desig_desc + *off' should be a valid
+ * descriptor; returns -1 if normal end condition and -2 for an abnormal
+ * termination. Matches association, designator_type and/or code_set when
+ * any of those values are greater than or equal to zero. */
 int
 sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
                    int * off, int m_assoc, int m_desig_type, int m_code_set)

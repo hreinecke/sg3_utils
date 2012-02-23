@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,13 +20,20 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
+/* This program uses a ATA PASS-THROUGH SCSI command. This usage is
+ * defined in the SCSI to ATA Translation (SAT) drafts and standards.
+ * See http://www.t10.org for drafts. SAT is a standard: SAT ANSI INCITS
+ * 431-2007 (draft prior to that is sat-r09.pdf). SAT-2 is also a
+ * standard: SAT-2 ANSI INCITS 465-2010 and the draft prior to that is
+ * sat2r09.pdf . The SAT-3 project has started and the most recent draft
+ * is sat3r01.pdf .
+ */
+
 /* This program performs a ATA PASS-THROUGH (16) SCSI command in order
-   to perform an ATA SET FEATURES command. See http://www.t10.org
-   SAT draft at time of writing: sat-r09.pdf
-
-   See man page (sg_sat_set_features.8) for details.
-
-*/
+ * to perform an ATA SET FEATURES command.
+ *
+ * See man page (sg_sat_set_features.8) for details.
+ */
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
@@ -39,11 +46,11 @@
 
 #define DEF_TIMEOUT 20
 
-static char * version_str = "1.04 20100312";
+static char * version_str = "1.05 20110401";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
-        {"chk_cond", no_argument, 0, 'C'},
+        {"ck_cond", no_argument, 0, 'C'},
         {"feature", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"len", required_argument, 0, 'l'},
@@ -53,17 +60,18 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+
 void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sat_set_features [--count=CO] [--chk_cond] [--feature=FEA] "
+          "sg_sat_set_features [--count=CO] [--ck_cond] [--feature=FEA] "
           "[--help]\n"
           "                           [--lba=LBA] [--len=16|12] [--verbose] "
           "[--version]\n"
           "                           DEVICE\n"
           "  where:\n"
           "    --count=CO | -c CO      count field contents (def: 0)\n"
-          "    --chk_cond | -C         set chk_cond field in pass-through "
+          "    --ck_cond | -C          set ck_cond field in pass-through "
           "(def: 0)\n"
           "    --feature=FEA|-f FEA     feature field contents\n"
           "                             (def: 0 (which is reserved))\n"
@@ -84,10 +92,8 @@ void usage()
           "/dev/sdc'\n");
 }
 
-
-
 static int do_set_features(int sg_fd, int feature, int count, int lba,
-                           int cdb_len, int chk_cond, int verbose)
+                           int cdb_len, int ck_cond, int verbose)
 {
     int res, ret;
     int extend = 0;
@@ -120,7 +126,7 @@ static int do_set_features(int sg_fd, int feature, int count, int lba,
         aptCmdBlk[10] = (lba >> 8) & 0xff;
         aptCmdBlk[12] = (lba >> 16) & 0xff;
         aptCmdBlk[1] = (protocol << 1) | extend;
-        aptCmdBlk[2] = (chk_cond << 5) | (t_dir << 3) |
+        aptCmdBlk[2] = (ck_cond << 5) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
         res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,
@@ -135,7 +141,7 @@ static int do_set_features(int sg_fd, int feature, int count, int lba,
         apt12CmdBlk[6] = (lba >> 8) & 0xff;
         apt12CmdBlk[7] = (lba >> 16) & 0xff;
         apt12CmdBlk[1] = (protocol << 1);
-        apt12CmdBlk[2] = (chk_cond << 5) | (t_dir << 3) |
+        apt12CmdBlk[2] = (ck_cond << 5) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
         res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,
@@ -249,7 +255,7 @@ int main(int argc, char * argv[])
     int feature = 0;
     int lba = 0;
     int verbose = 0;
-    int chk_cond = 0;
+    int ck_cond = 0;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
 
     while (1) {
@@ -269,7 +275,7 @@ int main(int argc, char * argv[])
             }
             break;
         case 'C':
-            chk_cond = 1;
+            ck_cond = 1;
             break;
         case 'f':
             feature = sg_get_num(optarg);
@@ -335,7 +341,7 @@ int main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    ret = do_set_features(sg_fd, feature, count, lba, cdb_len, chk_cond,
+    ret = do_set_features(sg_fd, feature, count, lba, cdb_len, ck_cond,
                           verbose);
 
     res = sg_cmds_close_device(sg_fd);

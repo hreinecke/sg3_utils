@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
+.TH SG3_UTILS "8" "January 2012" "sg3_utils\-1.34" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -137,8 +137,8 @@ in this section. Beware that backslash is an escape character in Unix like
 shells and the C programming language. In a shell like Msys (from MinGW)
 each backslash may need to be typed twice.
 .PP
-The sg_scan utility lists out Windows device names in forms that are
-suitable for other utilities in this package to use.
+The sg_scan utility within this package lists out Windows device names in
+a form that is suitable for other utilities in this package to use.
 .SH FREEBSD DEVICE NAMING
 SCSI disks have block names of the form /dev/da<num> where <num> is an
 integer starting at zero. The "da" is replaced by "sa" for SCSI tape
@@ -271,6 +271,10 @@ separator (i.e. the short form does not use "=" as a separator).
 If an option takes a numeric argument then that argument is assumed to
 be decimal unless otherwise indicated (e.g. with a leading "0x", a
 trailing "h" or as noted in the usage message).
+.PP
+Some options are used uniformally in most of the utilities in this
+package. Those options are listed below. Note that there are some
+exceptions.
 .TP
 \fB\-h\fR, \fB\-?\fR, \fB\-\-help\fR
 output the usage message then exit. In a few older utilities the '\-h'
@@ -362,7 +366,7 @@ trailing "h" or "H" as found in (storage) standards. When hex numbers are
 given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
 .SH SCRIPTS, EXAMPLES and UTILS
-There are several bourne shell scripts in the 'scripts' subdirectory that
+There are several Bourne shell scripts in the 'scripts' subdirectory that
 invoke compiled utilities (e.g. sg_readcap). The scripts start with 'scsi_'
 rather than 'sg_'. One purpose of these scripts is to call the same
 utility (e.g. sg_readcap) on multiple disks. Most of the basic compiled
@@ -391,7 +395,7 @@ CREDITS file and individual source files (in the 'src' directory).
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 1999\-2011 Douglas Gilbert
+Copyright \(co 1999\-2012 Douglas Gilbert
 .br
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files
@@ -400,4 +404,4 @@ code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
 under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(sdparm), sg_scan(sg3_utils), ddpt(ddpt), lsscsi(lsscsi), dmesg(1), mt(1)
+.B sdparm(sdparm), ddpt(ddpt), lsscsi(lsscsi), dmesg(1), mt(1)

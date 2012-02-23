@@ -17,7 +17,7 @@
 #include "sg_cmds_extra.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004-2009 D. Gilbert
+*  Copyright (C) 2004-2012 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -27,7 +27,7 @@
 
 */
 
-static char * version_str = "0.37 20090903";
+static char * version_str = "0.38 20120222";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -222,7 +222,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, 0);
+            dStrHex((const char *)&ucp[8], 8, -1);
             break;
         case TPROTO_SPI: /* Parallel SCSI */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
@@ -236,21 +236,21 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
         case TPROTO_SSA:
             printf("%s  SSA (transport id not defined):\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
+            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
             break;
         case TPROTO_1394: /* IEEE 1394 */
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, 0);
+            dStrHex((const char *)&ucp[8], 8, -1);
             break;
         case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 16, 0);
+            dStrHex((const char *)&ucp[8], 16, -1);
             break;
         case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
@@ -261,7 +261,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
                 printf("name and session id: %.*s\n", num, &ucp[4]);
             else {
                 printf("  [Unexpected format code: %d]\n", format_code);
-                dStrHex((const char *)ucp, num + 4, 0);
+                dStrHex((const char *)ucp, num + 4, -1);
             }
             break;
         case TPROTO_SAS:
@@ -279,18 +279,33 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
         case TPROTO_ADT:
             printf("%s  ADT:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
+            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
             break;
         case TPROTO_ATA:
             printf("%s  ATAPI:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
+            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            break;
+        case TPROTO_UAS:
+            printf("%s  UAS:\n", leadin);
+            printf("%s  format code: %d\n", leadin, format_code);
+            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            break;
+        case TPROTO_SOP:
+            printf("%s  SOP ", leadin);
+            num = ((ucp[2] << 8) | ucp[3]);
+            if (0 == format_code)
+                printf("Routing ID: 0x%x\n", num);
+            else {
+                printf("  [Unexpected format code: %d]\n", format_code);
+                dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            }
             break;
         case TPROTO_NONE:
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
+            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
             break;
         }
     }

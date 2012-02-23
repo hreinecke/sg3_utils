@@ -4,7 +4,7 @@ you can use sg_start to start (spin-up, 1) and stop (spin-down, 0) devices.
 I also offers a parameter (-s) to send a synchronize cache command to a
 device, so it should write back its internal buffers to the medium.
 
-Be aware that the Linux SCSI subsystem at this time does not autmatically
+Be aware that the Linux SCSI subsystem at this time does not automatically
 starts stopped devices, so stopping a device which is in use may have fatal
 results for you.
 
@@ -34,4 +34,5 @@ Postscript
 sg_start has been reworked to allow a block device (e.g. /dev/sda) in
 addition to the sg device name (e.g. /dev/sg0) in the lk 2.6 series.
 sg_start now has more command line options, see its man page.
-	Doug Gilbert <dgilbert at interlog dot com> 2004/5/8
+
+	Douglas Gilbert <dgilbert at interlog dot com> 2004/5/8

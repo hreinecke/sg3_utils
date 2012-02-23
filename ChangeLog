@@ -2,6 +2,59 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.34 [20120222] [svn: r441]
+  - sg_verify: add 16 byte cdb, bytchk (data-out buffer)
+    and group number support
+  - sync to spc4r34 and sbc3r30
+  - sg_inq: add --export to experiment with udev
+  - sg_ses: increase max dpage response size to 64 KB
+  - sg_sanitize: add --ause, --fail and --test=
+  - sg_pt_linux: expand DID_ (host_byte) codes
+  - sg_lib: fix sg_get_command_name() service actions
+    - decode extended_copy and receive_copy service actions
+  - sg_lib_data: sync asc/ascq codes with t10 dated 20111222
+
+Changelog for sg3_utils-1.33 [20120118] [svn: r435]
+  - sg_ses: major rework of indexes (again), now two level
+  - sg_write_buffer: new --specific option for mode specific
+    field; new mode 13 (spc4r32)
+  - sg_vpd: add hp3par volume info vendor VPD page
+    - fix 'scsi ports' [0x88] page problem
+    - add 'sinq' pseudo page for standard inquiry response
+    - add power consumption page
+  - sg_format: add --poll= option for request sense polling
+    - improve handling of disks > 2 TB and DIF (protection)
+  - sg_logs: LB provision lpage extra (sbc3r28)
+  - sg_modes: application tag mpage subcode 0xf0->0x2
+  - sg_write_same: no prot fields when wrprotect=0
+  - sg_get_lba_status: reflect change in sbc3r25 to Parameter
+    Data Length response field (offset reduced from 8 to 4)
+  - sg_inq, sg_vpd: sync with spc4r33
+  - win32: change DataBufferOffset type per MSDN; caused
+    problem with 64 bit machines (with buffered interface)
+  - sg_luns: tweak documentation for vendor specific reports
+  - add man pages for scsi_loging_level, scsi_mandat,
+    scsi_satl and scsi_temperature
+
+Changelog for sg3_utils-1.32 [20110730] [svn: r410]
+  - sg_sanitize: new utility for command added in sb3r27
+  - sg_sat_identify: add '--ident' to output WWN
+  - sg_ses: major rework of descriptor output
+    - add --index, --descriptor, --join, --clear, --get,
+      and --set options
+  - sg_raw: exit status corrections
+  - sg_decode_sense: add --nospace and --hex options
+  - sg_logs: fix bug with large --maxlen
+    - zero response length when resid implies it is invalid
+    - add scope field to lb provisioning lpage (sb3r27)
+  - sg_inq: sync version descriptors with spc4r31
+  - sg_lib_data: sync asc/ascq codes with spc4r31
+  - sg_vpd: add LBPRZ field in LB provisioning VPD page
+  - sg_format: allow format of pdt 7 (some MO drives)
+  - sg_cmd_basic: sg_cmds_process_resp() handle status good
+    with a sense key other than no_sense (e.g. completed)
+  - add README.iscsi
+
 Changelog for sg3_utils-1.31 [20110216] [svn: r386]
   - sg_decode_sense: new utility to decode sense data
   - sg_vpd: LB provisioning + Block limits pages (sbc3r26)
@@ -948,7 +1001,7 @@ Changelog for sg3_utils-0.90
     'seek' arguments. [This change is significant for raw devices and
     normal files since sg devices already use 31 bit block addressing.]
   - rename sg_s3_inq to sg_inq. This utility allows the INQUIRY response
-    to be decoded as per SCSI 3 and 4. Also can probe EVPD and CmdDt pages.
+    to be decoded as per SCSI 3 and 4. Also can probe VPD and CmdDt pages.
   - change multiplier suffixes on sg_dd, sgp_dd and sg_turs so lower case
     "k, m, g" are powers of 2 while "K, M, G" are powers of 10. This idea
     borrowed from lmdd (lmbench suite)

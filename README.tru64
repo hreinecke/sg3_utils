@@ -32,6 +32,7 @@ Here is a list of utilities that have been ported:
     sg_rmsn
     sg_rtpg
     sg_safte
+    sg_sanitize
     sg_sat_identify
     sg_sat_phy_event
     sg_sat_set_features
@@ -62,7 +63,7 @@ This package uses autotools infrastructure with the now common
 from the source found in the tarball. If the "./configure" sequence
 fails try using the ./autogen.sh prior to that sequence.
 
-Some man pages have examples which use linux device names which hopefully
+Some man pages have examples which use Linux device names which hopefully
 will not confuse Tru64 users.
 
 
@@ -91,5 +92,5 @@ function "getopt_long()" has been placed in the "getopt_long"
 subdirectory. Currently only the Tru64 port uses it.
 
 
-Doug Gilbert
-5th December 2010
+Douglas Gilbert
+21st June 2011

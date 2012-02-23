@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2011 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.2 20100312";
+static char * version_str = "1.3 20111014";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -113,7 +113,7 @@ dStrRaw(const char* str, int len)
 static int
 decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
 {
-    int c_set, piv, assoc, desig_type, i_len;
+    int c_set, assoc, desig_type, i_len;
     int off, u;
     const unsigned char * ucp;
     const unsigned char * ip;
@@ -131,7 +131,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
         }
         ip = ucp + 4;
         c_set = (ucp[0] & 0xf);
-        piv = ((ucp[1] & 0x80) ? 1 : 0);
+        /* piv = ((ucp[1] & 0x80) ? 1 : 0); */
         assoc = ((ucp[1] >> 4) & 0x3);
         desig_type = (ucp[1] & 0xf);
         switch (desig_type) {
@@ -386,7 +386,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, off, res, c, report_len, tgt_port_count, trunc;
+    int sg_fd, k, off, res, c, report_len, tgt_port_count;
     unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char setTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char rsp_buff[MX_ALLOC_LEN + 2];
@@ -569,7 +569,7 @@ main(int argc, char * argv[])
         }
 
         memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
-        trunc = 0;
+        /* trunc = 0; */
 
         res = sg_ll_report_tgt_prt_grp(sg_fd, reportTgtGrpBuff,
                                 sizeof(reportTgtGrpBuff), 1, verbose);
@@ -580,7 +580,7 @@ main(int argc, char * argv[])
                          (reportTgtGrpBuff[2] << 8) +
                          reportTgtGrpBuff[3] + 4;
             if (report_len > (int)sizeof(reportTgtGrpBuff)) {
-                trunc = 1;
+                /* trunc = 1; */
                 fprintf(stderr, "  <<report too long for internal buffer,"
                         " output truncated\n");
                 report_len = (int)sizeof(reportTgtGrpBuff);
@@ -641,7 +641,7 @@ main(int argc, char * argv[])
         transition_tpgs_states(tgtGrpState, numgrp, portgroup, state);
 
         memset(setTgtGrpBuff, 0x0, sizeof(setTgtGrpBuff));
-        trunc = 0;
+        /* trunc = 0; */
 
         encode_tpgs_states(setTgtGrpBuff, tgtGrpState, numgrp);
         report_len = numgrp * 4 + 4;

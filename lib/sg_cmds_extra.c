@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2011 Douglas Gilbert.
+ * Copyright (c) 1999-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -22,7 +22,7 @@
 #endif
 
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 #define DEF_PT_TIMEOUT 60       /* 60 seconds */
 #define LONG_PT_TIMEOUT 7200    /* 7,200 seconds == 120 minutes */
@@ -152,8 +152,14 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    get LBA status: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -217,8 +223,14 @@ sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len, int noisy,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    report target port group: "
+                    "response%s\n", (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -360,8 +372,14 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg, void * resp,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    report referrals: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -502,8 +520,14 @@ sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    receive diagnostic results: "
+                    "response%s\n", (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -1193,8 +1217,14 @@ sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read long(10): response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -1292,8 +1322,14 @@ sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read long(16): response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -1509,7 +1545,7 @@ sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int
-sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
+sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
                unsigned int lba, int veri_len, void * data_out,
                int data_out_len, unsigned int * infop, int noisy,
                int verbose)
@@ -1521,7 +1557,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
     struct sg_pt_base * ptvp;
 
     vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
-                 ((bytechk & 0x1) << 1) ;
+                 ((bytchk & 0x1) << 1) ;
     vCmdBlk[2] = (unsigned char)((lba >> 24) & 0xff);
     vCmdBlk[3] = (unsigned char)((lba >> 16) & 0xff);
     vCmdBlk[4] = (unsigned char)((lba >> 8) & 0xff);
@@ -1535,6 +1571,12 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
         for (k = 0; k < VERIFY10_CMDLEN; ++k)
             fprintf(sg_warnings_strm, "%02x ", vCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 3) && bytchk && data_out && (data_out_len > 0)) {
+            k = data_out_len > 4104 ? 4104 : data_out_len;
+            fprintf(sg_warnings_strm, "    data_out buffer%s\n",
+                    (data_out_len > 4104 ? ", first 4104 bytes" : ""));
+            dStrHex((const char *)data_out, k, verbose < 5);
+        }
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -1599,7 +1641,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int
-sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk, uint64_t llba,
+sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
                int veri_len, int group_num, void * data_out,
                int data_out_len, uint64_t * infop, int noisy, int verbose)
 {
@@ -1610,7 +1652,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk, uint64_t llba,
     struct sg_pt_base * ptvp;
 
     vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
-                 ((bytechk & 0x1) << 1) ;
+                 ((bytchk & 0x1) << 1) ;
     vCmdBlk[2] = (llba >> 56) & 0xff;
     vCmdBlk[3] = (llba >> 48) & 0xff;
     vCmdBlk[4] = (llba >> 40) & 0xff;
@@ -1631,6 +1673,12 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk, uint64_t llba,
         for (k = 0; k < VERIFY16_CMDLEN; ++k)
             fprintf(sg_warnings_strm, "%02x ", vCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 3) && bytchk && data_out && (data_out_len > 0)) {
+            k = data_out_len > 4104 ? 4104 : data_out_len;
+            fprintf(sg_warnings_strm, "    data_out buffer%s\n",
+                    (data_out_len > 4104 ? ", first 4104 bytes" : ""));
+            dStrHex((const char *)data_out, k, verbose < 5);
+        }
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -2125,9 +2173,14 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
             ret = -1;
             break;
         }
-    } else
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            fprintf(sg_warnings_strm, "    read block limits: response%s\n",
+                    (ret > 256 ? ", first 256 bytes" : ""));
+            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+        }
         ret = 0;
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
-

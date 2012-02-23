@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2011 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -19,12 +21,14 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* This program uses a ATA PASS-THROUGH SCSI command to package
-   an ATA IDENTIFY (PACKAGE) DEVICE command. See http://www.t10.org
-   for the most recent SAT: sat-r09.pdf . SAT is now a standard:
-   SAT ANSI INCITS 431-2007.
-
-*/
+/* This program uses a ATA PASS-THROUGH SCSI command to package an
+ * ATA IDENTIFY (PACKAGE) DEVICE command. It is based on the SCSI to
+ * ATA Translation (SAT) drafts and standards. See http://www.t10.org
+ * for drafts. SAT is a standard: SAT ANSI INCITS 431-2007 (draft prior
+ * to that is sat-r09.pdf). SAT-2 is also a standard: SAT-2 ANSI INCITS
+ * 465-2010 and the draft prior to that is sat2r09.pdf . The SAT-3
+ * project has started and the most recent draft is sat3r01.pdf .
+ */
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
@@ -41,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.06 20100312";
+static char * version_str = "1.08 20110513";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -49,6 +53,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"len", required_argument, 0, 'l'},
+        {"ident", no_argument, 0, 'i'},
         {"packet", no_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
         {"verbose", no_argument, 0, 'v'},
@@ -60,14 +65,18 @@ static void usage()
 {
     fprintf(stderr, "Usage: "
           "sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
-          "[--len=16|12]\n"
-          "                       [--packet] [--raw] [--verbose] [--version] "
-          "DEVICE\n"
+          "[--ident]\n"
+          "                       [--len=16|12] [--packet] [--raw] "
+          "[--verbose]\n"
+          "                       [--version] DEVICE\n"
           "  where:\n"
           "    --ck_cond|-c     sets ck_cond bit in cdb (def: 0)\n"
           "    --extend|-e      sets extend bit in cdb (def: 0)\n"
           "    --help|-h        print out usage message then exit\n"
           "    --hex|-H         output response in hex\n"
+          "    --ident|-i       output WWN prefixed by 0x, if not available "
+          "output\n"
+          "                     0x0000000000000000\n"
           "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
           "(default: 16)\n"
           "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
@@ -88,10 +97,10 @@ static void dStrRaw(const char* str, int len)
 }
 
 static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
-                           int ck_cond, int extend, int do_hex, int do_raw,
-                           int verbose)
+                           int ck_cond, int extend, int do_indent,
+                           int do_hex, int do_raw, int verbose)
 {
-    int ok, res, ret;
+    int ok, j, res, ret;
     int protocol = 4;   /* PIO data-in */
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
@@ -109,6 +118,8 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     unsigned char apt12CmdBlk[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
+    const unsigned short * usp;
+    uint64_t ull;
 
     sb_sz = sizeof(sense_buffer);
     memset(sense_buffer, 0, sb_sz);
@@ -244,10 +255,21 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         if (do_raw)
             dStrRaw((const char *)inBuff, 512);
         else if (0 == do_hex) {
-            printf("Response for IDENTIFY %sDEVICE ATA command:\n",
-                   (do_packet ? "PACKET " : ""));
-            dWordHex((const unsigned short *)inBuff, 256, 0,
-                     sg_is_big_endian());
+            if (do_indent) {
+                usp = (const unsigned short *)inBuff;
+                ull = 0;
+                for (j = 0; j < 4; ++j) {
+                    if (j > 0)
+                        ull <<= 16;
+                    ull |= usp[108 + j];
+                }
+                printf("0x%016" PRIx64 "\n", ull);
+            } else {
+                printf("Response for IDENTIFY %sDEVICE ATA command:\n",
+                       (do_packet ? "PACKET " : ""));
+                dWordHex((const unsigned short *)inBuff, 256, 0,
+                         sg_is_big_endian());
+            }
         } else if (1 == do_hex)
             dStrHex((const char *)inBuff, 512, 0);
         else if (2 == do_hex)
@@ -267,6 +289,7 @@ int main(int argc, char * argv[])
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
     int do_packet = 0;
     int do_hex = 0;
+    int do_indent = 0;
     int do_raw = 0;
     int verbose = 0;
     int ck_cond = 0;   /* set to 1 to read register(s) back */
@@ -276,7 +299,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "cehHl:prvV", long_options,
+        c = getopt_long(argc, argv, "cehHil:prvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -294,6 +317,9 @@ int main(int argc, char * argv[])
             return 0;
         case 'H':
             ++do_hex;
+            break;
+        case 'i':
+            ++do_indent;
             break;
         case 'l':
            cdb_len = sg_get_num(optarg);
@@ -354,7 +380,7 @@ int main(int argc, char * argv[])
     }
 
     ret = do_identify_dev(sg_fd, do_packet, cdb_len, ck_cond, extend,
-                          do_hex, do_raw, verbose);
+                          do_indent, do_hex, do_raw, verbose);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
