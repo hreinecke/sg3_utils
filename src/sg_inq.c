@@ -86,7 +86,7 @@ static char * version_str = "1.04 20120222";    /* SPC-4 rev 34 */
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
-#define VPD_MAN_ASS_SN 0xb1 
+#define VPD_MAN_ASS_SN 0xb1
 #define VPD_LB_PROVISIONING 0xb2
 #define VPD_REFERRALS 0xb3
 #define VPD_UPR_EMC 0xc0
@@ -248,6 +248,7 @@ usage()
             "format.\n"
             "                    Defaults to device id page (0x83) if --page "
             "not given\n"
+            "                    Only supported for VPD pages 0x80 and 0x83.\n"
             "    --extended|-E|-x    decode extended INQUIRY data VPD page "
             "(0x86)\n"
             "    --help|-h       print usage message then exit\n"
@@ -662,6 +663,45 @@ dStrRaw(const char* str, int len)
 
     for (k = 0 ; k < len; ++k)
         printf("%c", str[k]);
+}
+
+static int
+encode_whitespaces(unsigned char *str, int inlen)
+{
+    int outlen = inlen;
+    int i, j = 0, k, valid = 0;
+
+    /* Skip initial whitespaces */
+    while (isblank(str[j]))
+        j++;
+    k = j;
+    /* Strip trailing whitespaces */
+    while (outlen > k &&
+           (isblank(str[outlen - 1]) || str[outlen - 1] == '\0')) {
+        str[outlen - 1] = '\0';
+        outlen--;
+    }
+    for (i = 0; (k < outlen); ++k) {
+        if (isblank(str[k])) {
+            if (i > 0 && str[i - 1] != '_') {
+                str[i] = '_';
+                valid++;
+                i++;
+            }
+        } else if (!isprint(str[k])) {
+            str[i] = '.';
+            i++;
+        } else {
+            str[i] = str[k];
+            valid++;
+            i++;
+        }
+    }
+    if (!valid) {
+        i = 0;
+    }
+    str[i] = '\0';
+    return i;
 }
 
 struct vpd_name {
@@ -1238,28 +1278,16 @@ export_dev_ids(unsigned char * buff, int len)
         case 0: /* vendor specific */
             k = 0;
             if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
-                for (k = 0; (k < i_len); ++k) {
-                    if (isblank(ip[k])) {
-                        ip[k]='_';
-                    } else if (!isprint(ip[k])) {
-                        ip[k] = '.';
-                    }
-                }
+                k = encode_whitespaces(ip, i_len);
                 if (k >= i_len)
                     k = 1;
             }
             if (k)
-                printf("SCSI_IDENT_%s_VENDOR=%.*s\n", assoc_str, i_len, ip);
-            else
-                dStrHex((const char *)ip, i_len, 0);
+                printf("SCSI_IDENT_%s_VENDOR=%.*s\n", assoc_str, k, ip);
             break;
         case 1: /* T10 vendor identification */
-            for (k = 0; (k < i_len); ++k) {
-                if (isblank(ip[k])) {
-                    ip[k]='_';
-                }
-            }
-            printf("SCSI_IDENT_%s_T10=%.*s\n", assoc_str, i_len, ip);
+            k = encode_whitespaces(ip, i_len);
+            printf("SCSI_IDENT_%s_T10=%.*s\n", assoc_str, k, ip);
             break;
         case 2: /* EUI-64 based */
             if (1 != c_set) {
@@ -2397,7 +2425,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
 
     switch (optsp->page_num) {
     case VPD_UNIT_SERIAL_NUM:
-        if (! optsp->do_raw)
+        if (! optsp->do_raw && ! optsp->do_export)
             printf("VPD INQUIRY: Unit serial number page\n");
         res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
@@ -2420,7 +2448,12 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
                 if (len >= (int)sizeof(obuff))
                     len = sizeof(obuff) - 1;
                 memcpy(obuff, rsp_buff + 4, len);
-                printf("  Unit serial number: %s\n", obuff);
+                if (optsp->do_export) {
+                    len = encode_whitespaces((unsigned char *)obuff, len);
+                    printf("SCSI_IDENT_SERIAL=%s\n", obuff);
+                } else {
+                    printf("  Unit serial number: %s\n", obuff);
+                }
             }
         }
         break;
@@ -2911,11 +2944,6 @@ main(int argc, char * argv[])
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
-    if (opts.do_export && (NULL == opts.page_arg)) {
-        opts.page_num = VPD_DEVICE_ID;
-        ++opts.do_decode;
-        ++opts.do_vpd;
-    }
     if (opts.page_arg) {
         if (opts.page_num >= 0) {
             fprintf(stderr, "Given '-p' option and another option that "
@@ -2961,6 +2989,20 @@ main(int argc, char * argv[])
             }
             opts.page_num = n;
         }
+    }
+    if (opts.do_export) {
+        if (NULL == opts.page_arg) {
+            opts.page_num = VPD_DEVICE_ID;
+        }
+        if (opts.page_num != VPD_DEVICE_ID &&
+            opts.page_num != VPD_UNIT_SERIAL_NUM) {
+            fprintf(stderr, "Option '--export' only supported "
+                    "for VPD pages 0x80 and 0x83\n");
+            usage_for(&opts);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        ++opts.do_decode;
+        ++opts.do_vpd;
     }
 
     if ((0 == opts.do_cmddt) && (opts.page_num >= 0) && opts.p_given)
