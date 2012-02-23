@@ -27,9 +27,9 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.65 20120214";    /* ses3r04 */
+static char * version_str = "1.66 20120222";    /* ses3r04 */
 
-#define MX_ALLOC_LEN 4096
+#define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260
@@ -1233,19 +1233,30 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                            struct opts_t * op)
 {
     int resp_len, k, el, num_subs, sum_type_dheaders, res, n;
+    int ret = 0;
     unsigned int gen_code;
-    unsigned char resp[MX_ALLOC_LEN];
+    unsigned char * resp;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
-    res = do_rec_diag(fd, DPC_CONFIGURATION, resp, sizeof(resp), op,
+    resp = (unsigned char *)calloc(MX_ALLOC_LEN, 1);
+    if (NULL == resp) {
+        fprintf(stderr, "populate: unable to allocate %d bytes on heap\n",
+                MX_ALLOC_LEN);
+        ret = -1;
+        goto the_end;
+    }
+    res = do_rec_diag(fd, DPC_CONFIGURATION, resp, MX_ALLOC_LEN, op,
                       &resp_len);
     if (res) {
         fprintf(stderr, "populate: couldn't read config page, res=%d\n", res);
-        return -1;
+        ret = -1;
+        goto the_end;
     }
-    if (resp_len < 4)
-        return -1;
+    if (resp_len < 4) {
+        ret = -1;
+        goto the_end;
+    }
     num_subs = resp[1] + 1;
     sum_type_dheaders = 0;
     last_ucp = resp + resp_len - 1;
@@ -1279,7 +1290,8 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
             goto p_truncated;
         if (k >= MX_ELEM_HDR) {
             fprintf(stderr, "populate: too many elements\n");
-            return -1;
+            ret = -1;
+            goto the_end;
         }
         tdhp[k].etype = ucp[0];
         tdhp[k].num_elements = ucp[1];
@@ -1306,14 +1318,21 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                 fprintf(stderr, "populate: unable to find element type "
                         "'%s'\n",
                         op->ind_etp->abbrev);
-            return -1;
+            ret = -1;
+            goto the_end;
         }
     }
-    return sum_type_dheaders;
+    ret = sum_type_dheaders;
+    goto the_end;
 
 p_truncated:
     fprintf(stderr, "populate: config too short\n");
-    return -1;
+    ret = -1;
+
+the_end:
+    if (resp)
+        free(resp);
+    return ret;
 }
 
 static char *
@@ -2554,24 +2573,32 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
 static int
 ses_process_status_page(int sg_fd, struct opts_t * op)
 {
-    int j, rsp_len, res;
+    int j, resp_len, res;
+    int ret = 0;
     unsigned int ref_gen_code;
-    unsigned char rsp_buff[MX_ALLOC_LEN];
+    unsigned char *  resp;
     const char * cp;
     struct enclosure_info primary_info;
 
+    resp = (unsigned char *)calloc(MX_ALLOC_LEN, 1);
+    if (NULL == resp) {
+        fprintf(stderr, "process_status_page: unable to allocate %d bytes "
+                "on heap\n", MX_ALLOC_LEN);
+        ret = -1;
+        goto fini;
+    }
     cp = find_in_diag_page_desc(op->page_code);
-    res = do_rec_diag(sg_fd, op->page_code, rsp_buff, sizeof(rsp_buff),
-                      op, &rsp_len);
-    if (res)
-        return res;
+    ret = do_rec_diag(sg_fd, op->page_code, resp, MX_ALLOC_LEN,
+                      op, &resp_len);
+    if (ret)
+        goto fini;
     if (op->do_raw) {
         if (1 == op->do_raw)
-            dStrHex((const char *)rsp_buff + 4, rsp_len - 4, -1);
+            dStrHex((const char *)resp + 4, resp_len - 4, -1);
         else {
             if (sg_set_binary_mode(STDOUT_FILENO) < 0)
                 perror("sg_set_binary_mode");
-            dStrRaw((const char *)rsp_buff, rsp_len);
+            dStrRaw((const char *)resp, resp_len);
         }
     } else if (op->do_hex) {
         if (cp)
@@ -2579,23 +2606,25 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
         else
             printf("Response in hex from unknown diagnostic page "
                    "[0x%x]\n", op->page_code);
-        dStrHex((const char *)rsp_buff, rsp_len, 0);
+        dStrHex((const char *)resp, resp_len, 0);
     } else {
         memset(&primary_info, 0, sizeof(primary_info));
         switch (op->page_code) {
         case DPC_SUPPORTED:
             ses_supported_pages_sdg("Supported diagnostic pages",
-                                    rsp_buff, rsp_len);
+                                    resp, resp_len);
             break;
         case DPC_CONFIGURATION:
-            ses_configuration_sdg(rsp_buff, rsp_len);
+            ses_configuration_sdg(resp, resp_len);
             break;
         case DPC_ENC_STATUS:
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, &primary_info,
                                              op);
-            if (res < 0)
-                return res;
+            if (res < 0) {
+                ret = res;
+                goto fini;
+            }
             if (primary_info.have_info) {
                 printf("  Primary enclosure logical identifier (hex): ");
                 for (j = 0; j < 8; ++j)
@@ -2603,30 +2632,30 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
                 printf("\n");
             }
             ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
-                              rsp_buff, rsp_len, op);
+                              resp, resp_len, op);
             break;
         case DPC_HELP_TEXT:
             printf("Help text diagnostic page (for primary "
                    "subenclosure):\n");
-            if (rsp_len > 4)
-                printf("  %.*s\n", rsp_len - 4, rsp_buff + 4);
+            if (resp_len > 4)
+                printf("  %.*s\n", resp_len - 4, resp + 4);
             else
                 printf("  <empty>\n");
             break;
         case DPC_STRING:
             printf("String In diagnostic page (for primary "
                    "subenclosure):\n");
-            if (rsp_len > 4) {
+            if (resp_len > 4) {
 #if 1
-                dStrHex((const char *)(rsp_buff + 4), rsp_len - 4, 0);
+                dStrHex((const char *)(resp + 4), resp_len - 4, 0);
 #else
                 int j;
 
                 printf("  ");
-                for (j = 0; j < (rsp_len - 4); ++j) {
+                for (j = 0; j < (resp_len - 4); ++j) {
                     if ((j > 0) && (0 == (j % 16)))
                         printf("\n  ");
-                    printf("%02x ", *(rsp_buff + 4 + j));
+                    printf("%02x ", *(resp + 4 + j));
                 }
                 printf("\n");
 #endif
@@ -2637,8 +2666,10 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, &primary_info,
                                              op);
-            if (res < 0)
-                return res;
+            if (res < 0) {
+                ret = res;
+                goto fini;
+            }
             if (primary_info.have_info) {
                 printf("  Primary enclosure logical identifier (hex): ");
                 for (j = 0; j < 8; ++j)
@@ -2646,14 +2677,16 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
                 printf("\n");
             }
             ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                              rsp_buff, rsp_len, op);
+                              resp, resp_len, op);
             break;
         case DPC_ELEM_DESC:
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, &primary_info,
                                              op);
-            if (res < 0)
-                return res;
+            if (res < 0) {
+                ret = res;
+                goto fini;
+            }
             if (primary_info.have_info) {
                 printf("  Primary enclosure logical identifier (hex): ");
                 for (j = 0; j < 8; ++j)
@@ -2661,23 +2694,25 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
                 printf("\n");
             }
             ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                 rsp_buff, rsp_len, op);
+                                 resp, resp_len, op);
             break;
         case DPC_SHORT_ENC_STATUS:
             printf("Short enclosure status diagnostic page, "
-                   "status=0x%x\n", rsp_buff[1]);
+                   "status=0x%x\n", resp[1]);
             break;
         case DPC_ENC_BUSY:
             printf("Enclosure Busy diagnostic page, "
                    "busy=%d [vendor specific=0x%x]\n",
-                   rsp_buff[1] & 1, (rsp_buff[1] >> 1) & 0xff);
+                   resp[1] & 1, (resp[1] >> 1) & 0xff);
             break;
         case DPC_ADD_ELEM_STATUS:
             res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                              &ref_gen_code, &primary_info,
                                              op);
-            if (res < 0)
-                return res;
+            if (res < 0) {
+                ret = res;
+                goto fini;
+            }
             if (primary_info.have_info) {
                 printf("  Primary enclosure logical identifier (hex): ");
                 for (j = 0; j < 8; ++j)
@@ -2685,31 +2720,36 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
                 printf("\n");
             }
             ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                    rsp_buff, rsp_len, op);
+                                    resp, resp_len, op);
             break;
         case DPC_SUBENC_HELP_TEXT:
-            ses_subenc_help_sdg(rsp_buff, rsp_len);
+            ses_subenc_help_sdg(resp, resp_len);
             break;
         case DPC_SUBENC_STRING:
-            ses_subenc_string_sdg(rsp_buff, rsp_len);
+            ses_subenc_string_sdg(resp, resp_len);
             break;
         case DPC_SUPPORTED_SES:
             ses_supported_pages_sdg("Supported SES diagnostic pages",
-                                    rsp_buff, rsp_len);
+                                    resp, resp_len);
             break;
         case DPC_DOWNLOAD_MICROCODE:
-            ses_download_code_sdg(rsp_buff, rsp_len);
+            ses_download_code_sdg(resp, resp_len);
             break;
         case DPC_SUBENC_NICKNAME:
-            ses_subenc_nickname_sdg(rsp_buff, rsp_len);
+            ses_subenc_nickname_sdg(resp, resp_len);
             break;
         default:
             printf("Cannot decode response from diagnostic "
                    "page: %s\n", (cp ? cp : "<unknown>"));
-            dStrHex((const char *)rsp_buff, rsp_len, 0);
+            dStrHex((const char *)resp, resp_len, 0);
         }
     }
-    return 0;
+    ret = 0;
+
+fini:
+    if (resp)
+        free(resp);
+    return ret;
 }
 
 /* Fetch Configuration, Enclosure Status, Element Descriptor, Additional

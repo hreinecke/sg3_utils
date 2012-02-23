@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Douglas Gilbert.
+ * Copyright (c) 2006-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.58 20111209";    /* spc4r33 + sbc3r29 */
+static char * version_str = "0.59 20120222";    /* spc4r34 + sbc3r30 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1065,7 +1065,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, 0);
+            dStrHex((const char *)&ucp[8], 8, -1);
             bump = 24;
             break;
         case TPROTO_SPI:        /* Scsi Parallel Interface */
@@ -1089,7 +1089,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, 0);
+            dStrHex((const char *)&ucp[8], 8, -1);
             bump = 24;
             break;
         case TPROTO_SRP:
@@ -1097,7 +1097,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 16, 0);
+            dStrHex((const char *)&ucp[8], 16, -1);
             bump = 24;
             break;
         case TPROTO_ISCSI:
@@ -1136,6 +1136,23 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             printf("%s  ATAPI:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
             dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
+            bump = 24;
+            break;
+        case TPROTO_UAS:
+            printf("%s  UAS:\n", leadin);
+            printf("%s  format code: %d\n", leadin, format_code);
+            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0);
+            bump = 24;
+            break;
+        case TPROTO_SOP:
+            printf("%s  SOP ", leadin);
+            num = ((ucp[2] << 8) | ucp[3]);
+            if (0 == format_code)
+                printf("Routing ID: 0x%x\n", num);
+            else {
+                printf("  [Unexpected format code: %d]\n", format_code);
+                dStrHex((const char *)ucp, 24, 0);
+            }
             bump = 24;
             break;
         case TPROTO_NONE:

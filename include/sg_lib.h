@@ -90,7 +90,7 @@ extern "C" {
 #define SPC_SK_MISCOMPARE 0xe
 #define SPC_SK_COMPLETED 0xf
 
-/* Transport protocol identifiers */
+/* Transport protocol identifiers or just Protocol identifiers */
 #define TPROTO_FCP 0
 #define TPROTO_SPI 1
 #define TPROTO_SSA 2
@@ -100,6 +100,8 @@ extern "C" {
 #define TPROTO_SAS 6
 #define TPROTO_ADT 7
 #define TPROTO_ATA 8
+#define TPROTO_UAS 9
+#define TPROTO_SOP 0xa
 #define TPROTO_NONE 0xf
 
 
