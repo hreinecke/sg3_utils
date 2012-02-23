@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.72 20120218";  /* spc4r33, sbc3r29 */
+const char * sg_lib_version_str = "1.73 20120222";  /* spc4r34, sbc3r30 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -28,9 +28,9 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x5, 0, "Read Block Limits"},
     {0x7, 0, "Reassign Blocks"},
     {0x7, PDT_MCHANGER, "Initialize element status"},
-    {0x8, 0, "Read(6)"},
+    {0x8, 0, "Read(6)"},        /* obsolete in sbc3r30 */
     {0x8, PDT_PROCESSOR, "Receive"},
-    {0xa, 0, "Write(6)"},
+    {0xa, 0, "Write(6)"},       /* obsolete in sbc3r30 */
     {0xa, PDT_PRINTER, "Print"},
     {0xa, PDT_PROCESSOR, "Send"},
     {0xb, 0, "Seek(6)"},
@@ -202,7 +202,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
+struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
     {0x5, 0, "Report identifying information"},
                 /* was "Report device identifier" prior to spc4r07 */
     {0xa, 0, "Report target port groups"},
@@ -215,7 +215,7 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
+struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
     {0x6, 0, "Set identifying information"},
                 /* was "Set device identifier" prior to spc4r07 */
     {0xa, 0, "Set target port groups"},
@@ -226,17 +226,17 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = {
+struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
     {0x1, 0, "Read media serial number"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
+struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = { /* opcode 0xa9 */
     {0xff, 0, "Impossible command name"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
+struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
     {0x10, 0, "Read capacity(16)"},
     {0x11, 0, "Read long(16)"},
     {0x12, 0, "Get LBA status"},
@@ -244,13 +244,13 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
+struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
     {0x11, 0, "Write long(16)"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
+struct sg_lib_value_name_t sg_lib_pr_in_arr[] = { /* opcode 0x5e */
     {0x0, 0, "Persistent reserve in, read keys"},
     {0x1, 0, "Persistent reserve in, read reservation"},
     {0x2, 0, "Persistent reserve in, report capabilities"},
@@ -258,7 +258,7 @@ struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
+struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
     {0x0, 0, "Persistent reserve out, register"},
     {0x1, 0, "Persistent reserve out, reserve"},
     {0x2, 0, "Persistent reserve out, release"},
@@ -267,6 +267,27 @@ struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
     {0x5, 0, "Persistent reserve out, preempt and abort"},
     {0x6, 0, "Persistent reserve out, register and ignore existing key"},
     {0x7, 0, "Persistent reserve out, register and move"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
+    {0x0, 0, "Extended copy(lid1)"},
+    {0x1, 0, "Extended copy(lid4)"},
+    {0x10, 0, "Populate token"},
+    {0x11, 0, "Write using token"},
+    {0x1c, 0, "Extended copy abort"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
+    {0x0, 0, "Receive copy status(lid1)"},
+    {0x1, 0, "Receive copy data(lid1)"},
+    {0x3, 0, "Receive copy operating parameters"},
+    {0x4, 0, "Receive copy failure details(lid1)"},
+    {0x5, 0, "Receive copy status(lid4)"},
+    {0x6, 0, "Receive copy data(lid4)"},
+    {0x7, 0, "Receive ROD token information"},
+    {0x8, 0, "Report all ROD tokens"},
     {0xffff, 0, NULL},
 };
 
@@ -1114,8 +1135,9 @@ const char * sg_lib_transport_proto_strs[] =
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI Protocol (SPL-2)",
     "Automation/Drive Interface Transport (ADT-2)",
-    "AT Attachment Interface (ACS-2)",
+    "AT Attachment Interface (ACS-2)",		/* 0x8 */
     "USB Attached SCSI (UAS-2)",
-    "Oxa", "Oxb", "Oxc", "Oxd", "Oxe",
+    "SCSI over PCI Express (SOP)",
+    "Oxb", "Oxc", "Oxd", "Oxe",
     "No specific protocol"
 };

@@ -1057,7 +1057,7 @@ sg_get_command_name(const unsigned char * cmdp, int peri_type, int buff_len,
         return;
     }
     service_action = (SG_VARIABLE_LENGTH_CMD == cmdp[0]) ?
-                     (cmdp[1] & 0x1f) : ((cmdp[8] << 8) | cmdp[9]);
+                     ((cmdp[8] << 8) | cmdp[9]) : (cmdp[1] & 0x1f);
     sg_get_opcode_sa_name(cmdp[0], service_action, peri_type, buff_len, buff);
 }
 
@@ -1143,6 +1143,23 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         else
             snprintf(buff, buff_len, "Persistent reserve out, service "
                      "action=0x%x", service_action);
+        break;
+    case SG_EXTENDED_COPY:
+        vnp = get_value_name(sg_lib_xcopy_sa_arr, service_action, peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Extended copy, service action=0x%x",
+                     service_action);
+        break;
+    case SG_RECEIVE_COPY:
+        vnp = get_value_name(sg_lib_rec_copy_sa_arr, service_action,
+                             peri_type);
+        if (vnp)
+            strncpy(buff, vnp->name, buff_len);
+        else
+            snprintf(buff, buff_len, "Receive copy, service action=0x%x",
+                     service_action);
         break;
     default:
         sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
