@@ -1,0 +1,16 @@
+*.o
+*.c~
+aclocal.*
+autom4te.cache/*
+config.*
+depcomp
+install-sh
+Makefile
+Makefile.in
+lib/.deps/*
+src/.deps/*
+libtool
+ltmain.sh
+configure
+stamp-h1
+
