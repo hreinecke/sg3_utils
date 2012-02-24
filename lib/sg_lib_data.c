@@ -599,6 +599,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x23,0x07,"Invalid token operation, token expired"},
     {0x23,0x08,"Invalid token operation, token cancelled"},
     {0x23,0x09,"Invalid token operation, token deleted"},
+    {0x23,0x0a,"Invalid token operation, invalid token length"},
     {0x24,0x00,"Invalid field in cdb"},
     {0x24,0x01,"CDB decryption error"},
     {0x24,0x02,"Invalid cdb field while in explicit block model (obs)"},
@@ -1135,7 +1136,7 @@ const char * sg_lib_transport_proto_strs[] =
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI Protocol (SPL-2)",
     "Automation/Drive Interface Transport (ADT-2)",
-    "AT Attachment Interface (ACS-2)",		/* 0x8 */
+    "AT Attachment Interface (ACS-2)",          /* 0x8 */
     "USB Attached SCSI (UAS-2)",
     "SCSI over PCI Express (SOP)",
     "Oxb", "Oxc", "Oxd", "Oxe",

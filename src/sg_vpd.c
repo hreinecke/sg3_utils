@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.59 20120222";    /* spc4r34 + sbc3r30 */
+static char * version_str = "0.59 20120224";    /* spc4r34 + sbc3r30 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -40,7 +40,7 @@ extern const struct svpd_values_name_t *
                 svpd_find_vendor_by_acron(const char * ap);
 
 
-/* standard VPD pages */
+/* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
 #define VPD_UNIT_SERIAL_NUM 0x80
 #define VPD_IMP_OP_DEF 0x81     /* obsolete in SPC-2 */
@@ -56,6 +56,7 @@ extern const struct svpd_values_name_t *
 #define VPD_DEVICE_CONSTITUENTS 0x8b
 #define VPD_CFA_PROFILE_INFO 0x8c
 #define VPD_POWER_CONSUMPTION  0x8d
+#define VPD_3PARTY_COPY 0x8f
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
@@ -176,6 +177,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SECURITY_TOKEN, 0, 0x11, 0, "st", "Security token (OSD)"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, 0, "tas", "TapeAlert supported flags (SSC)"},
+    {VPD_3PARTY_COPY, 0, -1, 0, "tpc", "Third party copy"},
     {0, 0, 0, 0, NULL, NULL},
 };
 
@@ -723,6 +725,8 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
              */
             printf("%s\n", (const char *)ip);
             break;
+        case 9: /* PCIe routing ID */
+            break;
         default: /* reserved */
             break;
         }
@@ -994,6 +998,11 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len,
          */
         printf("      %s\n", (const char *)ip);
         break;
+    case 9: /* PCIe routing ID */
+        /* added in sbc4r34, no limits on code_set or association ?? */
+        d_id = ((ip[0] << 8) | ip[1]);
+        printf("      PCIe routing ID: 0x%x\n", d_id);
+        break;
     default: /* reserved */
         dStrHex((const char *)ip, i_len, 0);
         break;
@@ -1043,7 +1052,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
 }
 
 /* Transport IDs are initiator port identifiers, typically other than the
-   initiator port issuing a SCSI command. Code borrowed from sg_persist.c */
+   initiator port issuing a SCSI command. */
 static void
 decode_transport_id(const char * leadin, unsigned char * ucp, int len)
 {
@@ -1156,6 +1165,10 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             bump = 24;
             break;
         case TPROTO_NONE:
+            fprintf(stderr, "%s  No specified protocol\n", leadin);
+            /* dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0); */
+            bump = 24;
+            break;
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
@@ -1246,6 +1259,8 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
         printf("  POA_SUP=%d\n", !!(b[12] & 0x80));     /* spc4r32 */
         printf("  HRA_SUP=%d\n", !!(b[12] & 0x40));     /* spc4r32 */
         printf("  VSA_SUP=%d\n", !!(b[12] & 0x20));     /* spc4r32 */
+        printf("  Maximum supported sense data length=%d\n", 
+               b[13]); /* spc4r34 */
         return;
     }
     printf("  ACTIVATE_MICROCODE=%d SPT=%d GRD_CHK=%d APP_CHK=%d "
@@ -1263,6 +1278,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
            (b[10] << 8) + b[11]);    /* spc4r27 */
     printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
            !!(b[12] & 0x80), !!(b[12] & 0x40), !!(b[12] & 0x20));
+    printf("  Maximum supported sense data length=%d\n", b[13]); /* spc4r34 */
 }
 
 /* VPD_SOFTW_INF_ID */
@@ -2437,6 +2453,49 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                            (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
                 decode_power_consumption_vpd(rsp_buff, len, do_hex);
+            }
+            return 0;
+        }
+        break;
+    case VPD_3PARTY_COPY:   /* 0x8f */
+        if ((! do_raw) && (! do_quiet))
+            printf("Third party copy VPD page:\n");
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
+        if (0 == res) {
+            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
+            if (num_vpd != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably a STANDARD "
+                        "INQUIRY response\n");
+                if (verbose) {
+                    fprintf(stderr, "First 32 bytes of bad response\n");
+                        dStrHex((const char *)rsp_buff, 32, 0);
+                }
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching Third party copy page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
+            }
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else if (do_hex)
+                dStrHex((const char *)rsp_buff, len, 0);
+            else {
+                printf("   Leave decoding of this page until it is wanted, "
+                       "in hex:\n");
+                dStrHex((const char *)rsp_buff, len, 0);
             }
             return 0;
         }

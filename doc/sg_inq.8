@@ -85,7 +85,8 @@ print out information obtained from the device identification VPD page in
 the form: "SCSI_IDENT_<assoc>_<type>=<ident>" to stdout. This may be useful
 to tools like udev in Linux. If \fIPG\fR (from \fI\-\-page=PG\fR) is given
 then then it overrides the default choice of the device identification VPD
-page.
+page. Only other value of \fIPG\fR supported is 0x80 which is the unit
+serial number VPD page (used by older disks).
 .TP
 \fB\-E\fR, \fB\-x\fR, \fB\-\-extended\fR
 prints the extended INQUIRY VPD page [0x86].
