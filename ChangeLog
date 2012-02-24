@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.34 [20120222] [svn: r441]
+Changelog for sg3_utils-1.34 [20120224] [svn: r442]
   - sg_verify: add 16 byte cdb, bytchk (data-out buffer)
     and group number support
   - sync to spc4r34 and sbc3r30

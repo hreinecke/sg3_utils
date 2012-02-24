@@ -1,3 +1,14 @@
+/* A utility program originally written for the Linux OS SCSI subsystem.
+*  Copyright (C) 2000-2012 D. Gilbert
+*  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2, or (at your option)
+*  any later version.
+
+   This program outputs information provided by a SCSI LOG SENSE command.
+
+*/
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -14,18 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-/* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2011 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program outputs information provided by a SCSI LOG SENSE command.
-
-*/
-
-static char * version_str = "1.05 20111020";    /* spc4r30 + sbc3r28 */
+static char * version_str = "1.06 20120223";    /* spc4r34 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128

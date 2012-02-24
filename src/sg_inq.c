@@ -66,9 +66,10 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.04 20120222";    /* SPC-4 rev 34 */
+static char * version_str = "1.04 20120224";    /* SPC-4 rev 34 */
 
 
+/* Following VPD pages are in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
 #define VPD_UNIT_SERIAL_NUM 0x80
 #define VPD_DEVICE_ID  0x83
@@ -82,11 +83,12 @@ static char * version_str = "1.04 20120222";    /* SPC-4 rev 34 */
 #define VPD_DEVICE_CONSTITUENTS 0x8b
 #define VPD_CFA_PROFILE_INFO  0x8c
 #define VPD_POWER_CONSUMPTION  0x8d
+#define VPD_3PARTY_COPY  0x8f
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
-#define VPD_MAN_ASS_SN 0xb1 
+#define VPD_MAN_ASS_SN 0xb1
 #define VPD_LB_PROVISIONING 0xb2
 #define VPD_REFERRALS 0xb3
 #define VPD_UPR_EMC 0xc0
@@ -137,7 +139,6 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc",
      "Block device characteristics (SBC)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
-    {VPD_REFERRALS, 0, 0, 0, "ref", "Referrals (SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
 #if 0
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
@@ -150,19 +151,22 @@ static struct svpd_values_name_t vpd_pg[] = {
      "identification, target device only"},
 #endif
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
-    {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
-    {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
     {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv", "Logical block provisioning "
      "(SBC)"},
+    {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
+    {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
     {VPD_POWER_CONDITION, 0, -1, 0, "po", "Power condition"},
     {VPD_POWER_CONSUMPTION, 0, -1, 0, "psm", "Power consumption"},
     {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
      "information"},
     {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
+    {VPD_REFERRALS, 0, 0, 0, "ref", "Referrals (SBC)"},
     {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, 0, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
+    {VPD_3PARTY_COPY, 0, -1, 0, "tpc", "Third party copy"},
+    /* Following are vendor specific */
     {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (IBM)"},
     {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (IBM)"},
     {VPD_UPR_EMC, 0, -1, 1, "upr", "Unit path report (EMC)"},
@@ -247,7 +251,8 @@ usage()
             "    --export|-u     SCSI_IDENT_<assoc>_<type>=<ident> output "
             "format.\n"
             "                    Defaults to device id page (0x83) if --page "
-            "not given\n"
+            "not given,\n"
+            "                    only supported for VPD pages 0x80 and 0x83\n"
             "    --extended|-E|-x    decode extended INQUIRY data VPD page "
             "(0x86)\n"
             "    --help|-h       print usage message then exit\n"
@@ -664,6 +669,45 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
+static int
+encode_whitespaces(unsigned char *str, int inlen)
+{
+    int outlen = inlen;
+    int i, j = 0, k, valid = 0;
+
+    /* Skip initial whitespaces */
+    while (isblank(str[j]))
+        j++;
+    k = j;
+    /* Strip trailing whitespaces */
+    while (outlen > k &&
+           (isblank(str[outlen - 1]) || str[outlen - 1] == '\0')) {
+        str[outlen - 1] = '\0';
+        outlen--;
+    }
+    for (i = 0; (k < outlen); ++k) {
+        if (isblank(str[k])) {
+            if (i > 0 && str[i - 1] != '_') {
+                str[i] = '_';
+                valid++;
+                i++;
+            }
+        } else if (!isprint(str[k])) {
+            str[i] = '.';
+            i++;
+        } else {
+            str[i] = str[k];
+            valid++;
+            i++;
+        }
+    }
+    if (!valid) {
+        i = 0;
+    }
+    str[i] = '\0';
+    return i;
+}
+
 struct vpd_name {
     int number;
     int peri_type;
@@ -687,6 +731,7 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_DEVICE_CONSTITUENTS, 0, "Device constituents"},
     {VPD_CFA_PROFILE_INFO, 0, "CFA profile information"},       /* 0x8c */
     {VPD_POWER_CONSUMPTION, 0, "Power consumption"},            /* 0x8d */
+    {VPD_3PARTY_COPY, 0, "Third party copy"},                   /* 0x8f */
     /* 0xb0 to 0xbf are per peripheral device type */
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},               /* 0xb0 */
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
@@ -1186,6 +1231,11 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
              */
             printf("      %s\n", (const char *)ip);
             break;
+        case 9: /* PCIe routing ID */
+            /* added in sbc4r34, no limits on code_set or association ?? */
+            d_id = ((ip[0] << 8) | ip[1]);
+            printf("      PCIe routing ID: 0x%x\n", d_id);
+            break;
         default: /* reserved */
             dStrHex((const char *)ip, i_len, -1);
             break;
@@ -1238,28 +1288,16 @@ export_dev_ids(unsigned char * buff, int len)
         case 0: /* vendor specific */
             k = 0;
             if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
-                for (k = 0; (k < i_len); ++k) {
-                    if (isblank(ip[k])) {
-                        ip[k]='_';
-                    } else if (!isprint(ip[k])) {
-                        ip[k] = '.';
-                    }
-                }
+                k = encode_whitespaces(ip, i_len);
                 if (k >= i_len)
                     k = 1;
             }
             if (k)
-                printf("SCSI_IDENT_%s_VENDOR=%.*s\n", assoc_str, i_len, ip);
-            else
-                dStrHex((const char *)ip, i_len, 0);
+                printf("SCSI_IDENT_%s_VENDOR=%.*s\n", assoc_str, k, ip);
             break;
         case 1: /* T10 vendor identification */
-            for (k = 0; (k < i_len); ++k) {
-                if (isblank(ip[k])) {
-                    ip[k]='_';
-                }
-            }
-            printf("SCSI_IDENT_%s_T10=%.*s\n", assoc_str, i_len, ip);
+            k = encode_whitespaces(ip, i_len);
+            printf("SCSI_IDENT_%s_T10=%.*s\n", assoc_str, k, ip);
             break;
         case 2: /* EUI-64 based */
             if (1 != c_set) {
@@ -1357,6 +1395,8 @@ export_dev_ids(unsigned char * buff, int len)
             printf("SCSI_IDENT_%s_NAME=%.*s\n", assoc_str, i_len,
                    (const char *)ip);
             break;
+        case 9: /* PCIe Routing ID */
+            /* new in spc4r34, looks under-specified, drop through now */
         default: /* reserved */
             dStrHex((const char *)ip, i_len, -1);
             break;
@@ -1368,7 +1408,7 @@ export_dev_ids(unsigned char * buff, int len)
 }
 
 /* Transport IDs are initiator port identifiers, typically other than the
-   initiator port issuing a SCSI command. Code borrowed from sg_persist.c */
+   initiator port issuing a SCSI command. */
 static void
 decode_transport_id(const char * leadin, unsigned char * ucp, int len)
 {
@@ -1481,6 +1521,10 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             bump = 24;
             break;
         case TPROTO_NONE:
+            fprintf(stderr, "%s  No specified protocol\n", leadin);
+            /* dStrHex((const char *)ucp, ((len > 24) ? 24 : len), 0); */
+            bump = 24;
+            break;
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
@@ -1522,6 +1566,8 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            (buff[10] << 8) + buff[11]);     /* spc4r27 */
     printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
            !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20));
+    printf("  Maximum supported sense data length=%d\n",
+           buff[13]); /* spc4r34 */
 }
 
 /* VPD_SOFTW_INF_ID */
@@ -2397,7 +2443,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
 
     switch (optsp->page_num) {
     case VPD_UNIT_SERIAL_NUM:
-        if (! optsp->do_raw)
+        if (! optsp->do_raw && ! optsp->do_export)
             printf("VPD INQUIRY: Unit serial number page\n");
         res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
@@ -2420,7 +2466,12 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
                 if (len >= (int)sizeof(obuff))
                     len = sizeof(obuff) - 1;
                 memcpy(obuff, rsp_buff + 4, len);
-                printf("  Unit serial number: %s\n", obuff);
+                if (optsp->do_export) {
+                    len = encode_whitespaces((unsigned char *)obuff, len);
+                    printf("SCSI_IDENT_SERIAL=%s\n", obuff);
+                } else {
+                    printf("  Unit serial number: %s\n", obuff);
+                }
             }
         }
         break;
@@ -2911,11 +2962,6 @@ main(int argc, char * argv[])
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
-    if (opts.do_export && (NULL == opts.page_arg)) {
-        opts.page_num = VPD_DEVICE_ID;
-        ++opts.do_decode;
-        ++opts.do_vpd;
-    }
     if (opts.page_arg) {
         if (opts.page_num >= 0) {
             fprintf(stderr, "Given '-p' option and another option that "
@@ -2961,6 +3007,20 @@ main(int argc, char * argv[])
             }
             opts.page_num = n;
         }
+    }
+    if (opts.do_export) {
+        if (NULL == opts.page_arg) {
+            opts.page_num = VPD_DEVICE_ID;
+        }
+        if (opts.page_num != VPD_DEVICE_ID &&
+            opts.page_num != VPD_UNIT_SERIAL_NUM) {
+            fprintf(stderr, "Option '--export' only supported "
+                    "for VPD pages 0x80 and 0x83\n");
+            usage_for(&opts);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        ++opts.do_decode;
+        ++opts.do_vpd;
     }
 
     if ((0 == opts.do_cmddt) && (opts.page_num >= 0) && opts.p_given)
