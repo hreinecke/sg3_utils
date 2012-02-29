@@ -1161,6 +1161,26 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
             snprintf(buff, buff_len, "Receive copy, service action=0x%x",
                      service_action);
         break;
+    case SG_READ_BUFFER:
+        /* spc4r34 requested treating mode as service action */
+        vnp = get_value_name(sg_lib_read_buff_arr, service_action,
+                             peri_type);
+        if (vnp)
+            snprintf(buff, buff_len, "Read buffer (%s)\n", vnp->name);
+        else
+            snprintf(buff, buff_len, "Read buffer, mode=0x%x",
+                     service_action);
+        break;
+    case SG_WRITE_BUFFER:
+        /* spc4r34 requested treating mode as service action */
+        vnp = get_value_name(sg_lib_write_buff_arr, service_action,
+                             peri_type);
+        if (vnp)
+            snprintf(buff, buff_len, "Write buffer (%s)\n", vnp->name);
+        else
+            snprintf(buff, buff_len, "Write buffer, mode=0x%x",
+                     service_action);
+        break;
     default:
         sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
         break;

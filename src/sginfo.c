@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.29 [20090329]";
+static const char * version_str = "2.30 [20120224]";
 
 #include <stdio.h>
 #include <string.h>
@@ -1510,7 +1510,7 @@ static int read_defect_list(int grown_only)
         i = do_scsi_io(&sci);
         if (i) {
             fprintf(stdout, ">>> Unable to read %s defect data.\n",
-                    (table ? "grown" : "primary (manufacturer)"));
+                    (table ? "grown (GLIST)" : "primary (PLIST)"));
             status |= i;
             continue;
         }
@@ -1526,7 +1526,7 @@ static int read_defect_list(int grown_only)
          */
         if (0 != bp[0] || (table ? 0x08 : 0x10) != (bp[1] & 0xf8)) {
             fprintf(stdout, ">>> Invalid header for %s defect list.\n",
-                    (table ? "grown" : "primary (manufacturer)"));
+                    (table ? "grown (GLIST)" : "primary (PLIST)"));
             status |= 1;
             continue;
         }
@@ -1587,7 +1587,7 @@ static int read_defect_list(int grown_only)
                 if (trace_cmd)
                     fprintf(stdout,
                             ">>> Invalid header for %s defect list.\n",
-                            (table ? "grown" : "primary (manufacturer)"));
+                            (table ? "grown (GLIST)" : "primary (PLIST)"));
                 goto trytenbyte;
             }
             len = (bp[4] << 24) + (bp[5] << 16) + (bp[6] << 8) + bp[7];
@@ -1680,7 +1680,7 @@ trytenbyte:
         }
         if (i) {
             fprintf(stdout, ">>> Unable to read %s defect data.\n",
-                    (table ? "grown" : "primary (manufacturer)"));
+                    (table ? "grown (GLIST)" : "primary (PLIST)"));
             status |= i;
             continue;
         }
@@ -1694,7 +1694,7 @@ trytenbyte:
             }
             printf("%d entries (%d bytes) in %s table.\n",
                    reallen / ((0 == defect_format) ? 4 : 8), reallen,
-                   table ? "grown (GLIST)" : "primary (manufacturer,PLIST)");
+                   table ? "grown (GLIST)" : "primary (PLIST)");
             if (!sorthead)
                 printf("Format (%x) is: %s\n", defect_format,
                    formatname(defect_format));

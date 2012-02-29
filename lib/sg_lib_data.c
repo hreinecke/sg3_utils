@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.73 20120222";  /* spc4r34, sbc3r30 */
+const char * sg_lib_version_str = "1.74 20120224";  /* spc4r34, sbc3r30 */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
@@ -199,6 +199,35 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xbe, PDT_MMC, "Read CD"},
     {0xbf, 0, "Volume set out"},
     {0xbf, PDT_MMC, "Send DVD/BD structure"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
+    {0x0, 0, "combined header and data [or multiple modes]"},
+    {0x2, 0, "data"},
+    {0x3, 0, "descriptor"},
+    {0xa, 0, "read data from echo buffer"},
+    {0xb, 0, "echo buffer descriptor"},
+    {0x1a, 0, "enable expander comms protocol and echo buffer"},
+    {0x1c, 0, "error history"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
+    {0x0, 0, "combined header and data [or multiple modes]"},
+    {0x2, 0, "data"},
+    {0x4, 0, "download microcode and activate"},
+    {0x5, 0, "download microcode, save, and activate"},
+    {0x6, 0, "download microcode with offsets and activate"},
+    {0x7, 0, "download microcode with offsets, save, and activate"},
+    {0xa, 0, "write data to echo buffer"},
+    {0xd, 0, "download microcode with offsets, select activation events, "
+             " save and defer activate"},
+    {0xe, 0, "download microcode with offsets, save and defer activate"},
+    {0xf, 0, "activate deferred microcode"},
+    {0x1a, 0, "enable expander comms protocol and echo buffer"},
+    {0x1b, 0, "disable expander comms protocol"},
+    {0x1c, 0, "download application client error history"},
     {0xffff, 0, NULL},
 };
 
