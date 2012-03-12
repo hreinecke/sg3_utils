@@ -15,8 +15,9 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.74 20120224";  /* spc4r34, sbc3r30 */
+const char * sg_lib_version_str = "1.76 20120312";  /* spc4r34, sbc3r30 */
 
+#ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
     {0x1, 0, "Rezero Unit"},
@@ -392,11 +393,71 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x8f7f, 0, "Perform task management function (osd)"},
     {0xffff, 0, NULL},
 };
+#else
+
+struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = { /* opcode 0xa9 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_in_arr[] = { /* opcode 0x5e */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
+    {0xffff, 0, NULL},
+};
+
+#endif
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
  * The following should match asc-num.txt dated 20111222 */
 
+#ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
 {
     {0x40,0x01,0x7f,"Ram failure [0x%x]"},
@@ -1102,6 +1163,17 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x74,0x79,"Security conflict in translated device"},
     {0, 0, NULL}
 };
+#else
+struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
+{
+    {0, 0, 0, NULL}
+};
+
+struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
+{
+    {0, 0, NULL}
+};
+#endif /* SG_SCSI_STRINGS */
 
 const char * sg_lib_sense_key_desc[] = {
     "No Sense",                 /* Filemark, ILI and/or EOM; progress

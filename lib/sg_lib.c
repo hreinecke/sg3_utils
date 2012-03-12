@@ -182,13 +182,13 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
     }
     if (! found) {
         if (asc >= 0x80)
-            snprintf(buff, buff_len, "vendor specific ASC=%2x, ASCQ=%2x",
-                     asc, ascq);
+            snprintf(buff, buff_len, "vendor specific ASC=%02x, ASCQ=%02x "
+                     "(hex)", asc, ascq);
         else if (ascq >= 0x80)
-            snprintf(buff, buff_len, "ASC=%2x, vendor specific qualification "
-                     "ASCQ=%2x", asc, ascq);
+            snprintf(buff, buff_len, "ASC=%02x, vendor specific "
+                     "qualification ASCQ=%02x (hex)", asc, ascq);
         else
-            snprintf(buff, buff_len, "ASC=%2x, ASCQ=%2x", asc, ascq);
+            snprintf(buff, buff_len, "ASC=%02x, ASCQ=%02x (hex)", asc, ascq);
     }
     return buff;
 }
@@ -741,7 +741,8 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
     int len, valid, progress, n, r, pr, rem;
     unsigned int info;
     int descriptor_format = 0;
-    const char * error = NULL;
+    int sdat_ovfl = 0;
+    const char * ebp = NULL;
     char error_buff[64];
     char b[256];
     struct sg_scsi_sense_hdr ssh;
@@ -764,37 +765,47 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
     if (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh)) {
         switch (ssh.response_code) {
         case 0x70:      /* fixed, current */
-            error = "Fixed format, current";
+            ebp = "Fixed format, current";
             len = (sb_len > 7) ? (sense_buffer[7] + 8) : sb_len;
             len = (len > sb_len) ? sb_len : len;
+            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : 0;
             break;
         case 0x71:      /* fixed, deferred */
             /* error related to a previous command */
-            error = "Fixed format, <<<deferred>>>";
+            ebp = "Fixed format, <<<deferred>>>";
             len = (sb_len > 7) ? (sense_buffer[7] + 8) : sb_len;
             len = (len > sb_len) ? sb_len : len;
+            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : 0;
             break;
         case 0x72:      /* descriptor, current */
             descriptor_format = 1;
-            error = "Descriptor format, current";
+            ebp = "Descriptor format, current";
+            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : 0;
             break;
         case 0x73:      /* descriptor, deferred */
             descriptor_format = 1;
-            error = "Descriptor format, <<<deferred>>>";
+            ebp = "Descriptor format, <<<deferred>>>";
+            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : 0;
             break;
         case 0x0:
-            error = "Response code: 0x0 (?)";
+            ebp = "Response code: 0x0 (?)";
             break;
         default:
             snprintf(error_buff, sizeof(error_buff),
                      "Unknown response code: 0x%x", ssh.response_code);
-            error = error_buff;
+            ebp = error_buff;
             break;
         }
         n += snprintf(buff + n, buff_len - n, " %s;  Sense key: %s\n ",
-                      error, sg_lib_sense_key_desc[ssh.sense_key]);
+                      ebp, sg_lib_sense_key_desc[ssh.sense_key]);
         if (n >= buff_len)
             return;
+        if (sdat_ovfl) {
+            n += snprintf(buff + n, buff_len - n, "<<<Sense data "
+                          "overflow>>>\n");
+            if (n >= buff_len)
+                return;
+        }
         if (descriptor_format) {
             n += snprintf(buff + n, buff_len - n, "%s\n",
                           sg_get_asc_ascq_str(ssh.asc, ssh.ascq,

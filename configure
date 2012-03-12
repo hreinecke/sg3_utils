@@ -751,8 +751,9 @@ enable_fast_install
 with_gnu_ld
 with_sysroot
 enable_libtool_lock
-enable_no_linux_bsg
+enable_linuxbsg
 enable_win32_spt_direct
+enable_scsistrings
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1392,9 +1393,10 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
-  --enable-no-linux-bsg   ignore linux bsg (sgv4) if present
+  --disable-linuxbsg      ignore linux bsg (sgv4) if present
   --enable-win32-spt-direct
                           enable Win32 SPT Direct
+  --disable-scsistrings   Disable full SCSI sense strings
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -11454,13 +11456,12 @@ else
 fi
 
 
-# Check whether --enable-no-linux-bsg was given.
-if test "${enable_no_linux_bsg+set}" = set; then :
-  enableval=$enable_no_linux_bsg;
+# Check whether --enable-linuxbsg was given.
+if test "${enable_linuxbsg+set}" = set; then :
+  enableval=$enable_linuxbsg;
 cat >>confdefs.h <<_ACEOF
 #define IGNORE_LINUX_BSG 1
 _ACEOF
-
 
 fi
 
@@ -11472,6 +11473,18 @@ cat >>confdefs.h <<_ACEOF
 #define WIN32_SPT_DIRECT 1
 _ACEOF
 
+
+fi
+
+
+# Check whether --enable-scsistrings was given.
+if test "${enable_scsistrings+set}" = set; then :
+  enableval=$enable_scsistrings;
+else
+
+cat >>confdefs.h <<_ACEOF
+#define SG_SCSI_STRINGS 1
+_ACEOF
 
 fi
 

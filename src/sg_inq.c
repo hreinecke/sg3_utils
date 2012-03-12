@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.04 20120224";    /* SPC-4 rev 34 */
+static char * version_str = "1.05 20120311";    /* SPC-4 rev 34 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -117,7 +117,7 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
 static void decode_transport_id(const char * leadin, unsigned char * ucp,
                                 int len);
 
-#ifdef SG_LIB_LINUX
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
 static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
                             int do_verbose);
 #endif
@@ -174,7 +174,7 @@ static struct svpd_values_name_t vpd_pg[] = {
 };
 
 static struct option long_options[] = {
-#ifdef SG_LIB_LINUX
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
         {"ata", 0, 0, 'a'},
 #endif
         {"cmddt", 0, 0, 'c'},
@@ -186,8 +186,10 @@ static struct option long_options[] = {
         {"id", 0, 0, 'i'},
         {"len", 1, 0, 'l'},
         {"maxlen", 1, 0, 'm'},
+#ifdef SG_SCSI_STRINGS
         {"new", 0, 0, 'N'},
         {"old", 0, 0, 'O'},
+#endif
         {"page", 1, 0, 'p'},
         {"raw", 0, 0, 'r'},
         {"verbose", 0, 0, 'v'},
@@ -215,13 +217,15 @@ struct opts_t {
     int p_given;
     const char * page_arg;
     const char * device_name;
+#ifdef SG_SCSI_STRINGS
     int opt_new;
+#endif
 };
 
 static void
 usage()
 {
-#ifdef SG_LIB_LINUX
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
     fprintf(stderr,
             "Usage: sg_inq [--ata] [--cmddt] [--descriptors] [--export] "
             "[--extended]\n"
@@ -279,6 +283,7 @@ usage()
             "utility has a more up to date list of VPD pages.\n");
 }
 
+#ifdef SG_SCSI_STRINGS
 static void
 usage_old()
 {
@@ -304,7 +309,7 @@ usage_old()
             "  where:\n"
             "    -a    decode ATA information VPD page (0x89)\n");
 
-#endif
+#endif  /* SG_LIB_LINUX */
     fprintf(stderr,
             "    -b    decode Block limits VPD page (0xb0) (SBC)\n"
             "    -c    set CmdDt mode (use -o for opcode) [obsolete]\n"
@@ -343,6 +348,17 @@ usage_for(const struct opts_t * optsp)
         usage_old();
 }
 
+#else  /* SG_SCSI_STRINGS */
+
+static void
+usage_for(const struct opts_t * optsp)
+{
+    optsp = optsp;
+    usage();
+}
+
+#endif /* SG_SCSI_STRINGS */
+
 /* Processes command line options according to new option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
@@ -354,17 +370,27 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         int option_index = 0;
 
 #ifdef SG_LIB_LINUX
+#ifdef SG_SCSI_STRINGS
         c = getopt_long(argc, argv, "acdeEhHil:m:NOp:ruvVx", long_options,
                         &option_index);
 #else
+        c = getopt_long(argc, argv, "cdeEhHil:m:p:ruvVx", long_options,
+                        &option_index);
+#endif /* SG_SCSI_STRINGS */
+#else  /* SG_LIB_LINUX */
+#ifdef SG_SCSI_STRINGS
         c = getopt_long(argc, argv, "cdeEhHil:m:NOp:ruvVx", long_options,
                         &option_index);
-#endif
+#else
+        c = getopt_long(argc, argv, "cdeEhHil:m:p:ruvVx", long_options,
+                        &option_index);
+#endif /* SG_SCSI_STRINGS */
+#endif /* SG_LIB_LINUX */
         if (c == -1)
             break;
 
         switch (c) {
-#ifdef SG_LIB_LINUX
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
         case 'a':
             ++optsp->do_ata;
             break;
@@ -408,11 +434,13 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             optsp->resp_len = n;
+#ifdef SG_SCSI_STRINGS
         case 'N':
             break;      /* ignore */
         case 'O':
             optsp->opt_new = 0;
             return 0;
+#endif
         case 'p':
             optsp->page_arg = optarg;
             ++optsp->p_given;
@@ -453,6 +481,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
+#ifdef SG_SCSI_STRINGS
 /* Processes command line options according to old option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
@@ -636,6 +665,16 @@ process_cl(struct opts_t * optsp, int argc, char * argv[])
     return res;
 }
 
+#else  /* SG_SCSI_STRINGS */
+
+static int
+process_cl(struct opts_t * optsp, int argc, char * argv[])
+{
+    return process_cl_new(optsp, argc, argv);
+}
+
+#endif  /* SG_SCSI_STRINGS */
+
 static const struct svpd_values_name_t *
 sdp_find_vpd_by_acron(const char * ap)
 {
@@ -815,13 +854,10 @@ static const char * network_service_type_arr[] =
     "logging",
     "code download",
     "administrative configuration service",
-    "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
-    "reserved[0xa]", "reserved[0xb]", "reserved[0xc]", "reserved[0xd]",
-    "reserved[0xe]", "reserved[0xf]", "reserved[0x10]", "reserved[0x11]",
-    "reserved[0x12]", "reserved[0x13]", "reserved[0x14]", "reserved[0x15]",
-    "reserved[0x16]", "reserved[0x17]", "reserved[0x18]", "reserved[0x19]",
-    "reserved[0x1a]", "reserved[0x1b]", "reserved[0x1c]", "reserved[0x1d]",
-    "reserved[0x1e]", "reserved[0x1f]",
+    "[0x7]", "[0x8]", "[0x9]", "[0xa]", "[0xb]", "[0xc]", "[0xd]",
+    "[0xe]", "[0xf]", "[0x10]", "[0x11]", "[0x12]", "[0x13]", "[0x14]",
+    "[0x15]", "[0x16]", "[0x17]", "[0x18]", "[0x19]", "[0x1a]",
+    "[0x1b]", "[0x1c]", "[0x1d]", "[0x1e]", "[0x1f]",
 };
 
 /* VPD_MAN_NET_ADDR */
@@ -956,9 +992,8 @@ static const char * code_set_arr[] =
     "Binary",
     "ASCII",
     "UTF-8",
-    "Reserved [0x4]", "Reserved [0x5]", "Reserved [0x6]", "Reserved [0x7]",
-    "Reserved [0x8]", "Reserved [0x9]", "Reserved [0xa]", "Reserved [0xb]",
-    "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
+    "[0x4]", "[0x5]", "[0x6]", "[0x7]", "[0x8]", "[0x9]", "[0xa]", "[0xb]",
+    "[0xc]", "[0xd]", "[0xe]", "[0xf]",
 };
 
 static const char * desig_type_arr[] =
@@ -972,8 +1007,7 @@ static const char * desig_type_arr[] =
     "Logical unit group", /* SCSI_IDENT_PORT_LU_GROUP */
     "MD5 logical unit identifier", /* SCSI_IDENT_DEVICE_MD5 */
     "SCSI name string", /* SCSI_IDENT_DEVICE_SCSINAME */
-    "Reserved [0x9]", "Reserved [0xa]", "Reserved [0xb]",
-    "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
+    "[0x9]", "[0xa]", "[0xb]", "[0xc]", "[0xd]", "[0xe]", "[0xf]",
 };
 
 /* These are target port, device server (i.e. target) and LU identifiers */
@@ -2218,7 +2252,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             }
         }
     } else if (res < 0) { /* could be an ATA device */
-#ifdef SG_LIB_LINUX
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
         /* Try an ATA Identify Device command */
         res = try_ata_identify(sg_fd, optsp->do_hex, optsp->do_raw,
                                optsp->do_verbose);
@@ -2252,6 +2286,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
     return 0;
 }
 
+#ifdef SG_SCSI_STRINGS
 /* Returns 0 if successful */
 static int
 process_cmddt(int sg_fd, const struct opts_t * optsp)
@@ -2363,6 +2398,21 @@ process_cmddt(int sg_fd, const struct opts_t * optsp)
     }
     return res;
 }
+
+#else /* SG_SCSI_STRINGS */
+
+/* Returns 0. */
+static int
+process_cmddt(int sg_fd, const struct opts_t * optsp)
+{
+    sg_fd = sg_fd;
+    optsp = optsp;
+    fprintf(stderr, "'--cmddt' not implemented, use sg_opcodes\n");
+    return 0;
+}
+
+#endif /* SG_SCSI_STRINGS */
+
 
 /* Returns 0 if successful */
 static int
@@ -2939,8 +2989,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, num, res, n;
-    unsigned int u;
+    int sg_fd, res, n;
     int ret = 0;
     const struct svpd_values_name_t * vnp;
     struct opts_t opts;
@@ -2971,12 +3020,17 @@ main(int argc, char * argv[])
         if (isalpha(*opts.page_arg)) {
             vnp = sdp_find_vpd_by_acron(opts.page_arg);
             if (NULL == vnp) {
+#ifdef SG_SCSI_STRINGS
                 if (opts.opt_new)
                     fprintf(stderr, "abbreviation %s given to '--page=' "
                             "not recognized\n", opts.page_arg);
                 else
                     fprintf(stderr, "abbreviation %s given to '-p=' "
                             "not recognized\n", opts.page_arg);
+#else
+                fprintf(stderr, "abbreviation %s given to '--page=' "
+                        "not recognized\n", opts.page_arg);
+#endif
                 fprintf(stderr, ">>> Available abbreviations:\n");
                 enumerate_vpds();
                 return SG_LIB_SYNTAX_ERROR;
@@ -2985,6 +3039,7 @@ main(int argc, char * argv[])
                 ++opts.do_decode;
             opts.page_num = vnp->value;
         } else {
+#ifdef SG_SCSI_STRINGS
             if (opts.opt_new) {
                 n = sg_get_num(opts.page_arg);
                 if ((n < 0) || (n > 255)) {
@@ -2996,6 +3051,9 @@ main(int argc, char * argv[])
                 if ((1 != opts.do_hex) && (0 == opts.do_raw))
                     ++opts.do_decode;
             } else {
+                int num;
+                unsigned int u;
+
                 num = sscanf(opts.page_arg, "%x", &u);
                 if ((1 != num) || (u > 255)) {
                     fprintf(stderr, "Inappropriate value after '-o=' "
@@ -3005,6 +3063,17 @@ main(int argc, char * argv[])
                 }
                 n = u;
             }
+#else
+            n = sg_get_num(opts.page_arg);
+            if ((n < 0) || (n > 255)) {
+                fprintf(stderr, "Bad argument to '--page=', "
+                        "expecting 0 to 255 inclusive\n");
+                usage_for(&opts);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if ((1 != opts.do_hex) && (0 == opts.do_raw))
+                ++opts.do_decode;
+#endif /* SG_SCSI_STRINGS */
             opts.page_num = n;
         }
     }
@@ -3032,10 +3101,14 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (opts.do_vpd && opts.do_cmddt) {
+#ifdef SG_SCSI_STRINGS
         if (opts.opt_new)
             fprintf(stderr, "Can't use '--cmddt' with VPD pages\n");
         else
             fprintf(stderr, "Can't have both '-e' and '-c' (or '-cl')\n");
+#else
+        fprintf(stderr, "Can't use '--cmddt' with VPD pages\n");
+#endif
         usage_for(&opts);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -3083,7 +3156,7 @@ main(int argc, char * argv[])
     }
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
-#ifdef SG_LIB_LINUX
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
     if (opts.do_ata) {
         res = try_ata_identify(sg_fd, opts.do_hex, opts.do_raw,
                                opts.do_verbose);
@@ -3131,7 +3204,7 @@ err_out:
 }
 
 
-#ifdef SG_LIB_LINUX
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
 /* Following code permits ATA IDENTIFY commands to be performed on
    ATA non "Packet Interface" devices (e.g. ATA disks).
    GPL-ed code borrowed from smartmontools (smartmontools.sf.net).

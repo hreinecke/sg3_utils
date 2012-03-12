@@ -66,14 +66,18 @@ AM_CONDITIONAL(OS_SOLARIS, [echo $host_os | grep '^solaris' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 
-AC_ARG_ENABLE([no-linux-bsg],
-  AC_HELP_STRING([--enable-no-linux-bsg], [ignore linux bsg (sgv4) if present]),
-  AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [ignore linux bsg], )
-)
+AC_ARG_ENABLE([linuxbsg],
+  AC_HELP_STRING([--disable-linuxbsg], [ignore linux bsg (sgv4) if present]),
+  [AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [ignore linux bsg], )], [])
 
 AC_ARG_ENABLE([win32-spt-direct],
   AC_HELP_STRING([--enable-win32-spt-direct], [enable Win32 SPT Direct]),
   AC_DEFINE_UNQUOTED(WIN32_SPT_DIRECT, 1, [enable Win32 SPT Direct], )
 )
+
+AC_ARG_ENABLE([scsistrings],
+  [AS_HELP_STRING([--disable-scsistrings],
+		  [Disable full SCSI sense strings])],
+  [], [AC_DEFINE_UNQUOTED(SG_SCSI_STRINGS, 1, [full SCSI sense strings], )])
 
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile)

@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2011 Douglas Gilbert.
+ * Copyright (c) 2004-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,8 @@ extern "C" {
  * sensep or ata_return_dp (or both) may be NULL pointers. Returns SCSI
  * status value (>= 0) or -1 if other error. Users are expected to check the
  * sense buffer themselves. If available the data in resid is written to
- * residp.
+ * residp. Note in SAT-2 and later, fixed format sense data may be placed in
+ * *sensep in which case sensep[0]==0x70 .
  */
 extern int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
                           int timeout_secs,  void * dinp, void * doutp,

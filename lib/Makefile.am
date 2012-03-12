@@ -5,6 +5,7 @@ libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
+	sg_cmds_basic2.c \
 	sg_cmds_extra.c \
 	sg_cmds_mmc.c \
 	sg_pt_common.c \
@@ -27,6 +28,7 @@ libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
+	sg_cmds_basic2.c \
 	sg_cmds_extra.c \
 	sg_cmds_mmc.c \
 	sg_pt_common.c \
@@ -49,6 +51,7 @@ libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
+	sg_cmds_basic2.c \
 	sg_cmds_extra.c \
 	sg_cmds_mmc.c \
 	sg_pt_common.c \
@@ -71,6 +74,7 @@ libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
+	sg_cmds_basic2.c \
 	sg_cmds_extra.c \
 	sg_cmds_mmc.c \
 	sg_pt_common.c \
@@ -94,6 +98,7 @@ libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
+	sg_cmds_basic2.c \
 	sg_cmds_extra.c \
 	sg_cmds_mmc.c \
 	sg_pt_common.c \
@@ -117,6 +122,7 @@ libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_lib_data.c \
 	sg_cmds_basic.c \
+	sg_cmds_basic2.c \
 	sg_cmds_extra.c \
 	sg_cmds_mmc.c \
 	sg_pt_common.c \

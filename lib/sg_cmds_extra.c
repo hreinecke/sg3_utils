@@ -1748,7 +1748,8 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
  * sensep or ata_return_dp (or both) may be NULL pointers. Returns SCSI
  * status value (>= 0) or -1 if other error. Users are expected to check the
  * sense buffer themselves. If available the data in resid is written to
- * residp.
+ * residp. Note in SAT-2 and later, fixed format sense data may be placed in
+ * *sensep in which case sensep[0]==0x70 .
  */
 int
 sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
