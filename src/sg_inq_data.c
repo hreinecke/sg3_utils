@@ -50,6 +50,7 @@ struct sg_version_descriptor {
 
 /* table from SPC-4 revision 34 [sorted numerically (from Annex E.9)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
+#ifdef SG_SCSI_STRINGS
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
@@ -459,4 +460,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xffc2, "IEEE 1667-2009"},
     {0xffff, NULL},
 };
+#else
+struct sg_version_descriptor sg_version_descriptor_arr[] = {
+    {0xffff, NULL},
+};
+#endif
 

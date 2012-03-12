@@ -94,6 +94,9 @@
 /* sg3_utils on Win32 */
 #undef SG_LIB_WIN32
 
+/* full SCSI sense strings */
+#undef SG_SCSI_STRINGS
+
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
