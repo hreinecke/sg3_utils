@@ -30,6 +30,7 @@ extern "C" {
 #define SG_RECEIVE_COPY 0x84
 #define SG_SERVICE_ACTION_IN_12 0xab
 #define SG_SERVICE_ACTION_OUT_12 0xa9
+#define SG_SERVICE_ACTION_BIDI 0x9d
 #define SG_SERVICE_ACTION_IN_16 0x9e
 #define SG_SERVICE_ACTION_OUT_16 0x9f
 #define SG_READ_BUFFER 0x3c
@@ -71,6 +72,7 @@ extern struct sg_lib_value_name_t sg_lib_serv_in12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_in16_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out16_arr[];
+extern struct sg_lib_value_name_t sg_lib_serv_bidi_arr[];
 extern struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_variable_length_arr[];

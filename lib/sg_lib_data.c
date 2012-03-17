@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.76 20120312";  /* spc4r34, sbc3r30 */
+const char * sg_lib_version_str = "1.77 20120313";  /* spc4r35, sbc3r30 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -151,6 +151,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x92, PDT_TAPE, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, PDT_TAPE, "Erase(16)"},
+    {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
     {0xa0, 0, "Report luns"},
@@ -241,7 +242,7 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
     {0xd, 0, "Report supported task management functions"},
     {0xe, 0, "Report priority"},
     {0xf, 0, "Report timestamp"},
-    {0x10, 0, "Maintenance in"},
+    {0x10, 0, "Management protocol in"},
     {0xffff, 0, NULL},
 };
 
@@ -250,9 +251,10 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
                 /* was "Set device identifier" prior to spc4r07 */
     {0xa, 0, "Set target port groups"},
     {0xb, 0, "Change aliases"},
+    {0xc, 0, "Remove I_T nexus"},
     {0xe, 0, "Set priority"},
     {0xf, 0, "Set timestamp"},
-    {0x10, 0, "Maintenance out"},
+    {0x10, 0, "Management protocol out"},
     {0xffff, 0, NULL},
 };
 
@@ -277,6 +279,10 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
     {0x11, 0, "Write long(16)"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = { /* opcode 0x9d */
     {0xffff, 0, NULL},
 };
 
@@ -431,6 +437,10 @@ struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
     {0xffff, 0, NULL},
 };
 
+struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = { /* opcode 0x9d */
+    {0xffff, 0, NULL},
+};
+
 struct sg_lib_value_name_t sg_lib_pr_in_arr[] = { /* opcode 0x5e */
     {0xffff, 0, NULL},
 };
@@ -558,6 +568,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0B,0x06,"Warning - non-volatile cache now volatile"},
     {0x0B,0x07,"Warning - degraded power to non-volatile cache"},
     {0x0B,0x08,"Warning - power loss expected"},
+    {0x0B,0x09,"Warning - device statistics notification active"},
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -850,6 +861,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3B,0x19,"Element enabled"},
     {0x3B,0x1a,"Data transfer device removed"},
     {0x3B,0x1b,"Data transfer device inserted"},
+    {0x3B,0x1c,"Too many logical objects on partition to support operation"},
     {0x3D,0x00,"Invalid bits in identify message"},
     {0x3E,0x00,"Logical unit has not self-configured yet"},
     {0x3E,0x01,"Logical unit failure"},

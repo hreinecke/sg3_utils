@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Douglas Gilbert.
+ * Copyright (c) 2006-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -45,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.08 20110513";
+static char * version_str = "1.09 20120314";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -107,6 +107,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
     int resid = 0;
     int got_ard = 0;    /* got ATA result descriptor */
+    int got_fixsense = 0;    /* got ATA result in fixed format sense */
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
     unsigned char inBuff[ID_RESPONSE_LEN];
@@ -177,14 +178,25 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
             case SPC_SK_RECOVERED_ERROR:
                 if ((0x0 == ssh.asc) &&
                     (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
-                    if (SAT_ATA_RETURN_DESC != ata_return_desc[0]) {
-                        if (verbose)
-                            fprintf(stderr, "did not find ATA Return "
-                                    "(sense) Descriptor\n");
-                        return SG_LIB_CAT_RECOVERED;
+                    if (0x72 == ssh.response_code) {
+                        if (SAT_ATA_RETURN_DESC != ata_return_desc[0]) {
+                            if (verbose)
+                                fprintf(stderr, "did not find ATA Return "
+                                        "(sense) Descriptor\n");
+                            return SG_LIB_CAT_RECOVERED;
+                        }
+                        got_ard = 1;
+                        break;
+                    } else if (0x70 == ssh.response_code) {
+                        got_fixsense = 1;
+                        break;
+                    } else {
+                        if (verbose < 2)
+                            fprintf(stderr, "ATA PASS-THROUGH (%d), "
+                                    "unexpected  response_code=0x%x\n",
+                                    ssh.response_code, cdb_len);
+                            return SG_LIB_CAT_RECOVERED;
                     }
-                    got_ard = 1;
-                    break;
                 } else if (SPC_SK_RECOVERED_ERROR == ssh.sense_key)
                     return SG_LIB_CAT_RECOVERED;
                 else {
@@ -242,6 +254,16 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                 "it was not indicated\n");
     if (got_ard) {
         if (ata_return_desc[3] & 0x4) {
+                fprintf(stderr, "error indication in returned FIS: aborted "
+                        "command\n");
+                fprintf(stderr, "    try again with%s '-p' option\n",
+                        (do_packet ? "out" : ""));
+                return SG_LIB_CAT_ABORTED_COMMAND;
+        }
+        ok = 1;
+    }
+    if (got_fixsense) {
+        if (0x4 & sense_buffer[3]) { /* Error is MSB of Info field */
                 fprintf(stderr, "error indication in returned FIS: aborted "
                         "command\n");
                 fprintf(stderr, "    try again with%s '-p' option\n",

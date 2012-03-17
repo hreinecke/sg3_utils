@@ -48,7 +48,7 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 34 [sorted numerically (from Annex E.9)] */
+/* table from SPC-4 revision 35 [sorted numerically (from Annex E.9)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt  */
 #ifdef SG_SCSI_STRINGS
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
@@ -201,6 +201,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x500, "ADC-3 (no version claimed)"},
     {0x502, "ADC-3 T10/1895-D revision 04"},
     {0x504, "ADC-3 T10/1895-D revision 05"},
+    {0x506, "ADC-3 T10/1895-D revision 05a"},
     {0x520, "SSC-4 (no version claimed)"},
     {0x523, "SSC-4 T10/2123-D revision 2"},
     {0x560, "OSD-3 (no version claimed)"},
@@ -445,6 +446,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1ec8, "SAT-2 T10/1826-D revision 09"},
     {0x1eca, "SAT-2 ANSI INCITS 465-2010"},
     {0x1ee0, "SAT-3 (no version claimed)"},
+    {0x1ee2, "SAT-3 T10/2126-D revision 4"},
     {0x1f00, "SAT-4 (no version claimed)"},
     {0x20a0, "SPL (no version claimed)"},
     {0x20a3, "SPL T10/2124-D revision 6a"},
