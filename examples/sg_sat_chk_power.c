@@ -56,9 +56,10 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.04 20120315";
+static char * version_str = "1.04 20120319";
 
 
+#if 0
 /* Returns length of decoded fixed format sense for SAT ATA pass-through
  * command, else returns 0. If returns 0 (expected sense data not found)
  * then '\0' placed in first byte of bp. */
@@ -66,7 +67,7 @@ static int
 sg_sat_decode_fixed_sense(const unsigned char * sp, int slen, char * bp,
                           int max_blen, int verbose)
 {
-    int k, n;
+    int n;
 
     if ((NULL == bp) || (NULL == sp) || (max_blen < 1) || (slen < 14))
         return 0;
@@ -76,12 +77,12 @@ sg_sat_decode_fixed_sense(const unsigned char * sp, int slen, char * bp,
         (0 != sp[12]) || (ASCQ_ATA_PT_INFO_AVAILABLE != sp[13]))
         return 0;
     n = snprintf(bp, max_blen, "error=0x%x, status=0x%x, device=0x%x, "
-                 "scount(7:0)=0x%x%c\n", sp[3], sp[4], sp[5], sp[6],
+                 "sector_count(7:0)=0x%x%c\n", sp[3], sp[4], sp[5], sp[6],
                  ((0x40 & sp[8]) ? '+' : ' '));
     if (n >= max_blen)
         return max_blen - 1;
     n += snprintf(bp + n, max_blen - n, "extend=%d, log_index=0x%x, "
-                  "lba_high(7:0)=0x%x, _mid(7:0)=0x%x, _low(7:0)=0x%x%c\n",
+                  "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n",
                   (!!(0x80 & sp[8])), (0xf & sp[8]), sp[9], sp[10], sp[11],
                   ((0x20 & sp[8]) ? '+' : ' '));
     if (n >= max_blen)
@@ -92,6 +93,7 @@ sg_sat_decode_fixed_sense(const unsigned char * sp, int slen, char * bp,
                       !!(0x20 & sp[8]));
     return (n >= max_blen) ? max_blen - 1 : n;
 }
+#endif
 
 int main(int argc, char * argv[])
 {

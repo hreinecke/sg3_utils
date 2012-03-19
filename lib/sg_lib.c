@@ -41,6 +41,9 @@
 #include "config.h"
 #endif
 
+/* sg_lib_version_str (and datestamp) defined in sg_lib_data.c file */
+
+#define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d  /* corresponding ASC is 0 */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -449,7 +452,7 @@ static const char * sdata_src[] = {
     };
 
 
-/* Print descriptor format sense descriptors (assumes sense buffer is
+/* Decode descriptor format sense descriptors (assumes sense buffer is
    in descriptor format) */
 static void
 sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
@@ -621,7 +624,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             n += sprintf(b + n, "OSD attribute identification\n");
             processed = 0;
             break;
-        case 9:
+        case 9:         /* this is defined in SAT (and SAT-2) */
             n += sprintf(b + n, "ATA Status Return\n");
             if (add_len >= 12) {
                 int extend, sector_count;
@@ -733,6 +736,33 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
     }
 }
 
+/* Decode SAT ATA PASS-THROUGH fixed format sense */
+static void
+sg_get_sense_sat_pt_fixed_str(const unsigned char * sp, int slen, int blen,
+                              char * b)
+{
+    int n = 0;
+
+    slen = slen;        /* suppress warning */
+    if (blen < 1)
+        return;
+    if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2])) {
+        n += snprintf(b + n, blen - n, "  >> expected Sense key: Recovered "
+                      "Error ??\n");
+        if (n >= blen)
+            return;
+    }
+    n += snprintf(b + n, blen - n, "  error=0x%x, status=0x%x, "
+                  "device=0x%x, sector_count(7:0)=0x%x%c\n", sp[3], sp[4],
+                  sp[5], sp[6], ((0x40 & sp[8]) ? '+' : ' '));
+    if (n >= blen)
+        return;
+    n += snprintf(b + n, blen - n, "  extend=%d, log_index=0x%x, "
+                  "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n",
+                  (!!(0x80 & sp[8])), (0xf & sp[8]), sp[9], sp[10], sp[11],
+                  ((0x20 & sp[8]) ? '+' : ' '));
+}
+
 /* Fetch sense information */
 void
 sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
@@ -814,6 +844,19 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 return;
             sg_get_sense_descriptors_str(sense_buffer, len, buff_len - n,
                                          buff + n);
+            n = strlen(buff);
+            if (n >= buff_len)
+                return;
+        } else if ((len > 12) && (0 == ssh.asc) && 
+                   (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
+            /* SAT ATA PASS-THROUGH fixed format */
+            n += snprintf(buff + n, buff_len - n, "%s\n",
+                          sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
+                                              sizeof(b), b));
+            if (n >= buff_len)
+                return;
+            sg_get_sense_sat_pt_fixed_str(sense_buffer, len, buff_len - n,
+                                          buff + n);
             n = strlen(buff);
             if (n >= buff_len)
                 return;
@@ -963,6 +1006,7 @@ sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
     fprintf(sg_warnings_strm, "%s", b);
 }
 
+/* See description in sg_lib.h header file */
 int
 sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
                         struct sg_scsi_sense_hdr * sshp)

@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.06 20120223";    /* spc4r34 + sbc3r30 */
+static char * version_str = "1.07 20120319";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -46,6 +46,7 @@ static char * version_str = "1.06 20120223";    /* spc4r34 + sbc3r30 */
 #define APP_CLIENT_LPAGE 0xf
 #define SELF_TEST_LPAGE 0x10
 #define SOLID_STATE_MEDIA_LPAGE 0x11
+#define SAT_ATA_RESULTS_LPAGE 0x16
 #define PROTO_SPECIFIC_LPAGE 0x18
 #define STATS_LPAGE 0x19
 #define PCT_LPAGE 0x1a
@@ -740,7 +741,7 @@ show_page_name(int pg_code, int subpg_code,
             case SOLID_STATE_MEDIA_LPAGE:       /* 0x11 */
                 printf("%sSolid state media (sbc-3)\n", b);
                 break;
-            case 0x16:
+            case SAT_ATA_RESULTS_LPAGE:
                 printf("%sATA pass-through results (sat-2)\n", b);
                 break;
             case 0x17:
@@ -2779,6 +2780,50 @@ show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* SAT_ATA_RESULTS_LPAGE (SAT-2) */
+static void
+show_ata_pt_results_page(unsigned char * resp, int len, int show_pcb)
+{
+    int num, pl, pc, pcb;
+    unsigned char * ucp;
+    unsigned char * dp;
+    char str[PCB_STR_LEN];
+
+    printf("ATA pass-through results page (sat-2) [0x16]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if ((pc < 0xf) && (pl > 17)) {
+            int extend, sector_count;
+
+            dp = ucp + 4;
+            printf("  Log_index=0x%x (parameter_code=0x%x)\n", pc + 1, pc);
+            extend = dp[2] & 1;
+            sector_count = dp[5] + (extend ? (dp[4] << 8) : 0);
+            printf("    extend=%d  error=0x%x sector_count=0x%x\n", extend,
+                   dp[3], sector_count);
+            if (extend)
+                printf("    lba=0x%02x%02x%02x%02x%02x%02x\n", dp[10], dp[8],
+                       dp[6], dp[11], dp[9], dp[7]);
+            else
+                printf("    lba=0x%02x%02x%02x\n", dp[11], dp[9], dp[7]);
+            printf("    device=0x%x  status=0x%x\n", dp[12], dp[13]);
+        } else {
+            printf("  Reserved [parameter_code=0x%x]:", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("\n        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
 static const char * bms_status[] = {
     "no background scans active",
     "background medium scan is active",
@@ -3699,9 +3744,13 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case 0x16:
+    case SAT_ATA_RESULTS_LPAGE:         /* 0x16 */
         {
             switch (inq_dat->peripheral_type) {
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
+                /* disk (direct access) type devices */
+                show_ata_pt_results_page(resp, len, optsp->do_pcb);
+                break;
             case PDT_MCHANGER: /* smc-3 */
                 show_mchanger_diag_data_page(resp, len, optsp->do_pcb);
                 break;
@@ -3710,6 +3759,7 @@ show_ascii_page(unsigned char * resp, int len,
                 break;
             }
         }
+        break;
     case 0x17:
         {
             switch (inq_dat->peripheral_type) {
