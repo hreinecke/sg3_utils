@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.34 [20120314] [svn: r445]
+Changelog for sg3_utils-1.34 [20120319] [svn: r446]
   - sg_verify: add 16 byte cdb, bytchk (data-out buffer)
     and group number support
   - sync to spc4r35 and sbc3r30
@@ -10,11 +10,13 @@ Changelog for sg3_utils-1.34 [20120314] [svn: r445]
   - sg_ses: increase max dpage response size to 64 KB
   - sg_sanitize: add --ause, --fail and --test=
   - sg_luns: add long extended flat space addressing format
+  - sg_logs: add ATA pass-through results lpage (SAT-2)
   - sg_pt_linux: expand DID_ (host_byte) codes
   - sg_lib: fix sg_get_command_name() service actions
     - report sdat_ovfl bit (if set) in sense data
     - decode extended_copy and receive_copy service actions
     - decode read_buffer and write_buffer modes
+    - decode ATA PT fixed format sense (SAT-2)
   - ./configure options:
     - change --enable-no-linux-bsg to --disable-linuxbsg
     - add --disable-scsistrings to reduce utility size

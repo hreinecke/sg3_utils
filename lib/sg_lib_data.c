@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.77 20120313";  /* spc4r35, sbc3r30 */
+const char * sg_lib_version_str = "1.78 20120318";  /* spc4r35, sbc3r30 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
