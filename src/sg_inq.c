@@ -983,6 +983,29 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
     const unsigned char * ip;
     char b[64];
 
+    if (buff[2] != 0) {
+        /*
+         * Reference the 3rd byte of the first Identification descriptor
+         * of a page 83 reply to determine whether the reply is compliant
+         * with SCSI-2 or SPC-2/3 specifications.  A zero value in the
+         * 3rd byte indicates an SPC-2/3 conformant reply ( the field is
+         * reserved ).  This byte will be non-zero for a SCSI-2
+         * conformant page 83 reply from these EMC Symmetrix models since
+         * the 7th byte of the reply corresponds to the 4th and 5th
+         * nibbles of the 6-byte OUI for EMC, that is, 0x006048.
+         */
+        i_len = len;
+        ip = ucp = buff;
+        c_set = 1;
+        assoc = 0;
+        piv = 0;
+        desig_type = 3;
+        j = 1;
+        off = 16;
+        printf("  Pre-SPC descriptor, descriptor length: %d\n", i_len);
+        goto decode;
+    }
+
     for (j = 1, off = -1;
          (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
          ++j) {
@@ -1003,6 +1026,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         piv = ((ucp[1] & 0x80) ? 1 : 0);
         assoc = ((ucp[1] >> 4) & 0x3);
         desig_type = (ucp[1] & 0xf);
+  decode:
         if (piv && ((1 == assoc) || (2 == assoc)))
             printf("    transport: %s\n",
                    sg_get_trans_proto_str(p_id, sizeof(b), b));
@@ -1244,6 +1268,20 @@ export_dev_ids(unsigned char * buff, int len)
     unsigned char * ip;
     const char * assoc_str;
 
+    if (buff[2] != 0) {
+        /*
+         * Cf decode_dev_ids() for details
+         */
+        i_len = len;
+        ip = buff;
+        c_set = 1;
+        assoc = 0;
+        desig_type = 3;
+        j = 1;
+        off = 16;
+        goto decode;
+    }
+
     for (j = 1, off = -1;
          (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
          ++j) {
@@ -1259,6 +1297,8 @@ export_dev_ids(unsigned char * buff, int len)
         ip = ucp + 4;
         c_set = (ucp[0] & 0xf);
         assoc = ((ucp[1] >> 4) & 0x3);
+        desig_type = (ucp[1] & 0xf);
+  decode:
         switch (assoc) {
             case 0:
                 assoc_str = "LUN";
@@ -1273,7 +1313,6 @@ export_dev_ids(unsigned char * buff, int len)
                 fprintf(stderr, "    Invalid association %d\n", assoc);
                 return;
         }
-        desig_type = (ucp[1] & 0xf);
         switch (desig_type) {
         case 0: /* vendor specific */
             k = 0;
