@@ -597,6 +597,19 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
     rtp = 0;
     memset(sas_tport_addr, 0, sizeof(sas_tport_addr));
     off = -1;
+    if (buff[2] != 0) {
+        if (m_assoc != VPD_ASSOC_LU)
+            return 0;
+        ip = buff;
+        p_id = 0;
+        c_set = 1;
+        assoc = VPD_ASSOC_LU;
+        piv = 0;
+        desig_type = 3;
+        i_len = 16;
+        off = 16;
+        goto decode;
+    }
     while ((u = sg_vpd_dev_id_iter(buff, len, &off, m_assoc, m_desig_type,
                                    m_code_set)) == 0) {
         ucp = buff + off;
@@ -613,6 +626,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
         is_sas = (piv && (6 == p_id)) ? 1 : 0;
         assoc = ((ucp[1] >> 4) & 0x3);
         desig_type = (ucp[1] & 0xf);
+ decode:
         switch (desig_type) {
         case 0: /* vendor specific */
             break;
@@ -742,22 +756,16 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
 }
 
 static void
-decode_designation_descriptor(const unsigned char * ucp, int i_len,
-                              int long_out, int print_assoc)
+decode_designation_descriptor(const unsigned char * ip, int i_len,
+                              int p_id, int c_set, int piv, int assoc,
+                              int desig_type, int long_out, int print_assoc)
 {
-    int m, p_id, piv, c_set, assoc, desig_type, ci_off, c_id, d_id, naa;
+    int m, ci_off, c_id, d_id, naa;
     int vsi, k;
-    const unsigned char * ip;
     uint64_t vsei;
     uint64_t id_ext;
     char b[64];
 
-    ip = ucp + 4;
-    p_id = ((ucp[0] >> 4) & 0xf);
-    c_set = (ucp[0] & 0xf);
-    piv = ((ucp[1] & 0x80) ? 1 : 0);
-    assoc = ((ucp[1] >> 4) & 0x3);
-    desig_type = (ucp[1] & 0xf);
     if (print_assoc)
         printf("  %s:\n", assoc_arr[assoc]);
     printf("    designator type: %s,  code set: %s\n",
@@ -1007,13 +1015,19 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                int m_assoc, int m_desig_type, int m_code_set, int long_out,
                int quiet)
 {
-    int assoc, i_len;
+    int assoc, i_len, c_set, piv, p_id, desig_type;
     int printed, off, u;
     const unsigned char * ucp;
 
     if (quiet)
         return decode_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
                                     m_code_set);
+    if ( buff[2] != 0 ) {
+        if (m_assoc == VPD_ASSOC_LU)
+            decode_designation_descriptor( buff, 16, 0, 1, 0, m_assoc, 3,
+                                           long_out, 0);
+        return 0;
+    }
     off = -1;
     printed = 0;
     while ((u = sg_vpd_dev_id_iter(buff, len, &off, m_assoc, m_desig_type,
@@ -1032,7 +1046,12 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
         }
         if (NULL == print_if_found)
             printf("  %s:\n", assoc_arr[assoc]);
-        decode_designation_descriptor(ucp, i_len, long_out, 0);
+        p_id = ((ucp[0] >> 4) & 0xf);
+        c_set = (ucp[0] & 0xf);
+        piv = ((ucp[1] & 0x80) ? 1 : 0);
+        desig_type = (ucp[1] & 0xf);
+        decode_designation_descriptor(ucp + 4, i_len, p_id, c_set, piv, assoc,
+                                      desig_type, long_out, 0);
     }
     if (-2 == u) {
         fprintf(stderr, "VPD page error: short designator around "
@@ -1698,7 +1717,7 @@ decode_block_lb_prov_vpd(unsigned char * b, int len)
     printf("  Provisioning type: %d\n", b[6] & 0x7);
     if (dp) {
         const unsigned char * ucp;
-        int i_len;
+        int i_len, p_id, c_set, piv, assoc, desig_type;
 
         ucp = b + 8;
         i_len = ucp[3];
@@ -1708,7 +1727,13 @@ decode_block_lb_prov_vpd(unsigned char * b, int len)
             return 0;
         }
         printf("  Provisioning group descriptor\n");
-        decode_designation_descriptor(ucp, i_len, 0, 1);
+        p_id = ((ucp[0] >> 4) & 0xf);
+        c_set = (ucp[0] & 0xf);
+        piv = ((ucp[1] & 0x80) ? 1 : 0);
+        assoc = ((ucp[1] >> 4) & 0x3);
+        desig_type = (ucp[1] & 0xf);
+        decode_designation_descriptor(ucp, i_len, p_id, c_set, piv, assoc,
+                                      desig_type, 0, 1);
     }
     return 0;
 }
