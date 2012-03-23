@@ -1,3 +1,13 @@
+/* A utility program originally written for the Linux OS SCSI subsystem.
+ *  Copyright (C) 2004-2012 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ *  This program issues the SCSI PERSISTENT IN and OUT commands.
+ */
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -16,18 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2004-2012 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program issues the SCSI PERSISTENT IN and OUT commands.
-
-*/
-
-static char * version_str = "0.38 20120222";
+static char * version_str = "0.38 20120224";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -198,6 +197,10 @@ usage()
             "Performs a SCSI PERSISTENT RESERVE (IN or OUT) command\n");
 }
 
+/* If num_tids==0 then only one TransportID is assumed with len bytes in
+ * it. If num_tids>0 then that many TransportIDs is assumed, each in an
+ * element that is MX_TID_LEN bytes long (and the 'len' argument is
+ * ignored). */ 
 static void
 decode_transport_id(const char * leadin, unsigned char * ucp, int len,
                     int num_tids)
@@ -302,6 +305,9 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
             }
             break;
         case TPROTO_NONE:
+            fprintf(stderr, "%s  No specified protocol\n", leadin);
+            /* dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1); */
+            break;
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);

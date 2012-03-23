@@ -169,6 +169,8 @@ by the "--prefix=<directory>" option which defaults to
 "--prefix=/usr/local". As an example to install the executables in /usr/bin
 and disable the creation of the shared library (libsgutils<num>.so) this
 invocation could be used: "./configure --prefix=/usr --disable-shared".
+To reduce the size of an executable as well try this:
+"./configure --prefix=/usr --disable-shared --disable-scsistrings".
 
 The C code in this package is written for portability rather than speed.
 It assumes a level of C99 compliance and favours POSIX system and library
@@ -370,4 +372,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-17th February 2012
+3rd March 2012

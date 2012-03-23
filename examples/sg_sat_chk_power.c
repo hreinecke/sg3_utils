@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2012 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,12 +50,50 @@
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
 #define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
+#define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d
 
 #define ATA_CHECK_POWER_MODE 0xe5
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.03 20070129";
+static char * version_str = "1.04 20120319";
+
+
+#if 0
+/* Returns length of decoded fixed format sense for SAT ATA pass-through
+ * command, else returns 0. If returns 0 (expected sense data not found)
+ * then '\0' placed in first byte of bp. */
+static int
+sg_sat_decode_fixed_sense(const unsigned char * sp, int slen, char * bp,
+                          int max_blen, int verbose)
+{
+    int n;
+
+    if ((NULL == bp) || (NULL == sp) || (max_blen < 1) || (slen < 14))
+        return 0;
+    bp[0] = '\0';
+    if ((0x70 != (0x7f & sp[0])) ||
+        (SPC_SK_RECOVERED_ERROR != (0xf & sp[2])) ||
+        (0 != sp[12]) || (ASCQ_ATA_PT_INFO_AVAILABLE != sp[13]))
+        return 0;
+    n = snprintf(bp, max_blen, "error=0x%x, status=0x%x, device=0x%x, "
+                 "sector_count(7:0)=0x%x%c\n", sp[3], sp[4], sp[5], sp[6],
+                 ((0x40 & sp[8]) ? '+' : ' '));
+    if (n >= max_blen)
+        return max_blen - 1;
+    n += snprintf(bp + n, max_blen - n, "extend=%d, log_index=0x%x, "
+                  "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n",
+                  (!!(0x80 & sp[8])), (0xf & sp[8]), sp[9], sp[10], sp[11],
+                  ((0x20 & sp[8]) ? '+' : ' '));
+    if (n >= max_blen)
+        return max_blen - 1;
+    if (verbose)
+        n += snprintf(bp + n, max_blen - n, "  sector_count_upper_nonzero="
+                      "%d, lba_upper_nonzero=%d\n", !!(0x40 & sp[8]),
+                      !!(0x20 & sp[8]));
+    return (n >= max_blen) ? max_blen - 1 : n;
+}
+#endif
 
 int main(int argc, char * argv[])
 {

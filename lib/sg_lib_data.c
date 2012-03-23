@@ -15,8 +15,9 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.73 20120222";  /* spc4r34, sbc3r30 */
+const char * sg_lib_version_str = "1.78 20120318";  /* spc4r35, sbc3r30 */
 
+#ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, 0, "Test Unit Ready"},
     {0x1, 0, "Rezero Unit"},
@@ -150,6 +151,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x92, PDT_TAPE, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, PDT_TAPE, "Erase(16)"},
+    {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
     {0xa0, 0, "Report luns"},
@@ -202,6 +204,35 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
 };
 
+struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
+    {0x0, 0, "combined header and data [or multiple modes]"},
+    {0x2, 0, "data"},
+    {0x3, 0, "descriptor"},
+    {0xa, 0, "read data from echo buffer"},
+    {0xb, 0, "echo buffer descriptor"},
+    {0x1a, 0, "enable expander comms protocol and echo buffer"},
+    {0x1c, 0, "error history"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
+    {0x0, 0, "combined header and data [or multiple modes]"},
+    {0x2, 0, "data"},
+    {0x4, 0, "download microcode and activate"},
+    {0x5, 0, "download microcode, save, and activate"},
+    {0x6, 0, "download microcode with offsets and activate"},
+    {0x7, 0, "download microcode with offsets, save, and activate"},
+    {0xa, 0, "write data to echo buffer"},
+    {0xd, 0, "download microcode with offsets, select activation events, "
+             " save and defer activate"},
+    {0xe, 0, "download microcode with offsets, save and defer activate"},
+    {0xf, 0, "activate deferred microcode"},
+    {0x1a, 0, "enable expander comms protocol and echo buffer"},
+    {0x1b, 0, "disable expander comms protocol"},
+    {0x1c, 0, "download application client error history"},
+    {0xffff, 0, NULL},
+};
+
 struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
     {0x5, 0, "Report identifying information"},
                 /* was "Report device identifier" prior to spc4r07 */
@@ -211,7 +242,7 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
     {0xd, 0, "Report supported task management functions"},
     {0xe, 0, "Report priority"},
     {0xf, 0, "Report timestamp"},
-    {0x10, 0, "Maintenance in"},
+    {0x10, 0, "Management protocol in"},
     {0xffff, 0, NULL},
 };
 
@@ -220,9 +251,10 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
                 /* was "Set device identifier" prior to spc4r07 */
     {0xa, 0, "Set target port groups"},
     {0xb, 0, "Change aliases"},
+    {0xc, 0, "Remove I_T nexus"},
     {0xe, 0, "Set priority"},
     {0xf, 0, "Set timestamp"},
-    {0x10, 0, "Maintenance out"},
+    {0x10, 0, "Management protocol out"},
     {0xffff, 0, NULL},
 };
 
@@ -247,6 +279,10 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
     {0x11, 0, "Write long(16)"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = { /* opcode 0x9d */
     {0xffff, 0, NULL},
 };
 
@@ -363,11 +399,75 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x8f7f, 0, "Perform task management function (osd)"},
     {0xffff, 0, NULL},
 };
+#else
+
+struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = { /* opcode 0xa9 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = { /* opcode 0x9d */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_in_arr[] = { /* opcode 0x5e */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
+    {0xffff, 0, NULL},
+};
+
+#endif
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
  * The following should match asc-num.txt dated 20111222 */
 
+#ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
 {
     {0x40,0x01,0x7f,"Ram failure [0x%x]"},
@@ -468,6 +568,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0B,0x06,"Warning - non-volatile cache now volatile"},
     {0x0B,0x07,"Warning - degraded power to non-volatile cache"},
     {0x0B,0x08,"Warning - power loss expected"},
+    {0x0B,0x09,"Warning - device statistics notification active"},
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -599,6 +700,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x23,0x07,"Invalid token operation, token expired"},
     {0x23,0x08,"Invalid token operation, token cancelled"},
     {0x23,0x09,"Invalid token operation, token deleted"},
+    {0x23,0x0a,"Invalid token operation, invalid token length"},
     {0x24,0x00,"Invalid field in cdb"},
     {0x24,0x01,"CDB decryption error"},
     {0x24,0x02,"Invalid cdb field while in explicit block model (obs)"},
@@ -759,6 +861,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3B,0x19,"Element enabled"},
     {0x3B,0x1a,"Data transfer device removed"},
     {0x3B,0x1b,"Data transfer device inserted"},
+    {0x3B,0x1c,"Too many logical objects on partition to support operation"},
     {0x3D,0x00,"Invalid bits in identify message"},
     {0x3E,0x00,"Logical unit has not self-configured yet"},
     {0x3E,0x01,"Logical unit failure"},
@@ -1072,6 +1175,17 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x74,0x79,"Security conflict in translated device"},
     {0, 0, NULL}
 };
+#else
+struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
+{
+    {0, 0, 0, NULL}
+};
+
+struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
+{
+    {0, 0, NULL}
+};
+#endif /* SG_SCSI_STRINGS */
 
 const char * sg_lib_sense_key_desc[] = {
     "No Sense",                 /* Filemark, ILI and/or EOM; progress
@@ -1135,7 +1249,7 @@ const char * sg_lib_transport_proto_strs[] =
     "Internet SCSI (iSCSI)",
     "Serial Attached SCSI Protocol (SPL-2)",
     "Automation/Drive Interface Transport (ADT-2)",
-    "AT Attachment Interface (ACS-2)",		/* 0x8 */
+    "AT Attachment Interface (ACS-2)",          /* 0x8 */
     "USB Attached SCSI (UAS-2)",
     "SCSI over PCI Express (SOP)",
     "Oxb", "Oxc", "Oxd", "Oxe",
