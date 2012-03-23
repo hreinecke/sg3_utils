@@ -56,6 +56,10 @@
 #define REASSIGN_BLKS_CMDLEN  6
 #define RECEIVE_DIAGNOSTICS_CMD   0x1c
 #define RECEIVE_DIAGNOSTICS_CMDLEN  6
+#define EXTENDED_COPY_CMD   0x83
+#define EXTENDED_COPY_CMDLEN 16
+#define RECEIVE_COPY_RESULTS_CMD   0x84
+#define RECEIVE_COPY_RESULTS_CMDLEN 16
 #define SEND_DIAGNOSTIC_CMD   0x1d
 #define SEND_DIAGNOSTIC_CMDLEN  6
 #define SERVICE_ACTION_IN_12_CMD 0xab
@@ -78,6 +82,10 @@
 #define READ_MEDIA_SERIAL_NUM_SA 0x1
 #define REPORT_IDENTIFYING_INFORMATION_SA 0x5
 #define REPORT_TGT_PRT_GRP_SA 0xa
+#define RECEIVE_COPY_RES_COPY_STATUS_SA 0x00
+#define RECEIVE_COPY_RES_RECEIVE_DATA_SA 0x01
+#define RECEIVE_COPY_RES_OPERATING_PARMS_SA 0x03
+#define RECEIVE_COPY_RES_FAILED_SEGMENT_DETAILS_SA 0x04
 #define SET_IDENTIFYING_INFORMATION_SA 0x6
 #define SET_TGT_PRT_GRP_SA 0xa
 #define WRITE_LONG_16_SA 0x11
@@ -164,13 +172,21 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
     return ret;
 }
 
+int
+sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len,
+                         int noisy, int verbose)
+{
+    return sg_ll_report_tgt_prt_grp2(sg_fd, resp, mx_resp_len, 0, noisy,
+                                     verbose);
+}
+
 /* Invokes a SCSI REPORT TARGET PORT GROUPS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
 int
-sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len, int noisy,
-                         int verbose)
+sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
+                          int extended, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char rtpgCmdBlk[MAINTENANCE_IN_CMDLEN] =
@@ -179,6 +195,9 @@ sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len, int noisy,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    if (extended) {
+        rtpgCmdBlk[1] |= 0x20;
+    }
     rtpgCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
     rtpgCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
     rtpgCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
@@ -2185,3 +2204,140 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
+
+/* Invokes a SCSI RECEIVE COPY RESULTS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Receive copy results not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+int
+sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
+                           int mx_resp_len, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char rcvcopyresCmdBlk[RECEIVE_COPY_RESULTS_CMDLEN] =
+      {RECEIVE_COPY_RESULTS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    rcvcopyresCmdBlk[1] = (unsigned char)(sa & 0x1f);
+    rcvcopyresCmdBlk[2] = (unsigned char)(list_id);
+    rcvcopyresCmdBlk[10] = (unsigned char)((mx_resp_len >> 24) & 0xff);
+    rcvcopyresCmdBlk[11] = (unsigned char)((mx_resp_len >> 16) & 0xff);
+    rcvcopyresCmdBlk[12] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    rcvcopyresCmdBlk[13] = (unsigned char)(mx_resp_len & 0xff);
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Receive copy results cmd: ");
+        for (k = 0; k < RECEIVE_COPY_RESULTS_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", rcvcopyresCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "receive copy results: out of "
+                "memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, rcvcopyresCmdBlk, sizeof(rcvcopyresCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "receive copy results", res,
+                               mx_resp_len, sense_b, noisy, verbose,
+                               &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI RECEIVE COPY RESULTS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Receive copy results not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+int
+sg_ll_extended_copy(int sg_fd, void * resp,
+                    int mx_resp_len, int noisy, int verbose)
+{
+    int k, res, ret, sense_cat;
+    unsigned char xcopyCmdBlk[EXTENDED_COPY_CMDLEN] =
+      {EXTENDED_COPY_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    xcopyCmdBlk[10] = (unsigned char)((mx_resp_len >> 24) & 0xff);
+    xcopyCmdBlk[11] = (unsigned char)((mx_resp_len >> 16) & 0xff);
+    xcopyCmdBlk[12] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    xcopyCmdBlk[13] = (unsigned char)(mx_resp_len & 0xff);
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    Extended copy cmd: ");
+        for (k = 0; k < EXTENDED_COPY_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", xcopyCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "extended copy: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, xcopyCmdBlk, sizeof(xcopyCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, (unsigned char *)resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "extended copy", res,
+                               mx_resp_len, sense_b, noisy, verbose,
+                               &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+

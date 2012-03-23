@@ -126,16 +126,18 @@ Default value is 0. This option is needed by some PROUT sub\-commands.
 Preempt is a sub\-command of the PROUT command. Preempts the existing
 persistent reservation (identified by \fI\-\-param\-sark=SARK\fR) with
 the registration key that is registered for this I_T_L nexus (identified
-by \fI\-\-param\-rk=RK\fR). The associated \fI\-\-prout\-type=TYPE\fR option
-needs to match the type of the reservation.
+by \fI\-\-param\-rk=RK\fR). If a new reservation is establised as
+a result of the preemption then the supplied \fI\-\-prout\-type=TYPE\fR
+is used as the type for this new reservation.
 .TP
 \fB\-A\fR, \fB\-\-preempt\-abort\fR
 Preempt and Abort is a sub\-command of the PROUT command. Preempts
 the existing persistent reservation (identified by \fI\-\-param\-sark=SARK\fR)
 with the registration key that is registered for this I_T_L nexus (identified
-by \fI\-\-param\-rk=RK\fR). The associated \fI\-\-prout\-type=TYPE\fR option
-needs to match the type of the reservation. ACA and other pending tasks are
-aborted.
+by \fI\-\-param\-rk=RK\fR). If a new reservation is establised as
+a result of the preemption then the supplied \fI\-\-prout\-type=TYPE\fR
+is used as the type for this new reservation. ACA and other pending
+tasks are aborted.
 .TP
 \fB\-T\fR, \fB\-\-prout\-type\fR=\fITYPE\fR
 specify the PROUT command's 'type' argument. Required by
