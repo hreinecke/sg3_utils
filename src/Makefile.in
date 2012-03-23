@@ -252,7 +252,9 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_same$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_wr_mode$(EXEEXT)
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_wr_mode$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_xcopy$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_copy_results$(EXEEXT)
 @OS_FREEBSD_TRUE@bin_PROGRAMS = sg_decode_sense$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_format$(EXEEXT) sg_get_config$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_get_lba_status$(EXEEXT) sg_ident$(EXEEXT) \
@@ -288,6 +290,9 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
+am_sg_copy_results_OBJECTS = sg_copy_results.$(OBJEXT)
+sg_copy_results_OBJECTS = $(am_sg_copy_results_OBJECTS)
+sg_copy_results_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_dd_OBJECTS = sg_dd.$(OBJEXT)
 sg_dd_OBJECTS = $(am_sg_dd_OBJECTS)
 sg_dd_DEPENDENCIES = ../lib/libsgutils2.la
@@ -438,6 +443,9 @@ sg_write_long_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_write_same_OBJECTS = sg_write_same.$(OBJEXT)
 sg_write_same_OBJECTS = $(am_sg_write_same_OBJECTS)
 sg_write_same_DEPENDENCIES = ../lib/libsgutils2.la
+am_sg_xcopy_OBJECTS = sg_xcopy.$(OBJEXT)
+sg_xcopy_OBJECTS = $(am_sg_xcopy_OBJECTS)
+sg_xcopy_DEPENDENCIES = ../lib/libsgutils2.la
 am_sginfo_OBJECTS = sginfo.$(OBJEXT)
 sginfo_OBJECTS = $(am_sginfo_OBJECTS)
 sginfo_DEPENDENCIES = ../lib/libsgutils2.la
@@ -460,14 +468,15 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
-	$(sg_emc_trespass_SOURCES) $(sg_format_SOURCES) \
-	$(sg_get_config_SOURCES) $(sg_get_lba_status_SOURCES) \
-	$(sg_ident_SOURCES) $(sg_inq_SOURCES) $(sg_logs_SOURCES) \
-	$(sg_luns_SOURCES) $(sg_map_SOURCES) $(sg_map26_SOURCES) \
-	$(sg_modes_SOURCES) $(sg_opcodes_SOURCES) \
-	$(sg_persist_SOURCES) $(sg_prevent_SOURCES) $(sg_raw_SOURCES) \
-	$(sg_rbuf_SOURCES) $(sg_rdac_SOURCES) $(sg_read_SOURCES) \
+SOURCES = $(sg_copy_results_SOURCES) $(sg_dd_SOURCES) \
+	$(sg_decode_sense_SOURCES) $(sg_emc_trespass_SOURCES) \
+	$(sg_format_SOURCES) $(sg_get_config_SOURCES) \
+	$(sg_get_lba_status_SOURCES) $(sg_ident_SOURCES) \
+	$(sg_inq_SOURCES) $(sg_logs_SOURCES) $(sg_luns_SOURCES) \
+	$(sg_map_SOURCES) $(sg_map26_SOURCES) $(sg_modes_SOURCES) \
+	$(sg_opcodes_SOURCES) $(sg_persist_SOURCES) \
+	$(sg_prevent_SOURCES) $(sg_raw_SOURCES) $(sg_rbuf_SOURCES) \
+	$(sg_rdac_SOURCES) $(sg_read_SOURCES) \
 	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
@@ -480,16 +489,17 @@ SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
 	$(sg_turs_SOURCES) $(sg_unmap_SOURCES) $(sg_verify_SOURCES) \
 	$(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
 	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
-	$(sg_write_same_SOURCES) $(sginfo_SOURCES) $(sgm_dd_SOURCES) \
-	$(sgp_dd_SOURCES)
-DIST_SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
-	$(sg_emc_trespass_SOURCES) $(sg_format_SOURCES) \
-	$(sg_get_config_SOURCES) $(sg_get_lba_status_SOURCES) \
-	$(sg_ident_SOURCES) $(sg_inq_SOURCES) $(sg_logs_SOURCES) \
-	$(sg_luns_SOURCES) $(sg_map_SOURCES) $(sg_map26_SOURCES) \
-	$(sg_modes_SOURCES) $(sg_opcodes_SOURCES) \
-	$(sg_persist_SOURCES) $(sg_prevent_SOURCES) $(sg_raw_SOURCES) \
-	$(sg_rbuf_SOURCES) $(sg_rdac_SOURCES) $(sg_read_SOURCES) \
+	$(sg_write_same_SOURCES) $(sg_xcopy_SOURCES) $(sginfo_SOURCES) \
+	$(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
+DIST_SOURCES = $(sg_copy_results_SOURCES) $(sg_dd_SOURCES) \
+	$(sg_decode_sense_SOURCES) $(sg_emc_trespass_SOURCES) \
+	$(sg_format_SOURCES) $(sg_get_config_SOURCES) \
+	$(sg_get_lba_status_SOURCES) $(sg_ident_SOURCES) \
+	$(sg_inq_SOURCES) $(sg_logs_SOURCES) $(sg_luns_SOURCES) \
+	$(sg_map_SOURCES) $(sg_map26_SOURCES) $(sg_modes_SOURCES) \
+	$(sg_opcodes_SOURCES) $(sg_persist_SOURCES) \
+	$(sg_prevent_SOURCES) $(sg_raw_SOURCES) $(sg_rbuf_SOURCES) \
+	$(sg_rdac_SOURCES) $(sg_read_SOURCES) \
 	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
@@ -502,8 +512,8 @@ DIST_SOURCES = $(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
 	$(sg_turs_SOURCES) $(sg_unmap_SOURCES) $(sg_verify_SOURCES) \
 	$(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
 	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
-	$(sg_write_same_SOURCES) $(sginfo_SOURCES) $(sgm_dd_SOURCES) \
-	$(sgp_dd_SOURCES)
+	$(sg_write_same_SOURCES) $(sg_xcopy_SOURCES) $(sginfo_SOURCES) \
+	$(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -731,6 +741,10 @@ sg_write_same_SOURCES = sg_write_same.c
 sg_write_same_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_wr_mode_SOURCES = sg_wr_mode.c
 sg_wr_mode_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_xcopy_SOURCES = sg_xcopy.c
+sg_xcopy_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_copy_results_SOURCES = sg_copy_results.c
+sg_copy_results_LDADD = ../lib/libsgutils2.la @os_libs@
 all: all-am
 
 .SUFFIXES:
@@ -808,6 +822,9 @@ clean-binPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
+sg_copy_results$(EXEEXT): $(sg_copy_results_OBJECTS) $(sg_copy_results_DEPENDENCIES) 
+	@rm -f sg_copy_results$(EXEEXT)
+	$(LINK) $(sg_copy_results_OBJECTS) $(sg_copy_results_LDADD) $(LIBS)
 sg_dd$(EXEEXT): $(sg_dd_OBJECTS) $(sg_dd_DEPENDENCIES) 
 	@rm -f sg_dd$(EXEEXT)
 	$(LINK) $(sg_dd_OBJECTS) $(sg_dd_LDADD) $(LIBS)
@@ -958,6 +975,9 @@ sg_write_long$(EXEEXT): $(sg_write_long_OBJECTS) $(sg_write_long_DEPENDENCIES)
 sg_write_same$(EXEEXT): $(sg_write_same_OBJECTS) $(sg_write_same_DEPENDENCIES) 
 	@rm -f sg_write_same$(EXEEXT)
 	$(LINK) $(sg_write_same_OBJECTS) $(sg_write_same_LDADD) $(LIBS)
+sg_xcopy$(EXEEXT): $(sg_xcopy_OBJECTS) $(sg_xcopy_DEPENDENCIES) 
+	@rm -f sg_xcopy$(EXEEXT)
+	$(LINK) $(sg_xcopy_OBJECTS) $(sg_xcopy_LDADD) $(LIBS)
 sginfo$(EXEEXT): $(sginfo_OBJECTS) $(sginfo_DEPENDENCIES) 
 	@rm -f sginfo$(EXEEXT)
 	$(LINK) $(sginfo_OBJECTS) $(sginfo_LDADD) $(LIBS)
@@ -974,6 +994,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_copy_results.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_dd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_decode_sense.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_emc_trespass.Po@am__quote@
@@ -1026,6 +1047,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_buffer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_long.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_same.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_xcopy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sginfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sgm_dd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sgp_dd.Po@am__quote@
