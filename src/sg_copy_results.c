@@ -47,10 +47,10 @@ static char * version_str = "1.1 20120905";
 
 struct descriptor_type {
     int code;
-    char desc[];
+    char desc[124];
 };
 
-struct descriptor_type target_descriptor_codes [] = {
+struct descriptor_type target_descriptor_codes[] = {
     { 0xe0, "Fibre Channel N_Port_Name"},
     { 0xe1, "Fibre Channel N_port_ID"},
     { 0xe2, "Fibre Channesl N_port_ID with N_Port_Name checking"},
@@ -62,7 +62,8 @@ struct descriptor_type target_descriptor_codes [] = {
     { 0xe8, "IEEE 1395 EUI-64" },
     { 0xe9, "SAS Serial SCSI Protocol" },
     { 0xea, "IPv6" },
-    { 0xeb, "IP Copy Service" }
+    { 0xeb, "IP Copy Service" },
+    { -1, "" }
 };
 
 struct descriptor_type segment_descriptor_codes [] = {
@@ -93,7 +94,8 @@ struct descriptor_type segment_descriptor_codes [] = {
     { 0x13, "Image copy from sequential-access device to sequential-access "
             "device" },
     { 0x14, "Register persistent reservation key" },
-    { 0x15, "Third party persistent reservations source I_T nexus" }
+    { 0x15, "Third party persistent reservations source I_T nexus" },
+    { -1, "" }
 };
 
 static void
@@ -181,22 +183,33 @@ scsi_operating_parameters(unsigned char *rcBuff, unsigned int rcBuffLen)
     printf("    Held data granularity: %lu bytes\n",
            (unsigned long)(1 << rcBuff[39]));
 
-    printf("    Implemented descriptor list:\n        ");
+    printf("    Implemented descriptor list:\n");
     for (n = 0; n < rcBuff[43]; n++) {
         int code = rcBuff[44 + n];
 
         if (code < 0x16) {
-            printf("Segment descriptor 0x%02x: %s\n",
-                   code, segment_descriptor_codes[code].desc);
+            struct descriptor_type *seg_desc = segment_descriptor_codes;
+            while (strlen(seg_desc->desc)) {
+                if (seg_desc->code == code)
+                    break;
+                seg_desc++;
+            }
+            printf("        Segment descriptor 0x%02x: %s\n", code,
+                   strlen(seg_desc->desc) ? seg_desc->desc : "Reserved");
         } else if (code < 0xc0) {
-            printf("Segment descriptor 0x%02x: Reserved\n", code);
+            printf("        Segment descriptor 0x%02x: Reserved\n", code);
         } else if (code < 0xe0) {
-            printf("Vendor specific descriptor 0x%02x\n", code);
-        } else if (code < 0xec) {
-            printf("Target descriptor 0x%02x: %s\n",
-                   code, target_descriptor_codes[code - 0xe0].desc);
+            printf("        Vendor specific descriptor 0x%02x\n", code);
         } else {
-            printf("Target descriptor 0x%02x: Reserved\n", code);
+            struct descriptor_type *tgt_desc = target_descriptor_codes;
+
+            while (strlen(tgt_desc->desc)) {
+                if (tgt_desc->code == code)
+                    break;
+                tgt_desc++;
+            }
+            printf("        Target descriptor 0x%02x: %s\n", code,
+                   strlen(tgt_desc->desc) ? tgt_desc->desc : "Reserved");
         }
     }
     printf("\n");
