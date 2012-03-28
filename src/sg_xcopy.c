@@ -3,7 +3,7 @@
  *
  *  Copyright (c) 2011-2012 Hannes Reinecke, SUSE Labs
  *
- *  Largerly taken from 'sg_dd', which has the
+ *  Largely taken from 'sg_dd', which has the
  *
  *  Copyright (C) 1999 - 2010 D. Gilbert and P. Allworth
  *  This program is free software; you can redistribute it and/or modify
@@ -283,14 +283,12 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
 
     if (fp->sg_type & FT_SG) {
         snprintf(ebuff, EBUFF_SZ, "%s", fp->fname);
-    } else if (fp->sg_type & FT_BLOCK) {
+    } else if (fp->sg_type & FT_BLOCK || fp->sg_type & FT_OTHER) {
         int fd;
 
         snprintf(ebuff, EBUFF_SZ, "/sys/dev/block/%d:%d/partition",
                  devmajor, devminor);
-        if ((fd = open(ebuff, O_RDONLY)) < 0) {
-            perror("opening partition");
-        } else {
+        if ((fd = open(ebuff, O_RDONLY)) >= 0) {
             len = read(fd, ebuff, EBUFF_SZ);
             if (len < 0) {
                 perror("read partition");
@@ -1084,7 +1082,6 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
 {
     int outfd, flags, verb, res;
     char ebuff[EBUFF_SZ];
-    struct sg_simple_inquiry_resp sir;
 
     verb = (verbose ? verbose - 1: 0);
     ofp->sg_type = dd_filetype(ofp);
@@ -1092,8 +1089,6 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
         fprintf(stderr, " >> Output file type: %s, devno %d:%d\n",
                 dd_filetype_str(ofp->sg_type, ebuff),
                 major(ofp->devno), minor(ofp->devno));
-
-    ofp->sg_type |= FT_SG;
 
     if (!(FT_DEV_NULL & ofp->sg_type)) {
         flags = O_RDWR | O_NONBLOCK;
@@ -1108,14 +1103,6 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
         if (verbose)
             fprintf(stderr, "        open output(sg_io), flags=0x%x\n",
                     flags);
-        if (sg_simple_inquiry(outfd, &sir, 0, verb)) {
-            fprintf(stderr, "INQUIRY failed on %s\n", ofp->fname);
-            goto other_err;
-        }
-        ofp->pdt = sir.peripheral_type;
-        if (verbose)
-            fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
-                    ofp->fname, sir.vendor, sir.product, sir.revision, ofp->pdt);
     } else {
         outfd = -1; /* don't bother opening */
     }
@@ -1133,8 +1120,6 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
 
 file_err:
     return -SG_LIB_FILE_ERROR;
-other_err:
-    return -SG_LIB_CAT_OTHER;
 }
 
 
@@ -1385,14 +1370,14 @@ main(int argc, char * argv[])
                 "bs=%d, device claims=%d\n", ifp.fname, blk_sz, in_sect_sz);
     }
 
-    res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
+    res = scsi_read_capacity(ofp.sg_fd, &out_num_sect, &out_sect_sz);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
         fprintf(stderr, "Unit attention (readcap out), continuing\n");
-        res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
+        res = scsi_read_capacity(ofp.sg_fd, &out_num_sect, &out_sect_sz);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
         fprintf(stderr,
                 "Aborted command (readcap out), continuing\n");
-        res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
+        res = scsi_read_capacity(ofp.sg_fd, &out_num_sect, &out_sect_sz);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
@@ -1432,11 +1417,11 @@ main(int argc, char * argv[])
             dd_count, skip, in_num_sect, skip + seek, out_num_sect);
 #endif
 
-    res = scsi_operating_parameter(infd, ifp.sg_type, 0, &max_bytes_in);
+    res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0, &max_bytes_in);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
             fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(infd, ifp.sg_type, 0, &max_bytes_in);
+            res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0, &max_bytes_in);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
                 fprintf(stderr, "receive copy results not supported on %s\n",
@@ -1458,7 +1443,7 @@ main(int argc, char * argv[])
 
     if (res & TD_VPD) {
         printf("  >> using VPD identification for source %s\n", ifp.fname);
-        res = desc_from_vpd_id(infd, src_desc, 256, in_sect_sz);
+        res = desc_from_vpd_id(ifp.sg_fd, src_desc, 256, in_sect_sz);
         if (res > 256) {
             fprintf(stderr, "source descriptor too large (%d bytes)\n", res);
             return SG_LIB_CAT_MALFORMED;
@@ -1468,21 +1453,21 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_INVALID_OP;
     }
 
-    res = scsi_operating_parameter(outfd, ofp.sg_type, 1, &max_bytes_out);
+    res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1, &max_bytes_out);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
             fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(outfd, ofp.sg_type, 1, &max_bytes_out);
+            res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1, &max_bytes_out);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
                 fprintf(stderr, "receive copy results not supported on %s\n",
-                        ifp.fname);
+                        ofp.fname);
 #ifndef SG_DEBUG
                 return EINVAL;
 #endif
             } else if (-res == SG_LIB_CAT_NOT_READY)
                 fprintf(stderr, "receive copy results failed on %s - not "
-                        "ready\n", ifp.fname);
+                        "ready\n", ofp.fname);
             else {
                 fprintf(stderr, "Unable to receive copy results on %s\n",
                         ofp.fname);
@@ -1495,7 +1480,7 @@ main(int argc, char * argv[])
     if (res & TD_VPD) {
         printf("  >> using VPD identification for destination %s\n",
                ofp.fname);
-        res = desc_from_vpd_id(outfd, dst_desc, 256, out_sect_sz);
+        res = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256, out_sect_sz);
         if (res > 256) {
             fprintf(stderr, "destination descriptor too large (%d bytes)\n",
                     res);
