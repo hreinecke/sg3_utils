@@ -27,7 +27,7 @@
  * SCSI block device.
  */
 
-static char * version_str = "1.17 20120220";
+static char * version_str = "1.18 20120327";
 
 #define ME "sg_verify: "
 

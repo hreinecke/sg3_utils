@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.4 (2012-02-21)"
+#define SG_RAW_VERSION "0.4.5 (2012-03-28)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -379,7 +379,7 @@ int
 main(int argc, char *argv[])
 {
     int ret = 0;
-    int res_cat, slen, k, ret2;
+    int res_cat, status, slen, k, ret2;
     struct opts_t opts;
     int sg_fd = -1;
     struct sg_pt_base *ptvp = NULL;
@@ -387,7 +387,7 @@ main(int argc, char *argv[])
     unsigned char * dxfer_buffer_in = NULL;
     unsigned char * dxfer_buffer_out = NULL;
     unsigned char *wrkBuf = NULL;
-    char b[64];
+    char b[128];
 
     memset(&opts, 0, sizeof(opts));
     opts.timeout = DEFAULT_TIMEOUT;
@@ -465,23 +465,49 @@ main(int argc, char *argv[])
         ret = SG_LIB_CAT_OTHER;
         goto done;
     }
+
     slen = 0;
     res_cat = get_scsi_pt_result_category(ptvp);
-    if (SCSI_PT_RESULT_GOOD == res_cat)
+    switch (res_cat) {
+    case SCSI_PT_RESULT_GOOD:
         ret = 0;
-    else if (SCSI_PT_RESULT_SENSE == res_cat) {
+        break;
+    case SCSI_PT_RESULT_SENSE:
         slen = get_scsi_pt_sense_len(ptvp);
         ret = sg_err_category_sense(sense_buffer, slen);
-    } else
+        break;
+    case SCSI_PT_RESULT_TRANSPORT_ERR:
+        get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
+        fprintf(sg_warnings_strm, ">>> transport error: %s\n", b);
         ret = SG_LIB_CAT_OTHER;
+        break;
+    case SCSI_PT_RESULT_OS_ERR:
+        get_scsi_pt_os_err_str(ptvp, sizeof(b), b);
+        fprintf(sg_warnings_strm, ">>> os error: %s\n", b);
+        ret = SG_LIB_CAT_OTHER;
+        break;
+    default:
+        fprintf(sg_warnings_strm, ">>> unknown pass through result "
+                "category (%d)\n", res_cat);
+        ret = SG_LIB_CAT_OTHER;
+        break;
+    }
 
+    status = get_scsi_pt_status_response(ptvp);
     fprintf(stderr, "SCSI Status: ");
-    sg_print_scsi_status(get_scsi_pt_status_response(ptvp));
+    sg_print_scsi_status(status);
     fprintf(stderr, "\n\n");
-    if (! opts.no_sense) {
-        fprintf(stderr, "Sense Information:\n");
-        sg_print_sense(NULL, sense_buffer, slen, (opts.do_verbose > 0));
-        fprintf(stderr, "\n");
+    if ((SAM_STAT_CHECK_CONDITION == status) && (! opts.no_sense)) {
+        if (SCSI_PT_RESULT_SENSE != res_cat)
+            slen = get_scsi_pt_sense_len(ptvp);
+        if (0 == slen)
+            fprintf(stderr, ">>> Strange: status is CHECK CONDITION but no "
+                    "Sense Information\n");
+        else {
+            fprintf(stderr, "Sense Information:\n");
+            sg_print_sense(NULL, sense_buffer, slen, (opts.do_verbose > 0));
+            fprintf(stderr, "\n");
+        }
     }
 
     if (opts.do_datain) {
