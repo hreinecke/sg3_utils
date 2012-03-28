@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.60 20120320";    /* spc4r35 + sbc3r30 */
+static char * version_str = "0.61 20120326";    /* spc4r35 + sbc3r30 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -2261,7 +2261,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         break;
     case VPD_MODE_PG_POLICY:    /* 0x87 */
         if ((! do_raw) && (! do_quiet))
-            printf("Mode page VPD policy:\n");
+            printf("Mode page policy VPD page:\n");
         res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                             verbose);
         if (0 == res) {
