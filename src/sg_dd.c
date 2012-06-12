@@ -392,7 +392,7 @@ usage()
            "                normal file or pipe\n"
            "    oflag       comma separated list from: [append,coe,dio,"
            "direct,dpo,\n"
-           "                dsync,excl,flock,fua,nocache, null,sgio,"
+           "                dsync,excl,flock,fua,nocache,null,sgio,"
            "sparse]\n"
            "    retries     retry sgio errors RETR times (def: 0)\n"
            "    seek        block position to start writing to OFILE\n"

@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.66 20120222";    /* ses3r04 */
+static char * version_str = "1.67 20120404";    /* ses3r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -366,12 +366,14 @@ static struct acronym2tuple ecs_a2t_arr[] = {
    {"ident", ARRAY_DEV_ETC, 2, 1, 1},
    {"ident", POWER_SUPPLY_ETC, 1, 7, 1},
    {"ident", COOLING_ETC, 1, 7, 1},
+   {"ident", ENCLOSURE_ETC, 1, 7, 1},
    {"insert", DEVICE_ETC, 2, 3, 1},
    {"insert", ARRAY_DEV_ETC, 2, 3, 1},
    {"locate", DEVICE_ETC, 2, 1, 1},
    {"locate", ARRAY_DEV_ETC, 2, 1, 1},
    {"locate", POWER_SUPPLY_ETC, 1, 7, 1},
    {"locate", COOLING_ETC, 1, 7, 1},
+   {"locate", ENCLOSURE_ETC, 1, 7, 1},
    {"missing", DEVICE_ETC, 2, 4, 1},
    {"missing", ARRAY_DEV_ETC, 2, 4, 1},
    {"locate", DEVICE_ETC, 2, 1, 1},
