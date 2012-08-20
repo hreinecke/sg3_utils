@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.16 20120125 */
+/* sg_pt_linux version 1.17 20120806 */
 
 
 #include <stdio.h>
@@ -481,14 +481,22 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
  * do_scsi_pt_v3() transfers the input data into a v3 structure and
  * then the output data is transferred back into a sg v4 structure.
  * That implementation detail could change in the future.
+ *
+ * [20120806] Only use MAJOR() macro in kdev_t.h if that header file is
+ * available and major() macro [N.B. lower case] is not available.
  */
 
 
 #include <linux/types.h>
 #include <linux/bsg.h>
 
+#ifdef major
+#define SG_DEV_MAJOR major
+#else
 #ifdef HAVE_LINUX_KDEV_T_H
 #include <linux/kdev_t.h>
+#endif
+#define SG_DEV_MAJOR MAJOR  /* MAJOR() macro faulty if > 255 minors */
 #endif
 
 
@@ -973,15 +981,9 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
                         strerror(ptp->os_err), ptp->os_err);
             return -ptp->os_err;
         }
-#ifdef HAVE_LINUX_KDEV_T_H
         if (! S_ISCHR(a_stat.st_mode) ||
-            (bsg_major != (int)MAJOR(a_stat.st_rdev)))
+            (bsg_major != (int)SG_DEV_MAJOR(a_stat.st_rdev)))
             return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
-#else
-        if (! S_ISCHR(a_stat.st_mode) ||
-            (bsg_major != (int)major(a_stat.st_rdev)))
-            return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
-#endif
     }
 
     if (! ptp->io_hdr.request) {
