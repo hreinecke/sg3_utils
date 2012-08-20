@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.16 20120322";
+static char * version_str = "1.17 20120820";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -246,7 +246,7 @@ int main(int argc, char * argv[])
         printf("Report target port groups:\n");
         ucp = reportTgtGrpBuff + 4;
         if (extended) {
-             if (!(ucp[0] & 0x10)) {
+             if (0x10 != (ucp[0] & 0x70)) {
                   fprintf(stderr, "   <<invalid extended header format\n");
                   goto err_out;
              }
