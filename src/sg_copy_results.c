@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Hannes Reinecke, SUSE Labs
+ * Copyright (c) 2011-2012 Hannes Reinecke, SUSE Labs
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static char * version_str = "1.0 20110608";
+static char * version_str = "1.1 20120905";
 
 
 #define MAX_XFER_LEN 10000
@@ -90,7 +90,8 @@ struct descriptor_type segment_descriptor_codes [] = {
     { 0x10, "Write filemarks to sequential-access device" },
     { 0x11, "Space records or filemarks on sequential-access device" },
     { 0x12, "Locate on sequential-access device" },
-    { 0x13, "Image copy from sequential-access device to sequential-access device" },
+    { 0x13, "Image copy from sequential-access device to sequential-access "
+            "device" },
     { 0x14, "Register persistent reservation key" },
     { 0x15, "Third party persistent reservations source I_T nexus" }
 };
@@ -104,7 +105,8 @@ scsi_copy_status(unsigned char *rcBuff, unsigned int rcBuffLen)
         fprintf(stderr, "  <<not enough data to procedd report>>\n");
         return;
     }
-    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) | rcBuff[3];
+    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
+          rcBuff[3];
     if (len > rcBuffLen) {
         fprintf(stderr, "  <<report too long for internal buffer,"
                 " output truncated\n");
@@ -137,7 +139,8 @@ scsi_operating_parameters(unsigned char *rcBuff, unsigned int rcBuffLen)
 {
     unsigned int len, n;
 
-    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) | rcBuff[3];
+    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
+          rcBuff[3];
     if (len > rcBuffLen) {
         fprintf(stderr, "  <<report too long for internal buffer,"
                 " output truncated\n");
@@ -217,25 +220,27 @@ static void
 usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_copy_results [--status|--receive|--params|--failed] [--help] "
-          "[--list_id=ID]\n"
-          "                     [--verbose] [--version] [--hex] DEVICE\n"
+          "sg_copy_results [--failed|--params|--receive|--status] [--help]\n"
+          "                       [--hex] [--list_id=ID] [--verbose] "
+          "[--version]\n"
+          "                       DEVICE\n"
           "  where:\n"
-          "    --status|-s          use COPY STATUS service action\n"
-          "    --receive|-r         use RECEIVE DATA service action\n"
-          "    --params|-p          use OPERATING PARAMETERS service action\n"
-          "    --failed|-f          use FAILD SEGMENT DETAILS service action\n"
+          "    --failed|-f          use FAILED SEGMENT DETAILS service "
+          "action\n"
           "    --help|-h            print out usage message\n"
-          "    --list_id=ID|-l ID   list identifier "
-          "(default: 0)\n"
+          "    --hex|-H             print out response buffer in hex\n"
+          "    --list_id=ID|-l ID   list identifier (default: 0)\n"
+          "    --params|-p          use OPERATING PARAMETERS service "
+          "action\n"
+          "    --receive|-r         use RECEIVE DATA service action\n"
+          "    --status|-s          use COPY STATUS service action\n"
           "    --verbose|-v         increase verbosity\n"
           "    --version|-V         print version string then exit\n"
-          "    --hex|-H             print out response buffer in hex\n"
           "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000) "
           "(default:\n"
           "                             520 bytes)\n\n"
-          "Performs a SCSI RECEIVE COPY RESULTS command. Returns the response "
-          "as specified by the service action parameters.\n"
+          "Performs a SCSI RECEIVE COPY RESULTS command. Returns the "
+          "response as\nspecified by the service action parameters.\n"
           );
 }
 
@@ -371,14 +376,16 @@ main(int argc, char * argv[])
                 "aborted command\n");
         break;
     case SG_LIB_CAT_INVALID_OP:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS command not supported\n");
+        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS command not "
+                "supported\n");
         break;
     case SG_LIB_CAT_ILLEGAL_REQ:
         fprintf(stderr, "  SCSI RECEIVE COPY RESULTS failed, "
                 "bad field in cdb\n");
         break;
     default:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS command error %d\n", res);
+        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS command error %d\n",
+                res);
         break;
     }
     if (res != 0)

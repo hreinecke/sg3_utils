@@ -1,3 +1,30 @@
+/* A utility program for copying files. Specialised for "files" that
+ * represent devices that understand the SCSI command set.
+ *
+ * Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+
+   This program is a specialisation of the Unix "dd" command in which
+   either the input or the output file is a scsi generic device, raw
+   device, a block device or a normal file. The block size ('bs') is
+   assumed to be 512 if not given. This program complains if 'ibs' or
+   'obs' are given with a value that differs from 'bs' (or the default 512).
+   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
+   not given or 'of=-' then stdout assumed.
+
+   A non-standard argument "bpt" (blocks per transfer) is added to control
+   the maximum number of blocks in each transfer. The default value is 128.
+   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
+   in this case) is transferred to or from the sg device in a single SCSI
+   command. The actual size of the SCSI READ or WRITE command block can be
+   selected with the "cdbsz" argument.
+
+   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
+*/
+
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE     /* resolves u_char typedef in scsi/scsi.h [lk 2.4] */
@@ -31,34 +58,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-/* A utility program for copying files. Specialised for "files" that
-*  represent devices that understand the SCSI command set.
-*
-*  Copyright (C) 1999 - 2010 D. Gilbert and P. Allworth
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program is a specialisation of the Unix "dd" command in which
-   either the input or the output file is a scsi generic device, raw
-   device, a block device or a normal file. The block size ('bs') is
-   assumed to be 512 if not given. This program complains if 'ibs' or
-   'obs' are given with a value that differs from 'bs' (or the default 512).
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed.
-
-   A non-standard argument "bpt" (blocks per transfer) is added to control
-   the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
-   in this case) is transferred to or from the sg device in a single SCSI
-   command. The actual size of the SCSI READ or WRITE command block can be
-   selected with the "cdbsz" argument.
-
-   This version is designed for the linux kernel 2.4 and 2.6 series.
-*/
-
-static char * version_str = "5.74 20100724";
+static char * version_str = "5.75 20120907";
 
 #define ME "sg_dd: "
 
@@ -1113,7 +1113,8 @@ calc_duration_throughput(int contin)
     }
 }
 
-
+/* Process arguments given to 'iflag=" or 'oflag=" options. Returns 0
+ * on success, 1 on error. */
 static int
 process_flags(const char * arg, struct flags_t * fp)
 {
@@ -1158,6 +1159,60 @@ process_flags(const char * arg, struct flags_t * fp)
             ++fp->sparse;
         else if (0 == strcmp(cp, "flock"))
             ++fp->flock;
+        else {
+            fprintf(stderr, "unrecognised flag: %s\n", cp);
+            return 1;
+        }
+        cp = np;
+    } while (cp);
+    return 0;
+}
+
+/* Process arguments given to 'conv=" option. Returns 0 on success,
+ * 1 on error. */
+static int
+process_conv(const char * arg, struct flags_t * ifp, struct flags_t * ofp)
+{
+    char buff[256];
+    char * cp;
+    char * np;
+
+    strncpy(buff, arg, sizeof(buff));
+    buff[sizeof(buff) - 1] = '\0';
+    if ('\0' == buff[0]) {
+        fprintf(stderr, "no conversions found\n");
+        return 1;
+    }
+    cp = buff;
+    do {
+        np = strchr(cp, ',');
+        if (np)
+            *np++ = '\0';
+#if 0
+        if (0 == strcmp(cp, "fdatasync"))
+            ++ofp->fdatasync;
+        else if (0 == strcmp(cp, "fsync"))
+            ++ofp->fsync;
+#endif
+        if (0 == strcmp(cp, "noerror"))
+            ++ifp->coe;         /* will still fail on write error */
+        else if (0 == strcmp(cp, "notrunc"))
+            ;         /* this is the default action of ddpt so ignore */
+        else if (0 == strcmp(cp, "null"))
+            ;
+#if 0
+        else if (0 == strcmp(cp, "sparing"))
+            ++ofp->sparing;
+#endif
+        else if (0 == strcmp(cp, "sparse"))
+            ++ofp->sparse;
+        else if (0 == strcmp(cp, "sync"))
+            ;   /* dd(susv4): pad errored block(s) with zeros but ddpt does
+                 * that by default. Typical dd use: 'conv=noerror,sync' */
+#if 0
+        else if (0 == strcmp(cp, "trunc"))
+            ++ofp->trunc;
+#endif
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
@@ -1523,7 +1578,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "conv")) {
-            if ((0 != strcmp(buf, "sparse")) || process_flags(buf, &oflag)) {
+            if (process_conv(buf, &iflag, &oflag)) {
                 fprintf(stderr, ME "bad argument to 'conv='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -1603,7 +1658,8 @@ main(int argc, char * argv[])
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
         else if ((0 == strncmp(key, "--help", 7)) ||
-                   (0 == strcmp(key, "-?"))) {
+                 (0 == strncmp(key, "-h", 2)) ||
+                 (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
         } else if ((0 == strncmp(key, "--vers", 6)) ||

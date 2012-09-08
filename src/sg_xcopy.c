@@ -1,3 +1,33 @@
+/* A utility program for copying files. Similar to 'dd' but using
+ * the 'Extended Copy' command.
+ *
+ *  Copyright (c) 2011-2012 Hannes Reinecke, SUSE Labs
+ *
+ *  Largerly taken from 'sg_dd', which has the
+ *
+ *  Copyright (C) 1999 - 2010 D. Gilbert and P. Allworth
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+
+   This program is a specialisation of the Unix "dd" command in which
+   either the input or the output file is a scsi generic device, raw
+   device, a block device or a normal file. The block size ('bs') is
+   assumed to be 512 if not given. This program complains if 'ibs' or
+   'obs' are given with a value that differs from 'bs' (or the default 512).
+   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
+   not given or 'of=-' then stdout assumed.
+
+   A non-standard argument "bpt" (blocks per transfer) is added to control
+   the maximum number of blocks in each transfer. The default value is 128.
+   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
+   in this case) is transferred to or from the sg device in a single SCSI
+   command.
+
+   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
+*/
+
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE     /* resolves u_char typedef in scsi/scsi.h [lk 2.4] */
@@ -31,39 +61,9 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-/* A utility program for copying files. Similar to 'dd' but using
- * the 'Extended Copy' command.
- *
- *  Copyright (c) 2011-2012 Hannes Reinecke, SUSE Labs
- *
- *  Largerly taken from 'sg_dd', which has the
- *
- *  Copyright (C) 1999 - 2010 D. Gilbert and P. Allworth
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
+static char * version_str = "0.3 20120907";
 
-   This program is a specialisation of the Unix "dd" command in which
-   either the input or the output file is a scsi generic device, raw
-   device, a block device or a normal file. The block size ('bs') is
-   assumed to be 512 if not given. This program complains if 'ibs' or
-   'obs' are given with a value that differs from 'bs' (or the default 512).
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed.
-
-   A non-standard argument "bpt" (blocks per transfer) is added to control
-   the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
-   in this case) is transferred to or from the sg device in a single SCSI
-   command.
-
-   This version is designed for the linux kernel 2.4 and 2.6 series.
-*/
-
-static char * version_str = "0.2 20120322";
-
-#define ME "sg_xcp: "
+#define ME "sg_xcopy: "
 
 #define SG_DEBUG
 
@@ -129,9 +129,11 @@ static int64_t in_full = 0;
 static int in_partial = 0;
 static int64_t out_full = 0;
 static int out_partial = 0;
+#if 0
 static int recovered_errs = 0;
 static int unrecovered_errs = 0;
 static int num_retries = 0;
+#endif
 
 static int do_time = 0;
 static int verbose = 0;
@@ -149,10 +151,12 @@ struct xcopy_fp_t {
     int append;
     int excl;
     int flock;
-    int cat;     /* Destination count    */
-    int dc;      /* Descriptor type code */
+    int cat;     /* Segment descriptor CAT bit (residual data treatment) */
+    int dc;      /* Segment descriptor DC bit (destination count) */
     int pdt;     /* Peripheral device type */
+#if 0
     int retries;
+#endif
 };
 
 static struct xcopy_fp_t ifp;
@@ -183,8 +187,9 @@ print_stats(const char * str)
         fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
     fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial,
             in_partial);
-    fprintf(stderr, "%s%"PRId64"+%d records out\n", str, out_full - out_partial,
-            out_partial);
+    fprintf(stderr, "%s%"PRId64"+%d records out\n", str,
+            out_full - out_partial, out_partial);
+#if 0
     if (recovered_errs > 0)
         fprintf(stderr, "%s%d recovered errors\n", str, recovered_errs);
     if (num_retries > 0)
@@ -192,6 +197,7 @@ print_stats(const char * str)
     else if (unrecovered_errs)
         fprintf(stderr, "%s%d unrecovered error(s)\n", str,
                 unrecovered_errs);
+#endif
 }
 
 
@@ -393,37 +399,39 @@ usage()
     fprintf(stderr, "Usage: "
            "sg_xcopy  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
            " [iflag=FLAGS]\n"
-           "              [obs=BS] [of=OFILE] [oflag=FLAGS] "
+           "                 [obs=BS] [of=OFILE] [oflag=FLAGS] "
            "[seek=SEEK] [skip=SKIP]\n"
-           "              [--help] [--version]\n\n"
-           "              [list_id=ID] [id_usage=hold|discard] \n"
-           "              [bpt=BPT] [cat=0|1] [dc=0|1] [odir=0|1] "
-           "[of2=OFILE2] [prio=PRIO] [retries=RETR]\n"
-           "              [time=0|1] [verbose=VERB]\n"
+           "                 [--help] [--version]\n\n"
+           "                 [bpt=BPT] [cat=0|1] [dc=0|1] "
+           "[id_usage=hold|discard]\n"
+           "                 [list_id=ID] [prio=PRIO] [time=0|1] "
+           "[verbose=VERB]\n"
            "  where:\n"
            "    bpt         is blocks_per_transfer (default is 128 or 32 "
            "when BS>=2048)\n"
            "    bs          block size (default is 512)\n");
     fprintf(stderr,
+           "    cat         segment descriptor CAT bit (default: 0)\n"
            "    count       number of blocks to copy (def: device size)\n"
+           "    dc          segment descriptor DC bit (default: 0)\n"
            "    ibs         input block size (if given must be same as "
            "'bs=')\n"
+           "    id_usage    sets list id usage field to hold (0) or "
+           "discard (2)\n"
            "    if          file or device to read from (def: stdin)\n"
-           "    iflag       comma separated list from: [cat,dc,excl,\n"
-           "                flock,null]\n"
+           "    iflag       comma separated list from: [cat,dc,excl,"
+           "flock,null]\n"
+           "    list_id     sets list identifier field to ID (default: 1)\n"
            "    obs         output block size (if given must be same as "
            "'bs=')\n"
            "    of          file or device to write to (def: stdout), "
            "OFILE of '.'\n");
     fprintf(stderr,
            "                treated as /dev/null\n"
-           "    of2         additional output file (def: /dev/null), "
-           "OFILE2 should be\n"
-           "                normal file or pipe\n"
-           "    oflag       comma separated list from: [append,cat,dc,\n"
-           "                excl,flock,null]\n"
-           "    prio        Use priority PRIO (def: 1)\n"
-           "    retries     retry sgio errors RETR times (def: 0)\n"
+           "    oflag       comma separated list from: [append,cat,dc,"
+           "excl,flock,\n"
+           "                null]\n"
+           "    prio        set priority field to PRIO (def: 1)\n"
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
            "    time        0->no timing(def), 1->time plus calculate "
@@ -433,7 +441,7 @@ usage()
            "    --help      print out this usage message then exit\n"
            "    --version   print version information then exit\n\n"
            "copy from IFILE to OFILE, similar to dd command; "
-           "but using the EXTENDED COPY SCSI command\n");
+           "but using the SCSI\nEXTENDED COPY command\n");
 }
 
 static int
@@ -972,6 +980,8 @@ calc_duration_throughput(int contin)
     }
 }
 
+/* Process arguments given to 'iflag=" or 'oflag=" options. Returns 0
+ * on success, 1 on error. */
 static int
 process_flags(const char * arg, struct xcopy_fp_t * fp)
 {
@@ -1206,12 +1216,9 @@ main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'list_id_usage='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key, "conv")) {
-            if (process_flags(buf, &ofp)) {
-                fprintf(stderr, ME "bad argument to 'conv='\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
-        } else if (0 == strcmp(key, "count")) {
+        } else if (0 == strcmp(key, "conv"))
+            fprintf(stderr, ME ">>> ignoring all 'conv=' arguments\n");
+        else if (0 == strcmp(key, "count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
                 if (-1LL == dd_count) {
@@ -1254,6 +1261,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'oflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+#if 0
         } else if (0 == strcmp(key, "retries")) {
             ifp.retries = sg_get_num(buf);
             ofp.retries = ifp.retries;
@@ -1261,6 +1269,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, ME "bad argument to 'retries='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+#endif
         } else if (0 == strcmp(key, "seek")) {
             seek = sg_get_llnum(buf);
             if (-1LL == seek) {
@@ -1278,6 +1287,7 @@ main(int argc, char * argv[])
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
         else if ((0 == strncmp(key, "--help", 7)) ||
+                 (0 == strncmp(key, "-h", 2)) ||
                    (0 == strcmp(key, "-?"))) {
             usage();
             return 0;

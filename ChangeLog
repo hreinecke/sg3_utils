@@ -2,8 +2,8 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.34 [20120820] [svn: r451]
-  - sg_xcopy: new utility for extended copy command
+Changelog for sg3_utils-1.34 [20120907] [svn: r452]
+  - sg_xcopy: new dd like utility for extended copy command
   - sg_copy_results: new utility for receive copy results
   - sg_verify: add 16 byte cdb, bytchk (data-out buffer)
     and group number support
@@ -106,6 +106,7 @@ Changelog for sg3_utils-1.30 [20101111] [svn: r363]
   - sg_opcodes: add extended parameter data for TMFs (spc4r26)
   - sg_dd: clean count calculation, document nocache flag
     - treat bsg devices as implicit sg_io
+    - add more conversions
   - sg_write_same: if READ CAPACITY(16) fails try 10 byte variant
     - anticipate approval of proposal to allow UNMAP and ANCHOR
       bits to be set on WRITE SAME(10) with '--10' option
