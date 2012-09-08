@@ -1,3 +1,34 @@
+/* A utility program for copying files. Specialised for "files" that
+ * represent devices that understand the SCSI command set.
+ *
+ * Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+
+   This program is a specialisation of the Unix "dd" command in which
+   either the input or the output file is a scsi generic device or a
+   raw device. The block size ('bs') is assumed to be 512 if not given.
+   This program complains if 'ibs' or 'obs' are given with a value
+   that differs from 'bs' (or the default 512).
+   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
+   not given or 'of=-' then stdout assumed.
+
+   A non-standard argument "bpt" (blocks per transfer) is added to control
+   the maximum number of blocks in each transfer. The default value is 128.
+   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
+   in this case) is transferred to or from the sg device in a single SCSI
+   command.
+
+   This version uses memory-mapped transfers (i.e. mmap() call from the user
+   space) to speed transfers. If both sides of copy are sg devices
+   then only the read side will be mmap-ed, while the write side will
+   use normal IO.
+
+   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
+*/
+
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -30,41 +61,11 @@
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
 
-/* A utility program for copying files. Specialised for "files" that
-*  represent devices that understand the SCSI command set.
-*
-*  Copyright (C) 1999 - 2011 D. Gilbert and P. Allworth
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program is a specialisation of the Unix "dd" command in which
-   either the input or the output file is a scsi generic device or a
-   raw device. The block size ('bs') is assumed to be 512 if not given.
-   This program complains if 'ibs' or 'obs' are given with a value
-   that differs from 'bs' (or the default 512).
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed.
-
-   A non-standard argument "bpt" (blocks per transfer) is added to control
-   the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
-   in this case) is transferred to or from the sg device in a single SCSI
-   command.
-
-   This version uses memory-mapped transfers (i.e. mmap() call from the user
-   space) to speed transfers. If both sides of copy are sg devices
-   then only the read side will be mmap-ed, while the write side will
-   use normal IO.
-
-   This version is designed for the linux kernel 2.4 and 2.6 series.
-*/
 
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static char * version_str = "1.36 20111014 shared_mmap";
+static char * version_str = "1.36 20120907 shared_mmap";
 #else
 static char * version_str = "1.36 20111014";
 #endif

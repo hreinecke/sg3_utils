@@ -52,11 +52,11 @@
    in this case) are transferred to or from the sg device in a single SCSI
    command.
 
-   This version is designed for the linux kernel 2.4 and 2.6 series.
+   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
 
 */
 
-static char * version_str = "5.41 20120328";
+static char * version_str = "5.42 20120907";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1284,6 +1284,7 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"time"))
             do_time = sg_get_num(buf);
         else if ((0 == strncmp(key, "--help", 7)) ||
+                 (0 == strncmp(key, "-h", 2)) ||
                  (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
