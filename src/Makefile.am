@@ -11,7 +11,7 @@ bin_PROGRAMS = \
 	sg_copy_results sg_dd sg_decode_sense sg_emc_trespass sg_format \
 	sg_get_config sg_get_lba_status sg_ident sginfo sg_inq sg_logs \
 	sg_luns sg_map26 sg_map sgm_dd sg_modes sg_opcodes sgp_dd \
-	sg_persist sg_prevent sg_raw sg_rbuf sg_rdac sg_read sg_readcap 
+	sg_persist sg_prevent sg_raw sg_rbuf sg_rdac sg_read sg_readcap \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
 	sg_referrals sg_requests sg_reset sg_rmsn sg_rtpg sg_safte \
 	sg_sanitize sg_sat_identify sg_sat_phy_event sg_sat_set_features \
