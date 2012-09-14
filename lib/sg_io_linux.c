@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2010 Douglas Gilbert.
+ * Copyright (c) 1999-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,7 +21,7 @@
 #include "sg_io_linux.h"
 
 
-/* Version 1.03 20100312 */
+/* Version 1.04 20120914 */
 
 
 void
@@ -36,7 +36,8 @@ static const char * linux_host_bytes[] = {
     "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT",
     "DID_BAD_TARGET", "DID_ABORT", "DID_PARITY", "DID_ERROR",
     "DID_RESET", "DID_BAD_INTR", "DID_PASSTHROUGH", "DID_SOFT_ERROR",
-    "DID_IMM_RETRY", "DID_REQUEUE"
+    "DID_IMM_RETRY", "DID_REQUEUE", "DID_TRANSPORT_DISRUPTED",
+    "DID_TRANSPORT_FAILFAST", "DID_TARGET_FAILURE", "DID_NEXUS_FAILURE",
 };
 
 #define LINUX_HOST_BYTES_SZ \
