@@ -9,11 +9,31 @@ sg_copy_results \- sends a SCSI RECEIVE COPY RESULTS command
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility is designed to be used after the sg_xcopy utility which
-invokes the SCSI Extended Copy facility (see SPC\-3 revision 23 sections
-6.3 and 6.17). This utility sends a SCSI RECEIVE COPY RESULTS command
-to the given \fIDEVICE\fR and displays the response.
-xxxx
+This utility is designed to query the status of the SCSI Extended Copy
+facility (see SPC\-3 revision 23 sections 6.3 and 6.17), present in
+some modern storage arrays. This utility sends a SCSI RECEIVE COPY
+RESULTS command to the given \fIDEVICE\fR and displays the response.
+.PP
+The command has four distinct modes of operation, distinguished by
+the service action field:
+.TP
+\fBCOPY STATUS\fR
+Displays the current status of the EXTENDED COPY command identified by
+the list id field.
+.TP
+\fBRECEIVE DATA\fR
+Return the held data read by the EXTENDED COPY command identified by
+the list id field. This option is only meaningful if the respective
+segment descriptor are supported.
+.TP
+\fBOPERATING PARAMETERS\fR
+Return copy manager operating parameters. This option is also useful
+to determine if the SCSI Extended Copy facility is supported.
+.TP
+\fBFAILED SEGMENT DETAILS\fR
+Return copy target device sense data and other information about any
+failed segments.
+
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -31,6 +51,7 @@ sets the list identifier field to \fIID\fR (default: 0).
 .TP
 \fB\-p\fR, \fB\-\-params\fR
 sets the service action field to OPERATING PARAMETERS [3].
+This is the default.
 .TP
 \fB\-r\fR, \fB\-\-receive\fR
 sets the service action field to RECEIVE DATA [1].
@@ -49,9 +70,30 @@ sets the allocation length field to \fIBTL\fR. It is the byte transfer
 length and is the maximum (byte) size of the response. \fIBTL\fR must be
 less than 10000 and defaults to 520.
 .SH NOTES
-xxxxxxxxx
+Decoding of \fIRECEIVE DATA\fR service action is not implemented.
 .SH EXAMPLES
-xxxxxxx Some examples would be useful!
+Query the operating parameters for a device:
+.PP
+# sg_copy_results -p /dev/sdo
+.br
+Receive copy results (report operating parameters):
+    Supports no list identifier: no
+    Maximum target descriptor count: 2
+    Maximum segment descriptor count: 1
+    Maximum descriptor list length: 92 bytes
+    Maximum segment length: 33553920 bytes
+    Inline data not supported
+    Held data limit: 0 bytes
+    Maximum stream device transfer size: 0 bytes
+    Total concurrent copies: 0
+    Maximum concurrent copies: 255
+    Data segment granularity: 512 bytes
+    Inline data granularity: 1 bytes
+    Held data granularity: 1 bytes
+    Implemented descriptor list:
+        Segment descriptor 0x02: Copy from block device to block device
+        Target descriptor 0xe4: Identification descriptor
+
 .SH EXIT STATUS
 The exit status of sg_copy_results is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

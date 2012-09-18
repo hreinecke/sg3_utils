@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Fri Sep 14 2012 - dgilbert at interlog dot com
+* Tue Sep 18 2012 - dgilbert at interlog dot com
 - add sg_xcopy and sg_copy_results; track t10 changes
   * sg3_utils-1.34
 
