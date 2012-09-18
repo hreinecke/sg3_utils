@@ -99,6 +99,35 @@ struct descriptor_type segment_descriptor_codes [] = {
 };
 
 static void
+scsi_failed_segment_details(unsigned char *rcBuff, unsigned int rcBuffLen)
+{
+    unsigned int len;
+    char senseBuff[1024];
+    int senseLen;
+
+    if (rcBuffLen < 4) {
+        fprintf(stderr, "  <<not enough data to procedd report>>\n");
+        return;
+    }
+    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
+          rcBuff[3];
+    if (len + 3 > rcBuffLen) {
+        fprintf(stderr, "  <<report too long for internal buffer,"
+                " output truncated\n");
+    }
+    if (len < 52) {
+        fprintf(stderr, "  <<no segment details, response data length %d\n",
+                len);
+        return;
+    }
+    printf("Receive copy results (failed segment details):\n");
+    printf("    Extended copy command status: %d\n", rcBuff[56]);
+    senseLen = (rcBuff[58] << 8) | rcBuff[59];
+    sg_get_sense_str("    ", &rcBuff[60], senseLen, 0, 1024, senseBuff);
+    printf("%s", senseBuff);
+}
+
+static void
 scsi_copy_status(unsigned char *rcBuff, unsigned int rcBuffLen)
 {
     unsigned int len;
@@ -409,6 +438,10 @@ main(int argc, char * argv[])
         goto finish;
     }
     switch (sa) {
+    case 4: /* Failed segment details */
+        scsi_failed_segment_details(cpResultBuff, xfer_len);
+        res = 0;
+        break;
     case 3: /* Operating parameters */
         scsi_operating_parameters(cpResultBuff, xfer_len);
         res = 0;
