@@ -30,8 +30,11 @@ extern "C" {
 #define SG_RECEIVE_COPY 0x84
 #define SG_SERVICE_ACTION_IN_12 0xab
 #define SG_SERVICE_ACTION_OUT_12 0xa9
+#define SG_SERVICE_ACTION_BIDI 0x9d
 #define SG_SERVICE_ACTION_IN_16 0x9e
 #define SG_SERVICE_ACTION_OUT_16 0x9f
+#define SG_READ_BUFFER 0x3c
+#define SG_WRITE_BUFFER 0x3b
 #define SG_VARIABLE_LENGTH_CMD 0x7f
 
 
@@ -59,6 +62,8 @@ struct sg_lib_asc_ascq_range_t {
 extern const char * sg_lib_version_str;
 
 extern struct sg_lib_value_name_t sg_lib_normal_opcodes[];
+extern struct sg_lib_value_name_t sg_lib_read_buff_arr[];
+extern struct sg_lib_value_name_t sg_lib_write_buff_arr[];
 extern struct sg_lib_value_name_t sg_lib_maint_in_arr[];
 extern struct sg_lib_value_name_t sg_lib_maint_out_arr[];
 extern struct sg_lib_value_name_t sg_lib_pr_in_arr[];
@@ -67,6 +72,7 @@ extern struct sg_lib_value_name_t sg_lib_serv_in12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_in16_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out16_arr[];
+extern struct sg_lib_value_name_t sg_lib_serv_bidi_arr[];
 extern struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_variable_length_arr[];

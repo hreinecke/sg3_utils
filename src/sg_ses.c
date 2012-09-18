@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.66 20120222";    /* ses3r04 */
+static char * version_str = "1.68 20120820";    /* ses3r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -366,12 +366,14 @@ static struct acronym2tuple ecs_a2t_arr[] = {
    {"ident", ARRAY_DEV_ETC, 2, 1, 1},
    {"ident", POWER_SUPPLY_ETC, 1, 7, 1},
    {"ident", COOLING_ETC, 1, 7, 1},
+   {"ident", ENCLOSURE_ETC, 1, 7, 1},
    {"insert", DEVICE_ETC, 2, 3, 1},
    {"insert", ARRAY_DEV_ETC, 2, 3, 1},
    {"locate", DEVICE_ETC, 2, 1, 1},
    {"locate", ARRAY_DEV_ETC, 2, 1, 1},
    {"locate", POWER_SUPPLY_ETC, 1, 7, 1},
    {"locate", COOLING_ETC, 1, 7, 1},
+   {"locate", ENCLOSURE_ETC, 1, 7, 1},
    {"missing", DEVICE_ETC, 2, 4, 1},
    {"missing", ARRAY_DEV_ETC, 2, 4, 1},
    {"locate", DEVICE_ETC, 2, 1, 1},
@@ -1145,7 +1147,7 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-/* DPC_CONFIGURATION
+/* DPC_CONFIGURATION [0x1]
  * Display Configuration diagnostic page. */
 static void
 ses_configuration_sdg(const unsigned char * resp, int resp_len)
@@ -1774,7 +1776,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
     }
 }
 
-/* DPC_ENC_STATUS
+/* DPC_ENC_STATUS [0x2]
  * Display enclosure status diagnostic page. */
 static void
 ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
@@ -1913,7 +1915,7 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
     }
 }
 
-/* DPC_THRESHOLD */
+/* DPC_THRESHOLD [0x5] */
 static void
 ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                   unsigned int ref_gen_code, const unsigned char * resp,
@@ -1975,7 +1977,7 @@ truncated:
     return;
 }
 
-/* DPC_ELEM_DESC
+/* DPC_ELEM_DESC [0x7]
  * This page essentially contains names of overall and individual
  * elements. */
 static void
@@ -2211,7 +2213,7 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
     }
 }
 
-/* DPC_ADD_ELEM_STATUS
+/* DPC_ADD_ELEM_STATUS [0xa]
  * Previously called "Device element status descriptor". Changed "device"
  * to "additional" to allow for SAS expander and SATA devices */
 static void
@@ -2220,6 +2222,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                         int resp_len, const struct opts_t * op)
 {
     int j, k, desc_len, elem_type, invalid, el_num, eip, ind, match_ind_th;
+    int elem_count;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -2240,12 +2243,25 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  additional element status descriptor list\n");
     ucp = resp + 8;
-    for (k = 0, tp = tdhp; k < num_telems; ++k, ++tp) {
+    for (k = 0, tp = tdhp, elem_count = 0; k < num_telems; ++k, ++tp) {
         elem_type = tp->etype;
-        if (! active_et_aesp(elem_type))
+        if (! active_et_aesp(elem_type)) {
+            elem_count += tp->num_elements;
             continue;   /* skip if not element type of interest */
+        }
         if ((ucp + 1) > last_ucp)
             goto truncated;
+
+        /* if eip is 1, check that the element index (ucp[3]) is within the
+         * range for the element type (elem_type) because some element types
+         * are optional and might not be included in SES Page 0xA */
+        if (ucp[0] & 0x10)  /* eip=1 */ {
+            if ((ucp[3] < elem_count) ||
+                (ucp[3] >= (elem_count + tp->num_elements))) {
+                elem_count += tp->num_elements;
+                continue;
+            }
+        }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
             printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
@@ -2273,6 +2289,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                 additional_elem_helper("        ", ucp, desc_len, elem_type,
                                        op);
         }
+        elem_count += tp->num_elements;
     }
     return;
 truncated:
@@ -2280,7 +2297,7 @@ truncated:
     return;
 }
 
-/* DPC_SUBENC_HELP_TEXT */
+/* DPC_SUBENC_HELP_TEXT [0xb] */
 static void
 ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
 {
@@ -2316,7 +2333,7 @@ truncated:
     return;
 }
 
-/* DPC_SUBENC_STRING */
+/* DPC_SUBENC_STRING [0xc] */
 static void
 ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
 {
@@ -2359,7 +2376,7 @@ truncated:
     return;
 }
 
-/* DPC_SUBENC_NICKNAME */
+/* DPC_SUBENC_NICKNAME [0xf] */
 static void
 ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
 {
@@ -2395,7 +2412,7 @@ truncated:
     return;
 }
 
-/* DPC_SUPPORTED_SES */
+/* DPC_SUPPORTED_SES [0xd] */
 static void
 ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
                         int resp_len)
@@ -2424,7 +2441,7 @@ ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
     }
 }
 
-/* DPC_DOWNLOAD_MICROCODE */
+/* DPC_DOWNLOAD_MICROCODE [0xe] */
 static void
 ses_download_code_sdg(const unsigned char * resp, int resp_len)
 {

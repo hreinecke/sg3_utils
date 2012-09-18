@@ -39,6 +39,7 @@ Hannes Reinecke <hare at suse dot de>
         sg_vpd_vendor), sg_stpg and sg_safte [20071013]
         sg_referrals [20100906]
         sg_inq --export option [20120220]
+        sg_xcopy+sg_copy_results [20120322]
 
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]

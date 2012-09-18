@@ -2,17 +2,34 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.34 [20120222] [svn: r441]
+Changelog for sg3_utils-1.34 [20120910] [svn: r453]
+  - sg_xcopy: new dd like utility for extended copy command
+  - sg_copy_results: new utility for receive copy results
   - sg_verify: add 16 byte cdb, bytchk (data-out buffer)
     and group number support
-  - sync to spc4r34 and sbc3r30
+  - sync to spc4r35 and sbc3r30
   - sg_inq: add --export to experiment with udev
+    - decode old EMC Symmetrix abuse of VPD page 0x83
+  - sg_vpd: decode old EMC Symmetrix abuse of VPD page 0x83
   - sg_ses: increase max dpage response size to 64 KB
+    - allow ident,locate on enclosure controller
+    - more sanity for additional element status descriptor
   - sg_sanitize: add --ause, --fail and --test=
+  - sg_luns: add long extended flat space addressing format
+  - sg_logs: add ATA pass-through results lpage (SAT-2)
+  - sg_rtpg: add --extended option
   - sg_pt_linux: expand DID_ (host_byte) codes
+    - cope with a transport error plus sense data
+    - prefer major() over MAJOR() macro
   - sg_lib: fix sg_get_command_name() service actions
+    - report sdat_ovfl bit (if set) in sense data
     - decode extended_copy and receive_copy service actions
-  - sg_lib_data: sync asc/ascq codes with t10 dated 20111222
+    - decode read_buffer and write_buffer modes
+    - decode ATA PT fixed format sense (SAT-2)
+  - sg_cmds_extra: add sg_ll_report_tgt_prt_grp2()
+  - ./configure options:
+    - change --enable-no-linux-bsg to --disable-linuxbsg
+    - add --disable-scsistrings to reduce utility sizes
 
 Changelog for sg3_utils-1.33 [20120118] [svn: r435]
   - sg_ses: major rework of indexes (again), now two level
@@ -51,7 +68,7 @@ Changelog for sg3_utils-1.32 [20110730] [svn: r410]
   - sg_lib_data: sync asc/ascq codes with spc4r31
   - sg_vpd: add LBPRZ field in LB provisioning VPD page
   - sg_format: allow format of pdt 7 (some MO drives)
-  - sg_cmd_basic: sg_cmds_process_resp() handle status good
+  - sg_cmds_basic: sg_cmds_process_resp() handle status good
     with a sense key other than no_sense (e.g. completed)
   - add README.iscsi
 
@@ -89,6 +106,7 @@ Changelog for sg3_utils-1.30 [20101111] [svn: r363]
   - sg_opcodes: add extended parameter data for TMFs (spc4r26)
   - sg_dd: clean count calculation, document nocache flag
     - treat bsg devices as implicit sg_io
+    - add more conversions
   - sg_write_same: if READ CAPACITY(16) fails try 10 byte variant
     - anticipate approval of proposal to allow UNMAP and ANCHOR
       bits to be set on WRITE SAME(10) with '--10' option

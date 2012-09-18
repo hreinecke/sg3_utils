@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2011 Douglas Gilbert.
+ * Copyright (c) 1999-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -41,6 +41,9 @@
 #include "config.h"
 #endif
 
+/* sg_lib_version_str (and datestamp) defined in sg_lib_data.c file */
+
+#define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d  /* corresponding ASC is 0 */
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
@@ -182,13 +185,13 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
     }
     if (! found) {
         if (asc >= 0x80)
-            snprintf(buff, buff_len, "vendor specific ASC=%2x, ASCQ=%2x",
-                     asc, ascq);
+            snprintf(buff, buff_len, "vendor specific ASC=%02x, ASCQ=%02x "
+                     "(hex)", asc, ascq);
         else if (ascq >= 0x80)
-            snprintf(buff, buff_len, "ASC=%2x, vendor specific qualification "
-                     "ASCQ=%2x", asc, ascq);
+            snprintf(buff, buff_len, "ASC=%02x, vendor specific "
+                     "qualification ASCQ=%02x (hex)", asc, ascq);
         else
-            snprintf(buff, buff_len, "ASC=%2x, ASCQ=%2x", asc, ascq);
+            snprintf(buff, buff_len, "ASC=%02x, ASCQ=%02x (hex)", asc, ascq);
     }
     return buff;
 }
@@ -449,7 +452,7 @@ static const char * sdata_src[] = {
     };
 
 
-/* Print descriptor format sense descriptors (assumes sense buffer is
+/* Decode descriptor format sense descriptors (assumes sense buffer is
    in descriptor format) */
 static void
 sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
@@ -621,7 +624,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             n += sprintf(b + n, "OSD attribute identification\n");
             processed = 0;
             break;
-        case 9:
+        case 9:         /* this is defined in SAT (and SAT-2) */
             n += sprintf(b + n, "ATA Status Return\n");
             if (add_len >= 12) {
                 int extend, sector_count;
@@ -733,6 +736,33 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
     }
 }
 
+/* Decode SAT ATA PASS-THROUGH fixed format sense */
+static void
+sg_get_sense_sat_pt_fixed_str(const unsigned char * sp, int slen, int blen,
+                              char * b)
+{
+    int n = 0;
+
+    slen = slen;        /* suppress warning */
+    if (blen < 1)
+        return;
+    if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2])) {
+        n += snprintf(b + n, blen - n, "  >> expected Sense key: Recovered "
+                      "Error ??\n");
+        if (n >= blen)
+            return;
+    }
+    n += snprintf(b + n, blen - n, "  error=0x%x, status=0x%x, "
+                  "device=0x%x, sector_count(7:0)=0x%x%c\n", sp[3], sp[4],
+                  sp[5], sp[6], ((0x40 & sp[8]) ? '+' : ' '));
+    if (n >= blen)
+        return;
+    n += snprintf(b + n, blen - n, "  extend=%d, log_index=0x%x, "
+                  "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n",
+                  (!!(0x80 & sp[8])), (0xf & sp[8]), sp[9], sp[10], sp[11],
+                  ((0x20 & sp[8]) ? '+' : ' '));
+}
+
 /* Fetch sense information */
 void
 sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
@@ -741,7 +771,8 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
     int len, valid, progress, n, r, pr, rem;
     unsigned int info;
     int descriptor_format = 0;
-    const char * error = NULL;
+    int sdat_ovfl = 0;
+    const char * ebp = NULL;
     char error_buff[64];
     char b[256];
     struct sg_scsi_sense_hdr ssh;
@@ -764,37 +795,47 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
     if (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh)) {
         switch (ssh.response_code) {
         case 0x70:      /* fixed, current */
-            error = "Fixed format, current";
+            ebp = "Fixed format, current";
             len = (sb_len > 7) ? (sense_buffer[7] + 8) : sb_len;
             len = (len > sb_len) ? sb_len : len;
+            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : 0;
             break;
         case 0x71:      /* fixed, deferred */
             /* error related to a previous command */
-            error = "Fixed format, <<<deferred>>>";
+            ebp = "Fixed format, <<<deferred>>>";
             len = (sb_len > 7) ? (sense_buffer[7] + 8) : sb_len;
             len = (len > sb_len) ? sb_len : len;
+            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : 0;
             break;
         case 0x72:      /* descriptor, current */
             descriptor_format = 1;
-            error = "Descriptor format, current";
+            ebp = "Descriptor format, current";
+            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : 0;
             break;
         case 0x73:      /* descriptor, deferred */
             descriptor_format = 1;
-            error = "Descriptor format, <<<deferred>>>";
+            ebp = "Descriptor format, <<<deferred>>>";
+            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : 0;
             break;
         case 0x0:
-            error = "Response code: 0x0 (?)";
+            ebp = "Response code: 0x0 (?)";
             break;
         default:
             snprintf(error_buff, sizeof(error_buff),
                      "Unknown response code: 0x%x", ssh.response_code);
-            error = error_buff;
+            ebp = error_buff;
             break;
         }
         n += snprintf(buff + n, buff_len - n, " %s;  Sense key: %s\n ",
-                      error, sg_lib_sense_key_desc[ssh.sense_key]);
+                      ebp, sg_lib_sense_key_desc[ssh.sense_key]);
         if (n >= buff_len)
             return;
+        if (sdat_ovfl) {
+            n += snprintf(buff + n, buff_len - n, "<<<Sense data "
+                          "overflow>>>\n");
+            if (n >= buff_len)
+                return;
+        }
         if (descriptor_format) {
             n += snprintf(buff + n, buff_len - n, "%s\n",
                           sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
@@ -803,6 +844,19 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 return;
             sg_get_sense_descriptors_str(sense_buffer, len, buff_len - n,
                                          buff + n);
+            n = strlen(buff);
+            if (n >= buff_len)
+                return;
+        } else if ((len > 12) && (0 == ssh.asc) && 
+                   (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
+            /* SAT ATA PASS-THROUGH fixed format */
+            n += snprintf(buff + n, buff_len - n, "%s\n",
+                          sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
+                                              sizeof(b), b));
+            if (n >= buff_len)
+                return;
+            sg_get_sense_sat_pt_fixed_str(sense_buffer, len, buff_len - n,
+                                          buff + n);
             n = strlen(buff);
             if (n >= buff_len)
                 return;
@@ -952,6 +1006,7 @@ sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
     fprintf(sg_warnings_strm, "%s", b);
 }
 
+/* See description in sg_lib.h header file */
 int
 sg_scsi_normalize_sense(const unsigned char * sensep, int sb_len,
                         struct sg_scsi_sense_hdr * sshp)
@@ -1159,6 +1214,26 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
             strncpy(buff, vnp->name, buff_len);
         else
             snprintf(buff, buff_len, "Receive copy, service action=0x%x",
+                     service_action);
+        break;
+    case SG_READ_BUFFER:
+        /* spc4r34 requested treating mode as service action */
+        vnp = get_value_name(sg_lib_read_buff_arr, service_action,
+                             peri_type);
+        if (vnp)
+            snprintf(buff, buff_len, "Read buffer (%s)\n", vnp->name);
+        else
+            snprintf(buff, buff_len, "Read buffer, mode=0x%x",
+                     service_action);
+        break;
+    case SG_WRITE_BUFFER:
+        /* spc4r34 requested treating mode as service action */
+        vnp = get_value_name(sg_lib_write_buff_arr, service_action,
+                             peri_type);
+        if (vnp)
+            snprintf(buff, buff_len, "Write buffer (%s)\n", vnp->name);
+        else
+            snprintf(buff, buff_len, "Write buffer, mode=0x%x",
                      service_action);
         break;
     default:

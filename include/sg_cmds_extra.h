@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2011 Douglas Gilbert.
+ * Copyright (c) 2004-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,8 @@ extern "C" {
  * sensep or ata_return_dp (or both) may be NULL pointers. Returns SCSI
  * status value (>= 0) or -1 if other error. Users are expected to check the
  * sense buffer themselves. If available the data in resid is written to
- * residp.
+ * residp. Note in SAT-2 and later, fixed format sense data may be placed in
+ * *sensep in which case sensep[0]==0x70 .
  */
 extern int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
                           int timeout_secs,  void * dinp, void * doutp,
@@ -159,6 +160,8 @@ extern int sg_ll_report_id_info(int sg_fd, int itype, void * resp,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
 extern int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp,
                                     int mx_resp_len, int noisy, int verbose);
+extern int sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
+                                     int extended, int noisy, int verbose);
 
 /* Invokes a SCSI SET TARGET PORT GROUPS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not supported,
@@ -270,6 +273,23 @@ extern int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
 extern int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                               uint64_t llba, void * data_out, int xfer_len,
                               int * offsetp, int noisy, int verbose);
+
+/* Invokes a SCSI RECEIVE COPY RESULTS command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Receive copy results not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+extern int sg_ll_receive_copy_results(int sg_fd, int sa, int list_id,
+                                      void * resp, int mx_resp_len,
+                                      int noisy, int verbose);
+
+/* Invokes a SCSI EXTENDEd COPY command. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> Extended copy not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+extern int sg_ll_extended_copy(int sg_fd, void * resp, int mx_resp_len,
+                               int noisy, int verbose);
 
 #ifdef __cplusplus
 }

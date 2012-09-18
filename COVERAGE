@@ -12,6 +12,7 @@ ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
 		     sg__sat_set_features, sg_sat_smart_rd_data
 		     (previous four in the examples directory)]
 ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
+EXTENDED COPY       sg_xcopy, ++
 GET CONFIGURATION   sg_get_config, ++
 GET LBA STATUS      sg_get_lba_status, ++
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
@@ -39,12 +40,13 @@ READ BLOCK LIMITS   sg_read_block_limits, ++
 READ BUFFER         sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
-READ DEFECT(10)     sginfo, sg_reassign('-g'), ++
-READ DEFECT(12)     sginfo
+READ DEFECT(10)     sginfo('-d' or '-G'), sg_reassign('-g'), ++
+READ DEFECT(12)     sginfo('-d' or '-G')
 READ LONG (10)      sg_read_long, sg_dd, ++
 READ LONG (16)      sg_read_long, ++
 READ MEDIA SERIAL NUMBER     sg_rmsn, ++
 REASSIGN BLOCKS     sg_reassign, ++
+RECEIVE COPY RESULTS   sg_copy_results, ++
 RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses, ++
 REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
 REPORT LUNS         sg_luns, ++
@@ -97,4 +99,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Douglas Gilbert
-17th February 2012
+23rd March 2012

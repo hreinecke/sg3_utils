@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2012 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.07 20110216";
+static char * version_str = "1.08 20120224";
 
 
 static struct option long_options[] = {
@@ -316,7 +316,7 @@ main(int argc, char * argv[])
                 printf("Echo buffer capacity: %d (0x%x)\n", k, k);
                 break;
             default:
-                dStrHex((const char *)resp, rb_len, 1);
+                dStrHex((const char *)resp, rb_len, (verbose > 1 ? 0 : 1));
                 break;
             }
         }

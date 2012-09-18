@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2011 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2012 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.15 20111014";
+static char * version_str = "1.17 20120820";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -42,29 +42,9 @@ static char * version_str = "1.15 20111014";
 #define STATUS_CODE_CHANGED_BY_SET 0x1
 #define STATUS_CODE_CHANGED_BY_IMPLICIT 0x2
 
-/* <<<<<<<<<<<<<<< start of test code */
-/* #define TEST_CODE */
-
-#ifdef TEST_CODE
-
-#warning "<<<< TEST_CODE response compiled in >>>>"
-
-unsigned char dummy_resp[32] = {
-        0, 0, 0, 28,
-
-        0x80, 0x3, 0, 1, 0, 2, 0, 2,
-        0, 0, 0, 1,
-        0, 0, 0, 2,
-
-        0x1, 0x3, 0, 2, 0, 0, 0, 1,
-        0, 0, 0, 3,
-};
-
-#endif
-/* <<<<<<<<<<<<<<< end of test code */
-
 static struct option long_options[] = {
         {"decode", 0, 0, 'd'},
+        {"extended", 0, 0, 'e'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"raw", 0, 0, 'r'},
@@ -76,11 +56,12 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_rtpg   [--decode] [--help] [--hex] [--raw] [--verbose] "
-          "[--version]\n"
+          "sg_rtpg   [--decode] [--extended] [--help] [--hex] [--raw] "
+          "[--verbose] [--version]\n"
           "                 DEVICE\n"
           "  where:\n"
           "    --decode|-d        decode status and asym. access state\n"
+          "    --extended|-e      use extended header parameter data format\n"
           "    --help|-h          print out usage message\n"
           "    --hex|-H           print out response in hex\n"
           "    --raw|-r           output response in binary to stdout\n"
@@ -158,13 +139,14 @@ int main(int argc, char * argv[])
     int hex = 0;
     int raw = 0;
     int verbose = 0;
+    int extended = 0;
     const char * device_name = NULL;
     int ret = 0;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHrvV", long_options,
+        c = getopt_long(argc, argv, "dehHrvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -173,6 +155,9 @@ int main(int argc, char * argv[])
         case 'd':
             decode = 1;
             break;
+        case 'e':
+             extended = 1;
+             break;
         case 'h':
         case '?':
             usage();
@@ -231,13 +216,9 @@ int main(int argc, char * argv[])
     memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
     /* trunc = 0; */
 
-#ifndef TEST_CODE
-    res = sg_ll_report_tgt_prt_grp(sg_fd, reportTgtGrpBuff,
-                            sizeof(reportTgtGrpBuff), 1, verbose);
-#else
-    memcpy(reportTgtGrpBuff, dummy_resp, sizeof(dummy_resp));
-    res = 0;
-#endif
+    res = sg_ll_report_tgt_prt_grp2(sg_fd, reportTgtGrpBuff,
+                                    sizeof(reportTgtGrpBuff),
+                                    extended, 1, verbose);
     ret = res;
     if (0 == res) {
         report_len = (reportTgtGrpBuff[0] << 24) +
@@ -263,8 +244,16 @@ int main(int argc, char * argv[])
             goto err_out;
         }
         printf("Report target port groups:\n");
-        for (k = 4, ucp = reportTgtGrpBuff + 4; k < report_len;
-             k += off, ucp += off) {
+        ucp = reportTgtGrpBuff + 4;
+        if (extended) {
+             if (0x10 != (ucp[0] & 0x70)) {
+                  fprintf(stderr, "   <<invalid extended header format\n");
+                  goto err_out;
+             }
+             printf("  Implicit transition time: %d\n", ucp[1]);
+             ucp += 4;;
+        }
+        for (k = 4; k < report_len; k += off, ucp += off) {
 
             printf("  target port group id : 0x%x , Pref=%d\n",
                    (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));

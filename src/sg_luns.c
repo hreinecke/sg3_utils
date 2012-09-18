@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2011 Douglas Gilbert.
+ * Copyright (c) 2004-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -23,10 +23,11 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI REPORT LUNS command to the given SCSI device.
+ * This program issues the SCSI REPORT LUNS command to the given SCSI device
+ * and decodes the response.
  */
 
-static char * version_str = "1.16 20110825";
+static char * version_str = "1.17 20120314";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -77,13 +78,15 @@ usage()
             );
 }
 
-/* Decoded according to SAM-4 rev 4. Note that one draft: BCC rev 0,
+/* Decoded according to SAM-5 rev 10. Note that one draft: BCC rev 0,
  * defines its own "bridge addressing method" in place of the SAM-3
  * "logical addressing method".  */
 static void
 decode_lun(const char * leadin, unsigned char * lunp)
 {
-    int k, j, x, a_method, bus_id, target, lun, len, e_a_method, next_level;
+    int k, j, x, a_method, bus_id, target, lun, len_fld, e_a_method;
+    int next_level;
+    unsigned int u;
     unsigned char not_spec[8] = {0xff, 0xff, 0xff, 0xff,
                                  0xff, 0xff, 0xff, 0xff};
     char l_leadin[128];
@@ -127,10 +130,10 @@ decode_lun(const char * leadin, unsigned char * lunp)
                    "lun=%d\n", l_leadin, bus_id, target, lun);
             break;
         case 3:         /* extended logical unit addressing method */
-            len = (lunp[0] & 0x30) >> 4;
+            len_fld = (lunp[0] & 0x30) >> 4;
             e_a_method = lunp[0] & 0xf;
             x = lunp[1];
-            if ((0 == len) && (1 == e_a_method)) {
+            if ((0 == len_fld) && (1 == e_a_method)) {
                 switch (x) {
                 case 1:
                     printf("%sREPORT LUNS well known logical unit\n",
@@ -152,23 +155,28 @@ decode_lun(const char * leadin, unsigned char * lunp)
                     printf("%swell known logical unit %d\n", l_leadin, x);
                     break;
                 }
-            } else if ((1 == len) && (2 == e_a_method)) {
+            } else if ((1 == len_fld) && (2 == e_a_method)) {
                 x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
                 printf("%sExtended flat space logical unit addressing: "
                        "value=0x%x\n", l_leadin, x);
-            } else if ((3 == len) && (0xf == e_a_method))
+            } else if ((2 == len_fld) && (2 == e_a_method)) {
+                u = (lunp[1] << 24) + (lunp[2] << 16) + (lunp[3] << 8) +
+                    lunp[4];
+                printf("%sLong extended flat space logical unit addressing: "
+                       "value=0x%x\n", l_leadin, u);
+            } else if ((3 == len_fld) && (0xf == e_a_method))
                 printf("%sLogical unit _not_ specified addressing\n",
                        l_leadin);
             else {
-                if (len < 2) {
-                    if (1 == len)
+                if (len_fld < 2) {
+                    if (1 == len_fld)
                         x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
                     printf("%sExtended logical unit addressing: length=%d, "
-                           "e.a. method=%d, value=0x%x\n", l_leadin, len,
+                           "e.a. method=%d, value=0x%x\n", l_leadin, len_fld,
                            e_a_method, x);
                 } else {
                     ull = 0;
-                    x = (2 == len) ? 5 : 7;
+                    x = (2 == len_fld) ? 5 : 7;
                     for (j = 0; j < x; ++j) {
                         if (j > 0)
                             ull <<= 8;
@@ -176,7 +184,7 @@ decode_lun(const char * leadin, unsigned char * lunp)
                     }
                     printf("%sExtended logical unit addressing: length=%d, "
                            "e. a. method=%d, value=0x%" PRIx64 "\n",
-                           l_leadin, len, e_a_method, ull);
+                           l_leadin, len_fld, e_a_method, ull);
                 }
             }
             break;
