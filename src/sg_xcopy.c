@@ -386,6 +386,63 @@ dd_filetype_str(int ft, char * buff)
     return buff;
 }
 
+static int
+seg_desc_from_dd_type(int in_ft, int in_off, int out_ft, int out_off)
+{
+    int desc_type = -1;
+
+    switch (in_ft) {
+    case FT_BLOCK:
+        switch (out_ft) {
+        case FT_ST:
+            if (out_off)
+                break;
+
+            if (in_off)
+                desc_type = 0x8;
+            else
+                desc_type = 0;
+            break;
+        case FT_BLOCK:
+            if (in_off || out_off)
+                desc_type = 0xA;
+            else
+                desc_type = 2;
+            break;
+        default:
+            break;
+        }
+        break;
+    case FT_ST:
+        if (in_off)
+            break;
+
+        switch (out_ft) {
+        case FT_ST:
+            if (!out_off) {
+                desc_type = 3;
+                break;
+            }
+            break;
+        case FT_BLOCK:
+            if (out_off)
+                desc_type = 9;
+            else
+                desc_type = 3;
+            break;
+        case FT_DEV_NULL:
+            desc_type = 6;
+            break;
+        default:
+            break;
+        }
+        break;
+    default:
+        break;
+    }
+
+    return desc_type;
+}
 
 static void
 usage()
@@ -439,14 +496,53 @@ usage()
 }
 
 static int
+scsi_encode_seg_desc(unsigned char *seg_desc, int seg_desc_type,
+                     int64_t num_blk, uint64_t src_lba, uint64_t dst_lba)
+{
+    int seg_desc_len = 0;
+
+    seg_desc[0] = seg_desc_type;
+    seg_desc[1] = ifp.cat | (ifp.dc << 1);
+    if (seg_desc_type == 0x02) {
+        seg_desc_len = 0x18;
+        seg_desc[4] = 0;
+        seg_desc[5] = 0; /* Source target index */
+        seg_desc[7] = 1; /* Destination target index */
+        seg_desc[10] = (num_blk >> 8) & 0xff;
+        seg_desc[11] = num_blk & 0xff;
+        seg_desc[12] = (src_lba >> 56) & 0xff;
+        seg_desc[13] = (src_lba >> 48) & 0xff;
+        seg_desc[14] = (src_lba >> 40) & 0xff;
+        seg_desc[15] = (src_lba >> 32) & 0xff;
+        seg_desc[16] = (src_lba >> 24) & 0xff;
+        seg_desc[17] = (src_lba >> 16) & 0xff;
+        seg_desc[18] = (src_lba >> 8) & 0xff;
+        seg_desc[19] = src_lba & 0xff;
+        seg_desc[20] = (dst_lba >> 56) & 0xff;
+        seg_desc[21] = (dst_lba >> 48) & 0xff;
+        seg_desc[22] = (dst_lba >> 40) & 0xff;
+        seg_desc[23] = (dst_lba >> 32) & 0xff;
+        seg_desc[24] = (dst_lba >> 24) & 0xff;
+        seg_desc[25] = (dst_lba >> 16) & 0xff;
+        seg_desc[26] = (dst_lba >> 8) & 0xff;
+        seg_desc[27] = dst_lba & 0xff;
+    }
+    seg_desc[2] = (seg_desc_len >> 8) & 0xFF;
+    seg_desc[3] = seg_desc_len & 0xFF;
+
+    return seg_desc_len + 4;
+}
+
+static int
 scsi_extended_copy(int sg_fd, unsigned char list_id,
                    unsigned char *src_desc, int src_desc_len,
                    unsigned char *dst_desc, int dst_desc_len,
-                   int64_t num_blk, uint64_t src_lba, uint64_t dst_lba)
+                   int seg_desc_type, int64_t num_blk,
+                   uint64_t src_lba, uint64_t dst_lba)
 {
     unsigned char xcopyBuff[256];
-    unsigned char *seg_desc;
     int desc_offset = 16;
+    int seg_desc_len;
     int verb;
 
     verb = (verbose ? verbose - 1: 0);
@@ -456,48 +552,25 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     xcopyBuff[1] = (list_id_usage << 3) | priority;
     xcopyBuff[2] = 0;
     xcopyBuff[3] = src_desc_len + dst_desc_len; /* Two target descriptors */
-    xcopyBuff[11] = 28; /* One segment descriptor */
     memcpy(xcopyBuff + desc_offset, src_desc, src_desc_len);
     desc_offset += src_desc_len;
     memcpy(xcopyBuff + desc_offset, dst_desc, dst_desc_len);
     desc_offset += dst_desc_len;
-    seg_desc = xcopyBuff + desc_offset;
-    seg_desc[0] = 0x02;
-    seg_desc[1] = ifp.cat | (ifp.dc << 1);
-    seg_desc[2] = 0;
-    seg_desc[3] = 0x18;
-    seg_desc[4] = 0;
-    seg_desc[5] = 0; /* Source target index */
-    seg_desc[7] = 1; /* Destination target index */
-    seg_desc[10] = (num_blk >> 8) & 0xff;
-    seg_desc[11] = num_blk & 0xff;
-    seg_desc[12] = (src_lba >> 56) & 0xff;
-    seg_desc[13] = (src_lba >> 48) & 0xff;
-    seg_desc[14] = (src_lba >> 40) & 0xff;
-    seg_desc[15] = (src_lba >> 32) & 0xff;
-    seg_desc[16] = (src_lba >> 24) & 0xff;
-    seg_desc[17] = (src_lba >> 16) & 0xff;
-    seg_desc[18] = (src_lba >> 8) & 0xff;
-    seg_desc[19] = src_lba & 0xff;
-    seg_desc[20] = (dst_lba >> 56) & 0xff;
-    seg_desc[21] = (dst_lba >> 48) & 0xff;
-    seg_desc[22] = (dst_lba >> 40) & 0xff;
-    seg_desc[23] = (dst_lba >> 32) & 0xff;
-    seg_desc[24] = (dst_lba >> 24) & 0xff;
-    seg_desc[25] = (dst_lba >> 16) & 0xff;
-    seg_desc[26] = (dst_lba >> 8) & 0xff;
-    seg_desc[27] = dst_lba & 0xff;
-
+    seg_desc_len = scsi_encode_seg_desc(xcopyBuff + desc_offset,
+                                        seg_desc_type, num_blk,
+                                        src_lba, dst_lba);
+    xcopyBuff[11] = seg_desc_len; /* One segment descriptor */
+    desc_offset += seg_desc_len;
     if (verbose > 3) {
-        fprintf(stderr, "\nParameter list in hex:\n");
-        dStrHex((const char *)xcopyBuff, 108, 1);
+        fprintf(stderr, "\nParameter list in hex (length %d):\n", desc_offset);
+        dStrHex((const char *)xcopyBuff, desc_offset, 1);
     }
-    return sg_ll_extended_copy(sg_fd, xcopyBuff, 108, 0, verb);
+    return sg_ll_extended_copy(sg_fd, xcopyBuff, desc_offset, 0, verb);
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
 static int
-scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
+scsi_read_capacity(int sg_fd, char *fname, int64_t * num_sect, int * sect_sz)
 {
     int k, res;
     unsigned int ui;
@@ -533,14 +606,14 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
                    (rcBuff[6] << 8) | rcBuff[7];
     }
     if (verbose)
-        fprintf(stderr, "      number of blocks=%"PRId64" [0x%"PRIx64"], block "
-                "size=%d\n", *num_sect, *num_sect, *sect_sz);
+        fprintf(stderr, "    %s: number of blocks=%"PRId64" [0x%"PRIx64"], "
+                "block size=%d\n", fname, *num_sect, *num_sect, *sect_sz);
     return 0;
 }
 
 static int
 scsi_operating_parameter(int sg_fd, int type, int is_target,
-                         unsigned long *max_bytep)
+                         unsigned long *min_bytep, unsigned long *max_bytep)
 {
     int res;
     unsigned char rcBuff[256];
@@ -571,7 +644,7 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
     *max_bytep = max_segment_len;
     max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 | rcBuff[23];
     if (verbose) {
-        printf("Receive copy results (report operating parameters):\n");
+        printf(" >> Receive copy results (report operating parameters):\n");
         printf("    Maximum target descriptor count: %lu\n", max_target_num);
         printf("    Maximum segment descriptor count: %lu\n", max_segment_num);
         printf("    Maximum descriptor list length: %lu\n", max_desc_len);
@@ -592,12 +665,14 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
         num = rcBuff[28] << 24 | rcBuff[29] << 16 | rcBuff[30] << 8 | rcBuff[31];
         printf("    Maximum stream device transfer size: %lu\n", num);
         printf("    Maximum concurrent copies: %u\n", rcBuff[36]);
-        printf("    Data segment granularity: %u\n", rcBuff[37]);
-        printf("    Inline data granularity: %u\n", rcBuff[38]);
-        printf("    Held data granularity: %u\n", rcBuff[39]);
+        printf("    Data segment granularity: %u bytes\n", 1 << rcBuff[37]);
+        printf("    Inline data granularity: %u bytes\n", 1 << rcBuff[38]);
+        printf("    Held data granularity: %u bytes\n", 1 << rcBuff[39]);
 
         printf("    Implemented descriptor list:\n");
     }
+    *min_bytep = 1 << rcBuff[37];
+
     for (n = 0; n < rcBuff[43]; n++) {
         switch(rcBuff[44 + n]) {
         case 0x00: /* copy block to stream device */
@@ -1259,11 +1334,13 @@ main(int argc, char * argv[])
     int in_sect_sz, out_sect_sz;
     int ret = 0;
     unsigned long max_bytes_in, max_bytes_out;
+    unsigned long min_bytes_in, min_bytes_out;
     unsigned char list_id = 1;
     unsigned char src_desc[256];
     unsigned char dst_desc[256];
     int src_desc_len;
     int dst_desc_len;
+    int seg_desc_type;
 
     ifp.fname[0] = '\0';
     ofp.fname[0] = '\0';
@@ -1402,16 +1479,17 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if (blk_sz <= 0) {
-        blk_sz = DEF_BLOCK_SIZE;
-        fprintf(stderr, "Assume default 'bs' (block size) of %d bytes\n",
-                blk_sz);
-    }
-    if ((ibs && (ibs != blk_sz)) || (obs && (obs != blk_sz))) {
+    if ((ibs && blk_sz && (ibs != blk_sz)) ||
+        (obs && blk_sz && (obs != blk_sz))) {
         fprintf(stderr, "If 'ibs' or 'obs' given must be same as 'bs'\n");
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (blk_sz && !ibs)
+        ibs = blk_sz;
+    if (blk_sz && !obs)
+        obs = blk_sz;
+
     if ((skip < 0) || (seek < 0)) {
         fprintf(stderr, "skip and seek cannot be negative\n");
         return SG_LIB_SYNTAX_ERROR;
@@ -1463,13 +1541,13 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    res = scsi_read_capacity(ifp.sg_fd, &in_num_sect, &in_sect_sz);
+    res = scsi_read_capacity(ifp.sg_fd, ifp.fname, &in_num_sect, &in_sect_sz);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
         fprintf(stderr, "Unit attention (readcap in), continuing\n");
-        res = scsi_read_capacity(ifp.sg_fd, &in_num_sect, &in_sect_sz);
+        res = scsi_read_capacity(ifp.sg_fd, ifp.fname, &in_num_sect, &in_sect_sz);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
         fprintf(stderr, "Aborted command (readcap in), continuing\n");
-        res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
+        res = scsi_read_capacity(infd, ifp.fname, &in_num_sect, &in_sect_sz);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
@@ -1481,19 +1559,19 @@ main(int argc, char * argv[])
         else
             fprintf(stderr, "Unable to read capacity on %s\n", ifp.fname);
         in_num_sect = -1;
-    } else if (in_sect_sz != blk_sz) {
+    } else if (ibs && in_sect_sz != ibs) {
         fprintf(stderr, ">> warning: block size on %s confusion: "
-                "bs=%d, device claims=%d\n", ifp.fname, blk_sz, in_sect_sz);
+                "ibs=%d, device claims=%d\n", ifp.fname, ibs, in_sect_sz);
     }
 
-    res = scsi_read_capacity(ofp.sg_fd, &out_num_sect, &out_sect_sz);
+    res = scsi_read_capacity(ofp.sg_fd, ofp.fname, &out_num_sect, &out_sect_sz);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
         fprintf(stderr, "Unit attention (readcap out), continuing\n");
-        res = scsi_read_capacity(ofp.sg_fd, &out_num_sect, &out_sect_sz);
+        res = scsi_read_capacity(ofp.sg_fd, ofp.fname, &out_num_sect, &out_sect_sz);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
         fprintf(stderr,
                 "Aborted command (readcap out), continuing\n");
-        res = scsi_read_capacity(ofp.sg_fd, &out_num_sect, &out_sect_sz);
+        res = scsi_read_capacity(ofp.sg_fd, ofp.fname, &out_num_sect, &out_sect_sz);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
@@ -1502,11 +1580,11 @@ main(int argc, char * argv[])
         else
             fprintf(stderr, "Unable to read capacity on %s\n", ofp.fname);
         out_num_sect = -1;
-    } else if (blk_sz != out_sect_sz) {
+    } else if (obs && obs != out_sect_sz) {
         fprintf(stderr, ">> warning: block size on %s confusion: "
-                "bs=%d, device claims=%d\n", ofp.fname, blk_sz,
-                out_sect_sz);
+                "obs=%d, device claims=%d\n", ofp.fname, obs, out_sect_sz);
     }
+
     if ((dd_count < 0) || ((verbose > 0) && (0 == dd_count))) {
         if (skip && in_num_sect > skip)
             in_num_sect -= skip;
@@ -1527,11 +1605,13 @@ main(int argc, char * argv[])
         }
     }
 
-    res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0, &max_bytes_in);
+    res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0,
+                                   &min_bytes_in, &max_bytes_in);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
             fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0, &max_bytes_in);
+            res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0,
+                                           &min_bytes_in, &max_bytes_in);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
                 fprintf(stderr, "receive copy results not supported on %s\n",
@@ -1562,11 +1642,13 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_INVALID_OP;
     }
 
-    res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1, &max_bytes_out);
+    res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1,
+                                   &min_bytes_out, &max_bytes_out);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
             fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1, &max_bytes_out);
+            res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1,
+                                           &min_bytes_out, &max_bytes_out);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
                 fprintf(stderr, "receive copy results not supported on %s\n",
@@ -1604,12 +1686,23 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
+    if ((unsigned long)dd_count < min_bytes_in / in_sect_sz) {
+        fprintf(stderr, "not enough data to read (min %ld bytes)\n",
+                min_bytes_in);
+        return SG_LIB_CAT_OTHER;
+    }
+    if ((unsigned long)dd_count < min_bytes_out / out_sect_sz) {
+        fprintf(stderr, "not enough data to write (min %ld bytes)\n",
+                min_bytes_out);
+        return SG_LIB_CAT_OTHER;
+    }
+
     if (0 == bpt_given)
         bpt = max_bytes_in / in_sect_sz;
     if (max_bytes_out / out_sect_sz < (uint64_t)bpt)
         bpt = max_bytes_out / out_sect_sz;
-    if (bpt > dd_count)
-        bpt = dd_count;
+
+    seg_desc_type = seg_desc_from_dd_type(ifp.sg_type, 0, ofp.sg_type, 0);
 
     if (do_time) {
         start_tm.tv_sec = 0;
@@ -1620,9 +1713,9 @@ main(int argc, char * argv[])
 
 #ifdef SG_DEBUG
     fprintf(stderr,
-            "Start of loop, count=%"PRId64", lba_in=%"PRId64", "
-            "in_num_sect=%"PRId64", lba_out=%"PRId64", out_num_sect=%"PRId64"\n",
-            dd_count, skip, in_num_sect, skip + seek, out_num_sect);
+            "Start of loop, count=%"PRId64", bpt=%d, "
+            "lba_in=%"PRId64", lba_out=%"PRId64"\n",
+            dd_count, bpt, skip, skip + seek);
 #endif
     while (dd_count > 0) {
         if (dd_count > bpt)
@@ -1630,8 +1723,8 @@ main(int argc, char * argv[])
         else
             blocks = dd_count;
         res = scsi_extended_copy(infd, list_id, src_desc, src_desc_len,
-                                 dst_desc, dst_desc_len, blocks,
-                                 skip, skip + seek);
+                                 dst_desc, dst_desc_len, seg_desc_type,
+                                 blocks, skip, skip + seek);
         if (res != 0)
             break;
         in_full += blocks;
