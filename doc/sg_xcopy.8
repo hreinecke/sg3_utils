@@ -42,34 +42,37 @@ where \fIBS\fR
 be the block size of the physical device (if either the input or output
 files are accessed via SCSI commands). Note that this differs from
 .B dd(1)
-which permits \fIBS\fR to be an integral multiple. Default is 512 which
-is usually correct for disks but incorrect for cdroms (which normally
-have 2048 byte blocks). For this utility the maximum size of each individual
-IO operation is \fIBS\fR * \fIBPT\fR bytes.
+which permits \fIBS\fR to be an integral multiple. Defaults to the
+device block size.
 .TP
 \fBcat\fR=0 | 1
 sets the SCSI EXTENDED COPY command segment descriptor CAT bit to 0 or
-1 (default: 0).
+1 (default: 0). The CAT bit (in conjuction with the PAD bit) controls
+the handling of residual data. See section
+.B HANDLING OF RESIDUAL DATA
+for details.
 .TP
 \fBdc\fR=0 | 1
 sets the SCSI EXTENDED COPY command segment descriptor DC bit to 0 or
-1 (default: 0).
+1 (default: 0). The DC bit controls whether \fICOUNT\fR
+refers to the source (\fIdc=0\fR) or the target (\fIdc=1\fR) descriptor.
 .TP
 \fBconv\fR=\fBCONV\fR
 all \fBCONV\fR arguments are ignored.
 .TP
 \fBcount\fR=\fICOUNT\fR
 copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the
-minimum (of \fIIFILE\fR and \fIOFILE\fR) number of blocks that SCSI devices
-report from SCSI READ CAPACITY commands or that block devices (or their
-partitions) report. Normal files are not probed for their size. If
-\fIskip=SKIP\fR or \fIskip=SEEK\fR are given and the count is derived (i.e.
-not explicitly given) then the derived count is scaled back so that the
+minimum (\fIIFILE\fR if \fIdc=0\fR or \fIOFILE\fR if \fIdc=1\fR)
+number of blocks that SCSI devices report from SCSI READ CAPACITY
+commands or that block devices (or their partitions) report. Normal
+files are not probed for their size. If \fIskip=SKIP\fR or
+\fIskip=SEEK\fR are given and the count is derived (i.e. not
+explicitly given) then the derived count is scaled back so that the
 copy will not overrun the device. If the file name is a block device
 partition and \fICOUNT\fR is not given then the size of the partition
-rather than the size of the whole device is used. If \fICOUNT\fR is not
-given (or \fIcount=-1\fR) and cannot be derived then an error message is
-issued and no copy takes place.
+rather than the size of the whole device is used. If \fICOUNT\fR is
+not given (or \fIcount=-1\fR) and cannot be derived then an error
+message is issued and no copy takes place.
 .TP
 \fBibs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
@@ -157,11 +160,12 @@ from the beginning of the file or, if \fISEEK\fR is given, starting at
 block \fISEEK\fR. Note that attempting to 'append' to a device file (e.g.
 a disk) will usually be ignored or may cause an error to be reported.
 .TP
-cat
-sets the SCSI EXTENDED COPY command segment descriptor CAT bit.
-.TP
-dc
-sets the SCSI EXTENDED COPY command segment descriptor DC bit.
+pad
+sets the SCSI EXTENDED COPY command segment descriptor PAD bit. The
+PAD bit (in conjunction with the CAT bit) controls the handling of
+residual data.(See section
+.B HANDLING OF RESIDUAL DATA
+for details.
 .TP
 excl
 causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
@@ -177,6 +181,32 @@ and no copy is done.
 .TP
 null
 has no affect, just a placeholder.
+.SH HANDLING OF RESIDUAL DATA
+The \fIpad\fR and \fIcat\fR bits control the handling of residual
+data. As the data can be specified either in terms of source or target
+block size and both might have different block sizes residual data is
+likely to happen in these cases.
+If both block sizes are identical these bits have no effect as
+residual data will not occur.
+.PP
+If none of these bits are set, the EXTENDED COPY command will be
+aborted with additional sense 'UNEXPECTED INEXACT SEGMENT'.
+.PP
+If only the \fIcat\fR bit is set the residual data will be retained
+and made available for subsequent segment descriptors. Residual data
+will be discarded for the last segment descriptor.
+.PP
+If the \fIpad\fR bit is set for the source descriptor only, any
+residual data for both source or destination will be discarded.
+.PP
+If the \fIpad\fR bit is set for the target descriptor only any
+residual source data will be handled as if the \fIcat\fR bit is set,
+but any residual destination data will be padded to make a whole block
+transfer.
+.PP
+If the \fIpad\fR bit is set for both source and target any residual
+source data will be discarded, and any residual destination data will
+be padded.
 .SH RETIRED OPTIONS
 Here are some retired options that are still present:
 .TP
@@ -197,11 +227,32 @@ All informative, warning and error output is sent to stderr so that
 dd's output file can be stdout and remain unpolluted. If no options
 are given, then the usage message is output and nothing else happens.
 .PP
-Disk partition information can often be found with
-.B fdisk(8)
-[the "\-ul" argument is useful in this respect].
+The status of the SCSI EXTENDED COPY command can be queried with
+.B sg_copy_results(sg3_utils)
+.PP
+Currently only block-to-block transfers are implemented; \fIIFILE\fR
+and \fIOFILE\fR must refer to a SCSI block device.
 .SH EXAMPLES
-xxxxxxxxx >>>> Some examples might be (very) useful!
+Copy 2M of data from the start of one device to another:
+.PP
+# sg_xcopy if=/dev/sdo of=/dev/sdp count=2048 list_id=2 dc=1
+.br
+sg_xcopy: if=/dev/sdo skip=0 of=/dev/sdp seek=0 count=1024
+.br
+Start of loop, count=1024, bpt=65535, lba_in=0, lba_out=0
+.br
+sg_xcopy: 1024 blocks, 1 command
+.PP
+Check the status of the EXTENDED COPY command:
+.PP
+# sg_copy_results --status --list_id=2 /dev/sdp
+.br
+Receive copy results (copy status):
+    Held data discarded: Yes
+    Copy manager status: Operation completed without errors
+    Segments processed: 1
+    Transfer count units: 0
+    Transfer count: 0
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and
 SIGPIPE output the number of remaining blocks to be transferred and
@@ -243,4 +294,4 @@ recovery see
 .B sdparm(sdparm)
 .PP
 See also
-.B dd(1), ddrescue(GNU), ddpt
+.B dd(1), sg_copy_results(sg3_utils), ddrescue(GNU), ddpt

@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.78 20120318";  /* spc4r35, sbc3r30 */
+const char * sg_lib_version_str = "1.79 20120919";  /* spc4r35, sbc3r32 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -44,14 +44,14 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x12, 0, "Inquiry"},
     {0x13, 0, "Verify(6)"},  /* SSC */
     {0x14, 0, "Recover buffered data"},
-    {0x15, 0, "Mode select(6)"},
+    {0x15, 0, "Mode select(6)"}, /* SBC-3 r31 recommends Mode select(10) */
     {0x16, 0, "Reserve(6)"},    /* obsolete in SPC-4 r11 */
     {0x16, PDT_MCHANGER, "Reserve element(6)"},
     {0x17, 0, "Release(6)"},    /* obsolete in SPC-4 r11 */
     {0x17, PDT_MCHANGER, "Release element(6)"},
     {0x18, 0, "Copy"},          /* obsolete in SPC-4 r11 */
     {0x19, 0, "Erase(6)"},
-    {0x1a, 0, "Mode sense(6)"},
+    {0x1a, 0, "Mode sense(6)"}, /* SBC-3 r31 recommends Mode sense(10) */
     {0x1b, 0, "Start stop unit"},
     {0x1b, PDT_TAPE, "Load unload"},
     {0x1b, PDT_ADC, "Load unload"},
@@ -62,26 +62,30 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x23, 0, "Read Format capacities"},
     {0x24, 0, "Set window"},
     {0x25, 0, "Read capacity(10)"},
+                        /* SBC-3 r31 recommends Read capacity(16) */
     {0x25, PDT_OCRW, "Read card capacity"},
-    {0x28, 0, "Read(10)"},
+    {0x28, 0, "Read(10)"},      /* SBC-3 r31 recommends Read(16) */
     {0x29, 0, "Read generation"},
-    {0x2a, 0, "Write(10)"},
+    {0x2a, 0, "Write(10)"},     /* SBC-3 r31 recommends Write(16) */
     {0x2b, 0, "Seek(10)"},
     {0x2b, PDT_TAPE, "Locate(10)"},
     {0x2b, PDT_MCHANGER, "Position to element"},
     {0x2c, 0, "Erase(10)"},
     {0x2d, 0, "Read updated block"},
     {0x2e, 0, "Write and verify(10)"},
-    {0x2f, 0, "Verify(10)"},
+                        /* SBC-3 r31 recommends Write and verify(16) */
+    {0x2f, 0, "Verify(10)"},    /* SBC-3 r31 recommends Verify(16) */
     {0x30, 0, "Search data high(10)"},
     {0x31, 0, "Search data equal(10)"},
     {0x32, 0, "Search data low(10)"},
     {0x33, 0, "Set limits(10)"},
-    {0x34, 0, "Pre-fetch(10)"},
+    {0x34, 0, "Pre-fetch(10)"}, /* SBC-3 r31 recommends Pre-fetch(16) */
     {0x34, PDT_TAPE, "Read position"},
     {0x35, 0, "Synchronize cache(10)"},
+                        /* SBC-3 r31 recommends Synchronize cache(16) */
     {0x36, 0, "Lock unlock cache(10)"},
     {0x37, 0, "Read defect data(10)"},
+                        /* SBC-3 r31 recommends Read defect data(12) */
     {0x37, PDT_MCHANGER, "Initialize element status with range"},
     {0x38, 0, "Medium scan"},
     {0x39, 0, "Compare"},               /* obsolete in SPC-4 r11 */
@@ -89,10 +93,10 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x3b, 0, "Write buffer"},
     {0x3c, 0, "Read buffer"},
     {0x3d, 0, "Update block"},
-    {0x3e, 0, "Read long(10)"},
-    {0x3f, 0, "Write long(10)"},
+    {0x3e, 0, "Read long(10)"},  /* SBC-3 r31 recommends Read long(16) */
+    {0x3f, 0, "Write long(10)"}, /* SBC-3 r31 recommends Write long(16) */
     {0x40, 0, "Change definition"},     /* obsolete in SPC-4 r11 */
-    {0x41, 0, "Write same(10)"},
+    {0x41, 0, "Write same(10)"}, /* SBC-3 r31 recommends Write same(16) */
     {0x42, 0, "Unmap"},                 /* added SPC-4 rev 18 */
     {0x42, PDT_MMC, "Read sub-channel"},
     {0x43, PDT_MMC, "Read TOC/PMA/ATIP"},
@@ -106,10 +110,10 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x4c, 0, "Log select"},
     {0x4d, 0, "Log sense"},
     {0x4e, 0, "Stop play/scan"},
-    {0x50, 0, "Xdwrite(10)"},
+    {0x50, 0, "Xdwrite(10)"},           /* obsolete in SBC-3 r31 */
     {0x51, 0, "Xpwrite(10)"},
     {0x51, PDT_MMC, "Read disk information"},
-    {0x52, 0, "Xdread(10)"},
+    {0x52, 0, "Xdread(10)"},            /* obsolete in SBC-3 r31 */
     {0x52, PDT_MMC, "Read track information"},
     {0x53, 0, "Reserve track"},
     {0x54, 0, "Send OPC information"},
@@ -168,15 +172,16 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xa6, PDT_MMC, "Load/unload medium"},
     {0xa7, 0, "Move medium attached"},
     {0xa7, PDT_MMC, "Set read ahead"},
-    {0xa8, 0, "Read(12)"},
+    {0xa8, 0, "Read(12)"},      /* SBC-3 r31 recommends Read(16) */
     {0xa9, 0, "Service action out(12)"},
-    {0xaa, 0, "Write(12)"},
+    {0xaa, 0, "Write(12)"},     /* SBC-3 r31 recommends Write(16) */
     {0xab, 0, "Service action in(12)"},
     {0xac, 0, "erase(12)"},
     {0xac, PDT_MMC, "Get performance"},
     {0xad, PDT_MMC, "Read DVD/BD structure"},
     {0xae, 0, "Write and verify(12)"},
-    {0xaf, 0, "Verify(12)"},
+                        /* SBC-3 r31 recommends Write and verify(16) */
+    {0xaf, 0, "Verify(12)"},    /* SBC-3 r31 recommends Verify(16) */
     {0xb0, 0, "Search data high(12)"},
     {0xb1, 0, "Search data equal(12)"},
     {0xb1, PDT_MCHANGER, "Open/close import/export element"},
@@ -330,8 +335,8 @@ struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
 struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x1, 0, "Rebuild(32)"},
     {0x2, 0, "Regenerate(32)"},
-    {0x3, 0, "Xdread(32)"},
-    {0x4, 0, "Xdwrite(32)"},
+    {0x3, 0, "Xdread(32)"},     /* obsolete in SBC-3 r31 */
+    {0x4, 0, "Xdwrite(32)"},    /* obsolete in SBC-3 r31 */
     {0x5, 0, "Xdwrite extended(32)"},
     {0x6, 0, "Xpwrite(32)"},
     {0x7, 0, "Xdwriteread(32)"},
