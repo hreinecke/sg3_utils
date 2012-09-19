@@ -440,11 +440,13 @@ usage()
 
 static int
 scsi_extended_copy(int sg_fd, unsigned char list_id,
-                   unsigned char *src_desc, unsigned char *dst_desc,
+                   unsigned char *src_desc, int src_desc_len,
+                   unsigned char *dst_desc, int dst_desc_len,
                    int64_t num_blk, uint64_t src_lba, uint64_t dst_lba)
 {
     unsigned char xcopyBuff[256];
     unsigned char *seg_desc;
+    int desc_offset = 16;
     int verb;
 
     verb = (verbose ? verbose - 1: 0);
@@ -453,11 +455,13 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     xcopyBuff[0] = list_id;
     xcopyBuff[1] = (list_id_usage << 3) | priority;
     xcopyBuff[2] = 0;
-    xcopyBuff[3] = 64; /* Two target descriptors */
+    xcopyBuff[3] = src_desc_len + dst_desc_len; /* Two target descriptors */
     xcopyBuff[11] = 28; /* One segment descriptor */
-    memcpy(xcopyBuff + 16, src_desc, 32);
-    memcpy(xcopyBuff + 48, dst_desc, 32);
-    seg_desc = xcopyBuff + 80;
+    memcpy(xcopyBuff + desc_offset, src_desc, src_desc_len);
+    desc_offset += src_desc_len;
+    memcpy(xcopyBuff + desc_offset, dst_desc, dst_desc_len);
+    desc_offset += dst_desc_len;
+    seg_desc = xcopyBuff + desc_offset;
     seg_desc[0] = 0x02;
     seg_desc[1] = ifp.cat | (ifp.dc << 1);
     seg_desc[2] = 0;
@@ -541,7 +545,8 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
     int res;
     unsigned char rcBuff[256];
     unsigned int rcBuffLen = 256, len, n, td_list = 0;
-    unsigned long max_segment_len, max_segment_num, held_data_limit, num;
+    unsigned long num, max_target_num, max_segment_num;
+    unsigned long max_segment_len, max_desc_len, max_inline_data, held_data_limit;
     int verb, valid = 0;
 
     verb = (verbose ? verbose - 1: 0);
@@ -558,20 +563,20 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
         fprintf(stderr, "\nOutput response in hex:\n");
         dStrHex((const char *)rcBuff, len, 1);
     }
+    max_target_num = rcBuff[8] << 8 | rcBuff[9];
+    max_segment_num = rcBuff[10] << 8 | rcBuff[11];
+    max_desc_len = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 | rcBuff[15];
+    max_segment_len = rcBuff[16] << 24 | rcBuff[17] << 16 |
+        rcBuff[18] << 8 | rcBuff[19];
+    *max_bytep = max_segment_len;
+    max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 | rcBuff[23];
     if (verbose) {
         printf("Receive copy results (report operating parameters):\n");
-        num = rcBuff[8] << 8 | rcBuff[9];
-        printf("    Maximum target descriptor count: %lu\n", num);
-        max_segment_num = rcBuff[10] << 8 | rcBuff[11];
+        printf("    Maximum target descriptor count: %lu\n", max_target_num);
         printf("    Maximum segment descriptor count: %lu\n", max_segment_num);
-        num = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 | rcBuff[15];
-        printf("    Maximum descriptor list length: %lu\n", num);
-        max_segment_len = rcBuff[16] << 24 | rcBuff[17] << 16 |
-            rcBuff[18] << 8 | rcBuff[19];
-        *max_bytep = max_segment_len;
+        printf("    Maximum descriptor list length: %lu\n", max_desc_len);
         printf("    Maximum segment length: %lu\n", max_segment_len);
-        num = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 | rcBuff[23];
-        printf("    Maximum inline data length: %lu\n", num);
+        printf("    Maximum inline data length: %lu\n", max_inline_data);
     }
     held_data_limit = rcBuff[24] << 24 | rcBuff[25] << 16 |
         rcBuff[26] << 8 | rcBuff[27];
@@ -626,6 +631,102 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
                 valid++;
             if (verbose)
                 printf("        Copy Stream to Stream device\n");
+            break;
+        case 0x04: /* copy inline data to stream device */
+            if (!is_target && (type & FT_OTHER))
+                valid++;
+            if (is_target && (type & FT_ST))
+                valid++;
+            if (verbose)
+                printf("        Copy inline data to Stream device\n");
+            break;
+        case 0x05: /* copy embedded data to stream device */
+            if (!is_target && (type & FT_OTHER))
+                valid++;
+            if (is_target && (type & FT_ST))
+                valid++;
+            if (verbose)
+                printf("        Copy embedded data to Stream device\n");
+            break;
+        case 0x06: /* Read from stream device and discard */
+            if (!is_target && (type & FT_ST))
+                valid++;
+            if (is_target && (type & FT_DEV_NULL))
+                valid++;
+            if (verbose)
+                printf("        Read from stream device and discard\n");
+            break;
+        case 0x07: /* Verify block or stream device operation */
+            if (!is_target && (type & (FT_ST | FT_BLOCK)))
+                valid++;
+            if (is_target && (type & (FT_ST | FT_BLOCK)))
+                valid++;
+            if (verbose)
+                printf("        Verify block or stream device operation\n");
+            break;
+        case 0x08: /* copy block device with offset to stream device */
+            if (!is_target && (type & FT_BLOCK))
+                valid++;
+            if (is_target && (type & FT_ST))
+                valid++;
+            if (verbose)
+                printf("        Copy block device with offset to stream device\n");
+            break;
+        case 0x09: /* copy stream device to block device with offset */
+            if (!is_target && (type & FT_ST))
+                valid++;
+            if (is_target && (type & FT_BLOCK))
+                valid++;
+            if (verbose)
+                printf("        Copy stream device to block device with offset\n");
+            break;
+        case 0x0a: /* copy block device with offset to block device with offset */
+            if (!is_target && (type & FT_BLOCK))
+                valid++;
+            if (is_target && (type & FT_BLOCK))
+                valid++;
+            if (verbose)
+                printf("        Copy block device with offset to block device with offset\n");
+            break;
+        case 0x0b: /* copy block device to stream device and hold data */
+            if (!is_target && (type & FT_BLOCK))
+                valid++;
+            if (is_target && (type & FT_ST))
+                valid++;
+            if (verbose)
+                printf("        Copy block device to stream device and hold data\n");
+            break;
+        case 0x0c: /* copy stream device to block device and hold data */
+            if (!is_target && (type & FT_ST))
+                valid++;
+            if (is_target && (type & FT_BLOCK))
+                valid++;
+            if (verbose)
+                printf("        Copy stream device to block device and hold data\n");
+            break;
+        case 0x0d: /* copy block device to block device and hold data */
+            if (!is_target && (type & FT_BLOCK))
+                valid++;
+            if (is_target && (type & FT_BLOCK))
+                valid++;
+            if (verbose)
+                printf("        Copy block device to block device and hold data\n");
+            break;
+        case 0x0e: /* copy stream device to stream device and hold data */
+            if (!is_target && (type & FT_ST))
+                valid++;
+            if (is_target && (type & FT_ST))
+                valid++;
+            if (verbose)
+                printf("        Copy block device to block device and hold data\n");
+            break;
+        case 0x0f: /* read from stream device and hold data */
+            if (!is_target && (type & FT_ST))
+                valid++;
+            if (is_target && (type & FT_DEV_NULL))
+                valid++;
+            if (verbose)
+                printf("        Read from stream device and hold data\n");
             break;
         case 0xe0: /* FC N_Port_Name */
             if (verbose)
@@ -1161,8 +1262,8 @@ main(int argc, char * argv[])
     unsigned char list_id = 1;
     unsigned char src_desc[256];
     unsigned char dst_desc[256];
-    /* int src_desc_len = 256; */
-    /* int dst_desc_len = 256; */
+    int src_desc_len;
+    int dst_desc_len;
 
     ifp.fname[0] = '\0';
     ofp.fname[0] = '\0';
@@ -1425,12 +1526,6 @@ main(int argc, char * argv[])
                 dd_count = out_num_sect;
         }
     }
-#ifdef SG_DEBUG
-    fprintf(stderr,
-            "Start of loop, count=%"PRId64", lba_in=%"PRId64", "
-            "in_num_sect=%"PRId64", lba_out=%"PRId64", out_num_sect=%"PRId64"\n",
-            dd_count, skip, in_num_sect, skip + seek, out_num_sect);
-#endif
 
     res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0, &max_bytes_in);
     if (res < 0) {
@@ -1458,12 +1553,11 @@ main(int argc, char * argv[])
 
     if (res & TD_VPD) {
         printf("  >> using VPD identification for source %s\n", ifp.fname);
-        res = desc_from_vpd_id(ifp.sg_fd, src_desc, 256, in_sect_sz);
-        if (res > 256) {
+        src_desc_len = desc_from_vpd_id(ifp.sg_fd, src_desc, 256, in_sect_sz);
+        if (src_desc_len > 256) {
             fprintf(stderr, "source descriptor too large (%d bytes)\n", res);
             return SG_LIB_CAT_MALFORMED;
         }
-        /* src_desc_len = res; */
     } else {
         return SG_LIB_CAT_INVALID_OP;
     }
@@ -1495,13 +1589,12 @@ main(int argc, char * argv[])
     if (res & TD_VPD) {
         printf("  >> using VPD identification for destination %s\n",
                ofp.fname);
-        res = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256, out_sect_sz);
-        if (res > 256) {
+        dst_desc_len = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256, out_sect_sz);
+        if (dst_desc_len > 256) {
             fprintf(stderr, "destination descriptor too large (%d bytes)\n",
                     res);
             return SG_LIB_CAT_MALFORMED;
         }
-        /* dst_desc_len = res; */
     } else {
         return SG_LIB_CAT_INVALID_OP;
     }
@@ -1525,13 +1618,20 @@ main(int argc, char * argv[])
         start_tm_valid = 1;
     }
 
+#ifdef SG_DEBUG
+    fprintf(stderr,
+            "Start of loop, count=%"PRId64", lba_in=%"PRId64", "
+            "in_num_sect=%"PRId64", lba_out=%"PRId64", out_num_sect=%"PRId64"\n",
+            dd_count, skip, in_num_sect, skip + seek, out_num_sect);
+#endif
     while (dd_count > 0) {
         if (dd_count > bpt)
             blocks = bpt;
         else
             blocks = dd_count;
-        res = scsi_extended_copy(infd, list_id, src_desc, dst_desc,
-                                 blocks, skip, skip + seek);
+        res = scsi_extended_copy(infd, list_id, src_desc, src_desc_len,
+                                 dst_desc, dst_desc_len, blocks,
+                                 skip, skip + seek);
         if (res != 0)
             break;
         in_full += blocks;
