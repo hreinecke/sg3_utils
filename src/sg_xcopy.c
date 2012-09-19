@@ -144,6 +144,8 @@ struct xcopy_fp_t {
     dev_t devno;
     int sg_type;
     int sg_fd;
+    unsigned long min_bytes;
+    unsigned long max_bytes;
     int append;
     int excl;
     int flock;
@@ -612,8 +614,7 @@ scsi_read_capacity(int sg_fd, char *fname, int64_t * num_sect, int * sect_sz)
 }
 
 static int
-scsi_operating_parameter(int sg_fd, int type, int is_target,
-                         unsigned long *min_bytep, unsigned long *max_bytep)
+scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
 {
     int res;
     unsigned char rcBuff[256];
@@ -623,7 +624,7 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
     int verb, valid = 0;
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_receive_copy_results(sg_fd, 0x03, 0, rcBuff, rcBuffLen, 0, verb);
+    res = sg_ll_receive_copy_results(xfp->sg_fd, 0x03, 0, rcBuff, rcBuffLen, 0, verb);
     if (0 != res)
         return -res;
 
@@ -641,7 +642,7 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
     max_desc_len = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 | rcBuff[15];
     max_segment_len = rcBuff[16] << 24 | rcBuff[17] << 16 |
         rcBuff[18] << 8 | rcBuff[19];
-    *max_bytep = max_segment_len;
+    xfp->max_bytes = max_segment_len;
     max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 | rcBuff[23];
     if (verbose) {
         printf(" >> Receive copy results (report operating parameters):\n");
@@ -671,134 +672,134 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
 
         printf("    Implemented descriptor list:\n");
     }
-    *min_bytep = 1 << rcBuff[37];
+    xfp->min_bytes = 1 << rcBuff[37];
 
     for (n = 0; n < rcBuff[43]; n++) {
         switch(rcBuff[44 + n]) {
         case 0x00: /* copy block to stream device */
-            if (!is_target && (type & FT_BLOCK))
+            if (!is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
-            if (is_target && (type & FT_ST))
+            if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
                 printf("        Copy Block to Stream device\n");
             break;
         case 0x01: /* copy stream to block device */
-            if (!is_target && (type & FT_ST))
+            if (!is_target && (xfp->sg_type & FT_ST))
                 valid++;
-            if (is_target && (type & FT_BLOCK))
+            if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
                 printf("        Copy Stream to Block device\n");
             break;
         case 0x02: /* copy block to block device */
-            if (!is_target && (type & FT_BLOCK))
+            if (!is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
-            if (is_target && (type & FT_BLOCK))
+            if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
                 printf("        Copy Block to Block device\n");
             break;
         case 0x03: /* copy stream to stream device */
-            if (!is_target && (type & FT_ST))
+            if (!is_target && (xfp->sg_type & FT_ST))
                 valid++;
-            if (is_target && (type & FT_ST))
+            if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
                 printf("        Copy Stream to Stream device\n");
             break;
         case 0x04: /* copy inline data to stream device */
-            if (!is_target && (type & FT_OTHER))
+            if (!is_target && (xfp->sg_type & FT_OTHER))
                 valid++;
-            if (is_target && (type & FT_ST))
+            if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
                 printf("        Copy inline data to Stream device\n");
             break;
         case 0x05: /* copy embedded data to stream device */
-            if (!is_target && (type & FT_OTHER))
+            if (!is_target && (xfp->sg_type & FT_OTHER))
                 valid++;
-            if (is_target && (type & FT_ST))
+            if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
                 printf("        Copy embedded data to Stream device\n");
             break;
         case 0x06: /* Read from stream device and discard */
-            if (!is_target && (type & FT_ST))
+            if (!is_target && (xfp->sg_type & FT_ST))
                 valid++;
-            if (is_target && (type & FT_DEV_NULL))
+            if (is_target && (xfp->sg_type & FT_DEV_NULL))
                 valid++;
             if (verbose)
                 printf("        Read from stream device and discard\n");
             break;
         case 0x07: /* Verify block or stream device operation */
-            if (!is_target && (type & (FT_ST | FT_BLOCK)))
+            if (!is_target && (xfp->sg_type & (FT_ST | FT_BLOCK)))
                 valid++;
-            if (is_target && (type & (FT_ST | FT_BLOCK)))
+            if (is_target && (xfp->sg_type & (FT_ST | FT_BLOCK)))
                 valid++;
             if (verbose)
                 printf("        Verify block or stream device operation\n");
             break;
         case 0x08: /* copy block device with offset to stream device */
-            if (!is_target && (type & FT_BLOCK))
+            if (!is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
-            if (is_target && (type & FT_ST))
+            if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
                 printf("        Copy block device with offset to stream device\n");
             break;
         case 0x09: /* copy stream device to block device with offset */
-            if (!is_target && (type & FT_ST))
+            if (!is_target && (xfp->sg_type & FT_ST))
                 valid++;
-            if (is_target && (type & FT_BLOCK))
+            if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
                 printf("        Copy stream device to block device with offset\n");
             break;
         case 0x0a: /* copy block device with offset to block device with offset */
-            if (!is_target && (type & FT_BLOCK))
+            if (!is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
-            if (is_target && (type & FT_BLOCK))
+            if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
                 printf("        Copy block device with offset to block device with offset\n");
             break;
         case 0x0b: /* copy block device to stream device and hold data */
-            if (!is_target && (type & FT_BLOCK))
+            if (!is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
-            if (is_target && (type & FT_ST))
+            if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
                 printf("        Copy block device to stream device and hold data\n");
             break;
         case 0x0c: /* copy stream device to block device and hold data */
-            if (!is_target && (type & FT_ST))
+            if (!is_target && (xfp->sg_type & FT_ST))
                 valid++;
-            if (is_target && (type & FT_BLOCK))
+            if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
                 printf("        Copy stream device to block device and hold data\n");
             break;
         case 0x0d: /* copy block device to block device and hold data */
-            if (!is_target && (type & FT_BLOCK))
+            if (!is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
-            if (is_target && (type & FT_BLOCK))
+            if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
                 printf("        Copy block device to block device and hold data\n");
             break;
         case 0x0e: /* copy stream device to stream device and hold data */
-            if (!is_target && (type & FT_ST))
+            if (!is_target && (xfp->sg_type & FT_ST))
                 valid++;
-            if (is_target && (type & FT_ST))
+            if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
                 printf("        Copy block device to block device and hold data\n");
             break;
         case 0x0f: /* read from stream device and hold data */
-            if (!is_target && (type & FT_ST))
+            if (!is_target && (xfp->sg_type & FT_ST))
                 valid++;
-            if (is_target && (type & FT_DEV_NULL))
+            if (is_target && (xfp->sg_type & FT_DEV_NULL))
                 valid++;
             if (verbose)
                 printf("        Read from stream device and hold data\n");
@@ -1333,8 +1334,6 @@ main(int argc, char * argv[])
     int64_t out_num_sect = -1;
     int in_sect_sz, out_sect_sz;
     int ret = 0;
-    unsigned long max_bytes_in, max_bytes_out;
-    unsigned long min_bytes_in, min_bytes_out;
     unsigned char list_id = 1;
     unsigned char src_desc[256];
     unsigned char dst_desc[256];
@@ -1605,13 +1604,11 @@ main(int argc, char * argv[])
         }
     }
 
-    res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0,
-                                   &min_bytes_in, &max_bytes_in);
+    res = scsi_operating_parameter(&ifp, 0);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
             fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(ifp.sg_fd, ifp.sg_type, 0,
-                                           &min_bytes_in, &max_bytes_in);
+            res = scsi_operating_parameter(&ifp, 0);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
                 fprintf(stderr, "receive copy results not supported on %s\n",
@@ -1642,13 +1639,11 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_INVALID_OP;
     }
 
-    res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1,
-                                   &min_bytes_out, &max_bytes_out);
+    res = scsi_operating_parameter(&ofp, 1);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
             fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(ofp.sg_fd, ofp.sg_type, 1,
-                                           &min_bytes_out, &max_bytes_out);
+            res = scsi_operating_parameter(&ofp, 1);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
                 fprintf(stderr, "receive copy results not supported on %s\n",
@@ -1686,21 +1681,21 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
-    if ((unsigned long)dd_count < min_bytes_in / in_sect_sz) {
+    if ((unsigned long)dd_count < ifp.min_bytes / in_sect_sz) {
         fprintf(stderr, "not enough data to read (min %ld bytes)\n",
-                min_bytes_in);
+                ofp.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
-    if ((unsigned long)dd_count < min_bytes_out / out_sect_sz) {
+    if ((unsigned long)dd_count < ofp.min_bytes / out_sect_sz) {
         fprintf(stderr, "not enough data to write (min %ld bytes)\n",
-                min_bytes_out);
+                ofp.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
 
     if (0 == bpt_given)
-        bpt = max_bytes_in / in_sect_sz;
-    if (max_bytes_out / out_sect_sz < (uint64_t)bpt)
-        bpt = max_bytes_out / out_sect_sz;
+        bpt = ifp.max_bytes / in_sect_sz;
+    if (ofp.max_bytes / out_sect_sz < (uint64_t)bpt)
+        bpt = ofp.max_bytes / out_sect_sz;
 
     seg_desc_type = seg_desc_from_dd_type(ifp.sg_type, 0, ofp.sg_type, 0);
 
