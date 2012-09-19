@@ -139,6 +139,9 @@ static int blk_sz = 0;
 static int priority = 1;
 static int list_id_usage = -1;
 
+static char xcopy_flag_cat = 0;
+static char xcopy_flag_dc = 0;
+
 struct xcopy_fp_t {
     char fname[INOUTF_SZ];
     dev_t devno;
@@ -151,8 +154,7 @@ struct xcopy_fp_t {
     int append;
     int excl;
     int flock;
-    int cat;     /* Segment descriptor CAT bit (residual data treatment) */
-    int dc;      /* Segment descriptor DC bit (destination count) */
+    int pad;     /* Data descriptor PAD bit (residual data treatment) */
     int pdt;     /* Peripheral device type */
 #if 0
     int retries;
@@ -483,7 +485,7 @@ usage()
            "OFILE of '.'\n");
     fprintf(stderr,
            "                treated as /dev/null\n"
-           "    oflag       comma separated list from: [append,cat,dc,"
+           "    oflag       comma separated list from: [append,cat,pad,dc,"
            "excl,flock,\n"
            "                null]\n"
            "    prio        set priority field to PRIO (def: 1)\n"
@@ -506,7 +508,7 @@ scsi_encode_seg_desc(unsigned char *seg_desc, int seg_desc_type,
     int seg_desc_len = 0;
 
     seg_desc[0] = seg_desc_type;
-    seg_desc[1] = ifp.cat | (ifp.dc << 1);
+    seg_desc[1] = xcopy_flag_cat | (xcopy_flag_dc << 1);
     if (seg_desc_type == 0x02) {
         seg_desc_len = 0x18;
         seg_desc[4] = 0;
@@ -1054,7 +1056,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
 
 static int
 desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
-                 unsigned int block_size)
+                 unsigned int block_size, int pad)
 {
     int res;
     unsigned char rcBuff[256], *ucp, *best = NULL;
@@ -1133,6 +1135,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
             desc[0] = 0xe4;
             memcpy(desc + 4, best, best_len + 4);
             desc[4] &= 0x1f;
+            desc[28] = pad << 2;
             desc[29] = (block_size >> 16) & 0xff;
             desc[30] = (block_size >> 8) & 0xff;
             desc[31] = block_size & 0xff;
@@ -1198,14 +1201,12 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
             *np++ = '\0';
         if (0 == strcmp(cp, "append"))
             fp->append = 1;
-        else if (0 == strcmp(cp, "dc"))
-            ++fp->dc;
+        else if (0 == strcmp(cp, "pad"))
+            fp->pad = 1;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = 1;
         else if (0 == strcmp(cp, "null"))
             ;
-        else if (0 == strcmp(cp, "cat"))
-            ++fp->cat;
         else if (0 == strcmp(cp, "flock"))
             ++fp->flock;
         else {
@@ -1412,12 +1413,17 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "prio")) {
             priority = sg_get_num(buf);
         } else if (0 == strcmp(key, "cat")) {
-            ofp.cat = sg_get_num(buf);
-            ifp.cat = ofp.cat;
+            xcopy_flag_cat = sg_get_num(buf);
+            if (xcopy_flag_cat < 0 || xcopy_flag_cat > 1) {
+                fprintf(stderr, ME "bad argument to 'cat='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else if (0 == strcmp(key, "dc")) {
-            /* t = sg_get_num(buf); */
-            ofp.dc = sg_get_num(buf);
-            ifp.dc = ofp.dc;
+            xcopy_flag_dc = sg_get_num(buf);
+            if (xcopy_flag_dc < 0 || xcopy_flag_dc > 1) {
+                fprintf(stderr, ME "bad argument to 'dc='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
         } else if (strcmp(key, "if") == 0) {
@@ -1568,6 +1574,11 @@ main(int argc, char * argv[])
         fprintf(stderr, ">> warning: block size on %s confusion: "
                 "ibs=%d, device claims=%d\n", ifp.fname, ibs, ifp.sect_sz);
     }
+    if (skip && ifp.num_sect < skip) {
+        fprintf(stderr, "argument to 'skip=' exceeds device size "
+                "(max %"PRId64")\n", ifp.num_sect);
+        return SG_LIB_SYNTAX_ERROR;
+    }
 
     res = scsi_read_capacity(&ofp);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
@@ -1589,24 +1600,38 @@ main(int argc, char * argv[])
         fprintf(stderr, ">> warning: block size on %s confusion: "
                 "obs=%d, device claims=%d\n", ofp.fname, obs, ofp.sect_sz);
     }
-
+    if (seek && ofp.num_sect < seek) {
+        fprintf(stderr, "argument to 'seek=' exceeds device size "
+                "(max %"PRId64")\n", ofp.num_sect);
+        return SG_LIB_SYNTAX_ERROR;
+    }
     if ((dd_count < 0) || ((verbose > 0) && (0 == dd_count))) {
-        if (skip && ifp.num_sect > skip)
-            ifp.num_sect -= skip;
-        if (skip && ofp.num_sect > skip)
-            ofp.num_sect -= skip;
-        if (ofp.num_sect > seek)
-            ofp.num_sect -= seek;
+        if (xcopy_flag_dc == 0) {
+            dd_count = ifp.num_sect - skip;
+            if (dd_count * ifp.sect_sz > (ofp.num_sect - seek) * ofp.sect_sz)
+                dd_count = (ofp.num_sect - seek) * ofp.sect_sz / ifp.sect_sz;
+        } else {
+            dd_count = ofp.num_sect - seek;
+            if (dd_count * ofp.sect_sz > (ifp.num_sect - skip) * ifp.sect_sz)
+                dd_count = (ifp.num_sect - skip) * ifp.sect_sz / ofp.sect_sz;
+        }
+    } else {
+        int64_t dd_bytes;
 
-        if (dd_count < 0) {
-            if (ifp.num_sect > 0) {
-                if (ofp.num_sect > 0)
-                    dd_count = (ifp.num_sect > ofp.num_sect) ? ofp.num_sect :
-                                                           ifp.num_sect;
-                else
-                    dd_count = ifp.num_sect;
-            } else
-                dd_count = ofp.num_sect;
+        if (xcopy_flag_dc)
+            dd_bytes = dd_count * ofp.sect_sz;
+        else
+            dd_bytes = dd_count * ifp.sect_sz;
+
+        if (dd_bytes > ifp.num_sect * ifp.sect_sz) {
+            fprintf(stderr, "access beyond end of source device "
+                    "(max %"PRId64")\n", ifp.num_sect);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (dd_bytes > ofp.num_sect * ofp.sect_sz) {
+            fprintf(stderr, "access beyond end of target device "
+                    "(max %"PRId64")\n", ofp.num_sect);
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
 
@@ -1637,7 +1662,8 @@ main(int argc, char * argv[])
     if (res & TD_VPD) {
         if (verbose)
             printf("  >> using VPD identification for source %s\n", ifp.fname);
-        src_desc_len = desc_from_vpd_id(ifp.sg_fd, src_desc, 256, ifp.sect_sz);
+        src_desc_len = desc_from_vpd_id(ifp.sg_fd, src_desc, 256,
+                                        ifp.sect_sz, ifp.pad);
         if (src_desc_len > 256) {
             fprintf(stderr, "source descriptor too large (%d bytes)\n", res);
             return SG_LIB_CAT_MALFORMED;
@@ -1674,7 +1700,8 @@ main(int argc, char * argv[])
         if (verbose)
             printf("  >> using VPD identification for destination %s\n",
                    ofp.fname);
-        dst_desc_len = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256, ofp.sect_sz);
+        dst_desc_len = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256,
+                                        ofp.sect_sz, ofp.pad);
         if (dst_desc_len > 256) {
             fprintf(stderr, "destination descriptor too large (%d bytes)\n",
                     res);
@@ -1700,10 +1727,26 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
-    if (0 == bpt_given)
-        bpt = ifp.max_bytes / ifp.sect_sz;
-    if (ofp.max_bytes / ofp.sect_sz < (uint64_t)bpt)
-        bpt = ofp.max_bytes / ofp.sect_sz;
+    if (bpt_given) {
+        if (xcopy_flag_dc) {
+            if ((unsigned long)bpt * ofp.sect_sz > ofp.max_bytes) {
+                fprintf(stderr, "bpt too large (max %ld blocks)\n",
+                        ofp.max_bytes / ofp.sect_sz);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else {
+            if ((unsigned long)bpt * ifp.sect_sz > ifp.max_bytes) {
+                fprintf(stderr, "bpt too large (max %ld blocks)\n",
+                        ifp.max_bytes / ifp.sect_sz);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        }
+    } else {
+        if (xcopy_flag_dc)
+            bpt = ofp.max_bytes / ofp.sect_sz;
+        else
+            bpt = ifp.max_bytes / ifp.sect_sz;
+    }
 
     seg_desc_type = seg_desc_from_dd_type(ifp.sg_type, 0, ofp.sg_type, 0);
 
