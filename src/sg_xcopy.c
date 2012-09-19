@@ -146,6 +146,8 @@ struct xcopy_fp_t {
     int sg_fd;
     unsigned long min_bytes;
     unsigned long max_bytes;
+    int64_t num_sect;
+    int sect_sz;
     int append;
     int excl;
     int flock;
@@ -572,7 +574,7 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
 static int
-scsi_read_capacity(int sg_fd, char *fname, int64_t * num_sect, int * sect_sz)
+scsi_read_capacity(struct xcopy_fp_t *xfp)
 {
     int k, res;
     unsigned int ui;
@@ -580,7 +582,8 @@ scsi_read_capacity(int sg_fd, char *fname, int64_t * num_sect, int * sect_sz)
     int verb;
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0, verb);
+    res = sg_ll_readcap_10(xfp->sg_fd, 0, 0, rcBuff,
+                           READ_CAP_REPLY_LEN, 0, verb);
     if (0 != res)
         return res;
 
@@ -588,28 +591,29 @@ scsi_read_capacity(int sg_fd, char *fname, int64_t * num_sect, int * sect_sz)
         (0xff == rcBuff[3])) {
         int64_t ls;
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
-                               verb);
+        res = sg_ll_readcap_16(xfp->sg_fd, 0, 0, rcBuff,
+                               RCAP16_REPLY_LEN, 0, verb);
         if (0 != res)
             return res;
         for (k = 0, ls = 0; k < 8; ++k) {
             ls <<= 8;
             ls |= rcBuff[k];
         }
-        *num_sect = ls + 1;
-        *sect_sz = (rcBuff[8] << 24) | (rcBuff[9] << 16) |
-                   (rcBuff[10] << 8) | rcBuff[11];
+        xfp->num_sect = ls + 1;
+        xfp->sect_sz = (rcBuff[8] << 24) | (rcBuff[9] << 16) |
+                       (rcBuff[10] << 8) | rcBuff[11];
     } else {
         ui = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
               rcBuff[3]);
         /* take care not to sign extend values > 0x7fffffff */
-        *num_sect = (int64_t)ui + 1;
-        *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
-                   (rcBuff[6] << 8) | rcBuff[7];
+        xfp->num_sect = (int64_t)ui + 1;
+        xfp->sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
+                       (rcBuff[6] << 8) | rcBuff[7];
     }
     if (verbose)
         fprintf(stderr, "    %s: number of blocks=%"PRId64" [0x%"PRIx64"], "
-                "block size=%d\n", fname, *num_sect, *num_sect, *sect_sz);
+                "block size=%d\n", xfp->fname, xfp->num_sect, xfp->num_sect,
+                xfp->sect_sz);
     return 0;
 }
 
@@ -1333,9 +1337,6 @@ main(int argc, char * argv[])
     int num_xcopy = 0;
     int res, k;
     int infd, outfd;
-    int64_t in_num_sect = -1;
-    int64_t out_num_sect = -1;
-    int in_sect_sz, out_sect_sz;
     int ret = 0;
     unsigned char list_id = 1;
     unsigned char src_desc[256];
@@ -1346,6 +1347,8 @@ main(int argc, char * argv[])
 
     ifp.fname[0] = '\0';
     ofp.fname[0] = '\0';
+    ifp.num_sect = -1;
+    ofp.num_sect = -1;
 
     if (argc < 2) {
         fprintf(stderr,
@@ -1543,13 +1546,13 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    res = scsi_read_capacity(ifp.sg_fd, ifp.fname, &in_num_sect, &in_sect_sz);
+    res = scsi_read_capacity(&ifp);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
         fprintf(stderr, "Unit attention (readcap in), continuing\n");
-        res = scsi_read_capacity(ifp.sg_fd, ifp.fname, &in_num_sect, &in_sect_sz);
+        res = scsi_read_capacity(&ifp);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
         fprintf(stderr, "Aborted command (readcap in), continuing\n");
-        res = scsi_read_capacity(infd, ifp.fname, &in_num_sect, &in_sect_sz);
+        res = scsi_read_capacity(&ifp);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
@@ -1560,20 +1563,20 @@ main(int argc, char * argv[])
                     "ready\n", ifp.fname);
         else
             fprintf(stderr, "Unable to read capacity on %s\n", ifp.fname);
-        in_num_sect = -1;
-    } else if (ibs && in_sect_sz != ibs) {
+        ifp.num_sect = -1;
+    } else if (ibs && ifp.sect_sz != ibs) {
         fprintf(stderr, ">> warning: block size on %s confusion: "
-                "ibs=%d, device claims=%d\n", ifp.fname, ibs, in_sect_sz);
+                "ibs=%d, device claims=%d\n", ifp.fname, ibs, ifp.sect_sz);
     }
 
-    res = scsi_read_capacity(ofp.sg_fd, ofp.fname, &out_num_sect, &out_sect_sz);
+    res = scsi_read_capacity(&ofp);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
         fprintf(stderr, "Unit attention (readcap out), continuing\n");
-        res = scsi_read_capacity(ofp.sg_fd, ofp.fname, &out_num_sect, &out_sect_sz);
+        res = scsi_read_capacity(&ofp);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
         fprintf(stderr,
                 "Aborted command (readcap out), continuing\n");
-        res = scsi_read_capacity(ofp.sg_fd, ofp.fname, &out_num_sect, &out_sect_sz);
+        res = scsi_read_capacity(&ofp);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
@@ -1581,29 +1584,29 @@ main(int argc, char * argv[])
                     ofp.fname);
         else
             fprintf(stderr, "Unable to read capacity on %s\n", ofp.fname);
-        out_num_sect = -1;
-    } else if (obs && obs != out_sect_sz) {
+        ofp.num_sect = -1;
+    } else if (obs && obs != ofp.sect_sz) {
         fprintf(stderr, ">> warning: block size on %s confusion: "
-                "obs=%d, device claims=%d\n", ofp.fname, obs, out_sect_sz);
+                "obs=%d, device claims=%d\n", ofp.fname, obs, ofp.sect_sz);
     }
 
     if ((dd_count < 0) || ((verbose > 0) && (0 == dd_count))) {
-        if (skip && in_num_sect > skip)
-            in_num_sect -= skip;
-        if (skip && out_num_sect > skip)
-            out_num_sect -= skip;
-        if (out_num_sect > seek)
-            out_num_sect -= seek;
+        if (skip && ifp.num_sect > skip)
+            ifp.num_sect -= skip;
+        if (skip && ofp.num_sect > skip)
+            ofp.num_sect -= skip;
+        if (ofp.num_sect > seek)
+            ofp.num_sect -= seek;
 
         if (dd_count < 0) {
-            if (in_num_sect > 0) {
-                if (out_num_sect > 0)
-                    dd_count = (in_num_sect > out_num_sect) ? out_num_sect :
-                                                           in_num_sect;
+            if (ifp.num_sect > 0) {
+                if (ofp.num_sect > 0)
+                    dd_count = (ifp.num_sect > ofp.num_sect) ? ofp.num_sect :
+                                                           ifp.num_sect;
                 else
-                    dd_count = in_num_sect;
+                    dd_count = ifp.num_sect;
             } else
-                dd_count = out_num_sect;
+                dd_count = ofp.num_sect;
         }
     }
 
@@ -1634,7 +1637,7 @@ main(int argc, char * argv[])
     if (res & TD_VPD) {
         if (verbose)
             printf("  >> using VPD identification for source %s\n", ifp.fname);
-        src_desc_len = desc_from_vpd_id(ifp.sg_fd, src_desc, 256, in_sect_sz);
+        src_desc_len = desc_from_vpd_id(ifp.sg_fd, src_desc, 256, ifp.sect_sz);
         if (src_desc_len > 256) {
             fprintf(stderr, "source descriptor too large (%d bytes)\n", res);
             return SG_LIB_CAT_MALFORMED;
@@ -1671,7 +1674,7 @@ main(int argc, char * argv[])
         if (verbose)
             printf("  >> using VPD identification for destination %s\n",
                    ofp.fname);
-        dst_desc_len = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256, out_sect_sz);
+        dst_desc_len = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256, ofp.sect_sz);
         if (dst_desc_len > 256) {
             fprintf(stderr, "destination descriptor too large (%d bytes)\n",
                     res);
@@ -1686,21 +1689,21 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
-    if ((unsigned long)dd_count < ifp.min_bytes / in_sect_sz) {
+    if ((unsigned long)dd_count < ifp.min_bytes / ifp.sect_sz) {
         fprintf(stderr, "not enough data to read (min %ld bytes)\n",
                 ofp.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
-    if ((unsigned long)dd_count < ofp.min_bytes / out_sect_sz) {
+    if ((unsigned long)dd_count < ofp.min_bytes / ofp.sect_sz) {
         fprintf(stderr, "not enough data to write (min %ld bytes)\n",
                 ofp.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
 
     if (0 == bpt_given)
-        bpt = ifp.max_bytes / in_sect_sz;
-    if (ofp.max_bytes / out_sect_sz < (uint64_t)bpt)
-        bpt = ofp.max_bytes / out_sect_sz;
+        bpt = ifp.max_bytes / ifp.sect_sz;
+    if (ofp.max_bytes / ofp.sect_sz < (uint64_t)bpt)
+        bpt = ofp.max_bytes / ofp.sect_sz;
 
     seg_desc_type = seg_desc_from_dd_type(ifp.sg_type, 0, ofp.sg_type, 0);
 
