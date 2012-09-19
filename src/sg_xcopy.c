@@ -83,10 +83,6 @@ static char * version_str = "0.3 20120907";
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
-#define EXTENDED_COPY_OPCODE 0x83
-#define READ_LONG_OPCODE 0x3E
-#define READ_LONG_CMD_LEN 10
-#define READ_LONG_DEF_BLK_INC 8
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
@@ -562,19 +558,21 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
         fprintf(stderr, "\nOutput response in hex:\n");
         dStrHex((const char *)rcBuff, len, 1);
     }
-    printf("Receive copy results (report operating parameters):\n");
-    num = rcBuff[8] << 8 | rcBuff[9];
-    printf("    Maximum target descriptor count: %lu\n", num);
-    max_segment_num = rcBuff[10] << 8 | rcBuff[11];
-    printf("    Maximum segment descriptor count: %lu\n", max_segment_num);
-    num = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 | rcBuff[15];
-    printf("    Maximum descriptor list length: %lu\n", num);
-    max_segment_len = rcBuff[16] << 24 | rcBuff[17] << 16 |
-        rcBuff[18] << 8 | rcBuff[19];
-    *max_bytep = max_segment_len;
-    printf("    Maximum segment length: %lu\n", max_segment_len);
-    num = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 | rcBuff[23];
-    printf("    Maximum inline data length: %lu\n", num);
+    if (verbose) {
+        printf("Receive copy results (report operating parameters):\n");
+        num = rcBuff[8] << 8 | rcBuff[9];
+        printf("    Maximum target descriptor count: %lu\n", num);
+        max_segment_num = rcBuff[10] << 8 | rcBuff[11];
+        printf("    Maximum segment descriptor count: %lu\n", max_segment_num);
+        num = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 | rcBuff[15];
+        printf("    Maximum descriptor list length: %lu\n", num);
+        max_segment_len = rcBuff[16] << 24 | rcBuff[17] << 16 |
+            rcBuff[18] << 8 | rcBuff[19];
+        *max_bytep = max_segment_len;
+        printf("    Maximum segment length: %lu\n", max_segment_len);
+        num = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 | rcBuff[23];
+        printf("    Maximum inline data length: %lu\n", num);
+    }
     held_data_limit = rcBuff[24] << 24 | rcBuff[25] << 16 |
         rcBuff[26] << 8 | rcBuff[27];
     if (list_id_usage < 0) {
@@ -583,15 +581,18 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
         else
             list_id_usage = 0;
     }
-    printf("    Held data limit: %lu (usage: %d)\n", held_data_limit, list_id_usage);
-    num = rcBuff[28] << 24 | rcBuff[29] << 16 | rcBuff[30] << 8 | rcBuff[31];
-    printf("    Maximum stream device transfer size: %lu\n", num);
-    printf("    Maximum concurrent copies: %u\n", rcBuff[36]);
-    printf("    Data segment granularity: %u\n", rcBuff[37]);
-    printf("    Inline data granularity: %u\n", rcBuff[38]);
-    printf("    Held data granularity: %u\n", rcBuff[39]);
+    if (verbose) {
+        printf("    Held data limit: %lu (usage: %d)\n",
+               held_data_limit, list_id_usage);
+        num = rcBuff[28] << 24 | rcBuff[29] << 16 | rcBuff[30] << 8 | rcBuff[31];
+        printf("    Maximum stream device transfer size: %lu\n", num);
+        printf("    Maximum concurrent copies: %u\n", rcBuff[36]);
+        printf("    Data segment granularity: %u\n", rcBuff[37]);
+        printf("    Inline data granularity: %u\n", rcBuff[38]);
+        printf("    Held data granularity: %u\n", rcBuff[39]);
 
-    printf("    Implemented descriptor list:\n");
+        printf("    Implemented descriptor list:\n");
+    }
     for (n = 0; n < rcBuff[43]; n++) {
         switch(rcBuff[44 + n]) {
         case 0x00: /* copy block to stream device */
@@ -599,71 +600,85 @@ scsi_operating_parameter(int sg_fd, int type, int is_target,
                 valid++;
             if (is_target && (type & FT_ST))
                 valid++;
-            printf("        Copy Block to Stream device\n");
+            if (verbose)
+                printf("        Copy Block to Stream device\n");
             break;
         case 0x01: /* copy stream to block device */
             if (!is_target && (type & FT_ST))
                 valid++;
             if (is_target && (type & FT_BLOCK))
                 valid++;
-            printf("        Copy Stream to Block device\n");
+            if (verbose)
+                printf("        Copy Stream to Block device\n");
             break;
         case 0x02: /* copy block to block device */
             if (!is_target && (type & FT_BLOCK))
                 valid++;
             if (is_target && (type & FT_BLOCK))
                 valid++;
-            printf("        Copy Block to Block device\n");
+            if (verbose)
+                printf("        Copy Block to Block device\n");
             break;
         case 0x03: /* copy stream to stream device */
             if (!is_target && (type & FT_ST))
                 valid++;
             if (is_target && (type & FT_ST))
                 valid++;
-            printf("        Copy Stream to Stream device\n");
+            if (verbose)
+                printf("        Copy Stream to Stream device\n");
             break;
         case 0xe0: /* FC N_Port_Name */
-            printf("        FC N_Port_Name target descriptor\n");
+            if (verbose)
+                printf("        FC N_Port_Name target descriptor\n");
             td_list |= TD_FC_WWPN;
             break;
         case 0xe1: /* FC Port_ID */
-            printf("        FC Port_ID target descriptor\n");
+            if (verbose)
+                printf("        FC Port_ID target descriptor\n");
             td_list |= TD_FC_PORT;
             break;
         case 0xe2: /* FC N_Port_ID with N_Port_Name checking */
-            printf("        FC N_Port_ID with N_Port_Name target descriptor\n");
+            if (verbose)
+                printf("        FC N_Port_ID with N_Port_Name target descriptor\n");
             td_list |= TD_FC_WWPN_AND_PORT;
             break;
         case 0xe3: /* Parallel Interface T_L  */
-            printf("        SPI T_L target descriptor\n");
+            if (verbose)
+                printf("        SPI T_L target descriptor\n");
             td_list |= TD_SPI;
             break;
         case 0xe4: /* identification descriptor */
-            printf("        Identification target descriptor\n");
+            if (verbose)
+                printf("        Identification target descriptor\n");
             td_list |= TD_VPD;
             break;
         case 0xe5: /* IPv4  */
-            printf("        IPv4 target descriptor\n");
+            if (verbose)
+                printf("        IPv4 target descriptor\n");
             td_list |= TD_IPV4;
             break;
         case 0xe6: /* Alias */
-            printf("        Alias target descriptor\n");
+            if (verbose)
+                printf("        Alias target descriptor\n");
             td_list |= TD_ALIAS;
             break;
         case 0xe7: /* RDMA */
-            printf("        RDMA target descriptor\n");
+            if (verbose)
+                printf("        RDMA target descriptor\n");
             td_list |= TD_RDMA;
             break;
         case 0xe8: /* FireWire */
-            printf("        IEEE 1394 target descriptor\n");
+            if (verbose)
+                printf("        IEEE 1394 target descriptor\n");
             td_list |= TD_FW;
             break;
         case 0xe9: /* SAS */
-            printf("        SAS target descriptor\n");
+            if (verbose)
+                printf("        SAS target descriptor\n");
             td_list |= TD_SAS;
             break;
         default:
-            printf("        Unhandled target descriptor 0x%02x\n",
+            fprintf(stderr, ">> Unhandled target descriptor 0x%02x\n",
                    rcBuff[44 + n]);
             break;
         }
