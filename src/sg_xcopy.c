@@ -886,7 +886,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
     if (piv && ((1 == assoc) || (2 == assoc)))
         printf("     transport: %s\n",
                sg_get_trans_proto_str(p_id, sizeof(b), b));
-    /* printf("    associated with the %s\n", assoc_arr[assoc]); */
+
     switch (desig_type) {
     case 0: /* vendor specific */
         k = 0;
@@ -1090,8 +1090,9 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         }
         assoc = ((ucp[1] >> 4) & 0x3);
         desig = (ucp[1] & 0xf);
-        fprintf(stderr, "    Desc %d: assoc %u desig %u len %d\n", off,
-                assoc, desig, i_len);
+        if (verbose)
+            fprintf(stderr, "    Desc %d: assoc %u desig %u len %d\n", off,
+                    assoc, desig, i_len);
         /* Descriptor must be less than 16 bytes */
         if (i_len > 16)
             continue;
@@ -1121,7 +1122,8 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         }
     }
     if (best) {
-        decode_designation_descriptor(best, best_len);
+        if (verbose)
+            decode_designation_descriptor(best, best_len);
         if (best_len + 4 < desc_len) {
             memset(desc, 0, 32);
             desc[0] = 0xe4;
@@ -1328,6 +1330,7 @@ main(int argc, char * argv[])
     char * key;
     char * buf;
     int blocks = 0;
+    int num_xcopy = 0;
     int res, k;
     int infd, outfd;
     int64_t in_num_sect = -1;
@@ -1629,7 +1632,8 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_INVALID_OP;
 
     if (res & TD_VPD) {
-        printf("  >> using VPD identification for source %s\n", ifp.fname);
+        if (verbose)
+            printf("  >> using VPD identification for source %s\n", ifp.fname);
         src_desc_len = desc_from_vpd_id(ifp.sg_fd, src_desc, 256, in_sect_sz);
         if (src_desc_len > 256) {
             fprintf(stderr, "source descriptor too large (%d bytes)\n", res);
@@ -1664,8 +1668,9 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_INVALID_OP;
 
     if (res & TD_VPD) {
-        printf("  >> using VPD identification for destination %s\n",
-               ofp.fname);
+        if (verbose)
+            printf("  >> using VPD identification for destination %s\n",
+                   ofp.fname);
         dst_desc_len = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256, out_sect_sz);
         if (dst_desc_len > 256) {
             fprintf(stderr, "destination descriptor too large (%d bytes)\n",
@@ -1725,10 +1730,17 @@ main(int argc, char * argv[])
         in_full += blocks;
         skip += blocks;
         dd_count -= blocks;
+        num_xcopy++;
     }
 
     if (do_time)
         calc_duration_throughput(0);
+    if (res)
+        fprintf(stderr, "sg_xcopy: failed with error %d (%ld blocks left)\n",
+                res, dd_count);
+    else
+        fprintf(stderr, "sg_xcopy: %ld blocks, %d command%s\n",
+                in_full, num_xcopy, num_xcopy>1?"s":"");
 
     return res;
 }
