@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.56 20120217";
+static char * version_str = "1.57 20120328";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -78,6 +78,48 @@ sg_cmds_close_device(int device_fd)
     return scsi_pt_close_device(device_fd);
 }
 
+static int
+sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
+                       const unsigned char * sbp, int slen, int noisy,
+                       int verbose, int * o_sense_cat)
+{
+    int scat, got;
+    int n = 0;
+    int check_data_in = 0;
+    char b[512];
+
+    scat = sg_err_category_sense(sbp, slen);
+    switch (scat) {
+    case SG_LIB_CAT_NOT_READY:
+    case SG_LIB_CAT_UNIT_ATTENTION:
+    case SG_LIB_CAT_INVALID_OP:
+    case SG_LIB_CAT_ILLEGAL_REQ:
+    case SG_LIB_CAT_ABORTED_COMMAND:
+    case SG_LIB_CAT_NO_SENSE:
+        n = 0;
+        break;
+    case SG_LIB_CAT_RECOVERED:
+    case SG_LIB_CAT_MEDIUM_HARD:
+        ++check_data_in;
+    default:
+        n = noisy;
+        break;
+    }
+    if (verbose || n) {
+        sg_get_sense_str(leadin, sbp, slen, (verbose > 1),
+                         sizeof(b), b);
+        fprintf(sg_warnings_strm, "%s", b);
+        if ((mx_di_len > 0) && (resid > 0)) {
+            got = mx_di_len - resid;
+            if ((verbose > 2) || check_data_in || (got > 0))
+                fprintf(sg_warnings_strm, "    pass-through requested "
+                        "%d bytes but got %d bytes\n", mx_di_len, got);
+        }
+    }
+    if (o_sense_cat)
+        *o_sense_cat = scat;
+    return -2;
+}
 
 /* This is a helper function used by sg_cmds_* implementations after
  * the call to the pass-through. pt_res is returned from do_scsi_pt().
@@ -93,8 +135,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, int mx_di_len, const unsigned char * sbp,
                      int noisy, int verbose, int * o_sense_cat)
 {
-    int got, cat, duration, slen, scat, n, resid, resp_code;
-    int check_data_in = 0;
+    int got, cat, duration, slen, resid, resp_code;
     char b[1024];
 
     if (NULL == leadin)
@@ -147,43 +188,19 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         }
         return -1;
     case SCSI_PT_RESULT_SENSE:
-        scat = sg_err_category_sense(sbp, slen);
-        switch (scat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-        case SG_LIB_CAT_NO_SENSE:
-            n = 0;
-            break;
-        case SG_LIB_CAT_RECOVERED:
-        case SG_LIB_CAT_MEDIUM_HARD:
-            ++check_data_in;
-        default:
-            n = noisy;
-            break;
-        }
-        if (verbose || n) {
-            sg_get_sense_str(leadin, sbp, slen, (verbose > 1),
-                             sizeof(b), b);
-            fprintf(sg_warnings_strm, "%s", b);
-            if ((mx_di_len > 0) && (resid > 0)) {
-                got = mx_di_len - resid;
-                if ((verbose > 2) || check_data_in || (got > 0))
-                    fprintf(sg_warnings_strm, "    pass-through requested "
-                            "%d bytes but got %d bytes\n", mx_di_len, got);
-            }
-        }
-        if (o_sense_cat)
-            *o_sense_cat = scat;
-        return -2;
+        return sg_cmds_process_helper(leadin, mx_di_len, resid, sbp, slen,
+                                      noisy, verbose, o_sense_cat);
     case SCSI_PT_RESULT_TRANSPORT_ERR:
         if (verbose || noisy) {
             get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
             fprintf(sg_warnings_strm, "%s: transport: %s\n", leadin, b);
         }
-        return -1;
+        if ((SAM_STAT_CHECK_CONDITION == get_scsi_pt_status_response(ptvp))
+            && (slen > 0))
+            return sg_cmds_process_helper(leadin, mx_di_len, resid, sbp,
+                                          slen, noisy, verbose, o_sense_cat);
+        else
+            return -1;
     case SCSI_PT_RESULT_OS_ERR:
         if (verbose || noisy) {
             get_scsi_pt_os_err_str(ptvp, sizeof(b), b);

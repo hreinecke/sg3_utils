@@ -33,7 +33,7 @@
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2007 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -52,11 +52,11 @@
    in this case) are transferred to or from the sg device in a single SCSI
    command.
 
-   This version is designed for the linux kernel 2.4 and 2.6 series.
+   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
 
 */
 
-static char * version_str = "5.40 20090205";
+static char * version_str = "5.42 20120907";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -364,6 +364,8 @@ usage()
            "    oflag       comma separated list from: [append,coe,dio,direct,"
            "dpo,dsync,\n"
            "                excl,fua,null]\n"
+           "    seek        block position to start writing to OFILE\n"
+           "    skip        block position to start reading from IFILE\n"
            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
            "after copy\n"
            "    thr         is number of threads, must be > 0, default 4, "
@@ -1282,6 +1284,7 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"time"))
             do_time = sg_get_num(buf);
         else if ((0 == strncmp(key, "--help", 7)) ||
+                 (0 == strncmp(key, "-h", 2)) ||
                  (0 == strcmp(key, "-?"))) {
             usage();
             return 0;

@@ -1,4 +1,4 @@
-.TH SG_DD "8" "May 2010" "sg3_utils\-1.29" SG3_UTILS
+.TH SG_DD "8" "September 2012" "sg3_utils\-1.32" SG3_UTILS
 .SH NAME
 sg_dd \- copies data to and from files and devices. Specialised for
 devices that understand the SCSI command set.
@@ -21,8 +21,7 @@ generic (sg) devices, raw devices or other devices that support the SG_IO
 ioctl (which are only found in the lk 2.6 series). Similar syntax and
 semantics to
 .B dd(1)
-but only one type of "conversion" is supported. That optional conversion is
-sparse writing of the output file.
+command.
 .PP
 The first group in the synopsis above are "standard" Unix
 .B dd(1)
@@ -95,10 +94,7 @@ the copy soon after unrecorded media is detected while still
 offering "continue on error" capability.
 .TP
 \fBconv\fR=\fBsparse\fR
-only one conversion is permitted: sparse writing of the \fIOFILE\fR.
-This option has the same action as 'oflag=sparse'. This alternate
-syntax was added for FreeBSD which uses this syntax in its dd command.
-See the FLAGS section below.
+see the CONVERSIONS section below.
 .TP
 \fBcount\fR=\fICOUNT\fR
 copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the
@@ -206,6 +202,32 @@ outputs version number information and exits.
 .TP
 \fB\-V\fR
 outputs version number information and exits.
+.SH CONVERSIONS
+One or more conversions can be given to the "conv=" option. If more than
+one is given, they should be comma separated. sg_dd does not perform the
+traditional dd conversions (e.g. ASCII to EBCDIC). Recently added
+conversions overlap somewhat with the flags so some conversions are
+now supported by sg_dd.
+.TP
+noerror
+this conversion is very close to "iflag=coe" and is treated as such. See
+the "coe" flag. Note that an error on \fIOFILE\fR will stop the copy.
+.TP
+notrunc
+this conversion is accepted for compatibilty with dd and ignored since
+the default action of this utility is not to truncate \fIOFILE\fR.
+.TP
+null
+has no affect, just a placeholder.
+.TP
+sparse
+FreeBSD supports "conv=sparse" so the same syntax is supported in sg_dd.
+See "sparse" in the FLAGS sections for more information.
+.TP
+sync
+is ignored by sg_dd. With dd it means supply zero fill (rather than skip)
+and is typically used like this "conv=noerror,sync" to have the same
+functionality as sg_dd's "iflag=coe".
 .SH FLAGS
 Here is a list of flags and their meanings:
 .TP
@@ -461,7 +483,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2010 Douglas Gilbert
+Copyright \(co 2000\-2012 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

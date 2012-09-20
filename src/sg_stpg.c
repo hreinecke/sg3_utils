@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2011 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2012 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.3 20111014";
+static char * version_str = "1.4 20120322";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -571,8 +571,9 @@ main(int argc, char * argv[])
         memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
         /* trunc = 0; */
 
-        res = sg_ll_report_tgt_prt_grp(sg_fd, reportTgtGrpBuff,
-                                sizeof(reportTgtGrpBuff), 1, verbose);
+        res = sg_ll_report_tgt_prt_grp2(sg_fd, reportTgtGrpBuff,
+                                        sizeof(reportTgtGrpBuff), 0, 1,
+                                        verbose);
         ret = res;
         if (0 == res) {
             report_len = (reportTgtGrpBuff[0] << 24) +

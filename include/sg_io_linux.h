@@ -2,14 +2,14 @@
 #define SG_IO_LINUX_H
 
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
 /*
- * Version 1.02 [20090708]
+ * Version 1.03 [20120914]
  */
 
 /*
@@ -49,6 +49,18 @@ extern "C" {
 #define DID_REQUEUE 0x0d        /* Requeue command (no immediate retry) also
                                  * without decrementing the retry count    */
 #endif
+#ifndef DID_TRANSPORT_DISRUPTED
+#define DID_TRANSPORT_DISRUPTED 0xe
+#endif
+#ifndef DID_TRANSPORT_FAILFAST
+#define DID_TRANSPORT_FAILFAST 0xf
+#endif
+#ifndef DID_TARGET_FAILURE
+#define DID_TARGET_FAILURE 0x10
+#endif
+#ifndef DID_NEXUS_FAILURE
+#define DID_NEXUS_FAILURE 0x11
+#endif
 
 /* These defines are to isolate applications from kernel define changes */
 #define SG_LIB_DID_OK           DID_OK
@@ -65,6 +77,10 @@ extern "C" {
 #define SG_LIB_DID_SOFT_ERROR   DID_SOFT_ERROR
 #define SG_LIB_DID_IMM_RETRY    DID_IMM_RETRY
 #define SG_LIB_DID_REQUEUE      DID_REQUEUE
+#define SG_LIB_TRANSPORT_DISRUPTED      DID_TRANSPORT_DISRUPTED
+#define SG_LIB_DID_TRANSPORT_FAILFAST   DID_TRANSPORT_FAILFAST
+#define SG_LIB_DID_TARGET_FAILURE       DID_TARGET_FAILURE
+#define SG_LIB_DID_NEXUS_FAILURE        DID_NEXUS_FAILURE
 
 /* The following are 'driver_status' codes */
 #ifndef DRIVER_OK
