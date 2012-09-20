@@ -61,7 +61,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static char * version_str = "0.3 20120907";
+static char * version_str = "0.31 20120919";
 
 #define ME "sg_xcopy: "
 
@@ -1279,10 +1279,9 @@ file_err:
 static int
 open_of(struct xcopy_fp_t * ofp, int verbose)
 {
-    int outfd, flags, verb, res;
+    int outfd, flags, res;
     char ebuff[EBUFF_SZ];
 
-    verb = (verbose ? verbose - 1: 0);
     ofp->sg_type = dd_filetype(ofp);
     if (verbose)
         fprintf(stderr, " >> Output file type: %s, devno %d:%d\n",
@@ -1782,11 +1781,11 @@ main(int argc, char * argv[])
     if (do_time)
         calc_duration_throughput(0);
     if (res)
-        fprintf(stderr, "sg_xcopy: failed with error %d (%ld blocks left)\n",
-                res, dd_count);
+        fprintf(stderr, "sg_xcopy: failed with error %d (%"PRId64
+                " blocks left)\n", res, dd_count);
     else
-        fprintf(stderr, "sg_xcopy: %ld blocks, %d command%s\n",
-                in_full, num_xcopy, num_xcopy>1?"s":"");
+        fprintf(stderr, "sg_xcopy: %"PRId64" blocks, %d command%s\n",
+                in_full, num_xcopy, ((num_xcopy > 1) ? "s" : ""));
 
     return res;
 }

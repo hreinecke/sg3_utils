@@ -1,3 +1,14 @@
+/* A utility program originally written for the Linux OS SCSI subsystem
+*  Copyright (C) 2003-2012 D. Gilbert
+*  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2, or (at your option)
+*  any later version.
+
+   This program issues the SCSI SEND DIAGNOSTIC command and in one case
+   the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
+*/
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -13,18 +24,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2011 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program issues the SCSI SEND DIAGNOSTIC command and in one case
-   the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.
-*/
-
-static char * version_str = "0.37 20110607";
+static char * version_str = "0.38 20120919";
 
 #define ME "sg_senddiag: "
 
@@ -533,6 +533,7 @@ static struct page_code_desc pc_desc_arr[] = {
         {0x3f, "Protocol specific (SAS transport)"},
         {0x40, "Translate address (direct access)"},
         {0x41, "Device status (direct access)"},
+        {0x42, "Rebuild assist (direct access)"},
 };
 
 static const char * find_page_code_desc(int page_num)
