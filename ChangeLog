@@ -2,12 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.34 [20120919] [svn: r456]
+Changelog for sg3_utils-1.34 [20120921] [svn: r457]
   - sg_xcopy: new dd like utility for extended copy command
   - sg_copy_results: new utility for receive copy results
   - sg_verify: add 16 byte cdb, bytchk (data-out buffer)
     and group number support
-  - sync to spc4r35 and sbc3r32
+  - sync to spc4r36 and sbc3r32
   - sg_inq: add --export to experiment with udev
     - decode old EMC Symmetrix abuse of VPD page 0x83
   - sg_vpd: decode old EMC Symmetrix abuse of VPD page 0x83

@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.62 20120919";    /* spc4r35 + sbc3r32 */
+static char * version_str = "0.62 20120920";    /* spc4r36 + sbc3r32 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -579,7 +579,8 @@ static const char * desig_type_arr[] =
     "Logical unit group",
     "MD5 logical unit identifier",
     "SCSI name string",
-    "Reserved [0x9]", "Reserved [0xa]", "Reserved [0xb]",
+    "Protocol specific port identifier",  /* spc4r36 */
+    "Reserved [0xa]", "Reserved [0xb]",
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
@@ -1006,10 +1007,26 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
          */
         printf("      %s\n", (const char *)ip);
         break;
-    case 9: /* PCIe routing ID */
-        /* added in sbc4r34, no limits on code_set or association ?? */
-        d_id = ((ip[0] << 8) | ip[1]);
-        printf("      PCIe routing ID: 0x%x\n", d_id);
+    case 9: /* Protocol specific port identifier */
+        /* added in spc4r36, PIV must be set, proto_id indicates */
+        /* whether UAS (USB) or SOP (PCIe) or ... */
+        if (! piv)
+            printf("      >>>> Protocol specific port identifier "
+                   "expects protocol\n"
+                   "           identifier to be valid and it is not\n");
+        if (TPROTO_UAS == p_id) {
+            printf("      USB device address: 0x%x\n", 0x7f & ip[0]);
+            printf("      USB interface number: 0x%x\n", ip[2]);
+        } else if (TPROTO_SOP == p_id) {
+            printf("      PCIe routing ID, bus number: 0x%x\n", ip[0]);
+            printf("          function number: 0x%x\n", ip[1]);
+            printf("          [or device number: 0x%x, function number: "
+                   "0x%x]\n", (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
+        } else
+            printf("      >>>> unexpected protocol indentifier: %s\n"
+                   "           with Protocol specific port "
+                   "identifier\n",
+                   sg_get_trans_proto_str(p_id, sizeof(b), b));
         break;
     default: /* reserved */
         dStrHex((const char *)ip, i_len, 0);
