@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.79 20120919";  /* spc4r35, sbc3r32 */
+const char * sg_lib_version_str = "1.79 20120920";  /* spc4r36, sbc3r32 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -588,6 +588,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0C,0x0B,"Auxiliary memory write error"},
     {0x0C,0x0C,"Write error - unexpected unsolicited data"},
     {0x0C,0x0D,"Write error - not enough unsolicited data"},
+    {0x0C,0x0E,"Multiple write errors"},
     {0x0C,0x0F,"Defects in error window"},
     {0x0D,0x00,"Error detected by third party temporary initiator"},
     {0x0D,0x01,"Third party device failure"},
@@ -794,6 +795,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2F,0x00,"Commands cleared by another initiator"},
     {0x2F,0x01,"Commands cleared by power loss notification"},
     {0x2F,0x02,"Commands cleared by device server"},
+    {0x2F,0x03,"Some commands cleared by queuing layer event"},
     {0x30,0x00,"Incompatible medium installed"},
     {0x30,0x01,"Cannot read medium - unknown format"},
     {0x30,0x02,"Cannot read medium - incompatible format"},
@@ -906,6 +908,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
 
     {0x43,0x00,"Message error"},
     {0x44,0x00,"Internal target failure"},
+    {0x44,0x01,"Persistent reservation information lost"},
     {0x44,0x71,"ATA device failed Set Features"},
     {0x45,0x00,"Select or reselect failure"},
     {0x46,0x00,"Unsuccessful soft reset"},
@@ -928,6 +931,12 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x4B,0x05,"Data offset error"},
     {0x4B,0x06,"Initiator response timeout"},
     {0x4B,0x07,"Connection lost"},
+    {0x4B,0x08,"Data-in buffer overflow - data buffer size"},
+    {0x4B,0x09,"Data-in buffer overflow - data buffer descriptor area"},
+    {0x4B,0x0A,"Data-in buffer error"},
+    {0x4B,0x0B,"Data-out buffer overflow - data buffer size"},
+    {0x4B,0x0C,"Data-out buffer overflow - data buffer descriptor area"},
+    {0x4B,0x0D,"Data-out buffer error"},
     {0x4C,0x00,"Logical unit failed self-configuration"},
     /*
      * ASC 0x4D overridden by an "additional2" array entry
@@ -1246,7 +1255,7 @@ const char * sg_lib_pdt_strs[] = {
 
 const char * sg_lib_transport_proto_strs[] =
 {
-    "Fibre Channel Protocol for SCSI (FCP-2)",
+    "Fibre Channel Protocol for SCSI (FCP-4)",
     "SCSI Parallel Interface (SPI-5)",
     "Serial Storage Architecture SCSI-3 Protocol (SSA-S3P)",
     "Serial Bus Protocol for IEEE 1394 (SBP-3)",

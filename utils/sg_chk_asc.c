@@ -25,7 +25,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static char * version_str = "1.04 20120313";
+static char * version_str = "1.04 20120920";
 
 
 #define MAX_LINE_LEN 1024
@@ -169,7 +169,7 @@ printf("\"%s\",\n", b);
             if ((num > 6) && 
                 ((0 == memcmp("ASC", cp, 3)) ||
                  (0 == memcmp("vendor", cp, 6)))) {
-                fprintf(stderr, "%x,%x differ, ref: %s, sg_lib: "
+                fprintf(stderr, "%x,%x differ, ref: %s, sg_lib_data: "
                         "<missing>\n", asc, ascq, b);
                 continue;
             }
@@ -180,7 +180,7 @@ printf("\"%s\",\n", b);
                     cp[j] = toupper(cp[j]);
             }
             if (0 != strcmp(b, cp))
-                fprintf(stderr, "%x,%x differ, ref: %s, sg_lib: "
+                fprintf(stderr, "%x,%x differ, ref: %s, sg_lib_data: "
                         "%s\n", asc, ascq, b, cp);
         }
     }
