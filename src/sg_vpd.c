@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.62 20120920";    /* spc4r36 + sbc3r32 */
+static char * version_str = "0.63 20120921";    /* spc4r36 + sbc3r32 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -333,7 +333,7 @@ decode_std_inq(unsigned char * b, int len, int verbose)
     printf("  SCCS=%d  ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
            !!(b[5] & 0x80), !!(b[5] & 0x40), ((b[5] & 0x30) >> 4),
            !!(b[5] & 0x08), !!(b[5] & 0x01));
-    printf(" BQue=%d\n  EncServ=%d  ", !!(b[6] & 0x80), !!(b[6] & 0x40));
+    printf(" [BQue=%d]\n  EncServ=%d  ", !!(b[6] & 0x80), !!(b[6] & 0x40));
     if (b[6] & 0x10)
         printf("MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
     else
@@ -1321,8 +1321,6 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
-    int k;
-
     if (do_hex) {
         dStrHex((const char *)buff, len, 0);
         return;
@@ -1330,10 +1328,9 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     len -= 4;
     buff += 4;
     for ( ; len > 5; len -= 6, buff += 6) {
-        printf("    ");
-        for (k = 0; k < 6; ++k)
-            printf("%02x", (unsigned int)buff[k]);
-        printf("\n");
+        printf("    IEEE Company_id: 0x%06x, vendor specific extension "
+               "id: 0x%06x\n", (buff[0] << 16) | (buff[1] << 8) | buff[2],
+               (buff[3] << 16) | (buff[4] << 8) | buff[5]);
     }
 }
 

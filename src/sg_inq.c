@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.07 20120920";    /* SPC-4 rev 36 */
+static char * version_str = "1.07 20120921";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -1665,20 +1665,16 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
-    int k;
-
     if (do_hex) {
         dStrHex((const char *)buff, len, 0);
         return;
     }
     len -= 4;
     buff += 4;
-    for ( ; len > 5; len -= 6, buff += 6) {
-        printf("    ");
-        for (k = 0; k < 6; ++k)
-            printf("%02x", (unsigned int)buff[k]);
-        printf("\n");
-    }
+    for ( ; len > 5; len -= 6, buff += 6)
+        printf("    IEEE Company_id: 0x%06x, vendor specific extension "
+               "id: 0x%06x\n", (buff[0] << 16) | (buff[1] << 8) | buff[2],
+               (buff[3] << 16) | (buff[4] << 8) | buff[5]);
 }
 
 /* VPD_ATA_INFO */
@@ -2225,7 +2221,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             printf("ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
                    !!(rsp_buff[5] & 0x40), ((rsp_buff[5] & 0x30) >> 4),
                    !!(rsp_buff[5] & 0x08), !!(rsp_buff[5] & 0x01));
-            printf(" BQue=%d\n  EncServ=%d  ", !!(rsp_buff[6] & 0x80),
+            printf(" [BQue=%d]\n  EncServ=%d  ", !!(rsp_buff[6] & 0x80),
                    !!(rsp_buff[6] & 0x40));
             if (rsp_buff[6] & 0x10)
                 printf("MultiP=1 (VS=%d)  ", !!(rsp_buff[6] & 0x20));
