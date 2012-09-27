@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.07 20120921";    /* SPC-4 rev 36 */
+static char * version_str = "1.08 20120927";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -1927,14 +1927,34 @@ static const char * lun_op_arr[] =
     "I/O Operations being rejected, SP reboot or NDU in progress",
 };
 
+static const char * failover_mode_arr[] =
+{
+    "Legacy mode 0",
+    "Unknown mode (1)",
+    "Unknown mode (2)",
+    "Unknown mode (3)",
+    "Active/Passive (PNR) mode 1",
+    "Unknown mode (5)",
+    "Active/Active (ALUA) mode 4",
+    "Unknown mode (7)",
+    "Legacy mode 2",
+    "Unknown mode (9)",
+    "Unknown mode (10)",
+    "Unknown mode (11)",
+    "Unknown mode (12)",
+    "Unknown mode (13)",
+    "AIX Active/Passive (PAR) mode 3",
+    "Unknown mode (15)",
+};
+
 static void
 decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 {
-    int k, ip_mgmt, failover_mode, vpp80, lun_z;
+    int k, ip_mgmt, vpp80, lun_z;
 
     if (len < 3) {
-        fprintf(stderr, "Device identification VPD page length too "
-                "short=%d\n", len);
+        fprintf(stderr, "EMC upr VPD page [0xc0]: length too short=%d\n",
+                len);
         return;
     }
     if (buff[9] != 0x00) {
@@ -1986,13 +2006,11 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
         printf("\n");
     }
 
-    failover_mode = buff[28] & 0x0f;
     vpp80 = buff[30] & 0x08;
     lun_z = buff[30] & 0x04;
 
     printf("  System Type: %x, Failover mode: %s\n",
-                   buff[27],
-                   failover_mode == 4 ? "Set to 1" : "Unknown");
+           buff[27], failover_mode_arr[buff[28] & 0x0f]);
 
     printf("  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
                    vpp80 ? "array serial#" : "LUN serial#",
