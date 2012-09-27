@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Douglas Gilbert.
+ * Copyright (c) 2006-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -156,33 +156,6 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-static const char * lun_state_arr[] =
-{
-    "LUN not bound or LUN_Z report",
-    "LUN bound, but not owned by this SP",
-    "LUN bound and owned by this SP",
-};
-
-static const char * ip_mgmt_arr[] =
-{
-    "No IP access",
-    "Reserved (undefined)",
-    "via IPv4",
-    "via IPv6",
-};
-
-static const char * sp_arr[] =
-{
-    "SP A",
-    "SP B",
-};
-
-static const char * lun_op_arr[] =
-{
-    "Normal operations",
-    "I/O Operations being rejected, SP reboot or NDU in progress",
-};
-
 static void
 decode_vpd_c0_hp3par(unsigned char * buff, int len)
 {
@@ -292,14 +265,61 @@ decode_firm_vpd_c0_sea(unsigned char * buff, int len)
     }
 }
 
+static const char * lun_state_arr[] =
+{
+    "LUN not bound or LUN_Z report",
+    "LUN bound, but not owned by this SP",
+    "LUN bound and owned by this SP",
+};
+
+static const char * ip_mgmt_arr[] =
+{
+    "No IP access",
+    "Reserved (undefined)",
+    "via IPv4",
+    "via IPv6",
+};
+
+static const char * sp_arr[] =
+{
+    "SP A",
+    "SP B",
+};
+
+static const char * lun_op_arr[] =
+{
+    "Normal operations",
+    "I/O Operations being rejected, SP reboot or NDU in progress",
+};
+
+static const char * failover_mode_arr[] =
+{
+    "Legacy mode 0",
+    "Unknown mode (1)",
+    "Unknown mode (2)",
+    "Unknown mode (3)",
+    "Active/Passive (PNR) mode 1",
+    "Unknown mode (5)",
+    "Active/Active (ALUA) mode 4",
+    "Unknown mode (7)",
+    "Legacy mode 2",
+    "Unknown mode (9)",
+    "Unknown mode (10)",
+    "Unknown mode (11)",
+    "Unknown mode (12)",
+    "Unknown mode (13)",
+    "AIX Active/Passive (PAR) mode 3",
+    "Unknown mode (15)",
+};
+
 static void
 decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 {
-    int k, ip_mgmt, failover_mode, vpp80, lun_z;
+    int k, ip_mgmt, vpp80, lun_z;
 
     if (len < 3) {
-        fprintf(stderr, "EMC upr VPD page length too "
-                "short=%d\n", len);
+        fprintf(stderr, "EMC upr VPD page [0xc0]: length too short=%d\n",
+                len);
         return;
     }
     if (buff[9] != 0x00) {
@@ -351,22 +371,11 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
         printf("\n");
     }
 
-    failover_mode = buff[28] & 0x0f;
     vpp80 = buff[30] & 0x08;
     lun_z = buff[30] & 0x04;
 
-    printf("  System Type: %x, ", buff[27]);
-    switch (failover_mode) {
-        case 4:
-            printf("Failover mode: 1 (Linux)\n");
-            break;
-        case 6:
-            printf("Failover mode: 4 (ALUA)\n");
-            break;
-        default:
-            printf("Failover mode: Unknown (%d)\n", failover_mode);
-            break;
-    }
+    printf("  System Type: %x, Failover mode: %s\n",
+           buff[27], failover_mode_arr[buff[28] & 0x0f]);
 
     printf("  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
                    vpp80 ? "array serial#" : "LUN serial#",
