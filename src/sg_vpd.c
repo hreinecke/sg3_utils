@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.64 20120927";    /* spc4r36 + sbc3r32 */
+static char * version_str = "0.64 20120929";    /* spc4r36 + sbc3r32 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -608,6 +608,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
         c_set = 1;
         assoc = VPD_ASSOC_LU;
         piv = 0;
+        is_sas = 0;
         desig_type = 3;
         i_len = 16;
         off = 16;
