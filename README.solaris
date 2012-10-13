@@ -1,3 +1,22 @@
+Please Note:
+>>> Up to and including sg3_utils-1.33 the Solaris code was built
+>>> and tested on an OpenSolaris VM run with VirtualBox on Ubuntu
+>>> 11.10 . Now with Ubuntu 12.04 those VMs crash immediately when
+>>> started with VirtualBox. Further, Oracle (who owns SUN and thus
+>>> Solaris) no longer supports OpenSolaris and its package
+>>> repository has been withdrawn. The author can find no generic VMs
+>>> for Oracle Solaris 11 that run on VirtualBox or VMWare. The author
+>>> is also displeased with the withdrawal of the Open Software
+>>> OS and is disinclined to build a Solaris 11 system just to
+>>> virtualize it.
+>>> So as of sg3_utils-1.34 the Solaris port is provided "as-is" without
+>>> testing on a Solaris platform.
+
+Douglas Gilbert
+13th October 2012
+
+
+
 Introduction
 ============
 The Solaris port of sg3_utils contains those utilities that are
