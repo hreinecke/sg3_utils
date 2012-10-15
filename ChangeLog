@@ -2,6 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.35 [20121014] [svn: r462]
+  - bump to 1.35
+
 Changelog for sg3_utils-1.34 [20121013] [svn: r461]
   - sg_xcopy: new dd like utility for extended copy command
   - sg_copy_results: new utility for receive copy results
