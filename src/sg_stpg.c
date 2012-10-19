@@ -24,7 +24,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.4 20120322";
+static char * version_str = "1.5 20121019";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -35,6 +35,16 @@ static char * version_str = "1.4 20120322";
 #define TPGS_STATE_UNAVAILABLE 0x3
 #define TPGS_STATE_OFFLINE 0xe          /* SPC-4 rev 9 */
 #define TPGS_STATE_TRANSITIONING 0xf
+
+/* See also table 306 - Target port group descriptor format in SPC-4 rev 36e */
+static const unsigned char state_sup_mask[] = {
+        [TPGS_STATE_OPTIMIZED]     = 0x01,
+        [TPGS_STATE_NONOPTIMIZED]  = 0x02,
+        [TPGS_STATE_STANDBY]       = 0x04,
+        [TPGS_STATE_UNAVAILABLE]   = 0x08,
+        [TPGS_STATE_OFFLINE]       = 0x40,
+        [TPGS_STATE_TRANSITIONING] = 0x80,
+};
 
 #define VPD_DEVICE_ID  0x83
 #define DEF_VPD_DEVICE_ID_LEN  252
@@ -207,7 +217,7 @@ transition_tpgs_states(struct tgtgrp *tgtState, int numgrp, int portgroup,
           return 1;
      }
 
-     if (!( (1 << newstate) & tgtState[i].valid )) {
+     if (!( state_sup_mask[newstate] & tgtState[i].valid )) {
           printf("Portgroup 0x%02x: Invalid state 0x%x\n",
                  portgroup, newstate);
           return 1;
