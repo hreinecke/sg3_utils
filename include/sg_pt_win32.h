@@ -8,6 +8,7 @@
  * also been used as a reference.
  * Much of the information in this header can also be obtained
  * from msdn.microsoft.com .
+ * Updated for cygwin version 1.7.17 changes 20121026
  */
 
 #include <windows.h>
@@ -112,8 +113,12 @@ typedef struct {
  * file access values
  */
 #define FILE_ANY_ACCESS         0
+#ifndef FILE_READ_ACCESS
 #define FILE_READ_ACCESS        0x0001
+#endif
+#ifndef FILE_WRITE_ACCESS
 #define FILE_WRITE_ACCESS       0x0002
+#endif
 
 
 #define IOCTL_SCSI_BASE    0x00000004
@@ -128,8 +133,10 @@ typedef struct {
 /*
  * Standard IOCTL define
  */
+#ifndef CTL_CODE
 #define CTL_CODE(DevType, Function, Method, Access)             \
         (((DevType) << 16) | ((Access) << 14) | ((Function) << 2) | (Method))
+#endif
 
 #define IOCTL_SCSI_PASS_THROUGH         CTL_CODE(IOCTL_SCSI_BASE, 0x0401, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 #define IOCTL_SCSI_MINIPORT             CTL_CODE(IOCTL_SCSI_BASE, 0x0402, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)

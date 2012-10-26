@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2006-2011 Douglas Gilbert.
+ * Copyright (c) 2006-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.13 20110207 */
+/* sg_pt_win32 version 1.14 20121026 */
 
 #include <stdio.h>
 #include <stdlib.h>
