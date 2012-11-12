@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.68 20120820";    /* ses3r04 */
+static char * version_str = "1.69 20121112";    /* ses3r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -240,6 +240,7 @@ static struct diag_page_code dpc_arr[] = {
     {0x3f, "Protocol Specific (SAS transport)"},
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
+    {0x42, "Rebuild Assist (SBC)"},     /* sbc3r31 */
     {-1, NULL},
 };
 
@@ -264,6 +265,7 @@ static struct diag_page_code in_dpc_arr[] = {
     {0x3f, "Protocol Specific (SAS transport)"},
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
+    {0x42, "Rebuild Assist Input (SBC)"},
     {-1, NULL},
 };
 
@@ -288,6 +290,7 @@ static struct diag_page_code out_dpc_arr[] = {
     {0x3f, "Protocol Specific (SAS transport)"},
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
+    {0x42, "Rebuild Assist Output (SBC)"},
     {-1, NULL},
 };
 
