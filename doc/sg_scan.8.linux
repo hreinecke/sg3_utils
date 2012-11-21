@@ -1,7 +1,7 @@
-.TH SG_SCAN "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_SCAN "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
-sg_scan \- does a scan of sg devices (or given SCSI/ATAPI/ATA devices) and
-prints the results
+sg_scan \- scans sg devices (or SCSI/ATAPI/ATA devices) and prints
+results
 .SH SYNOPSIS
 .B sg_scan
 [\fI\-a\fR]
@@ -65,7 +65,7 @@ the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert and F. Jansen
 .SH COPYRIGHT
-Copyright \(co 1999\-2006 Douglas Gilbert
+Copyright \(co 1999\-2012 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
