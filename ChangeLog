@@ -2,10 +2,13 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.35 [20121119] [svn: r466]
+Changelog for sg3_utils-1.35 [20121124] [svn: r467]
   - sg_stpg: with --offline fix 'Invalid state 0xe'
+  - sg_ses: Door Lock element changed to Door element and
+    abbreviation changed frm 'dl' to 'do' (ses3r05)
   - sync to sbc3r33
   - sg_pt_win32, sg_scan(win32): changes for cygwin 1.7.17
+  - clean up man page summary lines
 
 Changelog for sg3_utils-1.34 [20121013] [svn: r461]
   - sg_xcopy: new dd like utility for extended copy command
