@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.63 20121112";    /* spc4r36 + sbc3r33 */
+static char * version_str = "0.64 20121204";    /* spc4r36 + sbc3r34 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1686,6 +1686,9 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Reserved [0x%x]\n", u);
         else
             printf("  Nominal rotation rate: %d rpm\n", u);
+        printf("  Product type=%d\n", buff[6]);
+        printf("  WABEREQ=%d\n", (buff[7] >> 6) & 0x3);
+        printf("  WACEREQ=%d\n", (buff[7] >> 4) & 0x3);
         u = buff[7] & 0xf;
         printf("  Nominal form factor");
         switch (u) {
@@ -1711,6 +1714,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
+        printf("  VBULS=%d\n", buff[8] & 0x1);
         break;
     case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
         printf("  Manufacturer-assigned serial number: %.*s\n",
