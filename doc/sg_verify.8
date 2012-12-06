@@ -1,12 +1,13 @@
-.TH SG_VERIFY "8" "September 2012" "sg3_utils\-1.34" SG3_UTILS
+.TH SG_VERIFY "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
 .B sg_verify
 [\fI\-\-16\fR] [\fI\-\-bpc=BPC\fR] [\fI\-\-bytchk=NDO\fR]
-[\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR] [\fI\-\-group=GN\fR] [\fI\-\-help\fR]
-[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-readonly\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vrprotect=VRP\fR]
+[\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR] [\fI\-\-ebytchk=BVAL\fR]
+[\fI\-\-group=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=IF\fR]
+[\fI\-\-lba=LBA\fR] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-vrprotect=VRP\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -19,8 +20,8 @@ When \fI\-\-bytchk=NDO\fR is not given then the verify starts at the logical
 block address given by the \fI\-\-lba=LBA\fR option and continues for
 \fI\-\-count=COUNT\fR blocks. No more than \fI\-\-bpc=BPC\fR blocks are
 verified by each VERIFY command so if necessary multiple VERIFY commands are
-sent. No news is good news (i.e. if there are no verify errors detected no
-messages are sent to stderr and the Unix return status is 0).
+sent. No news is good news (i.e. if there are no verify errors detected then
+no messages are sent to stderr and the Unix return status is 0).
 .PP
 When \fI\-\-bytchk=NDO\fR is given then the \fI\-\-bpc=BPC\fR option is
 ignored. A single verify command is issued and it starts at the logical block
@@ -50,11 +51,12 @@ devices (disks) this value may be constrained by the maximum transfer length
 field in the block limits VPD page.
 .TP
 \fB\-B\fR, \fB\-\-bytchk\fR=\fINDO\fR
-sets the BYTCHK bit in the VERIFY command. \fINDO\fR is the number of bytes
-to obtain from the \fIFN\fR file (if \fI\-\-in=FN\fR is given) or from stdin.
-Those bytes are placed in the data\-out buffer associated with the SCSI
-VERIFY command. The minimum value for \fINDO\fR is 1 and the maximum value
-is dependant on the OS.
+sets the BYTCHK field to one in the VERIFY command. \fINDO\fR is the number
+of bytes to obtain from the \fIFN\fR file (if \fI\-\-in=FN\fR is given) or
+from stdin. Those bytes are placed in the data\-out buffer associated with
+the SCSI VERIFY command. The minimum value for \fINDO\fR is 1 and the
+maximum value is dependant on the OS. The actual value in the BYTCHK field
+in the VERIFY command may be modified by a \fI\-\-ebytchk=BVAL\fR option.
 .TP
 \fB\-c\fR, \fB\-\-count\fR=\fICOUNT\fR
 where \fICOUNT\fR specifies the number of blocks to verify. The default value
@@ -70,6 +72,15 @@ device (e.g. a disk) has.
 disable page out changes the cache retention priority of blocks read on
 the device's cache to the lowest priority. This means that blocks read by
 other commands are more likely to remain in the device's cache.
+.TP
+\fB\-E\fR, \fB\-\-ebytchk\fR=\fIBVAL\fR
+sets the BYTCHK field to \fIBVAL\fR overriding the value (1) set by the
+\fI\-\-bytchk=NDO\fR option. Values of 1, 2 or 3 are accepted for \fIBVAL\fR
+however sbc3r34 reserves the value 2. If this option is given then
+\fI\-\-bytchk=NDO\fR must also be given. If \fIBVAL\fR is 3 then \fICOUNT\fR
+must be 1 and \fINDO\fR should be the size of one logical block (plus the
+size of some or all of the protection infomation if \fIVRP\fR is greater
+than 0).
 .TP
 \fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
 where \fIGN\fR becomes the contents of the group number field in the SCSI
@@ -106,18 +117,20 @@ where \fIVRP\fR is the value in the vrprotect field in the VERIFY command
 cdb. It must be a value between 0 and 7 inclusive. The default value is
 zero.
 .SH BYTCHK
-BYTCHK is the name of a bit field in the VERIFY(10) and VERIFY(16) commands.
-When set it indicates that associated with the SCSI VERIFY command a
-data\-out buffer will be sent for the device (disk) to check. Using the
-\fI\-\-bytchk=NDO\fR option sets the BYTCHK field and \fINDO\fR is the number
-of bytes placed in the data\-out buffer. Those bytes are obtained from stdin
-or \fIIF\fR (from the \fI\-\-in=FN\fR option).
+BYTCHK is the name of a field (two bits wide) in the VERIFY(10) and
+VERIFY(16) commands. When set to 1 or 3 (sbc3r34 reserves the value 2) it
+indicates that associated with the SCSI VERIFY command, a data\-out buffer
+will be sent for the device (disk) to check. Using the \fI\-\-bytchk=NDO\fR
+option sets the BYTCHK field to 1 and \fINDO\fR is the number of bytes
+placed in the data\-out buffer. Those bytes are obtained from stdin or
+\fIIF\fR (from the \fI\-\-in=FN\fR option). The \fI\-\-ebytchk=BVAL\fR
+option may be used to override the BYTCHK field value of 1 with \fIBVAL\fR.
 .PP
 The calculation of \fINDO\fR is left up to the user. Its value depends
-on the logical block size (found with the sg_readcap utility), the
-\fICOUNT\fR and the \fIVRP\fR values. If the \fIVRP\fR is greater than 0
-then each logical block will contain an extra 8 bytes (of protection
-information).
+on the logical block size (which cab be found with the sg_readcap utility),
+the \fICOUNT\fR and the \fIVRP\fR values. If the \fIVRP\fR is greater than
+0 then each logical block will contain an extra 8 bytes (at least) of
+protection information.
 .PP
 When the BYTCHK field is 0 then the verification process done by the
 device (disk) is vendor specific. It typically involves checking each

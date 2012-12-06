@@ -1575,8 +1575,9 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
     vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
-                 ((bytchk & 0x1) << 1) ;
+                 ((bytchk & 0x3) << 1) ;
     vCmdBlk[2] = (unsigned char)((lba >> 24) & 0xff);
     vCmdBlk[3] = (unsigned char)((lba >> 16) & 0xff);
     vCmdBlk[4] = (unsigned char)((lba >> 8) & 0xff);
@@ -1670,8 +1671,9 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
     vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
-                 ((bytchk & 0x1) << 1) ;
+                 ((bytchk & 0x3) << 1) ;
     vCmdBlk[2] = (llba >> 56) & 0xff;
     vCmdBlk[3] = (llba >> 48) & 0xff;
     vCmdBlk[4] = (llba >> 40) & 0xff;

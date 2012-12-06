@@ -25,9 +25,15 @@
  *
  * This program issues the SCSI VERIFY(10) or VERIFY(16) command to the given
  * SCSI block device.
+ *
+ * N.B. This utility should, but doesn't, check the logical block size with
+ * the SCSI READ CAPACITY command. It is up to the user to make sure that
+ * the count of blocks requested and the number of bytes transferred (when
+ * BYTCHK>0) are "in sync". That caclculation is somewhat complicated by
+ * the possibility of protection data (DIF).
  */
 
-static char * version_str = "1.18 20120927";
+static char * version_str = "1.19 20121204";    /* sbc3r34 */
 
 #define ME "sg_verify: "
 
@@ -40,6 +46,7 @@ static struct option long_options[] = {
         {"bytchk", 1, 0, 'B'},
         {"count", 1, 0, 'c'},
         {"dpo", 0, 0, 'd'},
+        {"ebytchk", 1, 0, 'E'},
         {"group", 1, 0, 'g'},
         {"help", 0, 0, 'h'},
         {"in", 1, 0, 'i'},
@@ -57,27 +64,38 @@ usage()
     fprintf(stderr, "Usage: "
           "sg_verify [--16] [--bpc=BPC] [--bytchk=NDO] [--count=COUNT] "
           "[--dpo]\n"
-          "                 [--group=GN] [--help] [--in=IF] [--lba=LBA] "
-          "[--readonly]\n"
-          "                 [--verbose] [--version] [--vrprotect=VRP] "
-          "DEVICE\n"
+          "                 [--ebytchk=BVAL] [--group=GN] [--help] "
+          "[--in=IF]\n"
+          "                 [--lba=LBA] [--readonly] [--verbose] "
+          "[--version]\n"
+          "                 [--vrprotect=VRP] DEVICE\n"
           "  where:\n"
           "    --16|-S             use VERIFY(16) (def: use "
           "VERIFY(10) )\n"
           "    --bpc=BPC|-b BPC    max blocks per verify command "
           "(def: 128)\n"
-          "    --bytchk=NDO|-B NDO    set BYTCHK (byte check) bit, NDO is "
+          "    --bytchk=NDO|-B NDO    set BYTCHK (byte check) to 1, NDO is "
           "number of\n"
           "                           bytes placed in data-out buffer. "
           "These are\n"
           "                           fetched from IF (or stdin) and used "
           "to verify\n"
           "                           the device data against. Forces "
-          "--bpc=COUNT\n"
+          "--bpc=COUNT.\n"
           "    --count=COUNT|-c COUNT    count of blocks to verify "
-          "(def: 1)\n"
+          "(def: 1).\n"
+          "                              If BVAL=3 then COUNT must "
+          "be 1 .\n"
           "    --dpo|-d            disable page out (cache retention "
           "priority)\n"
+          "    --ebytchk=BVAL|-E BVAL    extra BYTCHK value, either 1, 2 "
+          "or 3.\n"
+          "                              BVAL overrides BYTCHK=1 set by "
+          "'--bytchk='\n"
+          "                              If BVAL is 3 then NDO must be "
+          "the LBA\n"
+          "                              size (plus protection size if "
+          "DIF active)\n"
           "    --group=GN|-g GN    set group number field to GN (def: 0)\n"
           "    --help|-h           print out usage message\n"
           "    --in=IF|-i IF       input from file called IF (def: "
@@ -92,7 +110,8 @@ usage()
           "    --vrprotect=VRP|-P VRP    set vrprotect field to VRP "
           "(def: 0)\n"
           "Performs one or more SCSI VERIFY(10) or SCSI VERIFY(16) "
-          "commands\n"
+          "commands. sbc3r34\nmade the BYTCHK field two bits wide "
+          "(it was a single bit).\n"
           );
 }
 
@@ -103,6 +122,7 @@ main(int argc, char * argv[])
     int64_t ll;
     int dpo = 0;
     int bytchk = 0;
+    int ndo = 0;
     char *ref_data = NULL;
     int vrprotect = 0;
     int64_t count = 1;
@@ -127,7 +147,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:B:c:dg:hi:l:P:rSvV", long_options,
+        c = getopt_long(argc, argv, "b:B:c:dE:g:hi:l:P:rSvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -142,8 +162,8 @@ main(int argc, char * argv[])
             ++bpc_given;
             break;
         case 'B':
-            bytchk = sg_get_num(optarg);
-            if (bytchk < 1) {
+            ndo = sg_get_num(optarg);
+            if (ndo < 1) {
                 fprintf(stderr, "bad argument to '--bytchk'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -157,6 +177,13 @@ main(int argc, char * argv[])
             break;
         case 'd':
             dpo = 1;
+            break;
+        case 'E':
+            bytchk = sg_get_num(optarg);
+            if ((bytchk < 1) || (bytchk > 3)) {
+                fprintf(stderr, "bad argument to '--ebytchk'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'g':
             group = sg_get_num(optarg);
@@ -223,18 +250,30 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if (bytchk > 0) {
+    if (ndo > 0) {
+        if (0 == bytchk)
+            bytchk = 1;
         if (bpc_given && (bpc != count))
-            fprintf(stderr, "'bpc' argument ignored, using --bpc=COUNT\n");
+            fprintf(stderr, "'bpc' argument ignored, using --bpc=%"
+                    PRIu64 "\n", count);
         if (count > 0x7fffffffLL) {
             fprintf(stderr, "count exceed 31 bits, way too large\n");
             return SG_LIB_SYNTAX_ERROR;
         }
+        if ((3 == bytchk) && (1 != count)) {
+            fprintf(stderr, "count must be 1 when bytchk=3\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
         bpc = (int)count;
+    } else if (bytchk > 0) {
+        fprintf(stderr, "when the 'ebytchk=BVAL' option is given, "
+                "then '--bytchk=NDO' must also be given\n");
+        return SG_LIB_SYNTAX_ERROR;
     }
+
     if ((bpc > 0xffff) && (0 == verify16)) {
         fprintf(stderr, "'%s' exceeds 65535, so use VERIFY(16)\n",
-                (bytchk > 0) ? "count" : "bpc");
+                (ndo > 0) ? "count" : "bpc");
         ++verify16;
     }
     if (((lba + count - 1) > 0xffffffffLLU) && (0 == verify16)) {
@@ -248,10 +287,10 @@ main(int argc, char * argv[])
     orig_count = count;
     orig_lba = lba;
 
-    if (bytchk > 0) {
-        ref_data = malloc(bytchk);
+    if (ndo > 0) {
+        ref_data = malloc(ndo);
         if (NULL == ref_data) {
-            fprintf(stderr, "failed to allocate %d byte buffer\n", bytchk);
+            fprintf(stderr, "failed to allocate %d byte buffer\n", ndo);
             return SG_LIB_FILE_ERROR;
         }
         if ((NULL == file_name) || (0 == strcmp(file_name, "-"))) {
@@ -271,8 +310,8 @@ main(int argc, char * argv[])
         }
         if (verbose && got_stdin)
                 fprintf(stderr, "about to wait on STDIN\n");
-        for (nread = 0; nread < bytchk; nread += res) {
-            res = read(infd, ref_data + nread, bytchk - nread);
+        for (nread = 0; nread < ndo; nread += res) {
+            res = read(infd, ref_data + nread, ndo - nread);
             if (res <= 0) {
                 fprintf(stderr, "reading from %s failed at file offset=%d\n",
                         (got_stdin ? "stdin" : file_name), nread);
@@ -302,13 +341,13 @@ main(int argc, char * argv[])
     for (; count > 0; count -= bpc, lba += bpc) {
         num = (count > bpc) ? bpc : count;
         if (verify16)
-            res = sg_ll_verify16(sg_fd, vrprotect, dpo, bytchk > 0,
+            res = sg_ll_verify16(sg_fd, vrprotect, dpo, bytchk,
                                  lba, num, group, ref_data,
-                                 bytchk, &info64, 1, verbose);
+                                 ndo, &info64, 1, verbose);
         else
-            res = sg_ll_verify10(sg_fd, vrprotect, dpo, bytchk > 0,
+            res = sg_ll_verify10(sg_fd, vrprotect, dpo, bytchk,
                                  (unsigned int)lba, num, ref_data,
-                                 bytchk, &info, 1, verbose);
+                                 ndo, &info, 1, verbose);
         if (0 != res) {
             ret = res;
             switch (res) {

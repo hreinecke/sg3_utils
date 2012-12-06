@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.08 20120927";    /* SPC-4 rev 36 */
+static char * version_str = "1.09 20121204";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -1856,6 +1856,35 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                 printf("  Reserved [0x%x]\n", u);
             else
                 printf("  Nominal rotation rate: %d rpm\n", u);
+            printf("  Product type=%d\n", buff[6]);
+            printf("  WABEREQ=%d\n", (buff[7] >> 6) & 0x3);
+            printf("  WACEREQ=%d\n", (buff[7] >> 4) & 0x3);
+            u = buff[7] & 0xf;
+            printf("  Nominal form factor ");
+            switch(u) {
+            case 0:
+                printf("is not reported\n");
+                break;
+            case 1:
+                printf("5.25 inches\n");
+                break;
+            case 2:
+                printf("3.5 inches\n");
+                break;
+            case 3:
+                printf("2.5 inches\n");
+                break;
+            case 4:
+                printf("1.8 inches\n");
+                break;
+            case 5:
+                printf("less then 1.8 inches\n");
+                break;
+            default:
+                printf("reserved [%u]\n", u);
+                break;
+            }
+            printf("  VBULS=%d\n", buff[8] & 0x1);
             break;
         case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
             printf("  Manufacturer-assigned serial number: %.*s\n",
