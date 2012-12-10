@@ -1,0 +1,67 @@
+#		sg_compare_and_write.txt
+# This file provides a usage example of sg_compare_and_write.
+# sg_compare_and_write accepts a buffer containing 2 logical instances:
+# - the verify instance: used to match the current content of the LBA range
+# - the write instance: used to write to the LBA if the verify succeeds
+#
+# In case of failure to verify the data, the command will return with check
+# condition with the sense code set to MISCOMPARE DURING VERIFY OPERATION.
+#
+# The following example shows initialization, successful and unsuccessful
+# compare and write using sg3_utils. I am using caw_buf_zero2one and
+# caw_buf_one2zero as shown bellow.
+
+$ hexdump /tmp/caw_buf_zero2one
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000200 1111 1111 1111 1111 1111 1111 1111 1111
+*
+0000400
+
+$ hexdump /tmp/caw_buf_one2zero
+0000000 1111 1111 1111 1111 1111 1111 1111 1111
+*
+0000200 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000400
+
+$ sg_map -i -x
+/dev/sg0  0 0 0 0  0  /dev/sda  ATA       ST3320613AS       CC2H
+/dev/sg1  3 0 0 0  5  /dev/scd0  HL-DT-ST  DVD-RAM GH22NS30  1.01
+/dev/sg2  5 0 0 0  0  /dev/sdb  KMNRIO    K2                0000
+/dev/sg3  5 0 0 1  0  /dev/sdc  KMNRIO    K2                0000
+
+# First I zero out the volume to make sure that the first compare and write
+# will succeed
+$ sg_write_same --16 -i /dev/zero -n 0x200000  -x 512 /dev/sdc
+
+$ dd if=/dev/sdc bs=512 count=1 skip=100 2>/dev/null | hexdump
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000200
+
+$ ./sg_compare_and_write --in=/tmp/caw_buf_zero2one --lba=100 --xferlen=1024 /dev/sdc
+
+# contents of LBA 100 are a block of ones
+$ dd if=/dev/sdc bs=512 count=1 skip=100 2>/dev/null | hexdump
+0000000 1111 1111 1111 1111 1111 1111 1111 1111
+*
+0000200
+
+# We repeat the same compare and write command (zero2one input buffer).
+# compare and write fails since the verify failed (compared the zero block to
+# the actual 1 block in LBA 100
+$ ./sg_compare_and_write --in=/tmp/caw_buf_zero2one --lba=100 --xferlen=1024 /dev/sdc
+COMPARE AND WRITE:  Fixed format, current;  Sense key: Miscompare
+ Additional sense: Miscompare during verify operation
+sg_compare_and_write: SCSI COMPARE AND WRITE failed
+
+# Now we use the second buffer (one2zero)
+$ ./sg_compare_and_write --in=/tmp/caw_buf_one2zero --lba=100 --xferlen=1024 /dev/sdc
+
+# operation succeeded, contents of LBA 100 are back to zero
+$ dd if=/dev/sdc bs=512 count=1 skip=100 2>/dev/null | hexdump
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+0000200
+
