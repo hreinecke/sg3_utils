@@ -1,0 +1,120 @@
+.TH "COMPARE AND WRITE" "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.SH NAME
+sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
+.SH SYNOPSIS
+.B sg_compare_and_write
+[\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-fua_nv\fR] [\fI\-\-help\fR]
+\fI\-\-in=IF\fR \fI\-\-lba=LBA\fR [\fI\-\-num=NUM\fR] [\fI\-\-timeout=TO\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WP\fR]
+[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+Send the SCSI COMPARE AND WRITE command to \fIDEVICE\fR. This command receives
+a data buffer which contains a verify instance and a write instance each
+containing \fInum\fR blocks, the \fIDEVICE\fR will read \fInum\fR blocks
+starting at logical block address \fILBA\fR, compare the data read from
+the specified blocks to the verify instance and if they match, write the write
+instance to the \fIDEVICE\fR at the same logical block address \fILBA\fR.
+All of the above operations shall be performed as an uninteruppted series of
+actions.
+.PP
+The data buffer which contains the verify and write instances are obtained
+from the input file \fIIF\fR, this file is expected to be 2*\fInum\fR blocks
+long. If \fIbs\fR is not specified, then READ CAPACITY(10) is used to
+determine the block size. If not specified, the transfer size will be the
+2*\fInum\fR blocks.
+.PP
+In case of a mismatch between the blocks read from \fIDEVICE\fR and the verify
+instance in the data buffer, a check condition will be returned with sense key
+set to miscompare.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long option name.
+.TP
+\fB\-d\fR, \fB\-\-dpo\fR
+Set the DPO bit in the COMPARE AND WRITE CDB
+.TP
+\fB\-f\fR, \fB\-\-fua\fR
+Set the FUA bit in the COMPARE AND WRITE CDB
+.TP
+\fB\-F\fR, \fB\-\-fua_nv\fR
+Set the FUA_NV bit in the COMPARE AND WRITE CDB
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
+read data (binary) from file named \fIIF\fR and use it as the data out
+buffer for the SCSI COMPARE AND WRITE command. The \fIIF\fR shall be at
+2*\fINUM\fR blocks.
+.TP
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the logical block address to start the COMPARE AND WRITE command.
+Assumed to be in decimal unless prefixed with '0x' or has a trailing 'h'.
+.TP
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
+where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to read
+and compare with the verify instance. And given a match, the \fINUM\fR of
+blocks to write starting \fILBA\fR. The default value for \fINUM\fR is 1.
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
+where \fITO\fR is the command timeout value in seconds. The default value is
+60 seconds. If \fINUM\fR is large (or zero) a WRITE SAME command may require
+considerably more time than 60 seconds to complete.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the degree of verbosity (debug messages).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+output version string then exit.
+.TP
+\fB\-w\fR, \fB\-\-wrprotect\fR=\fIWP\fR
+set the WRPROTECT field in the cdb to \fIWP\fR. The default value is 0 which
+implies no protection information is sent (along with the user data) by this
+utility.
+.TP
+\fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
+where \fILEN\fR is the data out buffer length. Defaults to 2*\fINUM\fR blocks.
+.SH NOTES
+Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
+suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
+in the sg3_utils(8) man page.
+.SH EXIT STATUS
+The exit status of sg_compare_and_write is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Shahar Salzman.
+.SH "REPORTING BUGS"
+Report bugs to shahar.salzman@kaminario.com
+.SH COPYRIGHT
+Copyright \(co 2012 Kaminario Technologies LTD
+
+.br
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+.br
+* Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+.br
+* Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+.br
+* Neither the name of the <organization> nor the names of its contributors may
+be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+.br
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+.SH "SEE ALSO"
+.B sg_xcopy, sg_receive_copy_results(sg3_utils)

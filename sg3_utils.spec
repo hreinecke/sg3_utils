@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Fri Oct 26 2012 - dgilbert at interlog dot com
+* Sat Dec 08 2012 - dgilbert at interlog dot com
 - track t10 changes, fix for cygwin 1.7.17
   * sg3_utils-1.35
 
