@@ -79,7 +79,7 @@ static const char * linux_driver_suggests[] = {
 #define SG_LIB_DRIVER_MASK      DRIVER_MASK
 #define SG_LIB_SUGGEST_MASK     SUGGEST_MASK
 #define SG_LIB_DRIVER_SENSE    DRIVER_SENSE
- 
+
 
 
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -756,8 +756,8 @@ set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     /* default action of bsg (sg v4) is QUEUE_AT_HEAD */
-    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) 
-        ptp->io_hdr.flags |= BSG_FLAG_Q_AT_TAIL; 
+    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags)
+        ptp->io_hdr.flags |= BSG_FLAG_Q_AT_TAIL;
     if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags)
         ptp->io_hdr.flags &= ~BSG_FLAG_Q_AT_TAIL;
 }

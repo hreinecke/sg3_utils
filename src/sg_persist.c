@@ -200,7 +200,7 @@ usage()
 /* If num_tids==0 then only one TransportID is assumed with len bytes in
  * it. If num_tids>0 then that many TransportIDs is assumed, each in an
  * element that is MX_TID_LEN bytes long (and the 'len' argument is
- * ignored). */ 
+ * ignored). */
 static void
 decode_transport_id(const char * leadin, unsigned char * ucp, int len,
                     int num_tids)
@@ -210,7 +210,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
     int bump;
 
     if (num_tids > 0)
-        len = num_tids * MX_TID_LEN; 
+        len = num_tids * MX_TID_LEN;
     for (k = 0, bump = MX_TID_LEN; k < len; k += bump, ucp += bump) {
         if ((len < 24) || (0 != (len % 4)))
             printf("%sTransport Id short or not multiple of 4 "
@@ -666,7 +666,7 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
                 tidp[4 + j] = b | n;
                 ++j;
             } else
-                b = n << 4; 
+                b = n << 4;
         }
         return 1;
     } else if ((0 == memcmp("spi,", lcp, 4)) ||
@@ -706,7 +706,7 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
                 tidp[8 + j] = b | n;
                 ++j;
             } else
-                b = n << 4; 
+                b = n << 4;
         }
         return 1;
     } else if ((0 == memcmp("sbp,", lcp, 4)) ||
@@ -732,7 +732,7 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
                 tidp[8 + j] = b | n;
                 ++j;
             } else
-                b = n << 4; 
+                b = n << 4;
         }
         return 1;
     } else if ((0 == memcmp("srp,", lcp, 4)) ||
@@ -758,7 +758,7 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
                 tidp[8 + j] = b | n;
                 ++j;
             } else
-                b = n << 4; 
+                b = n << 4;
         }
         return 1;
     } else if (0 == memcmp("iqn.", lcp, 4)) {
@@ -775,7 +775,7 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
         else if (0 != (alen % 4))
             alen = ((alen / 4) + 1) * 4;
         if (alen > 241) { /* sam5r02.pdf A.2 (Annex) */
-            fprintf(stderr, "iSCSI name too long, alen=%d\n", alen); 
+            fprintf(stderr, "iSCSI name too long, alen=%d\n", alen);
             return 0;
         }
         tidp[3] = alen & 0xff;

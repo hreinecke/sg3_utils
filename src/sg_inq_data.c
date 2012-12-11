@@ -475,4 +475,3 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xffff, NULL},
 };
 #endif
-

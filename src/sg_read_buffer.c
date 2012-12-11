@@ -25,7 +25,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.08 20120224";
+static char * version_str = "1.08 20121211";
 
 
 static struct option long_options[] = {
@@ -305,8 +305,8 @@ main(int argc, char * argv[])
             switch (rb_mode) {
             case MODE_DESCRIPTOR:
                 k = (resp[1] << 16) | (resp[2] << 8) | resp[3];
-                printf("OFFSET BOUNDARY: %d, Buffer offset alignment: %d-byte\n",
-                       resp[0], (1 << resp[0]));
+                printf("OFFSET BOUNDARY: %d, Buffer offset alignment: "
+                       "%d-byte\n", resp[0], (1 << resp[0]));
                 printf("BUFFER CAPACITY: %d (0x%x)\n", k, k);
                 break;
             case MODE_ECHO_BDESC:

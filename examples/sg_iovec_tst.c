@@ -150,7 +150,8 @@ int main(int argc, char * argv[])
         printf("  where: -h       this usage message\n");
         printf("         -b=num   block size (default 512 Bytes)\n");
         printf("         -c=num   count of blocks to transfer\n");
-        printf(" reads from <generic_device> and sends to <output_filename>\n");
+        printf(" reads from <generic_device> and sends to "
+               "<output_filename>\n");
         return 1;
     }
 

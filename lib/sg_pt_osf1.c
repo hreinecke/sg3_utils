@@ -373,7 +373,8 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
     uagt.uagt_ccb = (CCB_HEADER *) &ccb;
     uagt.uagt_ccblen = sizeof(ccb);
     uagt.uagt_snsbuf = ccb.cam_sense_ptr = ptp->sense ? ptp->sense : sensep;
-    uagt.uagt_snslen = ccb.cam_sense_len = ptp->sense ? ptp->sense_len : sizeof sensep;
+    uagt.uagt_snslen = ccb.cam_sense_len = ptp->sense ? ptp->sense_len :
+                                                        sizeof sensep;
     uagt.uagt_buffer = ccb.cam_data_ptr =  ptp->dxferp;
     uagt.uagt_buflen = ccb.cam_dxfer_len = ptp->dxfer_len;
 

@@ -847,7 +847,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             n = strlen(buff);
             if (n >= buff_len)
                 return;
-        } else if ((len > 12) && (0 == ssh.asc) && 
+        } else if ((len > 12) && (0 == ssh.asc) &&
                    (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
             /* SAT ATA PASS-THROUGH fixed format */
             n += snprintf(buff + n, buff_len - n, "%s\n",
@@ -1870,4 +1870,3 @@ sg_set_binary_mode(int fd)
 }
 
 #endif
-

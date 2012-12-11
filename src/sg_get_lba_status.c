@@ -262,7 +262,7 @@ main(int argc, char * argv[])
         }
         if (rlen > maxlen)
             rlen = maxlen;
-        
+
         if (do_brief > 1) {
             if (rlen < 24) {
                 fprintf(stderr, "Need maxlen and response length to "

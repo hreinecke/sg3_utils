@@ -625,16 +625,18 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     int res;
     unsigned char rcBuff[256];
     unsigned int rcBuffLen = 256, len, n, td_list = 0;
-    unsigned long num, max_target_num, max_segment_num;
-    unsigned long max_segment_len, max_desc_len, max_inline_data, held_data_limit;
+    unsigned long num, max_target_num, max_segment_num, max_segment_len;
+    unsigned long max_desc_len, max_inline_data, held_data_limit;
     int verb, valid = 0;
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_receive_copy_results(xfp->sg_fd, 0x03, 0, rcBuff, rcBuffLen, 0, verb);
+    res = sg_ll_receive_copy_results(xfp->sg_fd, 0x03, 0, rcBuff, rcBuffLen,
+                                     0, verb);
     if (0 != res)
         return -res;
 
-    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) | rcBuff[3];
+    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
+          rcBuff[3];
     if (len > rcBuffLen) {
         fprintf(stderr, "  <<report too long for internal buffer,"
                 " output truncated\n");
@@ -645,11 +647,13 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     }
     max_target_num = rcBuff[8] << 8 | rcBuff[9];
     max_segment_num = rcBuff[10] << 8 | rcBuff[11];
-    max_desc_len = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 | rcBuff[15];
+    max_desc_len = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 |
+                   rcBuff[15];
     max_segment_len = rcBuff[16] << 24 | rcBuff[17] << 16 |
         rcBuff[18] << 8 | rcBuff[19];
     xfp->max_bytes = max_segment_len;
-    max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 | rcBuff[23];
+    max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 |
+                      rcBuff[23];
     if (verbose) {
         printf(" >> Receive copy results (report operating parameters):\n");
         printf("    Maximum target descriptor count: %lu\n", max_target_num);
@@ -669,7 +673,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     if (verbose) {
         printf("    Held data limit: %lu (usage: %d)\n",
                held_data_limit, list_id_usage);
-        num = rcBuff[28] << 24 | rcBuff[29] << 16 | rcBuff[30] << 8 | rcBuff[31];
+        num = rcBuff[28] << 24 | rcBuff[29] << 16 | rcBuff[30] << 8 |
+              rcBuff[31];
         printf("    Maximum stream device transfer size: %lu\n", num);
         printf("    Maximum concurrent copies: %u\n", rcBuff[36]);
         printf("    Data segment granularity: %u bytes\n", 1 << rcBuff[37]);
@@ -752,7 +757,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy block device with offset to stream device\n");
+                printf("        Copy block device with offset to stream "
+                       "device\n");
             break;
         case 0x09: /* copy stream device to block device with offset */
             if (!is_target && (xfp->sg_type & FT_ST))
@@ -760,15 +766,18 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy stream device to block device with offset\n");
+                printf("        Copy stream device to block device with "
+                       "offset\n");
             break;
-        case 0x0a: /* copy block device with offset to block device with offset */
+        case 0x0a: /* copy block device with offset to block device with
+                    * offset */
             if (!is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy block device with offset to block device with offset\n");
+                printf("        Copy block device with offset to block "
+                       "device with offset\n");
             break;
         case 0x0b: /* copy block device to stream device and hold data */
             if (!is_target && (xfp->sg_type & FT_BLOCK))
@@ -776,7 +785,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy block device to stream device and hold data\n");
+                printf("        Copy block device to stream device and hold "
+                       "data\n");
             break;
         case 0x0c: /* copy stream device to block device and hold data */
             if (!is_target && (xfp->sg_type & FT_ST))
@@ -784,7 +794,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy stream device to block device and hold data\n");
+                printf("        Copy stream device to block device and hold "
+                       "data\n");
             break;
         case 0x0d: /* copy block device to block device and hold data */
             if (!is_target && (xfp->sg_type & FT_BLOCK))
@@ -792,7 +803,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             if (is_target && (xfp->sg_type & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy block device to block device and hold data\n");
+                printf("        Copy block device to block device and hold "
+                       "data\n");
             break;
         case 0x0e: /* copy stream device to stream device and hold data */
             if (!is_target && (xfp->sg_type & FT_ST))
@@ -800,7 +812,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             if (is_target && (xfp->sg_type & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy block device to block device and hold data\n");
+                printf("        Copy block device to block device and hold "
+                       "data\n");
             break;
         case 0x0f: /* read from stream device and hold data */
             if (!is_target && (xfp->sg_type & FT_ST))
@@ -822,7 +835,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             break;
         case 0xe2: /* FC N_Port_ID with N_Port_Name checking */
             if (verbose)
-                printf("        FC N_Port_ID with N_Port_Name target descriptor\n");
+                printf("        FC N_Port_ID with N_Port_Name target "
+                       "descriptor\n");
             td_list |= TD_FC_WWPN_AND_PORT;
             break;
         case 0xe3: /* Parallel Interface T_L  */
@@ -1086,12 +1100,14 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         dStrHex((const char *)rcBuff, len, 1);
     }
 
-    while ((u = sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1)) == 0) {
+    while ((u = sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1)) ==
+           0) {
         ucp = rcBuff + 4 + off;
         i_len = ucp[3];
         if (((unsigned int)off + i_len + 4) > len) {
             fprintf(stderr, "    VPD page error: designator length %d longer "
-                    "than\n     remaining response length=%d\n", i_len, (len - off));
+                    "than\n     remaining response length=%d\n", i_len,
+                    (len - off));
             return SG_LIB_CAT_MALFORMED;
         }
         assoc = ((ucp[1] >> 4) & 0x3);
@@ -1514,8 +1530,9 @@ main(int argc, char * argv[])
     }
 
 #ifdef SG_DEBUG
-    fprintf(stderr, ME "if=%s skip=%"PRId64" of=%s seek=%"PRId64" count=%"PRId64"\n",
-           ifp.fname, skip, ofp.fname, seek, dd_count);
+    fprintf(stderr, ME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64
+            " count=%" PRId64 "\n", ifp.fname, skip, ofp.fname, seek,
+            dd_count);
 #endif
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);

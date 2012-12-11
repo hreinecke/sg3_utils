@@ -81,7 +81,7 @@ int main(int argc, char * argv[])
     /* N.B. An access mode of O_RDWR is required for some SCSI commands */
     if ((sg_fd = open(file_name, O_RDONLY)) < 0) {
         snprintf(ebuff, EBUFF_SZ,
-		 "sg_simple2: error opening file: %s", file_name);
+                 "sg_simple2: error opening file: %s", file_name);
         perror(ebuff);
         return 1;
     }
@@ -188,8 +188,9 @@ int main(int argc, char * argv[])
         printf("Test Unit Ready successful so unit is ready!\n");
     /* Extra info, not necessary to look at */
     if (do_extra)
-        printf("TEST UNIT READY duration=%u millisecs, resid=%d, msg_status=%d\n",
-               io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
+        printf("TEST UNIT READY duration=%u millisecs, resid=%d, "
+               "msg_status=%d\n", io_hdr.duration, io_hdr.resid,
+               (int)io_hdr.msg_status);
 
     close(sg_fd);
     return 0;

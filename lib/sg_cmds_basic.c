@@ -588,4 +588,3 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
-

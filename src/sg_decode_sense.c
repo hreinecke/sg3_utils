@@ -326,7 +326,7 @@ write2wfn(FILE * fp, struct opts_t * optsp)
                 n = 0;
             }
         }
-        if (n > 0) { 
+        if (n > 0) {
             b[n] = '\n';
             s = fwrite(b, 1, n + 1, fp);
         }
