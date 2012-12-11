@@ -216,17 +216,18 @@ decode_vpd_c0_hp3par(unsigned char * buff, int len)
         printf("  Allocation unit: %d\n", (buff[8] << 24) +  (buff[9] << 16) +
                 (buff[10] << 8) + buff[11]);
 
-        printf("  Data pool size: %" PRIu64 "\n", (((uint64_t) buff[12]) << 56) +
-                (((uint64_t) buff[13]) << 48) + (((uint64_t) buff[14]) << 40) +
-                (((uint64_t) buff[15]) << 32) + ((uint64_t) buff[16] << 24) +
-                (buff[17] << 16) + (buff[18] << 8) + buff[19]);
+        printf("  Data pool size: %" PRIu64 "\n",
+               (((uint64_t)buff[12]) << 56) + (((uint64_t)buff[13]) << 48) +
+               (((uint64_t)buff[14]) << 40) + (((uint64_t)buff[15]) << 32) +
+               (((uint64_t)buff[16]) << 24) + (buff[17] << 16) +
+               (buff[18] << 8) + buff[19]);
 
-        printf("  Space allocated: %" PRIu64 "\n", ((uint64_t) buff[20] << 56) +
-                ((uint64_t) buff[21] << 48) + ((uint64_t) buff[22] << 40) +
-                ((uint64_t) buff[23] << 32) + ((uint64_t) buff[24] << 24) +
-                (buff[25] << 16) + (buff[26] << 8) + buff[27]);
+        printf("  Space allocated: %" PRIu64 "\n",
+               (((uint64_t)buff[20]) << 56) + (((uint64_t)buff[21]) << 48) +
+               (((uint64_t)buff[22]) << 40) + (((uint64_t)buff[23]) << 32) +
+               (((uint64_t)buff[24]) << 24) + (buff[25] << 16) +
+               (buff[26] << 8) + buff[27]);
     }
-
     return;
 }
 

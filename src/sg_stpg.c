@@ -24,7 +24,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.5 20121019";
+static char * version_str = "1.5 20121211";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -565,15 +565,16 @@ main(int argc, char * argv[])
                 return SG_LIB_CAT_MALFORMED;
             }
             if (report_len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n", report_len,
-                        MX_ALLOC_LEN);
+                fprintf(stderr, "response length too long: %d > %d\n",
+                        report_len, MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (report_len > DEF_VPD_DEVICE_ID_LEN) {
                 if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
                                   report_len, 1, verbose))
                     return SG_LIB_CAT_OTHER;
             }
-            decode_target_port(rsp_buff + 4, report_len - 4, &relport, &portgroup);
+            decode_target_port(rsp_buff + 4, report_len - 4, &relport,
+                               &portgroup);
             printf("Device is at port Group 0x%02x, relative port 0x%02x\n",
                    portgroup, relport);
         }
@@ -629,7 +630,8 @@ main(int argc, char * argv[])
                 off = 8 + tgt_port_count * 4;
             }
         } else if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Report Target Port Groups command not supported\n");
+            fprintf(stderr, "Report Target Port Groups command not "
+                    "supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in Report Target Port Groups cdb "
                     "including unsupported service action\n");

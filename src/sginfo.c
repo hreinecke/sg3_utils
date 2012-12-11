@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.30 [20120224]";
+static const char * version_str = "2.30 [20121211]";
 
 #include <stdio.h>
 #include <string.h>
@@ -387,7 +387,8 @@ struct scsi_cmnd_io
 
 /* Returns 0 -> ok, 1 -> general error, 2 -> unknown opcode,
    3 -> unsupported field in cdb, 4 -> unsupported param in data-in */
-static int do_scsi_io(struct scsi_cmnd_io * sio)
+static int
+do_scsi_io(struct scsi_cmnd_io * sio)
 {
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
@@ -541,7 +542,8 @@ struct mpage_name_func * get_mpage_name_func(struct mpage_info * mpi)
 
 static char unkn_page_str[64];
 
-static char * get_page_name(struct mpage_info * mpi)
+static char *
+get_page_name(struct mpage_info * mpi)
 {
     struct mpage_name_func * mpf;
 
@@ -565,7 +567,8 @@ static char * get_page_name(struct mpage_info * mpi)
     return mpf->name;
 }
 
-static void dump(void *buffer, unsigned int length)
+static void
+dump(void *buffer, unsigned int length)
 {
     unsigned int i;
 
@@ -585,7 +588,8 @@ static void dump(void *buffer, unsigned int length)
 
 }
 
-static int getnbyte(const unsigned char *pnt, int nbyte)
+static int
+getnbyte(const unsigned char *pnt, int nbyte)
 {
     unsigned int result;
     int i;
@@ -598,7 +602,8 @@ static int getnbyte(const unsigned char *pnt, int nbyte)
     return result;
 }
 
-static int64_t getnbyte_ll(const unsigned char *pnt, int nbyte)
+static int64_t
+getnbyte_ll(const unsigned char *pnt, int nbyte)
 {
     int64_t result;
     int i;
@@ -612,7 +617,8 @@ static int64_t getnbyte_ll(const unsigned char *pnt, int nbyte)
     return result;
 }
 
-static int putnbyte(unsigned char *pnt, unsigned int value,
+static int
+putnbyte(unsigned char *pnt, unsigned int value,
                     unsigned int nbyte)
 {
     int i;
@@ -626,7 +632,8 @@ static int putnbyte(unsigned char *pnt, unsigned int value,
 
 #define REASON_SZ 128
 
-static void check_parm_type(int i)
+static void
+check_parm_type(int i)
 {
     char reason[REASON_SZ];
 
@@ -644,7 +651,8 @@ static void check_parm_type(int i)
     }
 }
 
-static void bitfield(unsigned char *pageaddr, char * text, int mask, int shift)
+static void
+bitfield(unsigned char *pageaddr, char * text, int mask, int shift)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -657,7 +665,8 @@ static void bitfield(unsigned char *pageaddr, char * text, int mask, int shift)
 }
 
 #if 0
-static void notbitfield(unsigned char *pageaddr, char * text, int mask,
+static void
+notbitfield(unsigned char *pageaddr, char * text, int mask,
                         int shift)
 {
     if (modifiable) {
@@ -675,7 +684,8 @@ static void notbitfield(unsigned char *pageaddr, char * text, int mask,
 }
 #endif
 
-static void intfield(unsigned char * pageaddr, int nbytes, char * text)
+static void
+intfield(unsigned char * pageaddr, int nbytes, char * text)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -686,7 +696,8 @@ static void intfield(unsigned char * pageaddr, int nbytes, char * text)
         printf("%-35s%d\n", text, getnbyte(pageaddr, nbytes));
 }
 
-static void hexfield(unsigned char * pageaddr, int nbytes, char * text)
+static void
+hexfield(unsigned char * pageaddr, int nbytes, char * text)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -697,7 +708,8 @@ static void hexfield(unsigned char * pageaddr, int nbytes, char * text)
         printf("%-35s0x%x\n", text, getnbyte(pageaddr, nbytes));
 }
 
-static void hexdatafield(unsigned char * pageaddr, int nbytes, char * text)
+static void
+hexdatafield(unsigned char * pageaddr, int nbytes, char * text)
 {
     if (x_interface && replace) {
         unsigned char *ptr;
@@ -751,7 +763,8 @@ static void hexdatafield(unsigned char * pageaddr, int nbytes, char * text)
 
 /* Offset into mode sense (6 or 10 byte) response that actual mode page
  * starts at (relative to resp[0]). Returns -1 if problem */
-static int modePageOffset(const unsigned char * resp, int len, int modese_6)
+static int
+modePageOffset(const unsigned char * resp, int len, int modese_6)
 {
     int bd_len;
     int resp_len = 0;
@@ -782,8 +795,9 @@ static int modePageOffset(const unsigned char * resp, int len, int modese_6)
 }
 
 /* Reads mode (sub-)page via 6 byte MODE SENSE, returns 0 if ok */
-static int get_mode_page6(struct mpage_info * mpi, int dbd,
-                          unsigned char * resp, int sngl_fetch)
+static int
+get_mode_page6(struct mpage_info * mpi, int dbd, unsigned char * resp,
+               int sngl_fetch)
 {
     int status, off;
     unsigned char cmd[6];
@@ -852,8 +866,9 @@ static int get_mode_page6(struct mpage_info * mpi, int dbd,
 }
 
 /* Reads mode (sub-)page via 10 byte MODE SENSE, returns 0 if ok */
-static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
-                           unsigned char * resp, int sngl_fetch)
+static int
+get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
+                unsigned char * resp, int sngl_fetch)
 {
     int status, off;
     unsigned char cmd[10];
@@ -926,8 +941,8 @@ static int get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
     return status;
 }
 
-static int get_mode_page(struct mpage_info * mpi, int dbd,
-                         unsigned char * resp)
+static int
+get_mode_page(struct mpage_info * mpi, int dbd, unsigned char * resp)
 {
     int res;
 
@@ -952,8 +967,9 @@ static int get_mode_page(struct mpage_info * mpi, int dbd,
 /* Contents should point to the mode parameter header that we obtained
    in a prior read operation.  This way we do not have to work out the
    format of the beast. Assume 0 or 1 block descriptors. */
-static int put_mode_page6(struct mpage_info * mpi,
-                          const unsigned char * msense6_resp, int sp_bit)
+static int
+put_mode_page6(struct mpage_info * mpi, const unsigned char * msense6_resp,
+               int sp_bit)
 {
     int status;
     int bdlen, resplen;
@@ -1007,8 +1023,9 @@ static int put_mode_page6(struct mpage_info * mpi,
 /* Contents should point to the mode parameter header that we obtained
    in a prior read operation.  This way we do not have to work out the
    format of the beast. Assume 0 or 1 block descriptors. */
-static int put_mode_page10(struct mpage_info * mpi,
-                           const unsigned char * msense10_resp, int sp_bit)
+static int
+put_mode_page10(struct mpage_info * mpi, const unsigned char * msense10_resp,
+                int sp_bit)
 {
     int status;
     int bdlen, resplen;
@@ -1062,8 +1079,8 @@ static int put_mode_page10(struct mpage_info * mpi,
     return status;
 }
 
-static int put_mode_page(struct mpage_info * mpi,
-                         const unsigned char * msense_resp)
+static int
+put_mode_page(struct mpage_info * mpi, const unsigned char * msense_resp)
 {
     if (mode6byte)
         return put_mode_page6(mpi, msense_resp, ! negate_sp_bit);
@@ -1071,8 +1088,9 @@ static int put_mode_page(struct mpage_info * mpi,
         return put_mode_page10(mpi, msense_resp, ! negate_sp_bit);
 }
 
-int setup_mode_page(struct mpage_info * mpi, int nparam,
-                    unsigned char * buff, unsigned char ** o_pagestart)
+static int
+setup_mode_page(struct mpage_info * mpi, int nparam, unsigned char * buff,
+                unsigned char ** o_pagestart)
 {
     int status, offset, rem_pglen;
     unsigned char * pgp;
@@ -1105,8 +1123,9 @@ int setup_mode_page(struct mpage_info * mpi, int nparam,
     return 0;
 }
 
-static int get_protocol_id(int port_not_lu, unsigned char * buff,
-                           int * proto_idp, int * offp)
+static int
+get_protocol_id(int port_not_lu, unsigned char * buff, int * proto_idp,
+                int * offp)
 {
     int status, off, proto_id, spf;
     struct mpage_info mp_i;
@@ -1134,7 +1153,8 @@ static int get_protocol_id(int port_not_lu, unsigned char * buff,
     return 0;
 }
 
-static int disk_geometry(struct mpage_info * mpi, const char * prefix)
+static int
+disk_geometry(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1164,7 +1184,8 @@ static int disk_geometry(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int common_disconnect_reconnect(struct mpage_info * mpi,
+static int
+common_disconnect_reconnect(struct mpage_info * mpi,
                                        const char * prefix)
 {
     int status;
@@ -1199,7 +1220,8 @@ static int common_disconnect_reconnect(struct mpage_info * mpi,
 
 }
 
-static int common_control(struct mpage_info * mpi, const char * prefix)
+static int
+common_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1242,7 +1264,8 @@ static int common_control(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int common_control_extension(struct mpage_info * mpi, const char * prefix)
+static int
+common_control_extension(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1270,7 +1293,8 @@ static int common_control_extension(struct mpage_info * mpi, const char * prefix
     return 0;
 }
 
-static int common_informational(struct mpage_info * mpi, const char * prefix)
+static int
+common_informational(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1302,7 +1326,8 @@ static int common_informational(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int disk_error_recovery(struct mpage_info * mpi, const char * prefix)
+static int
+disk_error_recovery(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1338,7 +1363,8 @@ static int disk_error_recovery(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_error_recovery(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_error_recovery(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1370,7 +1396,8 @@ static int cdvd_error_recovery(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_mrw(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_mrw(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1393,7 +1420,8 @@ static int cdvd_mrw(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
+static int
+disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1444,7 +1472,9 @@ static int disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static char *formatname(int format) {
+static char *
+formatname(int format)
+{
     switch(format) {
         case 0x0: return "logical block addresses (32 bit)";
         case 0x3: return "logical block addresses (64 bit)";
@@ -1456,7 +1486,8 @@ static char *formatname(int format) {
     return "Weird, unknown format";
 }
 
-static int read_defect_list(int grown_only)
+static int
+read_defect_list(int grown_only)
 {
     int i, len, reallen, table, k, defect_format;
     int status = 0;
@@ -1609,7 +1640,8 @@ static int read_defect_list(int grown_only)
             }
             if (len > 0xfff0 && heapp != NULL) {
                 cmd12[0] = 0xB7;          /* READ DEFECT DATA (12) */
-                cmd12[1] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
+                cmd12[1] = (table ? 0x08 : 0x10) | defectformat;
+                                                /*  List, Format */
                 cmd12[2] = 0x00;          /* (reserved) */
                 cmd12[3] = 0x00;          /* (reserved) */
                 cmd12[4] = 0x00;          /* (reserved) */
@@ -1660,7 +1692,8 @@ trytenbyte:
                 }
                 cmd[0] = 0x37;          /* READ DEFECT DATA (10) */
                 cmd[1] = 0x00;
-                cmd[2] = (table ? 0x08 : 0x10) | defectformat;/*  List, Format */
+                cmd[2] = (table ? 0x08 : 0x10) | defectformat;
+                                        /*  List, Format */
                 cmd[3] = 0x00;          /* (reserved) */
                 cmd[4] = 0x00;          /* (reserved) */
                 cmd[5] = 0x00;          /* (reserved) */
@@ -1702,8 +1735,8 @@ trytenbyte:
             switch (defect_format) {
             case 4:     /* bytes from index */
                 while (len > 0) {
-                    snprintf((char *)cbuffer1, 40, "%6d:%3u:%8d", getnbyte(df, 3),
-                             df[3], getnbyte(df + 4, 4));
+                    snprintf((char *)cbuffer1, 40, "%6d:%3u:%8d",
+                             getnbyte(df, 3), df[3], getnbyte(df + 4, 4));
                     if (sorthead == 0)
                         printf("%19s", (char *)cbuffer1);
                     else
@@ -1719,7 +1752,8 @@ trytenbyte:
                 }
             case 5:     /* physical sector */
                 while (len > 0) {
-                    snprintf((char *)cbuffer1, 40, "%6d:%2u:%5d", getnbyte(df, 3),
+                    snprintf((char *)cbuffer1, 40, "%6d:%2u:%5d",
+                             getnbyte(df, 3),
                              df[3], getnbyte(df + 4, 4));
                     if (sorthead == 0)
                         printf("%15s", (char *)cbuffer1);
@@ -1787,7 +1821,8 @@ trytenbyte:
     return status;
 }
 
-static int disk_cache(struct mpage_info * mpi, const char * prefix)
+static int
+disk_cache(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1830,7 +1865,8 @@ static int disk_cache(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int disk_format(struct mpage_info * mpi, const char * prefix)
+static int
+disk_format(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1866,8 +1902,8 @@ static int disk_format(struct mpage_info * mpi, const char * prefix)
 
 }
 
-static int disk_verify_error_recovery(struct mpage_info * mpi,
-                                      const char * prefix)
+static int
+disk_verify_error_recovery(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1898,8 +1934,8 @@ static int disk_verify_error_recovery(struct mpage_info * mpi,
 }
 
 #if 0
-static int peripheral_device_page(struct mpage_info * mpi,
-                                  const char * prefix)
+static int
+peripheral_device_page(struct mpage_info * mpi, const char * prefix)
 {
     static char *idents[] =
     {
@@ -1969,7 +2005,8 @@ static int peripheral_device_page(struct mpage_info * mpi,
 }
 #endif
 
-static int common_power_condition(struct mpage_info * mpi, const char * prefix)
+static int
+common_power_condition(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -1996,7 +2033,8 @@ static int common_power_condition(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int disk_xor_control(struct mpage_info * mpi, const char * prefix)
+static int
+disk_xor_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2024,7 +2062,8 @@ static int disk_xor_control(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int disk_background(struct mpage_info * mpi, const char * prefix)
+static int
+disk_background(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2052,7 +2091,8 @@ static int disk_background(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int optical_memory(struct mpage_info * mpi, const char * prefix)
+static int
+optical_memory(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2076,7 +2116,8 @@ static int optical_memory(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_write_param(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_write_param(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2119,7 +2160,8 @@ static int cdvd_write_param(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_audio_control(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_audio_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2152,7 +2194,8 @@ static int cdvd_audio_control(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_timeout(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_timeout(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2181,7 +2224,8 @@ static int cdvd_timeout(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_device_param(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_device_param(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2210,7 +2254,8 @@ static int cdvd_device_param(struct mpage_info * mpi, const char * prefix)
 /* This is not a standard t10.org MMC mode page (it is now "protocol specific
    lu" mode page). This definition was found in Hitachi GF-2050/GF-2055
    DVD-RAM drive SCSI reference manual. */
-static int cdvd_feature(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_feature(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2245,7 +2290,8 @@ static int cdvd_feature(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_mm_capab(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_mm_capab(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2317,7 +2363,8 @@ static int cdvd_mm_capab(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int cdvd_cache(struct mpage_info * mpi, const char * prefix)
+static int
+cdvd_cache(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2341,7 +2388,8 @@ static int cdvd_cache(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int tape_data_compression(struct mpage_info * mpi, const char * prefix)
+static int
+tape_data_compression(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2370,7 +2418,8 @@ static int tape_data_compression(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int tape_dev_config(struct mpage_info * mpi, const char * prefix)
+static int
+tape_dev_config(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2418,7 +2467,8 @@ static int tape_dev_config(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int tape_medium_part1(struct mpage_info * mpi, const char * prefix)
+static int
+tape_medium_part1(struct mpage_info * mpi, const char * prefix)
 {
     int status, off, len;
     unsigned char *pagestart;
@@ -2465,7 +2515,8 @@ static int tape_medium_part1(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int tape_medium_part2_4(struct mpage_info * mpi, const char * prefix)
+static int
+tape_medium_part2_4(struct mpage_info * mpi, const char * prefix)
 {
     int status, off, len;
     unsigned char *pagestart;
@@ -2501,7 +2552,8 @@ static int tape_medium_part2_4(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int ses_services_manag(struct mpage_info * mpi, const char * prefix)
+static int
+ses_services_manag(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2526,7 +2578,8 @@ static int ses_services_manag(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int fcp_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
+static int
+fcp_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2551,7 +2604,8 @@ static int fcp_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
+static int
+sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2575,7 +2629,8 @@ static int sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int common_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
+static int
+common_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
 {
     int status, proto_id;
 
@@ -2590,7 +2645,8 @@ static int common_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
         return DECODE_FAILED_TRY_HEX;
 }
 
-static int fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
+static int
+fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2624,7 +2680,8 @@ static int fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
+static int
+spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2649,7 +2706,8 @@ static int spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 }
 
 /* Protocol specific mode page for SAS, short format (subpage 0) */
-static int sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
+static int
+sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2675,7 +2733,8 @@ static int sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int common_proto_spec_port(struct mpage_info * mpi, const char * prefix)
+static int
+common_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status, proto_id;
 
@@ -2692,7 +2751,8 @@ static int common_proto_spec_port(struct mpage_info * mpi, const char * prefix)
         return DECODE_FAILED_TRY_HEX;
 }
 
-static int spi4_margin_control(struct mpage_info * mpi, const char * prefix)
+static int
+spi4_margin_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2722,8 +2782,8 @@ static int spi4_margin_control(struct mpage_info * mpi, const char * prefix)
 }
 
 /* Protocol specific mode page for SAS, phy control + discover (subpage 1) */
-static int sas_phy_control_discover(struct mpage_info * mpi,
-                                    const char * prefix)
+static int
+sas_phy_control_discover(struct mpage_info * mpi, const char * prefix)
 {
     int status, off, num_phys, k;
     unsigned char *pagestart;
@@ -2776,8 +2836,8 @@ static int sas_phy_control_discover(struct mpage_info * mpi,
 }
 
 
-static int common_proto_spec_port_sp1(struct mpage_info * mpi,
-                                      const char * prefix)
+static int
+common_proto_spec_port_sp1(struct mpage_info * mpi, const char * prefix)
 {
     int status, proto_id;
 
@@ -2792,7 +2852,8 @@ static int common_proto_spec_port_sp1(struct mpage_info * mpi,
         return DECODE_FAILED_TRY_HEX;
 }
 
-static int spi4_training_config(struct mpage_info * mpi, const char * prefix)
+static int
+spi4_training_config(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2844,7 +2905,8 @@ static int spi4_training_config(struct mpage_info * mpi, const char * prefix)
 }
 
 /* SAS(2) SSP, shared protocol specific port mode subpage (subpage 2) */
-static int sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
+static int
+sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2869,8 +2931,8 @@ static int sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int common_proto_spec_port_sp2(struct mpage_info * mpi,
-                                      const char * prefix)
+static int
+common_proto_spec_port_sp2(struct mpage_info * mpi, const char * prefix)
 {
     int status, proto_id;
 
@@ -2885,7 +2947,8 @@ static int common_proto_spec_port_sp2(struct mpage_info * mpi,
         return DECODE_FAILED_TRY_HEX;
 }
 
-static int spi4_negotiated(struct mpage_info * mpi, const char * prefix)
+static int
+spi4_negotiated(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2916,7 +2979,8 @@ static int spi4_negotiated(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static int spi4_report_xfer(struct mpage_info * mpi, const char * prefix)
+static int
+spi4_report_xfer(struct mpage_info * mpi, const char * prefix)
 {
     int status;
     unsigned char *pagestart;
@@ -2944,8 +3008,9 @@ static int spi4_report_xfer(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static void print_hex_page(struct mpage_info * mpi, const char * prefix,
-                           unsigned char *pagestart, int off, int len)
+static void
+print_hex_page(struct mpage_info * mpi, const char * prefix,
+               unsigned char *pagestart, int off, int len)
 {
     int k;
     char * pg_name;
@@ -2981,7 +3046,8 @@ static void print_hex_page(struct mpage_info * mpi, const char * prefix,
     printf("\n");
 }
 
-static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
+static int
+do_user_page(struct mpage_info * mpi, int decode_in_hex)
 {
     int status = 0;
     int len, off, res, done;
@@ -3023,7 +3089,7 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
         local_mp_i.subpage = (pagestart[0] & 0x40) ? pagestart[1] : 0;
         if(0 == local_mp_i.page) { /* page==0 vendor (unknown) format */
             off = 0;
-            len = mpi->resp_len - offset;       /* should be last listed page */
+            len = mpi->resp_len - offset;  /* should be last listed page */
         } else if (local_mp_i.subpage) {
             off = 4;
             len = (pagestart[2] << 8) + pagestart[3] + 4;
@@ -3058,8 +3124,8 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
                 if (multiple && x_interface && !replace) {
                     if (local_mp_i.subpage)
                         snprintf(prefix, sizeof(prefix), "sginfo -u 0x%x,0x%x"
-                                 " -XR %s ", local_mp_i.page, local_mp_i.subpage,
-                                 device_name);
+                                 " -XR %s ", local_mp_i.page,
+                                 local_mp_i.subpage, device_name);
                     else
                         snprintf(prefix, sizeof(prefix), "sginfo -u 0x%x -XR "
                                  "%s ", local_mp_i.page, device_name);
@@ -3073,8 +3139,8 @@ static int do_user_page(struct mpage_info * mpi, int decode_in_hex)
     return status;
 }
 
-static int do_inquiry(int * peri_type, int * resp_byte6,
-                      int inquiry_verbosity)
+static int
+do_inquiry(int * peri_type, int * resp_byte6, int inquiry_verbosity)
 {
     int status;
     unsigned char cmd[6];
@@ -3162,7 +3228,8 @@ static int do_inquiry(int * peri_type, int * resp_byte6,
 
 }
 
-static int do_serial_number()
+static int
+do_serial_number(void)
 {
     int status, pagelen;
     unsigned char cmd[6];
@@ -3265,7 +3332,8 @@ typedef struct my_scsi_idlun
 
 #define MDEV_NAME_SZ 256
 
-static void make_dev_name(char * fname, int k, int do_numeric)
+static void
+make_dev_name(char * fname, int k, int do_numeric)
 {
     char buff[MDEV_NAME_SZ];
     size_t len;
@@ -3292,7 +3360,8 @@ static Sg_map sg_map_arr[MAX_SG_DEVS + 1];
 #define MAX_HOLES 4
 
 /* Print out a list of the known devices on the system */
-static void show_devices(int raw)
+static void
+show_devices(int raw)
 {
     int k, j, fd, err, bus;
     My_scsi_idlun m_idlun;
@@ -3333,7 +3402,8 @@ static void show_devices(int raw)
         if ( strncmp("sg",entry->d_name,2) == 0 ) {
                 continue;
         }
-        if ( strncmp("sd",entry->d_name,2) == 0 && isdigit(entry->d_name[strlen(entry->d_name)-1]) ) {
+        if ((strncmp("sd",entry->d_name,2) == 0) &&
+            isdigit(entry->d_name[strlen(entry->d_name)-1])) {
                 continue;
         }
 
@@ -3460,7 +3530,8 @@ static void show_devices(int raw)
 
 #define DEVNAME_SZ 256
 
-static int open_sg_io_dev(char * devname)
+static int
+open_sg_io_dev(char * devname)
 {
     int fd, fdrw, err, bus, bbus, k, v;
     My_scsi_idlun m_idlun, mm_idlun;
@@ -3560,13 +3631,16 @@ static int open_sg_io_dev(char * devname)
         return fd;
 }
 
-static void usage(char *errtext)
+static void
+usage(char *errtext)
 {
     if (errtext)
         fprintf(stderr, "Error: sginfo: %s\n", errtext);
-    fprintf(stderr, "Usage: sginfo [-options] [device] [replacement_values]\n");
+    fprintf(stderr, "Usage: sginfo [-options] [device] "
+            "[replacement_values]\n");
     fputs("\tAllowed options are:\n"
-          "\t-6    Do 6 byte mode sense and select commands (def: 10 bytes).\n"
+          "\t-6    Do 6 byte mode sense and select commands (def: 10 "
+          "bytes).\n"
           "\t-a    Display inquiry info, serial # and all mode pages.\n"
           "\t-A    Similar to '-a' but displays all subpages as well.\n"
           "\t-c    Access Caching Page.\n"
@@ -3820,7 +3894,8 @@ int main(int argc, char *argv[])
 
                 if ((len & 1) || (len != (int)strspn(argv[optind + j] + 1,
                                                 "0123456789ABCDEFabcdef")))
-                            usage("Odd number of chars or non-hex digit in @hexdatafield");
+                            usage("Odd number of chars or non-hex digit in "
+                                  "@hexdatafield");
 
                 replacement_values[j] = (unsigned long) argv[optind + j];
                 is_hex[j] = 1;

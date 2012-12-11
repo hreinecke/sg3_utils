@@ -868,7 +868,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         num = ucp[5];
         printf("      Profile numbers:\n");
         for (k = 6; (num > 0) && (k < len); --num, k += 2) {
-            printf("        %d\n", 
+            printf("        %d\n",
                    ((unsigned int)ucp[k] << 8) + ucp[k + 1]);
         }
         break;

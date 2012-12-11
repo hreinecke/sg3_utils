@@ -499,4 +499,3 @@ static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
                    fname);
     }
 }
-

@@ -93,6 +93,9 @@ Ronnie Sahlberg <ronniesahlberg at gmail dot com> has written libiscsi and a
 
 Saeed Bishara contributed sg_write_long
 
+Shahar Salzman <shahar dot salzman at kaminario dot com> contributed
+	sg_compare_and_write [20121205]
+
 Thomas Kolbe <tkolbe at partnersdata dot com>
         Solaris port help and testing [20070503]
 
@@ -107,4 +110,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-22nd March 2012
+10th December 2012

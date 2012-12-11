@@ -472,7 +472,7 @@ main(int argc, char * argv[])
                 opts.xfer_len = (int)a_stat.st_size;
         }
     }
-    
+
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,

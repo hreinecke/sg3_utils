@@ -1796,8 +1796,8 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             if (len > 19) {     /* added in sbc3r09 */
                 u = (buff[16] << 24) | (buff[17] << 16) | (buff[18] << 8) |
                     buff[19];
-                printf("  Maximum prefetch, xdread, xdwrite transfer length: %u "
-                       "blocks\n", u);
+                printf("  Maximum prefetch, xdread, xdwrite transfer length: "
+                       "%u blocks\n", u);
             }
             if (len > 27) {     /* added in sbc3r18 */
                 u = ((unsigned int)buff[20] << 24) | (buff[21] << 16) |
@@ -1910,15 +1910,18 @@ decode_b3_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 0xc0) {
-                fprintf(stderr, "Referrals VPD page length too short=%d\n", len);
+                fprintf(stderr, "Referrals VPD page length too short=%d\n",
+                        len);
                 return;
             }
             s = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) | buff[11];
-            m = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) | buff[15];
+            m = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) |
+                buff[15];
             if (0 == s)
                 printf("  Single user data segment\n");
             else if (0 == m)
-                printf("  Segment size specified by user data segment descriptor\n");
+                printf("  Segment size specified by user data segment "
+                       "descriptor\n");
             else
                 printf("  Segment size: %u, segment multiplier: %u\n", s, m);
             break;
@@ -3400,7 +3403,8 @@ ata_command_interface(int device, char *data, int * atapi_flag, int verbose)
         } else if (atapi_flag) {
             *atapi_flag = 1;
             if (verbose > 1)
-                fprintf(stderr, "HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) succeeded\n");
+                fprintf(stderr, "HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) "
+                        "succeeded\n");
         }
     } else {    /* assume non-packet device */
         buff[0] = ATA_IDENTIFY_DEVICE;

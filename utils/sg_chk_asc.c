@@ -163,10 +163,11 @@ printf("\"%s\",\n", b);
                 continue;
             }
             num = strlen(cp);
-// fprintf(stderr, "file: asc=%x  acsq=%x  strlen=%d %s\n", asc, ascq, num, cp);
+// fprintf(stderr, "file: asc=%x  acsq=%x  strlen=%d %s\n", asc, ascq, num,
+//         cp);
 //            if (num < 20)
 //                continue;
-            if ((num > 6) && 
+            if ((num > 6) &&
                 ((0 == memcmp("ASC", cp, 3)) ||
                  (0 == memcmp("vendor", cp, 6)))) {
                 fprintf(stderr, "%x,%x differ, ref: %s, sg_lib_data: "

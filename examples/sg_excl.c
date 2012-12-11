@@ -188,8 +188,9 @@ int main(int argc, char * argv[])
         printf("Test Unit Ready failed so unit may _not_ be ready!\n");
 
     if (do_extra)
-        printf("TEST UNIT READY duration=%u millisecs, resid=%d, msg_status=%d\n",
-               io_hdr.duration, io_hdr.resid, (int)io_hdr.msg_status);
+        printf("TEST UNIT READY duration=%u millisecs, resid=%d, "
+	       "msg_status=%d\n", io_hdr.duration, io_hdr.resid,
+		(int)io_hdr.msg_status);
 
     sleep(60);
     close(sg_fd);

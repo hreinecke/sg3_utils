@@ -1,3 +1,29 @@
+/* A utility program for copying files. Specialised for "files" that
+*  represent devices that understand the SCSI command set.
+*
+*  Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
+*  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2, or (at your option)
+*  any later version.
+
+   This program is a specialisation of the Unix "dd" command in which
+   one or both of the given files is a scsi generic device or a raw
+   device. A block size ('bs') is assumed to be 512 if not given. This
+   program complains if 'ibs' or 'obs' are given with some other value
+   than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
+   'of' is not given or 'of=-' then stdout assumed.
+
+   A non-standard argument "bpt" (blocks per transfer) is added to control
+   the maximum number of blocks in each transfer. The default value is 128.
+   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
+   in this case) are transferred to or from the sg device in a single SCSI
+   command.
+
+   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
+
+*/
+
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -30,33 +56,8 @@
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
 
-/* A utility program for copying files. Specialised for "files" that
-*  represent devices that understand the SCSI command set.
-*
-*  Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
 
-   This program is a specialisation of the Unix "dd" command in which
-   one or both of the given files is a scsi generic device or a raw
-   device. A block size ('bs') is assumed to be 512 if not given. This
-   program complains if 'ibs' or 'obs' are given with some other value
-   than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
-   'of' is not given or 'of=-' then stdout assumed.
-
-   A non-standard argument "bpt" (blocks per transfer) is added to control
-   the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
-   in this case) are transferred to or from the sg device in a single SCSI
-   command.
-
-   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
-
-*/
-
-static char * version_str = "5.42 20120907";
+static char * version_str = "5.43 20121211";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -227,8 +228,8 @@ print_stats(const char * str)
         fprintf(stderr, "  remaining block count=%"PRId64"\n",
                 rcoll.out_rem_count);
     infull = dd_count - rcoll.in_rem_count;
-    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, infull - rcoll.in_partial,
-            rcoll.in_partial);
+    fprintf(stderr, "%s%"PRId64"+%d records in\n", str,
+            infull - rcoll.in_partial, rcoll.in_partial);
 
     outfull = dd_count - rcoll.out_rem_count;
     fprintf(stderr, "%s%"PRId64"+%d records out\n", str,
@@ -858,8 +859,8 @@ sg_in_operation(Rq_coll * clp, Rq_elem * rep)
                 return;
             } else {
                 memset(rep->buffp, 0, rep->num_blks * rep->bs);
-                fprintf(stderr, ">> substituted zeros for in blk=%"PRId64" for "
-                        "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
+                fprintf(stderr, ">> substituted zeros for in blk=%" PRId64
+                        " for %d bytes\n", rep->blk, rep->num_blks * rep->bs);
             }
             /* fall through */
         case 0:
@@ -1333,8 +1334,8 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (rcoll.debug)
-        fprintf(stderr, ME "if=%s skip=%"PRId64" of=%s seek=%"PRId64" count=%"PRId64"\n",
-               inf, skip, outf, seek, dd_count);
+        fprintf(stderr, ME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64
+                " count=%" PRId64 "\n", inf, skip, outf, seek, dd_count);
 
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
@@ -1555,8 +1556,9 @@ main(int argc, char * argv[])
             dd_count = out_num_sect;
     }
     if (rcoll.debug > 1)
-        fprintf(stderr, "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", "
-                "out_num_sect=%"PRId64"\n", dd_count, in_num_sect, out_num_sect);
+        fprintf(stderr, "Start of loop, count=%" PRId64 ", in_num_sect=%"
+                PRId64 ", out_num_sect=%" PRId64 "\n", dd_count, in_num_sect,
+                out_num_sect);
     if (dd_count < 0) {
         fprintf(stderr, "Couldn't calculate count, please give one\n");
         return SG_LIB_CAT_OTHER;
@@ -1669,8 +1671,8 @@ main(int argc, char * argv[])
         close(rcoll.outfd);
     res = exit_status;
     if (0 != rcoll.out_count) {
-        fprintf(stderr, ">>>> Some error occurred, remaining blocks=%"PRId64"\n",
-               rcoll.out_count);
+        fprintf(stderr, ">>>> Some error occurred, remaining blocks=%"
+                PRId64 "\n", rcoll.out_count);
         if (0 == res)
             res = SG_LIB_CAT_OTHER;
     }

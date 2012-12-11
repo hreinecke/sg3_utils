@@ -81,7 +81,7 @@ scsi_pt_open_device(const char * device_name, int read_only, int verbose)
     oflags |= (read_only ? O_RDONLY : O_RDWR);
     return scsi_pt_open_flags(device_name, oflags, verbose);
 }
- 
+
 /* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed
  * together. The 'flags' argument is ignored in FreeBSD.
  * Returns >= 0 if successful, otherwise returns negated errno. */
