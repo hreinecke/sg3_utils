@@ -3,5 +3,9 @@ been removed (apart from the rescan-scsi-bus.sh script). See the
 sg3_utils-1.22 source tarball for the most recent version that
 included this source.
 
+The primary site for rescan-scsi-bus.sh is http://www.garloff.de/kurt/linux
+under the "Rescan SCSI bus" heading. Updated to rescan-scsi-bus.sh
+version 1.56 (2012-01-15) in sg3_utils version 1.35 .
+
 Douglas Gilbert
-10th October 2006
+20th December 2012
