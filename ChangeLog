@@ -2,15 +2,15 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.35 [20121220] [svn: r471]
+Changelog for sg3_utils-1.35 [20121221] [svn: r472]
   - sg_compare_and_write: new utility
   - sg_inq+sg_vpd: block device characteristics VPD page:
     add product_type, WABEREQ, WACEREQ and VBULS fields
   - sg_verify: add --ebytchk option for sbc3r34 changes
-  - sg_stpg: with --offline fix 'Invalid state 0xe'
+  - sg_stpg: --offline option: fix 'Invalid state 0xe'
   - sg_ses: Door Lock element changed to Door element and
-    abbreviation changed frm 'dl' to 'do' (ses3r05)
-  - archive/rescan-scsi-bus.sh: update to version 1.56
+    abbreviation changed from 'dl' to 'do' (ses3r05)
+  - archive/rescan-scsi-bus.sh: upgrade to version 1.56+
   - sync to sbc3r34
   - sg_lib: sg_ll_verify10+16 expand BYTCHK two 2 bit field
   - sg_pt_win32, sg_scan(win32): changes for cygwin 1.7.17

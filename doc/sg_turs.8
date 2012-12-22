@@ -1,4 +1,4 @@
-.TH SG_TURS "8" "August 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_TURS "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
@@ -63,8 +63,8 @@ The SCSI FORMAT command for disks used with the IMMED bit set is an example
 of an operation that takes a significant amount of time and precludes other
 media access during that time. The IMMED bit set instructs the FORMAT command
 to return control to the application client once the format has commenced (see
-SBC-3). Several long duration SCSI commands associated with tape drives also
-use the progress indication (see SSC-3).
+SBC\-3). Several long duration SCSI commands associated with tape drives also
+use the progress indication (see SSC\-3).
 .PP
 Early standards suggested that the SCSI TEST UNIT READY command be used for
 polling the progress indication. More recent standards seem to suggest
@@ -105,7 +105,7 @@ print out version string then exit.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000\-2008 Douglas Gilbert
+Copyright \(co 2000\-2012 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

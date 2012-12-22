@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_PERSIST "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -221,7 +221,7 @@ comma (or single space) separated list of ASCII hex bytes representing
 a single TransportID as defined in SPC\-4. They are usually 24 bytes
 long apart from in iSCSI. The \fITIDS\fR argument may be a transport
 specific form (e.g. "sas,5000c50005b32001"). The \fITIDS\fR argument
-may be "-" in which case one or more TransportIDs can be read from stdin.
+may be "\-" in which case one or more TransportIDs can be read from stdin.
 The \fITIDS\fR argument may be of the form "file=<name>" in which case
 one or more TransportIDs can be read from a file called <name>. See
 the "TRANSPORT IDs" section below for more information.
@@ -265,26 +265,26 @@ The "fcp," form should be followed by 16 ASCII hex digits that represent an
 initiator's N_PORT_NAME. The "spi," form should be followed
 by "<scsi_address>,<relative_target_port_identifier>" (both decimal numbers).
 The "sbp," form should be followed by 16 ASCII hex digits that represent an
-initiator's EUI-64 name. The "srp," form should be followed by 32 ASCII hex
+initiator's EUI\-64 name. The "srp," form should be followed by 32 ASCII hex
 digits that represent an initiator port identifier. The "sas," form should be
 followed by 16 ASCII hex digits that represent an initiator's port SAS
 address. 
 .PP
 There are two iSCSI qualified name forms. The shorter form contains the
 iSCSI name of the initiator
-port (e.g. "iqn.5886.com.acme.diskarrays-sn-a8675309"). The longer form adds
-the initiator session id (ISID in hex) separated by ",i,0x".
-For example "iqn.5886.com.acme.diskarrays-sn-a8675309,i,0x1234567890ab".
-On the command line to stop punctuation in an iSCSI name being (mis)-
-interpreted by the shell, putting the option argument containing the iSCSI
-name in double quotes is advised. iSCSI names are encoded in UTF-8 so if
-non (7 bit) ASCII characters appear in the iSCSI name on the command line,
-there will be difficulties if they are not encoded in UTF-8. The locale can
-be changed temporarily by prefixing the command line invocation of
-sg_persist with "LANG=en_US.utf-8" for example.
+port (e.g. "iqn.5886.com.acme.diskarrays\-sn\-a8675309"). The longer form
+adds the initiator session id (ISID in hex) separated by ",i,0x".
+For example "iqn.5886.com.acme.diskarrays\-sn\-a8675309,i,0x1234567890ab".
+On the command line to stop punctuation in an iSCSI name
+being (mis)\-interpreted by the shell, putting the option argument
+containing the iSCSI name in double quotes is advised. iSCSI names are
+encoded in UTF\-8 so if non (7 bit) ASCII characters appear in the
+iSCSI name on the command line, there will be difficulties if they are not
+encoded in UTF\-8. The locale can be changed temporarily by prefixing the
+command line invocation of sg_persist with "LANG=en_US.utf\-8" for example.
 .PP
 Alternatively the \fITIDS\fR argument may specify a file (or pipe) from which
-one or more TransportIDs may be read. If the \fITIDS\fR argument is "-"
+one or more TransportIDs may be read. If the \fITIDS\fR argument is "\-"
 then stdin (standard input) is read. If the \fITIDS\fR argument is of the
 form "file=<name>" than a file called <name> is read.
 A valid SPC\-4 TransportID is built from the transport specific string

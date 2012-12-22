@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "February 2012" "sg3_utils\-1.33" SG3_UTILS
+.TH SG_FORMAT "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
@@ -405,7 +405,7 @@ check which protection types are supported by a disk (by checking the SPT
 field in the Extended inquiry VPD page together with the Protect bit in the
 standard inquiry response):
 .PP
-   # sg_vpd -p ei -l /dev/sdb
+   # sg_vpd \-p ei \-l /dev/sdb
 .br
    extended INQUIRY data VPD page:
 .br
@@ -422,7 +422,7 @@ Format with type 1 protection:
 After a successful format with type 1 protection, READ CAPACITY(16)
 should show something like this:
 .PP
-   # sg_readcap -l /dev/sdm
+   # sg_readcap \-l /dev/sdm
 .br
    Read Capacity results:
 .br

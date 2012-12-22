@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "February 2012" "sg3_utils\-1.34" SG3_UTILS
+.TH SG3_UTILS "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -143,10 +143,10 @@ a form that is suitable for other utilities in this package to use.
 SCSI disks have block names of the form /dev/da<num> where <num> is an
 integer starting at zero. The "da" is replaced by "sa" for SCSI tape
 drives and "cd" for SCSI CD/DVD/BD drives. Each SCSI device has a
-corresponding pass-through device name of the form /dev/pass<num>
+corresponding pass\-through device name of the form /dev/pass<num>
 where <num> is an integer starting at zero. The "camcontrol devlist"
 command may be useful for finding out which SCSI device names are
-available and the correspondence between between class and pass-through
+available and the correspondence between between class and pass\-through
 names.
 .SH SOLARIS DEVICE NAMING
 SCSI device names below the /dev directory have a form like: c5t4d3s2
@@ -377,7 +377,7 @@ subdirectory.
 .PP
 There is some example C code plus examples of complex invocations in
 the 'examples' subdirectory. There is also a README file. The example C
-may be a simpler example of how to use a SCSI pass-through in Linux
+may be a simpler example of how to use a SCSI pass\-through in Linux
 than the main utilities (found in the 'src' subdirectory). This is due
 to the fewer abstraction layers (e.g. they don't worry the MinGW in
 Windows may open a file in text rather than binary mode).

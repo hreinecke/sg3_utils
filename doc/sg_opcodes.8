@@ -1,4 +1,4 @@
-.TH SG_OPCODES "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_OPCODES "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
@@ -193,7 +193,7 @@ To see the information about a specific command give its operation
 code to the '\-\-op=' option. A command line invocation is shown first
 followed by a typical response:
 .PP
-   # sg_opcodes --op=93h /dev/sdb
+   # sg_opcodes \-\-op=93h /dev/sdb
 .PP
   Opcode=0x93
 .br
@@ -205,7 +205,7 @@ followed by a typical response:
 .PP
 The next example shows the supported task management functions:
 .PP
-   # sg_opcodes --tmf -n /dev/sdb
+   # sg_opcodes \-\-tmf \-n /dev/sdb
 .PP
 Task Management Functions supported by device:
 .br

@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_WRITE_SAME "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -239,7 +239,7 @@ going to modify LBA 2468 then we take a copy of it first:
 The following command line sets the user data to zeroes and the PI to 8
 0xFF bytes on LBA 2468:
 .PP
-  sg_write_same --lba=2468 /dev/sdb
+  sg_write_same \-\-lba=2468 /dev/sdb
 .PP
 Reading back that block should be successful because the application tag
 is 0xffff which suppresses the guard (CRC) check (which would otherwise be
@@ -260,10 +260,10 @@ below shows:
 .br
   dd if=/dev/zero bs=1 count=2 seek=514 conv=notrunc of=lb.bin
 .PP
-The resulting file can be viewed with 'hexdump -C lb.bin' and should
+The resulting file can be viewed with 'hexdump \-C lb.bin' and should
 contain 520 bytes. Now that file can be written to LBA 2468 as follows:
 .PP
-  sg_write_same --lba=2468 wrprotect=3 --in=lb.bin /dev/sdb
+  sg_write_same \-\-lba=2468 wrprotect=3 \-\-in=lb.bin /dev/sdb
 .PP
 Note the \fI\-\-wrprotect=3\fR rather than being set to 1, since we want
 the WRITE SAME command to succeed even though the PI data now indicates
@@ -274,7 +274,7 @@ error should occur:
 .PP
 dd errors are not very expressive, if dmesg is checked there should be
 a line something like this: "[sdb]  Add. Sense: Logical block guard check
-failed". The block can be corrected by doing a "sg_write_same --lba=1234
+failed". The block can be corrected by doing a "sg_write_same \-\-lba=1234
 /dev/sdb" again or restoring the original contents of that LBA:
 .PP
   dd if=2468.bin bs=512 seek=2468 of=/dev/sdb conv=notrunc count=1
