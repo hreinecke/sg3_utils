@@ -1,4 +1,4 @@
-.TH SG_WRITE_LONG "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_WRITE_LONG "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_write_long \- send SCSI WRITE LONG command
 .SH SYNOPSIS
@@ -141,7 +141,7 @@ the sector is read (and no others) and the error is fully reported.
 The "blk_sgio=1" option causes the SG_IO ioctl to be used by sg_dd rather
 than the block subsystem.
 .PP
-Finally we should restore sector 0x1234 to a non-corrupted state. A sector
+Finally we should restore sector 0x1234 to a non\-corrupted state. A sector
 full of zeroes could be written with:
 .PP
   sg_dd if=/dev/zero of=/dev/sda blk_sgio=1 seek=0x1234 bs=512 count=1

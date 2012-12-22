@@ -1,4 +1,4 @@
-.TH SG_WRITE_BUFFER "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_WRITE_BUFFER "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_write_buffer \- send SCSI WRITE BUFFER command
 .SH SYNOPSIS
@@ -63,7 +63,7 @@ given by \fI\-\-length=LEN\fR). If not given the byte offset defaults to
 0 (i.e. the start of the file).
 .TP
 \fB\-S\fR, \fB\-\-specific\fR=\fIMS\fR
-\fIMS\fR is the mode specific field in the cdb. This is a 3-bit field
+\fIMS\fR is the mode specific field in the cdb. This is a 3\-bit field
 so the values 0 to 7 are accepted. This field was introduced in SPC\-4
 revision 32 and can be used to specify additional events that activate
 deferred microcode (when \fIMO\fR is 0xD).

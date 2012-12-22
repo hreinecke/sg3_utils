@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_XCOPY "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -71,7 +71,7 @@ explicitly given) then the derived count is scaled back so that the
 copy will not overrun the device. If the file name is a block device
 partition and \fICOUNT\fR is not given then the size of the partition
 rather than the size of the whole device is used. If \fICOUNT\fR is
-not given (or \fIcount=-1\fR) and cannot be derived then an error
+not given (or \fIcount=\-1\fR) and cannot be derived then an error
 message is issued and no copy takes place.
 .TP
 \fBibs\fR=\fIBS\fR
@@ -230,7 +230,7 @@ are given, then the usage message is output and nothing else happens.
 The status of the SCSI EXTENDED COPY command can be queried with
 .B sg_copy_results(sg3_utils)
 .PP
-Currently only block-to-block transfers are implemented; \fIIFILE\fR
+Currently only block\-to\-block transfers are implemented; \fIIFILE\fR
 and \fIOFILE\fR must refer to a SCSI block device.
 PP
 No account is taken of partitions so, for example, /dev/sbc2, /dev/sdc,
@@ -238,7 +238,7 @@ No account is taken of partitions so, for example, /dev/sbc2, /dev/sdc,
 whole logical unit (i.e. the whole disk) starting at LBA 0. So any
 partition indication (e.g. /dev/sdc2) is ignored. The user should set
 \fISKIP\fR,  \fISEEK\fR and \fICOUNT\fR with information obtained
-from a command like 'fdisk -l -u /dev/sdc' to account for partitions.
+from a command like 'fdisk \-l \-u /dev/sdc' to account for partitions.
 .SH EXAMPLES
 Copy 2M of data from the start of one device to another:
 .PP
@@ -252,7 +252,7 @@ sg_xcopy: 1024 blocks, 1 command
 .PP
 Check the status of the EXTENDED COPY command:
 .PP
-# sg_copy_results --status --list_id=2 /dev/sdp
+# sg_copy_results \-\-status \-\-list_id=2 /dev/sdp
 .br
 Receive copy results (copy status):
     Held data discarded: Yes

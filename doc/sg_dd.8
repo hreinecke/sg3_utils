@@ -1,4 +1,4 @@
-.TH SG_DD "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_DD "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -106,7 +106,7 @@ not explicitly given) then the derived count is scaled back so that the
 copy will not overrun the device. If the file name is a block device
 partition and \fICOUNT\fR is not given then the size of the partition
 rather than the size of the whole device is used. If \fICOUNT\fR is not
-given (or \fIcount=-1\fR) and cannot be derived then an error message is
+given (or \fIcount=\-1\fR) and cannot be derived then an error message is
 issued and no copy takes place.
 .TP
 \fBdio\fR=0 | 1
@@ -395,7 +395,7 @@ Disk partition information can often be found with
 .PP
 For sg devices (and block devices when blk_sgio=1 is given) this utility
 issues SCSI READ and WRITE (SBC) commands which are appropriate for disks and
-reading from CD/DVD/HD-DVD/BD drives. Those commands
+reading from CD/DVD/HD\-DVD/BD drives. Those commands
 are not formatted correctly for tape devices so sg_dd should not be used on
 tape devices. If the largest block address of the requested transfer
 exceeds a 32 bit block number (i.e 0xffff) then a warning is issued and
@@ -452,7 +452,7 @@ On completion this will output a line like:
 in this case is 1,000,000 bytes per second.
 .PP
 The 'of2=' option can be used to copy data and take a md5sum of it
-without needing to re-read the data:
+without needing to re\-read the data:
 .PP
   mkfifo fif
 .br
@@ -461,7 +461,7 @@ without needing to re-read the data:
   sg_dd if=/dev/sg3 iflag=coe of=sg3.img oflag=sparse of2=fif bs=512
 .PP
 This will image /dev/sg3 (e.g. an unmounted disk) and place the contents
-in the (sparse) file sg3.img . Without re-reading the data it will also
+in the (sparse) file sg3.img . Without re\-reading the data it will also
 perform a md5sum calculation on the image.
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and

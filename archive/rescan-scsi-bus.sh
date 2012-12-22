@@ -623,7 +623,7 @@ modprobe sg >/dev/null 2>&1
 
 if test -x /usr/bin/sg_inq; then
     sg_version=$(sg_inq -V 2>&1 | cut -d " " -f 3)
-    sg_version=${sg_version##0.}
+    sg_version=${sg_version/./}
     #echo "\"$sg_version\""
     if [ -z "$sg_version" -o "$sg_version" -lt 70 ] ; then
         sg_len_arg="-36"
