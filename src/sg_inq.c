@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2012 D. Gilbert
+*  Copyright (C) 2000-2013 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.09 20121204";    /* SPC-4 rev 36 */
+static char * version_str = "1.10 20130107";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -2303,10 +2303,17 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
                 printf(" Inquiry response length=%d, no vendor, "
                        "product or revision data\n", act_len);
             else {
+                int i;
+
                 if (act_len < SAFE_STD_INQ_RESP_LEN)
                     rsp_buff[act_len] = '\0';
                 memcpy(xtra_buff, &rsp_buff[8], 8);
                 xtra_buff[8] = '\0';
+                /* Fixup any tab characters */
+                for (i = 0; i < 8; ++i) {
+                    if (xtra_buff[i] == 0x09)
+                        xtra_buff[i] = ' ';
+                }
                 printf(" Vendor identification: %s\n", xtra_buff);
                 if (act_len <= 16)
                     printf(" Product identification: <none>\n");
