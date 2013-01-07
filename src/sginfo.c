@@ -3333,8 +3333,11 @@ static void show_devices(int raw)
         if ( strncmp("sg",entry->d_name,2) == 0 ) {
                 continue;
         }
-        if ( strncmp("sd",entry->d_name,2) == 0 && isdigit(entry->d_name[strlen(entry->d_name)-1]) ) {
-                continue;
+        if ( strncmp("sd",entry->d_name,2) == 0 ) {
+            continue;
+        }
+        if ( isdigit(entry->d_name[strlen(entry->d_name)-1]) ) {
+            continue;
         }
 
         snprintf(dev_name, sizeof(dev_name),"/dev/%s",entry->d_name);
