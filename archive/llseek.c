@@ -8,6 +8,9 @@
  * of fdisk. It allows seeks to 64 bit offsets, if supported.
  * Changed "ext2_" prefix to "llse".
  */
+
+#include "config.h"
+
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
@@ -31,7 +34,7 @@ extern llse_loff_t llse_llseek (unsigned int, llse_loff_t, unsigned int);
 
 #else   /* HAVE_LLSEEK */
 
-#if defined(__alpha__) || defined(__ia64__)  || defined(__s390x__)
+#if defined(__alpha__) || defined(__ia64__)  || defined(__s390x__) || defined (__x86_64__) || defined (__powerpc64__)
 
 #define my_llseek lseek
 
@@ -65,10 +68,14 @@ static llse_loff_t my_llseek (unsigned int fd, llse_loff_t offset,
         llse_loff_t result;
         int retval;
 
+#ifdef HAVE_LSEEK64
+        return lseek64 (fd, offset, origin);
+#else
         retval = _llseek (fd, ((uint64_t) offset) >> 32,
                         ((uint64_t) offset) & 0xffffffff,
                         &result, origin);
         return (retval == -1 ? (llse_loff_t) retval : result);
+#endif
 }
 
 #endif /* __alpha__ */
