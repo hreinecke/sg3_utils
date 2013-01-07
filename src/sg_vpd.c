@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.62 20120919";    /* spc4r35 + sbc3r32 */
+static char * version_str = "0.64 20120929";    /* spc4r36 + sbc3r32 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -333,7 +333,7 @@ decode_std_inq(unsigned char * b, int len, int verbose)
     printf("  SCCS=%d  ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
            !!(b[5] & 0x80), !!(b[5] & 0x40), ((b[5] & 0x30) >> 4),
            !!(b[5] & 0x08), !!(b[5] & 0x01));
-    printf(" BQue=%d\n  EncServ=%d  ", !!(b[6] & 0x80), !!(b[6] & 0x40));
+    printf(" [BQue=%d]\n  EncServ=%d  ", !!(b[6] & 0x80), !!(b[6] & 0x40));
     if (b[6] & 0x10)
         printf("MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
     else
@@ -579,7 +579,8 @@ static const char * desig_type_arr[] =
     "Logical unit group",
     "MD5 logical unit identifier",
     "SCSI name string",
-    "Reserved [0x9]", "Reserved [0xa]", "Reserved [0xb]",
+    "Protocol specific port identifier",  /* spc4r36 */
+    "Reserved [0xa]", "Reserved [0xb]",
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
@@ -607,6 +608,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
         c_set = 1;
         assoc = VPD_ASSOC_LU;
         piv = 0;
+        is_sas = 0;
         desig_type = 3;
         i_len = 16;
         off = 16;
@@ -1006,10 +1008,26 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
          */
         printf("      %s\n", (const char *)ip);
         break;
-    case 9: /* PCIe routing ID */
-        /* added in sbc4r34, no limits on code_set or association ?? */
-        d_id = ((ip[0] << 8) | ip[1]);
-        printf("      PCIe routing ID: 0x%x\n", d_id);
+    case 9: /* Protocol specific port identifier */
+        /* added in spc4r36, PIV must be set, proto_id indicates */
+        /* whether UAS (USB) or SOP (PCIe) or ... */
+        if (! piv)
+            printf("      >>>> Protocol specific port identifier "
+                   "expects protocol\n"
+                   "           identifier to be valid and it is not\n");
+        if (TPROTO_UAS == p_id) {
+            printf("      USB device address: 0x%x\n", 0x7f & ip[0]);
+            printf("      USB interface number: 0x%x\n", ip[2]);
+        } else if (TPROTO_SOP == p_id) {
+            printf("      PCIe routing ID, bus number: 0x%x\n", ip[0]);
+            printf("          function number: 0x%x\n", ip[1]);
+            printf("          [or device number: 0x%x, function number: "
+                   "0x%x]\n", (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
+        } else
+            printf("      >>>> unexpected protocol indentifier: %s\n"
+                   "           with Protocol specific port "
+                   "identifier\n",
+                   sg_get_trans_proto_str(p_id, sizeof(b), b));
         break;
     default: /* reserved */
         dStrHex((const char *)ip, i_len, 0);
@@ -1304,8 +1322,6 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
-    int k;
-
     if (do_hex) {
         dStrHex((const char *)buff, len, 0);
         return;
@@ -1313,10 +1329,9 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     len -= 4;
     buff += 4;
     for ( ; len > 5; len -= 6, buff += 6) {
-        printf("    ");
-        for (k = 0; k < 6; ++k)
-            printf("%02x", (unsigned int)buff[k]);
-        printf("\n");
+        printf("    IEEE Company_id: 0x%06x, vendor specific extension "
+               "id: 0x%06x\n", (buff[0] << 16) | (buff[1] << 8) | buff[2],
+               (buff[3] << 16) | (buff[4] << 8) | buff[5]);
     }
 }
 

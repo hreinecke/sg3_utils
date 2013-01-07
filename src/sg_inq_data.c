@@ -1,13 +1,3 @@
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-
 /* A utility program originally written for the Linux OS SCSI subsystem.
 *  Copyright (C) 2000-2012 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
@@ -19,6 +9,16 @@
    It is mainly based on the SCSI SPC-4 document at http://www.t10.org .
 
 */
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 
 /* Assume index is less than 16 */
 const char * sg_ansi_version_arr[] =
@@ -186,6 +186,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x461, "SPC-4 T10/1731-D revision 16"},
     {0x462, "SPC-4 T10/1731-D revision 18"},
     {0x463, "SPC-4 T10/1731-D revision 23"},
+    {0x466, "SPC-4 T10/1731-D revision 36"},
     {0x480, "SMC-3 (no version claimed)"},
     {0x482, "SMC-3 T10/1730-D revision 15"},
     {0x482, "SMC-3 T10/1730-D revision 16"},
@@ -206,6 +207,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x523, "SSC-4 T10/2123-D revision 2"},
     {0x560, "OSD-3 (no version claimed)"},
     {0x580, "SES-3 (no version claimed)"},
+    {0x5a0, "SSC-5 (no version claimed)"},
+    {0x5c0, "SPC-5 (no version claimed)"},
+    {0x5e0, "SFSC (no version claimed)"},
     {0x820, "SSA-TL2 (no version claimed)"},
     {0x83b, "SSA-TL2 T10/1147-D revision 05b"},
     {0x83c, "SSA-TL2 ANSI INCITS 308-1998"},
@@ -266,7 +270,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa42, "FCP-4 T10/1828-D revision 01"},
     {0xa44, "FCP-4 T10/1828-D revision 02"},
     {0xa45, "FCP-4 T10/1828-D revision 02b"},
-    {0xa46, "FCP-4 ANSI INCITS 481-2011"},
+    {0xa46, "FCP-4 ANSI INCITS 481-2012"},
     {0xaa0, "SPI (no version claimed)"},
     {0xab9, "SPI T10/0855-D revision 15a"},
     {0xaba, "SPI ANSI INCITS 253-1995"},
@@ -389,9 +393,11 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x12a3, "FC-SCM T11/1824DT revision 1.0"},
     {0x12a5, "FC-SCM T11/1824DT revision 1.1"},
     {0x12a7, "FC-SCM T11/1824DT revision 1.4"},
+    {0x12aa, "FC-SCM INCITS TR-47 2012"},
     {0x12c0, "FC-DA-2 (no version claimed)"},
     {0x12c3, "FC-DA-2 T11/1870DT revision 1.04"},
     {0x12c5, "FC-DA-2 T11/1870DT revision 1.06"},
+    {0x12c9, "FC-DA-2 INCITS TR-49 2012"},
     {0x12e0, "FC-DA (no version claimed)"},
     {0x12e2, "FC-DA T11/1513-DT revision 3.1"},
     {0x12e8, "FC-DA ANSI INCITS TR-36 2004"},
@@ -452,8 +458,10 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x20a3, "SPL T10/2124-D revision 6a"},
     {0x20a5, "SPL T10/2124-D revision 7"},
     {0x20a7, "SPL SPL ANSI INCITS 476-2011"},
+    {0x20a8, "SPL ANSI INCITS 476-2011 + SPL AM1 INCITS 476/AM1 2012"},
     {0x20c0, "SPL-2 (no version claimed)"},
     {0x20c2, "SPL-2 T10/2228-D revision 4"},
+    {0x20c4, "SPL-2 T10/2228-D revision 5"},
     {0x20e0, "SPL-3 (no version claimed)"},
     {0x21e0, "SOP (no version claimed)"},
     {0x2200, "PQI (no version claimed)"},

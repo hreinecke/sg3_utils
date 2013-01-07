@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.06 20120320";    /* SPC-4 rev 34 */
+static char * version_str = "1.08 20120927";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -1007,7 +1007,8 @@ static const char * desig_type_arr[] =
     "Logical unit group", /* SCSI_IDENT_PORT_LU_GROUP */
     "MD5 logical unit identifier", /* SCSI_IDENT_DEVICE_MD5 */
     "SCSI name string", /* SCSI_IDENT_DEVICE_SCSINAME */
-    "[0x9]", "[0xa]", "[0xb]", "[0xc]", "[0xd]", "[0xe]", "[0xf]",
+    "Protocol specific port identifier",        /* spc4r36 */
+    "[0xa]", "[0xb]", "[0xc]", "[0xd]", "[0xe]", "[0xf]",
 };
 
 /* These are target port, device server (i.e. target) and LU identifiers */
@@ -1038,6 +1039,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         c_set = 1;
         assoc = 0;
         piv = 0;
+        p_id = 0xf;
         desig_type = 3;
         j = 1;
         off = 16;
@@ -1060,9 +1062,9 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
             return;
         }
         ip = ucp + 4;
-        p_id = ((ucp[0] >> 4) & 0xf);
-        c_set = (ucp[0] & 0xf);
-        piv = ((ucp[1] & 0x80) ? 1 : 0);
+        p_id = ((ucp[0] >> 4) & 0xf);   /* protocol identifier */
+        c_set = (ucp[0] & 0xf);         /* code set */
+        piv = ((ucp[1] & 0x80) ? 1 : 0); /* protocol identifier valid */
         assoc = ((ucp[1] >> 4) & 0x3);
         desig_type = (ucp[1] & 0xf);
   decode:
@@ -1289,10 +1291,26 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
              */
             printf("      %s\n", (const char *)ip);
             break;
-        case 9: /* PCIe routing ID */
-            /* added in sbc4r34, no limits on code_set or association ?? */
-            d_id = ((ip[0] << 8) | ip[1]);
-            printf("      PCIe routing ID: 0x%x\n", d_id);
+        case 9: /* Protocol specific port identifier */
+            /* added in spc4r36, PIV must be set, proto_id indicates */
+            /* whether UAS (USB) or SOP (PCIe) or ... */
+            if (! piv)
+                printf("      >>>> Protocol specific port identifier "
+                       "expects protocol\n"
+                       "           identifier to be valid and it is not\n");
+            if (TPROTO_UAS == p_id) {
+                printf("      USB device address: 0x%x\n", 0x7f & ip[0]);
+                printf("      USB interface number: 0x%x\n", ip[2]);
+            } else if (TPROTO_SOP == p_id) {
+                printf("      PCIe routing ID, bus number: 0x%x\n", ip[0]);
+                printf("          function number: 0x%x\n", ip[1]);
+                printf("          [or device number: 0x%x, function number: "
+                       "0x%x]\n", (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
+            } else
+                printf("      >>>> unexpected protocol indentifier: %s\n"
+                       "           with Protocol specific port "
+                       "identifier\n",
+                       sg_get_trans_proto_str(p_id, sizeof(b), b));
             break;
         default: /* reserved */
             dStrHex((const char *)ip, i_len, -1);
@@ -1647,20 +1665,16 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
-    int k;
-
     if (do_hex) {
         dStrHex((const char *)buff, len, 0);
         return;
     }
     len -= 4;
     buff += 4;
-    for ( ; len > 5; len -= 6, buff += 6) {
-        printf("    ");
-        for (k = 0; k < 6; ++k)
-            printf("%02x", (unsigned int)buff[k]);
-        printf("\n");
-    }
+    for ( ; len > 5; len -= 6, buff += 6)
+        printf("    IEEE Company_id: 0x%06x, vendor specific extension "
+               "id: 0x%06x\n", (buff[0] << 16) | (buff[1] << 8) | buff[2],
+               (buff[3] << 16) | (buff[4] << 8) | buff[5]);
 }
 
 /* VPD_ATA_INFO */
@@ -1913,14 +1927,34 @@ static const char * lun_op_arr[] =
     "I/O Operations being rejected, SP reboot or NDU in progress",
 };
 
+static const char * failover_mode_arr[] =
+{
+    "Legacy mode 0",
+    "Unknown mode (1)",
+    "Unknown mode (2)",
+    "Unknown mode (3)",
+    "Active/Passive (PNR) mode 1",
+    "Unknown mode (5)",
+    "Active/Active (ALUA) mode 4",
+    "Unknown mode (7)",
+    "Legacy mode 2",
+    "Unknown mode (9)",
+    "Unknown mode (10)",
+    "Unknown mode (11)",
+    "Unknown mode (12)",
+    "Unknown mode (13)",
+    "AIX Active/Passive (PAR) mode 3",
+    "Unknown mode (15)",
+};
+
 static void
 decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 {
-    int k, ip_mgmt, failover_mode, vpp80, lun_z;
+    int k, ip_mgmt, vpp80, lun_z;
 
     if (len < 3) {
-        fprintf(stderr, "Device identification VPD page length too "
-                "short=%d\n", len);
+        fprintf(stderr, "EMC upr VPD page [0xc0]: length too short=%d\n",
+                len);
         return;
     }
     if (buff[9] != 0x00) {
@@ -1972,13 +2006,11 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
         printf("\n");
     }
 
-    failover_mode = buff[28] & 0x0f;
     vpp80 = buff[30] & 0x08;
     lun_z = buff[30] & 0x04;
 
     printf("  System Type: %x, Failover mode: %s\n",
-                   buff[27],
-                   failover_mode == 4 ? "Set to 1" : "Unknown");
+           buff[27], failover_mode_arr[buff[28] & 0x0f]);
 
     printf("  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
                    vpp80 ? "array serial#" : "LUN serial#",
@@ -2207,7 +2239,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             printf("ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
                    !!(rsp_buff[5] & 0x40), ((rsp_buff[5] & 0x30) >> 4),
                    !!(rsp_buff[5] & 0x08), !!(rsp_buff[5] & 0x01));
-            printf(" BQue=%d\n  EncServ=%d  ", !!(rsp_buff[6] & 0x80),
+            printf(" [BQue=%d]\n  EncServ=%d  ", !!(rsp_buff[6] & 0x80),
                    !!(rsp_buff[6] & 0x40));
             if (rsp_buff[6] & 0x10)
                 printf("MultiP=1 (VS=%d)  ", !!(rsp_buff[6] & 0x20));

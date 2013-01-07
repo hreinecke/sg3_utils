@@ -27,7 +27,7 @@
  * SCSI block device.
  */
 
-static char * version_str = "1.18 20120327";
+static char * version_str = "1.18 20120927";
 
 #define ME "sg_verify: "
 
@@ -299,7 +299,7 @@ main(int argc, char * argv[])
     }
 
     vc = verify16 ? "VERIFY(16)" : "VERIFY(10)";
-    for (; count > 0; count -= bpc, lba +=bpc) {
+    for (; count > 0; count -= bpc, lba += bpc) {
         num = (count > bpc) ? bpc : count;
         if (verify16)
             res = sg_ll_verify16(sg_fd, vrprotect, dpo, bytchk > 0,
