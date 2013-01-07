@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.35 [20121221] [svn: r472]
+Changelog for sg3_utils-1.35 [20130107] [svn: r473]
   - sg_compare_and_write: new utility
   - sg_inq+sg_vpd: block device characteristics VPD page:
     add product_type, WABEREQ, WACEREQ and VBULS fields
