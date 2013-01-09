@@ -747,6 +747,24 @@ encode_whitespaces(unsigned char *str, int inlen)
     return i;
 }
 
+static int
+encode_string(char *out, const unsigned char *in, int inlen)
+{
+    int i, j = 0;
+
+    for (i = 0; (i < inlen); ++i) {
+        if (isblank(in[i]) || !isprint(in[i])) {
+            sprintf(&out[j], "\\x%02x", in[i]);
+            j += 4;
+        } else {
+            out[j] = in[i];
+            j++;
+        }
+    }
+    out[j] = '\0';
+    return j;
+}
+
 struct vpd_name {
     int number;
     int peri_type;
@@ -2183,7 +2201,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
     res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, 0, verb);
     if (0 == res) {
         pqual = (rsp_buff[0] & 0xe0) >> 5;
-        if (! optsp->do_raw) {
+        if (! optsp->do_raw && ! optsp->do_export) {
             if (0 == pqual)
                 printf("standard INQUIRY:\n");
             else if (1 == pqual)
@@ -2225,7 +2243,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             dStrRaw((const char *)rsp_buff, act_len);
         else if (optsp->do_hex)
             dStrHex((const char *)rsp_buff, act_len, 0);
-        else {
+        else if (!optsp->do_export) {
             printf("  PQual=%d  Device_type=%d  RMB=%d  version=0x%02x ",
                    pqual, peri_type, !!(rsp_buff[1] & 0x80),
                    (unsigned int)rsp_buff[2]);
@@ -2266,45 +2284,63 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
             if (strlen(cp) > 0)
                 printf("   Peripheral device type: %s\n", cp);
-
-            if (act_len <= 8)
+        }
+        if (act_len <= 8) {
+            if (! optsp->do_export)
                 printf(" Inquiry response length=%d, no vendor, "
                        "product or revision data\n", act_len);
-            else {
-                int i;
+        } else {
+            int i;
 
-                if (act_len < SAFE_STD_INQ_RESP_LEN)
-                    rsp_buff[act_len] = '\0';
-                memcpy(xtra_buff, &rsp_buff[8], 8);
-                xtra_buff[8] = '\0';
-                /* Fixup any tab characters */
-                for (i = 0; i < 8; ++i)
-                    if (xtra_buff[i] == 0x09)
-                        xtra_buff[i] = ' ';
+            if (act_len < SAFE_STD_INQ_RESP_LEN)
+                rsp_buff[act_len] = '\0';
+            memcpy(xtra_buff, &rsp_buff[8], 8);
+            xtra_buff[8] = '\0';
+            /* Fixup any tab characters */
+            for (i = 0; i < 8; ++i)
+                if (xtra_buff[i] == 0x09)
+                    xtra_buff[i] = ' ';
+            if (optsp->do_export) {
+                len = encode_whitespaces((unsigned char *)xtra_buff, 8);
+                printf("SCSI_VENDOR=%s\n", xtra_buff);
+                encode_string(xtra_buff, &rsp_buff[8], 8);
+                printf("SCSI_VENDOR_ENC=%s\n", xtra_buff);
+            } else
                 printf(" Vendor identification: %s\n", xtra_buff);
-                if (act_len <= 16)
+            if (act_len <= 16) {
+                if (! optsp->do_export)
                     printf(" Product identification: <none>\n");
-                else {
-                    memcpy(xtra_buff, &rsp_buff[16], 16);
-                    xtra_buff[16] = '\0';
+            } else {
+                memcpy(xtra_buff, &rsp_buff[16], 16);
+                xtra_buff[16] = '\0';
+                if (optsp->do_export) {
+                    len = encode_whitespaces((unsigned char *)xtra_buff, 16);
+                    printf("SCSI_MODEL=%s\n", xtra_buff);
+                    encode_string(xtra_buff, &rsp_buff[16], 16);
+                    printf("SCSI_MODEL_ENC=%s\n", xtra_buff);
+                } else
                     printf(" Product identification: %s\n", xtra_buff);
-                }
-                if (act_len <= 32)
+            }
+            if (act_len <= 32) {
+                if (!optsp->do_export)
                     printf(" Product revision level: <none>\n");
-                else {
-                    memcpy(xtra_buff, &rsp_buff[32], 4);
-                    xtra_buff[4] = '\0';
+            } else {
+                memcpy(xtra_buff, &rsp_buff[32], 4);
+                xtra_buff[4] = '\0';
+                if (optsp->do_export)
+                    len = encode_whitespaces((unsigned char *)xtra_buff, 4);
+                    printf("SCSI_REVISION=%s\n", xtra_buff);
+                else
                     printf(" Product revision level: %s\n", xtra_buff);
-                }
-                if (optsp->do_descriptors) {
-                    for (j = 0, k = 58; ((j < 8) && ((k + 1) < act_len));
-                         k +=2, ++j)
-                        vdesc_arr[j] = ((rsp_buff[k] << 8) +
-                                         rsp_buff[k + 1]);
-                }
+            }
+            if (optsp->do_descriptors) {
+                for (j = 0, k = 58; ((j < 8) && ((k + 1) < act_len));
+                     k +=2, ++j)
+                    vdesc_arr[j] = ((rsp_buff[k] << 8) +
+                                    rsp_buff[k + 1]);
             }
         }
-        if (! (optsp->do_raw || optsp->do_hex)) {
+        if (! (optsp->do_raw || optsp->do_hex || optsp->do_export)) {
             if (0 == optsp->resp_len) {
                 if (0 == fetch_unit_serial_num(sg_fd, xtra_buff,
                                    sizeof(xtra_buff), optsp->do_verbose))
@@ -3155,18 +3191,17 @@ main(int argc, char * argv[])
         }
     }
     if (opts.do_export) {
-        if (NULL == opts.page_arg) {
-            opts.page_num = VPD_DEVICE_ID;
+        if (opts.page_num != -1) {
+            if (opts.page_num != VPD_DEVICE_ID &&
+                opts.page_num != VPD_UNIT_SERIAL_NUM) {
+                fprintf(stderr, "Option '--export' only supported "
+                        "for VPD pages 0x80 and 0x83\n");
+                usage_for(&opts);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            ++opts.do_decode;
+            ++opts.do_vpd;
         }
-        if (opts.page_num != VPD_DEVICE_ID &&
-            opts.page_num != VPD_UNIT_SERIAL_NUM) {
-            fprintf(stderr, "Option '--export' only supported "
-                    "for VPD pages 0x80 and 0x83\n");
-            usage_for(&opts);
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        ++opts.do_decode;
-        ++opts.do_vpd;
     }
 
     if ((0 == opts.do_cmddt) && (opts.page_num >= 0) && opts.p_given)
