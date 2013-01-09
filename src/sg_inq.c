@@ -2271,16 +2271,16 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
                 printf(" Inquiry response length=%d, no vendor, "
                        "product or revision data\n", act_len);
             else {
-		int i;
+                int i;
 
                 if (act_len < SAFE_STD_INQ_RESP_LEN)
                     rsp_buff[act_len] = '\0';
                 memcpy(xtra_buff, &rsp_buff[8], 8);
                 xtra_buff[8] = '\0';
-		/* Fixup any tab characters */
-		for (i = 0; i < 8; ++i)
-		    if (xtra_buff[i] == 0x09)
-			xtra_buff[i] = ' ';
+                /* Fixup any tab characters */
+                for (i = 0; i < 8; ++i)
+                    if (xtra_buff[i] == 0x09)
+                        xtra_buff[i] = ' ';
                 printf(" Vendor identification: %s\n", xtra_buff);
                 if (act_len <= 16)
                     printf(" Product identification: <none>\n");
