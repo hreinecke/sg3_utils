@@ -80,12 +80,17 @@ if any.
 see entry below for \fI\-\-vpd\fR.
 .TP
 \fB\-u\fR, \fB\-\-export\fR
-print out information obtained from the device identification VPD page in
-the form: "SCSI_IDENT_<assoc>_<type>=<ident>" to stdout. This may be useful
-to tools like udev in Linux. If \fIPG\fR (from \fI\-\-page=PG\fR) is given
-then then it overrides the default choice of the device identification VPD
-page. Only other value of \fIPG\fR supported is 0x80 which is the unit
-serial number VPD page (used by older disks).
+prints out information obtained from the device. The output can be
+modified by selecting a VPD page with \fIPG\fR (from
+\fI\-\-page=PG\fR). If the device identification VPD page 0x83 is
+given it prints out information in the form:
+"SCSI_IDENT_<assoc>_<type>=<ident>" to stdout. If the device serial
+number VPD page 0x80 is given it prints out information in the form:
+"SCSI_SERIAL=<ident>". Other VPD pages are not supported. If no VPD
+page is given it prints out information in the form:
+"SCSI_VENDOR=<vendor>", "SCSI_MODEL=<model>", and
+"SCSI_REVISION=<rev>", taken from the standard inquiry. This may be
+useful for tools like udev in Linux.
 .TP
 \fB\-E\fR, \fB\-x\fR, \fB\-\-extended\fR
 prints the extended INQUIRY VPD page [0x86].
