@@ -3,7 +3,7 @@
 # scsi add-single-device mechanism
 # (c) 1998--2010 Kurt Garloff <kurt@garloff.de>, GNU GPL v2 or v3
 # (c) 2006--2008 Hannes Reinecke, GNU GPL v2 or later
-# $Id: rescan-scsi-bus.sh,v 1.56 2012/01/14 22:23:53 garloff Exp $
+# $Id: rescan-scsi-bus.sh,v 1.53 2011/10/18 16:44:27 garloff Exp $
 
 SCAN_WILD_CARD=4294967295
 
@@ -216,6 +216,10 @@ sgdevice ()
 }
 
 # Test if SCSI device is still responding to commands
+# Return values:
+#   0 device is present
+#   1 device has changed
+#   2 device has been removed
 testonline ()
 {
   : testonline
@@ -232,7 +236,7 @@ testonline ()
     print_and_scroll_back "$host:$channel:$id:$lun $SGDEV ($RMB) "
   fi
   while test $RC = 2 -o $RC = 6 && test $ctr -le 8; do
-    if test $RC = 2 -a "$RMB" != "1"; then echo -n "."; let $LN+=1; sleep 1
+    if test $RC = 2 -a "$RMB" != "1"; then echo -n "."; let LN+=1; sleep 1
     else usleep 20000; fi
     let ctr+=1
     sg_turs /dev/$SGDEV >/dev/null 2>&1
@@ -257,7 +261,10 @@ testonline ()
   fi
 
   TYPE=$(printtype $IPTYPE)
-  procscsiscsi
+  if ! procscsiscsi ; then
+    echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV removed.\n\n\n"
+    return 2
+  fi
   TMPSTR=`echo "$SCSISTR" | grep 'Vendor:'`
   if [ "$TMPSTR" != "$STR" ]; then
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
@@ -313,25 +320,34 @@ chanlist ()
 idlist ()
 {
   local hcil
-  local cil
-  local il
   local target
   local tmpid
+  local newid
 
-  for dev in /sys/class/scsi_device/${host}:${channel}:* ; do
-    [ -d $dev ] || continue;
-    hcil=${dev##*/}
-    cil=${hcil#*:}
-    il=${cil#*:}
-    target=${il%%:*}
+  idsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
+  echo "${channel} - -" > /sys/class/scsi_host/host${host}/scan
+  # Rescan to check if we found new targets
+  newsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
+  for id in $newsearch ; do
+    newid=$id
     for tmpid in $idsearch ; do
-      if test "$target" -eq $tmpid ; then
-	target=
+      if test $id -eq $tmpid ; then
+	newid=
 	break
       fi
     done
-    if test -n "$target" ; then
-      idsearch="$idsearch $target"
+    if test -n "$newid" ; then
+      id=$newid
+      for dev in /sys/class/scsi_device/${host}:${channel}:${newid}:* ; do
+	[ -d $dev ] || continue;
+	hcil=${dev##*/}
+	lun=${hcil##*:}
+	printf "\r${green}NEW: $norm"
+	testexist
+	if test "$SCSISTR" ; then
+	  let found+=1
+	fi
+      done
     fi
   done
 }
@@ -392,7 +408,7 @@ dolunscan()
   : f $remove s $SCSISTR
   if test "$remove" -a "$SCSISTR"; then
     # Device exists: Test whether it's still online
-    # (testonline returns 1 if it's gone or has changed)
+    # (testonline returns 2 if it's gone and 1 if it has changed)
     testonline
     RC=$?
     if test $RC != 0 -o ! -z "$forceremove"; then
@@ -420,7 +436,7 @@ dolunscan()
     fi
     printf "\r\e[A\e[A\e[A${yellow}OLD: $norm"
     testexist
-    if test -z "$SCSISTR"; then
+    if test -z "$SCSISTR" -a $RC != 1; then
       printf "\r${red}DEL: $norm\r\n\n"
       let rmvd+=1;
       return 1
@@ -590,9 +606,12 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo " -w      scan for target device IDs 0--15   [default: 0--7]"
     echo " -c      enables scanning of channels 0 1   [default: 0 / all detected ones]"
     echo " -r      enables removing of devices        [default: disabled]"
+    echo " -f      flush failed multipath devices     [default: disabled]"
     echo " -i      issue a FibreChannel LIP reset     [default: disabled]"
     echo "--remove:        same as -r"
+    echo "--flush:         same as -f"
     echo "--issue-lip:     same as -i"
+    echo "--wide:          same as -w"
     echo "--forcerescan:   Rescan existing devices"
     echo "--forceremove:   Remove and readd every device (DANGEROUS)"
     echo "--nooptscan:     don't stop looking for LUNs is 0 is not found"
@@ -623,16 +642,13 @@ modprobe sg >/dev/null 2>&1
 
 if test -x /usr/bin/sg_inq; then
     sg_version=$(sg_inq -V 2>&1 | cut -d " " -f 3)
-    sg_version=${sg_version/./}
+    sg_version=${sg_version##0.}
     #echo "\"$sg_version\""
     if [ -z "$sg_version" -o "$sg_version" -lt 70 ] ; then
         sg_len_arg="-36"
     else
         sg_len_arg="--len=36"
     fi
-else
-    echo "WARN: /usr/bin/sg_inq not present -- please install sg3_utils"
-    echo " or rescan-scsi-bus.sh might not fully work."     
 fi    
 
 # defaults
@@ -656,12 +672,14 @@ opt="$1"
 while test ! -z "$opt" -a -z "${opt##-*}"; do
   opt=${opt#-}
   case "$opt" in
+    f) flush=1 ;;
     l) lunsearch=`seq 0 7` ;;
     L) lunsearch=`seq 0 $2`; shift ;;
     w) opt_idsearch=`seq 0 15` ;;
     c) opt_channelsearch="0 1" ;;
     r) remove=1 ;;
     i) lipreset=1 ;;
+    -flush)       flush=1 ;;
     -remove)      remove=1 ;;
     -forcerescan) remove=1; forcerescan=1 ;;
     -forceremove) remove=1; forceremove=1 ;;
@@ -678,6 +696,7 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     -reportlun2) scan_flags=$(($scan_flags|0x20000)) ;;
     -largelun) scan_flags=$(($scan_flags|0x200)) ;;
     -sparselun) scan_flags=$((scan_flags|0x40)) ;;
+    -wide) opt_idsearch=`seq 0 15` ;;
     *) echo "Unknown option -$opt !" ;;
   esac
   shift
@@ -706,10 +725,27 @@ if test -w /sys/module/scsi_mod/parameters/default_dev_flags -a $scan_flags != 0
     unset OLD_SCANFLAGS
   fi
 fi  
-echo "Scanning SCSI subsystem for new devices"
-test -z "$remove" || echo " and remove devices that have disappeared"
+DMSETUP=$(which dmsetup)
+[ -z "$DMSETUP" ] && flush=
+MULTIPATH=$(which multipath)
+[ -z "$MULTIPATH" ] && flush=
+
+echo -n "Scanning SCSI subsystem for new devices"
+test -z "$flush" || echo -n ", flush failed multipath devices,"
+test -z "$remove" || echo -n " and remove devices that have disappeared"
+echo
 declare -i found=0
 declare -i rmvd=0
+
+if [ -n "$flush" -a -x $MULTIPATH ] ; then
+  for mpath in $($DMSETUP ls --target=multipath | cut -f 1) ; do
+    num=$($DMSETUP status $mpath | awk 'BEGIN{RS=" ";active=0}/[0-9]+:[0-9]+/{dev=1}/A/{if (dev == 1) active++; dev=0} END{ print active }')
+    if [ $num -eq 0 ] ; then
+      $DMSETUP message $mpath 0 fail_if_no_path
+      $MULTIPATH -f $mpath
+    fi
+  done
+fi
 for host in $hosts; do
   echo -n "Scanning host $host "
   if test -e /sys/class/fc_host/host$host ; then
@@ -718,11 +754,6 @@ for host in $hosts; do
       echo 1 > /sys/class/fc_host/host$host/issue_lip 2> /dev/null;
       udevadm_settle
     fi
-    # We used to always trigger a rescan for FC to update channels and targets
-    # Commented out -- as discussed with Hannes we should rely
-    # on the main loop doing the scan, no need to do it here.
-    #echo "- - -" > /sys/class/scsi_host/host$host/scan 2> /dev/null;
-    #udevadm_settle
     channelsearch=
     idsearch=
   else
@@ -746,7 +777,7 @@ done
 if test -n "$OLD_SCANFLAGS"; then
   echo $OLD_SCANFLAGS > /sys/module/scsi_mod/parameters/default_dev_flags
 fi
-echo "$found new device(s) found.               "
+echo "$found new or changed device(s) found.               "
 echo "$rmvd device(s) removed.                 "
 
 # Local Variables:
