@@ -46,6 +46,7 @@
 #define VPD_V_HP3PAR 0xc0
 #define VPD_V_FIRM_SEA  0xc0
 #define VPD_V_UPR_EMC  0xc0
+#define VPD_V_HVER_RDAC  0xc0
 #define VPD_V_DATC_SEA  0xc1
 #define VPD_V_JUMP_SEA 0xc2
 #define VPD_V_SVER_RDAC 0xc2
@@ -88,6 +89,7 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_FEAT_RDAC, 1, -1, 1, "feat", "Feature Parameters (RDAC)"},
     {VPD_V_FIRM_SEA, 0, -1, 1, "firm", "Firmware numbers (Seagate)"},
     {VPD_V_HP3PAR, 2, -1, 1, "hp3par", "Volume information (HP/3PAR)"},
+    {VPD_V_HVER_RDAC, 3, -1, 1, "hver", "Hardware version (RDAC)"},
     {VPD_V_JUMP_SEA, 0, -1, 1, "jump", "Jump setting (Seagate)"},
     {VPD_V_SUBS_RDAC, 0, -1, 1, "sub", "Subsystem identifier (RDAC)"},
     {VPD_V_SVER_RDAC, 1, -1, 1, "sver", "Software version (RDAC)"},
@@ -389,9 +391,56 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 }
 
 static void
+decode_rdac_vpd_c0(unsigned char * buff, int len)
+{
+    int memsize;
+    char name[65];
+
+    if (len < 3) {
+        fprintf(stderr, "Hardware Version VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+    if (buff[4] != 'h' && buff[5] != 'w' && buff[6] != 'r') {
+        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
+                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        return;
+    }
+    printf("  Number of channels: %x\n", buff[8]);
+    memsize = buff[10] << 8 | buff[11];
+    printf("  Processor Memory Size: %d\n", memsize);
+    memset(name, 0, 65);
+    memcpy(name, buff + 16, 64);
+    printf("  Board Name: %s\n", name);
+    memset(name, 0, 65);
+    memcpy(name, buff + 80, 16);
+    printf("  Board Part Number: %s\n", name);
+    memset(name, 0, 65);
+    memcpy(name, buff + 96, 12);
+    printf("  Schematic Number: %s\n", name);
+    memset(name, 0, 65);
+    memcpy(name, buff + 108, 4);
+    printf("  Schematic Revision Number: %s\n", name);
+    memset(name, 0, 65);
+    memcpy(name, buff + 112, 16);
+    printf("  Board Serial Number: %s\n", name);
+    memset(name, 0, 65);
+    memcpy(name, buff + 144, 8);
+    printf("  Date of Manufacture: %s\n", name);
+    memset(name, 0, 65);
+    memcpy(name, buff + 152, 2);
+    printf("  Board Revision: %s\n", name);
+    memset(name, 0, 65);
+    memcpy(name, buff + 154, 2);
+    printf("  Board Identifier: %s\n", name);
+
+    return;
+}
+
+static void
 decode_rdac_vpd_c2(unsigned char * buff, int len)
 {
-    int i, n, v, r, m, p, num_part;
+    int i, n, v, r, m, p, d, y, num_part;
     char part[5];
 
     if (len < 3) {
@@ -433,12 +482,10 @@ decode_rdac_vpd_c2(unsigned char * buff, int len)
         m = buff[n++];
         p = buff[n++];
         printf("    Version: %d.%d.%d.%d\n", v, r, m, p);
-
-        /*
-         * These three bytes are actually the partition date,
-         * but I've no idea how it's encoded.
-         */
-        n += 3;
+        m = buff[n++];
+        d = buff[n++];
+        y = buff[n++];
+        printf("    Date: %d/%d/%d\n", m, d, y);
 
         n += 5;
     }
@@ -690,6 +737,8 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 decode_upr_vpd_c0_emc(rsp_buff, len);
             else if (2 == subvalue)
                 decode_vpd_c0_hp3par(rsp_buff, len);
+            else if (3 == subvalue)
+                decode_rdac_vpd_c0(rsp_buff, len);
             else
                 dStrHex((const char *)rsp_buff, len, 0);
             return 0;
