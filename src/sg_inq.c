@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2012 D. Gilbert
+*  Copyright (C) 2000-2013 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.08 20120927";    /* SPC-4 rev 36 */
+static char * version_str = "1.11 20130109";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -1814,8 +1814,8 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             if (len > 19) {     /* added in sbc3r09 */
                 u = (buff[16] << 24) | (buff[17] << 16) | (buff[18] << 8) |
                     buff[19];
-                printf("  Maximum prefetch, xdread, xdwrite transfer length: %u "
-                       "blocks\n", u);
+                printf("  Maximum prefetch, xdread, xdwrite transfer length: "
+                       "%u blocks\n", u);
             }
             if (len > 27) {     /* added in sbc3r18 */
                 u = ((unsigned int)buff[20] << 24) | (buff[21] << 16) |
@@ -1874,6 +1874,35 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                 printf("  Reserved [0x%x]\n", u);
             else
                 printf("  Nominal rotation rate: %d rpm\n", u);
+            printf("  Product type=%d\n", buff[6]);
+            printf("  WABEREQ=%d\n", (buff[7] >> 6) & 0x3);
+            printf("  WACEREQ=%d\n", (buff[7] >> 4) & 0x3);
+            u = buff[7] & 0xf;
+            printf("  Nominal form factor ");
+            switch(u) {
+            case 0:
+                printf("is not reported\n");
+                break;
+            case 1:
+                printf("5.25 inches\n");
+                break;
+            case 2:
+                printf("3.5 inches\n");
+                break;
+            case 3:
+                printf("2.5 inches\n");
+                break;
+            case 4:
+                printf("1.8 inches\n");
+                break;
+            case 5:
+                printf("less then 1.8 inches\n");
+                break;
+            default:
+                printf("reserved [%u]\n", u);
+                break;
+            }
+            printf("  VBULS=%d\n", buff[8] & 0x1);
             break;
         case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
             printf("  Manufacturer-assigned serial number: %.*s\n",
@@ -1899,15 +1928,18 @@ decode_b3_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 0xc0) {
-                fprintf(stderr, "Referrals VPD page length too short=%d\n", len);
+                fprintf(stderr, "Referrals VPD page length too short=%d\n",
+                        len);
                 return;
             }
             s = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) | buff[11];
-            m = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) | buff[15];
+            m = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) |
+                buff[15];
             if (0 == s)
                 printf("  Single user data segment\n");
             else if (0 == m)
-                printf("  Segment size specified by user data segment descriptor\n");
+                printf("  Segment size specified by user data segment "
+                       "descriptor\n");
             else
                 printf("  Segment size: %u, segment multiplier: %u\n", s, m);
             break;
@@ -2327,10 +2359,10 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             } else {
                 memcpy(xtra_buff, &rsp_buff[32], 4);
                 xtra_buff[4] = '\0';
-                if (optsp->do_export)
+                if (optsp->do_export) {
                     len = encode_whitespaces((unsigned char *)xtra_buff, 4);
                     printf("SCSI_REVISION=%s\n", xtra_buff);
-                else
+                } else
                     printf(" Product revision level: %s\n", xtra_buff);
             }
             if (optsp->do_descriptors) {
@@ -3412,7 +3444,8 @@ ata_command_interface(int device, char *data, int * atapi_flag, int verbose)
         } else if (atapi_flag) {
             *atapi_flag = 1;
             if (verbose > 1)
-                fprintf(stderr, "HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) succeeded\n");
+                fprintf(stderr, "HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) "
+                        "succeeded\n");
         }
     } else {    /* assume non-packet device */
         buff[0] = ATA_IDENTIFY_DEVICE;

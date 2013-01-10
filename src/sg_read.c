@@ -1,3 +1,23 @@
+/* A utility program for the Linux OS SCSI generic ("sg") device driver.
+*  Copyright (C) 2001 - 2012 D. Gilbert
+*  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2, or (at your option)
+*  any later version.
+
+   This program reads data from the given SCSI device (typically a disk
+   or cdrom) and discards that data. Its primary goal is to time
+   multiple reads all starting from the same logical address. Its interface
+   is a subset of another member of this package: sg_dd which is a
+   "dd" variant. The input file can be a scsi generic device, a block device,
+   a raw device or a seekable file. Streams such as stdin are not acceptable.
+   The block size ('bs') is assumed to be 512 if not given.
+
+   This version should compile with Linux sg drivers with version numbers
+   >= 30000 . For mmap-ed IO the sg version number >= 30122 .
+
+*/
+
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -27,27 +47,8 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2007 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
 
-   This program reads data from the given SCSI device (typically a disk
-   or cdrom) and discards that data. Its primary goal is to time
-   multiple reads all starting from the same logical address. Its interface
-   is a subset of another member of this package: sg_dd which is a
-   "dd" variant. The input file can be a scsi generic device, a block device,
-   a raw device or a seekable file. Streams such as stdin are not acceptable.
-   The block size ('bs') is assumed to be 512 if not given.
-
-   This version should compile with Linux sg drivers with version numbers
-   >= 30000 . For mmap-ed IO the sg version number >= 30122 .
-
-*/
-
-static const char * version_str = "1.18 20071226";
+static const char * version_str = "1.19 20121211";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -189,7 +190,8 @@ static void usage()
            "    no_dxfer 1->DMA to kernel buffers only, not user space, "
            "0->normal(def)\n"
            "    odir     1->open block device O_DIRECT, 0->don't (def)\n"
-           "    skip     each transfer starts at this logical address (def=0)\n"
+           "    skip     each transfer starts at this logical address "
+           "(def=0)\n"
            "    time     0->do nothing(def), 1->time from 1st cmd, 2->time "
            "from 2nd, ...\n"
            "    verbose  increase level of verbosity (def: 0)\n"
@@ -316,7 +318,8 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
     if (blocks > 0) {
         io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
         io_hdr.dxfer_len = bs * blocks;
-        if (! do_mmap) /* not required: shows dxferp unused during mmap-ed IO */
+        /* next: shows dxferp unused during mmap-ed IO */
+        if (! do_mmap)
             io_hdr.dxferp = buff;
         if (diop && *diop)
             io_hdr.flags |= SG_FLAG_DIRECT_IO;

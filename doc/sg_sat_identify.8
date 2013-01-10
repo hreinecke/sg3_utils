@@ -1,7 +1,7 @@
-.TH SG_SAT_IDENTIFY "8" "May 2011" "sg3_utils\-1.32" SG3_UTILS
+.TH SG_SAT_IDENTIFY "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
-sg_sat_identify \- sends a ATA IDENTIFY (PACKET) DEVICE command via a
-SCSI to ATA Translation (SAT) layer
+sg_sat_identify \- send ATA IDENTIFY DEVICE command via SCSI to ATA
+Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_identify
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
@@ -22,8 +22,8 @@ The SAT standard (SAT ANSI INCITS 431\-2007, prior draft: sat\-r09.pdf at
 www.t10.org) defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16
 byte "cdb" and the other with a 12 byte cdb. This utility defaults to using
 the 16 byte cdb variant. SAT\-2 is also a standard: SAT\-2 ANSI INCITS
-465\-2010 and the draft prior to that is sat2r09.pdf . The SAT-3 project has
-started and the most recent draft is sat3r01.pdf .
+465\-2010 and the draft prior to that is sat2r09.pdf . The SAT/-3 project
+has started and the most recent draft is sat3r01.pdf .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -55,10 +55,10 @@ a header. When given thrice (i.e. '\-HHH') the output is in hex, grouped in
 process.
 .TP
 \fB\-i\fR, \fB\-\-indent\fR
-outputs the World Wide Name (WWN) of the device. This should be a NAA-5
+outputs the World Wide Name (WWN) of the device. This should be a NAA\-5
 64 bit number. It is output in hex prefixed with "0x". If not available
 then "0x0000000000000000" is output. The equivalent for a SCSI disk (i.e. its
-logical unit name) can be found with "sg_vpd -ii".
+logical unit name) can be found with "sg_vpd \-ii".
 .TP
 \fB\-l\fR, \fB\-\-len\fR=16 | 12
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
@@ -108,7 +108,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2011 Douglas Gilbert
+Copyright \(co 2006\-2012 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

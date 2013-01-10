@@ -1,6 +1,6 @@
-.TH SG_GET_CONFIG "8" "February 2011" "sg3_utils\-1.31" SG3_UTILS
+.TH SG_GET_CONFIG "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
-sg_get_config \- sends a SCSI GET CONFIGURATION command (MMC-4 +)
+sg_get_config \- send SCSI GET CONFIGURATION command (MMC\-4 +)
 .SH SYNOPSIS
 .B sg_get_config
 [\fI\-\-brief\fR] [\fI\-\-current\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
@@ -12,8 +12,8 @@ sg_get_config \- sends a SCSI GET CONFIGURATION command (MMC-4 +)
 .PP
 Sends a SCSI GET CONFIGURATION command to \fIDEVICE\fR and decodes the
 response. The response includes the features and profiles of the device.
-Typically these devices are CD, DVD, HD-DVD and BD players that may (but not
-necessarily) have media in them. These devices may well be connected via
+Typically these devices are CD, DVD, HD\-DVD and BD players that may (but
+not necessarily) have media in them. These devices may well be connected via
 ATAPI, USB or IEEE 1394 transports. In such cases they are "SCSI" devices
 only in the sense that they use the "Multi\-Media command" set (MMC).
 MMC is a specialized SCSI command set whose definition can be found
@@ -133,7 +133,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2011 Douglas Gilbert
+Copyright \(co 2004\-2012 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

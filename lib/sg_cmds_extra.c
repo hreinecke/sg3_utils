@@ -328,8 +328,9 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, int noisy,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
 int
-sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg, void * resp,
-                       int mx_resp_len, int noisy, int verbose)
+sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
+                       void * resp, int mx_resp_len, int noisy,
+                       int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char repRefCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] =
@@ -939,7 +940,8 @@ sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    reassCmdBlk[1] = (unsigned char)(((longlba << 1) & 0x2) | (longlist & 0x1));
+    reassCmdBlk[1] = (unsigned char)(((longlba << 1) & 0x2) |
+                     (longlist & 0x1));
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
     if (verbose) {
@@ -1028,8 +1030,9 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "persistent reservation in", res, mx_resp_len,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "persistent reservation in", res,
+                               mx_resp_len, sense_b, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -1089,7 +1092,8 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
             fprintf(sg_warnings_strm, "%02x ", proutCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
         if (verbose > 1) {
-            fprintf(sg_warnings_strm, "    Persistent Reservation Out parameters:\n");
+            fprintf(sg_warnings_strm, "    Persistent Reservation Out "
+                    "parameters:\n");
             dStrHex((const char *)paramp, param_len, 0);
         }
     }
@@ -1575,8 +1579,9 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
     vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
-                 ((bytchk & 0x1) << 1) ;
+                 ((bytchk & 0x3) << 1) ;
     vCmdBlk[2] = (unsigned char)((lba >> 24) & 0xff);
     vCmdBlk[3] = (unsigned char)((lba >> 16) & 0xff);
     vCmdBlk[4] = (unsigned char)((lba >> 8) & 0xff);
@@ -1670,8 +1675,9 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
     vCmdBlk[1] = ((vrprotect & 0x7) << 5) | ((dpo & 0x1) << 4) |
-                 ((bytchk & 0x1) << 1) ;
+                 ((bytchk & 0x3) << 1) ;
     vCmdBlk[2] = (llba >> 56) & 0xff;
     vCmdBlk[3] = (llba >> 48) & 0xff;
     vCmdBlk[4] = (llba >> 40) & 0xff;
@@ -2150,7 +2156,7 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
                         int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rlCmdBlk[READ_BLOCK_LIMITS_CMDLEN] = 
+    unsigned char rlCmdBlk[READ_BLOCK_LIMITS_CMDLEN] =
       {READ_BLOCK_LIMITS_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -2339,5 +2345,3 @@ sg_ll_extended_copy(int sg_fd, void * resp,
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
-
-

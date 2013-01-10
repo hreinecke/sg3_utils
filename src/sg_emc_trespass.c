@@ -39,7 +39,8 @@ static int do_trespass(int fd, int hr, int short_cmd)
                 { 0, 0, 0, 0, 0, 0, 0, 0x00,
                   TRESPASS_PAGE,        /* Page code */
                   0x09,                 /* Page length - 2 */
-                  0x81,                 /* Trespass code + Honor reservation bit */
+                  0x81,                 /* Trespass code + Honor reservation
+					 * bit */
                   0xff, 0xff,           /* Trespass target */
                   0, 0, 0, 0, 0, 0      /* Reserved bytes / unknown */
         };
@@ -47,7 +48,8 @@ static int do_trespass(int fd, int hr, int short_cmd)
                 { 0, 0, 0, 0,
                   TRESPASS_PAGE,        /* Page code */
                   0x02,                 /* Page length - 2 */
-                  0x81,                 /* Trespass code + Honor reservation bit */
+                  0x81,                 /* Trespass code + Honor reservation
+					 * bit */
                   0xff,                 /* Trespass target */
         };
         int res;

@@ -21,4 +21,3 @@ scsi_pt_version()
 {
     return scsi_pt_version_str;
 }
-

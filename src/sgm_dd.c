@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static char * version_str = "1.36 20120907 shared_mmap";
+static char * version_str = "1.37 20121211 shared_mmap";
 #else
-static char * version_str = "1.36 20111014";
+static char * version_str = "1.37 20121211";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -177,7 +177,8 @@ print_stats()
 {
     if (0 != dd_count)
         fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
-    fprintf(stderr, "%"PRId64"+%d records in\n", in_full - in_partial, in_partial);
+    fprintf(stderr, "%"PRId64"+%d records in\n", in_full - in_partial,
+            in_partial);
     fprintf(stderr, "%"PRId64"+%d records out\n", out_full - out_partial,
             out_partial);
 }
@@ -373,8 +374,8 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
                    (rcBuff[6] << 8) | rcBuff[7];
     }
     if (verbose)
-        fprintf(stderr, "      number of blocks=%"PRId64" [0x%"PRIx64"], block "
-                "size=%d\n", *num_sect, *num_sect, *sect_sz);
+        fprintf(stderr, "      number of blocks=%" PRId64 " [0x%" PRIx64
+                "], block size=%d\n", *num_sect, *num_sect, *sect_sz);
     return 0;
 }
 
@@ -398,8 +399,9 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         }
         *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
         if (verbose)
-            fprintf(stderr, "      [bgs64] number of blocks=%"PRId64" [0x%"PRIx64"], "
-                    "block size=%d\n", *num_sect, *num_sect, *sect_sz);
+            fprintf(stderr, "      [bgs64] number of blocks=%" PRId64 " [0x%"
+                    PRIx64 "], block size=%d\n", *num_sect, *num_sect,
+                    *sect_sz);
  #else
         unsigned long ul;
 
@@ -409,8 +411,9 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         }
         *num_sect = (int64_t)ul;
         if (verbose)
-            fprintf(stderr, "      [bgs] number of blocks=%"PRId64" [0x%"PRIx64"], "
-                    " block size=%d\n", *num_sect, *num_sect, *sect_sz);
+            fprintf(stderr, "      [bgs] number of blocks=%" PRId64 " [0x%"
+                    PRIx64 "], block size=%d\n", *num_sect, *num_sect,
+                    *sect_sz);
  #endif
     }
     return 0;
@@ -529,8 +532,8 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     int k, res;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, dpo)) {
-        fprintf(stderr, ME "bad rd cdb build, from_block=%"PRId64", blocks=%d\n",
-                from_block, blocks);
+        fprintf(stderr, ME "bad rd cdb build, from_block=%" PRId64
+                ", blocks=%d\n", from_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
@@ -932,7 +935,8 @@ main(int argc, char * argv[])
     }
     if (blk_sz <= 0) {
         blk_sz = DEF_BLOCK_SIZE;
-        fprintf(stderr, "Assume default 'bs' (block size) of %d bytes\n", blk_sz);
+        fprintf(stderr, "Assume default 'bs' (block size) of %d bytes\n",
+                blk_sz);
     }
     if ((ibs && (ibs != blk_sz)) || (obs && (obs != blk_sz))) {
         fprintf(stderr, "If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -958,8 +962,8 @@ main(int argc, char * argv[])
         bpt = DEF_BLOCKS_PER_2048TRANSFER;
 
 #ifdef SG_DEBUG
-    fprintf(stderr, ME "if=%s skip=%"PRId64" of=%s seek=%"PRId64" count=%"PRId64"\n",
-           inf, skip, outf, seek, dd_count);
+    fprintf(stderr, ME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
+           PRId64 "\n", inf, skip, outf, seek, dd_count);
 #endif
     install_handler (SIGINT, interrupt_handler);
     install_handler (SIGQUIT, interrupt_handler);
@@ -1235,14 +1239,14 @@ main(int argc, char * argv[])
         if (out_num_sect > seek)
             out_num_sect -= seek;
 #ifdef SG_DEBUG
-        fprintf(stderr,
-            "Start of loop, count=%"PRId64", in_num_sect=%"PRId64", out_num_sect=%"PRId64"\n",
-            dd_count, in_num_sect, out_num_sect);
+        fprintf(stderr, "Start of loop, count=%" PRId64 ", in_num_sect=%"
+                PRId64 ", out_num_sect=%"PRId64"\n", dd_count, in_num_sect,
+                out_num_sect);
 #endif
         if (in_num_sect > 0) {
             if (out_num_sect > 0)
                 dd_count = (in_num_sect > out_num_sect) ? out_num_sect :
-                                                       in_num_sect;
+                                                          in_num_sect;
             else
                 dd_count = in_num_sect;
         }
@@ -1431,7 +1435,8 @@ main(int argc, char * argv[])
                 break;
             }
             else if (res < blocks * blk_sz) {
-                fprintf(stderr, "output file probably full, seek=%"PRId64" ", seek);
+                fprintf(stderr, "output file probably full, seek=%" PRId64
+                        " ", seek);
                 blocks = res / blk_sz;
                 out_full += blocks;
                 if ((res % blk_sz) > 0)

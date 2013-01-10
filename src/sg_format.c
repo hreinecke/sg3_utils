@@ -196,7 +196,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                 fmt_pl[1] |= 0x88;     /* fov=1, ip=1 */
                 fmt_pl[off + 0] = 0x20;     /* si=1 in init. pattern desc */
         }
-        if (longlist) 
+        if (longlist)
                 fmt_pl[3] = (pie & 0xf);    /* protection interval exponent */
 
         need_hdr = (immed || cmplst || dcrt || si || (pf_usage > 0) ||

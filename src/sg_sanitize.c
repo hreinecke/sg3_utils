@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.91 20120222";
+static char * version_str = "0.91 20121211";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -98,12 +98,12 @@ static void
 usage()
 {
   fprintf(stderr, "Usage: "
-          "sg_sanitize [--ause] [--block] [--count=OC] [--crypto] [--early] "
-          "[--fail] [--help]\n"
-          "                   [--invert] [--ipl=LEN] [--overwrite] "
-          "[--pattern=PF]\n"
-          "                   [--quick] [--test=TE] [--verbose] [--version] [--wait] "
-          "DEVICE\n"
+          "sg_sanitize [--ause] [--block] [--count=OC] [--crypto] [--early]\n"
+          "                   [--fail] [--help] [--invert] [--ipl=LEN] "
+          "[--overwrite]\n"
+          "                   [--pattern=PF] [--quick] [--test=TE] "
+          "[--verbose]\n"
+          "                   [--version] [--wait] DEVICE\n"
           "  where:\n"
           "    --ause|-A            set AUSE bit in cdb\n"
           "    --block|-B           do BLOCK ERASE sanitize\n"
@@ -389,7 +389,7 @@ main(int argc, char * argv[])
         }
 
     }
-    
+
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
     if (sg_fd < 0) {
         fprintf(stderr, ME "open error: %s: %s\n", device_name,

@@ -1,6 +1,6 @@
-.TH SG_WRITE_SAME "8" "November 2011" "sg3_utils\-1.33" SG3_UTILS
+.TH SG_WRITE_SAME "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
-sg_write_same \- send the SCSI WRITE SAME command
+sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
 .B sg_write_same
 [\fI\-\-10\fR] [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-anchor\fR]
@@ -189,6 +189,12 @@ commands (see the sg_unmap and sg_format utilities).
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
+.PP
+In Linux at this time the sg driver does not support cdb sizes greater than
+16 bytes. Hence a device node like /dev/sg1 which is associated with the
+sg driver will fail with this utility if the \fI\-\-32\fR option is
+given (or implied by other options). The bsg driver with device nodes like
+/dev/bsg/6:0:0:1 does support cdb sizes greater than 16 bytes.
 .SH EXIT STATUS
 The exit status of sg_write_same is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -233,7 +239,7 @@ going to modify LBA 2468 then we take a copy of it first:
 The following command line sets the user data to zeroes and the PI to 8
 0xFF bytes on LBA 2468:
 .PP
-  sg_write_same --lba=2468 /dev/sdb
+  sg_write_same \-\-lba=2468 /dev/sdb
 .PP
 Reading back that block should be successful because the application tag
 is 0xffff which suppresses the guard (CRC) check (which would otherwise be
@@ -254,10 +260,10 @@ below shows:
 .br
   dd if=/dev/zero bs=1 count=2 seek=514 conv=notrunc of=lb.bin
 .PP
-The resulting file can be viewed with 'hexdump -C lb.bin' and should
+The resulting file can be viewed with 'hexdump \-C lb.bin' and should
 contain 520 bytes. Now that file can be written to LBA 2468 as follows:
 .PP
-  sg_write_same --lba=2468 wrprotect=3 --in=lb.bin /dev/sdb
+  sg_write_same \-\-lba=2468 wrprotect=3 \-\-in=lb.bin /dev/sdb
 .PP
 Note the \fI\-\-wrprotect=3\fR rather than being set to 1, since we want
 the WRITE SAME command to succeed even though the PI data now indicates
@@ -268,7 +274,7 @@ error should occur:
 .PP
 dd errors are not very expressive, if dmesg is checked there should be
 a line something like this: "[sdb]  Add. Sense: Logical block guard check
-failed". The block can be corrected by doing a "sg_write_same --lba=1234
+failed". The block can be corrected by doing a "sg_write_same \-\-lba=1234
 /dev/sdb" again or restoring the original contents of that LBA:
 .PP
   dd if=2468.bin bs=512 seek=2468 of=/dev/sdb conv=notrunc count=1
@@ -280,7 +286,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2011 Douglas Gilbert
+Copyright \(co 2009\-2012 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

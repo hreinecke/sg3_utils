@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.34
+Version: 1.35
 # Release: 1%{?dist}
 Release: 1
 License: GPL
@@ -79,6 +79,10 @@ fi
 %{_libdir}/*.la
 
 %changelog
+* Wed Jan 09 2012 - dgilbert at interlog dot com
+- track t10 changes, fix for cygwin 1.7.17
+  * sg3_utils-1.35
+
 * Sat Oct 13 2012 - dgilbert at interlog dot com
 - add sg_xcopy and sg_copy_results; track t10 changes
   * sg3_utils-1.34

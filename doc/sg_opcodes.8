@@ -1,7 +1,6 @@
-.TH SG_OPCODES "8" "March 2011" "sg3_utils\-1.32" SG3_UTILS
+.TH SG_OPCODES "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
-sg_opcodes \- reports information on supported SCSI commands or
-task management functions
+sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
 .B sg_opcodes
 [\fI\-\-alpha\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-no-inquiry\fR]
@@ -194,7 +193,7 @@ To see the information about a specific command give its operation
 code to the '\-\-op=' option. A command line invocation is shown first
 followed by a typical response:
 .PP
-   # sg_opcodes --op=93h /dev/sdb
+   # sg_opcodes \-\-op=93h /dev/sdb
 .PP
   Opcode=0x93
 .br
@@ -206,7 +205,7 @@ followed by a typical response:
 .PP
 The next example shows the supported task management functions:
 .PP
-   # sg_opcodes --tmf -n /dev/sdb
+   # sg_opcodes \-\-tmf \-n /dev/sdb
 .PP
 Task Management Functions supported by device:
 .br
@@ -227,7 +226,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2011 Douglas Gilbert
+Copyright \(co 2004\-2012 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

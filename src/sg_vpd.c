@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.64 20120929";    /* spc4r36 + sbc3r32 */
+static char * version_str = "0.64 20121211";    /* spc4r36 + sbc3r34 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1296,7 +1296,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
         printf("  POA_SUP=%d\n", !!(b[12] & 0x80));     /* spc4r32 */
         printf("  HRA_SUP=%d\n", !!(b[12] & 0x40));     /* spc4r32 */
         printf("  VSA_SUP=%d\n", !!(b[12] & 0x20));     /* spc4r32 */
-        printf("  Maximum supported sense data length=%d\n", 
+        printf("  Maximum supported sense data length=%d\n",
                b[13]); /* spc4r34 */
         return;
     }
@@ -1613,7 +1613,8 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         if (len > 19) {     /* added in sbc3r09 */
             u = (buff[16] << 24) | (buff[17] << 16) | (buff[18] << 8) |
                 buff[19];
-            printf("  Maximum prefetch transfer length: %u blocks\n", u);
+            printf("  Maximum prefetch length: %u blocks\n", u);
+            /* was 'Maximum prefetch transfer length' prior to sbc3r33 */
         }
         if (len > 27) {     /* added in sbc3r18 */
             u = ((unsigned int)buff[20] << 24) | (buff[21] << 16) |
@@ -1685,6 +1686,9 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Reserved [0x%x]\n", u);
         else
             printf("  Nominal rotation rate: %d rpm\n", u);
+        printf("  Product type=%d\n", buff[6]);
+        printf("  WABEREQ=%d\n", (buff[7] >> 6) & 0x3);
+        printf("  WACEREQ=%d\n", (buff[7] >> 4) & 0x3);
         u = buff[7] & 0xf;
         printf("  Nominal form factor");
         switch (u) {
@@ -1710,6 +1714,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
+        printf("  VBULS=%d\n", buff[8] & 0x1);
         break;
     case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
         printf("  Manufacturer-assigned serial number: %.*s\n",
@@ -2356,7 +2361,8 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
-                decode_scsi_ports_vpd(rsp_buff, len, do_hex, do_long, do_quiet);
+                decode_scsi_ports_vpd(rsp_buff, len, do_hex, do_long,
+                                      do_quiet);
             }
             return 0;
         }
@@ -2821,7 +2827,8 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                     printf("Referrals VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
-                    printf("Automation device serial number VPD page (SSC):\n");
+                    printf("Automation device serial number VPD page "
+                           "(SSC):\n");
                     break;
                 default:
                     printf("VPD page=0x%x, pdt=0x%x:\n", 0xb3, pdt);

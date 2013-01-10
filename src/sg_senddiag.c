@@ -533,7 +533,7 @@ static struct page_code_desc pc_desc_arr[] = {
         {0x3f, "Protocol specific (SAS transport)"},
         {0x40, "Translate address (direct access)"},
         {0x41, "Device status (direct access)"},
-        {0x42, "Rebuild assist (direct access)"},
+        {0x42, "Rebuild assist (direct access)"}, /* sbc3r31 */
 };
 
 static const char * find_page_code_desc(int page_num)

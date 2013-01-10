@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.68 20120820";    /* ses3r04 */
+static char * version_str = "1.70 20121211";    /* ses3r05 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -64,7 +64,7 @@ static char * version_str = "1.68 20120820";    /* ses3r04 */
 #define POWER_SUPPLY_ETC 0x2
 #define COOLING_ETC 0x3
 #define TEMPERATURE_ETC 0x4
-#define DOOR_LOCK_ETC 0x5
+#define DOOR_ETC 0x5    /* prior to ses3r05 was DOOR_LOCK_ETC */
 #define AUD_ALARM_ETC 0x6
 #define ESC_ELECTRONICS_ETC 0x7
 #define SCC_CELECTR_ETC 0x8
@@ -240,6 +240,7 @@ static struct diag_page_code dpc_arr[] = {
     {0x3f, "Protocol Specific (SAS transport)"},
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
+    {0x42, "Rebuild Assist (SBC)"},     /* sbc3r31 */
     {-1, NULL},
 };
 
@@ -264,6 +265,7 @@ static struct diag_page_code in_dpc_arr[] = {
     {0x3f, "Protocol Specific (SAS transport)"},
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
+    {0x42, "Rebuild Assist Input (SBC)"},
     {-1, NULL},
 };
 
@@ -288,6 +290,7 @@ static struct diag_page_code out_dpc_arr[] = {
     {0x3f, "Protocol Specific (SAS transport)"},
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
+    {0x42, "Rebuild Assist Output (SBC)"},
     {-1, NULL},
 };
 
@@ -321,7 +324,8 @@ static struct element_type_t element_type_arr[] = {
     {POWER_SUPPLY_ETC, "ps", "Power supply"},
     {COOLING_ETC, "coo", "Cooling"},
     {TEMPERATURE_ETC, "ts", "Temperature sensor"},
-    {DOOR_LOCK_ETC, "dl", "Door lock"},
+    {DOOR_ETC, "do", "Door"},   /* prior to ses3r05 was 'dl' (for Door Lock)
+                                   but the "Lock" has been dropped */
     {AUD_ALARM_ETC, "aa", "Audible alarm"},
     {ESC_ELECTRONICS_ETC, "esc", "Enclosure services controller electronics"},
     {SCC_CELECTR_ETC, "sce", "SCC controller electronics"},
@@ -959,7 +963,7 @@ find_out_diag_page_desc(int page_num)
     }
     return NULL;
 }
-        
+
 /* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
  * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
@@ -1553,11 +1557,11 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         else
             printf("%sTemperature: <reserved>\n", pad);
         break;
-    case DOOR_LOCK_ETC:
+    case DOOR_ETC:      /* OPEN field added in ses3r05 */
         if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Unlock=%d\n", pad,
+            printf("%sIdent=%d, Fail=%d, Open=%d, Unlock=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[3] & 0x1));
+                   !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case AUD_ALARM_ETC:     /* audible alarm */
         if ((! filter) || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
@@ -3096,7 +3100,7 @@ try_again:
         }
     }
     if (0 == got1) {
-        if (op->ind_given) 
+        if (op->ind_given)
             printf("      >>> no match on --index=%d,%d\n", op->ind_th,
                    op->ind_indiv);
         if (op->desc_name)
@@ -3174,7 +3178,7 @@ strcase_eq(const char * s1p, const char * s2p)
 
 static int
 is_acronym_in_status_ctl(const struct tuple_acronym_val * tavp)
-{ 
+{
     const struct acronym2tuple * a2tp;
 
     for (a2tp = ecs_a2t_arr; a2tp->acron; ++ a2tp) {
@@ -3186,7 +3190,7 @@ is_acronym_in_status_ctl(const struct tuple_acronym_val * tavp)
 
 static int
 is_acronym_in_threshold(const struct tuple_acronym_val * tavp)
-{ 
+{
     const struct acronym2tuple * a2tp;
 
     for (a2tp = th_a2t_arr; a2tp->acron; ++ a2tp) {
@@ -3198,7 +3202,7 @@ is_acronym_in_threshold(const struct tuple_acronym_val * tavp)
 
 static int
 is_acronym_in_additional(const struct tuple_acronym_val * tavp)
-{ 
+{
     const struct acronym2tuple * a2tp;
 
     for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++ a2tp) {
@@ -3239,7 +3243,8 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
             return -2;
     }
     if (op->verbose > 1)
-        fprintf(stderr, "  s_byte=%d, s_bit=%d, n_bits=%d\n", s_byte, s_bit, n_bits);
+        fprintf(stderr, "  s_byte=%d, s_bit=%d, n_bits=%d\n", s_byte, s_bit,
+                n_bits);
     if (op->get_str) {
         ui = get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
         if (op->do_hex)
@@ -3378,7 +3383,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     char b[64];
 
     found = 0;
-    if (NULL == tavp->acron) {  
+    if (NULL == tavp->acron) {
         if (! op->page_code_given)
             op->page_code = DPC_ENC_CONTROL;
         ++found;

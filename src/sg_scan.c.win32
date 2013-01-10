@@ -1,9 +1,5 @@
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 /*
- * Copyright (c) 2006-2010 Douglas Gilbert.
+ * Copyright (c) 2006-2012 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -15,6 +11,10 @@
  * an optional scsi adapter scan.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -24,9 +24,11 @@
 #include <errno.h>
 
 #include "sg_lib.h"
+
+#define _WIN32_WINNT 0x0602
 #include "sg_pt_win32.h"
 
-static char * version_str = "1.08 (win32) 20100312";
+static char * version_str = "1.10 (win32) 20121211";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
@@ -47,6 +49,7 @@ static char * version_str = "1.08 (win32) 20100312";
     CTL_CODE(IOCTL_STORAGE_BASE, 0x0500, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 
+#ifndef _DEVIOCTL_
 typedef enum _STORAGE_BUS_TYPE {
     BusTypeUnknown      = 0x00,
     BusTypeScsi         = 0x01,
@@ -62,7 +65,9 @@ typedef enum _STORAGE_BUS_TYPE {
     BusTypeSata         = 0x0B,
     BusTypeSd           = 0x0C,
     BusTypeMmc          = 0x0D,
-    BusTypeMax          = 0x0E,
+    BusTypeVirtual             = 0xE,
+    BusTypeFileBackedVirtual   = 0xF,
+    BusTypeMax,
     BusTypeMaxReserved  = 0x7F
 } STORAGE_BUS_TYPE, *PSTORAGE_BUS_TYPE;
 
@@ -81,6 +86,7 @@ typedef struct _STORAGE_DEVICE_DESCRIPTOR {
     ULONG RawPropertiesLength;
     UCHAR RawDeviceProperties[1];
 } STORAGE_DEVICE_DESCRIPTOR, *PSTORAGE_DEVICE_DESCRIPTOR;
+#endif
 
 typedef struct _STORAGE_DEVICE_UNIQUE_IDENTIFIER {
     ULONG  Version;
@@ -93,6 +99,7 @@ typedef struct _STORAGE_DEVICE_UNIQUE_IDENTIFIER {
 // Use CompareStorageDuids(PSTORAGE_DEVICE_UNIQUE_IDENTIFIER duid1, duid2)
 // to test for equality
 
+#ifndef _DEVIOCTL_
 typedef enum _STORAGE_QUERY_TYPE {
     PropertyStandardQuery = 0,
     PropertyExistsQuery,
@@ -115,6 +122,7 @@ typedef struct _STORAGE_PROPERTY_QUERY {
     STORAGE_QUERY_TYPE QueryType;
     UCHAR AdditionalParameters[1];
 } STORAGE_PROPERTY_QUERY, *PSTORAGE_PROPERTY_QUERY;
+#endif
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -236,6 +244,10 @@ get_bus_type(int bt)
         return "Sd   ";
     case BusTypeMmc:
         return "Mmc  ";
+    case BusTypeVirtual:
+        return "Virt ";
+    case BusTypeFileBackedVirtual:
+        return "FBVir";
     case BusTypeMax:
         return "Max  ";
     default:
@@ -249,7 +261,8 @@ query_dev_property(HANDLE hdevice,
 {
     DWORD num_out, err;
     char b[256];
-    STORAGE_PROPERTY_QUERY query = {StorageDeviceProperty, PropertyStandardQuery, {0} };
+    STORAGE_PROPERTY_QUERY query = {StorageDeviceProperty,
+                                    PropertyStandardQuery, {0} };
 
     memset(data, 0, sizeof(*data));
     if (! DeviceIoControl(hdevice, IOCTL_STORAGE_QUERY_PROPERTY,
@@ -264,8 +277,8 @@ query_dev_property(HANDLE hdevice,
     }
 
     if (verbose > 3)
-        fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) num_out=%ld\n",
-                num_out);
+        fprintf(stderr, "  IOCTL_STORAGE_QUERY_PROPERTY(DevProp) "
+                "num_out=%ld\n", num_out);
     return 0;
 }
 
@@ -344,8 +357,8 @@ enum_scsi_adapters(void)
         if (fh != INVALID_HANDLE_VALUE) {
             hole_count = 0;
             success = DeviceIoControl(fh, IOCTL_SCSI_GET_INQUIRY_DATA,
-                                      NULL, 0, inqDataBuff, sizeof(inqDataBuff),
-                                      &dummy, FALSE);
+                                      NULL, 0, inqDataBuff,
+                                      sizeof(inqDataBuff), &dummy, FALSE);
             if (success) {
                 PSCSI_BUS_DATA pbd;
                 PSCSI_INQUIRY_DATA pid;
@@ -366,8 +379,10 @@ enum_scsi_adapters(void)
                                  pid->PathId, pid->TargetId, pid->Lun);
                         printf("%-15s", b);
                         snprintf(b, sizeof(b) - 1, "claimed=%d pdt=%xh %s ",
-                                 pid->DeviceClaimed, pid->InquiryData[0] % 0x3f,
-                                 ((0 == pid->InquiryData[4]) ? "dubious" : ""));
+                                 pid->DeviceClaimed,
+                                 pid->InquiryData[0] % 0x3f,
+                                 ((0 == pid->InquiryData[4]) ? "dubious" :
+                                                               ""));
                         printf("%-26s", b);
                         printf("%.8s  %.16s  %.4s\n", pid->InquiryData + 8,
                                pid->InquiryData + 16, pid->InquiryData + 32);
@@ -413,12 +428,14 @@ enum_volumes(char letter)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
-                fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
+                fprintf(stderr, "%s: query_dev_property failed\n",
+                        __FUNCTION__ );
             else
                 tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+                    fprintf(stderr, "%s: query_dev_uid failed\n",
+                            __FUNCTION__ );
             } else
                 tmp_se.qp_uid_valid = 1;
             if (('\0' == letter) || (letter == tmp_se.name[0]))
@@ -452,12 +469,14 @@ enum_pds(void)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
-                fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
+                fprintf(stderr, "%s: query_dev_property failed\n",
+                        __FUNCTION__ );
             else
                 tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+                    fprintf(stderr, "%s: query_dev_uid failed\n",
+                            __FUNCTION__ );
             } else
                 tmp_se.qp_uid_valid = 1;
             hole_count = 0;
@@ -498,12 +517,14 @@ enum_cdroms(void)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
-                fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
+                fprintf(stderr, "%s: query_dev_property failed\n",
+                        __FUNCTION__ );
             else
                 tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+                    fprintf(stderr, "%s: query_dev_uid failed\n",
+                            __FUNCTION__ );
             } else
                 tmp_se.qp_uid_valid = 1;
             hole_count = 0;
@@ -544,12 +565,14 @@ enum_tapes(void)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
-                fprintf(stderr, "%s: query_dev_property failed\n", __FUNCTION__ );
+                fprintf(stderr, "%s: query_dev_property failed\n",
+                        __FUNCTION__ );
             else
                 tmp_se.qp_descriptor_valid = 1;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
-                    fprintf(stderr, "%s: query_dev_uid failed\n", __FUNCTION__ );
+                    fprintf(stderr, "%s: query_dev_uid failed\n",
+                            __FUNCTION__ );
             } else
                 tmp_se.qp_uid_valid = 1;
             hole_count = 0;
@@ -608,7 +631,8 @@ sg_do_wscan(char letter, int show_bt, int scsi_scan)
                 printf("[%4s+] ", sp->volume_letters);
             if (sp->qp_descriptor_valid) {
                 if (show_bt)
-                    printf("<%s>  ", get_bus_type(sp->qp_descriptor.desc.BusType));
+                    printf("<%s>  ",
+                           get_bus_type(sp->qp_descriptor.desc.BusType));
                 j = sp->qp_descriptor.desc.VendorIdOffset;
                 if (j > 0)
                     printf("%s  ", sp->qp_descriptor.raw + j);

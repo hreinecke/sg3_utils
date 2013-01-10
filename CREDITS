@@ -38,7 +38,7 @@ Hannes Reinecke <hare at suse dot de>
         contributed sg_rdac, (and some corresponding VPD entries to
         sg_vpd_vendor), sg_stpg and sg_safte [20071013]
         sg_referrals [20100906]
-        sg_inq --export option [20120220]
+        sg_inq --export option [20120220+20130109]
         sg_xcopy+sg_copy_results [20120322]
 
 Hayashi Naoyuki <titan at culzean dot org>
@@ -93,6 +93,9 @@ Ronnie Sahlberg <ronniesahlberg at gmail dot com> has written libiscsi and a
 
 Saeed Bishara contributed sg_write_long
 
+Shahar Salzman <shahar dot salzman at kaminario dot com> contributed
+	sg_compare_and_write [20121205]
+
 Thomas Kolbe <tkolbe at partnersdata dot com>
         Solaris port help and testing [20070503]
 
@@ -107,4 +110,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-22nd March 2012
+9th January 2013

@@ -1,6 +1,6 @@
-.TH SG_STPG "8" "September 2007" "sg3_utils\-1.25" SG3_UTILS
+.TH SG_STPG "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
-sg_stpg \- sends a SCSI SET TARGET PORT GROUPS command
+sg_stpg \- send SCSI SET TARGET PORT GROUPS command
 .SH SYNOPSIS
 .B sg_stpg
 [\fI\-\-active\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-offline\fR]
@@ -29,8 +29,8 @@ whether a transition to the requested state is supported. If so the
 SET TARGET PORT GROUPS command is sent.
 .PP
 Target port group access is described in SPC\-4 found at www.t10.org
-in section 5.8 (in rev 11 dated 2007/5/14). The SET TARGET PORT
-GROUPS command is also described in that document.
+in sections 5.8 and 5.16 (in rev 36e dated 2012/8/24). The SET TARGET PORT
+GROUPS command is also described in section 6.45 of that document.
 .PP
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
@@ -114,7 +114,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2007 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert
+Copyright \(co 2007\-2012 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

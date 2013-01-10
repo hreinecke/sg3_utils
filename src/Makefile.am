@@ -17,7 +17,7 @@ bin_PROGRAMS = \
 	sg_sanitize sg_sat_identify sg_sat_phy_event sg_sat_set_features \
 	sg_scan sg_senddiag sg_ses sg_start sg_stpg sg_sync sg_test_rwbuf \
 	sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_wr_mode sg_xcopy
+	sg_write_same sg_wr_mode sg_xcopy sg_compare_and_write
 
 distclean-local:
 	rm -f sg_scan.c
@@ -38,7 +38,8 @@ bin_PROGRAMS = \
 	sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_identify \
 	sg_sat_phy_event sg_sat_set_features sg_scan sg_senddiag sg_ses \
 	sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd \
-	sg_write_buffer sg_write_long sg_write_same sg_wr_mode
+	sg_write_buffer sg_write_long sg_write_same sg_wr_mode \
+	sg_compare_and_write
 
 distclean-local:
 	rm -f sg_scan.c
@@ -59,7 +60,8 @@ bin_PROGRAMS = \
 	sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_identify \
 	sg_sat_phy_event sg_sat_set_features sg_scan sg_senddiag sg_ses \
 	sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd \
-	sg_write_buffer sg_write_long sg_write_same sg_wr_mode
+	sg_write_buffer sg_write_long sg_write_same sg_wr_mode \
+	sg_compare_and_write
 
 distclean-local:
 	rm -f sg_scan.c
@@ -80,7 +82,7 @@ bin_PROGRAMS = \
 	sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_identify \
 	sg_sat_phy_event sg_sat_set_features sg_senddiag sg_ses sg_start \
 	sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
-	sg_write_long sg_write_same sg_wr_mode
+	sg_write_long sg_write_same sg_wr_mode sg_compare_and_write
 
 endif
 
@@ -95,7 +97,7 @@ bin_PROGRAMS = \
 	sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_identify \
 	sg_sat_phy_event sg_sat_set_features sg_senddiag sg_ses sg_start \
 	sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
-	sg_write_long sg_write_same sg_wr_mode
+	sg_write_long sg_write_same sg_wr_mode sg_compare_and_write
 
 endif
 
@@ -110,11 +112,12 @@ bin_PROGRAMS = \
 	sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_identify \
 	sg_sat_phy_event sg_sat_set_features sg_senddiag sg_ses sg_start \
 	sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
-	sg_write_long sg_write_same sg_wr_mode
+	sg_write_long sg_write_same sg_wr_mode sg_compare_and_write
 
 endif
 
 
+# -std=<s> can be c99, c11, gnu11, etc. Default is gnu89 (gnu90 is the same)
 AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W
 # AM_CFLAGS = -I ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W -pedantic -std=c99
 
@@ -282,3 +285,6 @@ sg_xcopy_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_copy_results_SOURCES = sg_copy_results.c
 sg_copy_results_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_compare_and_write_SOURCES = sg_compare_and_write.c
+sg_compare_and_write_LDADD = ../lib/libsgutils2.la @os_libs@

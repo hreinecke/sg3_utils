@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.07 20120319";    /* spc4r35 + sbc3r30 */
+static char * version_str = "1.07 20121211";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -684,7 +684,9 @@ show_page_name(int pg_code, int subpg_code,
         case START_STOP_LPAGE: printf("%sStart-stop cycle counter", b); break;
         case APP_CLIENT_LPAGE: printf("%sApplication client", b); break;
         case SELF_TEST_LPAGE: printf("%sSelf-test results", b); break;
-        case PROTO_SPECIFIC_LPAGE: printf("%sProtocol specific port", b); break;
+        case PROTO_SPECIFIC_LPAGE:
+            printf("%sProtocol specific port", b);
+            break;
         case STATS_LPAGE:
             printf("%sGeneral statistics and performance", b);
             break;
@@ -1624,11 +1626,11 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
             if (extra > 7) {
                 n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
                 if (0xffffffff == n)
-                    printf("  Specified load-unload count over device lifetime "
-                           "= -1");
+                    printf("  Specified load-unload count over device "
+                           "lifetime = -1");
                 else
-                    printf("  Specified load-unload count over device lifetime "
-                           "= %u", n);
+                    printf("  Specified load-unload count over device "
+                           "lifetime = %u", n);
             }
             break;
         case 6:
@@ -3530,11 +3532,16 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
         switch (pc) {
         case 0: printf("  Blocks sent to initiator"); break;
         case 1: printf("  Blocks received from initiator"); break;
-        case 2: printf("  Blocks read from cache and sent to initiator"); break;
-        case 3: printf("  Number of read and write commands whose size "
-                       "<= segment size"); break;
-        case 4: printf("  Number of read and write commands whose size "
-                       "> segment size"); break;
+        case 2:
+            printf("  Blocks read from cache and sent to initiator");
+            break;
+        case 3:
+            printf("  Number of read and write commands whose size "
+                   "<= segment size");
+            break;
+        case 4:
+            printf("  Number of read and write commands whose size "
+                   "> segment size"); break;
         default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
         k = pl - 4;

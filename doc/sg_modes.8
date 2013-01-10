@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "January 2008" "sg3_utils\-1.26" SG3_UTILS
+.TH SG_MODES "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
 .SH NAME
 sg_modes \- reads mode pages with SCSI MODE SENSE command
 .SH SYNOPSIS
@@ -123,7 +123,7 @@ is not needed.
 The \fILEN\fR argument is the maximum response length in bytes. It is
 the 'allocation length' field in the cdb. When not given (or \fILEN\fR is
 zero) then the allocation length field is set to 4096 for MODE SENSE (10)
-or 252 for MODE SENSE (6). The \fILEN\fR argument must be non-negative
+or 252 for MODE SENSE (6). The \fILEN\fR argument must be non\-negative
 and no greater than 65535 for MODE SENSE (10) and not greater than 255
 for MODE SENSE (6).
 .TP
@@ -266,7 +266,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2008 Douglas Gilbert
+Copyright \(co 2000\-2012 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

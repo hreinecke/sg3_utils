@@ -138,8 +138,8 @@ int main(int argc, char * argv[])
         if (0 == rio_hdr.device_status)
             ok = 1;
         else {
-            switch (sg_err_category_sense((unsigned char *)(long)rio_hdr.response,
-                    rio_hdr.response_len)) {
+            switch (sg_err_category_sense((unsigned char *)(long)
+                    rio_hdr.response, rio_hdr.response_len)) {
             case SG_LIB_CAT_CLEAN:
                 ok = 1;
                 break;
@@ -158,8 +158,8 @@ int main(int argc, char * argv[])
         if (ok) { /* output result if it is available */
             /* if (0 == rio_hdr.pack_id) */
             if (0 == (rio_hdr.usr_ptr % 3))
-                printf("SEND DIAGNOSTIC %d duration=%u\n", (int)rio_hdr.usr_ptr,
-                       rio_hdr.duration);
+                printf("SEND DIAGNOSTIC %d duration=%u\n",
+                       (int)rio_hdr.usr_ptr, rio_hdr.duration);
             else
                 printf("INQUIRY %d duration=%u\n", (int)rio_hdr.usr_ptr,
                        rio_hdr.duration);

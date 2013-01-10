@@ -438,7 +438,7 @@ main(int argc, char *argv[])
             goto done;
         }
         set_scsi_pt_data_out(ptvp, dxfer_buffer_out, opts.dataout_len);
-    } 
+    }
     if (opts.do_datain) {
         dxfer_buffer_in = my_memalign(opts.datain_len, &wrkBuf);
         if (dxfer_buffer_in == NULL) {
