@@ -57,6 +57,7 @@
 #define VPD_V_EDID_RDAC 0xc8
 #define VPD_V_VAC_RDAC 0xc9
 #define VPD_V_RVSI_RDAC 0xca
+#define VPD_V_SAID_RDAC 0xd0
 
 
 #define DEF_ALLOC_LEN 252
@@ -96,6 +97,7 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_JUMP_SEA, 0, -1, 1, "jump", "Jump setting (Seagate)"},
     {VPD_V_RVSI_RDAC, 0, -1, 1, "rvsi", "Replicated volume source "
      "identifier (RDAC)"},
+    {VPD_V_SAID_RDAC, 0, -1, 1, "said", "Storage array world wide name (RDAC)"},
     {VPD_V_SUBS_RDAC, 0, -1, 1, "sub", "Subsystem identifier (RDAC)"},
     {VPD_V_SVER_RDAC, 1, -1, 1, "sver", "Software version (RDAC)"},
     {VPD_V_UPR_EMC, 1, -1, 1, "upr", "Unit path report (EMC)"},
@@ -760,6 +762,24 @@ decode_rdac_vpd_ca(unsigned char * buff, int len)
     return;
 }
 
+static void
+decode_rdac_vpd_d0(unsigned char * buff, int len)
+{
+    int i;
+
+    if (len < 20) {
+        fprintf(stderr, "Storage Array World Wide Name "
+                "VPD page length too short=%d\n", len);
+        return;
+    }
+    printf("  Storage Array WWN: ");
+    for (i = 0; i < 16; i++)
+        printf("%02x", buff[8 + i]);
+    printf("\n");
+
+    return;
+}
+
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_SYNTAX_ERROR for
    unsupported page */
 int
@@ -1086,6 +1106,44 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 dStrHex((const char *)rsp_buff, len, 0);
             else if (0 == subvalue)
                 decode_rdac_vpd_ca(rsp_buff, len);
+            else
+                dStrHex((const char *)rsp_buff, len, 0);
+            return 0;
+        }
+        break;
+    case VPD_V_SAID_RDAC:
+        if ((! do_raw) && (! do_quiet))
+            printf("%s VPD Page:\n", name);
+        res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
+                            verbose);
+        if (0 == res) {
+            len = rsp_buff[3] + 4;
+            if (num_vpd != rsp_buff[1]) {
+                fprintf(stderr, "invalid VPD response; probably not "
+                        "supported\n");
+                return SG_LIB_CAT_MALFORMED;
+            }
+            if (len > alloc_len) {
+                if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
+                    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
+                                        1, verbose);
+                    if (res) {
+                        fprintf(stderr, "fetching 0xd0 page "
+                                "(alloc_len=%d) failed\n", len);
+                        return res;
+                    }
+                } else {
+                    fprintf(stderr, ">>> warning: response length (%d) "
+                            "longer than requested (%d)\n", len, alloc_len);
+                    len = alloc_len;
+                }
+            }
+            if (do_raw)
+                dStrRaw((const char *)rsp_buff, len);
+            else if (do_hex)
+                dStrHex((const char *)rsp_buff, len, 0);
+            else if (0 == subvalue)
+                decode_rdac_vpd_d0(rsp_buff, len);
             else
                 dStrHex((const char *)rsp_buff, len, 0);
             return 0;
