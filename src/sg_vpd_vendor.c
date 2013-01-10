@@ -598,7 +598,7 @@ decode_rdac_vpd_c4(unsigned char * buff, int len)
     else if (!strcmp(subsystem_rev, "14.0"))
         printf(" (Board ID 2822)\n");
     else
-        printf(" {Board ID unknown)\n");
+        printf(" (Board ID unknown)\n");
 
     printf("  Slot ID: %s\n", slot_id);
 
