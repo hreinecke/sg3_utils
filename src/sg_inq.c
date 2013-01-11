@@ -167,8 +167,8 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_3PARTY_COPY, 0, -1, 0, "tpc", "Third party copy"},
     /* Following are vendor specific */
-    {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (IBM)"},
-    {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (IBM)"},
+    {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (RDAC)"},
+    {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (RDAC)"},
     {VPD_UPR_EMC, 0, -1, 1, "upr", "Unit path report (EMC)"},
     {0, 0, 0, 0, NULL, NULL},
 };
