@@ -36,7 +36,7 @@ Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
 
 Hannes Reinecke <hare at suse dot de> 
         contributed sg_rdac, (and some corresponding VPD entries to
-        sg_vpd_vendor), sg_stpg and sg_safte [20071013]
+        sg_vpd_vendor), sg_stpg and sg_safte [20071013+20130110]
         sg_referrals [20100906]
         sg_inq --export option [20120220+20130109]
         sg_xcopy+sg_copy_results [20120322]
@@ -110,4 +110,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-9th January 2013
+10th January 2013
