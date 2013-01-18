@@ -12,6 +12,7 @@ ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
 		     sg__sat_set_features, sg_sat_smart_rd_data
 		     (previous four in the examples directory)]
 ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
+COMPARE AND WRITE   sg_compare_and_write
 EXTENDED COPY       sg_xcopy, ++
 GET CONFIGURATION   sg_get_config, ++
 GET LBA STATUS      sg_get_lba_status, ++
@@ -99,4 +100,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Douglas Gilbert
-23rd March 2012
+14th January 2013
