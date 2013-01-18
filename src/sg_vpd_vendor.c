@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2012 Douglas Gilbert.
+ * Copyright (c) 2006-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -97,7 +97,8 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_JUMP_SEA, 0, -1, 1, "jump", "Jump setting (Seagate)"},
     {VPD_V_RVSI_RDAC, 0, -1, 1, "rvsi", "Replicated volume source "
      "identifier (RDAC)"},
-    {VPD_V_SAID_RDAC, 0, -1, 1, "said", "Storage array world wide name (RDAC)"},
+    {VPD_V_SAID_RDAC, 0, -1, 1, "said", "Storage array world wide name "
+     "(RDAC)"},
     {VPD_V_SUBS_RDAC, 0, -1, 1, "sub", "Subsystem identifier (RDAC)"},
     {VPD_V_SVER_RDAC, 1, -1, 1, "sver", "Software version (RDAC)"},
     {VPD_V_UPR_EMC, 1, -1, 1, "upr", "Unit path report (EMC)"},

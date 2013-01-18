@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2012 Douglas Gilbert.
+ * Copyright (c) 2006-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.64 20121211";    /* spc4r36 + sbc3r34 */
+static char * version_str = "0.65 20130117";    /* spc4r36 + sbc3r34 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
