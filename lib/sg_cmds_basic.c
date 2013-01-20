@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2012 Douglas Gilbert.
+ * Copyright (c) 1999-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.58 20121204";
+static char * version_str = "1.59 20130120";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

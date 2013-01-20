@@ -1,4 +1,4 @@
-AC_INIT(sg3_utils, 1.35, dgilbert@interlog.com)
+AC_INIT(sg3_utils, 1.36, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
