@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2005-2012 Douglas Gilbert.
+ * Copyright (c) 2005-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.17 20120806 */
+/* sg_pt_linux version 1.18 20130120 */
 
 
 #include <stdio.h>
@@ -407,6 +407,9 @@ get_scsi_pt_os_err(const struct sg_pt_base * vp)
     return ptp->os_err;
 }
 
+/* Returns b which will contain a null char terminated string (if
+ * max_b_len > 0). That string should decode Linux driver and host
+ * status values. */
 char *
 get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
                               char * b)
@@ -420,6 +423,8 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     const char * driv_cp = "unknown";
     const char * sugg_cp = "unknown";
 
+    if (max_b_len < 1)
+        return b;
     m = max_b_len;
     n = 0;
     if (hs) {
@@ -803,7 +808,9 @@ get_scsi_pt_transport_err(const struct sg_pt_base * vp)
     return ptp->io_hdr.transport_status;
 }
 
-/* Combine driver and transport (called "host" in linux kernel) statuses */
+/* Returns b which will contain a null char terminated string (if
+ * max_b_len > 0). Combined driver and transport (called "host" in Linux
+ * kernel) statuses */
 char *
 get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
                               char * b)
@@ -817,6 +824,8 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     const char * driv_cp = "invalid";
     const char * sugg_cp = "invalid";
 
+    if (max_b_len < 1)
+        return b;
     m = max_b_len;
     n = 0;
     if (hs) {
