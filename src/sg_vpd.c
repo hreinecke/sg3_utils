@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.65 20130117";    /* spc4r36 + sbc3r34 */
+static char * version_str = "0.66 20130123";    /* spc4r36 + sbc3r34 */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1537,8 +1537,9 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
 static void
 decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
 {
-    int k, bump, rel_port, desc_len, proto;
+    int k, j, bump, rel_port, desc_len, proto;
     unsigned char * ucp;
+    unsigned char * pidp;
 
     if (1 == do_hex) {
         dStrHex((const char *)buff, len, 0);
@@ -1571,6 +1572,12 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
             dStrHex((const char *)ucp, bump, 1);
         else {
             switch (proto) {
+            case TPROTO_SAS:    /* for SSP, added spl3r2 */
+                pidp = ucp + 8;
+                for (j = 0; j < desc_len; j += 4, pidp += 4)
+                    printf("  phy id=%d, ssp persistent capable=%d\n",
+                           pidp[1], (0x1 & pidp[2]));
+                break;
             default:
                 fprintf(stderr, "Unexpected proto=%d\n", proto);
                 dStrHex((const char *)ucp, bump, 1);

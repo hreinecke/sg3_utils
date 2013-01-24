@@ -52,29 +52,25 @@ FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 static void dStrHexErr(const char* str, int len, int b_len, char * b);
 
 
-/* Want safe, 'n += snprintf(b + n ...)' like function. If cp_max_len is 1
- * then assume cp is pointing to a null char and do nothing. Returns number
- * number of chars placed in cp excluding the trailing null char. So for
- * cp_max_len > 0 the return value is always < cp_max_len; for cp_max_len
- * <= 0 the return value is 0 (and no chars are written to cp). */
+/* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
+ * functions. Returns number number of chars placed in cp excluding the
+ * trailing null char. So for cp_max_len > 0 the return value is always
+ * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars
+ * are written to cp. Note this means that when cp_max_len = 1, this
+ * function assumes that cp[0] is the null character and does nothing
+ * (and returns 0).  */
 static int
 my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
 {
     va_list args;
     int n;
 
-    --cp_max_len;       /* saves several 'subtract 1's below */
-    if (cp_max_len < 1)
+    if (cp_max_len < 2)
         return 0;
-    va_start (args, fmt);
-    n = snprintf(cp, cp_max_len, fmt, args);
-    va_end (args);
-    if (n < cp_max_len)
-        return n;
-    else {
-        cp[cp_max_len] = '\0';  /* want trailing NULL char on string */
-        return cp_max_len;
-    }
+    va_start(args, fmt);
+    n = vsnprintf(cp, cp_max_len, fmt, args);
+    va_end(args);
+    return (n < cp_max_len) ? n : (cp_max_len - 1);
 }
 
 /* Searches 'arr' for match on 'value' then 'peri_type'. If matches
@@ -706,8 +702,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 processed = 0;
             }
             break;
-        case 0xa:       /* Added in SPC-4 rev 17 */
-            n += my_snprintf(b + n, blen - n, "Progress indication\n");
+        case 0xa:
+           /* Added in SPC-4 rev 17, became 'Another ...' in rev 34 */
+            n += my_snprintf(b + n, blen - n, "Another progress "
+                             "indication\n");
             if (add_len < 6) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
@@ -1035,7 +1033,7 @@ void
 sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                int sb_len, int raw_sinfo)
 {
-    char b[1024];
+    char b[2048];
 
     sg_get_sense_str(leadin, sense_buffer, sb_len, raw_sinfo, sizeof(b), b);
     if (NULL == sg_warnings_strm)
