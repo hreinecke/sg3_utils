@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2012 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2013 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -61,7 +61,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static char * version_str = "0.31 20120919";
+static char * version_str = "0.32 20130205";
 
 #define ME "sg_xcopy: "
 
@@ -112,6 +112,9 @@ static char * version_str = "0.31 20120919";
 #define TD_RDMA 128
 #define TD_FW 256
 #define TD_SAS 512
+#define TD_IPV6 1024
+#define TD_IP_COPY_SERVICE 2048
+#define TD_ROD 4096
 
 #define DEV_NULL_MINOR_NUM 3
 
@@ -651,7 +654,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
                    rcBuff[15];
     max_segment_len = rcBuff[16] << 24 | rcBuff[17] << 16 |
         rcBuff[18] << 8 | rcBuff[19];
-    xfp->max_bytes = max_segment_len;
+    xfp->max_bytes = max_segment_len ? max_segment_len : ULONG_MAX;
     max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 |
                       rcBuff[23];
     if (verbose) {
@@ -873,6 +876,21 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             if (verbose)
                 printf("        SAS target descriptor\n");
             td_list |= TD_SAS;
+            break;
+        case 0xea: /* IPv6 */
+            if (verbose)
+                printf("        IPv6 target descriptor\n");
+            td_list |= TD_IPV6;
+            break;
+        case 0xeb: /* IP Copy Service */
+            if (verbose)
+                printf("        IP Copy Service target descriptor\n");
+            td_list |= TD_IP_COPY_SERVICE;
+            break;
+        case 0xfe: /* ROD */
+            if (verbose)
+                printf("        ROD target descriptor\n");
+            td_list |= TD_ROD;
             break;
         default:
             fprintf(stderr, ">> Unhandled target descriptor 0x%02x\n",
