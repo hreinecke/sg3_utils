@@ -587,18 +587,15 @@ int
 sg_mode_page_offset(const unsigned char * resp, int resp_len,
                     int mode_sense_6, char * err_buff, int err_buff_len)
 {
-    int bd_len, n;
+    int bd_len;
     int calc_len;
     int offset;
 
     if ((NULL == resp) || (resp_len < 4) ||
         ((! mode_sense_6) && (resp_len < 8))) {
-        if (err_buff_len > 0) {
-            n = snprintf(err_buff, err_buff_len, "given response length too "
-                         "short: " "%d\n", resp_len);
-            if (n >= err_buff_len)
-                err_buff[err_buff_len - 1] = '\0';
-        }
+        if (err_buff_len > 0)
+            snprintf(err_buff, err_buff_len, "given response length too "
+                     "short: %d\n", resp_len);
         return -1;
     }
     if (mode_sense_6) {
@@ -612,22 +609,16 @@ sg_mode_page_offset(const unsigned char * resp, int resp_len,
         offset = bd_len + MODE10_RESP_HDR_LEN;
     }
     if ((offset + 2) > resp_len) {
-        if (err_buff_len > 0) {
-            n = snprintf(err_buff, err_buff_len, "given response length "
-                         "too small, offset=%d given_len=%d bd_len=%d\n",
-                         offset, resp_len, bd_len);
-            if (n >= err_buff_len)
-                err_buff[err_buff_len - 1] = '\0';
-        }
+        if (err_buff_len > 0)
+            snprintf(err_buff, err_buff_len, "given response length "
+                     "too small, offset=%d given_len=%d bd_len=%d\n",
+                     offset, resp_len, bd_len);
         offset = -1;
     } else if ((offset + 2) > calc_len) {
-        if (err_buff_len > 0) {
-            n = snprintf(err_buff, err_buff_len, "calculated response "
-                         "length too small, offset=%d calc_len=%d bd_len=%d\n",
-                         offset, calc_len, bd_len);
-            if (n >= err_buff_len)
-                err_buff[err_buff_len - 1] = '\0';
-        }
+        if (err_buff_len > 0)
+            snprintf(err_buff, err_buff_len, "calculated response "
+                     "length too small, offset=%d calc_len=%d bd_len=%d\n",
+                     offset, calc_len, bd_len);
         offset = -1;
     }
     return offset;

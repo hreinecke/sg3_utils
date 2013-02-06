@@ -34,7 +34,7 @@ Frank Jansen <fjansen at egenera dot com>: additions to sg_scan; contributed
 Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
-Hannes Reinecke <hare at suse dot de> 
+Hannes Reinecke <hare at suse dot de>
         contributed sg_rdac, (and some corresponding VPD entries to
         sg_vpd_vendor), sg_stpg and sg_safte [20071013+20130110]
         sg_referrals [20100906]
@@ -44,7 +44,7 @@ Hannes Reinecke <hare at suse dot de>
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]
 
-Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example 
+Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example
         programs for the original sg driver
 
 Ingo van Lil <inguin at gmx dot de>
@@ -87,6 +87,9 @@ Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
 Peter Allworth <linsol at zeta dot org dot au> original dd clone design used
         by sg3_utils's dd variants (e.g. sg_dd).
 
+Roland Dreier <roland at purestorage dot com>
+        extension and correction to sg_xcopy [20120205]
+
 Ronnie Sahlberg <ronniesahlberg at gmail dot com> has written libiscsi and a
         set of external patches to add direct iSCSI support to this package.
         See README.iscsi [20110518]
@@ -94,7 +97,7 @@ Ronnie Sahlberg <ronniesahlberg at gmail dot com> has written libiscsi and a
 Saeed Bishara contributed sg_write_long
 
 Shahar Salzman <shahar dot salzman at kaminario dot com> contributed
-	sg_compare_and_write [20121205]
+        sg_compare_and_write [20121205]
 
 Thomas Kolbe <tkolbe at partnersdata dot com>
         Solaris port help and testing [20070503]
@@ -105,9 +108,9 @@ Tim Hunt <tim at timhunt dot net> increased number of (sd and sg) devices
 Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
         to sort defect list by head.
 
-Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific" 
+Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
         data and "-6" switch for sg_modes
 
 
 Douglas Gilbert
-10th January 2013
+5th February 2013
