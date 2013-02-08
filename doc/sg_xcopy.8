@@ -9,9 +9,10 @@ COPY (XCOPY)
 [\fIoflag=FLAGS\fR] [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR]
 [\fI\-\-version\fR]
 .PP
-[\fIbpt=BPT\fR] [\fIcat=\fR0|1] [\fIdc=\fR0|1] [\fIid_usage=\fRhold|discard]
-[\fIlist_id=ID\fR] [\fIprio=PRIO\fR] [\fItime=\fR0|1] [\fIverbose=VERB\fR]
-[\fI\-h\fR] [\fI\-V\fR]
+[\fIbpt=BPT\fR] [\fIcat=\fR0|1] [\fIdc=\fR0|1]
+[\fIid_usage=\fRhold|discard|disable] [\fIlist_id=ID\fR]
+[\fIprio=PRIO\fR] [\fItime=\fR0|1] [\fIverbose=VERB\fR] [\fI\-h\fR]
+[\fI\-V\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -77,9 +78,10 @@ message is issued and no copy takes place.
 \fBibs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
 .TP
-\fBid_usage\fR=hold | discard
+\fBid_usage\fR=hold | discard | disable
 sets the SCSI EXTENDED COPY command parameter list field called LIST ID
-USAGE to 0 if the argument is 'hold' or to 2 if the argument is 'discard'.
+USAGE to 0 if the argument is 'hold', to 2 if the argument is 'discard',
+or to '3' if the argument is 'disable'.
 .TP
 \fBif\fR=\fIIFILE\fR
 read from \fIIFILE\fR instead of stdin. If \fIIFILE\fR is '\-' then stdin
