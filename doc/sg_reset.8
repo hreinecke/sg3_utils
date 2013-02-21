@@ -1,91 +1,126 @@
-.TH SG_RESET "8" "July 2009" "sg3_utils\-1.28" SG3_UTILS
+.TH SG_RESET "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
-sg_reset \- sends SCSI device, target, bus or host reset; or checks reset state
+sg_reset \- sends SCSI device, target, bus or host reset; or checks reset
+state
 .SH SYNOPSIS
 .B sg_reset
-[\fI\-b\fR] [\fI\-d\fR] [\fI\-h\fR] [\fI\-t\fR] [\fI\-V\fR]
+[\fI\-\-bus\fR] [\fI\-\-device\fR] [\fI\-\-help\fR] [\fI\-\-host\fR]
+[\fI\-\-no-esc\fR] [\fI\-\-target\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-The sg_reset utility with no options (just a \fIDEVICE\fR) reports on
-the reset state (e.g. if a reset is underway) of \fIDEVICE\fR. When given
-a \fI\-d\fR, \fI\-t\fR, \fI\-b\fR or \fI\-h\fR option it requests a device,
-target, bus or host reset respectively.
+The sg_reset utility with no options (just a \fIDEVICE\fR) reports on the
+reset state (e.g. if a reset is underway) of the \fIDEVICE\fR. When given
+a \fI\-\-device\fR, \fI\-\-target\fR, \fI\-\-bus\fR or \fI\-\-host\fR
+option it requests a device, target, bus or host reset respectively.
 .PP
-The ability to reset a SCSI target (often called a "hard reset" at the
-transport level) was added in linux kernel 2.6.27 . Low level drivers that
-support target reset hopefully reset a logical unit only when given the
-device reset (i.e. \fI\-d\fR) option. This should removed the ambiguity of
-whether "device" meant LU or target that we have had in the past.
+A device reset is applied to the Logical Unit (LU) corresponding to
+\fIDEVICE\fR. It is most likely implemented by a Low level Driver (LLD)
+in Linux as a LOGICAL UNIT RESET task management function.
 .PP
-In the linux kernel 2.6 series this utility can be called on sd,
-sr (cd/dvd), st or sg device nodes; if the user has appropriate
-permissions.
+The ability to reset a SCSI target was added in linux kernel 2.6.27 . A LLD
+may send Low level Drivers (LLDs) the I_T NEXUS RESET task management
+function. Alternatively it may use a transport mechanism to do the same
+thing (e.g. a hard reset on the link containing a SAS target).
 .PP
-In the linux kernel 2.4 series support for this utility first
-appeared in lk 2.4.19 and could only be called on sg device
-nodes. Various vendors made this capability available in their
-kernels prior to lk 2.4.19.
+In the linux kernel 2.6 series this utility can be called on sd, sr (cd/dvd),
+st or sg device nodes; if the user has appropriate permissions.
 .SH OPTIONS
 .TP
-\fB\-b\fR
-attempt a SCSI bus reset. This would normally be tried if the
-device reset (i.e. option \fI\-d\fR) was not successful.
+\fB\-b\fR, \fB\-\-bus\fR
+attempt a SCSI bus reset. A bus reset is a SCSI Parallel Interface (SPI)
+concept not found in modern transports. A recent LLD may implement it as
+a series of resets on targets that might be considered as siblings to the
+target on the \fIDEVICE\fR path.
 .TP
-\fB\-d\fR
-attempt a SCSI device reset. If the device seems stuck, this is
-the first reset that should be tried. This assumes the linux
-scsi mid level error handler is not already in the process
-of resetting \fIDEVICE\fR.
+\fB\-d\fR, \fB\-\-device\fR
+attempt a SCSI device reset. This would typically involve sending a LOGICAL
+UNIT RESET task management function to \fIDEVICE\fR.
 .TP
-\fB\-h\fR
-attempt a host adapter reset. This would normally be tried if both
-device reset (i.e. option \fI\-d\fR) and bus reset (i.e. option \fI\-b\fR)
-were not successful.
+\fB\-h\fR, \fB\-\-help\fR
+print the usage message then exit.
 .TP
-\fB\-t\fR
-attempt a SCSI target reset. This assumes the linux scsi mid level
-error handler is not already in the process of resetting the target that
-contains the given \fIDEVICE\fR.
+\fB\-H\fR, \fB\-\-host\fR
+attempt a host reset. The "host" in this context is often called
+a Host Bus Adapter (HBA) and contains one or more SCSI initiators.
 .TP
-\fB\-V\fR
+\fB\-N\fR, \fB\-\-no\-esc\fR
+without this option, if a device reset (\fI\-\-device\fR) fails then it
+will escalate to a target reset. And if a target reset (\fI\-\-target\fR)
+fails then it will escalate to a bus reset. And if a bus
+reset (\fI\-\-bus\fR) fails then it will escalate to a host reset. With this
+option only the requested reset is attempted. An alternate option name of
+\fI\-\-no-escalate\fR is also accepted.
+.TP
+\fB\-t\fR, \fB\-\-target\fR
+attempt a SCSI target reset. A SCSI target contains one or more LUs. This
+would typically involve sending a I_T NEXUS RESET task management function
+to \fIDEVICE\fR There may be a transport action that is equivalent (e.g.
+in SAS a hard reset on the link that contains the target).
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the degree of verbosity (debug messages).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
 prints the version string then exits.
 .SH NOTES
-The error recovery code within the linux kernel when faced with a SCSI command
-timing out and no response from the device (LU), first tries a device reset
-and if that is not successful tries a target reset. If that is not successful
-it tries a bus reset. If that is not successful it tries a host reset. Users
-of this utility should check whether such a recovery is already underway
-before trying to reset with this utility. The "device,target,bus,host"
-order is also recommended (i.e. first start with the smallest
-hammer). The above is a generalization and exact details will vary depending
-on the transport and the low level driver concerned.
+The error recovery code within the Linux kernel (SCSI mid\-level) when faced
+with a SCSI command timing out and no response from the device (LU) does the
+following. First it tries a device reset and if that is not successful tries
+a target reset. If that is not successful it tries a bus reset. If that is
+not successful it tries a host reset. Users of this utility can check whether
+such a recovery is already underway before trying to reset with this utility.
+Calling this utility with no options, just the \fIDEVICE\fR, will do such
+a check. The "device,target,bus,host" order is the reset escalation that the
+\fI\-\-no-esc\fR option attempts to stop. In large storage configurations
+th escalation may be (very) undesirable.
 .PP
-SAM\-4 defines a hard reset, a logical unit reset and a I_T nexus reset. A
-hard reset is defined to be a power on condition, a microcode change or a
-transport reset event. A LU reset and an I_T nexus reset can be requested
-via task management function (and support for LU reset is mandatory). In
-Linux the SCSI subsystem leaves it up to the low level drivers as to whether
-a "device reset" is only for the addressed LU or all the LUs in the device
-that contains the addressed LU (i.e. a target reset). The additional of the
-target reset (i.e. option \fI\-t\fR) should give more control in this area.
-The "bus reset" is a transport reset and may be a dummy operation, depending
-on the transport. A "host reset" attempts to re\-initialize the HBA that the
-request passes through en route to the \fIDEVICE\fR. Note that a "host reset"
-and a "bus reset" may cause collateral damage.
+This utility calls the SG_SCSI_RESET ioctl and as of lk 3.8.0 the
+\fI\-\-no-esc\fR option is not supported but may be soon after.
 .PP
-This utility does not allow individual SCSI commands (or tasks as they are
-called in SAM\-4) to be aborted. SAM\-4 defines ABORT TASK and ABORT TASK
-SET task management functions for that.
+SAM\-4 and 5 define a hard reset, a LOGICAL UNIT RESET and a I_T NEXUS
+RESET. A hard reset is defined to be a power on condition, a microcode
+change or a transport reset event. LOGICAL UNIT RESET and I_T NEXUS
+RESET can be requested via task management functions (and support for
+LOGICAL UNIT RESET is mandatory). In Linux the SCSI subsystem leaves it up
+to the LLDs as to exactly what type (if any) of reset is performed.
+The "bus reset" is SCSI Parallel Interface (SPI) concept that may not map
+well to recent SCSI transports so it may be a dummy operation. A "host reset"
+attempts to re\-initialize the HBA that the request passes through en route
+to the \fIDEVICE\fR. Note that a "host reset" and a "bus reset" may cause
+collateral damage.
 .PP
-Prior to SAM\-3 there was a TARGET RESET task management function. Several
-transports still support that function and many associated linux low level
-drivers map the \fI\-t\fR option to it.
+This utility does not allow individual SCSI commands to be aborted. SAM\-4
+defines ABORT TASK and ABORT TASK SET task management functions for that.
+.PP
+Prior to SAM\-3 there was a TARGET RESET task management function. And in
+SAM\-4 I_T NEXUS RESET appeared which seems closely related: the "I_T"
+stands for Initiator\-Target.
+.PP
+Transports may have their own types of resets not supported by this utility.
+For example SAS has a link reset in which both ends of a physical link (e.g.
+between a SAS expander and a SAS tape drive) renogiatate their connection.
+.PP
+Prior to version 0.57 of this utility the command line had short options
+only (e.g. \fI\-d\fR but not \fI\-\-device\fR). Also \fI\-h\fR invoked a host
+reset while in the current version \fI\-h\fR is equivalent to \fI\-\-help\fR
+and both \fI\-H\fR and \fI\-\-host\fR invoke a host reset. For backward
+compatibility define the environment variable SG3_UTILS_OLD_OPTS or
+SG_RESET_OLD_OPTS . In this case \fI\-h\fR will invoke a host reset and the
+output will be verbose as it was previously (equivalent to using the
+\fI\-\-verbose\fR option now).
+For example:
+.PP
+    SG_RESET_OLD_OPTS=1 sg_reset -h /dev/sg1
+.br
+sg_reset: starting host reset
+.br
+sg_reset: completed host reset
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH COPYRIGHT
-Copyright \(co 1999\-2009 Douglas Gilbert
+Copyright \(co 1999\-2013 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
