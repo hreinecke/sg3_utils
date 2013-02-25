@@ -2217,7 +2217,7 @@ get_ansi_version_str(int version, char * buff, int buff_len)
 }
 
 
-/* Returns 0 if successful */
+/* Process a standard INQUIRY response. Returns 0 if successful */
 static int
 process_std_inq(int sg_fd, const struct opts_t * optsp)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2012 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -27,7 +28,7 @@
  * and decodes the response.
  */
 
-static char * version_str = "1.17 20120314";
+static char * version_str = "1.18 20130224";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -43,6 +44,7 @@ static struct option long_options[] = {
         {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
         {"select", required_argument, 0, 's'},
+        {"test", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -52,26 +54,33 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-            "sg_luns    [--decode] [--help] [--hex] [--maxlen=LEN] [--quiet] "
-            "[--raw]\n"
-            "                  [--select=SR] [--verbose] [--version] DEVICE\n"
+            "sg_luns    [--decode] [--help] [--hex] [--maxlen=LEN] "
+            "[--quiet]\n"
+            "                  [--raw] [--select=SR] [--test=LUNHEX] "
+            "[--verbose]\n"
+            "                  [--version] DEVICE\n"
             "  where:\n"
             "    --decode|-d        decode all luns into component parts\n"
             "    --help|-h          print out usage message\n"
-            "    --hex|-H           output in hexadecimal\n"
+            "    --hex|-H           output response in hexadecimal; used "
+            "twice\n"
+            "                       shows decoded values in hex\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
             DEF_RLUNS_BUFF_LEN );
     fprintf(stderr, "    --quiet|-q         output only ASCII hex lun "
             "values\n"
-            "    --raw|-r           output in binary\n"
+            "    --raw|-r           output response in binary\n"
             "    --select=SR|-s SR    select report SR (def: 0)\n"
             "                          0 -> luns apart from 'well "
             "known' lus\n"
             "                          1 -> only 'well known' "
             "logical unit numbers\n"
             "                          2 -> all luns\n"
+            "    --test=LUNHEX|-t LUNHEX    decode LUNHEX and ignore "
+            "other options\n"
+            "                               and DEVICE (apart from '-H')\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI REPORT LUNS command\n"
@@ -82,11 +91,10 @@ usage()
  * defines its own "bridge addressing method" in place of the SAM-3
  * "logical addressing method".  */
 static void
-decode_lun(const char * leadin, unsigned char * lunp)
+decode_lun(const char * leadin, const unsigned char * lunp, int do_hex)
 {
     int k, j, x, a_method, bus_id, target, lun, len_fld, e_a_method;
     int next_level;
-    unsigned int u;
     unsigned char not_spec[8] = {0xff, 0xff, 0xff, 0xff,
                                  0xff, 0xff, 0xff, 0xff};
     char l_leadin[128];
@@ -109,25 +117,40 @@ decode_lun(const char * leadin, unsigned char * lunp)
         switch (a_method) {
         case 0:         /* peripheral device addressing method */
             bus_id = lunp[0] & 0x3f;
-            if (0 == bus_id)
-                printf("%sPeripheral device addressing: lun=%d\n",
-                       l_leadin, lunp[1]);
-            else {
-                printf("%sPeripheral device addressing: bus_id=%d, "
-                       "target=%d\n", l_leadin, bus_id, lunp[1]);
+            if (0 == bus_id) {
+                if (do_hex)
+                    printf("%sPeripheral device addressing: lun=0x%x\n",
+                           l_leadin, lunp[1]);
+                else
+                    printf("%sPeripheral device addressing: lun=%d\n",
+                           l_leadin, lunp[1]);
+            } else {
+                if (do_hex)
+                    printf("%sPeripheral device addressing: bus_id=0x%x, "
+                           "target=0x%x\n", l_leadin, bus_id, lunp[1]);
+                else
+                    printf("%sPeripheral device addressing: bus_id=%d, "
+                           "target=%d\n", l_leadin, bus_id, lunp[1]);
                 next_level = 1;
             }
             break;
         case 1:         /* flat space addressing method */
             lun = ((lunp[0] & 0x3f) << 8) + lunp[1];
-            printf("%sFlat space addressing: lun=%d\n", l_leadin, lun);
+            if (do_hex)
+                printf("%sFlat space addressing: lun=0x%x\n", l_leadin, lun);
+            else
+                printf("%sFlat space addressing: lun=%d\n", l_leadin, lun);
             break;
         case 2:         /* logical unit addressing method */
             target = (lunp[0] & 0x3f);
             bus_id = (lunp[1] >> 5) & 0x7;
             lun = lunp[1] & 0x1f;
-            printf("%sLogical unit addressing: bus_id=%d, target=%d, "
-                   "lun=%d\n", l_leadin, bus_id, target, lun);
+            if (do_hex)
+                printf("%sLogical unit addressing: bus_id=0x%x, target=0x%x, "
+                       "lun=0x%x\n", l_leadin, bus_id, target, lun);
+            else
+                printf("%sLogical unit addressing: bus_id=%d, target=%d, "
+                       "lun=%d\n", l_leadin, bus_id, target, lun);
             break;
         case 3:         /* extended logical unit addressing method */
             len_fld = (lunp[0] & 0x30) >> 4;
@@ -152,18 +175,34 @@ decode_lun(const char * leadin, unsigned char * lunp)
                            l_leadin);
                     break;
                 default:
-                    printf("%swell known logical unit %d\n", l_leadin, x);
+                    if (do_hex)
+                        printf("%swell known logical unit 0x%x\n", l_leadin,
+                               x);
+                    else
+                        printf("%swell known logical unit %d\n", l_leadin, x);
                     break;
                 }
             } else if ((1 == len_fld) && (2 == e_a_method)) {
                 x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
-                printf("%sExtended flat space logical unit addressing: "
-                       "value=0x%x\n", l_leadin, x);
+                if (do_hex)
+                    printf("%sExtended flat space addressing: value=0x%x\n",
+                           l_leadin, x);
+                else
+                    printf("%sExtended flat space addressing: value=%d\n",
+                           l_leadin, x);
             } else if ((2 == len_fld) && (2 == e_a_method)) {
-                u = (lunp[1] << 24) + (lunp[2] << 16) + (lunp[3] << 8) +
-                    lunp[4];
-                printf("%sLong extended flat space logical unit addressing: "
-                       "value=0x%x\n", l_leadin, u);
+                ull = 0;
+                for (j = 0; j < 5; ++j) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= lunp[1 + j];
+                }
+                if (do_hex)
+                    printf("%sLong extended flat space addressing: "
+                           "value=0x%" PRIx64 "\n", l_leadin, ull);
+                else
+                    printf("%sLong extended flat space  addressing: "
+                           "value=%" PRIu64 "\n", l_leadin, ull);
             } else if ((3 == len_fld) && (0xf == e_a_method))
                 printf("%sLogical unit _not_ specified addressing\n",
                        l_leadin);
@@ -171,9 +210,14 @@ decode_lun(const char * leadin, unsigned char * lunp)
                 if (len_fld < 2) {
                     if (1 == len_fld)
                         x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
-                    printf("%sExtended logical unit addressing: length=%d, "
-                           "e.a. method=%d, value=0x%x\n", l_leadin, len_fld,
-                           e_a_method, x);
+                    if (do_hex)
+                        printf("%sExtended logical unit addressing: "
+                               "length=%d, e.a. method=%d, value=0x%x\n",
+                               l_leadin, len_fld, e_a_method, x);
+                    else
+                        printf("%sExtended logical unit addressing: "
+                               "length=%d, e.a. method=%d, value=%d\n",
+                               l_leadin, len_fld, e_a_method, x);
                 } else {
                     ull = 0;
                     x = (2 == len_fld) ? 5 : 7;
@@ -182,9 +226,14 @@ decode_lun(const char * leadin, unsigned char * lunp)
                             ull <<= 8;
                         ull |= lunp[1 + j];
                     }
-                    printf("%sExtended logical unit addressing: length=%d, "
-                           "e. a. method=%d, value=0x%" PRIx64 "\n",
-                           l_leadin, len_fld, e_a_method, ull);
+                    if (do_hex)
+                        printf("%sExtended logical unit addressing: "
+                               "length=%d, e. a. method=%d, value=0x%" PRIx64
+                               "\n", l_leadin, len_fld, e_a_method, ull);
+                    else
+                        printf("%sExtended logical unit addressing: "
+                               "length=%d, e. a. method=%d, value=%" PRIu64
+                               "\n", l_leadin, len_fld, e_a_method, ull);
                 }
             }
             break;
@@ -221,13 +270,17 @@ main(int argc, char * argv[])
     int do_raw = 0;
     int select_rep = 0;
     int verbose = 0;
+    unsigned int h;
+    const char * test_arg = NULL;
     const char * device_name = NULL;
+    const char * cp;
+    unsigned char lun_arr[8];
     int ret = 0;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHm:qrs:vV", long_options,
+        c = getopt_long(argc, argv, "dhHm:qrs:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -264,6 +317,9 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
+        case 't':
+            test_arg = optarg;
+            break;
         case 'v':
             ++verbose;
             break;
@@ -290,6 +346,39 @@ main(int argc, char * argv[])
         }
     }
 
+    if (test_arg) {
+        memset(lun_arr, 0, sizeof(lun_arr));
+        cp = test_arg;
+        if (('0' == test_arg[0]) && ('X' == toupper(test_arg[1])))
+            cp += 2;
+        if (strchr(cp, ' ') || strchr(cp, '\t')) {
+            for (k = 0; k < 8; ++k, cp += m) {
+                if (1 != sscanf(cp, " %2x%n", &h, &m))
+                    break;
+                lun_arr[k] = h & 0xff;
+            }
+        } else {
+            for (k = 0; k < 8; ++k, cp += 2) {
+            if (1 != sscanf(cp, "%2x", &h))
+                    break;
+                lun_arr[k] = h & 0xff;
+            }
+        }
+        if (0 == k) {
+            fprintf(stderr, "expected a hex number, optionally prefixed "
+                    "by '0x'\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (verbose) {
+            printf("64 bit LUN is T10 preferred (hex) format: ");
+            for (k = 0; k < 8; ++k)
+                printf(" %02x", lun_arr[k]);
+            printf("\n");
+        }
+        printf("Decoded LUN:\n");
+        decode_lun("  ", lun_arr, do_hex);
+        return 0;
+    }
     if (NULL == device_name) {
         fprintf(stderr, "missing device name!\n");
         usage();
@@ -324,7 +413,7 @@ main(int argc, char * argv[])
             dStrRaw((const char *)reportLunsBuff, list_len + 8);
             goto the_end;
         }
-        if (do_hex) {
+        if (1 == do_hex) {
             dStrHex((const char *)reportLunsBuff, list_len + 8, 1);
             goto the_end;
         }
@@ -353,7 +442,7 @@ main(int argc, char * argv[])
                 printf("%02x", reportLunsBuff[off]);
             printf("\n");
             if (decode)
-                decode_lun("      ", reportLunsBuff + off - 8);
+                decode_lun("      ", reportLunsBuff + off - 8, do_hex);
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Luns command not supported (support "
