@@ -1,16 +1,24 @@
-.TH SG_LUNS "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_LUNS "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command
 .SH SYNOPSIS
 .B sg_luns
 [\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-select=SR\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-select=SR\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_luns
+\fI\-\-test=LUNHEX\fR [\fI\-\-hex\fR] [\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send the SCSI REPORT LUNS command to the \fIDEVICE\fR and outputs the
-response. In the SPC\-3 SCSI standard support for this command is mandatory.
+In the first form shown in the SYNOPSIS this utility sends the SCSI REPORT
+LUNS command to the \fIDEVICE\fR and outputs the response. In the SPC\-3
+SCSI standard support for the REPORT LUNS command is mandatory.
+.PP
+When the \fI\-\-test=LUNHEX\fR option is given (the second form in the
+SYNOPSIS), the \fILUNHEX\fR value (assumed to represent a LUN in hex) is
+decoded as outlined in SAM\-3 and SAM\-4 .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -23,7 +31,10 @@ standard INQUIRY's response.
 output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-output response to this command in ASCII hex.
+when given once this utility will output response to the REPORT LUNS command
+in ASCII hex then exit. When given twice it causes the decode options to
+output values in hex rather than decimal. When this option is used with
+\fI\-\-test=LUNHEX\fR than decoded values are output in hex.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
@@ -54,8 +65,19 @@ meanings of the \fISR\fR values are:
 .br
   \fB2\fR : all luns
 .br
-Values between 0xf8 and 0xff (inclusive) are vendor specific (SPC\-4 (rev 32),
+Values between 0xf8 and 0xff (inclusive) are vendor specific (SPC\-4 rev 32),
 other values greater than 2 are reserved.
+.TP
+\fB\-t\fR, \fB\-\-test\fR=\fILUNHEX\fR
+\fILUNHEX\fR is assumed to be a hexadecimal number in ASCII hex. The number
+can be up to 64 bits in size (i.e. 16 hexadecimal digits). All \fILUNHEX\fR
+values are padded to the right if less than 16 hexadecimal digits are
+given (e.g. \fI\-\-test=0122003a\fR becomes 0122003a00000000). \fILUNHEX\fR
+may be prefixed by '0x' or '0X' (e.g. the last example could have been
+\fI\-\-test=0x0122003a\fR). \fILUNHEX\fR may also be given with spaces or
+tabs between each byte (or anywhere else) but then \fILUNHEX\fR would need
+to be surrounded by single or double quotes. The given hexadecimal number is
+decoded as if the \fI\-\-decode\fR had been given.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -70,7 +92,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Douglas Gilbert
+Copyright \(co 2004\-2013 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

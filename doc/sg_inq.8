@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "January 2013" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_INQ "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command, output and decode response
 .SH SYNOPSIS
@@ -22,7 +22,7 @@ This utility by default sends a SCSI INQUIRY command to the given
 device and then outputs the response. All SCSI devices are meant
 to respond to a "standard" INQUIRY command with at least a 36 byte
 response (in SCSI 2 and higher). An INQUIRY is termed as "standard"
-when both the EVPD and CmdDt (obsolete) bits are clear.
+when both the EVPD and CmdDt (now obsolete) bits are clear.
 .PP
 This utility supports two command line syntaxes, the preferred one is
 shown first in the synopsis and explained in this section. A later
