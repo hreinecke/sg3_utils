@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.36 [20130225] [svn: r482]
+Changelog for sg3_utils-1.36 [20130227] [svn: r483]
   - sg_lib: improve snprintf handling
   - sg_vpd: Protocol-specific port information VPD page for
     SAS SSP, persistent connection (spl3r2)
@@ -13,6 +13,7 @@ Changelog for sg3_utils-1.36 [20130225] [svn: r482]
     - clean up including adding long option names
   - sg_luns: add --test=LUNHEX option for decoding LUNs
     - decoded luns output in decimal or hex (if -HH given)
+    - can map between T10 and Linux LUN representations
 
 Changelog for sg3_utils-1.35 [20130117] [svn: r476]
   - sg_compare_and_write: new utility
