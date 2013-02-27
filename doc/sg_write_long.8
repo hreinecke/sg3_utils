@@ -1,4 +1,4 @@
-.TH SG_WRITE_LONG "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_WRITE_LONG "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_write_long \- send SCSI WRITE LONG command
 .SH SYNOPSIS
@@ -142,7 +142,7 @@ The "blk_sgio=1" option causes the SG_IO ioctl to be used by sg_dd rather
 than the block subsystem.
 .PP
 Finally we should restore sector 0x1234 to a non\-corrupted state. A sector
-full of zeroes could be written with:
+full of zeros could be written with:
 .PP
   sg_dd if=/dev/zero of=/dev/sda blk_sgio=1 seek=0x1234 bs=512 count=1
 .PP
@@ -163,7 +163,7 @@ Written by Saeed Bishara. Further work by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Douglas Gilbert
+Copyright \(co 2004\-2013 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

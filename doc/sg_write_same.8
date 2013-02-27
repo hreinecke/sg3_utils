@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_WRITE_SAME "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -19,7 +19,7 @@ The length of the block to be written multiple times is obtained from either
 the \fILEN\fR argument, or the length of the given input file \fIIF\fR,
 or by calling READ CAPACITY(16) on \fIDEVICE\fR. The contents of the
 block to be written are obtained from the input file \fIIF\fR or
-zeroes are used. If READ CAPACITY(16) is called (which implies \fIIF\fR
+zeros are used. If READ CAPACITY(16) is called (which implies \fIIF\fR
 was not given) and the PROT_EN bit is set then an extra 8 bytes (i.e.
 more than the logical block size) of 0xff are sent. If READ CAPACITY(16)
 fails then READ CAPACITY(10) is used to determine the block size.
@@ -57,7 +57,7 @@ LBWS or LBWS10 is set and the WRITE SAME (32) is supported then WRITE
 SAME (32) supports the UNMAP bit. This is as of SBC\-3 revision 26.
 .PP
 As a precaution against an accidental 'sg_write_same /dev/sda' (for example)
-overwriting LBA 0 on /dev/sda with zeroes, at least one of the
+overwriting LBA 0 on /dev/sda with zeros, at least one of the
 \fI\-\-in=IF\fR, \fI\-\-lba=LBA\fR or \fI\-\-num=NUM\fR options must be
 given. Obviously this utility can destroy a lot of user data so check the
 options carefully.
@@ -145,7 +145,7 @@ may be increased by 8 bytes if the \fIDEVICE\fR's protection type is 1 or
 greater and the WRPROTECT field (see \fI\-\-wrprotect=WPR\fR) is 1 or
 greater. If both this option and the \fIIF\fR option are given and
 \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR is the
-data out buffer length with zeroes used as pad bytes.
+data out buffer length with zeros used as pad bytes.
 .SH UNMAP
 Logical block provisioning is a new term introduced in SBC\-3 revision
 25 for the ability to mark blocks as unused. It is closely related to the
@@ -163,7 +163,7 @@ implemented. If the UNMAP command is implemented then
 the "Maximum unmap LBA count" and "Maximum unmap block descriptor count"
 fields in the Block Limits VPD page should both be greater than zero. The
 READ CAPACITY(16) command response also contains a LBPRZ bit which if set
-means that if unmapped blocks are read then zeroes will be returned for the
+means that if unmapped blocks are read then zeros will be returned for the
 data (and if protection information is active, 0xff bytes are returned for
 that). In SBC\-3 revision 27 the same LBPRZ bit was added to the Logical
 Block Provisioning VPD page.
@@ -206,9 +206,9 @@ One simple usage is to write blocks of zero from (and including) a given LBA:
 Since \fI\-\-xferlen=LEN\fR has not been given, then this utility will
 call the READ CAPACITY command on /dev/sdc to determine the number
 of bytes in a logical block.  Let us assume that is 512 bytes. Since
-\fI\-\-in=IF\fR is not given a block of zeroes is assumed. So 63 blocks
-of zeroes (each block containing 512 bytes) will be written from (and
-including) LBA 0x1234 . Note that only one block of zeroes is passed
+\fI\-\-in=IF\fR is not given a block of zeros is assumed. So 63 blocks
+of zeros (each block containing 512 bytes) will be written from (and
+including) LBA 0x1234 . Note that only one block of zeros is passed
 to the SCSI WRITE SAME command in the data out buffer (as required by
 SBC\-3).
 .PP
@@ -218,7 +218,7 @@ are "unmapped" ("trimmed" in ATA speak) rather than zeroed:
   sg_write_same \-\-unmap \-L 0x1234 \-n 63 /dev/sdc
 .PP
 Note that if the LBPRZ bit in the READ CAPACITY(16) response is set (i.e.
-LPPRZ is an acronym for logical block provisioning read zeroes) then these
+LPPRZ is an acronym for logical block provisioning read zeros) then these
 two examples do the same thing, at least seen from the point of view of
 subsequent reads.
 .PP
@@ -236,7 +236,7 @@ going to modify LBA 2468 then we take a copy of it first:
 .PP
   dd if=/dev/sdb skip=2468 bs=512 of=2468.bin count=1
 .PP
-The following command line sets the user data to zeroes and the PI to 8
+The following command line sets the user data to zeros and the PI to 8
 0xFF bytes on LBA 2468:
 .PP
   sg_write_same \-\-lba=2468 /dev/sdb
@@ -247,7 +247,7 @@ wrong):
 .PP
   dd if=/dev/sdb skip=2468 bs=512 of=/dev/null count=1
 .PP
-Now an attempt is made to create a binary file with zeroes in the user data,
+Now an attempt is made to create a binary file with zeros in the user data,
 0x0000 in the application tag and 0xff bytes in the other two PI fields. It
 is awkward to create 0xff bytes in a file (in Unix) as the "tr" command
 below shows:
@@ -286,7 +286,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2012 Douglas Gilbert
+Copyright \(co 2009\-2013 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
