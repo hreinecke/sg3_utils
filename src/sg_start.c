@@ -1,3 +1,22 @@
+/*
+ *  Copyright (C) 1999-2013 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+
+    Start/Stop parameter by Kurt Garloff <garloff at suse dot de>, 6/2000
+    Sync cache parameter by Kurt Garloff <garloff at suse dot de>, 1/2001
+    Guard block device answering sg's ioctls.
+                     <dgilbert at interlog dot com> 12/2002
+    Convert to SG_IO ioctl so can use sg or block devices in 2.6.* 3/2003
+
+    This utility was written for the Linux 2.4 kernel series. It now
+    builds for the Linux 2.6 and 3 kernel series and various other
+    Operating Systems.
+
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,26 +30,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-/*
- *  Copyright (C) 1999-2011 D. Gilbert
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
 
-    Start/Stop parameter by Kurt Garloff <garloff at suse dot de>, 6/2000
-    Sync cache parameter by Kurt Garloff <garloff at suse dot de>, 1/2001
-    Guard block device answering sg's ioctls.
-                     <dgilbert at interlog dot com> 12/2002
-    Convert to SG_IO ioctl so can use sg or block devices in 2.6.* 3/2003
-
-    This utility was written for the Linux 2.4 kernel series. It should
-    now build for the Linux 2.6 kernel series and various other Operating
-    Systems.
-
-*/
-
-static char * version_str = "0.58 20110129";  /* sbc3r14; mmc6r01a */
+static char * version_str = "0.59 20130228";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},

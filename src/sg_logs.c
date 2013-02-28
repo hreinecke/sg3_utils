@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2012 D. Gilbert
+*  Copyright (C) 2000-2013 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.07 20121211";    /* spc4r35 + sbc3r30 */
+static char * version_str = "1.08 20130228";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -577,7 +577,7 @@ dStrRaw(const char* str, int len)
    command, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
    SG_LIB_CAT_ABORTED_COMMAND and -1 for other errors. */
 static int
-do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
+do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
         const struct opts_t * optsp)
 {
     int actual_len, res, vb;
@@ -591,7 +591,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
                                    optsp->page_control, optsp->pg_code,
                                    optsp->subpg_code, optsp->paramp,
                                    resp, LOG_SENSE_PROBE_ALLOC_LEN,
-                                   noisy, vb))) {
+                                   1 /* noisy */, vb))) {
             switch (res) {
             case SG_LIB_CAT_NOT_READY:
             case SG_LIB_CAT_INVALID_OP:
@@ -630,7 +630,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
     if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
                                optsp->page_control, optsp->pg_code,
                                optsp->subpg_code, optsp->paramp,
-                               resp, actual_len, noisy, vb))) {
+                               resp, actual_len, 1 /* noisy */, vb))) {
         switch (res) {
         case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_INVALID_OP:
@@ -1969,24 +1969,42 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("    reason: %s\n", s);
             t = (0xf & vcp[5]);
             switch (t) {
-            case 0: snprintf(s, sz, "phy enabled; unknown");
-                         break;
-            case 1: snprintf(s, sz, "phy disabled"); break;
-            case 2: snprintf(s, sz, "phy enabled; speed negotiation failed");
-                         break;
-            case 3: snprintf(s, sz, "phy enabled; SATA spinup hold state");
-                         break;
-            case 4: snprintf(s, sz, "phy enabled; port selector");
-                         break;
-            case 5: snprintf(s, sz, "phy enabled; reset in progress");
-                         break;
-            case 6: snprintf(s, sz, "phy enabled; unsupported phy attached");
-                         break;
-            case 8: snprintf(s, sz, "phy enabled; 1.5 Gbps"); break;
-            case 9: snprintf(s, sz, "phy enabled; 3 Gbps"); break;
-            case 0xa: snprintf(s, sz, "phy enabled; 6 Gbps"); break;
-            case 0xb: snprintf(s, sz, "phy enabled; 12 Gbps"); break;
-            default: snprintf(s, sz, "reserved [%d]", t); break;
+            case 0:
+                snprintf(s, sz, "phy enabled; unknown reason");
+                break;
+            case 1:
+                snprintf(s, sz, "phy disabled");
+                break;
+            case 2:
+                snprintf(s, sz, "phy enabled; speed negotiation failed");
+                break;
+            case 3:
+                snprintf(s, sz, "phy enabled; SATA spinup hold state");
+                break;
+            case 4:
+                snprintf(s, sz, "phy enabled; port selector");
+                break;
+            case 5:
+                snprintf(s, sz, "phy enabled; reset in progress");
+                break;
+            case 6:
+                snprintf(s, sz, "phy enabled; unsupported phy attached");
+                break;
+            case 8:
+                snprintf(s, sz, "1.5 Gbps");
+                break;
+            case 9:
+                snprintf(s, sz, "3 Gbps");
+                break;
+            case 0xa:
+                snprintf(s, sz, "6 Gbps");
+                break;
+            case 0xb:
+                snprintf(s, sz, "12 Gbps");
+                break;
+            default:
+                snprintf(s, sz, "reserved [%d]", t);
+                break;
             }
             printf("    negotiated logical link rate: %s\n", s);
             printf("    attached initiator port: ssp=%d stp=%d smp=%d\n",
@@ -3870,7 +3888,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
 
     optsp->pg_code = TEMPERATURE_LPAGE;
     optsp->subpg_code = NOT_SPG_SUBPG;
-    res = do_logs(sg_fd, resp, max_len, 0, optsp);
+    res = do_logs(sg_fd, resp, max_len, optsp);
     if (0 == res) {
         len = (resp[2] << 8) + resp[3] + 4;
         if (optsp->do_raw)
@@ -3883,7 +3901,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
         fprintf(stderr, "Device not ready\n");
     else {
         optsp->pg_code = IE_LPAGE;
-        res = do_logs(sg_fd, resp, max_len, 0, optsp);
+        res = do_logs(sg_fd, resp, max_len, optsp);
         if (0 == res) {
             len = (resp[2] << 8) + resp[3] + 4;
             if (optsp->do_raw)
@@ -3999,7 +4017,7 @@ main(int argc, char * argv[])
         return (k >= 0) ?  k : SG_LIB_CAT_OTHER;
     }
     resp_len = (opts.maxlen > 0) ? opts.maxlen : MX_ALLOC_LEN;
-    res = do_logs(sg_fd, rsp_buff, resp_len, 1, &opts);
+    res = do_logs(sg_fd, rsp_buff, resp_len, &opts);
     if (0 == res) {
         pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
         if ((pg_len + 4) > resp_len) {
@@ -4061,7 +4079,7 @@ main(int argc, char * argv[])
             else
                 opts.subpg_code = NOT_SPG_SUBPG;
 
-            res = do_logs(sg_fd, rsp_buff, resp_len, 1, &opts);
+            res = do_logs(sg_fd, rsp_buff, resp_len, &opts);
             if (0 == res) {
                 pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
                 if ((pg_len + 4) > resp_len) {

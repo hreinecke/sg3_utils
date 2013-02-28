@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2012 D. Gilbert
+ *  Copyright (C) 2000-2013 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.39 20120920";
+static char * version_str = "1.40 20130228";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -866,7 +866,7 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
     for (header = 0, k = 0; k < PG_CODE_MAX; ++k) {
         if (optsp->do_six) {
             res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0, rbuf, mresp_len,
-                                    0, optsp->do_verbose);
+                                    1, optsp->do_verbose);
             if (SG_LIB_CAT_INVALID_OP == res) {
                 fprintf(stderr, ">>>>>> try again without the '-6' "
                         "switch for a 10 byte MODE SENSE command\n");

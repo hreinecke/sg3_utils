@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2011  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2013  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.20 20111105";
+static char * version_str = "1.21 20130228";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -252,7 +252,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
-                                                             0, verb);
+                                                             1, verb);
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 655;
@@ -354,7 +354,7 @@ print_read_cap(int fd, int do_16, int verbose)
 
         if (do_16) {
                 res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
-                                       resp_buff, 32, 0, verbose);
+                                       resp_buff, 32, 1, verbose);
                 if (0 == res) {
                         for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
                                 llast_blk_addr <<= 8;
@@ -385,7 +385,7 @@ print_read_cap(int fd, int do_16, int verbose)
                 }
         } else {
                 res = sg_ll_readcap_10(fd, 0 /* pmi */, 0 /* lba */,
-                                       resp_buff, 8, 0, verbose);
+                                       resp_buff, 8, 1, verbose);
                 if (0 == res) {
                         last_blk_addr = ((resp_buff[0] << 24) |
                                          (resp_buff[1] << 16) |

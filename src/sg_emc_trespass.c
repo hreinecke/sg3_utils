@@ -1,17 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-#include "sg_lib.h"
-#include "sg_cmds_basic.h"
-
 /* The program allows the user to send a trespass command to change the
  * LUN ownership from one Service-Processor to this one on an EMC
  * CLARiiON and potentially other devices.
@@ -27,7 +13,22 @@
  *  any later version.
  */
 
-static char * version_str = "0.16 20070714";
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#include "sg_lib.h"
+#include "sg_cmds_basic.h"
+
+
+static char * version_str = "0.17 20130228";
 
 static int debug = 0;
 
@@ -40,7 +41,7 @@ static int do_trespass(int fd, int hr, int short_cmd)
                   TRESPASS_PAGE,        /* Page code */
                   0x09,                 /* Page length - 2 */
                   0x81,                 /* Trespass code + Honor reservation
-					 * bit */
+                                         * bit */
                   0xff, 0xff,           /* Trespass target */
                   0, 0, 0, 0, 0, 0      /* Reserved bytes / unknown */
         };
@@ -49,7 +50,7 @@ static int do_trespass(int fd, int hr, int short_cmd)
                   TRESPASS_PAGE,        /* Page code */
                   0x02,                 /* Page length - 2 */
                   0x81,                 /* Trespass code + Honor reservation
-					 * bit */
+                                         * bit */
                   0xff,                 /* Trespass target */
         };
         int res;
@@ -105,7 +106,8 @@ void usage ()
                "    -s : Send Short Trespass Command page (default: long)\n"
                "         (for FC series)\n"
                "    -V: print version string then exit\n"
-               "     DEVICE   sg or block device (latter in lk 2.6.*)\n"
+               "     DEVICE   sg or block device (latter in lk 2.6 or lk 3 "
+               "series)\n"
                "        Example: sg_emc_trespass /dev/sda\n");
         exit (1);
 }

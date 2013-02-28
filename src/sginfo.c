@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.31 [20130107]";
+static const char * version_str = "2.32 [20130228]";
 
 #include <stdio.h>
 #include <string.h>
@@ -3622,7 +3622,8 @@ open_sg_io_dev(char * devname)
     }
     if (fd >= 0) {
         if ((ioctl(fd, SG_GET_VERSION_NUM, &v) < 0) || (v < 30000)) {
-            fprintf(stderr, "requires lk 2.4 (sg driver) or lk 2.6\n");
+            fprintf(stderr, "requires lk 2.4 (sg driver), lk 2.6 or lk 3 "
+		    "series\n");
             close(fd);
             return -9999;
         }
