@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2013 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -58,7 +58,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static char * version_str = "5.75 20121211";
+static char * version_str = "5.76 20130228";
 
 #define ME "sg_dd: "
 
@@ -420,7 +420,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     int verb;
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0, verb);
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 1, verb);
     if (0 != res)
         return res;
 
@@ -428,7 +428,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         (0xff == rcBuff[3])) {
         int64_t ls;
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 1,
                                verb);
         if (0 != res)
             return res;
@@ -2185,7 +2185,7 @@ main(int argc, char * argv[])
     if (do_sync) {
         if (FT_SG & out_type) {
             fprintf(stderr, ">> Synchronizing cache on %s\n", outf);
-            res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, 0, 0);
+            res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, 1, 0);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 fprintf(stderr, "Unit attention (out, sync cache), "
                         "continuing\n");

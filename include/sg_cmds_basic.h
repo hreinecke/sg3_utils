@@ -2,10 +2,23 @@
 #define SG_CMDS_BASIC_H
 
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
+ */
+
+/*
+ * Error, warning and verbose output is sent to the file pointed to by
+ * sg_warnings_strm which is declared in sg_lib.h and can be set with
+ * the sg_set_warnings_strm() function. If not given sg_warnings_strm
+ * defaults to stderr.
+ * If 'noisy' and 'verbose' are both zero then following functions should
+ * not output anything to sg_warnings_strm. If 'noisy' is non-zero and
+ * 'verbose' is zero then Unit Attention, Recovered, Medium and Hardware
+ * errors (sense keys) send output to sg_warnings_strm. Increasing values
+ * of 'verbose' send increasing amounts of (debug) output to
+ * sg_warnings_strm.
  */
 
 #ifdef __cplusplus

@@ -665,12 +665,12 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
     memset(buff, 0, MODE10_RESP_HDR_LEN);
     if (mode6)  /* want first 8 bytes just in case */
         res = sg_ll_mode_sense6(sg_fd, dbd, 0 /* pc */, pg_code,
-                                sub_pg_code, buff, MODE10_RESP_HDR_LEN, 0,
+                                sub_pg_code, buff, MODE10_RESP_HDR_LEN, 1,
                                 verbose);
     else
         res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd,
                                  0 /* pc */, pg_code, sub_pg_code, buff,
-                                 MODE10_RESP_HDR_LEN, 0, verbose);
+                                 MODE10_RESP_HDR_LEN, 1, verbose);
     if (0 != res)
         return res;
     n = buff[0];
@@ -722,11 +722,11 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
         if (mode6)
             res = sg_ll_mode_sense6(sg_fd, dbd, k /* pc */,
                                     pg_code, sub_pg_code, buff,
-                                    calc_len, 0, verbose);
+                                    calc_len, 1, verbose);
         else
             res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd,
                                      k /* pc */, pg_code, sub_pg_code,
-                                     buff, calc_len, 0, verbose);
+                                     buff, calc_len, 1, verbose);
         if (0 != res) {
             if (0 == first_err)
                 first_err = res;

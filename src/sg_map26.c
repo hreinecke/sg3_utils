@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -10,7 +10,7 @@
  *
  * This program maps a primary SCSI device node name to the corresponding
  * SCSI generic device node name (or vice versa). Targets linux
- * kernel 2.6 series. Sysfs device names can also be mapped.
+ * kernel 2.6 or 3 series. Sysfs device names can also be mapped.
  */
 
 /* #define _XOPEN_SOURCE 500 */
@@ -39,7 +39,7 @@
 #endif
 #include "sg_lib.h"
 
-static char * version_str = "1.08 20081009";
+static char * version_str = "1.09 20130228";
 
 #define ME "sg_map26: "
 

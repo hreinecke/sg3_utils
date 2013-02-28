@@ -1,3 +1,16 @@
+/* This program sends a user specified number of TEST UNIT READY commands
+   to the given sg device. Since TUR is a simple command involing no
+   data transfer (and no REQUEST SENSE command iff the unit is ready)
+   then this can be used for timing per SCSI command overheads.
+
+ * Copyright (C) 2000-2013 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+
+ */
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -16,20 +29,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-/* This program sends a user specified number of TEST UNIT READY commands
-   to the given sg device. Since TUR is a simple command involing no
-   data transfer (and no REQUEST SENSE command iff the unit is ready)
-   then this can be used for timing per SCSI command overheads.
 
- * Copyright (C) 2000-2010 D. Gilbert
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
-
- */
-
-static char * version_str = "3.28 20101203";
+static char * version_str = "3.29 20130228";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -328,7 +329,8 @@ int main(int argc, char * argv[])
         }
 #endif
         for (k = 0; k < opts.do_number; ++k) {
-            res = sg_ll_test_unit_ready(sg_fd, k, 0, opts.do_verbose);
+            /* Might get Unit Attention on first invocation */
+            res = sg_ll_test_unit_ready(sg_fd, k, (0 == k), opts.do_verbose);
             if (res) {
                 ++num_errs;
                 ret = res;

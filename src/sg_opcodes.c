@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2011 D. Gilbert
+ *  Copyright (C) 2004-2013 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static char * version_str = "0.37 20110303";    /* spc4r26 */
+static char * version_str = "0.38 20130228";    /* spc4r26 */
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
@@ -738,10 +738,10 @@ main(int argc, char * argv[])
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
     if (opts.do_taskman)
         res = do_rstmf(sg_fd, opts.do_repd, rsoc_buff,
-                       (opts.do_repd ? 16 : 4), 0, opts.do_verbose);
+                       (opts.do_repd ? 16 : 4), 1, opts.do_verbose);
     else
         res = do_rsoc(sg_fd, opts.do_rctd, rep_opts, opts.do_opcode,
-                      opts.do_servact, rsoc_buff, sizeof(rsoc_buff), 0,
+                      opts.do_servact, rsoc_buff, sizeof(rsoc_buff), 1,
                       opts.do_verbose);
     switch (res) {
     case 0:

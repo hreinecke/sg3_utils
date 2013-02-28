@@ -1,3 +1,18 @@
+/* This code is does a SCSI READ CAPACITY command on the given device
+   and outputs the result.
+
+*  Copyright (C) 1999 - 2013 D. Gilbert
+*  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2, or (at your option)
+*  any later version.
+
+   This program was originally written with Linux 2.4 kernel series.
+   It now builds for the Linux 2.6 and 3 kernel series and various other
+   operating systems.
+
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -13,22 +28,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-/* This code is does a SCSI READ CAPACITY command on the given device
-   and outputs the result.
 
-*  Copyright (C) 1999 - 2011 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program was originally written with Linux 2.4 kernel series.
-   It should now also build for the Linux 2.6 kernel series and various
-   other operating systems.
-
-*/
-
-static char * version_str = "3.87 20111023";
+static char * version_str = "3.88 20130228";
 
 #define ME "sg_readcap: "
 
@@ -389,7 +390,7 @@ int main(int argc, char * argv[])
 
     if (! opts.do_long) {
         res = sg_ll_readcap_10(sg_fd, opts.do_pmi, (unsigned int)opts.llba,
-                               resp_buff, RCAP_REPLY_LEN, 0, opts.do_verbose);
+                               resp_buff, RCAP_REPLY_LEN, 1, opts.do_verbose);
         ret = res;
         if (0 == res) {
             if (opts.do_hex || opts.do_raw) {
@@ -466,7 +467,7 @@ int main(int argc, char * argv[])
     }
     if (opts.do_long) {
         res = sg_ll_readcap_16(sg_fd, opts.do_pmi, opts.llba, resp_buff,
-                               RCAP16_REPLY_LEN, 0, opts.do_verbose);
+                               RCAP16_REPLY_LEN, 1, opts.do_verbose);
         ret = res;
         if (0 == res) {
             if (opts.do_hex || opts.do_raw) {
