@@ -2,11 +2,18 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.35 [20130109] [svn: r474]
+Changelog for sg3_utils-1.36 [20130206] [svn: r479]
+  - sg_lib: improve snprintf handling
+  - sg_vpd: Protocol-specific port information VPD page for
+    SAS SSP, persistent connection (spl3r2)
+  - sg_xcopy: handle more descriptor types and correction
+
+Changelog for sg3_utils-1.35 [20130117] [svn: r476]
   - sg_compare_and_write: new utility
   - sg_inq+sg_vpd: block device characteristics VPD page:
     add product_type, WABEREQ, WACEREQ and VBULS fields
   - sg_inq: more --export option changes for udev
+  - sg_vpd: add more rdac vendor specific vpd pages
   - sg_verify: add --ebytchk option for sbc3r34 changes
   - sg_stpg: --offline option: fix 'Invalid state 0xe'
   - sg_ses: Door Lock element changed to Door element and

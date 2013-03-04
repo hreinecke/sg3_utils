@@ -9,7 +9,6 @@
 #include <string.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
-#include <sys/ioctl.h>
 #include <getopt.h>
 
 #ifdef HAVE_CONFIG_H
@@ -21,7 +20,7 @@
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
 *
-*  Copyright (c) 2012, Kaminario Technologies LTD
+*  Copyright (c) 2012-2013, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -42,14 +41,14 @@
 *  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-*  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-*  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+*  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *
 *  This command performs a SCSI COMPARE AND WRITE on the given lba.
 *
 */
 
-static const char * version_str = "1.01 20121209";
+static const char * version_str = "1.02 20130117";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -435,11 +434,10 @@ main(int argc, char * argv[])
 
         if (opts.verbose)
                 fprintf(stderr, "Running COMPARE AND WRITE command with the "
-                        "following options:\n  in=%s device=%s lba=0x%" PRIx64
-                        " num_blocks=%d xfer_len=%d timeout=%d\n",
-                        opts.ifilename, opts.device_name,
-                        (unsigned long)opts.lba, opts.numblocks,
-                        opts.xfer_len, opts.timeout);
+                        "following options:\n  in=%s device=%s lba=0x%"
+                        PRIx64 " num_blocks=%d xfer_len=%d timeout=%d\n",
+                        opts.ifilename, opts.device_name, opts.lba,
+                        opts.numblocks, opts.xfer_len, opts.timeout);
 
         infd = open_if(opts.ifilename);
         if (infd <=0) {

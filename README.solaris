@@ -30,6 +30,7 @@ for Solaris.
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
+    sg_compare_and_write
     sg_decode_sense
     sg_format
     sg_get_config
@@ -155,4 +156,4 @@ disks to accept SCSI commands including the SCSI ATA PASS THROUGH commands.
 
 
 Douglas Gilbert
-21st June 2011
+14th January 2013
