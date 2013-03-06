@@ -28,7 +28,7 @@
  * and decodes the response.
  */
 
-static char * version_str = "1.19 20130226";
+static char * version_str = "1.20 20130305";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -40,6 +40,7 @@ static struct option long_options[] = {
         {"decode", no_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
+        {"linux", no_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
@@ -54,11 +55,11 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-            "sg_luns    [--decode] [--help] [--hex] [--maxlen=LEN] "
-            "[--quiet]\n"
-            "                  [--raw] [--select=SR] [--verbose] "
-            "[--version]\n"
-            "                  DEVICE\n"
+            "sg_luns    [--decode] [--help] [--hex] [--linux] "
+            "[--maxlen=LEN]\n"
+            "                  [--quiet] [--raw] [--select=SR] "
+            "[--verbose]\n"
+            "                  [--version] DEVICE\n"
             "     or\n"
             "       sg_luns    --test=LUNHEX [--hex] [--verbose]\n"
             "  where:\n"
@@ -67,6 +68,8 @@ usage()
             "    --hex|-H           output response in hexadecimal; used "
             "twice\n"
             "                       shows decoded values in hex\n"
+            "    --linux|-l         show Linux integer lun after T10 "
+            "representation\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
@@ -86,7 +89,8 @@ usage()
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI REPORT LUNS command. When the --test=LUNHEX "
-            "option is given, decodes LUNHEX.\n"
+            "option is\ngiven, decodes LUNHEX rather than sending a "
+            "REPORT LUNS command.\n"
             );
 }
 
@@ -94,13 +98,15 @@ usage()
  * defines its own "bridge addressing method" in place of the SAM-3
  * "logical addressing method".  */
 static void
-decode_lun(const char * leadin, const unsigned char * lunp, int do_hex)
+decode_lun(const char * leadin, const unsigned char * lunp, int do_hex,
+           int verbose)
 {
     int k, j, x, a_method, bus_id, target, lun, len_fld, e_a_method;
     int next_level;
     unsigned char not_spec[8] = {0xff, 0xff, 0xff, 0xff,
                                  0xff, 0xff, 0xff, 0xff};
     char l_leadin[128];
+    char b[256];
     uint64_t ull;
 
     if (0 == memcmp(lunp, not_spec, sizeof(not_spec))) {
@@ -120,22 +126,23 @@ decode_lun(const char * leadin, const unsigned char * lunp, int do_hex)
         switch (a_method) {
         case 0:         /* peripheral device addressing method */
             bus_id = lunp[0] & 0x3f;
-            if (0 == bus_id) {
+            snprintf(b, sizeof(b), "%sPeripheral device addressing: ",
+                     l_leadin);
+            if ((0 == bus_id) && (0 == verbose)) {
                 if (do_hex)
-                    printf("%sPeripheral device addressing: lun=0x%02x\n",
-                           l_leadin, lunp[1]);
+                    printf("%slun=0x%02x\n", b, lunp[1]);
                 else
-                    printf("%sPeripheral device addressing: lun=%d\n",
-                           l_leadin, lunp[1]);
+                    printf("%slun=%d\n", b, lunp[1]);
             } else {
                 if (do_hex)
-                    printf("%sPeripheral device addressing: bus_id=0x%02x, "
-                           "target=0x%02x\n", l_leadin, bus_id, lunp[1]);
+                    printf("%sbus_id=0x%02x, %s=0x%02x\n", b, bus_id,
+                           (bus_id ? "target" : "lun"), lunp[1]);
                 else
-                    printf("%sPeripheral device addressing: bus_id=%d, "
-                           "target=%d\n", l_leadin, bus_id, lunp[1]);
-                next_level = 1;
+                    printf("%sbus_id=%d, %s=%d\n", b, bus_id,
+                           (bus_id ? "target" : "lun"), lunp[1]);
             }
+            if (bus_id)
+                next_level = 1;
             break;
         case 1:         /* flat space addressing method */
             lun = ((lunp[0] & 0x3f) << 8) + lunp[1];
@@ -157,34 +164,30 @@ decode_lun(const char * leadin, const unsigned char * lunp, int do_hex)
                 printf("%sLogical unit addressing: bus_id=%d, target=%d, "
                        "lun=%d\n", l_leadin, bus_id, target, lun);
             break;
-        case 3:         /* extended logical unit addressing method */
+        case 3:         /* extended logical unit + flat space addressing */
             len_fld = (lunp[0] & 0x30) >> 4;
             e_a_method = lunp[0] & 0xf;
             x = lunp[1];
             if ((0 == len_fld) && (1 == e_a_method)) {
+                snprintf(b, sizeof(b), "well known logical unit");
                 switch (x) {
                 case 1:
-                    printf("%sREPORT LUNS well known logical unit\n",
-                           l_leadin);
+                    printf("%sREPORT LUNS %s\n", l_leadin, b);
                     break;
                 case 2:
-                    printf("%sACCESS CONTROLS well known logical unit\n",
-                           l_leadin);
+                    printf("%sACCESS CONTROLS %s\n", l_leadin, b);
                     break;
                 case 3:
-                    printf("%sTARGET LOG PAGES well known logical unit\n",
-                           l_leadin);
+                    printf("%sTARGET LOG PAGES %s\n", l_leadin, b);
                     break;
                 case 4:
-                    printf("%sSECURITY PROTOCOL well known logical unit\n",
-                           l_leadin);
+                    printf("%sSECURITY PROTOCOL %s\n", l_leadin, b);
                     break;
                 default:
                     if (do_hex)
-                        printf("%swell known logical unit 0x%02x\n", l_leadin,
-                               x);
+                        printf("%s%s 0x%02x\n", l_leadin, b, x);
                     else
-                        printf("%swell known logical unit %d\n", l_leadin, x);
+                        printf("%s%s %d\n", l_leadin, b, x);
                     break;
                 }
             } else if ((1 == len_fld) && (2 == e_a_method)) {
@@ -275,17 +278,33 @@ linux2t10_lun(uint64_t linux_lun, unsigned char t10_lun[])
 static uint64_t
 t10_2linux_lun(const unsigned char t10_lun[])
 {
-    int k;
     const unsigned char * cp;
-    uint64_t res = 0;
+    uint64_t res;
 
-     for (k = 6, cp = t10_lun + 6; k >= 0; k -= 2, cp -= 2) {
-        if (6 != k)
-            res <<= 16;
+     res = (t10_lun[6] << 8) + t10_lun[7];
+     for (cp = t10_lun + 4; cp >= t10_lun; cp -= 2) {
+        res <<= 16;
         res += (*cp << 8) + *(cp + 1);
     }
     return res;
 }
+
+/* Copy of t10_lun --> Linux unsigned int (i.e. 32 bit ) present in Linux
+ * kernel, up to least lk 3.8.0, extended to 64 bits.
+ * BEWARE: for sizeof(int==4) this function is BROKEN and is left here as
+ * as example and may soon be removed. */
+static uint64_t
+t10_2linux_lun64bitBR(const unsigned char t10_lun[])
+{
+    int i;
+    uint64_t lun;
+
+    lun = 0;
+    for (i = 0; i < (int)sizeof(lun); i += 2)
+        lun = lun | (((t10_lun[i] << 8) | t10_lun[i + 1]) << (i * 8));
+    return lun;
+}
+
 
 static void
 dStrRaw(const char* str, int len)
@@ -302,6 +321,7 @@ main(int argc, char * argv[])
     int sg_fd, k, m, off, res, c, list_len, luns, trunc;
     int decode = 0;
     int do_hex = 0;
+    int do_linux = 0;
     int maxlen = 0;
     int do_quiet = 0;
     int do_raw = 0;
@@ -309,6 +329,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     int test_linux_in = 0;
     int test_linux_out = 0;
+    int test_linux_out2 = 0;
     unsigned int h;
     const char * test_arg = NULL;
     const char * device_name = NULL;
@@ -319,7 +340,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHm:qrs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHlm:qrs:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -334,6 +355,9 @@ main(int argc, char * argv[])
             return 0;
         case 'H':
             ++do_hex;
+            break;
+        case 'l':
+            ++do_linux;
             break;
         case 'm':
             maxlen = sg_get_num(optarg);
@@ -409,6 +433,8 @@ main(int argc, char * argv[])
                 }
                 if (strchr(cp, 'L') || strchr(cp, 'l'))
                     test_linux_out = 1;
+                else if (strchr(cp, 'B') || strchr(cp, 'b'))
+                    test_linux_out2 = 1;
             } else {
                 for (k = 0; k < 8; ++k, cp += 2) {
                 if (1 != sscanf(cp, "%2x", &h))
@@ -417,6 +443,8 @@ main(int argc, char * argv[])
                 }
                 if (strchr(cp, 'L') || strchr(cp, 'l'))
                     test_linux_out = 1;
+                else if (strchr(cp, 'B') || strchr(cp, 'b'))
+                    test_linux_out2 = 1;
             }
             if (0 == k) {
                 fprintf(stderr, "expected a hex number, optionally prefixed "
@@ -424,17 +452,35 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         }
-        if (verbose || test_linux_in) {
+        if (verbose || test_linux_in || test_linux_out2) {
             printf("64 bit LUN in T10 preferred (hex) format: ");
             for (k = 0; k < 8; ++k)
                 printf(" %02x", lun_arr[k]);
             printf("\n");
         }
-        if (test_linux_out)
-            printf("Linux 'word flipped' integer LUN representation: %" PRIu64
-                   "\n", t10_2linux_lun(lun_arr));
+        if (test_linux_out) {
+            if (do_hex > 1)
+                printf("Linux 'word flipped' integer LUN representation: "
+                       "0x%016" PRIx64 "\n", t10_2linux_lun(lun_arr));
+            else if (do_hex)
+                printf("Linux 'word flipped' integer LUN representation: 0x%"
+                       PRIx64 "\n", t10_2linux_lun(lun_arr));
+            else
+                printf("Linux 'word flipped' integer LUN representation: %"
+                       PRIu64 "\n", t10_2linux_lun(lun_arr));
+        } else if (test_linux_out2) {
+            if (do_hex > 1)
+                printf("Linux internal 64 bit LUN representation: 0x%016"
+                       PRIx64 "\n", t10_2linux_lun64bitBR(lun_arr));
+            else if (do_hex)
+                printf("Linux internal 64 bit LUN representation: 0x%"
+                       PRIx64 "\n", t10_2linux_lun64bitBR(lun_arr));
+            else
+                printf("Linux internal 64 bit LUN representation: %"
+                       PRIu64 "\n", t10_2linux_lun64bitBR(lun_arr));
+        }
         printf("Decoded LUN:\n");
-        decode_lun("  ", lun_arr, do_hex);
+        decode_lun("  ", lun_arr, do_hex, verbose);
         return 0;
     }
     if (NULL == device_name) {
@@ -490,17 +536,27 @@ main(int argc, char * argv[])
             dStrHex((const char *)reportLunsBuff,
                     (trunc ? maxlen : list_len + 8), 1);
         }
-        for (k = 0, off = 8; k < luns; ++k) {
+        for (k = 0, off = 8; k < luns; ++k, off += 8) {
             if (0 == do_quiet) {
                 if (0 == k)
                     printf("Report luns [select_report=0x%x]:\n", select_rep);
                 printf("    ");
             }
-            for (m = 0; m < 8; ++m, ++off)
-                printf("%02x", reportLunsBuff[off]);
+            for (m = 0; m < 8; ++m)
+                printf("%02x", reportLunsBuff[off + m]);
+            if (do_linux) {
+                uint64_t lin_lun;
+
+                lin_lun = t10_2linux_lun(reportLunsBuff + off);
+                if (do_hex > 1)
+                    printf("    [0x%" PRIx64 "]", lin_lun);
+                else
+                    printf("    [%" PRIu64 "]", lin_lun);
+            }
             printf("\n");
             if (decode)
-                decode_lun("      ", reportLunsBuff + off - 8, do_hex);
+                decode_lun("      ", reportLunsBuff + off, do_hex,
+                           verbose);
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Report Luns command not supported (support "
