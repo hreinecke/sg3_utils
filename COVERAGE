@@ -41,8 +41,8 @@ READ BLOCK LIMITS   sg_read_block_limits, ++
 READ BUFFER         sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
-READ DEFECT(10)     sginfo('-d' or '-G'), sg_reassign('-g'), ++
-READ DEFECT(12)     sginfo('-d' or '-G')
+READ DEFECT(10)     sginfo('-d' or '-G'), sg_reassign('-g'), smartmontools, ++
+READ DEFECT(12)     sginfo('-d' or '-G'), smartmontools
 READ LONG (10)      sg_read_long, sg_dd, ++
 READ LONG (16)      sg_read_long, ++
 READ MEDIA SERIAL NUMBER     sg_rmsn, ++
@@ -100,4 +100,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Douglas Gilbert
-14th January 2013
+1st March 2013

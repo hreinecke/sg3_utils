@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.40 20130228";
+static char * version_str = "1.41 20130301";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -132,7 +132,8 @@ usage()
            "SENSE(10)\n"
            "    --verbose|-v    increase verbosity\n"
            "    --version|-V    output version string then exit\n\n"
-           "Performs a SCSI MODE SENSE (10 or 6) command\n");
+           "Performs a SCSI MODE SENSE (10 or 6) command. To access and "
+           "possibly change\nmode page fields see the sdparm utility.\n");
 }
 
 static void
