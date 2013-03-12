@@ -237,23 +237,23 @@ const unsigned char *
 sg_scsi_sense_desc_find(const unsigned char * sensep, int sense_len,
                         int desc_type)
 {
-    int add_sen_len, add_len, desc_len, k;
+    int add_sb_len, add_d_len, desc_len, k;
     const unsigned char * descp;
 
-    if ((sense_len < 8) || (0 == (add_sen_len = sensep[7])))
+    if ((sense_len < 8) || (0 == (add_sb_len = sensep[7])))
         return NULL;
     if ((sensep[0] < 0x72) || (sensep[0] > 0x73))
         return NULL;
-    add_sen_len = (add_sen_len < (sense_len - 8)) ?
-                         add_sen_len : (sense_len - 8);
+    add_sb_len = (add_sb_len < (sense_len - 8)) ?
+                         add_sb_len : (sense_len - 8);
     descp = &sensep[8];
-    for (desc_len = 0, k = 0; k < add_sen_len; k += desc_len) {
+    for (desc_len = 0, k = 0; k < add_sb_len; k += desc_len) {
         descp += desc_len;
-        add_len = (k < (add_sen_len - 1)) ? descp[1]: -1;
-        desc_len = add_len + 2;
+        add_d_len = (k < (add_sb_len - 1)) ? descp[1]: -1;
+        desc_len = add_d_len + 2;
         if (descp[0] == desc_type)
             return descp;
-        if (add_len < 0) /* short descriptor ?? */
+        if (add_d_len < 0) /* short descriptor ?? */
             break;
     }
     return NULL;
@@ -498,36 +498,34 @@ static const char * sdata_src[] = {
    in descriptor format) */
 static void
 sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
-                             int buff_len, char * buff)
+                             int blen, char * b)
 {
-    int add_sen_len, add_len, desc_len, k, j, sense_key, processed;
-    int n, progress, pr, rem, blen;
+    int add_sb_len, add_d_len, desc_len, k, j, sense_key, processed;
+    int n, progress, pr, rem;
     const unsigned char * descp;
     const char * dtsp = "   >> descriptor too short";
-    char b[2048];
 
-    if ((NULL == buff) || (buff_len <= 0))
+    if ((NULL == b) || (blen <= 0))
         return;
-    buff[0] = '\0';
-    if ((sb_len < 8) || (0 == (add_sen_len = sense_buffer[7])))
+    b[0] = '\0';
+    if ((sb_len < 8) || (0 == (add_sb_len = sense_buffer[7])))
         return;
-    add_sen_len = (add_sen_len < (sb_len - 8)) ? add_sen_len : (sb_len - 8);
-    blen = (int)sizeof(b);
-    descp = &sense_buffer[8];
+    add_sb_len = (add_sb_len < (sb_len - 8)) ? add_sb_len : (sb_len - 8);
     sense_key = (sense_buffer[1] & 0xf);
-    for (desc_len = 0, k = 0; k < add_sen_len; k += desc_len) {
-        descp += desc_len;
-        add_len = (k < (add_sen_len - 1)) ? descp[1] : -1;
-        if ((k + add_len + 2) > add_sen_len)
-            add_len = add_sen_len - k - 2;
-        desc_len = add_len + 2;
-        n = 0;
+
+    for (descp = (sense_buffer + 8), k = 0, n = 0;
+         (k < add_sb_len) && (n < blen);
+         k += desc_len, descp += desc_len) {
+        add_d_len = (k < (add_sb_len - 1)) ? descp[1] : -1;
+        if ((k + add_d_len + 2) > add_sb_len)
+            add_d_len = add_sb_len - k - 2;
+        desc_len = add_d_len + 2;
         n += my_snprintf(b + n, blen - n, "  Descriptor type: ");
         processed = 1;
         switch (descp[0]) {
         case 0:
             n += my_snprintf(b + n, blen - n, "Information\n");
-            if ((add_len >= 10) && (0x80 & descp[2])) {
+            if ((add_d_len >= 10) && (0x80 & descp[2])) {
                 n += my_snprintf(b + n, blen - n, "    0x");
                 for (j = 0; j < 8; ++j)
                     n += my_snprintf(b + n, blen - n, "%02x", descp[4 + j]);
@@ -539,7 +537,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         case 1:
             n += my_snprintf(b + n, blen - n, "Command specific\n");
-            if (add_len >= 10) {
+            if (add_d_len >= 10) {
                 n += my_snprintf(b + n, blen - n, "    0x");
                 for (j = 0; j < 8; ++j)
                     n += my_snprintf(b + n, blen - n, "%02x", descp[4 + j]);
@@ -554,7 +552,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             switch (sense_key) {
             case SPC_SK_ILLEGAL_REQUEST:
                 n += my_snprintf(b + n, blen - n, " Field pointer\n");
-                if (add_len < 6) {
+                if (add_d_len < 6) {
                     n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                     processed = 0;
                     break;
@@ -572,7 +570,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             case SPC_SK_MEDIUM_ERROR:
             case SPC_SK_RECOVERED_ERROR:
                 n += my_snprintf(b + n, blen - n, " Actual retry count\n");
-                if (add_len < 6) {
+                if (add_d_len < 6) {
                     n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                     processed = 0;
                     break;
@@ -583,7 +581,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             case SPC_SK_NO_SENSE:
             case SPC_SK_NOT_READY:
                 n += my_snprintf(b + n, blen - n, " Progress indication: ");
-                if (add_len < 6) {
+                if (add_d_len < 6) {
                     n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                     processed = 0;
                     break;
@@ -595,7 +593,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 break;
             case SPC_SK_COPY_ABORTED:
                 n += my_snprintf(b + n, blen - n, " Segment pointer\n");
-                if (add_len < 6) {
+                if (add_d_len < 6) {
                     n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                     processed = 0;
                     break;
@@ -626,7 +624,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         case 3:
             n += my_snprintf(b + n, blen - n, "Field replaceable unit\n");
-            if (add_len >= 2)
+            if (add_d_len >= 2)
                 n += my_snprintf(b + n, blen - n, "    code=0x%x\n",
                                  descp[3]);
             else {
@@ -636,7 +634,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         case 4:
             n += my_snprintf(b + n, blen - n, "Stream commands\n");
-            if (add_len >= 2) {
+            if (add_d_len >= 2) {
                 if (descp[3] & 0x80)
                     n += my_snprintf(b + n, blen - n, "    FILEMARK");
                 if (descp[3] & 0x40)
@@ -653,7 +651,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         case 5:
             n += my_snprintf(b + n, blen - n, "Block commands\n");
-            if (add_len >= 2)
+            if (add_d_len >= 2)
                 n += my_snprintf(b + n, blen - n, "    Incorrect Length "
                                  "Indicator (ILI) %s\n",
                                  (descp[3] & 0x20) ? "set" : "clear");
@@ -678,7 +676,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         case 9:         /* this is defined in SAT (and SAT-2) */
             n += my_snprintf(b + n, blen - n, "ATA Status Return\n");
-            if (add_len >= 12) {
+            if (add_d_len >= 12) {
                 int extend, sector_count;
 
                 extend = descp[2] & 1;
@@ -706,7 +704,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
            /* Added in SPC-4 rev 17, became 'Another ...' in rev 34 */
             n += my_snprintf(b + n, blen - n, "Another progress "
                              "indication\n");
-            if (add_len < 6) {
+            if (add_d_len < 6) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
                 break;
@@ -721,16 +719,17 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         case 0xb:       /* Added in SPC-4 rev 23, defined in SBC-3 rev 22 */
             n += my_snprintf(b + n, blen - n, "User data segment referral\n");
-            if (add_len < 2) {
+            if (add_d_len < 2) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
                 break;
             }
-            n += uds_referral_descriptor_str(b + n, blen - n, descp, add_len);
+            n += uds_referral_descriptor_str(b + n, blen - n, descp,
+                                             add_d_len);
             break;
         case 0xc:       /* Added in SPC-4 rev 28 */
             n += my_snprintf(b + n, blen - n, "Forwarded sense data\n");
-            if (add_len < 2) {
+            if (add_d_len < 2) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
                 break;
@@ -751,10 +750,10 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 c[sizeof(c) - 1] = '\0';
                 n += my_snprintf(b + n, blen - n, "    Forwarded status: "
                                  "%s\n", c);
-                if (add_len > 2) {
+                if (add_d_len > 2) {
                     /* recursing; hope not to get carried away */
                     n += my_snprintf(b + n, blen - n, " vvvvvvvvvvvvvvvv\n");
-                    sg_get_sense_str(NULL, descp + 4, add_len - 2, 0,
+                    sg_get_sense_str(NULL, descp + 4, add_d_len - 2, 0,
                                      sizeof(c), c);
                     n += my_snprintf(b + n, blen - n, "%s", c);
                     n += my_snprintf(b + n, blen - n, " ^^^^^^^^^^^^^^^^\n");
@@ -772,9 +771,9 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             break;
         }
         if (! processed) {
-            if (add_len > 0) {
+            if (add_d_len > 0) {
                 n += my_snprintf(b + n, blen - n, "    ");
-                for (j = 0; j < add_len; ++j) {
+                for (j = 0; j < add_d_len; ++j) {
                     if ((j > 0) && (0 == (j % 24)))
                         n += my_snprintf(b + n, blen - n, "\n    ");
                     n += my_snprintf(b + n, blen - n, "%02x ", descp[j + 2]);
@@ -782,17 +781,8 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 n += my_snprintf(b + n, blen - n, "\n");
             }
         }
-        if (add_len < 0)
+        if (add_d_len < 0)
             n += my_snprintf(b + n, blen - n, "    short descriptor\n");
-        j = strlen(buff);
-        if ((n + j) >= buff_len) {
-            strncpy(buff + j, b, buff_len - j);
-            buff[buff_len - 1] = '\0';
-            break;
-        }
-        strcpy(buff + j, b);
-        if (add_len < 0)
-            break;
     }
 }
 

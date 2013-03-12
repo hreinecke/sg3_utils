@@ -6,8 +6,8 @@ sg_inq \- issue SCSI INQUIRY command, output and decode response
 [\fI\-\-ata\fR] [\fI\-\-cmddt\fR] [\fI\-\-descriptors\fR] [\fI\-\-export\fR]
 [\fI\-\-extended\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
 [\fI\-\-len=LEN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR]
-\fIDEVICE\fR
+[\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c\fR] [\fI\-cl\fR]
@@ -142,6 +142,12 @@ abbreviations make little sense).
 output the response in binary to stdout. Error messages and warnings, if
 any, are sent to stderr.
 .TP
+\fB\-s\fR, \fB\-\-vendor\fR
+output a standard INQUIRY response's vendor specific field from offset 36
+to 55 in ASCII. When used twice (i.e. '\-ss') also output the vendor
+specific field from offset 96 in ASCII. This is only done if the data
+passes some simple sanity checks.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level of verbosity. Can be used multiple times.
 .TP
@@ -183,6 +189,11 @@ a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
 will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
 device names may be used as well (e.g. "/dev/st0m").
+.PP
+The number of bytes output by \fI\-\-hex\fR and \fI\-\-raw\fR is 36 bytes
+or the number given to \fI\-\-len=LEN\fR (or \fI\-\-maxlen=LEN\fR). That
+number is reduced if the "resid" returned by the HBA indicates less bytes
+were sent back from \fIDEVICE\fR.
 .SH ATA DEVICES
 There are two major types of ATA devices: non\-packet devices (e.g. ATA
 disks) and packet devices (ATAPI). The majority of ATAPI devices are
