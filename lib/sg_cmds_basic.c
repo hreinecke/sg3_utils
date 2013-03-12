@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.60 20130227";
+static char * version_str = "1.61 20130311";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -139,6 +139,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     int got, cat, duration, slen, resid, resp_code;
     char b[1024];
 
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (NULL == leadin)
         leadin = "";
     if (pt_res < 0) {
