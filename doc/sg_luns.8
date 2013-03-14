@@ -26,7 +26,7 @@ SAM\-4 and SAM\-5 (revision 13, section 4.7) .
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-d\fR, \fB\-\-decode\fR
-decode luns into their component parts, as described in the LUN section
+decode LUNs into their component parts, as described in the LUN section
 of SAM\-3, SAM\-4 and SAM\-5.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -44,7 +44,7 @@ the cdb's "allocation length" field. If not given (or \fILEN\fR is zero)
 then 8192 is used. The maximum allowed value of \fILEN\fR is 65536.
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
-output ASCII hex rendering of each report lun, one per line.
+output ASCII hex rendering of each report LUN, one per line.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary (to stdout).
@@ -56,11 +56,11 @@ REPORT LUNS command in SPC (most recent is SPC\-4 revision 36e in section
 6.33). To simplify, for the I_T nexus associated with the \fIDEVICE\fR, the
 meanings of the \fISR\fR values and the corresponding responses are:
 .br
-  \fB0\fR : all luns excluding well known logical units
+  \fB0\fR : all LUNs excluding well known logical units
 .br
   \fB1\fR : well known logical units
 .br
-  \fB2\fR : all luns
+  \fB2\fR : all LUNs
 .br
 Values between 0xf8 and 0xff (inclusive) are vendor specific (SPC\-4 rev
 36e), other values greater than 2 are reserved.
@@ -101,12 +101,12 @@ If the \fI\-\-hex\fR option is given once for the version of this utility
 that sends a REPORT LUNS command to \fIDEVICE\fR then the response is
 printed in hexadecimal. If the \fI\-\-hex\fR option is given twice then
 in the decoded output (if requested) some of the component fields (e.g. the
-actual lun) are printed in hex with leading zeros. If the \fI\-\-hex\fR
+actual LUN) are printed in hex with leading zeros. If the \fI\-\-hex\fR
 option is given once for the \fI\-\-test=\fR form of this utility then in
 the decoded output some of the component fields are printed in hex with
 leading zeros. This is to indicate the size of the component field. For
 example: in the Peripheral device addressing method (16 bits overall), the
-bus ID is 6 bits wide and the target/lun field is 8 bits wide; so both are
+bus ID is 6 bits wide and the target/LUN field is 8 bits wide; so both are
 shown with two hex digits (e.g. bus_id=0x02, target=0x3a).
 .SH EXAMPLES
 Typically by the time user space programs get to run, SCSI LUs have been
@@ -114,7 +114,7 @@ discovered. In Linux the lsscsi utility lists the LUs that are currently
 present. The LUN of a device (LU) is the fourth element in the tuple at the
 beginning of each line. Below we see a target (or "I_T Nexus": "6:0:0") has
 two LUNS: 1 and 49409. If 49409 is converted into t10 LUN format it is
-0xc101000000000000 which is the REPORT LUNS well known lun.
+0xc101000000000000 which is the REPORT LUNS well known LUN.
 .PP
   # lsscsi \-g
 .br
@@ -147,7 +147,7 @@ Now decode that LUN:
 .br
         Peripheral device addressing: lun=1
 .PP
-Would like to see how wide that component lun field is:
+Would like to see how wide that component LUN field is:
   # sg_luns \-d \-q \-HH /dev/sg1
 .br
   0001000000000000
@@ -156,13 +156,13 @@ Would like to see how wide that component lun field is:
 .PP
 So it is 8 bits wide (actually between 5 and 8 bits wide, inclusive).
 Now use \fI\-\-select=1\fR to find out if there are any well known
-luns:
+LUNs:
 .PP
   # sg_luns \-q \-s 1 /dev/sg1
 .br
   c101000000000000
 .PP
-So how many luns do we have all together (associated with the current
+So how many LUNs do we have all together (associated with the current
 I_T Nexus):
 .PP
   # sg_luns \-q \-s 2 /dev/sg1

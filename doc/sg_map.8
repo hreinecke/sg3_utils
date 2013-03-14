@@ -1,6 +1,6 @@
 .TH SG_MAP "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
 .SH NAME
-sg_map \- displays mapping between linux sg and other SCSI devices
+sg_map \- displays mapping between Linux sg and other SCSI devices
 .SH SYNOPSIS
 .B sg_map
 [\fI\-a\fR] [\fI-h\fR] [\fI\-i\fR] [\fI\-n\fR] [\fI\-scd\fR] [\fI\-sd\fR]
@@ -20,7 +20,7 @@ name.
 assume the sg devices have alphabetical device names and loop
 through /dev/sga, /dev/sgb, etc. Default is numeric scan.
 Note that sg device nodes with an alphabetical index have been
-deprecated since the linux kernel 2.2 series.
+deprecated since the Linux kernel 2.2 series.
 .TP
 \fB\-h\fR
 print usage message then exit.
@@ -72,7 +72,7 @@ observing the output of the command: "cat /proc/scsi/scsi".
 However if devices have been added since boot this can
 be deceptive.
 .PP
-In the linux kernel 2.6 series something close to the mapping
+In the Linux kernel 2.6 series something close to the mapping
 shown by this utility can be found by analysing sysfs. The
 main difference is that sysfs analysis will show the mapping
 between sg nodes and other SCSI device nodes in terms of
@@ -91,7 +91,7 @@ was not supported in Linux. It used a simple algorithm to scan sg
 device nodes in ascending numeric or alphabetical order, stopping
 after there were 5 consecutive errors.
 .PP
-In the linux kernel 2.6 series, this utility uses sysfs to find which
+In the Linux kernel 2.6 series, this utility uses sysfs to find which
 sg device nodes are active and only checks those. Hence there can be
 large "holes" in the numbering of sg device nodes (e.g. after an
 adapter has been removed) and still all active sg device nodes will
