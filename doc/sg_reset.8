@@ -19,12 +19,12 @@ A device reset is applied to the Logical Unit (LU) corresponding to
 \fIDEVICE\fR. It is most likely implemented by a Low level Driver (LLD)
 in Linux as a LOGICAL UNIT RESET task management function.
 .PP
-The ability to reset a SCSI target was added in linux kernel 2.6.27 . A LLD
+The ability to reset a SCSI target was added in Linux kernel 2.6.27 . A LLD
 may send Low level Drivers (LLDs) the I_T NEXUS RESET task management
 function. Alternatively it may use a transport mechanism to do the same
 thing (e.g. a hard reset on the link containing a SAS target).
 .PP
-In the linux kernel 2.6 series this utility can be called on sd, sr (cd/dvd),
+In the Linux kernel 2.6 series this utility can be called on sd, sr (cd/dvd),
 st or sg device nodes; if the user has appropriate permissions.
 .SH OPTIONS
 .TP
@@ -100,7 +100,7 @@ stands for Initiator\-Target.
 .PP
 Transports may have their own types of resets not supported by this utility.
 For example SAS has a link reset in which both ends of a physical link (e.g.
-between a SAS expander and a SAS tape drive) renogiatate their connection.
+between a SAS expander and a SAS tape drive) renegotiate their connection.
 .PP
 Prior to version 0.57 of this utility the command line had short options
 only (e.g. \fI\-d\fR but not \fI\-\-device\fR). Also \fI\-h\fR invoked a host
