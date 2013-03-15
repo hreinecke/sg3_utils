@@ -1,11 +1,11 @@
-.TH SG_LUNS "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_LUNS "8" "March 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command or decode LUN
 .SH SYNOPSIS
 .B sg_luns
-[\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-select=SR\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-linux\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
+[\fI\-\-select=SR\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_luns
 \fI\-\-test=LUNHEX\fR [\fI\-\-hex\fR] [\fI\-\-verbose\fR]
@@ -37,6 +37,13 @@ when given once this utility will output response to the REPORT LUNS command
 in ASCII hex then exit. When given twice it causes the decode option to
 output values in hex rather than decimal. When this option is used with
 \fI\-\-test=LUNHEX\fR then decoded component fields are output in hex.
+.TP
+\fB\-l\fR, \fB\-\-linux\fR
+this option is only available in Linux. After the T10 representation of
+each 64 bit LUN (in 16 hexadecimal digits), if this option is given then
+to the right, in square brackets, is the Linux LUN integer in decimal.
+If the \fI\-\-hex\fR option is given twice (e.g. \-HH) as well then the
+Linux LUN integer is output in hexadecimal.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
@@ -181,6 +188,15 @@ I_T Nexus):
 .br
         REPORT LUNS well known logical unit
 .PP
+The following example uses the \fI\-\-linux\fR option and is not available
+in other operating systems.
+.PP
+  # sg_luns \-q \-s 2 \-l /dev/sg1
+.br
+  0001000000000000    [1]
+.br
+  c101000000000000    [49409]
+.PP
 Now we use the \fI\-\-test=\fR option to decode LUNS input on the command
 line (rather than send a REPORT LUNS command and act on the response):
 .PP
@@ -220,7 +236,7 @@ Linux LUN 49409 translates to in the T10 world:
 And the mapping between T10 and Linux LUN representations can be done the
 other way:
 .PP
-  # sg_luns -t c101L
+  # sg_luns \-t c101L
 .br
   Linux 'word flipped' integer LUN representation: 49409
 .br
