@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2012 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.70 20121211";    /* ses3r05 */
+static char * version_str = "1.71 20130315";    /* ses3r05 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -385,6 +385,8 @@ static struct acronym2tuple ecs_a2t_arr[] = {
    {"prdfail", -1, 0, 6, 1},
    {"remove", DEVICE_ETC, 2, 2, 1},
    {"remove", ARRAY_DEV_ETC, 2, 2, 1},
+   {"speed_act", COOLING_ETC, 2, 7, 8}, /* actual speed (rpm / 10) */
+   {"speed_code", COOLING_ETC, 3, 2, 3},
    {"swap", -1, 0, 4, 1},               /* Reset swap */
    {NULL, 0, 0, 0, 0},
 };
