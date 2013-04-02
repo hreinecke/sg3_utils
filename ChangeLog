@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.36 [20130317] [svn: r491]
+Changelog for sg3_utils-1.36 [20130402] [svn: r492]
   - sg_vpd: Protocol-specific port information VPD page for
     SAS SSP, persistent connection (spl3r2)
   - sg_xcopy: handle more descriptor types; handle zero
@@ -18,6 +18,8 @@ Changelog for sg3_utils-1.36 [20130317] [svn: r491]
   - sg_inq: add --vendor option to show vendor specific
     fields in ASCII
     - take resid into account with response output
+  - sg_logs: add data compression page (ssc4)
+  - sg_sat_set_features: increase --lba from 1 to 3 bytes
   - sg_lib: improve snprintf handling
   - sg_lib_data: sync asc/ascq codes with T10 20130117
   - sg_cmds (lib): if noisy given, give more UA info

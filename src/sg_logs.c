@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.08 20130228";    /* spc4r35 + sbc3r30 */
+static char * version_str = "1.09 20130401";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -791,6 +791,9 @@ show_page_name(int pg_code, int subpg_code,
                 printf("%sVolume statistics (ssc-4)\n", b);
                 done = 0;
                 break;
+            case 0x1b:
+                printf("%sData compression (ssc-4)\n", b);
+                break;
             case 0x2d:
                 printf("%sCurrent service information (ssc-3)\n", b);
                 break;
@@ -901,7 +904,7 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
         outp[0] = '\0';
 }
 
-/* BUFF_OVER_UNDER_LPAGE */
+/* BUFF_OVER_UNDER_LPAGE, 0x1 */
 static void
 show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -968,6 +971,7 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 }
 
 /* WRITE_ERR_LPAGE; READ_ERR_LPAGE; READ_REV_ERR_LPAGE; VERIFY_ERR_LPAGE */
+/* 0x2, 0x3, 0x4, 0x5 */
 static void
 show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1035,7 +1039,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* NON_MEDIUM_LPAGE */
+/* NON_MEDIUM_LPAGE, 0x6 */
 static void
 show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1085,7 +1089,7 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* PCT_LPAGE */
+/* PCT_LPAGE, 0x1a */
 static void
 show_power_condition_transitions_page(unsigned char * resp, int len,
                                       int show_pcb)
@@ -1142,6 +1146,7 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
     }
 }
 
+/* Vendor specific: 0x30 */
 static void
 show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1234,6 +1239,7 @@ show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* Vendor specific: 0x31 */
 static void
 show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1282,11 +1288,12 @@ show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* originally vendor specific 0x32, ssc4 standardizes at 0x1b */
 static void
 show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, num, extra, pc, pcb;
-    unsigned int n;
+    int k, j, pl, num, extra, pc, pcb;
+    uint64_t n;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
@@ -1300,63 +1307,59 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
-        extra = ucp[3] + 4;
-        switch (ucp[3]) {
-        case 2:
-            n = (ucp[4] << 8) | ucp[5];
-            break;
-        case 4:
-            n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
-            break;
-        default:
-            n = 0;
+        pl = ucp[3];
+        extra = pl + 4;
+        if ((0 == pl) || (pl > 8)) {
+            printf("badly formed data compression log parameter\n");
+            printf("  parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            goto skip_para;
+        }
+        for (j = 0, n = 0; j < pl; ++j) {
+            if (j > 0)
+                n <<= 8;
+            n |= ucp[4 + j];
         }
         switch (pc) {
         case 0x00:
-            if (extra == 6)
-                printf("  Read compression ratio x100: %u", n);
+            printf("  Read compression ratio x100: %" PRIu64 , n);
             break;
         case 0x01:
-            if (extra == 6)
-                printf("  Write compression ratio x100: %u", n);
+            printf("  Write compression ratio x100: %" PRIu64 , n);
             break;
         case 0x02:
-            if (extra == 8)
-                printf("  Megabytes transferred to server: %u", n);
+            printf("  Megabytes transferred to server: %" PRIu64 , n);
             break;
         case 0x03:
-            if (extra == 8)
-                printf("  Bytes transferred to server: %u", n);
+            printf("  Bytes transferred to server: %" PRIu64 , n);
             break;
         case 0x04:
-            if (extra == 8)
-                printf("  Megabytes read from tape: %u", n);
+            printf("  Megabytes read from tape: %" PRIu64 , n);
             break;
         case 0x05:
-            if (extra == 8)
-                printf("  Bytes read from tape: %u", n);
+            printf("  Bytes read from tape: %" PRIu64 , n);
             break;
         case 0x06:
-            if (extra == 8)
-                printf("  Megabytes transferred from server: %u", n);
+            printf("  Megabytes transferred from server: %" PRIu64 , n);
             break;
         case 0x07:
-            if (extra == 8)
-                printf("  Bytes transferred from server: %u", n);
+            printf("  Bytes transferred from server: %" PRIu64 , n);
             break;
         case 0x08:
-            if (extra == 8)
-                printf("  Megabytes written to tape: %u", n);
+            printf("  Megabytes written to tape: %" PRIu64 , n);
             break;
         case 0x09:
-            if (extra == 8)
-                printf("  Bytes written to tape: %u", n);
+            printf("  Bytes written to tape: %" PRIu64 , n);
+            break;
+        case 0x100:
+            printf("  Data compression enabled: 0x%" PRIx64, n);
             break;
         default:
             printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
+skip_para:
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1365,7 +1368,7 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LAST_N_ERR_LPAGE */
+/* LAST_N_ERR_LPAGE, 0x7 */
 static void
 show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1407,7 +1410,7 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LAST_N_DEFERRED_LPAGE */
+/* LAST_N_DEFERRED_LPAGE, 0xb */
 static void
 show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1457,7 +1460,7 @@ static const char * self_test_result[] = {
     "reserved",
     "self test in progress"};
 
-/* SELF_TEST_LPAGE */
+/* SELF_TEST_LPAGE, 0x10 */
 static void
 show_self_test_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1504,7 +1507,7 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* TEMPERATURE_LPAGE */
+/* TEMPERATURE_LPAGE, 0xd */
 static void
 show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
                       int show_unknown)
@@ -1557,7 +1560,7 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
     }
 }
 
-/* START_STOP_LPAGE */
+/* START_STOP_LPAGE, 0xe */
 static void
 show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
 {
@@ -1655,7 +1658,7 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
     }
 }
 
-/* IE_LPAGE */
+/* IE_LPAGE, 0x2f */
 static void
 show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 {
@@ -1850,7 +1853,7 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
     }
 }
 
-/* PROTO_SPECIFIC_LPAGE for a SAS port */
+/* PROTO_SPECIFIC_LPAGE [0x18] for a SAS port */
 static void
 show_sas_port_param(unsigned char * ucp, int param_len,
                     const struct opts_t * optsp)
@@ -2060,7 +2063,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
     }
 }
 
-/* PROTO_SPECIFIC_LPAGE */
+/* PROTO_SPECIFIC_LPAGE, 0x18 */
 static int
 show_protocol_specific_page(unsigned char * resp, int len,
                             const struct opts_t * optsp)
@@ -2412,7 +2415,7 @@ show_stats_perform_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
-/* STATS_LPAGE, CACHE_STATS_SUBPG */
+/* STATS_LPAGE [0x16], CACHE_STATS_SUBPG [0x18, 0x20] */
 static int
 show_cache_stats_page(unsigned char * resp, int len,
                       const struct opts_t * optsp)
@@ -2545,7 +2548,7 @@ show_cache_stats_page(unsigned char * resp, int len,
     return 1;
 }
 
-/* FORMAT_STATUS_LPAGE */
+/* FORMAT_STATUS_LPAGE, 0x8 */
 static void
 show_format_status_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2615,6 +2618,7 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x17 */
 static void
 show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2686,7 +2690,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LB_PROV_LPAGE [0xc] */
+/* LB_PROV_LPAGE, 0xc */
 static void
 show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2760,7 +2764,7 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* SOLID_STATE_MEDIA_LPAGE */
+/* SOLID_STATE_MEDIA_LPAGE, 0x11 */
 static void
 show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2800,7 +2804,7 @@ show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* SAT_ATA_RESULTS_LPAGE (SAT-2) */
+/* SAT_ATA_RESULTS_LPAGE (SAT-2), 0x16 */
 static void
 show_ata_pt_results_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2869,6 +2873,7 @@ static const char * reassign_status[] = {
     "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
+/* 0x15 for disk */
 static void
 show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
                                   int verbose)
@@ -2979,6 +2984,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
+/* 0xc for tape */
 static void
 show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
                             int verbose)
@@ -3085,6 +3091,7 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
+/* 0x14 for tape and ADC */
 static void
 show_device_stats_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3189,6 +3196,7 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x14 for media changer */
 static void
 show_media_stats_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3323,6 +3331,7 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x15 for media changer */
 static void
 show_element_stats_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3360,6 +3369,7 @@ show_element_stats_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x16 for media changer */
 static void
 show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3495,6 +3505,7 @@ static char * tape_alert_strs[] = {
     "WORM medium - overwrite attempted",
 };
 
+/* TAPE_ALERT_LPAGE, 0x2e */
 static void
 show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
                          const struct opts_t * optsp)
@@ -3531,6 +3542,7 @@ show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
+/* 0x37 */
 static void
 show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3585,6 +3597,7 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x3e */
 static void
 show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3798,10 +3811,10 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case PROTO_SPECIFIC_LPAGE:
+    case PROTO_SPECIFIC_LPAGE:  /* 0x18 */
         done = show_protocol_specific_page(resp, len, optsp);
         break;
-    case STATS_LPAGE: /* defined for subpages 0 to 32 inclusive */
+    case STATS_LPAGE: /* 0x19, defined for subpages 0 to 32 inclusive */
         if (subpg_code <= HIGH_GRP_STATS_SUBPG)
             done = show_stats_perform_page(resp, len, optsp);
         else if (subpg_code == CACHE_STATS_SUBPG)
@@ -3809,10 +3822,13 @@ show_ascii_page(unsigned char * resp, int len,
         else
             done = 0;
         break;
-    case PCT_LPAGE:
+    case PCT_LPAGE:     /* 0x1a */
         show_power_condition_transitions_page(resp, len, optsp->do_pcb);
         break;
-    case TAPE_ALERT_LPAGE:
+    case 0x1b:
+        show_data_compression_log_page(resp, len, optsp->do_pcb);
+        break;
+    case TAPE_ALERT_LPAGE:      /* 0x2e */
         {
             switch (inq_dat->peripheral_type) {
             case PDT_TAPE:     /* ssc only */
@@ -3824,13 +3840,13 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case 0x30:
+    case 0x30:  /* vendor specific: IBM */
         show_tape_usage_log_page(resp, len, optsp->do_pcb);
         break;
-    case 0x31:
+    case 0x31:  /* vendor specific: IBM */
         show_tape_capacity_log_page(resp, len, optsp->do_pcb);
         break;
-    case 0x32:
+    case 0x32:  /* vendor specific, now tweaked and standardized at 0x1b */
         show_data_compression_log_page(resp, len, optsp->do_pcb);
         break;
     case IE_LPAGE:

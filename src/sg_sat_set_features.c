@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Douglas Gilbert.
+ * Copyright (c) 2006-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -46,7 +46,7 @@
 
 #define DEF_TIMEOUT 20
 
-static char * version_str = "1.05 20110401";
+static char * version_str = "1.06 20130402";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -297,7 +297,7 @@ int main(int argc, char * argv[])
             break;
         case 'L':
             lba = sg_get_num(optarg);
-            if ((lba < 0) || (lba > 255)) {
+            if ((lba < 0) || (lba > 0xffffff)) {
                 fprintf(stderr, "bad argument for '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -332,6 +332,12 @@ int main(int argc, char * argv[])
         fprintf(stderr, "missing device name!\n");
         usage();
         return 1;
+    }
+
+    if ((lba > 0xff) && (12 == cdb_len)) {
+        cdb_len = 16;
+        if (verbose)
+            fprintf(stderr, "Since lba > 0xff, forcing cdb length to 16\n");
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,
