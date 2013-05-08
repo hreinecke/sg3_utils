@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2012 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -23,7 +23,7 @@
  * (e.g. disks).
  */
 
-static char * version_str = "1.09 20120217";
+static const char * version_str = "1.09 20130507";
 
 
 static struct option long_options[] = {

@@ -28,7 +28,7 @@
 #include "sg_cmds_basic.h"
 
 
-static char * version_str = "0.17 20130228";
+static const char * version_str = "0.18 20130507";
 
 static int debug = 0;
 

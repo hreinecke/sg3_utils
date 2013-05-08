@@ -28,7 +28,7 @@
  * and decodes the response.
  */
 
-static char * version_str = "1.21 20130314";
+static const char * version_str = "1.21 20130507";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 64)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)

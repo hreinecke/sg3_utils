@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010 Hannes Reinecke.
+ * Copyright (c) 2010-2013 Hannes Reinecke.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * SCSI device.
  */
 
-static char * version_str = "1.03 20100813";    /* sbc3r24 */
+static const char * version_str = "1.03 20130507";    /* sbc3r24 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256

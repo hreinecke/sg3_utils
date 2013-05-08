@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2012 Douglas Gilbert.
+ * Copyright (c) 2006-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -45,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.09 20120314";
+static const char * version_str = "1.09 20130507";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},

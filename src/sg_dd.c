@@ -58,7 +58,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static char * version_str = "5.76 20130228";
+static const char * version_str = "5.77 20130507";
 
 #define ME "sg_dd: "
 
@@ -2111,7 +2111,7 @@ main(int argc, char * argv[])
                 break;
             } else if (res < blocks * blk_sz) {
                 fprintf(stderr, "output file probably full, seek=%" PRId64
-			" ", seek);
+                        " ", seek);
                 blocks = res / blk_sz;
                 out_full += blocks;
                 if ((res % blk_sz) > 0)

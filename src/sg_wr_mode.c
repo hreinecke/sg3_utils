@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * mode page on the given device.
  */
 
-static char * version_str = "1.10 20100423";
+static const char * version_str = "1.10 20130507";
 
 #define ME "sg_wr_mode: "
 
@@ -187,8 +187,8 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                     return 1;
                 }
                 mp_arr[k] = h;
-                cp = strchr(lcp, ',');
-                c2p = strchr(lcp, ' ');
+                cp = (char *)strchr(lcp, ',');
+                c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
                     cp = c2p;
                 if (NULL == cp)
@@ -247,8 +247,8 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
                     return 1;
                 }
                 mask_arr[k] = h;
-                cp = strchr(lcp, ',');
-                c2p = strchr(lcp, ' ');
+                cp = (char *)strchr(lcp, ',');
+                c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
                     cp = c2p;
                 if (NULL == cp)

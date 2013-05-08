@@ -1,14 +1,14 @@
 /* This program sends a user specified number of TEST UNIT READY commands
-   to the given sg device. Since TUR is a simple command involing no
-   data transfer (and no REQUEST SENSE command iff the unit is ready)
-   then this can be used for timing per SCSI command overheads.
-
+ * to the given sg device. Since TUR is a simple command involing no
+ * data transfer (and no REQUEST SENSE command iff the unit is ready)
+ * then this can be used for timing per SCSI command overheads.
+ *
  * Copyright (C) 2000-2013 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
-
+ *
  */
 
 #include <unistd.h>
@@ -30,7 +30,7 @@
 #include "sg_cmds_basic.h"
 
 
-static char * version_str = "3.29 20130228";
+static const char * version_str = "3.29 20130507";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Douglas Gilbert.
+ * Copyright (c) 2006-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
@@ -19,6 +20,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+
+static const char * version_str = "1.03 20130507";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -53,8 +56,6 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.03 20110401";
-
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
         {"extend", no_argument, 0, 'e'},
@@ -70,7 +71,7 @@ static struct option long_options[] = {
 
 struct phy_event_t {
     int id;
-    char * desc;
+    const char * desc;
 };
 
 static struct phy_event_t phy_event_arr[] = {   /* SATA 2.5 section 13.7.2 */

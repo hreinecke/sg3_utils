@@ -357,16 +357,18 @@ The more recent utilities that use "getopt_long" only are:
 
 Dangerous code
 ==============
-This code:
+This C code snippet:
     unsigned char uc = 0x80;
-    unsigned long long ull;
+    uint64_t ull;
     ull = (uc << 24);
-Gives an unexpected result because the 'unary conversion' of uc to a (32 bit
-signed) 'int' before the shift. The resultant type from the shift is also
-an int and it has its top bit set so there is sign extension when it is
-assigned into a 64 bit integer. The above will fail in a similar way on 64
-bit architectures that use the LP64 data model, if 'unsigned long ul' is used
-instead of ull variable in the above code example.
+Somewhat surprisingly sets ull to:
+    ull: 0xffffffff80000000
+This result is due to the 'unary conversion' of uc to a (32 bit signed)
+'int' before the shift. The resultant type from the shift is also an int
+and it has its top bit set so there is sign extension when it is assigned
+into a 64 bit unsigned integer. Making sure there is no conversion to 'int'
+solves the problem. In this case if uc is declared as unsigned int the
+result will be as expected (i.e. 0x80000000).
 
 Other SCSI and storage tools
 ============================
@@ -374,4 +376,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-2nd April 2013
+8th May 2013

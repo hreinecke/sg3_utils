@@ -28,7 +28,7 @@
 
 #define ME "sg_reset: "
 
-static char * version_str = "0.58 20130220";
+static const char * version_str = "0.58 20130507";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284

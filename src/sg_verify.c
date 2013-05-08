@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2012 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * the possibility of protection data (DIF).
  */
 
-static char * version_str = "1.19 20121204";    /* sbc3r34 */
+static const char * version_str = "1.19 20130507";    /* sbc3r34 */
 
 #define ME "sg_verify: "
 
@@ -288,7 +288,7 @@ main(int argc, char * argv[])
     orig_lba = lba;
 
     if (ndo > 0) {
-        ref_data = malloc(ndo);
+        ref_data = (char *)malloc(ndo);
         if (NULL == ref_data) {
             fprintf(stderr, "failed to allocate %d byte buffer\n", ndo);
             return SG_LIB_FILE_ERROR;

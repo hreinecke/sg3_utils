@@ -1,3 +1,23 @@
+/* Utility program for the Linux OS SCSI generic ("sg") device driver.
+*  Copyright (C) 2000-2007 D. Gilbert
+*  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2, or (at your option)
+*  any later version.
+
+   This shows the mapping from "sg" devices to other scsi devices
+   (i.e. sd, scd or st) if any.
+
+   Note: This program requires sg version 2 or better.
+
+   Version 0.19 20041203
+
+   Version 1.02 20050511
+        - allow for sparse disk name with up to 3 letter SCSI
+          disk device node names (e.g. /dev/sdaaa)
+          [Nate Dailey < Nate dot Dailey at stratus dot com >]
+*/
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -21,28 +41,8 @@
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
 
-/* Utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2007 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
 
-   This shows the mapping from "sg" devices to other scsi devices
-   (i.e. sd, scd or st) if any.
-
-   Note: This program requires sg version 2 or better.
-
-   Version 0.19 20041203
-
-   Version 1.02 20050511
-        - allow for sparse disk name with up to 3 letter SCSI
-          disk device node names (e.g. /dev/sdaaa)
-          [Nate Dailey < Nate dot Dailey at stratus dot com >]
-*/
-
-
-static char * version_str = "1.08 20070714";
+static const char * version_str = "1.09 20130507";
 
 static const char * devfs_id = "/dev/.devfsd";
 
@@ -114,8 +114,10 @@ static void usage()
     printf("    -sr     show mapping to cdroms (look for /dev/sr<n>\n");
     printf("    -st     show mapping to tapes (st and osst devices)\n");
     printf("    -V      print version string then exit\n");
-    printf("    -x      also show bus,chan,id,lun and type\n");
-    printf("  If no '-s*' arguments given then show all mappings\n");
+    printf("    -x      also show bus,chan,id,lun and type\n\n");
+    printf("If no '-s*' arguments given then show all mappings. This "
+           "utility\nis DEPRECATED, do not use in Linux 2.6 series or "
+           "later.\n");
 }
 
 static int scandir_select(const struct dirent * s)

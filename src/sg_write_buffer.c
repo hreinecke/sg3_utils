@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2013 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static char * version_str = "1.10 20110825";    /* spc4r32 */
+static const char * version_str = "1.10 20130507";    /* spc4r32 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -104,9 +104,9 @@ usage()
 
 
 static struct mode_s {
-        char *mode_string;
+        const char *mode_string;
         int   mode;
-        char *comment;
+        const char *comment;
 } modes[] = {
         { "hd",         MODE_HEADER_DATA, "combined header and data"},
         { "vendor",     MODE_VENDOR,    "vendor specific"},

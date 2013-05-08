@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
 *  represent devices that understand the SCSI command set.
 *
-*  Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
+*  Copyright (C) 1999 - 2013 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -57,7 +57,7 @@
 #include "sg_io_linux.h"
 
 
-static char * version_str = "5.43 20121211";
+static const char * version_str = "5.43 20130507";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

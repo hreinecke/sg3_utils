@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2012 Douglas Gilbert.
+ * Copyright (c) 2009-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,10 +24,11 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI GET LBA STATUS command to the given SCSI device.
+ * This program issues the SCSI GET LBA STATUS command to the given SCSI
+ * device.
  */
 
-static char * version_str = "1.04 20120118";    /* sbc2r29 */
+static const char * version_str = "1.05 20130507";    /* sbc2r29 */
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24

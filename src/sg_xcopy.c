@@ -61,7 +61,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static char * version_str = "0.33 20130207";
+static const char * version_str = "0.34 20130507";
 
 #define ME "sg_xcopy: "
 
@@ -466,6 +466,7 @@ usage()
            "[id_usage=hold|discard|disable]\n"
            "                 [list_id=ID] [prio=PRIO] [time=0|1] "
            "[verbose=VERB]\n"
+           "                 [--on_dst|--on_src] [--verbose]\n"
            "  where:\n"
            "    bpt         is blocks_per_transfer (default is 128 or 32 "
            "when BS>=2048)\n"
@@ -500,9 +501,14 @@ usage()
            "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
            "etc\n"
            "    --help      print out this usage message then exit\n"
+           "    --on_dst    send XCOPY command to the output file/device\n"
+           "    --on_src    send XCOPY command to the input file/device.\n"
+           "                Default if this and --on_dst options not "
+           "given\n"
+           "    --verbose   same action as verbose=1\n"
            "    --version   print version information then exit\n\n"
-           "copy from IFILE to OFILE, similar to dd command; "
-           "but using the SCSI\nEXTENDED COPY command\n");
+           "Copy from IFILE to OFILE, similar to dd command; "
+           "but using the SCSI\nEXTENDED COPY (XCOPY) command.\n");
 }
 
 static int
@@ -1371,7 +1377,7 @@ main(int argc, char * argv[])
     int blocks = 0;
     int num_xcopy = 0;
     int res, k;
-    int infd, outfd;
+    int infd, outfd, xcopy_fd;
     int ret = 0;
     unsigned char list_id = 1;
     int list_id_given = 0;
@@ -1380,6 +1386,8 @@ main(int argc, char * argv[])
     int src_desc_len;
     int dst_desc_len;
     int seg_desc_type;
+    int on_src = 0;
+    int on_dst = 0;
 
     ifp.fname[0] = '\0';
     ofp.fname[0] = '\0';
@@ -1513,6 +1521,10 @@ main(int argc, char * argv[])
             do_time = sg_get_num(buf);
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
+        else if (0 == strncmp(key, "--on_src", 8))
+            on_src = 1;
+        else if (0 == strncmp(key, "--on_dst", 8))
+            on_dst = 1;
         else if ((0 == strncmp(key, "--help", 7)) ||
                  (0 == strncmp(key, "-h", 2)) ||
                    (0 == strcmp(key, "-?"))) {
@@ -1540,6 +1552,14 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+    if (on_src && on_dst) {
+        fprintf(stderr, "Syntax error - either specify --on_src OR "
+                "--on_dst\n");
+        fprintf(stderr, "For more information use '--help'\n");
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if (!on_src && !on_dst)
+        on_src = 1;
     if ((ibs && blk_sz && (ibs != blk_sz)) ||
         (obs && blk_sz && (obs != blk_sz))) {
         fprintf(stderr, "If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -1573,9 +1593,9 @@ main(int argc, char * argv[])
     }
 
 #ifdef SG_DEBUG
-    fprintf(stderr, ME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64
-            " count=%" PRId64 "\n", ifp.fname, skip, ofp.fname, seek,
-            dd_count);
+    fprintf(stderr, ME "%s if=%s skip=%" PRId64 " of=%s seek=%" PRId64
+            " count=%" PRId64 "\n", (on_src)?"on-source":"on-destination",
+            ifp.fname, skip, ofp.fname, seek, dd_count);
 #endif
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
@@ -1822,12 +1842,13 @@ main(int argc, char * argv[])
             "lba_in=%"PRId64", lba_out=%"PRId64"\n",
             dd_count, bpt, skip, seek);
 #endif
+    xcopy_fd = (on_src) ? infd : outfd;
     while (dd_count > 0) {
         if (dd_count > bpt)
             blocks = bpt;
         else
             blocks = dd_count;
-        res = scsi_extended_copy(infd, list_id, src_desc, src_desc_len,
+        res = scsi_extended_copy(xcopy_fd, list_id, src_desc, src_desc_len,
                                  dst_desc, dst_desc_len, seg_desc_type,
                                  blocks, skip, seek);
         if (res != 0)

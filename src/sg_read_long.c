@@ -1,3 +1,17 @@
+/* A utility program for the Linux OS SCSI subsystem.
+   *  Copyright (C) 2004-2013 D. Gilbert
+   *  This program is free software; you can redistribute it and/or modify
+   *  it under the terms of the GNU General Public License as published by
+   *  the Free Software Foundation; either version 2, or (at your option)
+   *  any later version.
+
+   This program issues the SCSI command READ LONG to a given SCSI device.
+   It sends the command with the logical block address passed as the lba
+   argument, and the transfer length set to the xfer_len argument. the
+   buffer to be writen to the device filled with 0xff, this buffer includes
+   the sector data and the ECC bytes.
+*/
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -15,21 +29,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2010 D. Gilbert
-   *  This program is free software; you can redistribute it and/or modify
-   *  it under the terms of the GNU General Public License as published by
-   *  the Free Software Foundation; either version 2, or (at your option)
-   *  any later version.
-
-   This program issues the SCSI command READ LONG to a given SCSI device.
-   It sends the command with the logical block address passed as the lba
-   argument, and the transfer length set to the xfer_len argument. the
-   buffer to be writen to the device filled with 0xff, this buffer includes
-   the sector data and the ECC bytes.
-*/
-
-static char * version_str = "1.18 20101215";
+static const char * version_str = "1.18 20130507";
 
 #define MAX_XFER_LEN 10000
 

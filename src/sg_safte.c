@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2013 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static char * version_str = "0.24 20100312";
+static const char * version_str = "0.24 20130507";
 
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */

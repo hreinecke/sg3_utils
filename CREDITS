@@ -50,6 +50,9 @@ Hayashi Naoyuki <titan at culzean dot org>
 Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example
         programs for the original sg driver
 
+Ilan Steinberg <ilan dot steinberg at kaminario dot com>
+        sg_xcopy: contributed --on_src and --on_dst options [20130505]
+
 Ingo van Lil <inguin at gmx dot de>
         contributed sg_raw [20070331]
 
@@ -116,4 +119,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-7th February 2013
+8th May 2013

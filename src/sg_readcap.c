@@ -29,7 +29,7 @@
 #include "sg_cmds_basic.h"
 
 
-static char * version_str = "3.88 20130228";
+static const char * version_str = "3.88 20130507";
 
 #define ME "sg_readcap: "
 

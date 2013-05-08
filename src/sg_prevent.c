@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2010 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * given SCSI device.
  */
 
-static char * version_str = "1.06 20070919";
+static const char * version_str = "1.06 20130507";
 
 #define ME "sg_prevent: "
 

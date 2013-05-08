@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2012 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2013 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static char * version_str = "1.08 20121211";
+static const char * version_str = "1.09 20130507";
 
 
 static struct option long_options[] = {
@@ -78,9 +78,9 @@ usage()
 #define MODE_ERR_HISTORY        0x1C
 
 static struct mode_s {
-        char *mode_string;
+        const char *mode_string;
         int   mode;
-        char *comment;
+        const char *comment;
 } modes[] = {
         { "hd",         MODE_HEADER_DATA, "combined header and data"},
         { "vendor",     MODE_VENDOR,    "vendor specific"},
