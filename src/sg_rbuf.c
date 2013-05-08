@@ -1,3 +1,16 @@
+/* A utility program originally written for the Linux OS SCSI subsystem.
+ *  Copyright (C) 1999-2013 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ * This program uses the SCSI command READ BUFFER on the given
+ * device, first to find out how big it is and then to read that
+ * buffer (data mode, buffer id 0).
+ */
+
+
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -24,19 +37,6 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2011 D. Gilbert
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- * This program uses the SCSI command READ BUFFER on the given
- * device, first to find out how big it is and then to read that
- * buffer (data mode, buffer id 0).
- */
-
-
 #define RB_MODE_DESC 3
 #define RB_MODE_DATA 2
 #define RB_DESC_LEN 4
@@ -51,7 +51,7 @@
 #endif
 
 
-static char * version_str = "4.89 20110211";
+static const char * version_str = "4.89 20130507";
 
 static struct option long_options[] = {
         {"buffer", 1, 0, 'b'},

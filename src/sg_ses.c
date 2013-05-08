@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static char * version_str = "1.71 20130315";    /* ses3r05 */
+static const char * version_str = "1.71 20130507";    /* ses3r05 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -89,7 +89,7 @@ static char * version_str = "1.71 20130315";    /* ses3r05 */
 
 struct element_type_t {
     int elem_type_code;
-    char * abbrev;      /* non-const so can hook char array for writing */
+    const char * abbrev; 
     const char * desc;
 };
 
@@ -349,10 +349,8 @@ static struct element_type_t element_type_arr[] = {
     {-1, NULL, NULL},
 };
 
-static char abbrev_arr[8];
-
 static struct element_type_t element_type_by_code =
-    {0, abbrev_arr, "element type code form"};
+    {0, NULL, "element type code form"};
 
 /* Many control element names below have "RQST" in front in drafts.
    These are for the Enclosure Control/Status diagnostic page */
@@ -540,6 +538,7 @@ parse_index(struct opts_t *op)
 {
     int n;
     const char * cp;
+    char * mallcp;
     char * c2p;
     const struct element_type_t * etp;
     char b[64];
@@ -604,8 +603,10 @@ parse_index(struct opts_t *op)
             return SG_LIB_SYNTAX_ERROR;
         }
         element_type_by_code.elem_type_code = n;
-        element_type_by_code.abbrev[0] = '_';
-        snprintf(element_type_by_code.abbrev + 1, 6, "%d", n);
+        mallcp = (char *)malloc(8);  /* willfully forget about freeing this */
+        mallcp[0] = '_';
+        snprintf(mallcp + 1, 6, "%d", n);
+        element_type_by_code.abbrev = mallcp;
         if (c2p) {
             n = sg_get_num(c2p + 1);
             if ((n < 0) || (n > 255)) {
@@ -2066,7 +2067,7 @@ sas_addr_non_zero(const unsigned char * ucp)
     return 0;
 }
 
-static char * sas_device_type[] = {
+static const char * sas_device_type[] = {
     "no device attached",
     "end device",
     "expander device",  /* in SAS-1.1 this was a "edge expander device */
@@ -2572,8 +2573,8 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                     return 1;
                 }
                 arr[k] = h;
-                cp = strchr(lcp, ',');
-                c2p = strchr(lcp, ' ');
+                cp = (char *)strchr(lcp, ',');
+                c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
                     cp = c2p;
                 if (NULL == cp)

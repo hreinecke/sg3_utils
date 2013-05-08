@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.41 20130301";
+static const char * version_str = "1.41 20130507";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -992,7 +992,7 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         if (opts.maxlen > DEF_ALLOC_LEN) {
-            malloc_rsp_buff = malloc(opts.maxlen);
+            malloc_rsp_buff = (unsigned char *)malloc(opts.maxlen);
             if (NULL == malloc_rsp_buff) {
                 fprintf(stderr, "Unable to malloc maxlen=%d bytes\n",
                         opts.maxlen);

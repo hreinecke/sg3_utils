@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2012 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2013 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.17 20120820";
+static const char * version_str = "1.17 20130507";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 

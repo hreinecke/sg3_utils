@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.61 20130311";
+static const char * version_str = "1.61 20130507";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -100,7 +100,7 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     case SG_LIB_CAT_RECOVERED:
     case SG_LIB_CAT_MEDIUM_HARD:
         ++check_data_in;
-	/* drop through */
+        /* drop through */
     case SG_LIB_CAT_UNIT_ATTENTION:
     default:
         n = noisy;

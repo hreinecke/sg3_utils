@@ -46,7 +46,7 @@
 
 #define DEF_TIMEOUT 20
 
-static char * version_str = "1.06 20130402";
+static const char * version_str = "1.06 20130507";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},

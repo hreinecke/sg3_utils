@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "1.01 20130220";
+static const char * version_str = "1.01 20130507";
 
 
 #define ME "sg_write_same: "

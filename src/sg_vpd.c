@@ -30,7 +30,7 @@
 
 */
 
-static char * version_str = "0.66 20130301";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.66 20130507";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 extern void svpd_enumerate_vendor(void);

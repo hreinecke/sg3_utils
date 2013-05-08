@@ -31,7 +31,7 @@
 #include "sg_cmds_basic.h"
 
 
-static char * version_str = "0.59 20130228";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.59 20130507";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},

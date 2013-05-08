@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static char * version_str = "1.37 20121211 shared_mmap";
+static const char * version_str = "1.37 20130507 shared_mmap";
 #else
-static char * version_str = "1.37 20121211";
+static const char * version_str = "1.37 20130507";
 #endif
 
 #define DEF_BLOCK_SIZE 512

@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.09 20130401";    /* spc4r35 + sbc3r30 */
+static const char * version_str = "1.10 20130507";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2696,7 +2696,7 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
-    char * cp;
+    const char * cp;
     char str[PCB_STR_LEN];
 
     printf("Logical block provisioning page (sbc-3) [0xc]\n");
@@ -3441,7 +3441,7 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-static char * tape_alert_strs[] = {
+static const char * tape_alert_strs[] = {
     "<parameter code 0, unknown>",              /* 0x0 */
     "Read warning",
     "Write warning",

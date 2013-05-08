@@ -25,7 +25,7 @@
 #include "sg_cmds_basic.h"
 
 
-static char * version_str = "1.06 20070714";
+static const char * version_str = "1.06 20130507";
 
 unsigned char mode6_hdr[] = {
     75, /* Length */

@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2012 D. Gilbert
+ *  Copyright (C) 2004-2013 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static char * version_str = "0.38 20120224";
+static const char * version_str = "0.38 20130507";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -932,8 +932,8 @@ build_transportid(const char * inp, struct opts_t * optsp)
                     return 1;
                 }
                 tid_arr[k] = h;
-                cp = strchr(lcp, ',');
-                c2p = strchr(lcp, ' ');
+                cp = (char *)strchr(lcp, ',');
+                c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
                     cp = c2p;
                 if (NULL == cp)

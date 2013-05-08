@@ -39,7 +39,7 @@
 #endif
 #include "sg_lib.h"
 
-static char * version_str = "1.09 20130228";
+static const char * version_str = "1.09 20130507";
 
 #define ME "sg_map26: "
 

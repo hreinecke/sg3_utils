@@ -1685,9 +1685,9 @@ sg_get_num(const char * buf)
                 return num * 1073741824;
             return -1;
         case 'X':
-            cp = strchr(buf, 'x');
+            cp = (char *)strchr(buf, 'x');
             if (NULL == cp)
-                cp = strchr(buf, 'X');
+                cp = (char *)strchr(buf, 'X');
             if (cp) {
                 n = sg_get_num(cp + 1);
                 if (-1 != n)
@@ -1712,12 +1712,12 @@ sg_get_num_nomult(const char * buf)
 {
     int res, len, num;
     unsigned int unum;
-    const char * commap;
+    char * commap;
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1;
     len = strlen(buf);
-    commap = strchr(buf + 1, ',');
+    commap = (char *)strchr(buf + 1, ',');
     if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
         res = sscanf(buf + 2, "%x", &unum);
         num = unum;
@@ -1817,9 +1817,9 @@ sg_get_llnum(const char * buf)
                 return num * 1099511627776LL * 1024;
             return -1LL;
         case 'X':
-            cp = strchr(buf, 'x');
+            cp = (char *)strchr(buf, 'x');
             if (NULL == cp)
-                cp = strchr(buf, 'X');
+                cp = (char *)strchr(buf, 'X');
             if (cp) {
                 ll = sg_get_llnum(cp + 1);
                 if (-1LL != ll)
