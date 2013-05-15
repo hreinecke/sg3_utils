@@ -50,14 +50,6 @@ usage()
   echo "Check <device> for manadatory SCSI command support"
 }
 
-if (( $# < 1 ))
-  then
-    usage
-    exit 1
-fi 
-
-# opt=$1
-# echo ${opt##-*}
 
 opt="$1"
 while test ! -z "$opt" -a -z "${opt##-*}"; do
@@ -74,6 +66,12 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   shift
   opt="$1"
 done
+
+if [ $# -lt 1 ]
+  then
+    usage
+    exit 1
+fi 
 
 for command in "sg_inq" "sg_luns" "sg_turs" "sg_requests" "sg_vpd" \
                 "sg_vpd -i" "sg_senddiag -t"

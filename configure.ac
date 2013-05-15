@@ -81,4 +81,4 @@ AC_ARG_ENABLE([scsistrings],
 		  [Disable full SCSI sense strings])],
   [], [AC_DEFINE_UNQUOTED(SG_SCSI_STRINGS, 1, [full SCSI sense strings], )])
 
-AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile)
+AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile scripts/Makefile)

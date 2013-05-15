@@ -2,9 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.36 [20130508] [svn: r494]
-  - sg_vpd: Protocol-specific port information VPD page for
-    SAS SSP, persistent connection (spl3r2)
+Changelog for sg3_utils-1.36 [20130513] [svn: r495]
+  - sg_vpd: Protocol-specific port information VPD page
+    for SAS SSP, persistent connection (spl3r2), power
+    disable (spl3r3)
   - sg_xcopy: handle more descriptor types; handle zero
     maximum segment length; allow list IDs to be disabled;
     improve skip/seek handling; allow xcopy on destination

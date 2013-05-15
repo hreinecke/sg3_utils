@@ -2,7 +2,8 @@
 SUBDIRS = include \
 	  lib \
 	  src \
-	  doc
+	  doc \
+	  scripts
 
 EXTRA_DIST=autogen.sh COVERAGE CREDITS
 

@@ -29,12 +29,6 @@ usage()
   echo "Send SCSI START STOP UNIT command to start each <device>"
 }
 
-if (( $# < 1 ))
-  then
-    usage
-    exit 1
-fi
-
 opt="$1"
 while test ! -z "$opt" -a -z "${opt##-*}"; do
   opt=${opt#-}
@@ -47,6 +41,12 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   shift
   opt="$1"
 done
+
+if [ $# -lt 1 ]
+  then
+    usage
+    exit 1
+fi
 
 for i
 do
