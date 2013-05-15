@@ -58,15 +58,6 @@ usage()
   echo "Check <device> for SCSI to ATA Translation Layer (SATL) support"
 }
 
-if (( $# < 1 ))
-  then
-    usage
-    exit 1
-fi 
-
-# opt=$1
-# echo ${opt##-*}
-
 opt="$1"
 while test ! -z "$opt" -a -z "${opt##-*}"; do
   opt=${opt#-}
@@ -80,6 +71,12 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   shift
   opt="$1"
 done
+
+if [ $# -lt 1 ]
+  then
+    usage
+    exit 1
+fi 
 
 for command in "sg_inq" "sg_vpd" "sg_vpd -p di" "sg_vpd -p ai" "sg_luns" \
                "sg_turs" "sg_requests -s" "sg_senddiag -t" "sg_modes -a" \
