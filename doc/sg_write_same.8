@@ -1,19 +1,24 @@
-.TH SG_WRITE_SAME "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_WRITE_SAME "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
 .B sg_write_same
 [\fI\-\-10\fR] [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-anchor\fR]
-[\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=IF\fR]
-[\fI\-\-lba=LBA\fR] [\fI\-\-lbdata\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-pbdata\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-unmap\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR]
-[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
+[\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-lbdata\fR] [\fI\-\-pbdata\fR] [\fI\-\-num=NUM\fR] [\fI\-\-ndob\fR]
+[\fI\-\-timeout=TO\fR] [\fI\-\-unmap\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR] [\fI\-\-xferlen=LEN\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 Send the SCSI WRITE SAME (10, 16 or 32 byte) command to \fIDEVICE\fR. This
 command writes the given block \fINUM\fR times to consecutive blocks on
 the \fIDEVICE\fR starting at logical block address \fILBA\fR.
+.PP
+SBC\-3 revision 35d introduced a "no data-out buffer" (NDOB) bit which, if
+set, bypasses the requirement to send a single block of data to the
+\fIDEVICE\fR together with the command. Only WRITE SAME (16 and 32 byte)
+support the NDOB bit.
 .PP
 The length of the block to be written multiple times is obtained from either
 the \fILEN\fR argument, or the length of the given input file \fIIF\fR,
@@ -104,6 +109,11 @@ trailing 'h'.
 .TP
 \fB\-L\fR, \fB\-\-lbdata\fR
 sets the LBDATA bit in the WRITE SAME cdb.
+.TP
+\fB\-N\fR, \fB\-\-ndob\fR
+sets the NDOB bit in the WRITE SAME (16 and 32 byte) commands. Default is to
+clear this bit. When this option is given then \fI\-\-in=IF\fR is not allowed
+and \fI\-\-xferlen=LEN\fR can only be given if \fILEN\fR is 0 .
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write the

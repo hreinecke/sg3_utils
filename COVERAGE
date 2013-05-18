@@ -62,6 +62,7 @@ SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
 SET TARGET PORT GROUPS       sg_stpg, ++
 START STOP          sg_start, ++
 SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
+SYNCHRONIZE CACHE(16)   sg_sync++
 TEST UNIT READY     sg_turs, sg_format, ++
 UNMAP               sg_unmap, ++
 VERIFY(10)          sg_verify, ++
@@ -100,4 +101,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Douglas Gilbert
-1st March 2013
+16th May 2013

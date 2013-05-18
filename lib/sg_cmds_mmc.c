@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2010 Douglas Gilbert.
+ * Copyright (c) 2008-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -22,7 +22,7 @@
 #endif
 
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 #define DEF_PT_TIMEOUT 60       /* 60 seconds */
 

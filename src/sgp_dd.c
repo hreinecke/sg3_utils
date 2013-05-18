@@ -69,7 +69,7 @@ static const char * version_str = "5.43 20130507";
 
 /* #define SG_DEBUG */
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
 

@@ -61,7 +61,7 @@ static const char * version_str = "1.19 20121211";
 #define SG_FLAG_MMAP_IO 4
 #endif
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 40000       /* 40,000 millisecs == 40 seconds */
 
 #ifndef RAW_MAJOR

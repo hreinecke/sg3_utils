@@ -371,7 +371,7 @@ struct scsi_cmnd_io
     size_t dxfer_len;           /* bytes to be transferred to/from dxferp */
 };
 
-#define SENSE_BUFF_LEN   32
+#define SENSE_BUFF_LEN   64
 #define CMD_TIMEOUT   60000 /* 60,000 milliseconds (60 seconds) */
 #define EBUFF_SZ   256
 

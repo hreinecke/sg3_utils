@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.10 20130507";    /* spc4r35 + sbc3r30 */
+static const char * version_str = "1.11 20130517";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -904,7 +904,7 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
         outp[0] = '\0';
 }
 
-/* BUFF_OVER_UNDER_LPAGE, 0x1 */
+/* BUFF_OVER_UNDER_LPAGE [0x1] */
 static void
 show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -971,7 +971,7 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 }
 
 /* WRITE_ERR_LPAGE; READ_ERR_LPAGE; READ_REV_ERR_LPAGE; VERIFY_ERR_LPAGE */
-/* 0x2, 0x3, 0x4, 0x5 */
+/* [0x2, 0x3, 0x4, 0x5] */
 static void
 show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1039,7 +1039,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* NON_MEDIUM_LPAGE, 0x6 */
+/* NON_MEDIUM_LPAGE [0x6] */
 static void
 show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1089,7 +1089,7 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* PCT_LPAGE, 0x1a */
+/* PCT_LPAGE [0x1a] */
 static void
 show_power_condition_transitions_page(unsigned char * resp, int len,
                                       int show_pcb)
@@ -1368,7 +1368,7 @@ skip_para:
     }
 }
 
-/* LAST_N_ERR_LPAGE, 0x7 */
+/* LAST_N_ERR_LPAGE [0x7] */
 static void
 show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1410,7 +1410,7 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LAST_N_DEFERRED_LPAGE, 0xb */
+/* LAST_N_DEFERRED_LPAGE [0xb] */
 static void
 show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1460,7 +1460,7 @@ static const char * self_test_result[] = {
     "reserved",
     "self test in progress"};
 
-/* SELF_TEST_LPAGE, 0x10 */
+/* SELF_TEST_LPAGE [0x10] */
 static void
 show_self_test_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1507,7 +1507,7 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* TEMPERATURE_LPAGE, 0xd */
+/* TEMPERATURE_LPAGE [0xd] */
 static void
 show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
                       int show_unknown)
@@ -1560,7 +1560,7 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
     }
 }
 
-/* START_STOP_LPAGE, 0xe */
+/* START_STOP_LPAGE [0xe] */
 static void
 show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
 {
@@ -1658,7 +1658,7 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
     }
 }
 
-/* IE_LPAGE, 0x2f */
+/* IE_LPAGE [0x2f] */
 static void
 show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 {
@@ -2063,7 +2063,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
     }
 }
 
-/* PROTO_SPECIFIC_LPAGE, 0x18 */
+/* PROTO_SPECIFIC_LPAGE [0x18] */
 static int
 show_protocol_specific_page(unsigned char * resp, int len,
                             const struct opts_t * optsp)
@@ -2088,7 +2088,7 @@ show_protocol_specific_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
-/* STATS_LPAGE, 0x0 to 0x1f */
+/* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f */
 static int
 show_stats_perform_page(unsigned char * resp, int len,
                         const struct opts_t * optsp)
@@ -2415,7 +2415,7 @@ show_stats_perform_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
-/* STATS_LPAGE [0x16], CACHE_STATS_SUBPG [0x18, 0x20] */
+/* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20] */
 static int
 show_cache_stats_page(unsigned char * resp, int len,
                       const struct opts_t * optsp)
@@ -2548,7 +2548,7 @@ show_cache_stats_page(unsigned char * resp, int len,
     return 1;
 }
 
-/* FORMAT_STATUS_LPAGE, 0x8 */
+/* FORMAT_STATUS_LPAGE [0x8] */
 static void
 show_format_status_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2618,7 +2618,7 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* 0x17 */
+/* Non-volatile cache page [0x17] */
 static void
 show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2690,7 +2690,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LB_PROV_LPAGE, 0xc */
+/* LB_PROV_LPAGE [0xc] */
 static void
 show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2764,7 +2764,7 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* SOLID_STATE_MEDIA_LPAGE, 0x11 */
+/* SOLID_STATE_MEDIA_LPAGE [0x11] */
 static void
 show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2804,7 +2804,7 @@ show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* SAT_ATA_RESULTS_LPAGE (SAT-2), 0x16 */
+/* SAT_ATA_RESULTS_LPAGE (SAT-2) [0x16] */
 static void
 show_ata_pt_results_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2859,6 +2859,8 @@ static const char * bms_status[] = {
     "background scan halted due to temperature out of range",
     "background scan enabled, none active (waiting for BMS interval timer "
         "to expire)", /* 8 */
+    "background scan halted - scan results list full",
+    "background scan halted - pre-scan time limit timer expired" /* 10 */,
 };
 
 static const char * reassign_status[] = {
@@ -2873,7 +2875,7 @@ static const char * reassign_status[] = {
     "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
-/* 0x15 for disk */
+/* Background scan results [0x15] for disk */
 static void
 show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
                                   int verbose)
@@ -2984,7 +2986,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
-/* 0xc for tape */
+/* Sequential access device page [0xc] for tape */
 static void
 show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
                             int verbose)
@@ -3505,7 +3507,7 @@ static const char * tape_alert_strs[] = {
     "WORM medium - overwrite attempted",
 };
 
-/* TAPE_ALERT_LPAGE, 0x2e */
+/* TAPE_ALERT_LPAGE [0x2e] */
 static void
 show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
                          const struct opts_t * optsp)

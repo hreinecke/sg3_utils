@@ -1,4 +1,4 @@
-.TH SG_READCAP "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_READCAP "8" "May 2012" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_readcap \- send SCSI READ CAPACITY command
 .SH SYNOPSIS
@@ -46,6 +46,10 @@ on the old command line syntax outlines the second group of options.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+.TP
+\fB\-\-16\fR
+Use the 16 byte cdb variant of the READ CAPACITY command. See the '\-\-long'
+option.
 \fB\-b\fR, \fB\-\-brief\fR
 outputs two hex numbers (prefixed with '0x' and space separated)
 to stdout. The first number is the maximum number of blocks on the
@@ -73,11 +77,7 @@ Use the 16 byte cdb variant of the READ CAPACITY command. The default
 action is to use the 10 byte cdb variant which limits the maximum
 block address to (2**32 \- 2). When a 10 byte cdb READ CAPACITY command
 is used on a device whose size is too large then a last block address
-of 0xffffffff is returned (if the device complies with SBC\-2).
-.TP
-\fB\-\-16\fR
-Use the 16 byte cdb variant of the READ CAPACITY command. See the '\-\-long'
-option.
+of 0xffffffff is returned (if the device complies with SBC\-2 or later).
 .TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
@@ -157,7 +157,7 @@ outputs version string then exits.
 .SH AUTHORS
 Written by Douglas Gilbert
 .SH COPYRIGHT
-Copyright \(co 1999\-2012 Douglas Gilbert
+Copyright \(co 1999\-2013 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
