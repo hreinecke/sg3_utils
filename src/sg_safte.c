@@ -29,7 +29,7 @@
 static const char * version_str = "0.24 20130507";
 
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 #define EBUFF_SZ 256
 

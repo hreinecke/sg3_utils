@@ -1,4 +1,4 @@
-.TH "COMPARE AND WRITE" "8" "January 2013" "sg3_utils\-1.35" SG3_UTILS
+.TH "COMPARE AND WRITE" "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 .SH SYNOPSIS
@@ -27,6 +27,9 @@ determine the block size. If not specified, the transfer size will be the
 In case of a mismatch between the blocks read from \fIDEVICE\fR and the verify
 instance in the data buffer, a check condition will be returned with sense key
 set to miscompare.
+.PP
+This command is defined in SBC\-3 whose most recent revision is 35d. SBC\-3
+and other SCSI documents can be found at http://www.t10.org .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long option name.
@@ -38,7 +41,8 @@ Set the DPO bit in the COMPARE AND WRITE CDB
 Set the FUA bit in the COMPARE AND WRITE CDB
 .TP
 \fB\-F\fR, \fB\-\-fua_nv\fR
-Set the FUA_NV bit in the COMPARE AND WRITE CDB
+Set the FUA_NV bit in the COMPARE AND WRITE CDB. This bit was removed in
+SBC\-3 revision 35d and its position marked as "reserved".
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -108,7 +112,7 @@ specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+DISCLAIMED. IN NO EVENT SHALL Kaminario Technologies LTD BE LIABLE FOR ANY
 DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
 (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND

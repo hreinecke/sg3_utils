@@ -48,7 +48,7 @@
 *
 */
 
-static const char * version_str = "1.03 20130507";
+static const char * version_str = "1.04 20130516";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -58,7 +58,7 @@ static const char * version_str = "1.03 20130507";
 #define COMPARE_AND_WRITE_OPCODE (0x89)
 #define COMPARE_AND_WRITE_CDB_SIZE (16)
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 #define ME "sg_compare_and_write: "
 

@@ -1,21 +1,18 @@
-.TH SG_SYNC "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_SYNC "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_sync \- send SCSI SYNCHRONIZE CACHE command
 .SH SYNOPSIS
 .B sg_sync
-[\fI\-\-count=COUNT\fR] [\fI\-\-group=GN\fR] [\fI\-\-help\fR]
-[\fI\-\-immed\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-sync\-nv\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-16\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-group=GN\fR]
+[\fI\-\-help\fR] [\fI\-\-immed\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-sync\-nv\fR]
+[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send SYNCHRONIZE CACHE (10) command to \fIDEVICE\fR. This command is
-defined for SCSI block devices (see SBC\-2). If successful this command
-makes sure that any blocks whose latest versions are held in (volatile)
-cache are written to (also termed as "synchronized with") the medium. If
-the \fI\-\-sync\-nv\fR option is given and the device has a non\-volatile
-cache then any blocks whose latest versions are held in volatile cache are
-written to non\-volatile cache.
+Send SYNCHRONIZE CACHE(10) or SYNCHRONIZE CACHE(16) command to \fIDEVICE\fR.
+These commands are defined for SCSI block devices (see SBC\-3). If successful
+these commands make sure that any blocks whose latest versions are held in
+cache are written to (also termed as "synchronized with") the medium.
 .PP
 If the \fILBA\fR and \fICOUNT\fR arguments are both zero (their defaults)
 then all blocks in the cache are synchronized. If \fILBA\fR is greater than
@@ -27,11 +24,14 @@ the cache whose addresses lie in the range \fILBA\fR to
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-S\fR, \fB\-\-16\fR
+performs a SYNCHRONIZE CACHE(16) command. Default is to perform a
+SYNCHRONIZE CACHE(10) command.
+.TP
 \fB\-c\fR, \fB\-\-count\fR=\fICOUNT\fR
 where \fICOUNT\fR is the number of blocks to synchronize from and including
-\fILBA\fR. Default value is 0. When 0 then all blocks in the (volatile) cache
-from and including \fILBA\fR argument to the highest block address are
-synchronized.
+\fILBA\fR. Default value is 0. When 0 then all blocks in the cache from and
+including \fILBA\fR argument to the highest block address are synchronized.
 .TP
 \fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
 where \fIGN\fR is the group number which can be between 0 and 31 inclusive.
@@ -45,19 +45,27 @@ output the usage message then exit.
 \fB\-i\fR, \fB\-\-immed\fR
 sets the IMMED bit in the SYNCHRONIZE CACHE command. This instructs the
 device, if the format of the command is acceptable, to return a GOOD
-status immediately rather than wait for the blocks in the (volatile)
-cache to be synchronized with (i.e. written to) the medium (or the
-non\-volatile cache).
+status immediately rather than wait for the blocks in the cache to be
+synchronized with (i.e. written to) the medium.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
-where \fILBA\fR is the lowest logical block address in the (volatile)
-cache to synchronize to the medium (or the non\-volatile cache). Default
-value is 0 .
+where \fILBA\fR is the lowest logical block address in the cache to
+synchronize to the medium. Default value is 0 .
 .TP
-\fB\-s\fR, \fB\-\-sync-nv\fR
+\fB\-s\fR, \fB\-\-sync\-nv\fR
 synchronize the (volatile) cache with the non\-volatile cache. Without this
 option (or if there is no non\-volatile cache in the device) the
-synchronization is with the medium.
+synchronization is with the medium. The SYNC_NV bit was made obsolete in
+SBC\-3 revsion 35d.
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fISECS\fR
+where \fISECS\fR is the number of seconds the OS allows the SYNCHRONIZE
+CACHE(16) to complete before it tries to cancel the command. Cancelling
+commands (typically with the task management function "abort task") is
+best avoided. Note this option is only active together with the \fI\-\-16\fR
+option. The default timeout is 60 seconds for both SYNCHRONIZE CACHE(10)
+and SYNCHRONIZE CACHE(16). Note that timeout issues can be avoided with
+the \fI\-\-immed\fR option.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -65,6 +73,11 @@ increase the level of verbosity, (i.e. debug output).
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
 .SH NOTES
+With the SYNCHRONIZE CACHE(16) command \fILBA\fR can be up to 64 bits
+in size and \fICOUNT\fR up to 32 bits in size. With the SYNCHRONIZ
+CACHE(10) command \fILBA\fR can be up to 32 bits in size and \fICOUNT\fR
+up to 16 bits in size.
+.PP
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
@@ -76,7 +89,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Douglas Gilbert
+Copyright \(co 2004\-2013 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

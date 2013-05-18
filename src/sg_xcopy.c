@@ -80,7 +80,7 @@ static const char * version_str = "0.34 20130507";
 #define CACHING_MP 8
 #define CONTROL_MP 0xa
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
 
