@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.36 [20130517] [svn: r496]
+Changelog for sg3_utils-1.36 [20130531] [svn: r497]
   - sg_vpd: Protocol-specific port information VPD page
     for SAS SSP, persistent connection (spl3r2), power
     disable (spl3r3)
@@ -12,13 +12,12 @@ Changelog for sg3_utils-1.36 [20130517] [svn: r496]
     improve skip/seek handling; allow xcopy on destination
   - sg_reset: and --no-esc option to stop reset escalation
     - clean up cli, add long option names
-  - sg_luns: add --test=LUNHEX option for decoding LUNs
+  - sg_luns: add --test=ALUN option for decoding LUNs
     - decoded luns output in decimal or hex (if -HH given)
-    - can map between T10 and Linux LUN representations
     - add '--linux' option to show Linux LUN after T10
-      representation
-  - sg_inq: add --vendor option to show vendor specific
-    fields in ASCII
+      representation, can map one to the other
+  - sg_inq: add --vendor option to show standard inquiry's
+    vendor specific fields in ASCII
     - take resid into account with response output
   - sg_sync: add --16 (for 16 byte command) and --timeout=
   - sg_logs: add data compression page (ssc4)

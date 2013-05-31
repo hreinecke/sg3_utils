@@ -25,7 +25,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.23 20130507";
+static const char * version_str = "1.23 20130530";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -257,7 +257,7 @@ main(int argc, char * argv[])
             } else
                 printf("Progress indication: %d.%02d%% done\n",
                        (progress * 100) / 65536,
-                       ((progress * 100) % 65536) / 655);
+                       ((progress * 100) % 65536) / 656);
         }
         goto finish;
     }

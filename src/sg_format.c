@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.22 20130507";
+static const char * version_str = "1.23 20130530";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -55,9 +55,9 @@ static const char * version_str = "1.22 20130507";
 
 #define THIS_MPAGE_EXISTS RW_ERROR_RECOVERY_PAGE
 
-#define SHORT_TIMEOUT           20   /* 20 seconds unless immed=0 ... */
-#define FORMAT_TIMEOUT          (15 * 3600)       /* 15 hours ! */
-                        /* Seagate ST32000444SS 2TB disk takes 9.5 hours */
+#define SHORT_TIMEOUT           20   /* 20 seconds unless --wait given */
+#define FORMAT_TIMEOUT          (20 * 3600)       /* 20 hours ! */
+/* Seagate ST32000444SS 2TB disk takes 9.5 hours, now there are 4TB disks */
 
 #define POLL_DURATION_SECS 60
 #define DEF_POLL_TYPE 0
@@ -255,7 +255,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                                              1, verb);
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
-                                rem = ((progress * 100) % 65536) / 655;
+                                rem = ((progress * 100) % 65536) / 656;
                                 printf("Format in progress, %d.%02d%% done\n",
                                        pr, rem);
                         } else
@@ -283,7 +283,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                                   &progress);
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
-                                rem = ((progress * 100) % 65536) / 655;
+                                rem = ((progress * 100) % 65536) / 656;
                                 printf("Format in progress, %d.%02d%% done\n",
                                        pr, rem);
                         } else
@@ -333,7 +333,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
             } else
                 printf("Progress indication: %d.%02d%% done\n",
                        (progress * 100) / 65536,
-                       ((progress * 100) % 65536) / 655);
+                       ((progress * 100) % 65536) / 656);
         }
 #endif
         printf("FORMAT Complete\n");

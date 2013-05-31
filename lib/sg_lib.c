@@ -343,9 +343,10 @@ sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
 /* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
  * returns 1 if progress indication sense data descriptor found. Places
  * progress field from sense data where progress_outp points. If progress
- * field is not available returns 0. Handles both fixed and descriptor
- * sense formats. N.B. App should multiply by 100 and divide by 65536
- * to get percentage completion from given value. */
+ * field is not available returns 0 and *progress_outp is unaltered. Handles
+ * both fixed and descriptor sense formats.
+ * Hint: if 1 is returned *progress_outp may be multiplied by 100 then
+ * divided by 65536 to get the percentage completion. */
 int
 sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
                           int * progress_outp)
@@ -588,7 +589,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 }
                 progress = (descp[5] << 8) + descp[6];
                 pr = (progress * 100) / 65536;
-                rem = ((progress * 100) % 65536) / 655;
+                rem = ((progress * 100) % 65536) / 656;
                 n += my_snprintf(b + n, blen - n, "%d.%02d%%\n", pr, rem);
                 break;
             case SPC_SK_COPY_ABORTED:
@@ -711,7 +712,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             }
             progress = (descp[6] << 8) + descp[7];
             pr = (progress * 100) / 65536;
-            rem = ((progress * 100) % 65536) / 655;
+            rem = ((progress * 100) % 65536) / 656;
             n += my_snprintf(b + n, blen - n, "    %d.02%d%%", pr, rem);
             n += my_snprintf(b + n, blen - n, " [sense_key=0x%x "
                              "asc,ascq=0x%x,0x%x]\n",
@@ -945,7 +946,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 case SPC_SK_NOT_READY:
                     progress = (sense_buffer[16] << 8) + sense_buffer[17];
                     pr = (progress * 100) / 65536;
-                    rem = ((progress * 100) % 65536) / 655;
+                    rem = ((progress * 100) % 65536) / 656;
                     r += my_snprintf(b + r, blen - r, "  Progress "
                                      "indication: %d.%02d%%\n", pr, rem);
                     break;
