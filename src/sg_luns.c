@@ -28,12 +28,11 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.21 20130507";
+static const char * version_str = "1.22 20130528";
 
-#define MAX_RLUNS_BUFF_LEN (1024 * 64)
+#define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
 
-static unsigned char reportLunsBuff[MAX_RLUNS_BUFF_LEN];
 
 
 static struct option long_options[] = {
@@ -73,7 +72,7 @@ usage()
 #endif
     fprintf(stderr,
             "     or\n"
-            "       sg_luns    --test=LUNHEX [--hex] [--verbose]\n"
+            "       sg_luns    --test=ALUN [--hex] [--verbose]\n"
             "  where:\n"
             "    --decode|-d        decode all luns into component parts\n"
             "    --help|-h          print out usage message\n"
@@ -97,13 +96,13 @@ usage()
             "                          1 -> only 'well known' "
             "logical unit numbers\n"
             "                          2 -> all luns\n"
-            "    --test=LUNHEX|-t LUNHEX    decode LUNHEX and ignore "
-            "other options\n"
-            "                               and DEVICE (apart from '-H')\n"
+            "    --test=ALUN|-t ALUN    decode ALUN and ignore most other "
+            "options\n"
+            "                           and DEVICE (apart from '-H')\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
-            "Performs a SCSI REPORT LUNS command. When the --test=LUNHEX "
-            "option is\ngiven, decodes LUNHEX rather than sending a "
+            "Performs a SCSI REPORT LUNS command. When the --test=ALUN "
+            "option is\ngiven, decodes ALUN rather than sending a "
             "REPORT LUNS command.\n", DEF_RLUNS_BUFF_LEN );
 }
 
@@ -354,6 +353,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     const char * cp;
     unsigned char lun_arr[8];
+    unsigned char * reportLunsBuff = NULL;
     int ret = 0;
 
     while (1) {
@@ -525,8 +525,7 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (0 == maxlen)
-        maxlen = DEF_RLUNS_BUFF_LEN;
+
     if (do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
@@ -541,7 +540,13 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    memset(reportLunsBuff, 0x0, maxlen);
+    if (0 == maxlen)
+        maxlen = DEF_RLUNS_BUFF_LEN;
+    reportLunsBuff = (unsigned char *)calloc(1, maxlen);
+    if (NULL == reportLunsBuff) {
+        fprintf(stderr, "unable to malloc %d bytes\n", maxlen);
+        return SG_LIB_CAT_OTHER;
+    }
     trunc = 0;
 
     res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen, 1,
@@ -611,6 +616,8 @@ main(int argc, char * argv[])
     }
 
 the_end:
+    if (reportLunsBuff)
+        free(reportLunsBuff);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));

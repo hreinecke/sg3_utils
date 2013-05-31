@@ -30,7 +30,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "3.29 20130507";
+static const char * version_str = "3.29 20130530";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -313,7 +313,7 @@ int main(int argc, char * argv[])
                 break;
             } else {
                 pr = (progress * 100) / 65536;
-                rem = ((progress * 100) % 65536) / 655;
+                rem = ((progress * 100) % 65536) / 656;
                 printf("Progress indication: %d.%02d%% done\n", pr, rem);
             }
         }
