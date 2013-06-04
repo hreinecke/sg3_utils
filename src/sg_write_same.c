@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.02 20130516";
+static const char * version_str = "1.03 20130603";
 
 
 #define ME "sg_write_same: "
@@ -293,7 +293,7 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 if (valid)
                     fprintf(stderr, "Medium or hardware error starting at "
-                            "lba=%"PRIu64" [0x%"PRIx64"]\n", ull, ull);
+                            "lba=%" PRIu64 " [0x%" PRIx64 "]\n", ull, ull);
             }
             ret = sense_cat;
             break;
