@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.41 20130507";
+static const char * version_str = "1.42 20130604";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -1072,7 +1072,7 @@ main(int argc, char * argv[])
         }
     }
 
-    memset(rsp_buff, 0, sizeof(rsp_buff));
+    memset(rsp_buff, 0, rsp_buff_size);
     if (opts.do_six) {
         res = sg_ll_mode_sense6(sg_fd, opts.do_dbd, opts.page_control,
                                 opts.pg_code, opts.subpg_code, rsp_buff,

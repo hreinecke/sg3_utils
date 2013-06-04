@@ -51,7 +51,7 @@
 #endif
 
 
-static const char * version_str = "4.89 20130507";
+static const char * version_str = "4.90 20130603";
 
 static struct option long_options[] = {
         {"buffer", 1, 0, 'b'},
@@ -608,8 +608,8 @@ main(int argc, char * argv[])
     }
     if (dio_incomplete)
         printf(">> direct IO requested but not done\n");
-    printf("Read %"PRId64" MiB (actual: %"PRId64" bytes), buffer size=%d KiB "
-           "(%d bytes)\n", (total_size / (1024 * 1024)),
+    printf("Read %" PRId64 " MiB (actual: %" PRId64 " bytes), buffer "
+           "size=%d KiB (%d bytes)\n", (total_size / (1024 * 1024)),
            (int64_t)num * buf_size, buf_size / 1024, buf_size);
 
     if (rawp) free(rawp);

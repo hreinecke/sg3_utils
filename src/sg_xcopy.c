@@ -61,7 +61,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.34 20130507";
+static const char * version_str = "0.35 20130603";
 
 #define ME "sg_xcopy: "
 
@@ -189,10 +189,10 @@ static void
 print_stats(const char * str)
 {
     if (0 != dd_count)
-        fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
-    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial,
-            in_partial);
-    fprintf(stderr, "%s%"PRId64"+%d records out\n", str,
+        fprintf(stderr, "  remaining block count=%" PRId64 "\n", dd_count);
+    fprintf(stderr, "%s%" PRId64 "+%d records in\n", str,
+            in_full - in_partial, in_partial);
+    fprintf(stderr, "%s%" PRId64 "+%d records out\n", str,
             out_full - out_partial, out_partial);
 #if 0
     if (recovered_errs > 0)
@@ -623,9 +623,9 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
                        (rcBuff[6] << 8) | rcBuff[7];
     }
     if (verbose)
-        fprintf(stderr, "    %s: number of blocks=%"PRId64" [0x%"PRIx64"], "
-                "block size=%d\n", xfp->fname, xfp->num_sect, xfp->num_sect,
-                xfp->sect_sz);
+        fprintf(stderr, "    %s: number of blocks=%" PRId64 " [0x%" PRIx64
+                "], block size=%d\n", xfp->fname, xfp->num_sect,
+                xfp->num_sect, xfp->sect_sz);
     return 0;
 }
 
@@ -1655,7 +1655,7 @@ main(int argc, char * argv[])
     }
     if (skip && ifp.num_sect < skip) {
         fprintf(stderr, "argument to 'skip=' exceeds device size "
-                "(max %"PRId64")\n", ifp.num_sect);
+                "(max %" PRId64 ")\n", ifp.num_sect);
         return SG_LIB_SYNTAX_ERROR;
     }
 
@@ -1681,7 +1681,7 @@ main(int argc, char * argv[])
     }
     if (seek && ofp.num_sect < seek) {
         fprintf(stderr, "argument to 'seek=' exceeds device size "
-                "(max %"PRId64")\n", ofp.num_sect);
+                "(max %" PRId64 ")\n", ofp.num_sect);
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((dd_count < 0) || ((verbose > 0) && (0 == dd_count))) {
@@ -1704,12 +1704,12 @@ main(int argc, char * argv[])
 
         if (dd_bytes > ifp.num_sect * ifp.sect_sz) {
             fprintf(stderr, "access beyond end of source device "
-                    "(max %"PRId64")\n", ifp.num_sect);
+                    "(max %" PRId64 ")\n", ifp.num_sect);
             return SG_LIB_SYNTAX_ERROR;
         }
         if (dd_bytes > ofp.num_sect * ofp.sect_sz) {
             fprintf(stderr, "access beyond end of target device "
-                    "(max %"PRId64")\n", ofp.num_sect);
+                    "(max %" PRId64 ")\n", ofp.num_sect);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -1838,8 +1838,8 @@ main(int argc, char * argv[])
 
 #ifdef SG_DEBUG
     fprintf(stderr,
-            "Start of loop, count=%"PRId64", bpt=%d, "
-            "lba_in=%"PRId64", lba_out=%"PRId64"\n",
+            "Start of loop, count=%" PRId64 ", bpt=%d, "
+            "lba_in=%" PRId64 ", lba_out=%" PRId64 "\n",
             dd_count, bpt, skip, seek);
 #endif
     xcopy_fd = (on_src) ? infd : outfd;
@@ -1862,10 +1862,10 @@ main(int argc, char * argv[])
     if (do_time)
         calc_duration_throughput(0);
     if (res)
-        fprintf(stderr, "sg_xcopy: failed with error %d (%"PRId64
+        fprintf(stderr, "sg_xcopy: failed with error %d (%" PRId64
                 " blocks left)\n", res, dd_count);
     else
-        fprintf(stderr, "sg_xcopy: %"PRId64" blocks, %d command%s\n",
+        fprintf(stderr, "sg_xcopy: %" PRId64 " blocks, %d command%s\n",
                 in_full, num_xcopy, ((num_xcopy > 1) ? "s" : ""));
 
     return res;

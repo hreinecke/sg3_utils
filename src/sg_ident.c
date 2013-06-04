@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2011 Douglas Gilbert.
+ * Copyright (c) 2005-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.10 20130507";
+static const char * version_str = "1.11 20130603";
 
 #define ME "sg_ident: "
 
@@ -49,10 +49,12 @@ static struct option long_options[] = {
 static void decode_ii(const unsigned char * iip, int ii_len, int itype,
                       int ascii, int raw, int verbose)
 {
-    int k, n;
+    int k;
 
     if (raw) {
         if (ii_len > 0) {
+            int n;
+
             if (sg_set_binary_mode(STDOUT_FILENO) < 0)
                 perror("sg_set_binary_mode");
 #if 0
@@ -60,8 +62,9 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
 #else
             n = write(STDOUT_FILENO, iip, ii_len);
 #endif
+            if (verbose && (n < 1))
+                fprintf(stderr, "unable to write to stdout\n");
         }
-        n = n;  /* suppress warning */
         return;
     }
     if (0x7f == itype) {  /* list of available information types */

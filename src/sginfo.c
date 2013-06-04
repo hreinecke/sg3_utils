@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.33 [20130507]";
+static const char * version_str = "2.34 [20130603]";
 
 #include <stdio.h>
 #include <string.h>
@@ -639,14 +639,14 @@ check_parm_type(int i)
 
     if (i == 1 && is_hex[next_parameter] != 1) {
         snprintf(reason, REASON_SZ,
-                 "simple number (pos %i) instead of @ hexdatafield: %"PRIu64,
-                 next_parameter, replacement_values[next_parameter]);
+                 "simple number (pos %i) instead of @ hexdatafield: %"
+                 PRIu64 , next_parameter, replacement_values[next_parameter]);
         usage(reason);
     }
     if (i != 1 && is_hex[next_parameter]) {
         snprintf(reason, REASON_SZ,
-                 "@ hexdatafield (pos %i) instead of a simple number: %"PRIu64,
-                 next_parameter, replacement_values[next_parameter]);
+                 "@ hexdatafield (pos %i) instead of a simple number: %"
+                 PRIu64 , next_parameter, replacement_values[next_parameter]);
         usage(reason);
     }
 }
@@ -1783,7 +1783,7 @@ trytenbyte:
                 }
             case 3:     /* lba (64 bit) */
                 while (len > 0) {
-                    printf("%15"PRId64, getnbyte_ll(df, 8));
+                    printf("%15" PRId64 , getnbyte_ll(df, 8));
                     len -= 8;
                     df += 8;
                     i++;

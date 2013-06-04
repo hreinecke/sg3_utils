@@ -1,23 +1,3 @@
-#define _XOPEN_SOURCE 500
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <string.h>
-#define __STDC_FORMAT_MACROS 1
-#include <inttypes.h>
-#include <getopt.h>
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-#include "sg_lib.h"
-#include "sg_cmds_basic.h"
-#include "sg_pt.h"
-
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
 *
 *  Copyright (c) 2012-2013, Kaminario Technologies LTD
@@ -48,7 +28,27 @@
 *
 */
 
-static const char * version_str = "1.04 20130516";
+#define _XOPEN_SOURCE 500
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+#include <getopt.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#include "sg_lib.h"
+#include "sg_cmds_basic.h"
+#include "sg_pt.h"
+
+static const char * version_str = "1.06 20130604";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -288,7 +288,7 @@ sg_build_scsi_cdb(unsigned char * cdbp, unsigned int blocks,
 {
         memset(cdbp, 0, COMPARE_AND_WRITE_CDB_SIZE);
         cdbp[0] = COMPARE_AND_WRITE_OPCODE;
-        cdbp[1] = (flags.wrprotect && WRPROTECT_MASK) << WRPROTECT_SHIFT;
+        cdbp[1] = (flags.wrprotect & WRPROTECT_MASK) << WRPROTECT_SHIFT;
         if (flags.dpo)
                 cdbp[1] |= FLAG_DPO;
         if (flags.fua)
@@ -321,7 +321,7 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
         int res, ret;
 
         if (sg_build_scsi_cdb(cawCmd, blocks, lba, flags)) {
-                fprintf(stderr, ME "bad cdb build, lba=0x%"PRIx64", "
+                fprintf(stderr, ME "bad cdb build, lba=0x%" PRIx64 ", "
                         "blocks=%d\n", lba, blocks);
                 return -1;
         }
@@ -375,8 +375,8 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                                 if (valid)
                                         fprintf(stderr, "Medium or hardware "
                                                 "error starting at lba=%"
-                                                PRIu64" [0x%"PRIx64"]\n", ull,
-                                                ull);
+                                                PRIu64 " [0x%" PRIx64 "]\n",
+                                                ull, ull);
                         }
                         ret = sense_cat;
                         break;

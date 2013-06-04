@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2012 D. Gilbert
+*  Copyright (C) 2001 - 2013 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -48,7 +48,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.19 20121211";
+static const char * version_str = "1.20 20130603";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -105,8 +105,9 @@ static void print_stats(int iters, const char * str)
 {
     if (orig_count > 0) {
         if (0 != dd_count)
-            fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
-        fprintf(stderr, "%"PRId64"+%d records in", in_full - in_partial,
+            fprintf(stderr, "  remaining block count=%" PRId64 "\n",
+                    dd_count);
+        fprintf(stderr, "%" PRId64 "+%d records in", in_full - in_partial,
                 in_partial);
         if (iters > 0)
             fprintf(stderr, ", %s commands issued: %d\n", (str ? str : ""),
@@ -307,8 +308,8 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, dpo)) {
-        fprintf(stderr, ME "bad cdb build, from_block=%"PRId64", blocks=%d\n",
-                from_block, blocks);
+        fprintf(stderr, ME "bad cdb build, from_block=%" PRId64
+                ", blocks=%d\n", from_block, blocks);
         return -1;
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
@@ -677,7 +678,7 @@ int main(int argc, char * argv[])
     start_tm.tv_usec = 0;
 
     if (verbose && (dd_count < 0))
-        fprintf(stderr, "About to issue %"PRId64" zero block SCSI READs\n",
+        fprintf(stderr, "About to issue %" PRId64 " zero block SCSI READs\n",
                 0 - dd_count);
 
     /* main loop */
@@ -754,7 +755,8 @@ int main(int argc, char * argv[])
                    (EINTR == errno))
                 ;
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%"PRId64" ", skip);
+                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%" PRId64 " ",
+                         skip);
                 perror(ebuff);
                 break;
             } else if (res < blocks * bs) {

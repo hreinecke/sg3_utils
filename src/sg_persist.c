@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.38 20130507";
+static const char * version_str = "0.39 20130604";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -330,17 +330,24 @@ prin_work(int sg_fd, const struct opts_t * optsp)
     res = sg_ll_persistent_reserve_in(sg_fd, optsp->prin_sa, pr_buff,
                                       optsp->alloc_len, 1, optsp->verbose);
     if (res) {
-       if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "PR in: command not supported\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "PR in: bad field in cdb including "
-                    "unsupported service action\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            fprintf(stderr, "PR in: unit attention\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "PR in: aborted command\n");
+        char b[64];
+
+        if (optsp->prin_sa < num_prin_sa_strs)
+            snprintf(b, sizeof(b), "%s", prin_sa_strs[optsp->prin_sa]);
         else
-            fprintf(stderr, "PR in: command failed\n");
+            snprintf(b, sizeof(b), "service action=0x%x", optsp->prin_sa);
+
+       if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "PR in (%s): command not supported\n", b);
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "PR in (%s): bad field in cdb including "
+                    "unsupported service action\n", b);
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "PR in (%s): unit attention\n", b);
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "PR in (%s): aborted command\n", b);
+        else
+            fprintf(stderr, "PR in (%s): command failed\n", b);
         return res;
     }
     if (PRIN_RCAP_SA == optsp->prin_sa) {
@@ -569,7 +576,8 @@ prout_work(int sg_fd, struct opts_t * optsp)
         char buff[64];
 
         if (optsp->prout_sa < num_prout_sa_strs)
-            strncpy(buff, prout_sa_strs[optsp->prout_sa], sizeof(buff));
+            snprintf(buff, sizeof(buff), "%s",
+                     prout_sa_strs[optsp->prout_sa]);
         else
             snprintf(buff, sizeof(buff), "service action=0x%x",
                      optsp->prout_sa);

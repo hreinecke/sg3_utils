@@ -468,7 +468,7 @@ uds_referral_descriptor_str(char * b, int blen, const unsigned char * dp,
                 ull <<= 8;
             ull |= dp[4 + j];
         }
-        n += my_snprintf(b + n, blen - n, "      first uds LBA: 0x%"PRIx64
+        n += my_snprintf(b + n, blen - n, "      first uds LBA: 0x%" PRIx64
                          "\n", ull);
         ull = 0;
         for (j = 0; j < 8; ++j) {
@@ -476,7 +476,7 @@ uds_referral_descriptor_str(char * b, int blen, const unsigned char * dp,
                 ull <<= 8;
             ull |= dp[12 + j];
         }
-        n += my_snprintf(b + n, blen - n, "      last uds LBA:  0x%"PRIx64
+        n += my_snprintf(b + n, blen - n, "      last uds LBA:  0x%" PRIx64
                          "\n", ull);
         for (j = 0; j < tpgd; ++j) {
             tp = dp + 20 + (j * 4);
