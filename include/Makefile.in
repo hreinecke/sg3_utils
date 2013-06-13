@@ -51,6 +51,12 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@OS_LINUX_TRUE@am__append_1 = \
+@OS_LINUX_TRUE@	sg_linux_inc.h \
+@OS_LINUX_TRUE@	sg_io_linux.h
+
+@OS_WIN32_MINGW_TRUE@am__append_2 = sg_pt_win32.h
+@OS_WIN32_CYGWIN_TRUE@am__append_3 = sg_pt_win32.h
 subdir = include
 DIST_COMMON = $(am__noinst_HEADERS_DIST) \
 	$(am__scsiinclude_HEADERS_DIST) $(srcdir)/Makefile.am \
@@ -223,64 +229,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 scsiincludedir = $(includedir)/scsi
-@OS_FREEBSD_TRUE@scsiinclude_HEADERS = \
-@OS_FREEBSD_TRUE@	sg_lib.h \
-@OS_FREEBSD_TRUE@	sg_lib_data.h \
-@OS_FREEBSD_TRUE@	sg_cmds.h \
-@OS_FREEBSD_TRUE@	sg_cmds_basic.h \
-@OS_FREEBSD_TRUE@	sg_cmds_extra.h \
-@OS_FREEBSD_TRUE@	sg_cmds_mmc.h \
-@OS_FREEBSD_TRUE@	sg_pt.h
-
-@OS_LINUX_TRUE@scsiinclude_HEADERS = \
-@OS_LINUX_TRUE@	sg_lib.h \
-@OS_LINUX_TRUE@	sg_lib_data.h \
-@OS_LINUX_TRUE@	sg_cmds.h \
-@OS_LINUX_TRUE@	sg_cmds_basic.h \
-@OS_LINUX_TRUE@	sg_cmds_extra.h \
-@OS_LINUX_TRUE@	sg_cmds_mmc.h \
-@OS_LINUX_TRUE@	sg_pt.h \
-@OS_LINUX_TRUE@	sg_linux_inc.h \
-@OS_LINUX_TRUE@	sg_io_linux.h
-
-@OS_OSF_TRUE@scsiinclude_HEADERS = \
-@OS_OSF_TRUE@	sg_lib.h \
-@OS_OSF_TRUE@	sg_lib_data.h \
-@OS_OSF_TRUE@	sg_cmds.h \
-@OS_OSF_TRUE@	sg_cmds_basic.h \
-@OS_OSF_TRUE@	sg_cmds_extra.h \
-@OS_OSF_TRUE@	sg_cmds_mmc.h \
-@OS_OSF_TRUE@	sg_pt.h
-
-@OS_SOLARIS_TRUE@scsiinclude_HEADERS = \
-@OS_SOLARIS_TRUE@	sg_lib.h \
-@OS_SOLARIS_TRUE@	sg_lib_data.h \
-@OS_SOLARIS_TRUE@	sg_cmds.h \
-@OS_SOLARIS_TRUE@	sg_cmds_basic.h \
-@OS_SOLARIS_TRUE@	sg_cmds_extra.h \
-@OS_SOLARIS_TRUE@	sg_cmds_mmc.h \
-@OS_SOLARIS_TRUE@	sg_pt.h
-
-@OS_WIN32_CYGWIN_TRUE@scsiinclude_HEADERS = \
-@OS_WIN32_CYGWIN_TRUE@	sg_lib.h \
-@OS_WIN32_CYGWIN_TRUE@	sg_lib_data.h \
-@OS_WIN32_CYGWIN_TRUE@	sg_cmds.h \
-@OS_WIN32_CYGWIN_TRUE@	sg_cmds_basic.h \
-@OS_WIN32_CYGWIN_TRUE@	sg_cmds_extra.h \
-@OS_WIN32_CYGWIN_TRUE@	sg_cmds_mmc.h \
-@OS_WIN32_CYGWIN_TRUE@	sg_pt.h \
-@OS_WIN32_CYGWIN_TRUE@	sg_pt_win32.h
-
-@OS_WIN32_MINGW_TRUE@scsiinclude_HEADERS = \
-@OS_WIN32_MINGW_TRUE@	sg_lib.h \
-@OS_WIN32_MINGW_TRUE@	sg_lib_data.h \
-@OS_WIN32_MINGW_TRUE@	sg_cmds.h \
-@OS_WIN32_MINGW_TRUE@	sg_cmds_basic.h \
-@OS_WIN32_MINGW_TRUE@	sg_cmds_extra.h \
-@OS_WIN32_MINGW_TRUE@	sg_cmds_mmc.h \
-@OS_WIN32_MINGW_TRUE@	sg_pt.h \
-@OS_WIN32_MINGW_TRUE@	sg_pt_win32.h
-
+scsiinclude_HEADERS = sg_lib.h sg_lib_data.h sg_cmds.h sg_cmds_basic.h \
+	sg_cmds_extra.h sg_cmds_mmc.h sg_pt.h $(am__append_1) \
+	$(am__append_2) $(am__append_3)
 @OS_FREEBSD_TRUE@noinst_HEADERS = \
 @OS_FREEBSD_TRUE@	sg_linux_inc.h \
 @OS_FREEBSD_TRUE@	sg_io_linux.h \
