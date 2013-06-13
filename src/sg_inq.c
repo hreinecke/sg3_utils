@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.13 20130507";    /* SPC-4 rev 36 */
+static const char * version_str = "1.14 20130613";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -2018,7 +2018,7 @@ decode_b3_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-            if (len < 0xc0) {
+            if (len < 0x10) {
                 fprintf(stderr, "Referrals VPD page length too short=%d\n",
                         len);
                 return;
