@@ -151,6 +151,16 @@ Darwin is not supported because the Apple folks do not want to give their
 users a pass-through SCSI interface. The author has read about creative
 hackers using a VM containing a real OS to circumvent the Apple restriction.
 
+C standard is C99
+==================
+The C code in this package is written for portability rather than speed.
+It assumes a level of C99 compliance and favours POSIX system and library
+calls over OS specific calls.
+
+The C code is written in a C++ friendly way and is checked from time to
+time that it compiles clean with C++. To accomodate C++ certain C99
+constructs such as designated initializers cannot be used.
+
 Building
 ========
 This package is designed to be built with the usual:
@@ -171,10 +181,6 @@ and disable the creation of the shared library (libsgutils<num>.so) this
 invocation could be used: "./configure --prefix=/usr --disable-shared".
 To reduce the size of an executable as well try this:
 "./configure --prefix=/usr --disable-shared --disable-scsistrings".
-
-The C code in this package is written for portability rather than speed.
-It assumes a level of C99 compliance and favours POSIX system and library
-calls over OS specific calls.
 
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
@@ -376,4 +382,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-14th June 2013
+21st June 2013

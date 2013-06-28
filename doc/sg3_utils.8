@@ -73,7 +73,7 @@ been ported to other OSes.
 .SH LINUX DEVICE NAMING
 Normal disk block devices have names like /dev/sda, /dev/sdb,
 /dev/sdc, etc. SCSI disks in Linux have always had names like that but
-in recent Linux kernels (e.g. lk 2.6 series) it is becoming more common 
+in recent Linux kernels (e.g. lk 2.6 series) it is becoming more common
 for almost all disks to be named like that. Partitions within a disk
 are specified by a number appended to the device name, starting at
 1 (e.g. /dev/sda1 ).
@@ -90,7 +90,7 @@ to SCSI devices. It uses names of the form /dev/sg<num> where <num> starts
 at zero. The "lsscsi \-g" command may be useful in finding these and which
 generic name corresponds to a device type name (e.g. /dev/sg2 may
 correspond to /dev/sda). In the lk 2.6 series a block SCSI generic
-driver was introduced and its names are of the form 
+driver was introduced and its names are of the form
 /dev/bsg/<h:c:t:l> where h, c, t and l are numbers. Again see the lsscsi
 command to find the correspondence between that SCSI tuple (i.e. <h:c:t:l>)
 and alternate device names.
@@ -258,6 +258,25 @@ doesn't fit into any of the above categories.
 any errors that can't be categorized into values 1 to 98 may yield
 this value. This includes transport and operating system errors
 after the command has been sent to the device.
+.TP
+.B 126
+the utility was found but could not be executed. That might occur if the
+executable does not have execute permissions.
+.TP
+.B 127
+This is the exit status for utility not found. That might occur when a
+script calls a utility in this package but the PATH environment variable
+has not been properly set up, so the script cannot find the executable.
+.TP
+.B 128 + <signum>
+If a signal kills a utility then the exit status is 128 plus the signal
+number. For example if a segmentation fault occurs then a utility is
+typically killed by SIGSEGV which according to 'man 7 signal' has an
+associated signal number of 11; so the exit status will be 139 .
+.TP
+.B 255
+the utility tried to yield an exit status of 255 or larger. That should
+not happen; given here for completeness.
 .PP
 Most of the error conditions reported above will be repeatable (an
 example of one that is not is "unit attention") so the utility can
@@ -385,7 +404,7 @@ Windows may open a file in text rather than binary mode).
 Some utilities that the author has found useful have been placed in
 the 'utils' subdirectory.
 .SH WEB SITE
-There is a web page discussing this package at 
+There is a web page discussing this package at
 http://sg.danny.cz/sg/sg3_utils.html . The device naming used by this
 package on various operating systems is discussed at:
 http://sg.danny.cz/sg/device_name.html .

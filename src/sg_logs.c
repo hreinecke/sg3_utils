@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.11 20130517";    /* spc4r35 + sbc3r30 */
+static const char * version_str = "1.12 20130621";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -170,7 +170,8 @@ usage()
            "0x18) log page\n"
            "    --verbose|-v    increase verbosity\n"
            "    --version|-V    output version string then exit\n\n"
-           "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
+           "Performs a SCSI LOG SENSE (or LOG SELECT) command and decodes "
+           "the response.\n");
 }
 
 static void
@@ -568,6 +569,28 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
+/* Decode counter up to 8 chars long (big endian) into an uint64_t.
+ * In the unlikely event that the counter is larger than 8 chars long
+ * then take the last 8 chars. */
+static uint64_t
+decode_count(const unsigned char * xp, int len)
+{
+    int j;
+    uint64_t ull;
+
+    if (len > (int)sizeof(ull)) {
+        xp += (len - sizeof(ull));
+        len = sizeof(ull);
+    }
+    ull = 0;
+    for (j = 0; j < len; ++j) {
+        if (j > 0)
+            ull <<= 8;
+        ull |= xp[j];
+    }
+    return ull;
+}
+
 /* Call LOG SENSE twice: the first time ask for 4 byte response to determine
    actual length of response; then a second time requesting the
    min(actual_len, mx_resp_len) bytes. If the calculated length for the
@@ -785,11 +808,9 @@ show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x16:
                 printf("%sTape diagnostic (ssc-3)\n", b);
-                done = 0;
                 break;
             case 0x17:
                 printf("%sVolume statistics (ssc-4)\n", b);
-                done = 0;
                 break;
             case 0x1b:
                 printf("%sData compression (ssc-4)\n", b);
@@ -854,11 +875,9 @@ show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x15:
                 printf("%sService buffers information (adc)\n", b);
-                done = 0;
                 break;
             case 0x16:
                 printf("%sTape diagnostic (adc)\n", b);
-                done = 0;
                 break;
             default:
                 done = 0;
@@ -908,10 +927,8 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
 static void
 show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, num, pl, count_basis, cause, pcb;
+    int num, pl, count_basis, cause, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
-    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Buffer over-run/under-run page\n");
@@ -945,19 +962,7 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
             else
                 printf("under-run");
             printf(", count");
-            k = pl - 4;
-            xp = ucp + 4;
-            if (k > (int)sizeof(ull)) {
-                xp += (k - sizeof(ull));
-                k = sizeof(ull);
-            }
-            ull = 0;
-            for (j = 0; j < k; ++j) {
-                if (j > 0)
-                    ull <<= 8;
-                ull |= xp[j];
-            }
-            printf(" = %" PRIu64 "", ull);
+            printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
         }
         if (show_pcb) {
             pcb = ucp[2];
@@ -975,10 +980,8 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 static void
 show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
-    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     switch(resp[0] & 0x3f) {
@@ -1016,19 +1019,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
         case 0x8015: printf("  Positioning errors [Hitachi]"); break;
         default: printf("  Reserved or vendor specific [0x%x]", pc); break;
         }
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
-        }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
-        printf(" = %" PRIu64 "", ull);
+        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1043,10 +1034,8 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 static void
 show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
-    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Non-medium error page\n");
@@ -1066,19 +1055,7 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
                 printf("  Vendor specific [0x%x]", pc);
             break;
         }
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
-        }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
-        printf(" = %" PRIu64 "", ull);
+        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1094,10 +1071,8 @@ static void
 show_power_condition_transitions_page(unsigned char * resp, int len,
                                       int show_pcb)
 {
-    int k, j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
-    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Power condition transitions page\n");
@@ -1123,19 +1098,7 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
         default:
             printf("  Reserved [0x%x]", pc);
         }
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
-        }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
-        printf(" = %" PRIu64 "", ull);
+        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -2683,7 +2646,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
+            printf("        <%s>\n", pcb_str);
         }
         num -= pl;
         ucp += pl;
@@ -2752,12 +2715,12 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
             printf("  Vendor specific [0x%x]:", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
         } else {
-            printf("  Reserved [parameter_code=0x%x]:", pc);
+            printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
         }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("\n        <%s>\n", str);
+            printf("        <%s>\n", str);
         }
         num -= pl;
         ucp += pl;
@@ -2792,12 +2755,136 @@ show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
             }
             printf(" %d%%\n", ucp[7]);
         } else {
-            printf("  Reserved [parameter_code=0x%x]:", pc);
+            printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
         }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("\n        <%s>\n", str);
+            printf("        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static const char * dt_dev_activity[] = {
+    "No DT device activity",
+    "Cleaning operation in progress",
+    "Volume is being loaded",
+    "Volume is being unloaded",
+    "Other medium activity",
+    "Reading from medium",
+    "Writing to medium",
+    "Locating medium",
+    "Rewinding medium", /* 8 */
+    "Erasing volume",
+    "Formatting volume",
+    "Calibrating",
+    "Other DT device activity",
+    "Microcode update in progress",
+    "Reading encrypted from medium",
+    "Writing encrypted to medium",
+    "Diagnostic operation in progress", /* 10 */
+};
+
+/* DT device status [0x11] (ssc, adc) */
+static void
+show_dt_device_status_page(unsigned char * resp, int len, int show_pcb)
+{
+    int num, pl, pc, pcb, j;
+    unsigned char * ucp;
+    char str[PCB_STR_LEN];
+
+    printf("DT device status page (ssc-3, adc-3) [0x11]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        switch (pc) {
+        case 0x0:
+            printf("  Very high frequency data:\n");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    fprintf(stderr, "    truncated by response length, "
+                            "expected at least 8 bytes\n");
+                else
+                    fprintf(stderr, "    parameter length >= 8 expected, "
+                            "got %d\n", pl);
+                break;
+            }
+            printf("  PAMR=%d HUI=%d MACC=%d CMPR=%d ", !!(0x80 & ucp[4]),
+                   !!(0x40 & ucp[4]), !!(0x20 & ucp[4]), !!(0x10 & ucp[4]));
+            printf("WRTP=%d CRQST=%d CRQRD=%d DINIT=%d\n", !!(0x8 & ucp[4]),
+                   !!(0x4 & ucp[4]), !!(0x2 & ucp[4]), !!(0x1 & ucp[4]));
+            printf("  INXTN=%d RAA=%d MPRSNT=%d ", !!(0x80 & ucp[5]),
+                   !!(0x20 & ucp[5]), !!(0x10 & ucp[5]));
+            printf("MSTD=%d MTHRD=%d MOUNTED=%d\n",
+                   !!(0x4 & ucp[5]), !!(0x2 & ucp[5]), !!(0x1 & ucp[5]));
+            printf("  DT device activity: ");
+            j = ucp[6];
+            if (j < (int)(sizeof(dt_dev_activity) /
+                          sizeof(dt_dev_activity[0])))
+                printf("%s\n", dt_dev_activity[j]);
+            else if (j < 0x80)
+                printf("Reserved [0x%x]\n", j);
+            else
+                printf("Vendor specific [0x%x]\n", j);
+            printf("  VS=%d TDDEC=%d EPP=%d ", !!(0x80 & ucp[7]),
+                   !!(0x20 & ucp[7]), !!(0x10 & ucp[7]));
+            printf("ESR=%d RRQST=%d INTFC=%d TAFC=%d\n", !!(0x8 & ucp[7]),
+                   !!(0x4 & ucp[7]), !!(0x2 & ucp[7]), !!(0x1 & ucp[7]));
+            break;
+        case 0x1:
+            printf("  Very high frequency polling delay: ");
+            if ((pl < 6) || (num < 6)) {
+                if (num < 6)
+                    fprintf(stderr, "\n    truncated by response length, "
+                            "expected at least 6 bytes\n");
+                else
+                    fprintf(stderr, "\n    parameter length >= 6 expected, "
+                            "got %d\n", pl);
+                break;
+            }
+            printf(" %d milliseconds\n", (ucp[4] << 8) + ucp[5]);
+            break;
+        case 0x2:
+            printf("   DT device ADC data encryption control status (hex "
+                   "only now):\n");
+            if ((pl < 12) || (num < 12)) {
+                if (num < 12)
+                    fprintf(stderr, "    truncated by response length, "
+                            "expected at least 12 bytes\n");
+                else
+                    fprintf(stderr, "    parameter length >= 12 expected, "
+                            "got %d\n", pl);
+                break;
+            }
+            dStrHex((const char *)ucp + 4, 8, 1);
+            break;
+        case 0x3:
+            printf("   Key management error data (hex only now):\n");
+            if ((pl < 16) || (num < 16)) {
+                if (num < 16)
+                    fprintf(stderr, "    truncated by response length, "
+                            "expected at least 16 bytes\n");
+                else
+                    fprintf(stderr, "    parameter length >= 16 expected, "
+                            "got %d\n", pl);
+                break;
+            }
+            dStrHex((const char *)ucp + 4, 12, 1);
+            break;
+        default:
+            printf("  Reserved [parameter_code=0x%x]:\n", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            break;
+        }
+// xxxxxxxxxxxxxxx
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
         }
         num -= pl;
         ucp += pl;
@@ -2836,12 +2923,12 @@ show_ata_pt_results_page(unsigned char * resp, int len, int show_pcb)
                 printf("    lba=0x%02x%02x%02x\n", dp[11], dp[9], dp[7]);
             printf("    device=0x%x  status=0x%x\n", dp[12], dp[13]);
         } else {
-            printf("  Reserved [parameter_code=0x%x]:", pc);
+            printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
         }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("\n        <%s>\n", str);
+            printf("        <%s>\n", str);
         }
         num -= pl;
         ucp += pl;
@@ -2979,7 +3066,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
         }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("\n        <%s>\n", str);
+            printf("        <%s>\n", str);
         }
         num -= pl;
         ucp += pl;
@@ -2991,9 +3078,8 @@ static void
 show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
                             int verbose)
 {
-    int k, j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
     uint64_t ull, gbytes;
     char pcb_str[PCB_STR_LEN];
 
@@ -3004,18 +3090,7 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
-        }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
+        ull = decode_count(ucp + 4, pl - 4);
         gbytes = ull / 1000000000;
         switch (pc) {
         case 0:
@@ -3085,9 +3160,8 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+            printf("        <%s>\n", pcb_str);
+        }
         num -= pl;
         ucp += pl;
     }
@@ -3097,9 +3171,8 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
 static void
 show_device_stats_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
@@ -3111,18 +3184,7 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (pc < 0x1000) {
-            k = pl - 4;
-            xp = ucp + 4;
-            if (k > (int)sizeof(ull)) {
-                xp += (k - sizeof(ull));
-                k = sizeof(ull);
-            }
-            ull = 0;
-            for (j = 0; j < k; ++j) {
-                if (j > 0)
-                    ull <<= 8;
-                ull |= xp[j];
-            }
+            ull = decode_count(ucp + 4, pl - 4);
             switch (pc) {
             case 0:
                 printf("  Lifetime media loads: %" PRIu64 "\n", ull);
@@ -3181,6 +3243,7 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
                 printf("  Media motion (head) hours for each medium type:\n");
                 printf("      <<to be decoded, dump in hex for now>>:\n");
                 dStrHex((const char *)ucp, pl, 0);
+                // xxxxxxxxxxx
                 break;
             default:
                 printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
@@ -3190,9 +3253,8 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+            printf("        <%s>\n", pcb_str);
+        }
         num -= pl;
         ucp += pl;
     }
@@ -3202,9 +3264,8 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
 static void
 show_media_stats_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
@@ -3215,18 +3276,7 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
-        }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
+        ull = decode_count(ucp + 4, pl - 4);
         switch (pc) {
         case 0:
             printf("  Number of moves: %" PRIu64 "\n", ull);
@@ -3325,9 +3375,8 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
         }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+            printf("        <%s>\n", pcb_str);
+        }
         num -= pl;
         ucp += pl;
     }
@@ -3364,7 +3413,59 @@ show_element_stats_page(unsigned char * resp, int len, int show_pcb)
         printf("    Number of unreadable volume identifiers: %u\n", v);
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("\n        <%s>\n", str);
+            printf("        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+/* 0x16 for tape */
+static void
+show_tape_diag_data_page(unsigned char * resp, int len, int show_pcb)
+{
+    int num, pl, pc, pcb;
+    unsigned int v;
+    unsigned char * ucp;
+    char str[PCB_STR_LEN];
+
+    printf("Tape diagnostics data page (ssc-3) [0x16]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        printf("  Parameter code: %d\n", pc);
+        printf("    Density code: 0x%x\n", ucp[6]);
+        printf("    Medium type: 0x%x\n", ucp[7]);
+        v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
+        printf("    Lifetime media motion hours: 0x%x\n", v);
+        printf("    Repeat: %d\n", !!(ucp[13] & 0x80));
+        printf("    Sense key: 0x%x\n", ucp[13] & 0xf);
+        printf("    Additional sense code: 0x%x\n", ucp[14]);
+        printf("    Additional sense code qualifier: 0x%x\n", ucp[15]);
+        v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
+        printf("    Vendor specific code qualifier: 0x%x\n", v);
+        v = (ucp[20] << 24) + (ucp[21] << 16) + (ucp[22] << 8) + ucp[23];
+        printf("    Product revision level: %u\n", v);
+        v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
+        printf("    Hours since last clean: %u\n", v);
+        printf("    Operation code: 0x%x\n", ucp[28]);
+        printf("    Service action: 0x%x\n", ucp[29] & 0xf);
+        printf("    Medium id number (in hex):\n");
+        // ssc4r03.pdf does not define this field, why? xxxxxx
+        dStrHex((const char *)(ucp + 32), 32, 0);
+        printf("    Timestamp origin: 0x%x\n", ucp[64] & 0xf);
+        printf("    Timestamp:\n");
+        dStrHex((const char *)(ucp + 66), 6, 1);
+        if (pl > 72) {
+            printf("    Vendor specific:\n");
+            dStrHex((const char *)(ucp + 72), pl - 72, 0);
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
         }
         num -= pl;
         ucp += pl;
@@ -3436,7 +3537,269 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
         }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("\n        <%s>\n", str);
+            printf("        <%s>\n", str);
+        }
+        num -= pl;
+        ucp += pl;
+    }
+}
+
+static void
+volume_stats_partition(const unsigned char * xp, int len, int hex)
+{
+    int dl;
+
+    while (len > 3) {
+        dl = xp[0] + 1;
+        if (dl < 3)
+            return;
+        if (hex)
+            printf("    partition number: %d, partition record data "
+                   "counter: 0x%" PRIx64 "\n", (xp[2] << 8) + xp[3],
+                   decode_count(xp + 4, dl - 4));
+        else {
+            int k;
+            int all_ffs = 0;
+            int ffs_last_fe = 0;
+            unsigned char uc;
+
+            for (k = 0; k < (dl - 4); ++k) {
+                uc = xp[4 + k];
+                if (uc < 0xfe)
+                    break;
+                if ((k < (dl - 5)) && (0xfe == uc))
+                    break;
+                if (k == (dl - 5)) {
+                    if (0xff == uc)
+                        all_ffs = 1;
+                    else if (0xfe == uc)
+                        ffs_last_fe = 1;
+                }
+            }
+
+            if (0 == (all_ffs + ffs_last_fe))
+                printf("    partition number: %d, partition record data "
+                       "counter: %" PRIu64 "\n", (xp[2] << 8) + xp[3],
+                       decode_count(xp + 4, dl - 4));
+            else if (all_ffs)
+                printf("    partition number: %d, partition record data "
+                       "counter is all 0xFFs\n", (xp[2] << 8) + xp[3]);
+            else
+                printf("    partition number: %d, partition record data "
+                       "counter is all 0xFFs apart\n    from a trailing "
+                       "0xFE\n", (xp[2] << 8) + xp[3]);
+        }
+        xp += dl;
+        len -= dl;
+    }
+}
+
+/* Volume Statistics log page (ssc-4) [0x17, 0x1-0xf] */
+static void
+show_volume_stats_page(unsigned char * resp, int len, int show_pcb)
+{
+    int num, pl, pc, pcb, spf, subpg_code;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    spf = !!(resp[0] & 0x40);
+    subpg_code = spf ? resp[1] : 0;
+    if (0 == subpg_code)
+        printf("Volume statistics page (ssc-4) but subpage=0, abnormal: "
+               "treat like subpage=1\n");
+    else if (subpg_code < 0x10)
+        printf("Volume statistics page (ssc-4), subpage=%d\n", subpg_code);
+    else {
+        printf("Volume statistics page (ssc-4), subpage=%d; Reserved, "
+               "skip\n", subpg_code);
+        return;
+    }
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+
+        switch (pc) {
+        case 0:
+            printf("  Page valid: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 1:
+            printf("  Thread count: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 2:
+            printf("  Total data sets written: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 3:
+            printf("  Total write retries: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 4:
+            printf("  Total unrecovered write errors: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 5:
+            printf("  Total suspended writes: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 6:
+            printf("  Total fatal suspended writes: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 7:
+            printf("  Total data sets read: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 8:
+            printf("  Total read retries: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 9:
+            printf("  Total unrecovered read errors: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0xa:
+            printf("  Total suspended reads: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0xb:
+            printf("  Total fatal suspended reads: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0xc:
+            printf("  Last mount unrecovered write errors: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0xd:
+            printf("  Last mount unrecovered read errors: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0xe:
+            printf("  Last mount megabytes written: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0xf:
+            printf("  Last mount megabytes read: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x10:
+            printf("  Lifetime megabytes written: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x11:
+            printf("  Lifetime megabytes read: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x12:
+            printf("  Last load write compression ratio: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x13:
+            printf("  Last load read compression ratio: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x14:
+            printf("  Medium mount time: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x15:
+            printf("  Medium ready time: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x16:
+            printf("  Total native capacity: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x17:
+            printf("  Total used native capacity: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x40:
+            printf("  Volume serial number: %.*s\n", pl - 4, ucp + 4);
+            break;
+        case 0x41:
+            printf("  Tape lot identifier: %.*s\n", pl - 4, ucp + 4);
+            break;
+        case 0x42:
+            printf("  Volume barcode: %.*s\n", pl - 4, ucp + 4);
+            break;
+        case 0x43:
+            printf("  Volume manufacturer: %.*s\n", pl - 4, ucp + 4);
+            break;
+        case 0x44:
+            printf("  Volume license code: %.*s\n", pl - 4, ucp + 4);
+            break;
+        case 0x45:
+            printf("  Volume personality: %.*s\n", pl - 4, ucp + 4);
+            break;
+        case 0x80:
+            printf("  Write protect: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x81:
+            printf("  WORM: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x82:
+            printf("  Maximum recommended tape path temperature exceeded: %"
+                   PRIu64 "\n", decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x100:
+            printf("  Volume write mounts: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x101:
+            printf("  Beginning of medium passes: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x102:
+            printf("  Middle of medium passes: %" PRIu64 "\n",
+                   decode_count(ucp + 4, pl - 4));
+            break;
+        case 0x200:
+            printf("  Logical position of first encrypted logical object:\n");
+            volume_stats_partition(ucp + 4, pl - 4, 1);
+            break;
+        case 0x201:
+            printf("  Logical position of first unencrypted logical object "
+                   "after first\n  encrypted logical object:\n");
+            volume_stats_partition(ucp + 4, pl - 4, 1);
+            break;
+        case 0x202:
+            printf("  Native capacity partition(s):\n");
+            volume_stats_partition(ucp + 4, pl - 4, 0);
+            break;
+        case 0x203:
+            printf("  Used native capacity partition(s):\n");
+            volume_stats_partition(ucp + 4, pl - 4, 0);
+            break;
+        case 0x204:
+            printf("  Remaining native capacity partition(s):\n");
+            volume_stats_partition(ucp + 4, pl - 4, 0);
+            break;
+        case 0x300:
+            printf("  Mount history, payload in hex:\n");
+            // xxxxxxxxxxxxxxxxx
+            dStrHex((const char *)(ucp + 4), pl - 4, 0);
+            break;
+
+        default:
+            if (pc >= 0xf000)
+                printf("  Vendor specific parameter code (0x%x), payload "
+                       "in hex\n", pc);
+            else
+                printf("  Reserved parameter code (0x%x), payload in hex\n",
+                       pc);
+            dStrHex((const char *)(ucp + 4), pl - 4, 0);
+            break;
+        }
+        if (show_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("        <%s>\n", pcb_str);
         }
         num -= pl;
         ucp += pl;
@@ -3537,7 +3900,7 @@ show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
         }
         if (show_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
-            printf("\n        <%s>\n", str);
+            printf("        <%s>\n", str);
         }
         num -= pl;
         ucp += pl;
@@ -3548,10 +3911,8 @@ show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
 static void
 show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     unsigned char * ucp;
-    unsigned char * xp;
-    uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     printf("Seagate cache page [0x37]\n");
@@ -3576,19 +3937,7 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
                    "> segment size"); break;
         default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
-        k = pl - 4;
-        xp = ucp + 4;
-        if (k > (int)sizeof(ull)) {
-            xp += (k - sizeof(ull));
-            k = sizeof(ull);
-        }
-        ull = 0;
-        for (j = 0; j < k; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= xp[j];
-        }
-        printf(" = %" PRIu64 "", ull);
+        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -3603,9 +3952,8 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
 static void
 show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, num, pl, pc, pcb, valid;
+    int num, pl, pc, pcb, valid;
     unsigned char * ucp;
-    unsigned char * xp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
@@ -3627,18 +3975,7 @@ show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
             break;
         }
         if (valid) {
-            k = pl - 4;
-            xp = ucp + 4;
-            if (k > (int)sizeof(ull)) {
-                xp += (k - sizeof(ull));
-                k = sizeof(ull);
-            }
-            ull = 0;
-            for (j = 0; j < k; ++j) {
-                if (j > 0)
-                    ull <<= 8;
-                ull |= xp[j];
-            }
+            ull = decode_count(ucp + 4, pl - 4);
             if (0 == pc)
                 printf(" = %.2f", ((double)ull) / 60.0 );
             else
@@ -3749,7 +4086,17 @@ show_ascii_page(unsigned char * resp, int len,
         show_self_test_page(resp, len, optsp->do_pcb);
         break;
     case SOLID_STATE_MEDIA_LPAGE:       /* 0x11 */
-        show_solid_state_media_page(resp, len, optsp->do_pcb);
+        switch (inq_dat->peripheral_type) {
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
+            show_solid_state_media_page(resp, len, optsp->do_pcb);
+            break;
+        case PDT_TAPE: case PDT_ADC:
+            show_dt_device_status_page(resp, len, optsp->do_pcb);
+            break;
+        default:
+            done = 0;
+            break;
+        }
         break;
     case 0x14:
         {
@@ -3791,6 +4138,9 @@ show_ascii_page(unsigned char * resp, int len,
                 /* disk (direct access) type devices */
                 show_ata_pt_results_page(resp, len, optsp->do_pcb);
                 break;
+            case PDT_TAPE: /* ssc-4 */
+                show_tape_diag_data_page(resp, len, optsp->do_pcb);
+                break;
             case PDT_MCHANGER: /* smc-3 */
                 show_mchanger_diag_data_page(resp, len, optsp->do_pcb);
                 break;
@@ -3806,6 +4156,9 @@ show_ascii_page(unsigned char * resp, int len,
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
                 show_non_volatile_cache_page(resp, len, optsp->do_pcb);
+                break;
+            case PDT_TAPE: /* ssc-4, subpages 1 to 0xf */
+                show_volume_stats_page(resp, len, optsp->do_pcb);
                 break;
             default:
                 done = 0;

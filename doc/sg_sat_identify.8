@@ -1,11 +1,11 @@
-.TH SG_SAT_IDENTIFY "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_SAT_IDENTIFY "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_sat_identify \- send ATA IDENTIFY DEVICE command via SCSI to ATA
 Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_identify
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-indent\fR] [\fI\-\-len=\fR16|12] [\fI\-\-packet\fR] [\fI\-\-raw\fR]
+[\fI\-\-indent\fR] [\fI\-\-len=\fR{16|12}] [\fI\-\-packet\fR] [\fI\-\-raw\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -60,7 +60,7 @@ outputs the World Wide Name (WWN) of the device. This should be a NAA\-5
 then "0x0000000000000000" is output. The equivalent for a SCSI disk (i.e. its
 logical unit name) can be found with "sg_vpd \-ii".
 .TP
-\fB\-l\fR, \fB\-\-len\fR=16 | 12
+\fB\-l\fR, \fB\-\-len\fR={16|12}
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
 The argument can either be 16 or 12. The default is 16. The larger cdb
 size is needed for 48 bit LBA addressing of ATA devices. On the other
@@ -108,7 +108,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2012 Douglas Gilbert
+Copyright \(co 2006\-2013 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
