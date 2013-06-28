@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.39 20130604";
+static const char * version_str = "0.40 20130626";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -992,7 +992,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQrRsS:T:UvVX:YZ",
+        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQ:rRsS:T:UvVX:YZ",
                         long_options, &option_index);
         if (c == -1)
             break;

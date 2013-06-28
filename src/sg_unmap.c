@@ -29,7 +29,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.02 20130507";
+static const char * version_str = "1.03 20130627";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -347,7 +347,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aghIHl:n:t:vV", long_options,
+        c = getopt_long(argc, argv, "ag:hIHl:n:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -361,7 +361,7 @@ main(int argc, char * argv[])
             if ((1 == num) && ((res < 0) || (res > 31)))
                 grpnum = res;
             else {
-                fprintf(stderr, "value for '--grpnum=' must be 0 to31\n");
+                fprintf(stderr, "value for '--grpnum=' must be 0 to 31\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;

@@ -1,4 +1,4 @@
-.TH SG_DD "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_DD "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -9,10 +9,10 @@ devices
 [\fIoflag=FLAGS\fR] [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR]
 [\fI\-\-version\fR]
 .PP
-[\fIblk_sgio=\fR0|1] [\fIbpt=BPT\fR] [\fIcdbsz=\fR6|10|12|16]
-[\fIcoe=\fR0|1|2|3] [\fIcoe_limit=CL\fR] [\fIdio=\fR0|1] [\fIodir=\fR0|1]
-[\fIof2=OFILE2\fR] [\fIretries=RETR\fR] [\fIsync=\fR0|1] [\fItime=\fR0|1]
-[\fIverbose=VERB\fR] [\fI\-V\fR]
+[\fIblk_sgio=\fR{0|1}] [\fIbpt=BPT\fR] [\fIcdbsz=\fR{6|10|12|16}]
+[\fIcoe=\fR{0|1|2|3}] [\fIcoe_limit=CL\fR] [\fIdio=\fR{0|1}]
+[\fIodir=\fR{0|1}] [\fIof2=OFILE2\fR] [\fIretries=RETR\fR] [\fIsync=\fR{0|1}]
+[\fItime=\fR{0|1}] [\fIverbose=VERB\fR] [\fI\-V\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -35,7 +35,7 @@ Linux specific features while adding some other generic features. This allows
 ddpt to be ported to other operating systems.
 .SH OPTIONS
 .TP
-\fBblk_sgio\fR=0 | 1
+\fBblk_sgio\fR={0|1}
 when set to 0, block devices (e.g. /dev/sda) are treated like normal
 files (i.e.
 .B read(2)
@@ -72,14 +72,14 @@ is usually correct for disks but incorrect for cdroms (which normally
 have 2048 byte blocks). For this utility the maximum size of each individual
 IO operation is \fIBS\fR * \fIBPT\fR bytes.
 .TP
-\fBcdbsz\fR=6 | 10 | 12 | 16
+\fBcdbsz\fR={6|10|12|16}
 size of SCSI READ and/or WRITE commands issued on sg device
 names (or block devices when 'iflag=sgio' and/or 'oflag=sgio' is given).
 Default is 10 byte SCSI command blocks (unless calculations indicate
 that a 4 byte block number may be exceeded or \fIBPT\fR is greater than
 16 bits (65535), in which case it defaults to 16 byte SCSI commands).
 .TP
-\fBcoe\fR=0 | 1 | 2 | 3
+\fBcoe\fR={0|1|2|3}
 set to 1 or more for continue on error. Only applies to errors on sg
 devices or block devices with the 'sgio' flag set. Thus errors on other
 files will stop sg_dd. Default is 0 which implies stop on any error. See
@@ -109,7 +109,7 @@ rather than the size of the whole device is used. If \fICOUNT\fR is not
 given (or \fIcount=\-1\fR) and cannot be derived then an error message is
 issued and no copy takes place.
 .TP
-\fBdio\fR=0 | 1
+\fBdio\fR={0|1}
 default is 0 which selects indirect (buffered) IO on sg devices. Value of 1
 attempts direct IO which, if not available, falls back to indirect IO and
 notes this at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
@@ -132,7 +132,7 @@ below.  These flags are associated with \fIIFILE\fR and are ignored when
 \fBobs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
 .TP
-\fBodir\fR=0 | 1
+\fBodir\fR={0|1}
 when set to one opens block devices (e.g. /dev/sda) with the O_DIRECT
 flag. User memory buffers are aligned to the page size when set. The
 default is 0 (i.e. the O_DIRECT flag is not used). Has no effect on sg,
@@ -174,12 +174,12 @@ Default is block 0 (i.e. start of file).
 start reading \fISKIP\fR bs\-sized blocks from the start of \fIIFILE\fR.
 Default is block 0 (i.e. start of file).
 .TP
-\fBsync\fR=0 | 1
+\fBsync\fR={0|1}
 when 1, does SYNCHRONIZE CACHE command on \fIOFILE\fR at the end of the
 transfer. Only active when \fIOFILE\fR is a sg device file name or a block
 device and 'blk_sgio=1' is given.
 .TP
-\fBtime\fR=0 | 1
+\fBtime\fR={0|1}
 when 1, times transfer and does throughput calculation, outputting the
 results (to stderr) at completion. When 0 (default) doesn't perform timing.
 .TP
@@ -483,7 +483,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2012 Douglas Gilbert
+Copyright \(co 2000\-2013 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

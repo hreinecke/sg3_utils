@@ -1,4 +1,4 @@
-.TH SG_COPY_RESULTS "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_COPY_RESULTS "8" "June 2012" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_copy_results \- send SCSI RECEIVE COPY RESULTS command (XCOPY related)
 .SH SYNOPSIS
@@ -9,10 +9,18 @@ sg_copy_results \- send SCSI RECEIVE COPY RESULTS command (XCOPY related)
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility is designed to query the status of the SCSI Extended Copy
-facility (see SPC\-3 revision 23 sections 6.3 and 6.17), present in
-some modern storage arrays. This utility sends a SCSI RECEIVE COPY
+This utility is designed to query the status of the SCSI Extended
+Copy (XCOPY) facility (see SPC\-3 revision 23 sections 6.3 and 6.17), present
+in some modern storage arrays. This utility sends a SCSI RECEIVE COPY
 RESULTS command to the given \fIDEVICE\fR and displays the response.
+.PP
+During the draft stages of SPC\-4 the T10 committee has expanded the XCOPY
+command so that it now has two variants: "LID1" (for a List Identifier
+length of 1 byte) and "LID4" (for a List Identifier length of 4 bytes).
+This utility supports the older, LID1 variant which is also found in SPC\-3
+and earlier. While the LID1 variant in SPC\-4 is command level (binary)
+compatible with XCOPY as defined in SPC\-3, some of the command naming has
+changed. This utility uses the older, SPC\-3 XCOPY names.
 .PP
 The command has four distinct modes of operation, distinguished by
 the service action field:
@@ -102,7 +110,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2012 Hannes Reinecke and Douglas Gilbert
+Copyright \(co 2012\-2013 Hannes Reinecke and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
