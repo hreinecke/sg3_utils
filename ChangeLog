@@ -2,12 +2,13 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.37 [20130627] [svn: r500]
+Changelog for sg3_utils-1.37 [20130701] [svn: r501]
   - sg_compare_and_write: fix wrprotect setting
   - sg_inq: fix referrals VPD page
-  - sg_logs: improve for tape drives
+  - sg_logs: improve for tape drives, general cleanup
   - sg_persist: fix core dump on -Q option
   - sg_unmap: fix core dump on -g option
+  - sg_libs: extended copy opcode renamed (spc4r34)
   - Makefile.am cleanup
 
 Changelog for sg3_utils-1.36 [20130531] [svn: r497]

@@ -26,8 +26,8 @@ extern "C" {
 #define SG_MAINTENANCE_OUT 0xa4
 #define SG_PERSISTENT_RESERVE_IN 0x5e
 #define SG_PERSISTENT_RESERVE_OUT 0x5f
-#define SG_EXTENDED_COPY 0x83
-#define SG_RECEIVE_COPY 0x84
+#define SG_EXTENDED_COPY 0x83 /* since spc4r34 called: Third party copy out */
+#define SG_RECEIVE_COPY 0x84  /* since spc4r34 called: Third party copy in */
 #define SG_SERVICE_ACTION_IN_12 0xab
 #define SG_SERVICE_ACTION_OUT_12 0xa9
 #define SG_SERVICE_ACTION_BIDI 0x9d

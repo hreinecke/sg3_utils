@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.12 20130621";    /* spc4r35 + sbc3r30 */
+static const char * version_str = "1.13 20130701";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -822,13 +822,13 @@ show_page_name(int pg_code, int subpg_code,
                 printf("%sTapeAlert (ssc-2)\n", b);
                 break;
             case 0x30:
-                printf("%sTape usage log (IBM specific)\n", b);
+                printf("%sTape usage (IBM specific)\n", b);
                 break;
             case 0x31:
-                printf("%sTape capacity log (IBM specific)\n", b);
+                printf("%sTape capacity (IBM specific)\n", b);
                 break;
             case 0x32:
-                printf("%sData compression log (IBM specific)\n", b);
+                printf("%sData compression (IBM specific)\n", b);
                 break;
             default:
                 done = 0;
@@ -931,7 +931,7 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Buffer over-run/under-run page\n");
+    printf("Buffer over-run/under-run page  (spc-2) [0x1]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -980,22 +980,23 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 static void
 show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc, pcb, pg_code;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    switch(resp[0] & 0x3f) {
+    pg_code = resp[0] & 0x3f;
+    switch(pg_code) {
     case WRITE_ERR_LPAGE:
-        printf("Write error counter page\n");
+        printf("Write error counter page  (spc-3) [0x%x]\n", pg_code);
         break;
     case READ_ERR_LPAGE:
-        printf("Read error counter page\n");
+        printf("Read error counter page  (spc-3) [0x%x]\n", pg_code);
         break;
     case READ_REV_ERR_LPAGE:
-        printf("Read Reverse error counter page\n");
+        printf("Read Reverse error counter page  (spc-3) [0x%x]\n", pg_code);
         break;
     case VERIFY_ERR_LPAGE:
-        printf("Verify error counter page\n");
+        printf("Verify error counter page  (spc-3) [0x%x]\n", pg_code);
         break;
     default:
         printf("expecting error counter page, got page = 0x%x\n", resp[0]);
@@ -1038,7 +1039,7 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Non-medium error page\n");
+    printf("Non-medium error page  (spc-2) [0x6]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -1075,7 +1076,7 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Power condition transitions page\n");
+    printf("Power condition transitions page  (spc-4) [0x1a]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -1109,7 +1110,7 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
     }
 }
 
-/* Vendor specific: 0x30 */
+/* Tape usage: Vendor specific (IBM): 0x30 */
 static void
 show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1122,10 +1123,10 @@ show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed tape usage log page\n");
+        printf("badly formed tape usage page\n");
         return;
     }
-    printf("Tape usage log page\n");
+    printf("Tape usage page  (IBM specific) [0x30]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
@@ -1202,7 +1203,7 @@ show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* Vendor specific: 0x31 */
+/* Tape capacity: vendor specific (IBM): 0x31 */
 static void
 show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1214,10 +1215,10 @@ show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed tape capacity log page\n");
+        printf("badly formed tape capacity page\n");
         return;
     }
-    printf("Tape capacity log page\n");
+    printf("Tape capacity page  (IBM specific) [0x31]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
@@ -1251,22 +1252,28 @@ show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* originally vendor specific 0x32, ssc4 standardizes at 0x1b */
+/* Data compression: originally vendor specific 0x32 (IBM), then
+ * ssc-4 standardizes it at 0x1b */
 static void
 show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, j, pl, num, extra, pc, pcb;
+    int k, j, pl, num, extra, pc, pcb, pg_code;
     uint64_t n;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
+    pg_code = resp[0] & 0x3f;
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed data compression log page\n");
+        printf("badly formed data compression page\n");
         return;
     }
-    printf("Data compression log page\n");
+    if (0x1b == pg_code)
+        printf("Data compression page  (ssc-4) [0x1b]\n");
+    else
+        printf("Data compression page  (IBM specific) [0x%x]\n",
+               pg_code);
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
@@ -1345,10 +1352,10 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
         printf("No error events logged\n");
         return;
     }
-    printf("Last n error events log page\n");
+    printf("Last n error events page  (spc-2) [0x7]\n");
     for (k = num; k > 0; k -= pl, ucp += pl) {
         if (k < 3) {
-            printf("short Last n error events log page\n");
+            printf("short Last n error events page\n");
             return;
         }
         pl = ucp[3] + 4;
@@ -1387,10 +1394,10 @@ show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
         printf("No deferred errors logged\n");
         return;
     }
-    printf("Last n deferred errors log page\n");
+    printf("Last n deferred errors page  (spc-2) [0xb]\n");
     for (k = num; k > 0; k -= pl, ucp += pl) {
         if (k < 3) {
-            printf("short Last n deferred errors log page\n");
+            printf("short Last n deferred errors page\n");
             return;
         }
         pl = ucp[3] + 4;
@@ -1428,9 +1435,11 @@ static void
 show_self_test_page(unsigned char * resp, int len, int show_pcb)
 {
     int k, num, n, res, pcb;
+    unsigned int v;
     unsigned char * ucp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
+    char b[80];
 
     num = len - 4;
     if (num < 0x190) {
@@ -1438,7 +1447,7 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
                "0x190 bytes]\n", num);
         return;
     }
-    printf("Self-test results page\n");
+    printf("Self-test results page  (spc-3) [0x10]\n");
     for (k = 0, ucp = resp + 4; k < 20; ++k, ucp += 20 ) {
         pcb = ucp[2];
         n = (ucp[6] << 8) | ucp[7];
@@ -1459,9 +1468,15 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
         ull <<= 8; ull |= ucp[15];
         if ((0xffffffffffffffffULL != ull) && (res > 0) && ( res < 0xf))
             printf("    address of first error = 0x%" PRIx64 "\n", ull);
-        if (ucp[16] & 0xf)
-            printf("    sense key = 0x%x, asc = 0x%x, asq = 0x%x",
-                   ucp[16] & 0xf, ucp[17], ucp[18]);
+        v = ucp[16] & 0xf;
+        if (v) {
+            printf("    sense key = 0x%x [%s] , asc = 0x%x, ascq = 0x%x",
+                   v, sg_get_sense_key_str(v, sizeof(b), b), ucp[17],
+                   ucp[18]);
+            if (ucp[17] || ucp[18])
+                printf("      [%s]\n", sg_get_asc_ascq_str(ucp[17], ucp[18],
+                       sizeof(b), b));
+        }
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1482,14 +1497,14 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed Temperature log page\n");
+        printf("badly formed Temperature page\n");
         return;
     }
     if (hdr)
-        printf("Temperature log page\n");
+        printf("Temperature page  (spc-3) [0xd]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
-            printf("short Temperature log page\n");
+            printf("short Temperature page\n");
             return;
         }
         extra = ucp[3] + 4;
@@ -1535,13 +1550,13 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed Start-stop cycle counter log page\n");
+        printf("badly formed Start-stop cycle counter page\n");
         return;
     }
-    printf("Start-stop cycle counter log page\n");
+    printf("Start-stop cycle counter page  (spc-3) [0xe]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
-            printf("short Start-stop cycle counter log page\n");
+            printf("short Start-stop cycle counter page\n");
             return;
         }
         extra = ucp[3] + 4;
@@ -1633,14 +1648,14 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed Informational Exceptions log page\n");
+        printf("badly formed Informational Exceptions page\n");
         return;
     }
     if (full)
-        printf("Informational Exceptions log page\n");
+        printf("Informational Exceptions page  (spc-3) [0x2f]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
-            printf("short Informational Exceptions log page\n");
+            printf("short Informational Exceptions page\n");
             return;
         }
         extra = ucp[3] + 4;
@@ -1650,10 +1665,9 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
             if (extra > 5) {
                 if (full) {
                     printf("  IE asc = 0x%x, ascq = 0x%x", ucp[4], ucp[5]);
-                    if (ucp[4]) {
+                    if (ucp[4] || ucp[5])
                         if(sg_get_asc_ascq_str(ucp[4], ucp[5], sizeof(b), b))
                             printf("\n    [%s]", b);
-                    }
                 }
                 if (extra > 6) {
                     if (ucp[6] < 0xff)
@@ -2042,7 +2056,8 @@ show_protocol_specific_page(unsigned char * resp, int len,
         if (6 != (0xf & ucp[4]))
             return 0;   /* only decode SAS log page */
         if ((0 == k) && (0 == optsp->do_name))
-            printf("Protocol Specific port log page for SAS SSP\n");
+            printf("Protocol Specific port page for SAS SSP  (sas-2) "
+                   "[0x18]\n");
         show_sas_port_param(ucp, param_len, optsp);
         k += param_len;
         ucp += param_len;
@@ -2072,6 +2087,12 @@ show_stats_perform_page(unsigned char * resp, int len,
         printf("log_page=0x%x\n", STATS_LPAGE);
         if (subpg_code > 0)
             printf("log_subpage=0x%x\n", subpg_code);
+    } else {
+        if (0 == subpg_code)
+            printf("General Statistics and Performance  (spc-4) [0x19]\n");
+        else
+            printf("Group Statistics and Performance (%d)  (spc-4) "
+                   "[0x19,0x%x]\n", subpg_code, subpg_code);
     }
     if (subpg_code > 31)
         return 0;
@@ -2394,7 +2415,7 @@ show_cache_stats_page(unsigned char * resp, int len,
     num = len - 4;
     ucp = resp + 4;
     if (num < 4) {
-        printf("badly formed Cache memory statistics log page\n");
+        printf("badly formed Cache memory statistics page\n");
         return 0;
     }
     spf = !!(resp[0] & 0x40);
@@ -2404,15 +2425,15 @@ show_cache_stats_page(unsigned char * resp, int len,
         if (subpg_code > 0)
             printf("log_subpage=0x%x\n", subpg_code);
     } else
-        printf("Cache memory statistics log page\n");
+        printf("Cache memory statistics page  (spc-4) [0x19,0x20]\n");
 
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
-            printf("short Cache memory statistics log page\n");
+            printf("short Cache memory statistics page\n");
             return 0;
         }
         if (8 != ucp[3]) {
-            printf("Cache memory statistics log page parameter length not "
+            printf("Cache memory statistics  page parameter length not "
                    "8\n");
             return 0;
         }
@@ -2521,7 +2542,7 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Format status page (sbc-2) [0x8]\n");
+    printf("Format status page  (sbc-2) [0x8]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -2589,7 +2610,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Non-volatile cache page (sbc-2) [0x17]\n");
+    printf("Non-volatile cache page  (sbc-2) [0x17]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -3050,8 +3071,9 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
             printf("    sense key: %s  [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
                    sg_get_sense_key_str(ucp[8] & 0xf, sizeof(str), str),
                    ucp[8] & 0xf, ucp[9], ucp[10]);
-            printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
-                                                     sizeof(str), str));
+            if (ucp[9] || ucp[10])
+                printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
+                                                         sizeof(str), str));
             if (verbose) {
                 printf("    vendor bytes [11 -> 15]: ");
                 for (m = 0; m < 5; ++m)
@@ -3428,6 +3450,7 @@ show_tape_diag_data_page(unsigned char * resp, int len, int show_pcb)
     unsigned int v;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
+    char b[80];
 
     printf("Tape diagnostics data page (ssc-3) [0x16]\n");
     num = len - 4;
@@ -3440,11 +3463,16 @@ show_tape_diag_data_page(unsigned char * resp, int len, int show_pcb)
         printf("    Density code: 0x%x\n", ucp[6]);
         printf("    Medium type: 0x%x\n", ucp[7]);
         v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
-        printf("    Lifetime media motion hours: 0x%x\n", v);
+        printf("    Lifetime media motion hours: %u\n", v);
         printf("    Repeat: %d\n", !!(ucp[13] & 0x80));
-        printf("    Sense key: 0x%x\n", ucp[13] & 0xf);
+        v = ucp[13] & 0xf;
+        printf("    Sense key: 0x%x [%s]\n", v,
+               sg_get_sense_key_str(v, sizeof(b), b));
         printf("    Additional sense code: 0x%x\n", ucp[14]);
         printf("    Additional sense code qualifier: 0x%x\n", ucp[15]);
+        if (ucp[14] || ucp[15])
+            printf("      [%s]\n", sg_get_asc_ascq_str(ucp[14], ucp[15],
+                   sizeof(b), b));
         v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
         printf("    Vendor specific code qualifier: 0x%x\n", v);
         v = (ucp[20] << 24) + (ucp[21] << 16) + (ucp[22] << 8) + ucp[23];
@@ -3480,6 +3508,7 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
     unsigned int v;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
+    char b[80];
 
     printf("Media changer diagnostics data page (smc-3) [0x16]\n");
     num = len - 4;
@@ -3490,9 +3519,14 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
         pl = ucp[3] + 4;
         printf("  Parameter code: %d\n", pc);
         printf("    Repeat: %d\n", !!(ucp[5] & 0x80));
-        printf("    Sense key: 0x%x\n", ucp[5] & 0xf);
+        v = ucp[5] & 0xf;
+        printf("    Sense key: 0x%x [%s]\n", v,
+               sg_get_sense_key_str(v, sizeof(b), b));
         printf("    Additional sense code: 0x%x\n", ucp[6]);
         printf("    Additional sense code qualifier: 0x%x\n", ucp[7]);
+        if (ucp[6] || ucp[7])
+            printf("      [%s]\n", sg_get_asc_ascq_str(ucp[6], ucp[7],
+                   sizeof(b), b));
         v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
         printf("    Vendor specific code qualifier: 0x%x\n", v);
         v = (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15];
@@ -4009,7 +4043,8 @@ show_ascii_page(unsigned char * resp, int len,
     subpg_code = spf ? resp[1] : 0;
 
     if ((SUPP_PAGES_LPAGE != pg_code ) && (SUPP_SPGS_SUBPG == subpg_code)) {
-        printf("Supported subpages for log page=0x%x\n", pg_code);
+        printf("Supported subpages for log page=0x%x  (spc-4) [0x%x, 0x%x]"
+               "\n", pg_code, pg_code, subpg_code);
         for (k = 0; k < num; k += 2)
             show_page_name((int)resp[4 + k], (int)resp[4 + k + 1],
                            inq_dat);
@@ -4018,12 +4053,13 @@ show_ascii_page(unsigned char * resp, int len,
     switch (pg_code) {
     case SUPP_PAGES_LPAGE:      /* 0x0 */
         if (spf) {
-            printf("Supported log pages and subpages:\n");
+            printf("Supported log pages and subpages  (spc-4) [0x%x, 0x%x]:"
+                   "\n", pg_code, subpg_code);
             for (k = 0; k < num; k += 2)
                 show_page_name((int)resp[4 + k], (int)resp[4 + k + 1],
                                inq_dat);
         } else {
-            printf("Supported log pages:\n");
+            printf("Supported log pages  (spc-2) [0x0]:\n");
             for (k = 0; k < num; ++k)
                 show_page_name((int)resp[4 + k], 0, inq_dat);
         }
@@ -4238,8 +4274,12 @@ show_ascii_page(unsigned char * resp, int len,
         break;
     }
     if (! done) {
-        printf("No ascii information for page = 0x%x, here is hex:\n",
-               resp[0] & 0x3f);
+        if (spf)
+            printf("No ascii information for page = 0x%x, subpage = 0x%x, "
+                   "here is hex:\n", pg_code, subpg_code);
+        else
+            printf("No ascii information for page = 0x%x, here is hex:\n",
+                   pg_code);
         if (len > 128) {
             dStrHex((const char *)resp, 64, 1);
             printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
@@ -4282,8 +4322,8 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
             else
                 show_ie_page(resp, len, 0, 0);
         } else
-            fprintf(stderr, "Unable to find temperature in either log page "
-                    "(temperature or IE)\n");
+            fprintf(stderr, "Unable to find temperature in either "
+                    "Temperature or IE log page\n");
     }
     sg_cmds_close_device(sg_fd);
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;

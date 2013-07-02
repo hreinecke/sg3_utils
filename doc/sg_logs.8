@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "October 2011" "sg3_utils\-1.33" SG3_UTILS
+.TH SG_LOGS "8" "July 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -23,14 +23,14 @@ This utility sends a SCSI LOG SENSE command to the \fIDEVICE\fR and then
 outputs the response. The LOG SENSE command is used to fetch log pages. Known
 log pages are decoded by default. When the \fI\-\-reset\fR and/or
 \fI\-\-select\fR option is given then a SCSI LOG SELECT command is issued to
-reset parameters.
+reset parameters (e.g. counters).
 .PP
 In SPC\-4 revision 5 a subpage code was introduced to both the LOG SENSE and
 LOG SELECT command. At the same time a page code field was introduced to the
 to the LOG SELECT command. The log subpage code can range from 0 to 255 (0xff)
 inclusive. The subpage code value 255 can be thought of as a wildcard.
 .PP
-This utility supports two command line surtaxes, the preferred one is shown
+This utility supports two command line syntaxes, the preferred one is shown
 first in the synopsis and explained in this section. A later section on the
 old command line syntax outlines the second group of options.
 .SH OPTIONS
@@ -338,7 +338,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2011 Douglas Gilbert
+Copyright \(co 2002\-2013 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
