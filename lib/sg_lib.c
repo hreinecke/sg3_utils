@@ -1234,6 +1234,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                         "action=0x%x", service_action);
         break;
     case SG_EXTENDED_COPY:
+        /* 'Extended copy' was renamed 'Third party copy out' in spc4r34 */
         vnp = get_value_name(sg_lib_xcopy_sa_arr, service_action, peri_type);
         if (vnp)
             my_snprintf(buff, buff_len, "%s", vnp->name);
@@ -1242,6 +1243,8 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                         service_action);
         break;
     case SG_RECEIVE_COPY:
+        /* 'Receive copy results' was renamed 'Third party copy in' in
+         * spc4r34 */
         vnp = get_value_name(sg_lib_rec_copy_sa_arr, service_action,
                              peri_type);
         if (vnp)

@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.14 20130613";    /* SPC-4 rev 36 */
+static const char * version_str = "1.15 20130701";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
