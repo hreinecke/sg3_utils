@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2012 D. Gilbert
+ *  Copyright (C) 2000-2013 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.39 20120920";
+static const char * version_str = "1.41 20130507";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -132,7 +132,8 @@ usage()
            "SENSE(10)\n"
            "    --verbose|-v    increase verbosity\n"
            "    --version|-V    output version string then exit\n\n"
-           "Performs a SCSI MODE SENSE (10 or 6) command\n");
+           "Performs a SCSI MODE SENSE (10 or 6) command. To access and "
+           "possibly change\nmode page fields see the sdparm utility.\n");
 }
 
 static void
@@ -866,7 +867,7 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
     for (header = 0, k = 0; k < PG_CODE_MAX; ++k) {
         if (optsp->do_six) {
             res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0, rbuf, mresp_len,
-                                    0, optsp->do_verbose);
+                                    1, optsp->do_verbose);
             if (SG_LIB_CAT_INVALID_OP == res) {
                 fprintf(stderr, ">>>>>> try again without the '-6' "
                         "switch for a 10 byte MODE SENSE command\n");
@@ -991,7 +992,7 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         if (opts.maxlen > DEF_ALLOC_LEN) {
-            malloc_rsp_buff = malloc(opts.maxlen);
+            malloc_rsp_buff = (unsigned char *)malloc(opts.maxlen);
             if (NULL == malloc_rsp_buff) {
                 fprintf(stderr, "Unable to malloc maxlen=%d bytes\n",
                         opts.maxlen);

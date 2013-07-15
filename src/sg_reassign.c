@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * vendor specific data is written.
  */
 
-static char * version_str = "1.12 20090611";
+static const char * version_str = "1.12 20130507";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -212,8 +212,8 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
             ll = get_llnum(lcp);
             if (-1 != ll) {
                 lba_arr[k] = (uint64_t)ll;
-                cp = strchr(lcp, ',');
-                c2p = strchr(lcp, ' ');
+                cp = (char *)strchr(lcp, ',');
+                c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
                     cp = c2p;
                 if (NULL == cp)

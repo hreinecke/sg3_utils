@@ -48,7 +48,7 @@
 *
 */
 
-static const char * version_str = "1.02 20130117";
+static const char * version_str = "1.04 20130516";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -58,7 +58,7 @@ static const char * version_str = "1.02 20130117";
 #define COMPARE_AND_WRITE_OPCODE (0x89)
 #define COMPARE_AND_WRITE_CDB_SIZE (16)
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 #define ME "sg_compare_and_write: "
 
@@ -79,6 +79,14 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+struct caw_flags {
+        int dpo;
+        int fua;
+        int fua_nv;
+        int group;
+        int wrprotect;
+};
+
 struct opts_t {
         char ifilename[256];
         uint64_t lba;
@@ -87,13 +95,7 @@ struct opts_t {
         int timeout;
         int xfer_len;
         const char * device_name;
-        struct caw_flags {
-                int dpo;
-                int fua;
-                int fua_nv;
-                int group;
-                int wrprotect;
-        } flags;
+        struct caw_flags flags;
 } opts;
 
 static void

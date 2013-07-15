@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2011 Douglas Gilbert.
+ * Copyright (c) 2006-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -46,7 +46,7 @@
 
 #define DEF_TIMEOUT 20
 
-static char * version_str = "1.05 20110401";
+static const char * version_str = "1.06 20130507";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -77,6 +77,8 @@ void usage()
           "                             (def: 0 (which is reserved))\n"
           "    --help | -h             output this usage message\n"
           "    --lba=LBA | -L LBA      LBA field contents (def: 0)\n"
+          "                            meaning depends on sub-command "
+          "(feature)\n"
           "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
           "(def: 16)\n"
           "    --verbose | -v          increase verbosity\n"
@@ -92,8 +94,9 @@ void usage()
           "/dev/sdc'\n");
 }
 
-static int do_set_features(int sg_fd, int feature, int count, int lba,
-                           int cdb_len, int ck_cond, int verbose)
+static int do_set_features(int sg_fd, int feature, int count,
+                           unsigned int lba, int cdb_len, int ck_cond,
+                           int verbose)
 {
     int res, ret;
     int extend = 0;
@@ -125,6 +128,7 @@ static int do_set_features(int sg_fd, int feature, int count, int lba,
         aptCmdBlk[8] = lba & 0xff;
         aptCmdBlk[10] = (lba >> 8) & 0xff;
         aptCmdBlk[12] = (lba >> 16) & 0xff;
+        aptCmdBlk[7] = (lba >> 24) & 0xff;
         aptCmdBlk[1] = (protocol << 1) | extend;
         aptCmdBlk[2] = (ck_cond << 5) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
@@ -249,11 +253,11 @@ static int do_set_features(int sg_fd, int feature, int count, int lba,
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, c, ret, res;
+    int sg_fd, c, k, ret, res;
     const char * device_name = NULL;
     int count = 0;
     int feature = 0;
-    int lba = 0;
+    unsigned int lba = 0;
     int verbose = 0;
     int ck_cond = 0;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
@@ -295,12 +299,13 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
-        case 'L':
-            lba = sg_get_num(optarg);
-            if ((lba < 0) || (lba > 255)) {
+        case 'L':       /* up to 26 bits, allow for 32 bits (less -1) */
+            k = sg_get_num(optarg);
+            if (-1 == k) {
                 fprintf(stderr, "bad argument for '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            lba = (unsigned int)k;
             break;
         case 'v':
             ++verbose;
@@ -332,6 +337,13 @@ int main(int argc, char * argv[])
         fprintf(stderr, "missing device name!\n");
         usage();
         return 1;
+    }
+
+    if ((lba > 0xffffff) && (12 == cdb_len)) {
+        cdb_len = 16;
+        if (verbose)
+            fprintf(stderr, "Since lba > 0xffffff, forcing cdb length to "
+                    "16\n");
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,

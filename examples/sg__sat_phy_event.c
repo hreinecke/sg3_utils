@@ -64,7 +64,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.00 20070507";
+static const char * version_str = "1.00 20070507";
 
 static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -98,7 +98,7 @@ static void usage()
 
 struct phy_event_t {
     int id;
-    char * desc;
+    const char * desc;
 };
 
 static struct phy_event_t phy_event_arr[] = {

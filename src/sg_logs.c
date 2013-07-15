@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2012 D. Gilbert
+*  Copyright (C) 2000-2013 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static char * version_str = "1.07 20121211";    /* spc4r35 + sbc3r30 */
+static const char * version_str = "1.11 20130517";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -577,7 +577,7 @@ dStrRaw(const char* str, int len)
    command, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
    SG_LIB_CAT_ABORTED_COMMAND and -1 for other errors. */
 static int
-do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
+do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
         const struct opts_t * optsp)
 {
     int actual_len, res, vb;
@@ -591,7 +591,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
                                    optsp->page_control, optsp->pg_code,
                                    optsp->subpg_code, optsp->paramp,
                                    resp, LOG_SENSE_PROBE_ALLOC_LEN,
-                                   noisy, vb))) {
+                                   1 /* noisy */, vb))) {
             switch (res) {
             case SG_LIB_CAT_NOT_READY:
             case SG_LIB_CAT_INVALID_OP:
@@ -630,7 +630,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len, int noisy,
     if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
                                optsp->page_control, optsp->pg_code,
                                optsp->subpg_code, optsp->paramp,
-                               resp, actual_len, noisy, vb))) {
+                               resp, actual_len, 1 /* noisy */, vb))) {
         switch (res) {
         case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_INVALID_OP:
@@ -791,6 +791,9 @@ show_page_name(int pg_code, int subpg_code,
                 printf("%sVolume statistics (ssc-4)\n", b);
                 done = 0;
                 break;
+            case 0x1b:
+                printf("%sData compression (ssc-4)\n", b);
+                break;
             case 0x2d:
                 printf("%sCurrent service information (ssc-3)\n", b);
                 break;
@@ -901,7 +904,7 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
         outp[0] = '\0';
 }
 
-/* BUFF_OVER_UNDER_LPAGE */
+/* BUFF_OVER_UNDER_LPAGE [0x1] */
 static void
 show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -968,6 +971,7 @@ show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
 }
 
 /* WRITE_ERR_LPAGE; READ_ERR_LPAGE; READ_REV_ERR_LPAGE; VERIFY_ERR_LPAGE */
+/* [0x2, 0x3, 0x4, 0x5] */
 static void
 show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1035,7 +1039,7 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* NON_MEDIUM_LPAGE */
+/* NON_MEDIUM_LPAGE [0x6] */
 static void
 show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1085,7 +1089,7 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* PCT_LPAGE */
+/* PCT_LPAGE [0x1a] */
 static void
 show_power_condition_transitions_page(unsigned char * resp, int len,
                                       int show_pcb)
@@ -1142,6 +1146,7 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
     }
 }
 
+/* Vendor specific: 0x30 */
 static void
 show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1234,6 +1239,7 @@ show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* Vendor specific: 0x31 */
 static void
 show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1282,11 +1288,12 @@ show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* originally vendor specific 0x32, ssc4 standardizes at 0x1b */
 static void
 show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
 {
-    int k, num, extra, pc, pcb;
-    unsigned int n;
+    int k, j, pl, num, extra, pc, pcb;
+    uint64_t n;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
@@ -1300,63 +1307,59 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
-        extra = ucp[3] + 4;
-        switch (ucp[3]) {
-        case 2:
-            n = (ucp[4] << 8) | ucp[5];
-            break;
-        case 4:
-            n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
-            break;
-        default:
-            n = 0;
+        pl = ucp[3];
+        extra = pl + 4;
+        if ((0 == pl) || (pl > 8)) {
+            printf("badly formed data compression log parameter\n");
+            printf("  parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)ucp, extra, 1);
+            goto skip_para;
+        }
+        for (j = 0, n = 0; j < pl; ++j) {
+            if (j > 0)
+                n <<= 8;
+            n |= ucp[4 + j];
         }
         switch (pc) {
         case 0x00:
-            if (extra == 6)
-                printf("  Read compression ratio x100: %u", n);
+            printf("  Read compression ratio x100: %" PRIu64 , n);
             break;
         case 0x01:
-            if (extra == 6)
-                printf("  Write compression ratio x100: %u", n);
+            printf("  Write compression ratio x100: %" PRIu64 , n);
             break;
         case 0x02:
-            if (extra == 8)
-                printf("  Megabytes transferred to server: %u", n);
+            printf("  Megabytes transferred to server: %" PRIu64 , n);
             break;
         case 0x03:
-            if (extra == 8)
-                printf("  Bytes transferred to server: %u", n);
+            printf("  Bytes transferred to server: %" PRIu64 , n);
             break;
         case 0x04:
-            if (extra == 8)
-                printf("  Megabytes read from tape: %u", n);
+            printf("  Megabytes read from tape: %" PRIu64 , n);
             break;
         case 0x05:
-            if (extra == 8)
-                printf("  Bytes read from tape: %u", n);
+            printf("  Bytes read from tape: %" PRIu64 , n);
             break;
         case 0x06:
-            if (extra == 8)
-                printf("  Megabytes transferred from server: %u", n);
+            printf("  Megabytes transferred from server: %" PRIu64 , n);
             break;
         case 0x07:
-            if (extra == 8)
-                printf("  Bytes transferred from server: %u", n);
+            printf("  Bytes transferred from server: %" PRIu64 , n);
             break;
         case 0x08:
-            if (extra == 8)
-                printf("  Megabytes written to tape: %u", n);
+            printf("  Megabytes written to tape: %" PRIu64 , n);
             break;
         case 0x09:
-            if (extra == 8)
-                printf("  Bytes written to tape: %u", n);
+            printf("  Bytes written to tape: %" PRIu64 , n);
+            break;
+        case 0x100:
+            printf("  Data compression enabled: 0x%" PRIx64, n);
             break;
         default:
             printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
+skip_para:
         if (show_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1365,7 +1368,7 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LAST_N_ERR_LPAGE */
+/* LAST_N_ERR_LPAGE [0x7] */
 static void
 show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1407,7 +1410,7 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* LAST_N_DEFERRED_LPAGE */
+/* LAST_N_DEFERRED_LPAGE [0xb] */
 static void
 show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1457,7 +1460,7 @@ static const char * self_test_result[] = {
     "reserved",
     "self test in progress"};
 
-/* SELF_TEST_LPAGE */
+/* SELF_TEST_LPAGE [0x10] */
 static void
 show_self_test_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -1504,7 +1507,7 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* TEMPERATURE_LPAGE */
+/* TEMPERATURE_LPAGE [0xd] */
 static void
 show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
                       int show_unknown)
@@ -1557,7 +1560,7 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
     }
 }
 
-/* START_STOP_LPAGE */
+/* START_STOP_LPAGE [0xe] */
 static void
 show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
 {
@@ -1655,7 +1658,7 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
     }
 }
 
-/* IE_LPAGE */
+/* IE_LPAGE [0x2f] */
 static void
 show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
 {
@@ -1850,7 +1853,7 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
     }
 }
 
-/* PROTO_SPECIFIC_LPAGE for a SAS port */
+/* PROTO_SPECIFIC_LPAGE [0x18] for a SAS port */
 static void
 show_sas_port_param(unsigned char * ucp, int param_len,
                     const struct opts_t * optsp)
@@ -1969,24 +1972,42 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("    reason: %s\n", s);
             t = (0xf & vcp[5]);
             switch (t) {
-            case 0: snprintf(s, sz, "phy enabled; unknown");
-                         break;
-            case 1: snprintf(s, sz, "phy disabled"); break;
-            case 2: snprintf(s, sz, "phy enabled; speed negotiation failed");
-                         break;
-            case 3: snprintf(s, sz, "phy enabled; SATA spinup hold state");
-                         break;
-            case 4: snprintf(s, sz, "phy enabled; port selector");
-                         break;
-            case 5: snprintf(s, sz, "phy enabled; reset in progress");
-                         break;
-            case 6: snprintf(s, sz, "phy enabled; unsupported phy attached");
-                         break;
-            case 8: snprintf(s, sz, "phy enabled; 1.5 Gbps"); break;
-            case 9: snprintf(s, sz, "phy enabled; 3 Gbps"); break;
-            case 0xa: snprintf(s, sz, "phy enabled; 6 Gbps"); break;
-            case 0xb: snprintf(s, sz, "phy enabled; 12 Gbps"); break;
-            default: snprintf(s, sz, "reserved [%d]", t); break;
+            case 0:
+                snprintf(s, sz, "phy enabled; unknown reason");
+                break;
+            case 1:
+                snprintf(s, sz, "phy disabled");
+                break;
+            case 2:
+                snprintf(s, sz, "phy enabled; speed negotiation failed");
+                break;
+            case 3:
+                snprintf(s, sz, "phy enabled; SATA spinup hold state");
+                break;
+            case 4:
+                snprintf(s, sz, "phy enabled; port selector");
+                break;
+            case 5:
+                snprintf(s, sz, "phy enabled; reset in progress");
+                break;
+            case 6:
+                snprintf(s, sz, "phy enabled; unsupported phy attached");
+                break;
+            case 8:
+                snprintf(s, sz, "1.5 Gbps");
+                break;
+            case 9:
+                snprintf(s, sz, "3 Gbps");
+                break;
+            case 0xa:
+                snprintf(s, sz, "6 Gbps");
+                break;
+            case 0xb:
+                snprintf(s, sz, "12 Gbps");
+                break;
+            default:
+                snprintf(s, sz, "reserved [%d]", t);
+                break;
             }
             printf("    negotiated logical link rate: %s\n", s);
             printf("    attached initiator port: ssp=%d stp=%d smp=%d\n",
@@ -2042,7 +2063,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
     }
 }
 
-/* PROTO_SPECIFIC_LPAGE */
+/* PROTO_SPECIFIC_LPAGE [0x18] */
 static int
 show_protocol_specific_page(unsigned char * resp, int len,
                             const struct opts_t * optsp)
@@ -2067,7 +2088,7 @@ show_protocol_specific_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
-/* STATS_LPAGE, 0x0 to 0x1f */
+/* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f */
 static int
 show_stats_perform_page(unsigned char * resp, int len,
                         const struct opts_t * optsp)
@@ -2394,7 +2415,7 @@ show_stats_perform_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
-/* STATS_LPAGE, CACHE_STATS_SUBPG */
+/* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20] */
 static int
 show_cache_stats_page(unsigned char * resp, int len,
                       const struct opts_t * optsp)
@@ -2527,7 +2548,7 @@ show_cache_stats_page(unsigned char * resp, int len,
     return 1;
 }
 
-/* FORMAT_STATUS_LPAGE */
+/* FORMAT_STATUS_LPAGE [0x8] */
 static void
 show_format_status_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2597,6 +2618,7 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* Non-volatile cache page [0x17] */
 static void
 show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2674,7 +2696,7 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
-    char * cp;
+    const char * cp;
     char str[PCB_STR_LEN];
 
     printf("Logical block provisioning page (sbc-3) [0xc]\n");
@@ -2742,7 +2764,7 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* SOLID_STATE_MEDIA_LPAGE */
+/* SOLID_STATE_MEDIA_LPAGE [0x11] */
 static void
 show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2782,7 +2804,7 @@ show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-/* SAT_ATA_RESULTS_LPAGE (SAT-2) */
+/* SAT_ATA_RESULTS_LPAGE (SAT-2) [0x16] */
 static void
 show_ata_pt_results_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -2837,6 +2859,8 @@ static const char * bms_status[] = {
     "background scan halted due to temperature out of range",
     "background scan enabled, none active (waiting for BMS interval timer "
         "to expire)", /* 8 */
+    "background scan halted - scan results list full",
+    "background scan halted - pre-scan time limit timer expired" /* 10 */,
 };
 
 static const char * reassign_status[] = {
@@ -2851,6 +2875,7 @@ static const char * reassign_status[] = {
     "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
+/* Background scan results [0x15] for disk */
 static void
 show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
                                   int verbose)
@@ -2961,6 +2986,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
+/* Sequential access device page [0xc] for tape */
 static void
 show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
                             int verbose)
@@ -3067,6 +3093,7 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
+/* 0x14 for tape and ADC */
 static void
 show_device_stats_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3171,6 +3198,7 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x14 for media changer */
 static void
 show_media_stats_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3305,6 +3333,7 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x15 for media changer */
 static void
 show_element_stats_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3342,6 +3371,7 @@ show_element_stats_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x16 for media changer */
 static void
 show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3413,7 +3443,7 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
-static char * tape_alert_strs[] = {
+static const char * tape_alert_strs[] = {
     "<parameter code 0, unknown>",              /* 0x0 */
     "Read warning",
     "Write warning",
@@ -3477,6 +3507,7 @@ static char * tape_alert_strs[] = {
     "WORM medium - overwrite attempted",
 };
 
+/* TAPE_ALERT_LPAGE [0x2e] */
 static void
 show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
                          const struct opts_t * optsp)
@@ -3513,6 +3544,7 @@ show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
     }
 }
 
+/* 0x37 */
 static void
 show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3567,6 +3599,7 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
     }
 }
 
+/* 0x3e */
 static void
 show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
 {
@@ -3780,10 +3813,10 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case PROTO_SPECIFIC_LPAGE:
+    case PROTO_SPECIFIC_LPAGE:  /* 0x18 */
         done = show_protocol_specific_page(resp, len, optsp);
         break;
-    case STATS_LPAGE: /* defined for subpages 0 to 32 inclusive */
+    case STATS_LPAGE: /* 0x19, defined for subpages 0 to 32 inclusive */
         if (subpg_code <= HIGH_GRP_STATS_SUBPG)
             done = show_stats_perform_page(resp, len, optsp);
         else if (subpg_code == CACHE_STATS_SUBPG)
@@ -3791,10 +3824,13 @@ show_ascii_page(unsigned char * resp, int len,
         else
             done = 0;
         break;
-    case PCT_LPAGE:
+    case PCT_LPAGE:     /* 0x1a */
         show_power_condition_transitions_page(resp, len, optsp->do_pcb);
         break;
-    case TAPE_ALERT_LPAGE:
+    case 0x1b:
+        show_data_compression_log_page(resp, len, optsp->do_pcb);
+        break;
+    case TAPE_ALERT_LPAGE:      /* 0x2e */
         {
             switch (inq_dat->peripheral_type) {
             case PDT_TAPE:     /* ssc only */
@@ -3806,13 +3842,13 @@ show_ascii_page(unsigned char * resp, int len,
             }
         }
         break;
-    case 0x30:
+    case 0x30:  /* vendor specific: IBM */
         show_tape_usage_log_page(resp, len, optsp->do_pcb);
         break;
-    case 0x31:
+    case 0x31:  /* vendor specific: IBM */
         show_tape_capacity_log_page(resp, len, optsp->do_pcb);
         break;
-    case 0x32:
+    case 0x32:  /* vendor specific, now tweaked and standardized at 0x1b */
         show_data_compression_log_page(resp, len, optsp->do_pcb);
         break;
     case IE_LPAGE:
@@ -3870,7 +3906,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
 
     optsp->pg_code = TEMPERATURE_LPAGE;
     optsp->subpg_code = NOT_SPG_SUBPG;
-    res = do_logs(sg_fd, resp, max_len, 0, optsp);
+    res = do_logs(sg_fd, resp, max_len, optsp);
     if (0 == res) {
         len = (resp[2] << 8) + resp[3] + 4;
         if (optsp->do_raw)
@@ -3883,7 +3919,7 @@ fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
         fprintf(stderr, "Device not ready\n");
     else {
         optsp->pg_code = IE_LPAGE;
-        res = do_logs(sg_fd, resp, max_len, 0, optsp);
+        res = do_logs(sg_fd, resp, max_len, optsp);
         if (0 == res) {
             len = (resp[2] << 8) + resp[3] + 4;
             if (optsp->do_raw)
@@ -3999,7 +4035,7 @@ main(int argc, char * argv[])
         return (k >= 0) ?  k : SG_LIB_CAT_OTHER;
     }
     resp_len = (opts.maxlen > 0) ? opts.maxlen : MX_ALLOC_LEN;
-    res = do_logs(sg_fd, rsp_buff, resp_len, 1, &opts);
+    res = do_logs(sg_fd, rsp_buff, resp_len, &opts);
     if (0 == res) {
         pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
         if ((pg_len + 4) > resp_len) {
@@ -4061,7 +4097,7 @@ main(int argc, char * argv[])
             else
                 opts.subpg_code = NOT_SPG_SUBPG;
 
-            res = do_logs(sg_fd, rsp_buff, resp_len, 1, &opts);
+            res = do_logs(sg_fd, rsp_buff, resp_len, &opts);
             if (0 == res) {
                 pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
                 if ((pg_len + 4) > resp_len) {

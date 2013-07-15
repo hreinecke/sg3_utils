@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2012 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -196,7 +196,7 @@ extern int sg_get_sense_filemark_eom_ili(const unsigned char * sensep,
 extern int sg_get_sense_progress_fld(const unsigned char * sensep,
                                      int sb_len, int * progress_outp);
 
-/* Closely related to sg_print_sense(). Puts decode sense data in 'buff'.
+/* Closely related to sg_print_sense(). Puts decoded sense data in 'buff'.
  * Usually multiline with multiple '\n' including one trailing. If
  * 'raw_sinfo' set appends sense buffer in hex. */
 extern void sg_get_sense_str(const char * leadin,

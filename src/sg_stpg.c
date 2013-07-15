@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2012 Hannes Reinecke, Christophe Varoqui and Douglas Gilbert.
+* Copyright (c) 2004-2013 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.5 20121211";
+static const char * version_str = "1.6 20130507";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -37,6 +37,8 @@ static char * version_str = "1.5 20121211";
 #define TPGS_STATE_TRANSITIONING 0xf
 
 /* See also table 306 - Target port group descriptor format in SPC-4 rev 36e */
+#ifndef __cplusplus
+
 static const unsigned char state_sup_mask[] = {
         [TPGS_STATE_OPTIMIZED]     = 0x01,
         [TPGS_STATE_NONOPTIMIZED]  = 0x02,
@@ -45,6 +47,16 @@ static const unsigned char state_sup_mask[] = {
         [TPGS_STATE_OFFLINE]       = 0x40,
         [TPGS_STATE_TRANSITIONING] = 0x80,
 };
+
+#else
+
+// C++ does not support designated initializers
+static const unsigned char state_sup_mask[] = {
+    0x1, 0x2, 0x4, 0x8, 0x0, 0x0, 0x0, 0x0,
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40, 0x80,
+};
+
+#endif  /* C or C++ ? */
 
 #define VPD_DEVICE_ID  0x83
 #define DEF_VPD_DEVICE_ID_LEN  252
@@ -294,7 +306,7 @@ build_port_arr(const char * inp, int * port_arr, int * port_arr_len,
         v = sg_get_num_nomult(lcp);
         if (-1 != v) {
             port_arr[k] = v;
-            cp = strchr(lcp, ',');
+            cp = (char *)strchr(lcp, ',');
             if (NULL == cp)
                 break;
             lcp = cp + 1;
@@ -379,7 +391,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
                 return 1;
             }
         }
-        cp = strchr(lcp, ',');
+        cp = (char *)strchr(lcp, ',');
         if (NULL == cp)
             break;
         lcp = cp + 1;

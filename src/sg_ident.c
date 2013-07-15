@@ -27,7 +27,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static char * version_str = "1.09 20111014";
+static const char * version_str = "1.10 20130507";
 
 #define ME "sg_ident: "
 

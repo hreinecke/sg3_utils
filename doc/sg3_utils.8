@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG3_UTILS "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -108,10 +108,10 @@ order as devices are discovered (and sometimes rediscovered).
 Some storage devices have a SCSI lower level device name which starts
 with a SCSI (pseudo) adapter name of the form "SCSI<n>:". To this is added
 sub\-addressing in the form of a "bus" number, a "target" identifier and
-a "lun" (logical unit number). The "bus" number is also known as a "PathId".
+a LUN (Logical Unit Number). The "bus" number is also known as a "PathId".
 These are assembled to form a device name of the
 form: "SCSI<n>:<bus>,<target>,<lun>". The trailing ",<lun>" may be omitted
-in which case a lun of zero is assumed. This lower level device name cannot
+in which case a LUN of zero is assumed. This lower level device name cannot
 often be used directly since Windows blocks attempts to use it if a class
 driver has "claimed" the device. There are SCSI device types (e.g.
 Automation/Drive interface type) for which there is no class driver. At
@@ -126,8 +126,8 @@ utilities in this package.
 A single device (e.g. a disk) can have many device names. For
 example: "PD0" can also be "C:", "D:" and "SCSI0:0,1,0". The two volume names
 reflect that the disk has two partitions on it. Disk partitions that are
-not recognised by Windows are not usually given a volume name. However
-Vista does show a volume name for a disk which has no partitions recognised
+not recognized by Windows are not usually given a volume name. However
+Vista does show a volume name for a disk which has no partitions recognized
 by it and when selected invites the user to format it (which may be rather
 unfriendly to other OSes).
 .PP
@@ -272,7 +272,7 @@ If an option takes a numeric argument then that argument is assumed to
 be decimal unless otherwise indicated (e.g. with a leading "0x", a
 trailing "h" or as noted in the usage message).
 .PP
-Some options are used uniformally in most of the utilities in this
+Some options are used uniformly in most of the utilities in this
 package. Those options are listed below. Note that there are some
 exceptions.
 .TP
@@ -366,7 +366,7 @@ trailing "h" or "H" as found in (storage) standards. When hex numbers are
 given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
 .SH SCRIPTS, EXAMPLES and UTILS
-There are several Bourne shell scripts in the 'scripts' subdirectory that
+There are several bash shell scripts in the 'scripts' subdirectory that
 invoke compiled utilities (e.g. sg_readcap). The scripts start with 'scsi_'
 rather than 'sg_'. One purpose of these scripts is to call the same
 utility (e.g. sg_readcap) on multiple disks. Most of the basic compiled
@@ -387,7 +387,7 @@ the 'utils' subdirectory.
 .SH WEB SITE
 There is a web page discussing this package at 
 http://sg.danny.cz/sg/sg3_utils.html . The device naming used by this
-package on various operating system is discussed in the page:
+package on various operating systems is discussed at:
 http://sg.danny.cz/sg/device_name.html .
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
@@ -395,7 +395,7 @@ CREDITS file and individual source files (in the 'src' directory).
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 1999\-2012 Douglas Gilbert
+Copyright \(co 1999\-2013 Douglas Gilbert
 .br
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files

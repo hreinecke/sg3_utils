@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012 Hannes Reinecke, SUSE Labs
+ * Copyright (c) 2011-2013 Hannes Reinecke, SUSE Labs
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static char * version_str = "1.1 20120905";
+static const char * version_str = "1.1 20130507";
 
 
 #define MAX_XFER_LEN 10000
@@ -381,7 +381,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (NULL == (cpResultBuff = malloc(xfer_len))) {
+    if (NULL == (cpResultBuff = (unsigned char *)malloc(xfer_len))) {
             fprintf(stderr, ME "out of memory\n");
             return SG_LIB_FILE_ERROR;
     }

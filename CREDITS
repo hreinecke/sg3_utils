@@ -34,6 +34,9 @@ Frank Jansen <fjansen at egenera dot com>: additions to sg_scan; contributed
 Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
+Greg Inozemtsev <greg at purestorage dot com>
+        extensions to sg_xcopy [20130207]
+
 Hannes Reinecke <hare at suse dot de>
         contributed sg_rdac, (and some corresponding VPD entries to
         sg_vpd_vendor), sg_stpg and sg_safte [20071013+20130110]
@@ -46,6 +49,9 @@ Hayashi Naoyuki <titan at culzean dot org>
 
 Heiko Eissfeldt <heiko at colossus dot escape dot de> sg based example
         programs for the original sg driver
+
+Ilan Steinberg <ilan dot steinberg at kaminario dot com>
+        sg_xcopy: contributed --on_src and --on_dst options [20130505]
 
 Ingo van Lil <inguin at gmx dot de>
         contributed sg_raw [20070331]
@@ -113,4 +119,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-5th February 2013
+8th May 2013

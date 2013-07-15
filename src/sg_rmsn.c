@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2011 Douglas Gilbert.
+ * Copyright (c) 2005-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static char * version_str = "1.09 20110206";
+static const char * version_str = "1.09 20130507";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 

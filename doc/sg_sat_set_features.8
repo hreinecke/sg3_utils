@@ -1,11 +1,11 @@
-.TH SG_SAT_SET_FEATURES "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_SAT_SET_FEATURES "8" "April 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_sat_set_features \- use ATA SET FEATURES command via a SCSI to ATA
 Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_set_features
-[\fI\-\-count=\fRCO] [\fI\-\-ck_cond\fR] [\fI\-\-feature=\fRFEA]
-[\fI\-\-help\fR] [\fI\-\-len=\fR16|12] [\fI\-\-lba=\fRLBA]
+[\fI\-\-count=CO\fR] [\fI\-\-ck_cond\fR] [\fI\-\-feature=FEA\fR]
+[\fI\-\-help\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-len=\fR16|12]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -55,17 +55,18 @@ are 2h to enable the write cache and 82h to disable it.
 outputs the usage message summarizing command line options
 then exits. Ignores \fIDEVICE\fR if given.
 .TP
+\fB\-L\fR, \fB\-\-lba\fR=\fILBA\fR
+the number \fILBA\fR is placed in the "lba" field of the ATA SET
+FEATURES command. Only some sub\-commands (a term used for the value
+placed in the "feature" field) require the lba field to be set. This
+value is typically not a "logical block address" as the acronym might
+imply.  The default value placed in the "lba" field is 0. The maximum value
+allowed for \fILBA\fR is 0xfffffffe (or 0xffffff if \fI\-\-len=\fR12).
+.TP
 \fB\-l\fR, \fB\-\-len\fR=16 | 12
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
 The argument can either be 16 or 12. The default is 16. Some SCSI
 transports cannot convey SCSI commands longer than 12 bytes.
-.TP
-\fB\-L\fR, \fB\-\-lba\fR=\fILBA\fR
-the number \fILBA\fR is placed in the "lba" field in the ATA SET
-FEATURES command. Only some subcommands (a term used for the value
-placed in the "feature" field) require the lba field to be set.
-This value is not a "logical block address" as the acronym might imply.
-The default value placed in the "lba" field is 0.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.
@@ -74,7 +75,7 @@ increases the level or verbosity.
 print out version string
 .SH NOTES
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
-a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
+a SCSI generic (sg) device. In the 2.6 and 3 series block devices (e.g. disks
 and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
 will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
 device names may be used as well (e.g. "/dev/st0m"). Prior to lk 2.6.29
@@ -88,9 +89,10 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2007\-2012 Douglas Gilbert
+Copyright \(co 2007\-2013 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_sat_identify(sg3_utils), sg_inq(sg3_utils), sdparm(sdparm), hdparm(hdparm)
+.B sg_sat_identify(sg3_utils), sg_inq(sg3_utils), sdparm(sdparm),
+.B hdparm(hdparm)

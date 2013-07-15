@@ -1,6 +1,6 @@
-.TH SG_MAP "8" "December 2006" "sg3_utils\-1.23" SG3_UTILS
+.TH SG_MAP "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
-sg_map \- displays mapping between linux sg and other SCSI devices
+sg_map \- displays mapping between Linux sg and other SCSI devices
 .SH SYNOPSIS
 .B sg_map
 [\fI\-a\fR] [\fI-h\fR] [\fI\-i\fR] [\fI\-n\fR] [\fI\-scd\fR] [\fI\-sd\fR]
@@ -14,13 +14,18 @@ sg devices and finds the corresponding SCSI disk, cdrom or tape
 device name (if any). Scanners are an example of SCSI devices
 that have no alternate SCSI device name apart from their sg device
 name.
+.PP
+This utility is deprecated and has not been updated for years, only very
+obvious bugs will be fixed. Unless a very old version of Linux is being
+used (e.g.  2.4 series or earlier), then please use a utility like lsscsi(8)
+or the facilities offered by udev(8).
 .SH OPTIONS
 .TP
 \fB\-a\fR
 assume the sg devices have alphabetical device names and loop
 through /dev/sga, /dev/sgb, etc. Default is numeric scan.
 Note that sg device nodes with an alphabetical index have been
-deprecated since the linux kernel 2.2 series.
+deprecated since the Linux kernel 2.2 series.
 .TP
 \fB\-h\fR
 print usage message then exit.
@@ -72,7 +77,7 @@ observing the output of the command: "cat /proc/scsi/scsi".
 However if devices have been added since boot this can
 be deceptive.
 .PP
-In the linux kernel 2.6 series something close to the mapping
+In the Linux kernel 2.6 series something close to the mapping
 shown by this utility can be found by analysing sysfs. The
 main difference is that sysfs analysis will show the mapping
 between sg nodes and other SCSI device nodes in terms of
@@ -91,7 +96,7 @@ was not supported in Linux. It used a simple algorithm to scan sg
 device nodes in ascending numeric or alphabetical order, stopping
 after there were 5 consecutive errors.
 .PP
-In the linux kernel 2.6 series, this utility uses sysfs to find which
+In the Linux kernel 2.6 series, this utility uses sysfs to find which
 sg device nodes are active and only checks those. Hence there can be
 large "holes" in the numbering of sg device nodes (e.g. after an
 adapter has been removed) and still all active sg device nodes will
@@ -159,7 +164,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2006 Douglas Gilbert
+Copyright \(co 2000\-2013 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -171,3 +176,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .B scsidev(8)
 ,
 .B devfsd(8)
+,
+.B lsscsi(8)
+,
+.B udev(7)

@@ -1,5 +1,8 @@
-/* sg_test_rwbuf.c */
 /*
+ * (c) 2000 Kurt Garloff <garloff at suse dot de>
+ * heavily based on Douglas Gilbert's sg_rbuf program.
+ * (c) 1999-2008 Douglas Gilbert
+ *
  * Program to test the SCSI host adapter by issueing
  * write and read operations on a device's buffer
  * and calculating checksums.
@@ -7,9 +10,6 @@
  * for this purpose (SG_GET_RESERVED_SIZE), you risk
  * serious data corruption, if the device is accessed by
  * somebody else in the meantime.
- * (c) 2000 Kurt Garloff <garloff at suse dot de>
- * heavily based on Douglas Gilbert's sg_rbuf program.
- * (c) 1999-2008 Douglas Gilbert
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 #include "sg_io_linux.h"
 
 
-static char * version_str = "1.07 20100423";
+static const char * version_str = "1.07 20130507";
 
 #define BPI (signed)(sizeof(int))
 

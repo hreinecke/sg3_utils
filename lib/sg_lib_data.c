@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2012 Douglas Gilbert.
+ * Copyright (c) 2007-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.80 20130120";  /* spc4r36, sbc3r32 */
+const char * sg_lib_version_str = "1.83 20130530";  /* spc4r36, sbc3r32 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -550,6 +550,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x1b,"Logical unit not ready, sanitize in progress"},
     {0x04,0x1c,"Logical unit not ready, additional power use not yet "
                 "granted"},
+    {0x04,0x1d,"Logical unit not ready, configuration in progress"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -937,6 +938,14 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x4B,0x0B,"Data-out buffer overflow - data buffer size"},
     {0x4B,0x0C,"Data-out buffer overflow - data buffer descriptor area"},
     {0x4B,0x0D,"Data-out buffer error"},
+    {0x4B,0x0E,"PCIe fabric error"},
+    {0x4B,0x0f,"PCIe completion timeout"},
+    {0x4B,0x10,"PCIe completer abort"},
+    {0x4B,0x11,"PCIe poisoned tlp received"},
+    {0x4B,0x12,"PCIe ecrc check failed"},
+    {0x4B,0x13,"PCIe unsupported request"},
+    {0x4B,0x14,"PCIe acs violation"},
+    {0x4B,0x15,"PCIe tlp prefix blocked"},
     {0x4C,0x00,"Logical unit failed self-configuration"},
     /*
      * ASC 0x4D overridden by an "additional2" array entry
@@ -1115,6 +1124,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x67,0x0A,"Set target port groups command failed"},
     {0x67,0x0B,"ATA device feature not enabled"},
     {0x68,0x00,"Logical unit not configured"},
+    {0x68,0x01,"Subsidiary logical unit not configured"},
     {0x69,0x00,"Data loss on logical unit"},
     {0x69,0x01,"Multiple logical unit failures"},
     {0x69,0x02,"Parity/data mismatch"},

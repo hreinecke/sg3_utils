@@ -1,4 +1,4 @@
-.TH SG_SCAN "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_SCAN "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_scan \- scans sg devices (or SCSI/ATAPI/ATA devices) and prints
 results
@@ -27,11 +27,16 @@ and /dev/st0m) are suitable. Devices names associated with ATAPI
 devices (e.g. most CD/DVD drives and ATAPI tape drives) are also suitable.
 If the device does not fall into the above categories then an ATA
 IDENTIFY command is tried.
+.PP
+In Linux 2.6 and 3 series kernels, the lsscsi utility may be helpful. Apart
+from providing more information (by data\-mining in the sysfs pseudo file
+system), it does not need root permissions to execute, as this utility
+would typically need.
 .SH OPTIONS
 .TP
 \fB\-a\fR
 do alphabetical scan (i.e. sga, sgb, sgc). Note that sg device nodes with
-an alphabetical index have been deprecated since the linux kernel 2.2
+an alphabetical index have been deprecated since the Linux kernel 2.2
 series.
 .TP
 \fB\-i\fR
@@ -52,7 +57,7 @@ was not supported in Linux. It used a simple algorithm to scan sg
 device nodes in ascending numeric or alphabetical order, stopping
 after there were 4 consecutive errors.
 .PP
-In the linux kernel 2.6 series, this utility uses sysfs to find which
+In the Linux kernel 2.6 series, this utility uses sysfs to find which
 sg device nodes are active and only checks those. Hence there can be
 large "holes" in the numbering of sg device nodes (e.g. after an
 adapter has been removed) and still all active sg device nodes will
@@ -65,7 +70,9 @@ the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert and F. Jansen
 .SH COPYRIGHT
-Copyright \(co 1999\-2012 Douglas Gilbert
+Copyright \(co 1999\-2013 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B lsscsi(8)

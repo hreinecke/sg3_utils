@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_XCOPY "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -9,22 +9,27 @@ COPY (XCOPY)
 [\fIoflag=FLAGS\fR] [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR]
 [\fI\-\-version\fR]
 .PP
-[\fIbpt=BPT\fR] [\fIcat=\fR0|1] [\fIdc=\fR0|1] [\fIid_usage=\fRhold|discard]
-[\fIlist_id=ID\fR] [\fIprio=PRIO\fR] [\fItime=\fR0|1] [\fIverbose=VERB\fR]
-[\fI\-h\fR] [\fI\-V\fR]
+[\fIbpt=BPT\fR] [\fIcat=\fR0|1] [\fIdc=\fR0|1]
+[\fIid_usage=\fRhold|discard|disable] [\fIlist_id=ID\fR] [\fIprio=PRIO\fR]
+[\fItime=\fR0|1] [\fIverbose=VERB\fR] [\fI\-\-on_dst|\-\-on_src\fR]
+[\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Copy data to and from any files. Specialized for "files" that are Linux SCSI
-devices that support the SCSI EXTENDED COPY command. Similar syntax and
-semantics to
+devices that support the SCSI EXTENDED COPY (XCOPY) command. Similar syntax
+and semantics to
 .B dd(1)
 but with no "conversions" is supported.
 .PP
 The first group in the synopsis above are "standard" Unix
 .B dd(1)
 operands. The second group are extra options added by this utility.
-Both groups are defined below.
+Both groups are defined below in combined, alphabetical order.
+.PP
+By default the XCOPY command is sent to \fIIFILE\fR. This can be changed
+with the \fI\-\-on_dst\fR option which causes the XCOPY command to be sent
+to \fIOFILE\fR instead.
 .SH OPTIONS
 .TP
 \fBbpt\fR=\fIBPT\fR
@@ -47,7 +52,7 @@ device block size.
 .TP
 \fBcat\fR=0 | 1
 sets the SCSI EXTENDED COPY command segment descriptor CAT bit to 0 or
-1 (default: 0). The CAT bit (in conjuction with the PAD bit) controls
+1 (default: 0). The CAT bit (in conjunction with the PAD bit) controls
 the handling of residual data. See section
 .B HANDLING OF RESIDUAL DATA
 for details.
@@ -77,9 +82,10 @@ message is issued and no copy takes place.
 \fBibs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
 .TP
-\fBid_usage\fR=hold | discard
+\fBid_usage\fR=hold | discard | disable
 sets the SCSI EXTENDED COPY command parameter list field called LIST ID
-USAGE to 0 if the argument is 'hold' or to 2 if the argument is 'discard'.
+USAGE to 0 if the argument is 'hold', to 2 if the argument is 'discard',
+or to '3' if the argument is 'disable'.
 .TP
 \fBif\fR=\fIIFILE\fR
 read from \fIIFILE\fR instead of stdin. If \fIIFILE\fR is '\-' then stdin
@@ -137,16 +143,21 @@ A value of 1 reports extra information that is not repetitive. A value
 repetitive. Values of 3 and 4 yield output for all SCSI commands (and
 Unix read() and write() calls) so there can be a lot of output.
 .TP
-\fB\-\-help\fR
+\fB\-h\fR, \fB\-\-help\fR
 outputs usage message and exits.
 .TP
-\fB\-\-version\fR
-outputs version number information and exits.
+\fB\-\-on_dst\fR
+send the XCOPY command to the output file/device.
 .TP
-\fB\-h\fR
-outputs usage message and exits.
+\fB\-\-on_src\fR
+send the XCOPY command to the input file/device. This is the default when
+this option and \fI\-\-on_dst\fR are not given.
 .TP
-\fB\-V\fR
+\fB\-v\fR, \fB\-\-verbose\fR
+equivalent to \fIverbose=1\fR. When used twice, equivalent to
+\fIverbose=2\fR, etc.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
 outputs version number information and exits.
 .SH FLAGS
 Here is a list of flags and their meanings:
@@ -232,7 +243,7 @@ The status of the SCSI EXTENDED COPY command can be queried with
 .PP
 Currently only block\-to\-block transfers are implemented; \fIIFILE\fR
 and \fIOFILE\fR must refer to a SCSI block device.
-PP
+.PP
 No account is taken of partitions so, for example, /dev/sbc2, /dev/sdc,
 /dev/sg2, and /dev/bsg/3:0:0:1 would all refer to the same thing: the
 whole logical unit (i.e. the whole disk) starting at LBA 0. So any

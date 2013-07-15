@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2012 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2013 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static char * version_str = "1.37 20121211 shared_mmap";
+static const char * version_str = "1.37 20130507 shared_mmap";
 #else
-static char * version_str = "1.37 20121211";
+static const char * version_str = "1.37 20130507";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -84,7 +84,7 @@ static char * version_str = "1.37 20121211";
 #define SG_FLAG_MMAP_IO 4
 #endif
 
-#define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
+#define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
 

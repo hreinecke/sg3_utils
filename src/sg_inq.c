@@ -38,6 +38,7 @@
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pt.h"
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -66,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static char * version_str = "1.11 20130109";    /* SPC-4 rev 36 */
+static const char * version_str = "1.13 20130507";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -106,6 +107,11 @@ static char * version_str = "1.11 20130109";    /* SPC-4 rev 36 */
 #define SAFE_STD_INQ_RESP_LEN 36
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 #define VPD_ATA_INFO_LEN  572
+
+#define SENSE_BUFF_LEN  64       /* Arbitrary, could be larger */
+#define INQUIRY_CMD     0x12
+#define INQUIRY_CMDLEN  6
+#define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
 static unsigned char rsp_buff[MX_ALLOC_LEN + 1];
@@ -192,6 +198,7 @@ static struct option long_options[] = {
 #endif
         {"page", 1, 0, 'p'},
         {"raw", 0, 0, 'r'},
+        {"vendor", 0, 0, 's'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {"vpd", 0, 0, 'e'},
@@ -206,6 +213,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int do_raw;
+    int do_vendor;
     int do_verbose;
     int do_version;
     int do_decode;
@@ -231,9 +239,9 @@ usage()
             "[--extended]\n"
             "              [--help] [--hex] [--id] [--len=LEN] "
             "[--maxlen=LEN]\n"
-            "              [--page=PG] [--raw] [--verbose] [--version] "
-            "[--vpd]\n"
-            "              DEVICE\n"
+            "              [--page=PG] [--raw] [--vendor] [--verbose] "
+            "[--version]\n"
+            "              [--vpd] DEVICE\n"
             "  where:\n"
             "    --ata|-a        treat DEVICE as (directly attached) ATA "
             "device\n");
@@ -273,6 +281,8 @@ usage()
             "                        abbreviation (opcode number if "
             "'--cmddt' given)\n"
             "    --raw|-r        output response in binary (to stdout)\n"
+            "    --vendor|-s     show vendor specific fields in std "
+            "inquiry\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string then exit\n"
             "    --vpd|-e        vital product data (set page with "
@@ -371,18 +381,18 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 
 #ifdef SG_LIB_LINUX
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "acdeEhHil:m:NOp:ruvVx", long_options,
+        c = getopt_long(argc, argv, "acdeEhHil:m:NOp:rsuvVx", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "cdeEhHil:m:p:ruvVx", long_options,
+        c = getopt_long(argc, argv, "cdeEhHil:m:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #else  /* SG_LIB_LINUX */
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "cdeEhHil:m:NOp:ruvVx", long_options,
+        c = getopt_long(argc, argv, "cdeEhHil:m:NOp:rsuvVx", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "cdeEhHil:m:p:ruvVx", long_options,
+        c = getopt_long(argc, argv, "cdeEhHil:m:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #endif /* SG_LIB_LINUX */
@@ -447,6 +457,9 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'r':
             ++optsp->do_raw;
+            break;
+        case 's':
+            ++optsp->do_vendor;
             break;
         case 'u':
             ++optsp->do_export;
@@ -675,6 +688,80 @@ process_cl(struct opts_t * optsp, int argc, char * argv[])
 
 #endif  /* SG_SCSI_STRINGS */
 
+
+/* Local version of sg_ll_inquiry() [found in libsgutils] that additionally
+ * passes back resid. Same return values as sg_ll_inquiry() (0 is good). */
+static int
+ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
+           int mx_resp_len, int * residp, int noisy, int verbose)
+{
+    int res, ret, k, sense_cat;
+    unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    unsigned char * up;
+    struct sg_pt_base * ptvp;
+
+    if (cmddt)
+        inqCmdBlk[1] |= 2;
+    if (evpd)
+        inqCmdBlk[1] |= 1;
+    inqCmdBlk[2] = (unsigned char)pg_op;
+    /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
+    inqCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
+    inqCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
+    if (verbose) {
+        fprintf(stderr, "    inquiry cdb: ");
+        for (k = 0; k < INQUIRY_CMDLEN; ++k)
+            fprintf(stderr, "%02x ", inqCmdBlk[k]);
+        fprintf(stderr, "\n");
+    }
+    if (resp && (mx_resp_len > 0)) {
+        up = (unsigned char *)resp;
+        up[0] = 0x7f;   /* defensive prefill */
+        if (mx_resp_len > 4)
+            up[4] = 0;
+    }
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(stderr, "inquiry: out of memory\n");
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
+                               noisy, verbose, &sense_cat);
+    if (residp)
+        *residp = get_scsi_pt_resid(ptvp);
+    destruct_scsi_pt_obj(ptvp);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else if (ret < 4) {
+        if (verbose)
+            fprintf(stderr, "inquiry: got too few bytes (%d)\n", ret);
+        ret = SG_LIB_CAT_MALFORMED;
+    } else
+        ret = 0;
+
+    return ret;
+}
+
 static const struct svpd_values_name_t *
 sdp_find_vpd_by_acron(const char * ap)
 {
@@ -708,43 +795,47 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
+/* Strip initial and trailing whitespaces; convert one or repeated
+ * whitespaces to a single "_"; convert non-printable characters to "."
+ * and if there are no valid (i.e. printable) characters return 0.
+ * Process 'str' in place (i.e. it's input and output) and return the
+ * length of the output, excluding the trailing '\0'.
+ */
 static int
 encode_whitespaces(unsigned char *str, int inlen)
 {
+    int k, res;
+    int j = 0;
+    int valid = 0;
     int outlen = inlen;
-    int i, j = 0, k, valid = 0;
 
     /* Skip initial whitespaces */
     while (isblank(str[j]))
         j++;
     k = j;
     /* Strip trailing whitespaces */
-    while (outlen > k &&
-           (isblank(str[outlen - 1]) || str[outlen - 1] == '\0')) {
+    while ((outlen > k) &&
+           (isblank(str[outlen - 1]) || ('\0' == str[outlen - 1]))) {
         str[outlen - 1] = '\0';
         outlen--;
     }
-    for (i = 0; (k < outlen); ++k) {
+    for (res = 0; k < outlen; ++k) {
         if (isblank(str[k])) {
-            if (i > 0 && str[i - 1] != '_') {
-                str[i] = '_';
+            if ((res > 0) && ('_' != str[res - 1])) {
+                str[res++] = '_';
                 valid++;
-                i++;
             }
-        } else if (!isprint(str[k])) {
-            str[i] = '.';
-            i++;
-        } else {
-            str[i] = str[k];
+        } else if (! isprint(str[k]))
+            str[res++] = '.';
+        else {
+            str[res++] = str[k];
             valid++;
-            i++;
         }
     }
-    if (!valid) {
-        i = 0;
-    }
-    str[i] = '\0';
-    return i;
+    if (! valid)
+        res = 0;
+    str[res] = '\0';
+    return res;
 }
 
 static int
@@ -768,7 +859,7 @@ encode_string(char *out, const unsigned char *in, int inlen)
 struct vpd_name {
     int number;
     int peri_type;
-    char * name;
+    const char * name;
 };
 
 /* In numerical order */
@@ -2152,7 +2243,7 @@ decode_rdac_vpd_c9(unsigned char * buff, int len)
 }
 
 /* Returns 0 if Unit Serial Number VPD page contents found, else see
-   sg_ll_inquiry() */
+   sg_ll_inquiry() return values */
 static int
 fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
@@ -2217,7 +2308,7 @@ get_ansi_version_str(int version, char * buff, int buff_len)
 }
 
 
-/* Returns 0 if successful */
+/* Process a standard INQUIRY response. Returns 0 if successful */
 static int
 process_std_inq(int sg_fd, const struct opts_t * optsp)
 {
@@ -2225,12 +2316,12 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
     const char * cp;
     int vdesc_arr[8];
     char buff[48];
-    int verb;
+    int verb, resid;
 
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
     rlen = (optsp->resp_len > 0) ? optsp->resp_len : SAFE_STD_INQ_RESP_LEN;
     verb = optsp->do_verbose;
-    res = sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, 0, verb);
+    res = ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, &resid, 0, verb);
     if (0 == res) {
         pqual = (rsp_buff[0] & 0xe0) >> 5;
         if (! optsp->do_raw && ! optsp->do_export) {
@@ -2256,13 +2347,13 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             (0 == optsp->resp_len)) {
             rlen = len;
             memset(rsp_buff, 0, rlen);
-            if (sg_ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, 1, verb)) {
+            if (ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, &resid, 1, verb)) {
                 fprintf(stderr, "second INQUIRY (%d byte) failed\n", len);
                 return SG_LIB_CAT_OTHER;
             }
             if (len != (rsp_buff[4] + 5)) {
-                fprintf(stderr, "strange, twin INQUIRYs yield different "
-                        "'additional lengths'\n");
+                fprintf(stderr, "strange, consecutive INQUIRYs yield "
+                        "different 'additional lengths'\n");
                 res = SG_LIB_CAT_MALFORMED;
                 len = rsp_buff[4] + 5;
             }
@@ -2271,6 +2362,9 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             act_len = rlen;
         else
             act_len = (rlen < len) ? rlen : len;
+        /* don't use more than HBA's resid says was transferred from LU */
+        if (act_len > (rlen - resid))
+            act_len = rlen - resid;
         if (optsp->do_raw)
             dStrRaw((const char *)rsp_buff, act_len);
         else if (optsp->do_hex)
@@ -2365,11 +2459,30 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
                 } else
                     printf(" Product revision level: %s\n", xtra_buff);
             }
+            if (optsp->do_vendor && (act_len > 36) && ('\0' != rsp_buff[36]) &&
+                (' ' != rsp_buff[36])) {
+                memcpy(xtra_buff, &rsp_buff[36], act_len < 56 ? act_len - 36 :
+                       20);
+                if (optsp->do_export) {
+                    len = encode_whitespaces((unsigned char *)xtra_buff, 20);
+                    printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
+                } else
+                    printf(" Vendor specific: %s\n", xtra_buff);
+            }
             if (optsp->do_descriptors) {
                 for (j = 0, k = 58; ((j < 8) && ((k + 1) < act_len));
                      k +=2, ++j)
                     vdesc_arr[j] = ((rsp_buff[k] << 8) +
                                     rsp_buff[k + 1]);
+            }
+            if ((optsp->do_vendor > 1) && (act_len > 96)) {
+                memcpy(xtra_buff, &rsp_buff[96], act_len - 96);
+                if (optsp->do_export) {
+                    len = encode_whitespaces((unsigned char *)xtra_buff,
+                                             act_len - 96);
+                    printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
+                } else
+                    printf(" Vendor specific: %s\n", xtra_buff);
             }
         }
         if (! (optsp->do_raw || optsp->do_hex || optsp->do_export)) {
@@ -2414,18 +2527,22 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
     } else {
         fprintf(stderr, "    inquiry: failed requesting %d byte response: ",
                 rlen);
-        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "not supported (?)\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            fprintf(stderr, "device not ready (?)\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "field in cdb illegal\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            fprintf(stderr, "unit attention (?)\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "aborted command\n");
+        if (resid && verb)
+            snprintf(buff, sizeof(buff), " [resid=%d]", resid);
         else
-            fprintf(stderr, "res=%d\n", res);
+            buff[0] = '\0';
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "not supported (?)%s\n", buff);
+        else if (SG_LIB_CAT_NOT_READY == res)
+            fprintf(stderr, "device not ready (?)%s\n", buff);
+        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            fprintf(stderr, "field in cdb illegal%s\n", buff);
+        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+            fprintf(stderr, "unit attention (?)%s\n", buff);
+        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+            fprintf(stderr, "aborted command%s\n", buff);
+        else
+            fprintf(stderr, "res=%d%s\n", res, buff);
         return res;
     }
     return 0;

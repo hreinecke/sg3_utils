@@ -173,7 +173,7 @@ SCSI5:0,19,0  claimed=1 pdt=0h          ATA       ST3160812AS       D
 SCSI5:0,21,0  claimed=1 pdt=0h          SEAGATE   ST336754SS        0003
 SCSI5:0,112,0 claimed=0 pdt=10h         LSI       PSEUDO DEVICE     2.34
 
-The storage devices scanned are PhysicalDrive<n> (shorted form PD<n> used),
+The storage devices scanned are PhysicalDrive<n> (shortened form PD<n> used),
 CDROM<n> (which includes DVD and BD drives) and TAPE<n>. There is also an
 optional SCSI adapter scan with device names of the form SCSI<n>:<b>:<t>:<l> .
 These only come into play for devices that are not claimed by one of the
@@ -216,4 +216,4 @@ mode" with the setmode() Windows command.
 
 
 Douglas Gilbert
-14th January 2013
+7th March 2013

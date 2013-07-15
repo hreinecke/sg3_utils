@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2011 Douglas Gilbert.
+ * Copyright (c) 2009-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * logical blocks.
  */
 
-static char * version_str = "1.02 20110831";
+static const char * version_str = "1.02 20130507";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -145,8 +145,8 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
             ll = get_llnum(lcp);
             if (-1 != ll) {
                 lba_arr[k] = (uint64_t)ll;
-                cp = strchr(lcp, ',');
-                c2p = strchr(lcp, ' ');
+                cp = (char *)strchr(lcp, ',');
+                c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
                     cp = c2p;
                 if (NULL == cp)
@@ -203,8 +203,8 @@ build_num_arr(const char * inp, uint32_t * num_arr,
             ll = get_llnum(lcp);
             if (-1 != ll) {
                 num_arr[k] = (uint32_t)ll;      // could truncate
-                cp = strchr(lcp, ',');
-                c2p = strchr(lcp, ' ');
+                cp = (char *)strchr(lcp, ',');
+                c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
                     cp = c2p;
                 if (NULL == cp)

@@ -27,7 +27,7 @@
 #endif
 
 
-static char * version_str = "1.59 20130120";
+static const char * version_str = "1.61 20130507";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -91,7 +91,6 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     scat = sg_err_category_sense(sbp, slen);
     switch (scat) {
     case SG_LIB_CAT_NOT_READY:
-    case SG_LIB_CAT_UNIT_ATTENTION:
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
     case SG_LIB_CAT_ABORTED_COMMAND:
@@ -101,6 +100,8 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     case SG_LIB_CAT_RECOVERED:
     case SG_LIB_CAT_MEDIUM_HARD:
         ++check_data_in;
+        /* drop through */
+    case SG_LIB_CAT_UNIT_ATTENTION:
     default:
         n = noisy;
         break;
@@ -138,6 +139,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     int got, cat, duration, slen, resid, resp_code;
     char b[1024];
 
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
     if (NULL == leadin)
         leadin = "";
     if (pt_res < 0) {

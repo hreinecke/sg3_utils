@@ -2,11 +2,33 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.36 [20130206] [svn: r479]
+Changelog for sg3_utils-1.36 [20130531] [svn: r497]
+  - sg_vpd: Protocol-specific port information VPD page
+    for SAS SSP, persistent connection (spl3r2), power
+    disable (spl3r3)
+    - block device characteristics: add FUAB bit
+  - sg_xcopy: handle more descriptor types; handle zero
+    maximum segment length; allow list IDs to be disabled;
+    improve skip/seek handling; allow xcopy on destination
+  - sg_reset: and --no-esc option to stop reset escalation
+    - clean up cli, add long option names
+  - sg_luns: add --test=ALUN option for decoding LUNs
+    - decoded luns output in decimal or hex (if -HH given)
+    - add '--linux' option to show Linux LUN after T10
+      representation, can map one to the other
+  - sg_inq: add --vendor option to show standard inquiry's
+    vendor specific fields in ASCII
+    - take resid into account with response output
+  - sg_sync: add --16 (for 16 byte command) and --timeout=
+  - sg_logs: add data compression page (ssc4)
+  - sg_sat_set_features: increase --lba from 1 to 4 bytes
+  - sg_write_same: add --ndob option (sbc3r35d)
+  - sg_map: mark as deprecated
+  - sginfo: mark as deprecated, especially -l (list)
   - sg_lib: improve snprintf handling
-  - sg_vpd: Protocol-specific port information VPD page for
-    SAS SSP, persistent connection (spl3r2)
-  - sg_xcopy: handle more descriptor types and correction
+  - sg_lib_data: sync asc/ascq codes with T10 20130117
+  - sg_cmds (lib): if noisy given, give more UA info
+  - make code more C++ friendly
 
 Changelog for sg3_utils-1.35 [20130117] [svn: r476]
   - sg_compare_and_write: new utility

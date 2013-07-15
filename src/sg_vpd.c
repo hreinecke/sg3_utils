@@ -30,7 +30,8 @@
 
 */
 
-static char * version_str = "0.66 20130123";    /* spc4r36 + sbc3r34 */
+static const char * version_str = "0.67 20130517";    /* spc4r36 + sbc3r35 */
+        /* And with sbc3r35, vale Mark Evans */
 
 extern void svpd_enumerate_vendor(void);
 extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
@@ -1573,6 +1574,7 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
         else {
             switch (proto) {
             case TPROTO_SAS:    /* for SSP, added spl3r2 */
+                printf(" pwr_d_s=%d\n", !!(ucp[3] & 0x1));
                 pidp = ucp + 8;
                 for (j = 0; j < desc_len; j += 4, pidp += 4)
                     printf("  phy id=%d, ssp persistent capable=%d\n",
@@ -1721,6 +1723,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
+        printf("  FUAB=%d\n", buff[8] & 0x2);
         printf("  VBULS=%d\n", buff[8] & 0x1);
         break;
     case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:

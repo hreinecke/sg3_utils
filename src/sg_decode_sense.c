@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2011 Douglas Gilbert.
+ * Copyright (c) 2010-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 
 
-static char * version_str = "1.03 20110524";
+static const char * version_str = "1.04 20130507";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 

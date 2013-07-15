@@ -21,7 +21,7 @@
  * -G    display only "grown" defect list (default format: index)
  * -i    display information from Inquiry command.
  * -I    access Informational Exceptions page.
- * -l    list known scsi devices on the system
+ * -l    list known scsi devices on the system [deprecated]
  * -n    access notch parameters page.
  * -N    Negate (stop) storing to saved page (active with -R)
  * -P    access Power Condition Page.
@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.31 [20130107]";
+static const char * version_str = "2.33 [20130507]";
 
 #include <stdio.h>
 #include <string.h>
@@ -236,7 +236,7 @@ struct mpage_name_func {
     int page;
     int subpage;
     enum page_class pg_class;
-    char * name;
+    const char * name;
     int (*func)(struct mpage_info *, const char *);
 };
 
@@ -353,7 +353,7 @@ static char is_hex[MAXPARM];
 
 
 /* forward declarations */
-static void usage(char *);
+static void usage(const char *);
 static void dump(void *buffer, unsigned int length);
 
 #define DXFER_NONE        0
@@ -371,7 +371,7 @@ struct scsi_cmnd_io
     size_t dxfer_len;           /* bytes to be transferred to/from dxferp */
 };
 
-#define SENSE_BUFF_LEN   32
+#define SENSE_BUFF_LEN   64
 #define CMD_TIMEOUT   60000 /* 60,000 milliseconds (60 seconds) */
 #define EBUFF_SZ   256
 
@@ -542,7 +542,7 @@ struct mpage_name_func * get_mpage_name_func(struct mpage_info * mpi)
 
 static char unkn_page_str[64];
 
-static char *
+static const char *
 get_page_name(struct mpage_info * mpi)
 {
     struct mpage_name_func * mpf;
@@ -641,18 +641,18 @@ check_parm_type(int i)
         snprintf(reason, REASON_SZ,
                  "simple number (pos %i) instead of @ hexdatafield: %"PRIu64,
                  next_parameter, replacement_values[next_parameter]);
-        usage (reason);
+        usage(reason);
     }
     if (i != 1 && is_hex[next_parameter]) {
         snprintf(reason, REASON_SZ,
                  "@ hexdatafield (pos %i) instead of a simple number: %"PRIu64,
                  next_parameter, replacement_values[next_parameter]);
-        usage (reason);
+        usage(reason);
     }
 }
 
 static void
-bitfield(unsigned char *pageaddr, char * text, int mask, int shift)
+bitfield(unsigned char *pageaddr, const char * text, int mask, int shift)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -685,7 +685,7 @@ notbitfield(unsigned char *pageaddr, char * text, int mask,
 #endif
 
 static void
-intfield(unsigned char * pageaddr, int nbytes, char * text)
+intfield(unsigned char * pageaddr, int nbytes, const char * text)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -697,7 +697,7 @@ intfield(unsigned char * pageaddr, int nbytes, char * text)
 }
 
 static void
-hexfield(unsigned char * pageaddr, int nbytes, char * text)
+hexfield(unsigned char * pageaddr, int nbytes, const char * text)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -709,7 +709,7 @@ hexfield(unsigned char * pageaddr, int nbytes, char * text)
 }
 
 static void
-hexdatafield(unsigned char * pageaddr, int nbytes, char * text)
+hexdatafield(unsigned char * pageaddr, int nbytes, const char * text)
 {
     if (x_interface && replace) {
         unsigned char *ptr;
@@ -1472,7 +1472,7 @@ disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
     return 0;
 }
 
-static char *
+static const char *
 formatname(int format)
 {
     switch(format) {
@@ -3013,7 +3013,7 @@ print_hex_page(struct mpage_info * mpi, const char * prefix,
                unsigned char *pagestart, int off, int len)
 {
     int k;
-    char * pg_name;
+    const char * pg_name;
 
     if (prefix[0])
         printf("%s", prefix);
@@ -3622,7 +3622,8 @@ open_sg_io_dev(char * devname)
     }
     if (fd >= 0) {
         if ((ioctl(fd, SG_GET_VERSION_NUM, &v) < 0) || (v < 30000)) {
-            fprintf(stderr, "requires lk 2.4 (sg driver) or lk 2.6\n");
+            fprintf(stderr, "requires lk 2.4 (sg driver), lk 2.6 or lk 3 "
+                    "series\n");
             close(fd);
             return -9999;
         }
@@ -3634,7 +3635,7 @@ open_sg_io_dev(char * devname)
 }
 
 static void
-usage(char *errtext)
+usage(const char *errtext)
 {
     if (errtext)
         fprintf(stderr, "Error: sginfo: %s\n", errtext);
@@ -3662,7 +3663,7 @@ usage(char *errtext)
           "\t-G    Display 'grown' defect list (default format: index).\n"
           "\t-i    Display information from INQUIRY command.\n"
           "\t-I    Access Informational Exception page.\n"
-          "\t-l    List known scsi devices on the system\n"
+          "\t-l    List known scsi devices on the system [DEPRECATED]\n"
           "\t-n    Access Notch and Partition Page.\n"
           "\t-N    Negate (stop) storing to saved page (active with -R).\n"
           "\t-P    Access Power Condition Page.\n"

@@ -56,7 +56,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.04 20120319";
+static const char * version_str = "1.04 20120319";
 
 
 #if 0

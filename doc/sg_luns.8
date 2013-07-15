@@ -1,67 +1,255 @@
-.TH SG_LUNS "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_LUNS "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
 .SH NAME
-sg_luns \- send SCSI REPORT LUNS command
+sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
 .B sg_luns
-[\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-select=SR\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-linux\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
+[\fI\-\-select=SR\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.PP
+.B sg_luns
+\fI\-\-test=ALUN\fR [\fI\-\-hex\fR] [\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send the SCSI REPORT LUNS command to the \fIDEVICE\fR and outputs the
-response. In the SPC\-3 SCSI standard support for this command is mandatory.
+In the first form shown in the SYNOPSIS this utility sends the SCSI REPORT
+LUNS command to the \fIDEVICE\fR and outputs the response. The response
+should be a list of LUNs ("a LUN inventory") for the I_T nexus associated
+with the \fIDEVICE\fR. Roughly speaking that is all LUNs that share the
+target device that the REPORT LUNS command is sent through. In the SPC\-3
+and SPC\-4 SCSI standards support for the REPORT LUNS command is mandatory.
+.PP
+When the \fI\-\-test=ALUN\fR option is given (the second form in the
+SYNOPSIS), then the \fIALUN\fR value is decoded as outlined in SAM\-3,
+SAM\-4 and SAM\-5 (revision 13, section 4.7) .
+.PP
+Where required below the first form shown in the SYNOPSIS is called "device
+mode" and the second form is called "test mode".
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-d\fR, \fB\-\-decode\fR
-decode logical unit numbers into their hierarchical parts. Interprets
-luns as described in SAM\-3 when the HiSup bit is set in a
-standard INQUIRY's response.
+decode LUNs into their component parts, as described in the LUN section
+of SAM\-3, SAM\-4 and SAM\-5.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-output response to this command in ASCII hex.
+[device mode] when given once this utility will output the SCSI
+response (i.e. the data\-out buffer) to the REPORT LUNS command in ASCII
+hex then exit. When given twice it causes \fI\-\-decode\fR to output
+component fields in hex rather than decimal.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+[test mode] when this option is given, then decoded component fields of
+\fIALUN\fR are output in hex.
+.TP
+\fB\-l\fR, \fB\-\-linux\fR
+this option is only available in Linux. After the T10 representation of
+each 64 bit LUN (in 16 hexadecimal digits), if this option is given then
+to the right, in square brackets, is the Linux LUN integer in decimal.
+If the \fI\-\-hex\fR option is given twice (e.g. \-HH) as well then the
+Linux LUN integer is output in hexadecimal.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
 the cdb's "allocation length" field. If not given (or \fILEN\fR is zero)
-then 8192 is used. The maximum allowed value of \fILEN\fR is 65536.
+then 8192 is used. The maximum allowed value of \fILEN\fR is 1048576.
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
-output ASCII hex rendering of each report lun, one per line.
+output only the ASCII hex rendering of each report LUN, one per line.
+Without the \fI\-\-quiet\fR option, there is header information printed
+before the LUN listing.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-output response in binary (to stdout).
+output the SCSI response (i.e. the data-out buffer) in binary (to stdout).
 .TP
 \fB\-s\fR, \fB\-\-select\fR=\fISR\fR
-this option sets the 'select report' field (\fISR\fR) in the SCSI REPORT
-LUNS command. The default value is 0. When 0 is given (or this option is
-not specified) then the \fIDEVICE\fR should yield a list of luns addressable
-via this "I_T nexus" that use the following lun addressing methods: logical
-unit addressing, peripheral device addressing and flat space addressing.
-When 1 is given the \fIDEVICE\fR should yield a list of only "well known"
-logical units addressable via this "I_T" nexus. When 2 is given the
-\fIDEVICE\fR should yield all luns addressable via this "I_T" nexus.
-To simplify, for the I_T nexus associated with the \fIDEVICE\fR, the
-meanings of the \fISR\fR values are:
+this option sets the SELECT REPORT field (\fISR\fR) in the SCSI REPORT
+LUNS command. The default value is 0. For detailed information see the
+REPORT LUNS command in SPC (most recent is SPC\-4 revision 36e in section
+6.33). To simplify, for the I_T nexus associated with the \fIDEVICE\fR, the
+meanings of the \fISR\fR values defined to date for SPC\-4 are:
 .br
-  \fB0\fR : all luns excluding well known logical units
+  \fB0\fR : all LUNs excluding well known logical units
 .br
   \fB1\fR : well known logical units
 .br
-  \fB2\fR : all luns
+  \fB2\fR : all LUNs
 .br
-Values between 0xf8 and 0xff (inclusive) are vendor specific (SPC\-4 (rev 32),
-other values greater than 2 are reserved.
+Values between 0xf8 and 0xff (inclusive) are vendor specific (SPC\-4 rev
+36e), other values greater than 2 are reserved. This utility will accept
+any value between 0 and 255 (0xff) for \fISR\fR .
+.TP
+\fB\-t\fR, \fB\-\-test\fR=\fIALUN\fR
+\fIALUN\fR is assumed to be a hexadecimal number in ASCII hex or the
+letter 'L' followed by a decimal number (see below). The hexadecimal number
+can be up to 64 bits in size (i.e. 16 hexadecimal digits) and is padded to
+the right if less than 16 hexadecimal digits are given (e.g.
+\fI\-\-test=0122003a\fR represents T10 LUN 0122003a00000000). \fIALUN\fR
+may be prefixed by '0x' or '0X' (e.g. the previous example could have been
+\fI\-\-test=0x0122003a\fR). \fIALUN\fR may also be given with spaces or
+tabs between each byte (or other grouping) but then \fIALUN\fR would need
+to be surrounded by single or double quotes.
+In the decimal number case (i.e. following a 'L') that number is assumed
+to be a Linux "word flipped" LUN which is converted into a T10 LUN
+representation and printed. In both cases the number is interpreted as a
+LUN and decoded as if the \fI\-\-decode\fR option had been given.
+Also when \fIALUN\fR is a hexadecimal number it can have a trailing 'L'
+in which case the corresponding Linux "word flipped" LUN value is output.
+The LUN is decoded in all cases.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.SH NOTES
+The SCSI REPORT LUNS command is important for Logical Unit (LU) discovery.
+After a target device is discovered (usually via some transport specific
+mechanism), a REPORT LUNS command should either be sent to LUN 0 (which
+is Peripheral device addressing method with bus_id=0 and target/lun=0)
+or to the REPORT LUNS well known LUN (i.e. 0xc101000000000000). SAM\-5
+requires that one of these responds with an inventory of LUNS that are
+contained in this target device.
+.PP
+In test mode, if the \fI\-\-hex\fR option is given once then in the decoded
+output, some of the component fields are printed in hex with leading zeros.
+The leading zeros are to indicate the size of the component field. For
+example: in the Peripheral device addressing method (16 bits overall), the
+bus ID is 6 bits wide and the target/LUN field is 8 bits wide; so both are
+shown with two hex digits (e.g. bus_id=0x02, target=0x3a).
+.SH EXAMPLES
+Typically by the time user space programs get to run, SCSI LUs have been
+discovered. In Linux the lsscsi utility lists the LUs that are currently
+present. The LUN of a device (LU) is the fourth element in the tuple at the
+beginning of each line. Below we see a target (or "I_T Nexus": "6:0:0") has
+two LUNS: 1 and 49409. If 49409 is converted into T10 LUN format it is
+0xc101000000000000 which is the REPORT LUNS well known LUN.
+.PP
+  # lsscsi \-g
+.br
+  [6:0:0:1]    disk    Linux    scsi_debug       0004  /dev/sdb   /dev/sg1
+.br
+  [6:0:0:49409]wlun    Linux    scsi_debug       0004  \-          /dev/sg2
+.PP
+We could send a REPORT LUNS command to either /dev/sdb, /dev/sg1 or
+/dev/sg2 and get the same result. Below we use /dev/sg1 :
+.PP
+  # sg_luns /dev/sg1
+.br
+  Lun list length = 8 which imples 1 lun entry
+.br
+  Report luns [select_report=0x0]:
+.br
+      0001000000000000
+.PP
+That is a bit noisy so cut down the clutter with \fI\-\-quiet\fR:
+.PP
+  # sg_luns \-q /dev/sg1
+.br
+  0001000000000000
+.PP
+Now decode that LUN into its component parts:
+.PP
+  # sg_luns \-d \-q /dev/sg1
+.br
+  0001000000000000
+.br
+        Peripheral device addressing: lun=1
+.PP
+Would like to see how wide that component LUN field is:
+  # sg_luns \-d \-q \-HH /dev/sg1
+.br
+  0001000000000000
+.br
+        Peripheral device addressing: lun=0x01
+.PP
+So it is 8 bits wide (actually between 5 and 8 bits wide, inclusive).
+Now use \fI\-\-select=1\fR to find out if there are any well known
+LUNs:
+.PP
+  # sg_luns \-q \-s 1 /dev/sg1
+.br
+  c101000000000000
+.PP
+So how many LUNs do we have all together (associated with the current
+I_T Nexus):
+.PP
+  # sg_luns \-q \-s 2 /dev/sg1
+.br
+  0001000000000000
+.br
+  c101000000000000
+.PP
+  # sg_luns \-q \-s 2 \-d /dev/sg1
+.br
+  0001000000000000
+.br
+        Peripheral device addressing: lun=1
+.br
+  c101000000000000
+.br
+        REPORT LUNS well known logical unit
+.PP
+The following example uses the \fI\-\-linux\fR option and is not available
+in other operating systems. The extra number in square brackets is the
+Linux version of T10 LUN shown at the start of the line.
+.PP
+  # sg_luns \-q \-s 2 \-l /dev/sg1
+.br
+  0001000000000000    [1]
+.br
+  c101000000000000    [49409]
+.PP
+Now we use the \fI\-\-test=\fR option to decode LUNS input on the command
+line (rather than send a REPORT LUNS command and act on the response):
+.PP
+  # sg_luns \-\-test=0001000000000000
+.br
+  Decoded LUN:
+.br
+    Peripheral device addressing: lun=1
+.PP
+  # sg_luns \-\-test="c1 01"
+.br
+  Decoded LUN:
+.br
+    REPORT LUNS well known logical unit
+.PP
+  # sg_luns \-t 0x023a004b \-H
+.br
+  Decoded LUN:
+.br
+    Peripheral device addressing: bus_id=0x02, target=0x3a
+.br
+    >>Second level addressing:
+.br
+      Peripheral device addressing: lun=0x4b
+.PP
+The next example is Linux specific as we try to find out what the
+Linux LUN 49409 translates to in the T10 world:
+.PP
+  # sg_luns \-\-test=L49409
+.br
+  64 bit LUN in T10 preferred (hex) format:  c1 01 00 00 00 00 00 00
+.br
+  Decoded LUN:
+.br
+    REPORT LUNS well known logical unit
+.PP
+And the mapping between T10 and Linux LUN representations can be done the
+other way:
+.PP
+  # sg_luns \-t c101L
+.br
+  Linux 'word flipped' integer LUN representation: 49409
+.br
+  Decoded LUN:
+.br
+    REPORT LUNS well known logical unit
+.br
 .SH EXIT STATUS
 The exit status of sg_luns is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -70,7 +258,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Douglas Gilbert
+Copyright \(co 2004\-2013 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
