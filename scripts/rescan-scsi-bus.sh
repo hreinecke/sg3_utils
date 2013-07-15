@@ -2,8 +2,8 @@
 # Skript to rescan SCSI bus, using the 
 # scsi add-single-device mechanism
 # (c) 1998--2010 Kurt Garloff <kurt@garloff.de>, GNU GPL v2 or v3
-# (c) 2006--2008 Hannes Reinecke, GNU GPL v2 or later
-# $Id: rescan-scsi-bus.sh,v 1.53 2011/10/18 16:44:27 garloff Exp $
+# (c) 2006--2013 Hannes Reinecke, GNU GPL v2 or later
+# $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
 SCAN_WILD_CARD=4294967295
 
@@ -641,14 +641,22 @@ fi
 modprobe sg >/dev/null 2>&1
 
 if test -x /usr/bin/sg_inq; then
-    sg_version=$(sg_inq -V 2>&1 | cut -d " " -f 3)
-    sg_version=${sg_version##0.}
-    #echo "\"$sg_version\""
-    if [ -z "$sg_version" -o "$sg_version" -lt 70 ] ; then
-        sg_len_arg="-36"
-    else
-        sg_len_arg="--len=36"
-    fi
+  sg_version=$(sg_inq -V 2>&1 | cut -d " " -f 3)
+  if test -n "$sg_version"; then
+    sg_ver_maj=${sg_version:0:1}
+    sg_version=${sg_version##?.}
+    let sg_version+=$((100*$sg_ver_maj))
+  fi
+  sg_version=${sg_version##0.}
+  #echo "\"$sg_version\""
+  if [ -z "$sg_version" -o "$sg_version" -lt 70 ] ; then
+    sg_len_arg="-36"
+  else
+    sg_len_arg="--len=36"
+  fi
+else
+  echo "WARN: /usr/bin/sg_inq not present -- please install sg3_utils"
+  echo " or rescan-scsi-bus.sh might not fully work."     
 fi    
 
 # defaults
