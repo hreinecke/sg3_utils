@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.15 20130701";    /* SPC-4 rev 36 */
+static const char * version_str = "1.16 20130715";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -1206,8 +1206,16 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
             break;
         case 1: /* T10 vendor identification */
             printf("      vendor id: %.8s\n", ip);
-            if (i_len > 8)
-                printf("      vendor specific: %.*s\n", i_len - 8, ip + 8);
+            if (i_len > 8) {
+                if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
+                    printf("      vendor specific: %.*s\n", i_len - 8, ip + 8);
+                } else {
+                    printf("      vendor specific: 0x");
+                    for (m = 8; m < i_len; ++m)
+                        printf("%02x", (unsigned int)ip[m]);
+                    printf("\n");
+                }
+            }
             break;
         case 2: /* EUI-64 based */
             printf("      EUI-64 based %d byte identifier\n", i_len);
@@ -1496,8 +1504,15 @@ export_dev_ids(unsigned char * buff, int len)
                 printf("SCSI_IDENT_%s_VENDOR=%.*s\n", assoc_str, k, ip);
             break;
         case 1: /* T10 vendor identification */
-            k = encode_whitespaces(ip, i_len);
-            printf("SCSI_IDENT_%s_T10=%.*s\n", assoc_str, k, ip);
+            printf("SCSI_IDENT_%s_T10=", assoc_str);
+            if ((2 == c_set) || (3 == c_set)) {
+                k = encode_whitespaces(ip, i_len);
+                printf("%.*s\n", k, ip);
+            } else {
+                for (m = 0; m < i_len; ++m)
+                    printf("%02x", (unsigned int)ip[m]);
+                printf("\n");
+            }
             break;
         case 2: /* EUI-64 based */
             if (1 != c_set) {

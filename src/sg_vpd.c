@@ -30,7 +30,7 @@
 
 */
 
-static const char * version_str = "0.67 20130517";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.68 20130715";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 extern void svpd_enumerate_vendor(void);
@@ -797,8 +797,16 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
         break;
     case 1: /* T10 vendor identification */
         printf("      vendor id: %.8s\n", ip);
-        if (i_len > 8)
-            printf("      vendor specific: %.*s\n", i_len - 8, ip + 8);
+        if (i_len > 8) {
+            if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
+                printf("      vendor specific: %.*s\n", i_len - 8, ip + 8);
+            } else {
+                printf("      vendor specific: 0x");
+                for (m = 8; m < i_len; ++m)
+                    printf("%02x", (unsigned int)ip[m]);
+                printf("\n");
+            }
+        }
         break;
     case 2: /* EUI-64 based */
         if (! long_out) {
