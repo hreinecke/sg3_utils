@@ -43,6 +43,7 @@ Hannes Reinecke <hare at suse dot de>
         sg_referrals [20100906]
         sg_inq --export option [20120220+20130109]
         sg_xcopy+sg_copy_results [20120322]
+	rescan-scsi-bus.sh patches to Kurt Garloff's v1.57 [20130715]
 
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]
@@ -66,7 +67,8 @@ Kai Makisara <Kai dot Makisara at kolumbus dot fi> help with tape
         minor numbers in lk 2.6 plus earlier advice [20081008]
 
 Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
-        Additions to sginfo and sg_map.
+        Additions to sginfo and sg_map. Author of rescan-scsi-bus.sh with
+        latest update to v1.57 [20130331]
 
 Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
         page decoding in sg_inq (vendor specific: EMC) and sg_emc_trespass
