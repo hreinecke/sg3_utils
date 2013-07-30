@@ -517,7 +517,7 @@ main(int argc, char *argv[])
         } else {
             if (opts.datain_file == NULL && !opts.datain_binary) {
                 fprintf(stderr, "Received %d bytes of data:\n", data_len);
-                dStrHex((const char *)dxfer_buffer_in, data_len, 0);
+                dStrHexErr((const char *)dxfer_buffer_in, data_len, 0);
             } else {
                 const char * cp = "stdout";
 

@@ -873,10 +873,10 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         break;
     default:
-        printf("    Unknown feature [0x%x], version=%d persist=%d, "
-               "current=%d\n", feature, ((ucp[2] >> 2) & 0xf),
-               !!(ucp[2] & 0x2), !!(ucp[2] & 0x1));
-        dStrHex((const char *)ucp, len, 1);
+        fprintf(stderr, "    Unknown feature [0x%x], version=%d persist=%d, "
+                "current=%d\n", feature, ((ucp[2] >> 2) & 0xf),
+                !!(ucp[2] & 0x2), !!(ucp[2] & 0x1));
+        dStrHexErr((const char *)ucp, len, 1);
         break;
     }
 }

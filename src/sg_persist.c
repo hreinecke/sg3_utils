@@ -306,12 +306,12 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
             break;
         case TPROTO_NONE:
             fprintf(stderr, "%s  No specified protocol\n", leadin);
-            /* dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1); */
+            /* dStrHexErr((const char *)ucp, ((len > 24) ? 24 : len), -1); */
             break;
         default:
             fprintf(stderr, "%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHexErr((const char *)ucp, ((len > 24) ? 24 : len), -1);
             break;
         }
     }

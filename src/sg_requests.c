@@ -25,7 +25,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.23 20130530";
+static const char * version_str = "1.24 20130730";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -242,7 +242,7 @@ main(int argc, char * argv[])
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
                 fprintf(stderr, "Parameter data in hex\n");
-                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+                dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
             sg_get_sense_progress_fld(requestSenseBuff, resp_len,
@@ -288,7 +288,7 @@ main(int argc, char * argv[])
                 sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
                 if (verbose > 1) {
                     fprintf(stderr, "\nParameter data in hex\n");
-                    dStrHex((const char *)requestSenseBuff, resp_len, 1);
+                    dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
                 }
             }
             continue;

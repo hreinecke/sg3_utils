@@ -100,12 +100,12 @@ extern "C" {
 #define TPROTO_SAS 6
 #define TPROTO_ADT 7
 #define TPROTO_ATA 8
-#define TPROTO_UAS 9
-#define TPROTO_SOP 0xa
+#define TPROTO_UAS 9            /* USB attached SCSI */
+#define TPROTO_SOP 0xa          /* SCSI over PCIe */
 #define TPROTO_NONE 0xf
 
 
-/* The format of the version string is like this: "1.47 20090201" */
+/* The format of the version string is like this: "1.87 20130731" */
 extern const char * sg_lib_version();
 
 /* Returns length of SCSI command given the opcode (first byte).
@@ -301,6 +301,18 @@ extern char * safe_strerror(int errnum);
  *     < 0     only the ASCII-hex bytes are listed (i.e. without address)
 */
 extern void dStrHex(const char* str, int len, int no_ascii);
+
+/* Print (to sg_warnings_strm (stderr)) 'str' of bytes in hex, 16 bytes per
+ * line optionally followed at right by its ASCII interpretation. Same
+ * logic as dStrHex() with different output stream (i.e. stderr). */
+extern void dStrHexErr(const char* str, int len, int no_ascii);
+
+/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
+ * separated) to 'b' not to exceed 'b_len' characters. Each line
+ * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
+ * per line with an extra space between the 8th and 9th bytes */
+extern void dStrHexStr(const char* str, int len, const char * leadin,
+                       int b_len, char * b);
 
 /* Returns 1 when executed on big endian machine; else returns 0.
  * Useful for displaying ATA identify words (which need swapping on a

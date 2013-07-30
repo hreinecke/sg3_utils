@@ -239,7 +239,7 @@ int main(int argc, char * argv[])
             printf("Report list length = %d\n", report_len);
         if (hex) {
             if (verbose)
-                fprintf(stderr, "\nOutput response in hex:\n");
+                printf("\nOutput response in hex:\n");
             dStrHex((const char *)reportTgtGrpBuff, report_len, 1);
             goto err_out;
         }

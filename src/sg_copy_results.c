@@ -34,7 +34,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.2 20130627";
+static const char * version_str = "1.4 20130730";
 
 
 #define MAX_XFER_LEN 10000
@@ -286,6 +286,14 @@ usage()
           );
 }
 
+static const char * rec_copy_name_arr[] = {
+    "Receive copy status(LID1)",
+    "Receive copy data(LID1)",
+    "Receive copy [0x2]",
+    "Receive copy operating parameters",
+    "Receive copy failure details(LID1)",
+};
+
 int
 main(int argc, char * argv[])
 {
@@ -296,6 +304,7 @@ main(int argc, char * argv[])
     int list_id = 0;
     int do_hex = 0;
     int verbose = 0;
+    const char * cp;
     const char * device_name = NULL;
     char file_name[256];
     int ret = 1;
@@ -394,46 +403,41 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
+    cp = (const char *)&rec_copy_name_arr[sa];
     if (verbose)
-        fprintf(stderr, ME "issue receive copy results to device %s\n"
-                "\t\txfer_len= %d (0x%x), sa=%d, list_id=%d\n",
-                device_name, xfer_len, xfer_len, sa, list_id);
+        fprintf(stderr, ME "issue %s to device %s\n\t\txfer_len= %d (0x%x), "
+                "list_id=%d\n", cp, device_name, xfer_len, xfer_len,
+                list_id);
 
     /* In SPC-4 opcode 0x84, service actions have command names:
      *    0x0    RECEIVE COPY STATUS(LID1)
      *    0x1    RECEIVE COPY DATA(LID1)
      *    0x3    RECEIVE COPY OPERATING PARAMETERS
      *    0x4    RECEIVE COPY FAILURE DETAILS(LID1)
-     */    
+     */
     res = sg_ll_receive_copy_results(sg_fd, sa, list_id, cpResultBuff,
-                                     xfer_len, 0, verbose);
+                                     xfer_len, 1, verbose);
     ret = res;
     switch (res) {
     case 0:
         break;
     case SG_LIB_CAT_NOT_READY:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS failed, "
-                "device not ready\n");
+        fprintf(stderr, "  SCSI %s failed, device not ready\n", cp);
         break;
     case SG_LIB_CAT_UNIT_ATTENTION:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS failed, "
-                "unit attention\n");
+        fprintf(stderr, "  SCSI %s failed, unit attention\n", cp);
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS failed, "
-                "aborted command\n");
+        fprintf(stderr, "  SCSI %s failed, aborted command\n", cp);
         break;
     case SG_LIB_CAT_INVALID_OP:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS command not "
-                "supported\n");
+        fprintf(stderr, "  SCSI %s command not supported\n", cp);
         break;
     case SG_LIB_CAT_ILLEGAL_REQ:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS failed, "
-                "bad field in cdb\n");
+        fprintf(stderr, "  SCSI %s failed, bad field in cdb\n", cp);
         break;
     default:
-        fprintf(stderr, "  SCSI RECEIVE COPY RESULTS command error %d\n",
-                res);
+        fprintf(stderr, "  SCSI %s command error %d\n", cp, res);
         break;
     }
     if (res != 0)

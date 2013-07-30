@@ -184,7 +184,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     }
     if ((op->verbose > 2) && (param_lst_len > 0)) {
         fprintf(stderr, "    Parameter list contents:\n");
-        dStrHex((const char *)param_lstp, param_lst_len, 1);
+        dStrHexErr((const char *)param_lstp, param_lst_len, 1);
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -538,7 +538,7 @@ main(int argc, char * argv[])
             resp_len = requestSenseBuff[7] + 8;
             if (vb > 2) {
                 fprintf(stderr, "Parameter data in hex\n");
-                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+                dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
             sg_get_sense_progress_fld(requestSenseBuff, resp_len,
