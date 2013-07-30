@@ -61,11 +61,9 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.36 20130627";
+static const char * version_str = "0.37 20130730";
 
 #define ME "sg_xcopy: "
-
-#define SG_DEBUG
 
 #define STR_SZ 1024
 #define INOUTF_SZ 512
@@ -561,7 +559,7 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     int seg_desc_len;
     int verb;
 
-    verb = (verbose ? verbose - 1: 0);
+    verb = verbose ? (verbose - 1) : 0;
 
     memset(xcopyBuff, 0, 256);
     xcopyBuff[0] = list_id;
@@ -580,7 +578,7 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     if (verbose > 3) {
         fprintf(stderr, "\nParameter list in hex (length %d):\n",
                 desc_offset);
-        dStrHex((const char *)xcopyBuff, desc_offset, 1);
+        dStrHexErr((const char *)xcopyBuff, desc_offset, 1);
     }
     /* set noisy so if a UA happens it will be printed to stderr */
     return sg_ll_extended_copy(sg_fd, xcopyBuff, desc_offset, 1, verb);
@@ -657,7 +655,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     }
     if (verbose > 2) {
         fprintf(stderr, "\nOutput response in hex:\n");
-        dStrHex((const char *)rcBuff, len, 1);
+        dStrHexErr((const char *)rcBuff, len, 1);
     }
     max_target_num = rcBuff[8] << 8 | rcBuff[9];
     max_segment_num = rcBuff[10] << 8 | rcBuff[11];
@@ -948,8 +946,10 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         }
         if (k)
             printf("      vendor specific: %.*s\n", i_len, ip);
-        else
-            dStrHex((const char *)ip, i_len, 0);
+        else {
+            fprintf(stderr, "      vendor specific:\n");
+            dStrHexErr((const char *)ip, i_len, 0);
+        }
         break;
     case 1: /* T10 vendor identification */
         printf("      vendor id: %.8s\n", ip);
@@ -960,7 +960,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         if ((8 != i_len) && (12 != i_len) && (16 != i_len)) {
             fprintf(stderr, "      << expect 8, 12 and 16 byte "
                     "EUI, got %d>>\n", i_len);
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         printf("      0x");
@@ -972,13 +972,13 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         if (1 != c_set) {
             fprintf(stderr, "      << unexpected code set %d for "
                     "NAA>>\n", c_set);
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         naa = (ip[0] >> 4) & 0xff;
         if (! ((2 == naa) || (5 == naa) || (6 == naa))) {
             fprintf(stderr, "      << unexpected NAA [0x%x]>>\n", naa);
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         if ((5 == naa) && (0x10 == i_len)) {
@@ -991,7 +991,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
             if (8 != i_len) {
                 fprintf(stderr, "      << unexpected NAA 2 identifier "
                         "length: 0x%x>>\n", i_len);
-                dStrHex((const char *)ip, i_len, 0);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             d_id = (((ip[0] & 0xf) << 8) | ip[1]);
@@ -1005,7 +1005,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
             if (8 != i_len) {
                 fprintf(stderr, "      << unexpected NAA 5 identifier "
                         "length: 0x%x>>\n", i_len);
-                dStrHex((const char *)ip, i_len, 0);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             /* c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) | */
@@ -1023,7 +1023,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
             if (16 != i_len) {
                 fprintf(stderr, "      << unexpected NAA 6 identifier "
                         "length: 0x%x>>\n", i_len);
-                dStrHex((const char *)ip, i_len, 0);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             /* c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) | */
@@ -1043,7 +1043,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
             fprintf(stderr, "      << expected binary code_set, target "
                     "port association, length 4>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         d_id = ((ip[2] << 8) | ip[3]);
@@ -1053,7 +1053,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
             fprintf(stderr, "      << expected binary code_set, target "
                     "port association, length 4>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         d_id = ((ip[2] << 8) | ip[3]);
@@ -1063,7 +1063,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         if ((1 != c_set) || (0 != assoc) || (4 != i_len)) {
             fprintf(stderr, "      << expected binary code_set, logical "
                     "unit association, length 4>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         d_id = ((ip[2] << 8) | ip[3]);
@@ -1071,18 +1071,18 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         break;
     case 7: /* MD5 logical unit identifier */
         if ((1 != c_set) || (0 != assoc)) {
-            printf("      << expected binary code_set, logical "
+            fprintf(stderr, "      << expected binary code_set, logical "
                    "unit association>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        printf("      MD5 logical unit identifier:\n");
-        dStrHex((const char *)ip, i_len, 0);
+        fprintf(stderr, "      MD5 logical unit identifier:\n");
+        dStrHexErr((const char *)ip, i_len, 0);
         break;
     case 8: /* SCSI name string */
         if (3 != c_set) {
             fprintf(stderr, "      << expected UTF-8 code_set>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         printf("      SCSI name string:\n");
@@ -1093,7 +1093,8 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
         printf("      %s\n", (const char *)ip);
         break;
     default: /* reserved */
-        dStrHex((const char *)ip, i_len, 0);
+        fprintf(stderr, "      reserved designator=0x%x\n", desig_type);
+        dStrHexErr((const char *)ip, i_len, 0);
         break;
     }
 }
@@ -1127,7 +1128,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
     }
     if (verbose > 2) {
         fprintf(stderr, "Output response in hex:\n");
-        dStrHex((const char *)rcBuff, len, 1);
+        dStrHexErr((const char *)rcBuff, len, 1);
     }
 
     while ((u = sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1)) ==
@@ -1187,7 +1188,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
             desc[31] = block_size & 0xff;
             if (verbose > 3) {
                 fprintf(stderr, "Descriptor in hex (bs %d):\n", block_size);
-                dStrHex((const char *)desc, 32, 1);
+                dStrHexErr((const char *)desc, 32, 1);
             }
             return 32;
         }
@@ -1597,11 +1598,10 @@ main(int argc, char * argv[])
         }
     }
 
-#ifdef SG_DEBUG
-    fprintf(stderr, ME "%s if=%s skip=%" PRId64 " of=%s seek=%" PRId64
-            " count=%" PRId64 "\n", (on_src)?"on-source":"on-destination",
-            ixcf.fname, skip, oxcf.fname, seek, dd_count);
-#endif
+    if (verbose > 1)
+        fprintf(stderr, ME "%s if=%s skip=%" PRId64 " of=%s seek=%" PRId64
+                " count=%" PRId64 "\n", (on_src)?"on-source":"on-destination",
+                ixcf.fname, skip, oxcf.fname, seek, dd_count);
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
     install_handler(SIGPIPE, interrupt_handler);
@@ -1730,17 +1730,15 @@ main(int argc, char * argv[])
             res = scsi_operating_parameter(&ixcf, 0);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
-                fprintf(stderr, "receive copy results not supported on %s\n",
-                        ixcf.fname);
-#ifndef SG_DEBUG
+                fprintf(stderr, "receive copy operating parameters not "
+                        "supported on %s\n", ixcf.fname);
                 return EINVAL;
-#endif
             } else if (-res == SG_LIB_CAT_NOT_READY)
-                fprintf(stderr, "receive copy results failed on %s - not "
-                        "ready\n", ixcf.fname);
+                fprintf(stderr, "receive copy operating parameters failed "
+                        "on %s - not ready\n", ixcf.fname);
             else {
-                fprintf(stderr, "Unable to receive copy results on %s\n",
-                        ixcf.fname);
+                fprintf(stderr, "Unable to receive copy operating "
+                        "parameters on %s\n", ixcf.fname);
                 return -res;
             }
         }
@@ -1768,17 +1766,15 @@ main(int argc, char * argv[])
             res = scsi_operating_parameter(&oxcf, 1);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
-                fprintf(stderr, "receive copy results not supported on %s\n",
-                        oxcf.fname);
-#ifndef SG_DEBUG
+                fprintf(stderr, "receive copy operating parameters not "
+                        "supported on %s\n", oxcf.fname);
                 return EINVAL;
-#endif
             } else if (-res == SG_LIB_CAT_NOT_READY)
-                fprintf(stderr, "receive copy results failed on %s - not "
-                        "ready\n", oxcf.fname);
+                fprintf(stderr, "receive copy operating parameters failed "
+                        "on %s - not ready\n", oxcf.fname);
             else {
-                fprintf(stderr, "Unable to receive copy results on %s\n",
-                        oxcf.fname);
+                fprintf(stderr, "Unable to receive copy operating "
+                        "parameters on %s\n", oxcf.fname);
                 return -res;
             }
         }
@@ -1831,10 +1827,14 @@ main(int argc, char * argv[])
             }
         }
     } else {
+        unsigned long r;
+
         if (xcopy_flag_dc)
-            bpt = oxcf.max_bytes / oxcf.sect_sz;
+            r = oxcf.max_bytes / (unsigned long)oxcf.sect_sz;
         else
-            bpt = ixcf.max_bytes / ixcf.sect_sz;
+            r = ixcf.max_bytes / (unsigned long)ixcf.sect_sz;
+        if (r > INT_MAX)
+            bpt = INT_MAX / 2;
     }
 
     seg_desc_type = seg_desc_from_dd_type(ixcf.sg_type, 0, oxcf.sg_type, 0);
@@ -1846,13 +1846,14 @@ main(int argc, char * argv[])
         start_tm_valid = 1;
     }
 
-#ifdef SG_DEBUG
-    fprintf(stderr,
-            "Start of loop, count=%" PRId64 ", bpt=%d, "
-            "lba_in=%" PRId64 ", lba_out=%" PRId64 "\n",
-            dd_count, bpt, skip, seek);
-#endif
+    if (verbose)
+        fprintf(stderr,
+                "Start of loop, count=%" PRId64 ", bpt=%d, "
+                "lba_in=%" PRId64 ", lba_out=%" PRId64 "\n",
+                dd_count, bpt, skip, seek);
+
     xcopy_fd = (on_src) ? infd : outfd;
+
     while (dd_count > 0) {
         if (dd_count > bpt)
             blocks = bpt;

@@ -185,7 +185,7 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
             len = (ret < len) ? ret : len;
             fprintf(sg_warnings_strm, "    get configuration: response%s\n",
                     (len > 256 ? ", first 256 bytes" : ""));
-            dStrHex((const char *)resp, (len > 256 ? 256 : len), -1);
+            dStrHexErr((const char *)resp, (len > 256 ? 256 : len), -1);
         }
         ret = 0;
     }
@@ -280,7 +280,7 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
             len = (ret < len) ? ret : len;
             fprintf(sg_warnings_strm, "    get performance:: response%s\n",
                     (len > 256 ? ", first 256 bytes" : ""));
-            dStrHex((const char *)resp, (len > 256 ? 256 : len), -1);
+            dStrHexErr((const char *)resp, (len > 256 ? 256 : len), -1);
         }
         ret = 0;
     }
@@ -316,7 +316,7 @@ sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
         if ((verbose > 1) && paramp && param_len) {
             fprintf(sg_warnings_strm, "    set streaming "
                     "parameter list:\n");
-            dStrHex((const char *)paramp, param_len, -1);
+            dStrHexErr((const char *)paramp, param_len, -1);
         }
     }
 

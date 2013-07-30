@@ -27,7 +27,7 @@
 #endif
 
 
-static const char * version_str = "1.61 20130507";
+static const char * version_str = "1.62 20130728";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

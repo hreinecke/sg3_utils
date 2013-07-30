@@ -25,7 +25,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.10 20130507";    /* spc4r32 */
+static const char * version_str = "1.10 20130730";    /* spc4r32 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -184,8 +184,8 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
         if ((verbose > 1) && paramp && param_len) {
             fprintf(sg_warnings_strm, "    Write buffer parameter list%s:\n",
                     ((param_len > 256) ? " (first 256 bytes)" : ""));
-            dStrHex((const char *)paramp,
-                    ((param_len > 256) ? 256 : param_len), -1);
+            dStrHexErr((const char *)paramp,
+                       ((param_len > 256) ? 256 : param_len), -1);
         }
     }
 

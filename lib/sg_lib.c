@@ -49,8 +49,6 @@
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 
-static void dStrHexErr(const char* str, int len, int b_len, char * b);
-
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
  * functions. Returns number number of chars placed in cp excluding the
@@ -1015,7 +1013,8 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                          "\n");
         if (n >= (buff_len - 1))
             return;
-        dStrHexErr((const char *)sense_buffer, len, buff_len - n, buff + n);
+        dStrHexStr((const char *)sense_buffer, len, "        ", buff_len - n,
+                   buff + n);
     }
 }
 
@@ -1391,8 +1390,8 @@ safe_strerror(int errnum)
        > 0     each line has address then up to 16 ASCII-hex bytes
        = 0     in addition, the bytes are listed in ASCII to the right
        < 0     only the ASCII-hex bytes are listed (i.e. without address) */
-void
-dStrHex(const char* str, int len, int no_ascii)
+static void
+dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
 {
     const char * p = str;
     const char * formatstr;
@@ -1421,14 +1420,14 @@ dStrHex(const char* str, int len, int no_ascii)
                         (int)(unsigned char)c);
             buff[bpos + 2] = ' ';
             if ((k > 0) && (0 == ((k + 1) % 16))) {
-                printf(formatstr, buff);
+                fprintf(fp, formatstr, buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
             }
         }
         if (bpos > bpstart) {
             buff[bpos + 2] = '\0';
-            printf("%s\n", buff);
+            fprintf(fp, "%s\n", buff);
         }
         return;
     }
@@ -1451,7 +1450,7 @@ dStrHex(const char* str, int len, int no_ascii)
             buff[cpos++] = c;
         }
         if (cpos > (cpstart + 15)) {
-            printf(formatstr, buff);
+            fprintf(fp, formatstr, buff);
             bpos = bpstart;
             cpos = cpstart;
             a += 16;
@@ -1462,45 +1461,70 @@ dStrHex(const char* str, int len, int no_ascii)
     }
     if (cpos > cpstart) {
         buff[cpos] = '\0';
-        printf("%s\n", buff);
+        fprintf(fp, "%s\n", buff);
     }
 }
 
-/* Output to ASCII-Hex bytes to 'b' not to exceed 'b_len' characters.
- * 16 bytes per line with an extra space between the 8th and 9th bytes */
-static void
-dStrHexErr(const char* str, int len, int b_len, char * b)
+void
+dStrHex(const char* str, int len, int no_ascii)
+{
+    dStrHexFp(str, len, no_ascii, stdout);
+}
+
+void
+dStrHexErr(const char* str, int len, int no_ascii)
+{
+    dStrHexFp(str, len, no_ascii,
+              (sg_warnings_strm ? sg_warnings_strm : stderr));
+}
+
+/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
+ * separated) to 'b' not to exceed 'b_len' characters. Each line
+ * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
+ * per line with an extra space between the 8th and 9th bytes */
+void
+dStrHexStr(const char* str, int len, const char * leadin, int b_len, char * b)
 {
     const char * p = str;
     unsigned char c;
-    char buff[82];
-    const int bpstart = 5;
-    int bpos = bpstart;
-    int k, n;
+    char buff[122];
+    int bpstart, bpos, k, n;
 
     if (len <= 0)
         return;
+    if (leadin) {
+        bpstart = strlen(leadin);
+        /* Cap leadin at 60 characters */
+        if (bpstart > 60)
+            bpstart = 60;
+    } else
+        bpstart = 0;
+    bpos = bpstart;
     n = 0;
-    memset(buff, ' ', 80);
-    buff[80] = '\0';
+    memset(buff, ' ', 120);
+    buff[120] = '\0';
+    if (bpstart > 0)
+        memcpy(buff, leadin, bpstart);
     for (k = 0; k < len; k++) {
         c = *p++;
-        bpos += 3;
-        if (bpos == (bpstart + (9 * 3)))
+        if (bpos == (bpstart + (8 * 3)))
             bpos++;
         my_snprintf(&buff[bpos], (int)sizeof(buff) - bpos, "%.2x",
                     (int)(unsigned char)c);
         buff[bpos + 2] = ' ';
         if ((k > 0) && (0 == ((k + 1) % 16))) {
-            n += my_snprintf(b + n, b_len - n, "%.60s\n", buff);
+            n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
             if (n >= (b_len - 1))
                 return;
             bpos = bpstart;
-            memset(buff, ' ', 80);
-        }
+            memset(buff, ' ', 120);
+            if (bpstart > 0)
+                memcpy(buff, leadin, bpstart);
+        } else
+            bpos += 3;
     }
     if (bpos > bpstart)
-        n += my_snprintf(b + n, b_len - n, "%.60s\n", buff);
+        n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
     return;
 }
 

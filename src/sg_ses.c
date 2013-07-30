@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.71 20130507";    /* ses3r05 */
+static const char * version_str = "1.72 20130730";    /* ses3r05 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -89,7 +89,7 @@ static const char * version_str = "1.71 20130507";    /* ses3r05 */
 
 struct element_type_t {
     int elem_type_code;
-    const char * abbrev; 
+    const char * abbrev;
     const char * desc;
 };
 
@@ -1103,14 +1103,14 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
             if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
                 fprintf(stderr, "Enclosure busy, try again later\n");
                 if (op->do_hex)
-                    dStrHex((const char *)rsp_buff, rsp_len, 0);
+                    dStrHexErr((const char *)rsp_buff, rsp_len, 0);
             } else if (0x8 == rsp_buff[0]) {
                 fprintf(stderr, "Enclosure only supports Short Enclosure "
                         "Status: 0x%x\n", rsp_buff[1]);
             } else {
                 fprintf(stderr, "Invalid response, wanted page code: 0x%x "
                         "but got 0x%x\n", page_code, rsp_buff[0]);
-                dStrHex((const char *)rsp_buff, rsp_len, 0);
+                dStrHexErr((const char *)rsp_buff, rsp_len, 0);
             }
             return -2;
         }

@@ -24,7 +24,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.6 20130507";
+static const char * version_str = "1.7 20130730";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -161,7 +161,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
                 fprintf(stderr, "      << expected binary code_set, target "
                         "port association, length 4>>\n");
-                dStrHex((const char *)ip, i_len, 0);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             *d_id = ((ip[2] << 8) | ip[3]);
@@ -170,7 +170,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
                 fprintf(stderr, "      << expected binary code_set, target "
                         "port association, length 4>>\n");
-                dStrHex((const char *)ip, i_len, 0);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             *d_tpg = ((ip[2] << 8) | ip[3]);
@@ -572,7 +572,7 @@ main(int argc, char * argv[])
                         "INQUIRY response\n");
                 if (verbose) {
                     fprintf(stderr, "First 32 bytes of bad response\n");
-                    dStrHex((const char *)rsp_buff, 32, 0);
+                    dStrHexErr((const char *)rsp_buff, 32, 0);
                 }
                 return SG_LIB_CAT_MALFORMED;
             }
@@ -617,7 +617,7 @@ main(int argc, char * argv[])
                 printf("Report list length = %d\n", report_len);
             if (hex) {
                 if (verbose)
-                    fprintf(stderr, "\nOutput response in hex:\n");
+                    printf("\nOutput response in hex:\n");
                 dStrHex((const char *)reportTgtGrpBuff, report_len, 1);
                 goto err_out;
             }

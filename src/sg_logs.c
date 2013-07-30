@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.13 20130701";    /* spc4r35 + sbc3r30 */
+static const char * version_str = "1.14 20130730";    /* spc4r35 + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -629,7 +629,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
         actual_len = (resp[2] << 8) + resp[3] + 4;
         if ((0 == optsp->do_raw) && (vb > 1)) {
             fprintf(stderr, "  Log sense (find length) response:\n");
-            dStrHex((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
+            dStrHexErr((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
             fprintf(stderr, "  hence calculated response length=%d\n",
                     actual_len);
         }
@@ -667,7 +667,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
     }
     if ((0 == optsp->do_raw) && (vb > 1)) {
         fprintf(stderr, "  Log sense response:\n");
-        dStrHex((const char *)resp, actual_len, 1);
+        dStrHexErr((const char *)resp, actual_len, 1);
     }
     return 0;
 }
@@ -1191,7 +1191,8 @@ show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
                 printf("  Total fatal suspended reads: %u", n);
             break;
         default:
-            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            printf("  unknown parameter code = 0x%x, contents in "
+                   "hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
@@ -1240,7 +1241,8 @@ show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
             printf("  Alternate partition maximum capacity (in MiB): %u", n);
             break;
         default:
-            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            printf("  unknown parameter code = 0x%x, contents in "
+                    "hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
@@ -1325,7 +1327,8 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
             printf("  Data compression enabled: 0x%" PRIx64, n);
             break;
         default:
-            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            printf("  unknown parameter code = 0x%x, contents in "
+                    "hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
@@ -1526,7 +1529,8 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
             }
 
         } else if (show_unknown) {
-            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            printf("  unknown parameter code = 0x%x, contents in "
+                   "hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
         } else
             continue;
@@ -1568,9 +1572,9 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
                 printf("  Date of manufacture, year: %.4s, week: %.2s",
                        &ucp[4], &ucp[8]);
             else if (verbose) {
-                printf("  Date of manufacture parameter length "
-                       "strange: %d\n", extra - 4);
-                dStrHex((const char *)ucp, extra, 1);
+                fprintf(stderr, "  Date of manufacture parameter length "
+                        "strange: %d\n", extra - 4);
+                dStrHexErr((const char *)ucp, extra, 1);
             }
             break;
         case 2:
@@ -1578,9 +1582,9 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
                 printf("  Accounting date, year: %.4s, week: %.2s",
                        &ucp[4], &ucp[8]);
             else if (verbose) {
-                printf("  Accounting date parameter length strange: %d\n",
-                       extra - 4);
-                dStrHex((const char *)ucp, extra, 1);
+                fprintf(stderr, "  Accounting date parameter length "
+                        "strange: %d\n", extra - 4);
+                dStrHexErr((const char *)ucp, extra, 1);
             }
             break;
         case 3:
@@ -1624,7 +1628,8 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
             }
             break;
         default:
-            printf("  unknown parameter code = 0x%x, contents in hex:\n", pc);
+            printf("  unknown parameter code = 0x%x, contents in "
+                   "hex:\n", pc);
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
@@ -2263,7 +2268,7 @@ show_stats_perform_page(unsigned char * resp, int len,
                     fprintf(stderr, "show_performance...  unknown parameter "
                             "code %d\n", param_code);
                 if (optsp->do_verbose)
-                    dStrHex((const char *)ucp, extra, 1);
+                    dStrHexErr((const char *)ucp, extra, 1);
                 break;
             }
             if ((optsp->do_pcb) && (0 == optsp->do_name)) {
@@ -2386,7 +2391,7 @@ show_stats_perform_page(unsigned char * resp, int len,
                     fprintf(stderr, "show_performance...  unknown parameter "
                             "code %d\n", param_code);
                 if (optsp->do_verbose)
-                    dStrHex((const char *)ucp, extra, 1);
+                    dStrHexErr((const char *)ucp, extra, 1);
                 break;
             }
             if ((optsp->do_pcb) && (0 == optsp->do_name)) {
@@ -2521,7 +2526,7 @@ show_cache_stats_page(unsigned char * resp, int len,
                 fprintf(stderr, "show_performance...  unknown parameter "
                         "code %d\n", pc);
             if (optsp->do_verbose)
-                dStrHex((const char *)ucp, extra, 1);
+                dStrHexErr((const char *)ucp, extra, 1);
             break;
         }
         if ((optsp->do_pcb) && (0 == optsp->do_name)) {

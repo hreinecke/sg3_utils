@@ -351,7 +351,7 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    mode sense (6): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -426,7 +426,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         if ((verbose > 2) && (ret > 0)) {
             fprintf(sg_warnings_strm, "    mode sense (10): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHex((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -465,7 +465,7 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
     }
     if (verbose > 1) {
         fprintf(sg_warnings_strm, "    mode select (6) parameter list\n");
-        dStrHex((const char *)paramp, param_len, -1);
+        dStrHexErr((const char *)paramp, param_len, -1);
     }
 
     ptvp = construct_scsi_pt_obj();
@@ -537,7 +537,7 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
     }
     if (verbose > 1) {
         fprintf(sg_warnings_strm, "    mode select (10) parameter list\n");
-        dStrHex((const char *)paramp, param_len, -1);
+        dStrHexErr((const char *)paramp, param_len, -1);
     }
 
     ptvp = construct_scsi_pt_obj();
@@ -856,7 +856,7 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
     }
     if ((verbose > 1) && (param_len > 0)) {
         fprintf(sg_warnings_strm, "    log select parameter list\n");
-        dStrHex((const char *)paramp, param_len, -1);
+        dStrHexErr((const char *)paramp, param_len, -1);
     }
 
     ptvp = construct_scsi_pt_obj();

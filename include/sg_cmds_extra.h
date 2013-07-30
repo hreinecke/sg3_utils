@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2012 Douglas Gilbert.
+ * Copyright (c) 2004-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -274,7 +274,8 @@ extern int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                               uint64_t llba, void * data_out, int xfer_len,
                               int * offsetp, int noisy, int verbose);
 
-/* Invokes a SCSI RECEIVE COPY RESULTS command. Return of 0 -> success,
+/* Invokes a SPC-3 SCSI RECEIVE COPY RESULTS command. In SPC-4 this function
+ * supports all service action variants of the THIRD-PARTY COPY IN opcode.
  * SG_LIB_CAT_INVALID_OP -> Receive copy results not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
@@ -283,12 +284,12 @@ extern int sg_ll_receive_copy_results(int sg_fd, int sa, int list_id,
                                       void * resp, int mx_resp_len,
                                       int noisy, int verbose);
 
-/* Invokes a SCSI EXTENDEd COPY command. Return of 0 -> success,
+/* Invokes a SCSI EXTENDED COPY(LID1) command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Extended copy not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-extern int sg_ll_extended_copy(int sg_fd, void * resp, int mx_resp_len,
+extern int sg_ll_extended_copy(int sg_fd, void * paramp, int param_len,
                                int noisy, int verbose);
 
 #ifdef __cplusplus
