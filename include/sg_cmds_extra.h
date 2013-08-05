@@ -292,6 +292,18 @@ extern int sg_ll_receive_copy_results(int sg_fd, int sa, int list_id,
 extern int sg_ll_extended_copy(int sg_fd, void * paramp, int param_len,
                                int noisy, int verbose);
 
+/* Handles various service actions associated with opcode 0x83 which is
+ * called THIRD PARTY COPY OUT. These include the EXTENDED COPY(LID4) and
+ * WRITE USING TOKEN commands. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> opcode 0x83 not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+extern int sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id,
+                                 int group_num, int timeout_secs,
+                                 void * paramp, int param_len, int noisy,
+                                 int verbose);
+
 #ifdef __cplusplus
 }
 #endif
