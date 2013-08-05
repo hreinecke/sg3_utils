@@ -2310,9 +2310,8 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
 
 /* SPC-4 rev 35 and later calls this opcode (0x83) "Third-party copy OUT"
  * The original EXTENDED COPY command (now called EXTENDED COPY (LID1))
- * is the only one supported by sg_ll_extended_copy(). Another function
- * perhaps sg_ll_3party_copy_out() is needed for the other service actions
- * ( > 0 ). */
+ * is the only one supported by sg_ll_extended_copy(). See function
+ * sg_ll_3party_copy_out() for the other service actions ( > 0 ). */
 
 /* Invokes a SCSI EXTENDED COPY (LID1) command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Receive copy results not supported,
@@ -2358,6 +2357,112 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, opcode_name, res, 0, sense_b,
+                               noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_NOT_READY:
+        case SG_LIB_CAT_INVALID_OP:
+        case SG_LIB_CAT_ILLEGAL_REQ:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = -1;
+            break;
+        }
+    } else
+        ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Handles various service actions associated with opcode 0x83 which is
+ * called THIRD PARTY COPY OUT. These include the EXTENDED COPY(LID4) and
+ * WRITE USING TOKEN commands. Return of 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> opcode 0x83 not supported,
+ * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
+ * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
+ * -1 -> other failure */
+int
+sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
+                      int timeout_secs, void * paramp, int param_len,
+                      int noisy, int verbose)
+{
+    int k, res, ret, sense_cat, tmout;
+    unsigned char xcopyCmdBlk[EXTENDED_COPY_CMDLEN] =
+      {EXTENDED_COPY_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+    const char * opcode_name = "bad sa";
+
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+    switch (sa) {
+    case 0x0:
+    case 0x1:
+        opcode_name = (0x0 == sa) ? "Extended copy (LID1)" :
+                      "Extended copy (LID4)";
+        xcopyCmdBlk[10] = (unsigned char)((param_len >> 24) & 0xff);
+        xcopyCmdBlk[11] = (unsigned char)((param_len >> 16) & 0xff);
+        xcopyCmdBlk[12] = (unsigned char)((param_len >> 8) & 0xff);
+        xcopyCmdBlk[13] = (unsigned char)(param_len & 0xff);
+        break;
+    case 0x10:
+    case 0x11:
+        opcode_name = (0x10 == sa) ? "Populate token" : "Write using token";
+        xcopyCmdBlk[6] = (unsigned char)((list_id >> 24) & 0xff);
+        xcopyCmdBlk[7] = (unsigned char)((list_id >> 16) & 0xff);
+        xcopyCmdBlk[8] = (unsigned char)((list_id >> 8) & 0xff);
+        xcopyCmdBlk[9] = (unsigned char)(list_id & 0xff);
+        xcopyCmdBlk[10] = (unsigned char)((param_len >> 24) & 0xff);
+        xcopyCmdBlk[11] = (unsigned char)((param_len >> 16) & 0xff);
+        xcopyCmdBlk[12] = (unsigned char)((param_len >> 8) & 0xff);
+        xcopyCmdBlk[13] = (unsigned char)(param_len & 0xff);
+        xcopyCmdBlk[14] = (unsigned char)(group_num & 0x1f);
+        break;
+    case 0x1c:
+        opcode_name = "Copy operation abort";
+        xcopyCmdBlk[2] = (unsigned char)((list_id >> 24) & 0xff);
+        xcopyCmdBlk[3] = (unsigned char)((list_id >> 16) & 0xff);
+        xcopyCmdBlk[4] = (unsigned char)((list_id >> 8) & 0xff);
+        xcopyCmdBlk[5] = (unsigned char)(list_id & 0xff);
+        break;
+    default:
+        fprintf(sg_warnings_strm, "sg_ll_3party_copy_out: unknown service "
+                "action 0x%x\n", sa);
+        return -1;
+    }
+    tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
+
+    if (verbose) {
+        fprintf(sg_warnings_strm, "    %s cmd: ", opcode_name);
+        for (k = 0; k < EXTENDED_COPY_CMDLEN; ++k)
+            fprintf(sg_warnings_strm, "%02x ", xcopyCmdBlk[k]);
+        fprintf(sg_warnings_strm, "\n");
+        if ((verbose > 1) && paramp && param_len) {
+            fprintf(sg_warnings_strm, "    %s parameter list:\n",
+                    opcode_name);
+            dStrHexErr((const char *)paramp, param_len, -1);
+        }
+    }
+
+    ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp) {
+        fprintf(sg_warnings_strm, "%s: out of memory\n", opcode_name);
+        return -1;
+    }
+    set_scsi_pt_cdb(ptvp, xcopyCmdBlk, sizeof(xcopyCmdBlk));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, opcode_name, res, 0, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)

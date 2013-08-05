@@ -261,7 +261,8 @@ subdirectory:
   - bsg_queue_tst, sg_excl, scsi_inquiry, sg_iovec_tst, sg_queue_tst,
     sg_sat_chk_power, sg__sat_identify, sg__sat_phy_event,
     sg__sat_set_features, sg_sat_smart_rd_data, sg_simple1, sg_simple2,
-    sg_simple3, sg_simple4, sg_simple5 and sg_simple16
+    sg_simple3, sg_simple4, sg_simple5, sg_simple16, sg_tst_excl and
+    sg_tst_excl2
 
 Also in that subdirectory is a script to test sg_persist, an example data
 file for sg_persist (called "transport_ids.txt") and an example data file for
@@ -326,6 +327,14 @@ descriptor (as defined in SAT).
 through the SAT-defined ATA PASS_THROUGH (16) SCSI command. If
 successful, the 256 word (512 byte) response is output.
 
+"sg_tst_excl" and "sg_tst_excl2" use multiple threads to bombard the
+given device with O_EXCL open flags, so only one should succeed at a
+time. While holding O_EXCL control a thread attempts a double increment
+on an integer in the given LBA. If the integer starts even (after the
+first read) then it should remain even if the O_EXCL flag is doing its job.
+The "sg_tst_excl" variant uses the Linux SG_IO v3 interface while the
+"sg_tst_excl2" uses the more generic sg_pt infrastructure. 
+
 
 Command line processing
 =======================
@@ -382,4 +391,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-30th July 2013
+2nd August 2013

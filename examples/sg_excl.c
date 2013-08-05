@@ -14,15 +14,15 @@
    executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver
 
-*  Copyright (C) 2003 D. Gilbert
+*  Copyright (C) 2003-2013 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   Invocation: sg_simple1 [-x] <sg_device>
+   Invocation: sg_excl [-x] <sg_device>
 
-   Version 03.57 (20020226)
+   Version 3.58 (20130731)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -71,7 +71,7 @@ int main(int argc, char * argv[])
         }
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_simple1 [-x] <sg_device>'\n");
+        printf("Usage: 'sg_excl [-x] <sg_device>'\n");
         return 1;
     }
 
@@ -189,8 +189,8 @@ int main(int argc, char * argv[])
 
     if (do_extra)
         printf("TEST UNIT READY duration=%u millisecs, resid=%d, "
-	       "msg_status=%d\n", io_hdr.duration, io_hdr.resid,
-		(int)io_hdr.msg_status);
+               "msg_status=%d\n", io_hdr.duration, io_hdr.resid,
+                (int)io_hdr.msg_status);
 
     sleep(60);
     close(sg_fd);
