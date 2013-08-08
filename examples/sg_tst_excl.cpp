@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.03 20130803";
+static const char * version_str = "1.04 20130806";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -104,10 +104,11 @@ static unsigned int bounce_count;
 static void
 usage(void)
 {
-    printf("Usage: %s [-l <lba>] [-n <n_per_thr>] [-t <num_thrs>]\n"
+    printf("Usage: %s [-b] [-l <lba>] [-n <n_per_thr>] [-t <num_thrs>]\n"
            "                   [-V] [-w <wait_ms>] [-x] "
            "<disk_device>\n", util_name);
     printf("  where\n");
+    printf("    -b                block on open (def: O_NONBLOCK)\n");
     printf("    -l <lba>          logical block to increment (def: %u)\n",
            DEF_LBA);
     printf("    -n <n_per_thr>    number of loops per thread "
@@ -133,15 +134,15 @@ usage(void)
 #define WRITE16_REPLY_LEN 512
 #define WRITE16_CMD_LEN 16
 
-/* Opens dev_name O_EXCL | O_NONBLOCK and spins if busy, sleeping for
- * wait_ms milliseconds if wait_ms is non-negative (else tight spin).
+/* Opens dev_name and spins if busy (i.e. gets EBUSY), sleeping for
+ * wait_ms milliseconds if wait_ms is positive.
  * Reads lba and treats the first 4 bytes as an int (SCSI endian),
  * increments it and writes it back. Repeats so that happens twice. Then
  * closes dev_name. If an error occurs returns -1 else returns 0 if
  * first int read from lba is even otherwise returns 1. */
 static int
-do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int excl,
-                   int wait_ms, unsigned int & bounces)
+do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
+                   int excl, int wait_ms, unsigned int & bounces)
 {
     int k, sg_fd, ok;
     int odd = 0;
@@ -154,12 +155,14 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int excl,
     unsigned char sense_buffer[64];
     unsigned char lb[READ16_REPLY_LEN];
     char ebuff[EBUFF_SZ];
-    int open_flags = O_RDWR | O_NONBLOCK;
+    int open_flags = O_RDWR;
 
     r16CmdBlk[6] = w16CmdBlk[6] = (lba >> 24) & 0xff;
     r16CmdBlk[7] = w16CmdBlk[7] = (lba >> 16) & 0xff;
     r16CmdBlk[8] = w16CmdBlk[8] = (lba >> 8) & 0xff;
     r16CmdBlk[9] = w16CmdBlk[9] = lba & 0xff;
+    if (! block)
+        open_flags |= O_NONBLOCK;
     if (excl)
         open_flags |= O_EXCL;
 
@@ -281,7 +284,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int excl,
 /* Send INQUIRY and fetches response. If okay puts PRODUCT ID field
  * in b (up to m_blen bytes). Returns 0 on success, else -1 . */
 static int
-do_inquiry_prod_id(const char * dev_name, int wait_ms,
+do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
                    unsigned int & bounces, char * b, int b_mlen)
 {
     int sg_fd, ok, ret;
@@ -291,9 +294,13 @@ do_inquiry_prod_id(const char * dev_name, int wait_ms,
     unsigned char inqBuff[INQ_REPLY_LEN];
     unsigned char sense_buffer[64];
     char ebuff[EBUFF_SZ];
+    int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
 
-    /* O_RDONLY | O_EXCL leads to EPERM (undocumented, historic) */
-    while (((sg_fd = open(dev_name, O_RDWR | O_EXCL | O_NONBLOCK)) < 0) &&
+    if (! block)
+        open_flags |= O_NONBLOCK;
+    if (excl)
+        open_flags |= O_EXCL;
+    while (((sg_fd = open(dev_name, open_flags)) < 0) &&
            (EBUSY == errno)) {
         ++bounces;
         if (wait_ms > 0)
@@ -364,8 +371,8 @@ do_inquiry_prod_id(const char * dev_name, int wait_ms,
 }
 
 static void
-work_thread(const char * dev_name, unsigned int lba, int id, int excl,
-            int num, int wait_ms)
+work_thread(const char * dev_name, unsigned int lba, int id, int block,
+            int excl, int num, int wait_ms)
 {
     unsigned int thr_odd_count = 0;
     unsigned int thr_bounce_count = 0;
@@ -375,7 +382,7 @@ work_thread(const char * dev_name, unsigned int lba, int id, int excl,
     cerr << "Enter work_thread id=" << id << " excl=" << excl << endl;
     console_mutex.unlock();
     for (k = 0; k < num; ++k) {
-        res = do_rd_inc_wr_twice(dev_name, lba, excl, wait_ms,
+        res = do_rd_inc_wr_twice(dev_name, lba, block, excl, wait_ms,
                                  thr_bounce_count);
         if (res < 0)
             break;
@@ -399,16 +406,19 @@ int
 main(int argc, char * argv[])
 {
     int k, res;
+    int block = 0;
     unsigned int lba = DEF_LBA;
     int num_per_thread = DEF_NUM_PER_THREAD;
     int num_threads = DEF_NUM_THREADS;
     int wait_ms = DEF_WAIT_MS;
-    int exclude_excl1 = 0;
+    int exclude_o_excl = 0;
     char * dev_name = NULL;
     char b[64];
 
     for (k = 1; k < argc; ++k) {
-        if (0 == memcmp("-l", argv[k], 2)) {
+        if (0 == memcmp("-b", argv[k], 2))
+            ++block;
+        else if (0 == memcmp("-l", argv[k], 2)) {
             ++k;
             if ((k < argc) && isdigit(*argv[k]))
                 lba = (unsigned int)atoi(argv[k]);
@@ -439,7 +449,7 @@ main(int argc, char * argv[])
             } else
                 break;
         } else if (0 == memcmp("-x", argv[k], 2))
-            ++exclude_excl1;
+            ++exclude_o_excl;
         else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             dev_name = NULL;
@@ -459,8 +469,8 @@ main(int argc, char * argv[])
     }
     try {
 
-        res = do_inquiry_prod_id(dev_name, wait_ms, bounce_count, b,
-                                 sizeof(b));
+        res = do_inquiry_prod_id(dev_name, block, ! exclude_o_excl, wait_ms,
+                                 bounce_count, b, sizeof(b));
         if (res) {
             fprintf(stderr, "INQUIRY failed on %s\n", dev_name);
             return 1;
@@ -477,10 +487,10 @@ main(int argc, char * argv[])
         vector<thread *> vt;
 
         for (k = 0; k < num_threads; ++k) {
-            int excl = ((0 == k) && exclude_excl1) ? 0 : 1;
+            int excl = ((0 == k) && exclude_o_excl) ? 0 : 1;
 
-            thread * tp = new thread {work_thread, dev_name, lba, k, excl,
-                                      num_per_thread, wait_ms};
+            thread * tp = new thread {work_thread, dev_name, lba, k, block,
+                                      excl, num_per_thread, wait_ms};
             vt.push_back(tp);
         }
 
