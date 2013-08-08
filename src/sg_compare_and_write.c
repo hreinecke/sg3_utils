@@ -28,9 +28,11 @@
 *
 */
 
+#ifndef __sun
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #endif
 
 #include <unistd.h>
@@ -48,7 +50,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.06 20130604";
+static const char * version_str = "1.07 20130807";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
