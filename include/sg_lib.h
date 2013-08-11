@@ -310,9 +310,10 @@ extern void dStrHexErr(const char* str, int len, int no_ascii);
 /* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
  * separated) to 'b' not to exceed 'b_len' characters. Each line
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
- * per line with an extra space between the 8th and 9th bytes */
+ * per line with an extra space between the 8th and 9th bytes. 'format'
+ * is unused, set to 0 . */
 extern void dStrHexStr(const char* str, int len, const char * leadin,
-                       int b_len, char * b);
+                       int format, int b_len, char * b);
 
 /* Returns 1 when executed on big endian machine; else returns 0.
  * Useful for displaying ATA identify words (which need swapping on a

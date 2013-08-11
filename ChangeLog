@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.37 [20130807] [svn: r505]
+Changelog for sg3_utils-1.37 [20130811] [svn: r506]
   - sg_compare_and_write: fix wrprotect setting
   - sg_inq: fix referrals VPD page
     - dev_id VPD: T10 vendor id designator clean up
@@ -10,6 +10,7 @@ Changelog for sg3_utils-1.37 [20130807] [svn: r505]
   - sg_persist: fix core dump on -Q option
   - sg_unmap: fix core dump on -g option
   - sg_vpd: dev_id VPD: T10 vendor id designator clean up
+  - sg_ses: add --nickname and --nickid options
   - sg_libs: extended copy opcode renamed (spc4r34)
     - sg_ll_receive_copy_results(): expand for all sa_s
     - add sg_ll_3party_copy_out()
