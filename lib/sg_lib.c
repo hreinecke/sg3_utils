@@ -1013,8 +1013,8 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                          "\n");
         if (n >= (buff_len - 1))
             return;
-        dStrHexStr((const char *)sense_buffer, len, "        ", buff_len - n,
-                   buff + n);
+        dStrHexStr((const char *)sense_buffer, len, "        ", 0,
+                   buff_len - n, buff + n);
     }
 }
 
@@ -1481,9 +1481,11 @@ dStrHexErr(const char* str, int len, int no_ascii)
 /* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
  * separated) to 'b' not to exceed 'b_len' characters. Each line
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
- * per line with an extra space between the 8th and 9th bytes */
+ * per line with an extra space between the 8th and 9th bytes. 'format'
+ * is unused (currently), set to 0 . */
 void
-dStrHexStr(const char* str, int len, const char * leadin, int b_len, char * b)
+dStrHexStr(const char* str, int len, const char * leadin, int format,
+           int b_len, char * b)
 {
     const char * p = str;
     unsigned char c;
@@ -1492,6 +1494,9 @@ dStrHexStr(const char* str, int len, const char * leadin, int b_len, char * b)
 
     if (len <= 0)
         return;
+    if (0 != format) {
+        ;       /* do nothing different for now */
+    }
     if (leadin) {
         bpstart = strlen(leadin);
         /* Cap leadin at 60 characters */
