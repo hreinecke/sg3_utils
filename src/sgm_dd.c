@@ -229,7 +229,7 @@ interrupt_handler(int sig)
 static void
 siginfo_handler(int sig)
 {
-    sig = sig;  /* dummy to stop -W warning messages */
+    if (sig) { ; }      /* unused, dummy to suppress warning */
     fprintf(stderr, "Progress report, continuing ...\n");
     print_stats();
     if (do_time)
@@ -849,7 +849,7 @@ main(int argc, char * argv[])
             cdbsz_given = 1;
         } else if (0 == strcmp(key,"coe")) {
             do_coe = sg_get_num(buf);   /* dummy, just accept + ignore */
-            do_coe = do_coe;    /* suppress warning */
+            if (do_coe) { ; }   /* unused, dummy to suppress warning */
         } else if (0 == strcmp(key,"count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);

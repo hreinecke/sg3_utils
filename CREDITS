@@ -35,7 +35,7 @@ Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
 Greg Inozemtsev <greg at purestorage dot com>
-        extensions to sg_xcopy [20130207]
+        extensions to sg_xcopy [20130207+20130816]
 
 Hannes Reinecke <hare at suse dot de>
         contributed sg_rdac, (and some corresponding VPD entries to
@@ -121,4 +121,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-8th May 2013
+16th August 2013

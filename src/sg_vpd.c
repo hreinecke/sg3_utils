@@ -1930,7 +1930,7 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
     int len, res;
     int alloc_len = maxlen;
 
-    do_quiet = do_quiet;       /* suppress warning */
+    if (do_quiet) { ; } /* unused, dummy to suppress warning */
     if ((! do_hex) && (! do_raw))
         printf("Only hex output supported\n");
     if (!do_raw) {

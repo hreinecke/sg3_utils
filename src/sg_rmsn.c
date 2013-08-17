@@ -165,7 +165,7 @@ int main(int argc, char * argv[])
             if (raw) {
                 if (sn_len > 0) {
                     n = fwrite(ucp + 4, 1, sn_len, stdout);
-                    n = n;      /* suppress warning */
+                    if (n) { ; }  /* unused, dummy to suppress warning */
                 }
             } else {
                 printf("Serial number:\n");
