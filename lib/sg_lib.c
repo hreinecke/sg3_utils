@@ -792,7 +792,7 @@ sg_get_sense_sat_pt_fixed_str(const unsigned char * sp, int slen, int blen,
 {
     int n = 0;
 
-    slen = slen;        /* suppress warning */
+    if (slen) { ; }     /* unused, suppress warning */
     if (blen < 1)
         return;
     if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2]))

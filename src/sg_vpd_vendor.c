@@ -793,7 +793,7 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
     const struct svpd_values_name_t * vnp;
     int alloc_len = maxlen;
 
-    do_long = do_long;        /* suppress warning */
+    if (do_long) { ; }  /* unused, dummy to suppress warning */
     vnp = svpd_get_v_detail(num_vpd, subvalue, -1);
     if (vnp && vnp->name)
         strcpy(name, vnp->name);
