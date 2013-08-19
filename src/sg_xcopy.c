@@ -411,6 +411,30 @@ dd_filetype_str(int ft, char * buff)
 }
 
 static int
+simplified_ft(const struct xcopy_fp_t * xfp)
+{
+    int ftype = xfp->sg_type;
+
+    switch (ftype) {
+    case FT_BLOCK:
+    case FT_ST:
+    case FT_OTHER:      /* typically regular file */
+    case FT_DEV_NULL:
+    case FT_FIFO:
+    case FT_ERROR:
+        return ftype;
+    default:
+        if (FT_SG & ftype) {
+            if ((0 == xfp->pdt) || (0xe == xfp->pdt)) /* D-A or RBC */
+            return FT_BLOCK;
+        else if (0x1 == xfp->pdt)
+            return FT_ST;
+        }
+        return FT_OTHER;
+    }
+}
+
+static int
 seg_desc_from_dd_type(int in_ft, int in_off, int out_ft, int out_off)
 {
     int desc_type = -1;
@@ -1850,7 +1874,8 @@ main(int argc, char * argv[])
         bpt = (r > MAX_BLOCKS_PER_TRANSFER) ? MAX_BLOCKS_PER_TRANSFER : r;
     }
 
-    seg_desc_type = seg_desc_from_dd_type(ixcf.sg_type, 0, oxcf.sg_type, 0);
+    seg_desc_type = seg_desc_from_dd_type(simplified_ft(&ixcf), 0,
+                                          simplified_ft(&oxcf), 0);
 
     if (do_time) {
         start_tm.tv_sec = 0;
