@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.38 20130817";
+static const char * version_str = "0.38 20130819";
 
 #define ME "sg_xcopy: "
 
@@ -597,8 +597,7 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     int seg_desc_len;
     int verb;
 
-    verb = verbose ? (verbose - 1) : 0;
-
+    verb = (verbose > 1) ? (verbose - 2) : 0;
     memset(xcopyBuff, 0, 256);
     xcopyBuff[0] = list_id;
     xcopyBuff[1] = (list_id_usage << 3) | priority;
@@ -613,10 +612,6 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
                                         src_lba, dst_lba);
     xcopyBuff[11] = seg_desc_len; /* One segment descriptor */
     desc_offset += seg_desc_len;
-    if (verbose > 3) {
-        pr2serr("\nParameter list in hex (length %d):\n", desc_offset);
-        dStrHexErr((const char *)xcopyBuff, desc_offset, 1);
-    }
     /* set noisy so if a UA happens it will be printed to stderr */
     return sg_ll_extended_copy(sg_fd, xcopyBuff, desc_offset, 1, verb);
 }
@@ -1135,6 +1130,26 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
          */
         pr2serr("      %s\n", (const char *)ip);
         break;
+    case 9: /* Protocol specific port identifier */
+        /* added in spc4r36, PIV must be set, proto_id indicates */
+        /* whether UAS (USB) or SOP (PCIe) or ... */
+        if (! piv)
+            pr2serr("      >>>> Protocol specific port identifier "
+                    "expects protocol\n"
+                    "           identifier to be valid and it is not\n");
+        if (TPROTO_UAS == p_id) {
+            pr2serr("      USB device address: 0x%x\n", 0x7f & ip[0]);
+            pr2serr("      USB interface number: 0x%x\n", ip[2]);
+        } else if (TPROTO_SOP == p_id) {
+            pr2serr("      PCIe routing ID, bus number: 0x%x\n", ip[0]);
+            pr2serr("          function number: 0x%x\n", ip[1]);
+            pr2serr("          [or device number: 0x%x, function number: "
+                    "0x%x]\n", (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
+        } else
+            pr2serr("      >>>> unexpected protocol indentifier: 0x%x\n"
+                    "           with Protocol specific port "
+                    "identifier\n", p_id);
+        break;
     default: /* reserved */
         pr2serr("      reserved designator=0x%x\n", desig_type);
         dStrHexErr((const char *)ip, i_len, 0);
@@ -1146,13 +1161,14 @@ static int
 desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
                  unsigned int block_size, int pad)
 {
-    int res;
+    int res, verb;
     unsigned char rcBuff[256], *ucp, *best = NULL;
     unsigned int len = 254;
     int off = -1, u, i_len, best_len = 0, assoc, desig, f_desig = 0;
 
+    verb = (verbose ? verbose - 1: 0);
     memset(rcBuff, 0xff, len);
-    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, 4, 1, verbose);
+    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, 4, 1, verb);
     if (0 != res) {
         pr2serr("VPD inquiry failed with %d\n", res);
         return res;
@@ -1161,7 +1177,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         return SG_LIB_CAT_MALFORMED;
     }
     len = ((rcBuff[2] << 8) + rcBuff[3]) + 4;
-    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, len, 1, verbose);
+    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, len, 1, verb);
     if (0 != res) {
         pr2serr("VPD inquiry failed with %d\n", res);
         return res;
@@ -1186,7 +1202,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         }
         assoc = ((ucp[1] >> 4) & 0x3);
         desig = (ucp[1] & 0xf);
-        if (verbose)
+        if (verbose > 2)
             pr2serr("    Desc %d: assoc %u desig %u len %d\n", off, assoc,
                     desig, i_len);
         /* Descriptor must be less than 16 bytes */

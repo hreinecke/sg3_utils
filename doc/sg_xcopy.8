@@ -260,6 +260,11 @@ whole logical unit (i.e. the whole disk) starting at LBA 0. So any
 partition indication (e.g. /dev/sdc2) is ignored. The user should set
 \fISKIP\fR,  \fISEEK\fR and \fICOUNT\fR with information obtained
 from a command like 'fdisk \-l \-u /dev/sdc' to account for partitions.
+.PP
+XCOPY (LID1) capability has been added to the ddpt utility which is in
+a package of the same name. The ddpt utility will run on other
+OSes (e.g. FreeBSD and Windows) while sg_xcopy only runs on Linux. Also
+ddpt permits the arguments to \fIibs=\fR and \fIibs=\fR to be different.
 .SH EXAMPLES
 Copy 2M of data from the start of one device to another:
 .PP
