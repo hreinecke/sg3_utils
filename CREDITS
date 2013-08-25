@@ -25,6 +25,9 @@ Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
         sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
         sg_turs and sginfo
 
+Eric Seppanen <eric @ purestorage dot com> borrowed ideas from alternate
+	implementation of sg_compare_and_write [20130823]
+
 Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
         is based.
 
@@ -121,4 +124,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-16th August 2013
+23rd August 2013

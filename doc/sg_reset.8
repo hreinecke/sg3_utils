@@ -1,4 +1,4 @@
-.TH SG_RESET "8" "February 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_RESET "8" "August 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_reset \- sends SCSI device, target, bus or host reset; or checks reset
 state
@@ -24,8 +24,12 @@ may send Low level Drivers (LLDs) the I_T NEXUS RESET task management
 function. Alternatively it may use a transport mechanism to do the same
 thing (e.g. a hard reset on the link containing a SAS target).
 .PP
-In the Linux kernel 2.6 series this utility can be called on sd, sr (cd/dvd),
-st or sg device nodes; if the user has appropriate permissions.
+In the Linux kernel 2.6 and 3 series this utility can be called on sd,
+sr (cd/dvd), st or sg device nodes; if the user has appropriate permissions.
+.PP
+Users of this utility can check whether a reset recovery is already underway
+before trying to send a new reset with this utility. Calling this utility
+with no options, just the \fIDEVICE\fR, will do such a check.
 .SH OPTIONS
 .TP
 \fB\-b\fR, \fB\-\-bus\fR
@@ -69,15 +73,14 @@ The error recovery code within the Linux kernel (SCSI mid\-level) when faced
 with a SCSI command timing out and no response from the device (LU) does the
 following. First it tries a device reset and if that is not successful tries
 a target reset. If that is not successful it tries a bus reset. If that is
-not successful it tries a host reset. Users of this utility can check whether
-such a recovery is already underway before trying to reset with this utility.
-Calling this utility with no options, just the \fIDEVICE\fR, will do such
-a check. The "device,target,bus,host" order is the reset escalation that the
-\fI\-\-no-esc\fR option attempts to stop. In large storage configurations
-th escalation may be (very) undesirable.
+not successful it tries a host reset. The "device,target,bus,host" order is
+the reset escalation that the \fI\-\-no-esc\fR option attempts to stop. In
+large storage configurations the escalation may be (very) undesirable.
 .PP
-This utility calls the SG_SCSI_RESET ioctl and as of lk 3.8.0 the
-\fI\-\-no-esc\fR option is not supported but may be soon after.
+This utility calls the SG_SCSI_RESET ioctl and as of lk 3.10.7 the
+\fI\-\-no-esc\fR option is not supported. Patches to implement this
+functionality have not been accepted. If you want it, post your concern
+to linux-scsi@vger.kernel.org which is the linux-scsi list.
 .PP
 SAM\-4 and 5 define a hard reset, a LOGICAL UNIT RESET and a I_T NEXUS
 RESET. A hard reset is defined to be a power on condition, a microcode

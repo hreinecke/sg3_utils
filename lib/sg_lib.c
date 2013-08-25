@@ -167,6 +167,22 @@ sg_print_scsi_status(int scsi_status)
     fprintf(sg_warnings_strm, "%s ", buff);
 }
 
+int
+sg_get_sense_key(const unsigned char * sensep, int sense_len)
+{
+    if ((NULL == sensep) || (sense_len < 2))
+        return -1;
+    switch (sensep[0] & 0x7f) {
+    case 0x70:
+    case 0x71:
+        return (sense_len < 3) ? -1 : (sensep[2] & 0xf);
+    case 0x72:
+    case 0x73:
+        return sensep[1] & 0xf;
+    default:
+        return -1;
+    }
+}
 
 char *
 sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
@@ -1098,8 +1114,13 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             break;
         case SPC_SK_ABORTED_COMMAND:
             return SG_LIB_CAT_ABORTED_COMMAND;
+        case SPC_SK_MISCOMPARE:
+            return SG_LIB_CAT_MISCOMPARE;
+        case SPC_SK_DATA_PROTECT:
+        case SPC_SK_COMPLETED:
+            return SG_LIB_CAT_SENSE;
         default:
-            ;   /* drop through (SPC_SK_COMPLETED amongst others) */
+            ;   /* rare and obsolete sense keys return SG_LIB_CAT_SENSE */
         }
     }
     return SG_LIB_CAT_SENSE;

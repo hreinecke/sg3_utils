@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "July 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG3_UTILS "8" "August 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -227,6 +227,10 @@ requested command.
 the \fIDEVICE\fR reports an aborted command. In some cases aborted
 commands can be retried immediately (e.g. if the transport aborted
 the command due to congestion).
+.TP
+.B 14
+the \fIDEVICE\fR reports a miscompare sense key. VERIFY and COMPARE AND
+WRITE commands may report this.
 .TP
 .B 15
 the utility is unable to open, close or use the given \fIDEVICE\fR.

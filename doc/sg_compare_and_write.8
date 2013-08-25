@@ -1,34 +1,57 @@
-.TH "COMPARE AND WRITE" "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH "COMPARE AND WRITE" "8" "August 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 .SH SYNOPSIS
 .B sg_compare_and_write
 [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-fua_nv\fR] [\fI\-\-help\fR]
-\fI\-\-in=IF\fR \fI\-\-lba=LBA\fR [\fI\-\-num=NUM\fR] [\fI\-\-timeout=TO\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WP\fR]
-[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
+\fI\-\-in=IF\fR [\fI\-\-inw=WF\fR] \fI\-\-lba=LBA\fR [\fI\-\-num=NUM\fR]
+[\fI\-\-quiet\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wrprotect=WP\fR] [\fI\-\-xferlen=LEN\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-Send the SCSI COMPARE AND WRITE command to \fIDEVICE\fR. This command receives
-a data buffer which contains a verify instance and a write instance each
-containing \fInum\fR blocks, the \fIDEVICE\fR will read \fInum\fR blocks
-starting at logical block address \fILBA\fR, compare the data read from
-the specified blocks to the verify instance and if they match, write the write
-instance to the \fIDEVICE\fR at the same logical block address \fILBA\fR.
-All of the above operations shall be performed as an uninterrupted series of
-actions.
+Send the SCSI COMPARE AND WRITE command to \fIDEVICE\fR. This utility
+reads a compare buffer and a write buffer from either one or two files. If
+the \fI\-\-inw=WF\fR option is not given then the concatenated compare
+and write buffers are read from the file indicated by the \fI\-\-in=IF\fR
+option. If the \fI\-\-inw=WF\fR option is given then the compare buffer
+is read from the file indicated by the \fI\-\-in=IF\fR while the write
+buffer is read from the file indicated by the \fI\-\-inw=WF\fR.
 .PP
-The data buffer which contains the verify and write instances are obtained
-from the input file \fIIF\fR, this file is expected to be 2*\fInum\fR blocks
-long. If \fIbs\fR is not specified, then READ CAPACITY(10) is used to
-determine the block size. If not specified, the transfer size will be the
-2*\fInum\fR blocks.
+Those buffers are expected to each contain \fINUM\fR blocks of data. The
+compare starts at at logical block address \fILBA\fR on the \fIDEVICE\fR
+and if the comparison fails (i.e. the provided compare buffer does not
+equal at \fILBA\fR on the \fIDEVICE\fR) then the COMPARE AND WRITE command
+finishes with a sense key of MISCOMPARE. In this case this utility will
+completes and set an exit status of 14 (which happens to be the sense key
+value of MISCOMPARE).
 .PP
-In case of a mismatch between the blocks read from \fIDEVICE\fR and the verify
-instance in the data buffer, a check condition will be returned with sense key
-set to miscompare.
+If the comparison succeeds then the provided write buffer is written to
+starting at \fILBA\fR for \fINUM\fR blocks on the \fIDEVICE\fR.
 .PP
-This command is defined in SBC\-3 whose most recent revision is 35d. SBC\-3
+The actual number of bytes transferred in the data\-out buffer of the
+COMPARE AND WRITE command may need to be given by the user with the
+\fI\-\-xferlen=LEN\fR option. \fILEN\fR defaults to (2* \fINUM\fR * 512)
+which is 1024 for the default \fINUM\fR of 1. If the block size is
+other than 512 then the user will need to use \fI\-\-xferlen=LEN\fR option.
+If protection information is given (indicated by a value of \fIWP\fR
+other than 0 (the default)) then for a \fINUM\fR of 1 \fILEN\fR should
+be 1040 . Note that the SCSI READ CAPACITY command is not checked by
+this utility (e.g. to find the block size).
+.PP
+The definition of the SCSI COMPARE AND WRITE command requires that the
+\fIDEVICE\fR implement the compare and optional write as an uninterrupted
+series of actions. Depending on some other \fIDEVICE\fR settings a
+verify operation may occur prior to the compare.
+.PP
+When a mismatch occurs between the compare buffer and the blocks starting
+at \fILBA\fR read from the \fIDEVICE\fR the sense buffer containing the
+MISCOMPARE sense key causes several messages to be sent to stderr (including
+the offset of the first byte mismatch). To suppress these messages use the
+\fI\-\-quiet\fR option. With or without the \fI\-\-quiet\fR option the exit
+status will be set to 14.
+.PP
+This command is defined in SBC\-3 whose most recent revision is 35f. SBC\-3
 and other SCSI documents can be found at http://www.t10.org .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
@@ -48,18 +71,32 @@ SBC\-3 revision 35d and its position marked as "reserved".
 output the usage message then exit.
 .TP
 \fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
-read data (binary) from file named \fIIF\fR and use it as the data out
-buffer for the SCSI COMPARE AND WRITE command. The \fIIF\fR shall be at
-2*\fINUM\fR blocks.
+read data (binary) from file named \fIIF\fR. This will either be the combined
+compare and write buffers (when the \fI\-\-inw=WF\fR option is not given) or
+just the compare buffer (when the \fI\-\-inw=WF\fR option is given). If
+\fIIF\fR is '\-' then stdin (e.g. a pipe) is read.
+.TP
+\fB\-D\fR, \fB\-\-inw\fR=\fIWF\fR
+read data (binary) from file named \fIWF\fR. This will the write buffer
+that will become the second half of the data-out buffer sent to the
+\fIDEVICE\fR associated with the COMPARE AND WRITE command. Note that
+when this option is given then the \fI\-\-in=IF\fR is expected to hold
+the associated compare buffer.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
-where \fILBA\fR is the logical block address to start the COMPARE AND WRITE command.
-Assumed to be in decimal unless prefixed with '0x' or has a trailing 'h'.
+where \fILBA\fR is the logical block address to start the COMPARE AND WRITE
+command. Assumed to be in decimal unless prefixed with '0x' or has a
+trailing 'h'.
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to read
 and compare with the verify instance. And given a match, the \fINUM\fR of
 blocks to write starting \fILBA\fR. The default value for \fINUM\fR is 1.
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+suppress the sense buffer messages associated with a MISCOMPARE sense key
+that would otherwise be sent to stderr. Still set the exit status to 14
+which is the sense key value indicating a MISCOMPARE.
 .TP
 \fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
 where \fITO\fR is the command timeout value in seconds. The default value is
@@ -78,18 +115,27 @@ implies no protection information is sent (along with the user data) by this
 utility.
 .TP
 \fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
-where \fILEN\fR is the data out buffer length. Defaults to 2*\fINUM\fR blocks.
+where \fILEN\fR is the data out buffer length in byte. It defaults to (2 *
+\fINUM\fR * 512) bytes. If the \fIDEVICE\fR block size is other than 512
+bytes or \fIWP\fR is non-zero (implying additional protection information)
+then this default will be incorrect; the use must supply the correct value
+for \fILEN\fR
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
 .SH EXIT STATUS
-The exit status of sg_compare_and_write is 0 when it is successful. Otherwise
-see the sg3_utils(8) man page.
+The exit status of sg_compare_and_write is 0 when it is successful. If the
+compare step fails then the exit status is 14. For other exit status values
+see the EXIT STATUS section in the sg3_utils(8) man page.
+.PP
+Earlier versions of this utility set an exit status of 98 when there was a
+MISCOMPARE.
 .SH AUTHORS
-Written by Shahar Salzman.
+Written by Shahar Salzman. Maintained by Douglas Gilbert. Additions by
+Eric Seppanen.
 .SH "REPORTING BUGS"
-Report bugs to shahar.salzman@kaminario.com
+Report bugs to shahar.salzman@kaminario.com or dgilbert@interlog.com
 .SH COPYRIGHT
 Copyright \(co 2012\-2013 Kaminario Technologies LTD
 

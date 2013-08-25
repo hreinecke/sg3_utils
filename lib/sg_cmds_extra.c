@@ -1566,14 +1566,14 @@ sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * SG_LIB_CAT_MEDIUM_HARD -> medium or hardware error, no valid info,
  * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> as previous, with valid info,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * SG_LIB_CAT_MISCOMPARE, -1 -> other failure */
 int
 sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
                unsigned int lba, int veri_len, void * data_out,
                int data_out_len, unsigned int * infop, int noisy,
                int verbose)
 {
-    int k, res, ret, sense_cat;
+    int k, res, ret, sense_cat, slen;
     unsigned char vCmdBlk[VERIFY10_CMDLEN] =
                 {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -1623,6 +1623,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
         case SG_LIB_CAT_ILLEGAL_REQ:
         case SG_LIB_CAT_UNIT_ATTENTION:
         case SG_LIB_CAT_ABORTED_COMMAND:
+        case SG_LIB_CAT_MISCOMPARE:
             ret = sense_cat;
             break;
         case SG_LIB_CAT_RECOVERED:
@@ -1631,7 +1632,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
             break;
         case SG_LIB_CAT_MEDIUM_HARD:
             {
-                int valid, slen;
+                int valid;
                 uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
@@ -1663,13 +1664,13 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
  * SG_LIB_CAT_MEDIUM_HARD -> medium or hardware error, no valid info,
  * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> as previous, with valid info,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * SG_LIB_CAT_MISCOMPARE, -1 -> other failure */
 int
 sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
                int veri_len, int group_num, void * data_out,
                int data_out_len, uint64_t * infop, int noisy, int verbose)
 {
-    int k, res, ret, sense_cat;
+    int k, res, ret, sense_cat, slen;
     unsigned char vCmdBlk[VERIFY16_CMDLEN] =
                 {VERIFY16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -1726,6 +1727,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
         case SG_LIB_CAT_ILLEGAL_REQ:
         case SG_LIB_CAT_UNIT_ATTENTION:
         case SG_LIB_CAT_ABORTED_COMMAND:
+        case SG_LIB_CAT_MISCOMPARE:
             ret = sense_cat;
             break;
         case SG_LIB_CAT_RECOVERED:
@@ -1734,7 +1736,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
             break;
         case SG_LIB_CAT_MEDIUM_HARD:
             {
-                int valid, slen;
+                int valid;
                 uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
