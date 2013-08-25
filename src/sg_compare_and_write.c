@@ -1,5 +1,4 @@
-/* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*
+/*
 *  Copyright (c) 2012-2013, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
@@ -23,10 +22,11 @@
 *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*
-*  This command performs a SCSI COMPARE AND WRITE on the given lba.
-*
-*/
+ *
+ * This command performs a SCSI COMPARE AND WRITE. See SBC-3 at
+ * http://www.t10.org
+ *
+ */
 
 #ifndef __sun
 #define _XOPEN_SOURCE 500
@@ -39,6 +39,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 #include <getopt.h>
@@ -50,7 +51,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.07 20130807";
+static const char * version_str = "1.08 20130824";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -71,8 +72,11 @@ static struct option long_options[] = {
         {"group", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'i'},
+        {"inc", required_argument, 0, 'C'},
+        {"inw", required_argument, 0, 'D'},
         {"lba", required_argument, 0, 'l'},
         {"num", required_argument, 0, 'n'},
+        {"quiet", no_argument, 0, 'q'},
         {"timeout", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
@@ -90,15 +94,19 @@ struct caw_flags {
 };
 
 struct opts_t {
-        char ifilename[256];
+        const char * ifn;
+        const char * wfn;
+        int wfn_given;
         uint64_t lba;
         int numblocks;
+        int quiet;
         int verbose;
         int timeout;
         int xfer_len;
         const char * device_name;
         struct caw_flags flags;
-} opts;
+};
+
 
 static void
 usage()
@@ -106,11 +114,12 @@ usage()
         fprintf(stderr, "Usage: "
                 "sg_compare_and_write [--dpo] [--fua] [--fua_nv] "
                 "[--group=GN] [--help]\n"
-                "                            --in=IF --lba=LBA [--num=NUM] "
-                "[--timeout=TO]\n"
-                "                            [--verbose] [--version] "
-                "[--wrpotect=w]\n"
-                "                            [--xferlen=LEN] DEVICE\n"
+                "                            --in=IF [--inw=WF] --lba=LBA "
+                "[--num=NUM]\n"
+                "                            [--quiet] [--timeout=TO] "
+                "[--verbose] [--version]\n"
+                "                            [--wrpotect=WP] [--xferlen=LEN] "
+                "DEVICE\n"
                 "  where:\n"
                 "    --dpo|-d            set the dpo bit in cdb (def: "
                 "clear)\n"
@@ -121,13 +130,20 @@ usage()
                 "    --group=GN|-g GN    GN is GROUP NUMBER to set in "
                 "cdb (def: 0)\n"
                 "    --help|-h           print out usage message\n"
-                "    --in=IF|-i IF       IF is input file, read the compare "
-                "and write buffer\n"
-                "                        from this file\n"
+                "    --in=IF|-i IF       IF is a file containing a compare "
+                "buffer and\n"
+                "                        optionally a write buffer (when "
+                "--inw=WF is\n"
+                "                        not given)\n"
+                "    --inw=WF|-D WF      WF is a file containing a write "
+                "buffer\n"
                 "    --lba=LBA|-l LBA    LBA of the first block of the "
                 "compare and write\n"
                 "    --num=NUM|-n NUM    number of blocks to "
                 "compare/write (def: 1)\n"
+                "    --quiet|-q          suppress MISCOMPARE report to "
+                "stderr,\n"
+                "                        still sets exit status of 14\n"
                 "    --timeout=TO|-t TO    timeout for the command "
                 "(def: 60 secs)\n"
                 "    --verbose|-v        increase verbosity (use '-vv' for "
@@ -135,50 +151,58 @@ usage()
                 "    --version|-V        print version string then exit\n"
                 "    --wrprotect=WP|-w WP    write protect information "
                 "(def: 0)\n"
-                "    --xferlen=LEN|-x LEN    number of bytes to transfer "
-                "(def: 1024)\n"
-                "                            default is "
-                "(NUM * default_block_size * 2)\n"
+                "    --xferlen=LEN|-x LEN    number of bytes to transfer. "
+                "Default is\n"
+                "                            (2 * NUM * 512) or 1024 when "
+                "NUM is 1\n"
                 "\n"
                 "Performs a SCSI COMPARE AND WRITE operation.\n");
 }
 
 static int
-parse_args(int argc, char* argv[])
+parse_args(int argc, char* argv[], struct opts_t * op)
 {
         int c;
         int lba_given = 0;
         int if_given = 0;
         int64_t ll;
 
-        memset(&opts, 0, sizeof(opts));
-        opts.numblocks = DEF_NUM_BLOCKS;
+        op->numblocks = DEF_NUM_BLOCKS;
         /* COMPARE AND WRITE defines 2*buffers compare + write */
-        opts.xfer_len = 2*DEF_NUM_BLOCKS*DEF_BLOCK_SIZE;
-        opts.timeout = DEF_TIMEOUT_SECS;
-        opts.device_name = NULL;
+        op->xfer_len = 0;
+        op->timeout = DEF_TIMEOUT_SECS;
+        op->device_name = NULL;
         while (1) {
                 int option_index = 0;
 
-                c = getopt_long(argc, argv, "dfFg:hi:l:n:t:vVw:x:",
+                c = getopt_long(argc, argv, "C:dD:fFg:hi:l:n:qt:vVw:x:",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
 
                 switch (c) {
+                case 'C':
+                case 'i':
+                        op->ifn = optarg;
+                        if_given = 1;
+                        break;
                 case 'd':
-                        opts.flags.dpo = 1;
+                        op->flags.dpo = 1;
+                        break;
+                case 'D':
+                        op->wfn = optarg;
+                        op->wfn_given = 1;
                         break;
                 case 'F':
-                        opts.flags.fua_nv = 1;
+                        op->flags.fua_nv = 1;
                         break;
                 case 'f':
-                        opts.flags.fua = 1;
+                        op->flags.fua = 1;
                         break;
                 case 'g':
-                        opts.flags.group = sg_get_num(optarg);
-                        if ((opts.flags.group < 0) ||
-                            (opts.flags.group > 31))  {
+                        op->flags.group = sg_get_num(optarg);
+                        if ((op->flags.group < 0) ||
+                            (op->flags.group > 31))  {
                                 fprintf(stderr, "argument to '--group' "
                                         "expected to be 0 to 31\n");
                                 goto out_err_no_usage;
@@ -188,52 +212,51 @@ parse_args(int argc, char* argv[])
                 case '?':
                         usage();
                         exit(0);
-                case 'i':
-                        strncpy(opts.ifilename, optarg,
-                                sizeof(opts.ifilename));
-                        if_given = 1;
-                        break;
                 case 'l':
                         ll = sg_get_llnum(optarg);
                         if (-1 == ll) {
                                 fprintf(stderr, "bad argument to '--lba'\n");
                                 goto out_err_no_usage;
                         }
-                        opts.lba = (uint64_t)ll;
+                        op->lba = (uint64_t)ll;
                         lba_given = 1;
                         break;
                 case 'n':
-                        opts.numblocks = sg_get_num(optarg);
-                        if (opts.numblocks < 0)  {
-                                fprintf(stderr, "bad argument to '--num'\n");
+                        op->numblocks = sg_get_num(optarg);
+                        if ((op->numblocks < 0) || (op->numblocks > 255))  {
+                                fprintf(stderr, "bad argument to '--num', "
+                                        "expect 0 to 255\n");
                                 goto out_err_no_usage;
                         }
                         break;
+                case 'q':
+                        ++op->quiet;
+                        break;
                 case 't':
-                        opts.timeout = sg_get_num(optarg);
-                        if (opts.timeout < 0)  {
+                        op->timeout = sg_get_num(optarg);
+                        if (op->timeout < 0)  {
                                 fprintf(stderr, "bad argument to "
                                         "'--timeout'\n");
                                 goto out_err_no_usage;
                         }
                         break;
                 case 'v':
-                        ++opts.verbose;
+                        ++op->verbose;
                         break;
                 case 'V':
                         fprintf(stderr, ME "version: %s\n", version_str);
                         exit(0);
                 case 'w':
-                        opts.flags.wrprotect = sg_get_num(optarg);
-                        if (opts.flags.wrprotect >> 3) {
+                        op->flags.wrprotect = sg_get_num(optarg);
+                        if (op->flags.wrprotect >> 3) {
                                 fprintf(stderr, "bad argument to "
                                         "'--wrprotect' not in range 0-7\n");
                                 goto out_err_no_usage;
                         }
                         break;
                 case 'x':
-                        opts.xfer_len = sg_get_num(optarg);
-                        if (opts.xfer_len < 0) {
+                        op->xfer_len = sg_get_num(optarg);
+                        if (op->xfer_len < 0) {
                                 fprintf(stderr, "bad argument to "
                                         "'--xferlen'\n");
                                 goto out_err_no_usage;
@@ -246,8 +269,8 @@ parse_args(int argc, char* argv[])
                 }
         }
         if (optind < argc) {
-                if (NULL == opts.device_name) {
-                        opts.device_name = argv[optind];
+                if (NULL == op->device_name) {
+                        op->device_name = argv[optind];
                         ++optind;
                 }
                 if (optind < argc) {
@@ -257,7 +280,7 @@ parse_args(int argc, char* argv[])
                         goto out_err;
                 }
         }
-        if (NULL == opts.device_name) {
+        if (NULL == op->device_name) {
                 fprintf(stderr, "missing device name!\n");
                 goto out_err;
         }
@@ -269,6 +292,8 @@ parse_args(int argc, char* argv[])
                 fprintf(stderr, "missing lba\n");
                 goto out_err;
         }
+        if (0 == op->xfer_len)
+            op->xfer_len = 2 * op->numblocks * DEF_BLOCK_SIZE;
         return 0;
 
 out_err:
@@ -311,16 +336,18 @@ sg_build_scsi_cdb(unsigned char * cdbp, unsigned int blocks,
         return 0;
 }
 
+/* Returns 0 for success, SG_LIB_CAT_MISCOMPARE if compare fails,
+ * various other SG_LIB_CAT_*, otherwise -1 . */
 static int
 sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                      int64_t lba, int xfer_len, struct caw_flags flags,
-                     int verbose)
+                     int noisy, int verbose)
 {
-        int k, sense_cat;
+        int k, sense_cat, valid, slen, res, ret;
         unsigned char cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
-        unsigned char senseBuff[SENSE_BUFF_LEN];
+        unsigned char sense_b[SENSE_BUFF_LEN];
         struct sg_pt_base * ptvp;
-        int res, ret;
+        uint64_t ull = 0;
 
         if (sg_build_scsi_cdb(cawCmd, blocks, lba, flags)) {
                 fprintf(stderr, ME "bad cdb build, lba=0x%" PRIx64 ", "
@@ -335,7 +362,7 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
         }
 
         set_scsi_pt_cdb(ptvp, cawCmd, COMPARE_AND_WRITE_CDB_SIZE);
-        set_scsi_pt_sense(ptvp, senseBuff, sizeof(senseBuff));
+        set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
         set_scsi_pt_data_out(ptvp, buff, xfer_len);
         if (verbose > 1) {
                 fprintf(stderr, "    Compare and write cdb: ");
@@ -349,7 +376,7 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
         }
         res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
         ret = sg_cmds_process_resp(ptvp, "COMPARE AND WRITE", res, 0,
-                                   senseBuff, 1 /* noisy */, verbose,
+                                   sense_b, noisy, verbose,
                                    &sense_cat);
         if (-1 == ret)
                 ;
@@ -367,20 +394,31 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                         ret = 0;
                         break;
                 case SG_LIB_CAT_MEDIUM_HARD:
-                        {
-                                int valid, slen;
-                                uint64_t ull = 0;
-
-                                slen = get_scsi_pt_sense_len(ptvp);
-                                valid = sg_get_sense_info_fld(senseBuff, slen,
-                                                              &ull);
-                                if (valid)
-                                        fprintf(stderr, "Medium or hardware "
-                                                "error starting at lba=%"
-                                                PRIu64 " [0x%" PRIx64 "]\n",
-                                                ull, ull);
-                        }
+                        slen = get_scsi_pt_sense_len(ptvp);
+                        valid = sg_get_sense_info_fld(sense_b, slen,
+                                                      &ull);
+                        if (valid)
+                                fprintf(stderr, "Medium or hardware "
+                                        "error starting at lba=%"
+                                        PRIu64 " [0x%" PRIx64 "]\n",
+                                        ull, ull);
+                        else
+                                fprintf(stderr, "Medium or hardware "
+                                        "error\n");
                         ret = sense_cat;
+                        break;
+                case SG_LIB_CAT_MISCOMPARE:
+                        ret = sense_cat;
+                        if (! (noisy || verbose))
+                                break;
+                        slen = get_scsi_pt_sense_len(ptvp);
+                        valid = sg_get_sense_info_fld(sense_b, slen, &ull);
+                        if (valid)
+                                fprintf(stderr, "Miscompare at byte offset: %"
+                                        PRIu64 " [0x%" PRIx64 "]\n", ull,
+                                        ull);
+                        else
+                                fprintf(stderr, "Miscompare reported\n");
                         break;
                 default:
                         ret = -1;
@@ -393,65 +431,92 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
         return ret;
 }
 
-
 static int
-open_if(const char * inf)
+open_if(const char * fn, int got_stdin)
 {
-        int fd = open(inf, O_RDONLY);
-        if (fd < 0) {
-                fprintf(stderr, ME "open error: %s: %s\n", inf,
-                        safe_strerror(-fd));
-                return -1*SG_LIB_FILE_ERROR;
+        int fd;
+
+        if (got_stdin)
+                fd = STDIN_FILENO;
+        else {
+                fd = open(fn, O_RDONLY);
+                if (fd < 0) {
+                        fprintf(stderr, ME "open error: %s: %s\n", fn,
+                                safe_strerror(errno));
+                        return -SG_LIB_FILE_ERROR;
+                }
+        }
+        if (sg_set_binary_mode(fd) < 0) {
+                perror("sg_set_binary_mode");
+                return -SG_LIB_FILE_ERROR;
         }
         return fd;
 }
 
 static int
-open_of(const char * outf, int verbose)
+open_dev(const char * outf, int verbose)
 {
         int sg_fd = sg_cmds_open_device(outf, 0 /* rw */, verbose);
         if (sg_fd < 0) {
                 fprintf(stderr, ME "open error: %s: %s\n", outf,
                         safe_strerror(-sg_fd));
-                return -1*SG_LIB_FILE_ERROR;
+                return -SG_LIB_FILE_ERROR;
         }
 
         return sg_fd;
 }
 
-#define STR_SZ 1024
-#define INF_SZ 512
 
 int
 main(int argc, char * argv[])
 {
-        int res;
-        int infd = 0;
-        int outfd = 0;
+        int res, half_xlen, ifn_stdin;
+        int infd = -1;
+        int wfd = -1;
+        int devfd = -1;
         unsigned char * wrkBuff = NULL;
+        struct opts_t opts;
 
-        res = parse_args(argc, argv);
+        memset(&opts, 0, sizeof(opts));
+        res = parse_args(argc, argv, &opts);
         if (res != 0) {
                 fprintf(stderr, "Failed parsing args\n");
                 goto out;
         }
 
-        if (opts.verbose)
+        if (opts.verbose) {
                 fprintf(stderr, "Running COMPARE AND WRITE command with the "
-                        "following options:\n  in=%s device=%s lba=0x%"
-                        PRIx64 " num_blocks=%d xfer_len=%d timeout=%d\n",
-                        opts.ifilename, opts.device_name, opts.lba,
-                        opts.numblocks, opts.xfer_len, opts.timeout);
-
-        infd = open_if(opts.ifilename);
-        if (infd <=0) {
-                res = -1*infd;
+                        "following options:\n  in=%s ", opts.ifn);
+                if (opts.wfn_given)
+                        fprintf(stderr, "inw=%s ", opts.wfn);
+                fprintf(stderr, "device=%s\n  lba=0x%" PRIx64
+                        " num_blocks=%d xfer_len=%d timeout=%d\n",
+                        opts.device_name, opts.lba, opts.numblocks,
+                        opts.xfer_len, opts.timeout);
+        }
+        ifn_stdin = ((1 == strlen(opts.ifn)) && ('-' == opts.ifn[0]));
+        infd = open_if(opts.ifn, ifn_stdin);
+        if (infd < 0) {
+                res = -infd;
                 goto out;
         }
+        if (opts.wfn_given) {
+                if ((1 == strlen(opts.wfn)) && ('-' == opts.wfn[0])) {
+                        fprintf(stderr, ME "don't allow stdin for write "
+                                "file\n");
+                        res = SG_LIB_FILE_ERROR;
+                        goto out;
+                }
+                wfd = open_if(opts.wfn, 0);
+                if (wfd < 0) {
+                        res = -wfd;
+                        goto out;
+                }
+        }
 
-        outfd = open_of(opts.device_name, opts.verbose);
-        if (outfd <=0) {
-                res = -1*outfd;
+        devfd = open_dev(opts.device_name, opts.verbose);
+        if (devfd < 0) {
+                res = -devfd;
                 goto out;
         }
 
@@ -462,47 +527,81 @@ main(int argc, char * argv[])
                 goto out;
         }
 
-        res = read(infd, wrkBuff, opts.xfer_len);
-        if (res < 0) {
-                fprintf(stderr, "Could not read from %s", opts.ifilename);
-                goto out;
-        } else if (res < opts.xfer_len) {
-                fprintf(stderr, "Read only %d bytes (expected %d) from  %s\n",
-                        res, opts.xfer_len, opts.ifilename);
-                goto out;
+        if (opts.wfn_given) {
+                half_xlen = opts.xfer_len / 2;
+                res = read(infd, wrkBuff, half_xlen);
+                if (res < 0) {
+                        fprintf(stderr, "Could not read from %s", opts.ifn);
+                        goto out;
+                } else if (res < half_xlen) {
+                        fprintf(stderr, "Read only %d bytes (expected %d) "
+                                "from %s\n", res, half_xlen, opts.ifn);
+                        goto out;
+                }
+                res = read(wfd, wrkBuff + half_xlen, half_xlen);
+                if (res < 0) {
+                        fprintf(stderr, "Could not read from %s", opts.wfn);
+                        goto out;
+                } else if (res < half_xlen) {
+                        fprintf(stderr, "Read only %d bytes (expected %d) "
+                                "from %s\n", res, half_xlen, opts.wfn);
+                        goto out;
+                }
+        } else {
+                res = read(infd, wrkBuff, opts.xfer_len);
+                if (res < 0) {
+                        fprintf(stderr, "Could not read from %s", opts.ifn);
+                        goto out;
+                } else if (res < opts.xfer_len) {
+                        fprintf(stderr, "Read only %d bytes (expected %d) "
+                                "from %s\n", res, opts.xfer_len, opts.ifn);
+                        goto out;
+                }
         }
-        res = sg_compare_and_write(outfd, wrkBuff, opts.numblocks, opts.lba,
-                opts.xfer_len, opts.flags, opts.verbose);
+        res = sg_compare_and_write(devfd, wrkBuff, opts.numblocks, opts.lba,
+                opts.xfer_len, opts.flags, !opts.quiet, opts.verbose);
 
 out:
         if (0 != res) {
                 switch (res) {
-                case SG_LIB_CAT_MEDIUM_HARD:
-                        fprintf(stderr, ME "SCSI COMPARE AND WRITE "
-                                "medium/hardware error\n");
+                case SG_LIB_CAT_ILLEGAL_REQ:
+                        fprintf(stderr, ME "SCSI COMPARE AND WRITE: "
+                                "illegal request\n");
+                        break;
+                case SG_LIB_CAT_INVALID_OP:
+                        fprintf(stderr, ME "SCSI COMPARE AND WRITE: "
+                                "invalid opcode\n");
                         break;
                 case SG_LIB_CAT_NOT_READY:
-                        fprintf(stderr, ME "device not compare_and_writey\n");
+                        fprintf(stderr, ME "device not ready\n");
                         break;
                 case SG_LIB_CAT_UNIT_ATTENTION:
                         fprintf(stderr, ME "SCSI COMPARE AND WRITE unit "
                                 "attention\n");
                         break;
                 case SG_LIB_CAT_ABORTED_COMMAND:
-                        fprintf(stderr, ME "SCSI READ aborted command\n");
+                        fprintf(stderr, ME "SCSI COMPARE AND WRITE command "
+                                "aborted\n");
                         break;
+                case SG_LIB_CAT_MEDIUM_HARD:
+                case SG_LIB_CAT_MISCOMPARE:
+                case SG_LIB_FILE_ERROR:
+                        break;  /* already reported */
                 default:
                         res = SG_LIB_CAT_OTHER;
-                        fprintf(stderr, ME "SCSI COMPARE AND WRITE failed\n");
+                        fprintf(stderr, ME "SCSI COMPARE AND WRITE failed, "
+                                "add '-vv' for more information\n");
                         break;
                 }
         }
 
         if (wrkBuff)
                 free(wrkBuff);
-        if (infd > 0)
+        if ((infd >= 0) && (! ifn_stdin))
                 close(infd);
-        if (outfd > 0)
-                close(outfd);
+        if (wfd >= 0)
+                close(wfd);
+        if (devfd >= 0)
+                close(devfd);
         return res;
 }

@@ -1233,7 +1233,7 @@ const char * sg_lib_sense_key_desc[] = {
     "Data Protect",             /* Access to the data is blocked */
     "Blank Check",              /* Reached unexpected written or unwritten
                                    region of the medium */
-    "Key=9",                    /* Vendor specific */
+    "Vendor specific(9)",       /* Vendor specific */
     "Copy Aborted",             /* COPY or COMPARE was aborted */
     "Aborted Command",          /* The target aborted the command */
     "Equal",                    /* SEARCH DATA found data equal (obsolete) */

@@ -84,8 +84,10 @@ extern "C" {
 #define SPC_SK_UNIT_ATTENTION 0x6
 #define SPC_SK_DATA_PROTECT 0x7
 #define SPC_SK_BLANK_CHECK 0x8
+#define SPC_SK_VENDOR_SPECIFIC 0x9
 #define SPC_SK_COPY_ABORTED 0xa
 #define SPC_SK_ABORTED_COMMAND 0xb
+#define SPC_SK_RESERVED 0xc
 #define SPC_SK_VOLUME_OVERFLOW 0xd
 #define SPC_SK_MISCOMPARE 0xe
 #define SPC_SK_COMPLETED 0xf
@@ -165,6 +167,10 @@ extern int sg_scsi_normalize_sense(const unsigned char * sensep,
  * descriptor; otherwise (including fixed format sense data) returns NULL. */
 extern const unsigned char * sg_scsi_sense_desc_find(
                 const unsigned char * sensep, int sense_len, int desc_type);
+
+/* Get sense key from sense buffer. If successful returns a sense key value
+ * between 0 and 15. If sense buffer cannot be decode, returns -1 . */
+extern int sg_get_sense_key(const unsigned char * sensep, int sense_len);
 
 /* Yield string associated with sense_key value. Returns 'buff'. */
 extern char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff);
@@ -246,6 +252,8 @@ extern void sg_print_scsi_status(int scsi_status);
                                 /*       [sk,asc,ascq: 0x5,0x20,0x0] */
 #define SG_LIB_CAT_ABORTED_COMMAND 11 /* interpreted from sense buffer */
                                 /*       [sk,asc,ascq: 0xb,*,*] */
+#define SG_LIB_CAT_MISCOMPARE 14 /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0xe,*,*] */
 #define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense" */
                                 /*       [sk,asc,ascq: 0x0,*,*] */
 #define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err */
