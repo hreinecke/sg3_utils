@@ -26,7 +26,7 @@ Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
         sg_turs and sginfo
 
 Eric Seppanen <eric @ purestorage dot com> borrowed ideas from alternate
-	implementation of sg_compare_and_write [20130823]
+        implementation of sg_compare_and_write [20130823]
 
 Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
         is based.
@@ -46,7 +46,7 @@ Hannes Reinecke <hare at suse dot de>
         sg_referrals [20100906]
         sg_inq --export option [20120220+20130109]
         sg_xcopy+sg_copy_results [20120322]
-	rescan-scsi-bus.sh patches to Kurt Garloff's v1.57 [20130715]
+        rescan-scsi-bus.sh patches to Kurt Garloff's v1.57 [20130715]
 
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]
@@ -107,6 +107,9 @@ Ronnie Sahlberg <ronniesahlberg at gmail dot com> has written libiscsi and a
 
 Saeed Bishara contributed sg_write_long
 
+Sean Stewart <Sean dot Stewart at netapp dot com> various improvements
+        to rescan-scsi-bush.sh script [20130827]
+
 Shahar Salzman <shahar dot salzman at kaminario dot com> contributed
         sg_compare_and_write [20121205]
 
@@ -124,4 +127,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-23rd August 2013
+28th August 2013

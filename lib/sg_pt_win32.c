@@ -13,6 +13,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <fcntl.h>
 
 #include "sg_pt.h"
 #include "sg_lib.h"
@@ -20,6 +21,13 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifndef O_EXCL
+// #define O_EXCL 0x80	// cygwin ??
+// #define O_EXCL 0x80	// Linux
+#define O_EXCL 0x400	// mingw
+#warning "O_EXCL not defined"
 #endif
 
 /* Use the Microsoft SCSI Pass Through (SPT) interface. It has two
@@ -130,17 +138,16 @@ scsi_pt_open_device(const char * device_name, int read_only, int verbose)
  * form.
  */
 int
-scsi_pt_open_flags(const char * device_name,
-                   int flags __attribute__ ((unused)),
-                   int verbose)
+scsi_pt_open_flags(const char * device_name, int flags, int verbose)
 {
     int len, k, adapter_num, bus, target, lun, off, got_scsi_name;
-    int index, num, got_pd_name, pd_num;
+    int index, num, got_pd_name, pd_num, share_mode;
     struct sg_pt_handle * shp;
     char buff[8];
 
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
+    share_mode = (O_EXCL & flags) ? 0 : (FILE_SHARE_READ | FILE_SHARE_WRITE);
     /* lock */
     for (k = 0; k < MAX_OPEN_SIMULT; k++)
         if (0 == handle_arr[k].in_use)
@@ -206,8 +213,7 @@ scsi_pt_open_flags(const char * device_name,
         snprintf(shp->adapter + 4, sizeof(shp->adapter) - 5, "%s",
                  device_name + off);
     shp->fh = CreateFile(shp->adapter, GENERIC_READ | GENERIC_WRITE,
-                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                         OPEN_EXISTING, 0, NULL);
+                         share_mode, NULL, OPEN_EXISTING, 0, NULL);
     if (shp->fh == INVALID_HANDLE_VALUE) {
         if (verbose)
             fprintf(sg_warnings_strm, "Windows CreateFile error=%ld\n",

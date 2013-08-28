@@ -30,15 +30,14 @@
 
 */
 
-static const char * version_str = "0.69 20130730";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.69 20130828";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
-extern void svpd_enumerate_vendor(void);
-extern int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue,
-                              int maxlen, int do_hex, int do_raw,
-                              int do_long, int do_quiet, int verbose);
-extern const struct svpd_values_name_t *
-                svpd_find_vendor_by_acron(const char * ap);
+void svpd_enumerate_vendor(void);
+int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
+                       int do_hex, int do_raw, int do_long, int do_quiet,
+                       int verbose);
+const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 
 
 /* standard VPD pages, in ascending page number order */
