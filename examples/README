@@ -10,5 +10,10 @@ There is an brief explanation of each example in the README file in
 the main (i.e. this directory's parent) directory. There are also
 some notes at the top of each source file.
 
+
+Those files with the extension "cpp" are C++ examples that use facilities
+in C++11. They can be built by calling 'make -f Makefile.cplus'. A
+gcc/g++ compiler of 4.7.3 vintage or later will be required.
+
 Douglas Gilbert
-17th February 2008
+30th August 2013

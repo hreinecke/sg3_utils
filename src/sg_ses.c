@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.73 20130810";    /* ses3r05 */
+static const char * version_str = "1.74 20130907";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -103,9 +103,9 @@ struct opts_t {
     int do_help;
     int do_hex;
     int ind_given;
-    int ind_th;
-    int ind_indiv;
-    int ind_etp_num;
+    int ind_th;         /* type header index */
+    int ind_indiv;      /* individual element index; -1 for overall */
+    int ind_et_inst;    /* ETs can have multiple type header instances */
     int inner_hex;
     int do_join;
     int do_list;
@@ -622,7 +622,7 @@ parse_index(struct opts_t *op)
                                 "for '--index', expect <num> from 0 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->ind_etp_num = n;
+            op->ind_et_inst = n;
         }
         op->ind_etp = &element_type_by_code;
         if (NULL == cp)
@@ -645,7 +645,7 @@ parse_index(struct opts_t *op)
                         "for '--index', expect <num> from 0 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->ind_etp_num = n;
+            op->ind_et_inst = n;
         }
         op->ind_etp = etp;
         if (NULL == cp)
@@ -655,7 +655,7 @@ parse_index(struct opts_t *op)
         if (op->ind_etp)
             fprintf(stderr, "   element type abbreviation: %s, etp_num=%d, "
                     "individual index=%d\n", op->ind_etp->abbrev,
-                    op->ind_etp_num, op->ind_indiv);
+                    op->ind_et_inst, op->ind_indiv);
         else
             fprintf(stderr, "   type header index=%d, individual "
                     "index=%d\n", op->ind_th, op->ind_indiv);
@@ -1346,7 +1346,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         tdhp[k].txt_len = ucp[3];
     }
     if (op->ind_given && op->ind_etp) {
-        n = op->ind_etp_num;
+        n = op->ind_et_inst;
         for (k = 0; k < sum_type_dheaders; ++k) {
             if (op->ind_etp->elem_type_code == tdhp[k].etype) {
                 if (0 == n)
@@ -1358,9 +1358,9 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         if (k < sum_type_dheaders)
             op->ind_th = k;
         else {
-            if (op->ind_etp_num)
+            if (op->ind_et_inst)
                 fprintf(stderr, "populate: unable to find element type "
-                        "'%s%d'\n", op->ind_etp->abbrev, op->ind_etp_num);
+                        "'%s%d'\n", op->ind_etp->abbrev, op->ind_et_inst);
             else
                 fprintf(stderr, "populate: unable to find element type "
                         "'%s'\n",
@@ -2324,7 +2324,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                     continue;
             }
             if (eip)
-                printf("      Element index: %d\n", ind);
+                printf("      Element index: %d  eiioe=%d\n", ind,
+                       (ucp[2] & 1));
             else
                 printf("      Element %d descriptor\n", ind);
             if (invalid && (0 == op->inner_hex))
@@ -2821,8 +2822,8 @@ fini:
 static int
 join_work(int sg_fd, struct opts_t * op, int display)
 {
-    int k, j, res, num_t_hdrs, elem_ind, ei, get_out;
-    int desc_len, dn_len, broken_ei, ei2, got1;
+    int k, j, res, num_t_hdrs, elem_ind, ei, get_out, desc_len, dn_len;
+    int et4aes, broken_ei, ei2, got1, jr_max_ind, eip, eiioe;
     unsigned int ref_gen_code, gen_code;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
@@ -2931,8 +2932,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
                           sizeof(threshold_rsp), op, &threshold_rsp_len);
         if (0 == res) {
             if (threshold_rsp_len < 8) {
-                fprintf(stderr, "Additional Element Status response too "
-                        "short\n");
+                fprintf(stderr, "Threshold In response too short\n");
                 return -1;
             }
             gen_code = (threshold_rsp[4] << 24) | (threshold_rsp[5] << 16) |
@@ -2962,7 +2962,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
         jrp->el_ind_indiv = -1;
         jrp->etype = tdhp->etype;
         jrp->ei_asc = -1;
-        broken_ei = active_et_aesp(tdhp->etype);
+        et4aes = active_et_aesp(tdhp->etype);
         jrp->ei_asc2 = -1;
         jrp->se_id = tdhp->se_id;
         /* check es_ucp < es_last_ucp still in range */
@@ -2983,7 +2983,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
             jrp->el_ind_th = k;
             jrp->el_ind_indiv = elem_ind;
             jrp->ei_asc = ei++;
-            if (broken_ei)
+            if (et4aes)
                 jrp->ei_asc2 = ei2++;
             else
                 jrp->ei_asc2 = -1;
@@ -2999,9 +2999,12 @@ join_work(int sg_fd, struct opts_t * op, int display)
                 t_ucp += 4;
             jrp->add_elem_statp = NULL;
         }
-        if (jrp >= join_arr_lastp)
+        if (jrp >= join_arr_lastp) {
+            ++k;
             break;      /* leave last row all zeros */
+        }
     }
+    jr_max_ind = k;
 
     broken_ei = 0;
     if (ae_ucp) {
@@ -3018,7 +3021,19 @@ join_work(int sg_fd, struct opts_t * op, int display)
                                     "page\n");
                         break;
                     }
-                    if (ae_ucp[0] & 0x10) {     /* EIP bit set */
+                    eip = !!(ae_ucp[0] & 0x10);
+                    eiioe = eip ? (ae_ucp[2] & 1) : 0;
+                    if (eip && eiioe) {
+                        ei = ae_ucp[3];
+                        jr2p = join_arr + ei;
+                        if ((ei >= jr_max_ind) || (NULL == jr2p->enc_statp)) {
+                            get_out = 1;
+                            fprintf(stderr, "join_work: oi=%d, ei=%d, eiioe=1 "
+                                    "not in join_arr\n", k, ei);
+                            break;
+                        }
+                        jr2p->add_elem_statp = ae_ucp;
+                    } else if (eip) {     /* and EIIOE=0 */
                         ei = ae_ucp[3];
 try_again:
                         for (jr2p = join_arr; jr2p->enc_statp; ++jr2p) {
