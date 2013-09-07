@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.04 20130806";
+static const char * version_str = "1.04 20130829";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -104,11 +104,16 @@ static unsigned int bounce_count;
 static void
 usage(void)
 {
-    printf("Usage: %s [-b] [-l <lba>] [-n <n_per_thr>] [-t <num_thrs>]\n"
+    printf("Usage: %s [-b] [-f] [-h] [-l <lba>] [-n <n_per_thr>] "
+           "[-t <num_thrs>]\n"
            "                   [-V] [-w <wait_ms>] [-x] "
            "<disk_device>\n", util_name);
     printf("  where\n");
     printf("    -b                block on open (def: O_NONBLOCK)\n");
+    printf("    -f                force: any SCSI disk (def: only "
+           "scsi_debug)\n");
+    printf("                      WARNING: <lba> written to\n");
+    printf("    -h                print this usage message then exit\n");
     printf("    -l <lba>          logical block to increment (def: %u)\n",
            DEF_LBA);
     printf("    -n <n_per_thr>    number of loops per thread "
@@ -407,6 +412,7 @@ main(int argc, char * argv[])
 {
     int k, res;
     int block = 0;
+    int force = 0;
     unsigned int lba = DEF_LBA;
     int num_per_thread = DEF_NUM_PER_THREAD;
     int num_threads = DEF_NUM_THREADS;
@@ -418,7 +424,12 @@ main(int argc, char * argv[])
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-b", argv[k], 2))
             ++block;
-        else if (0 == memcmp("-l", argv[k], 2)) {
+        else if (0 == memcmp("-f", argv[k], 2))
+            ++force;
+        else if (0 == memcmp("-h", argv[k], 2)) {
+            usage();
+            return 0;
+        } else if (0 == memcmp("-l", argv[k], 2)) {
             ++k;
             if ((k < argc) && isdigit(*argv[k]))
                 lba = (unsigned int)atoi(argv[k]);
@@ -469,19 +480,21 @@ main(int argc, char * argv[])
     }
     try {
 
-        res = do_inquiry_prod_id(dev_name, block, ! exclude_o_excl, wait_ms,
-                                 bounce_count, b, sizeof(b));
-        if (res) {
-            fprintf(stderr, "INQUIRY failed on %s\n", dev_name);
-            return 1;
-        }
-        // Comment out next block to use with non scsi_debug devices
-        // If so, be careful, as it writes to a LBA <lba>
-        if (0 != memcmp("scsi_debug", b, 10)) {
-            fprintf(stderr, "Since this utility writes to LBA %d, only "
-                    "devices with scsi_debug\nproduct ID accepted.\n",
-                    lba);
-            return 2;
+        if (! force) {
+            res = do_inquiry_prod_id(dev_name, block, ! exclude_o_excl,
+                                     wait_ms, bounce_count, b, sizeof(b));
+            if (res) {
+                fprintf(stderr, "INQUIRY failed on %s\n", dev_name);
+                return 1;
+            }
+            // For safety, since <lba> written to, only permit scsi_debug
+            // devices. Bypass this with '-f' option.
+            if (0 != memcmp("scsi_debug", b, 10)) {
+                fprintf(stderr, "Since this utility writes to LBA %d, only "
+                        "devices with scsi_debug\nproduct ID accepted.\n",
+                        lba);
+                return 2;
+            }
         }
 
         vector<thread *> vt;
