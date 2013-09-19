@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.10 20100321 */
+/* sg_pt_freebsd version 1.11 20130918 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -393,8 +393,11 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
 
         if ((SAM_STAT_CHECK_CONDITION == ptp->scsi_status) ||
             (SAM_STAT_COMMAND_TERMINATED == ptp->scsi_status)) {
-            len = ptp->sense_len - ptp->sense_resid;
-            if (len)
+            if (ptp->sense_resid > ptp->sense_len)
+                len = ptp->sense_len;   /* crazy; ignore sense_resid */
+            else
+                len = ptp->sense_len - ptp->sense_resid;
+            if (len > 0)
                 memcpy(ptp->sense, &(ccb->csio.sense_data), len);
         }
     } else
@@ -442,10 +445,11 @@ int
 get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 {
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
-    int len;
 
-    len = ptp->sense_len - ptp->sense_resid;
-    return (len > 0) ? len : 0;
+    if (ptp->sense_resid > ptp->sense_len)
+        return ptp->sense_len;  /* strange; ignore ptp->sense_resid */
+    else
+        return ptp->sense_len - ptp->sense_resid;
 }
 
 int
