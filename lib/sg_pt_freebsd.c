@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.11 20130918 */
+/* sg_pt_freebsd version 1.12 20130919 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -346,13 +346,15 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
-    if (! (ccb = cam_getccb(fdchan->cam_dev))) {
-        if (verbose)
-            fprintf(sg_warnings_strm, "cam_getccb: failed\n");
-        ptp->os_err = ENOMEM;
-        return -ptp->os_err;
+    if (NULL == ptp->ccb) {     /* re-use if we have one already */
+        if (! (ccb = cam_getccb(fdchan->cam_dev))) {
+            if (verbose)
+                fprintf(sg_warnings_strm, "cam_getccb: failed\n");
+            ptp->os_err = ENOMEM;
+            return -ptp->os_err;
+        }
+        ptp->ccb = ccb;
     }
-    ptp->ccb = ccb;
 
     // clear out structure, except for header that was filled in for us
     bzero(&(&ccb->ccb_h)[1],

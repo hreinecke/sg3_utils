@@ -27,9 +27,9 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.76 20130919";    /* ses3r06 */
+static const char * version_str = "1.77 20130919";    /* ses3r06 */
 
-#define MX_ALLOC_LEN ((64 * 1024) - 1)	/* max allowable for big enclosures */
+#define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260
@@ -214,16 +214,16 @@ static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 
 #ifdef SG_LIB_FREEBSD
 
-#include <sys/param.h>	/* contains PAGE_SIZE */
+#include <sys/param.h>  /* contains PAGE_SIZE */
 
 static unsigned char enc_stat_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (PAGE_SIZE)));
+        __attribute__ ((aligned (PAGE_SIZE)));
 static unsigned char elem_desc_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (PAGE_SIZE)));
+        __attribute__ ((aligned (PAGE_SIZE)));
 static unsigned char add_elem_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (PAGE_SIZE)));
+        __attribute__ ((aligned (PAGE_SIZE)));
 static unsigned char threshold_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (PAGE_SIZE)));
+        __attribute__ ((aligned (PAGE_SIZE)));
 
 #else
 
@@ -509,6 +509,8 @@ usage()
             "acronyms\n"
             "    --filter|-f         filter out enclosure status flags that "
             "are clear\n"
+            "                        use thrice for status=okay entries "
+            "only\n"
             "    --get=STR|-G STR    get value of field by acronym or "
             "position\n"
             "    --help|-h           print out usage message\n"
@@ -728,7 +730,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             ++op->do_enumerate;
             break;
         case 'f':
-            op->do_filter = 1;
+            ++op->do_filter;
             break;
         case 'G':
             op->get_str = optarg;
@@ -1539,7 +1541,8 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
 {
     int res, a, b;
     char bb[128];
-    int filter = op->do_filter;
+    int nofilter = ! op->do_filter;
+
 
     if (op->inner_hex) {
         printf("%s%02x %02x %02x %02x\n", pad, statp[0], statp[1], statp[2],
@@ -1557,43 +1560,43 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         break;
     case DEVICE_ETC:
         printf("%sSlot address: %d\n", pad, statp[1]);
-        if ((! filter) || (0xe0 & statp[2]))
+        if (nofilter || (0xe0 & statp[2]))
             printf("%sApp client bypassed A=%d, Do not remove=%d, Enc "
                    "bypassed A=%d\n", pad, !!(statp[2] & 0x80),
                    !!(statp[2] & 0x40), !!(statp[2] & 0x20));
-        if ((! filter) || (0x1c & statp[2]))
+        if (nofilter || (0x1c & statp[2]))
             printf("%sEnc bypassed B=%d, Ready to insert=%d, RMV=%d, Ident="
                    "%d\n", pad, !!(statp[2] & 0x10), !!(statp[2] & 0x8),
                    !!(statp[2] & 0x4), !!(statp[2] & 0x2));
-        if ((! filter) || ((1 & statp[2]) || (0xe0 & statp[3])))
+        if (nofilter || ((1 & statp[2]) || (0xe0 & statp[3])))
             printf("%sReport=%d, App client bypassed B=%d, Fault sensed=%d, "
                    "Fault requested=%d\n", pad, !!(statp[2] & 0x1),
                    !!(statp[3] & 0x80), !!(statp[3] & 0x40),
                    !!(statp[3] & 0x20));
-        if ((! filter) || (0x1e & statp[3]))
+        if (nofilter || (0x1e & statp[3]))
             printf("%sDevice off=%d, Bypassed A=%d, Bypassed B=%d, Device "
                    "bypassed A=%d\n", pad, !!(statp[3] & 0x10),
                    !!(statp[3] & 0x8), !!(statp[3] & 0x4), !!(statp[3] & 0x2));
-        if ((! filter) || (0x1 & statp[3]))
+        if (nofilter || (0x1 & statp[3]))
             printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
         break;
     case POWER_SUPPLY_ETC:
-        if ((! filter) || ((0x80 & statp[1]) || (0xe & statp[2])))
+        if (nofilter || ((0x80 & statp[1]) || (0xe & statp[2])))
             printf("%sIdent=%d, DC overvoltage=%d, DC undervoltage=%d, DC "
                    "overcurrent=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[2] & 0x8), !!(statp[2] & 0x4), !!(statp[2] & 0x2));
-        if ((! filter) || (0xf8 & statp[3]))
+        if (nofilter || (0xf8 & statp[3]))
             printf("%sHot swap=%d, Fail=%d, Requested on=%d, Off=%d, "
                    "Overtmp fail=%d\n", pad, !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x20),
                    !!(statp[3] & 0x10), !!(statp[3] & 0x8));
-        if ((! filter) || (0x7 & statp[3]))
+        if (nofilter || (0x7 & statp[3]))
             printf("%sTemperature warn=%d, AC fail=%d, DC fail=%d\n",
                    pad, !!(statp[3] & 0x4), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
     case COOLING_ETC:
-        if ((! filter) || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
             printf("%sIdent=%d, Hot swap=%d, Fail=%d, Requested on=%d, "
                    "Off=%d\n", pad, !!(statp[1] & 0x80), !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x20),
@@ -1603,7 +1606,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                actual_speed_desc[7 & statp[3]]);
         break;
     case TEMPERATURE_ETC:     /* temperature sensor */
-        if ((! filter) || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
+        if (nofilter || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
             printf("%sIdent=%d, Fail=%d, OT failure=%d, OT warning=%d, "
                    "UT failure=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[3] & 0x8),
@@ -1617,31 +1620,31 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
             printf("%sTemperature: <reserved>\n", pad);
         break;
     case DOOR_ETC:      /* OPEN field added in ses3r05 */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Open=%d, Unlock=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case AUD_ALARM_ETC:     /* audible alarm */
-        if ((! filter) || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Request mute=%d, Mute=%d, "
                    "Remind=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x10));
-        if ((! filter) || (0xf & statp[3]))
+        if (nofilter || (0xf & statp[3]))
             printf("%sTone indicator: Info=%d, Non-crit=%d, Crit=%d, "
                    "Unrecov=%d\n", pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case ESC_ELECTRONICS_ETC: /* enclosure services controller electronics */
-        if ((! filter) || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
             (0x80 & statp[3]))
             printf("%sIdent=%d, Fail=%d, Report=%d, Hot swap=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x80));
         break;
     case SCC_CELECTR_ETC:     /* SCC controller electronics */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2])))
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2])))
             printf("%sIdent=%d, Fail=%d, Report=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1));
@@ -1681,12 +1684,12 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
             printf("%sBattery status: 255 or more minutes remaining\n", pad);
         else
             printf("%sBattery status: %d minutes remaining\n", pad, statp[1]);
-        if ((! filter) || (0xf8 & statp[2]))
+        if (nofilter || (0xf8 & statp[2]))
             printf("%sAC low=%d, AC high=%d, AC qual=%d, AC fail=%d, DC fail="
                    "%d\n", pad, !!(statp[2] & 0x80), !!(statp[2] & 0x40),
                    !!(statp[2] & 0x20), !!(statp[2] & 0x10),
                    !!(statp[2] & 0x8));
-        if ((! filter) || ((0x7 & statp[2]) || (0xc3 & statp[3]))) {
+        if (nofilter || ((0x7 & statp[2]) || (0xc3 & statp[3]))) {
             printf("%sUPS fail=%d, Warn=%d, Intf fail=%d, Ident=%d, Fail=%d, "
                    "Batt fail=%d\n", pad, !!(statp[2] & 0x4),
                    !!(statp[2] & 0x2), !!(statp[2] & 0x1),
@@ -1696,33 +1699,33 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         }
         break;
     case DISPLAY_ETC:   /* Display (ses2r15) */
-        if ((! filter) || (0xc0 & statp[1]))
+        if (nofilter || (0xc0 & statp[1]))
             printf("%sIdent=%d, Fail=%d, Display mode status=%d, Display "
                    "character status=0x%x\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), (statp[1] & 0x3),
                    ((statp[2] << 8) & statp[3]));
         break;
     case KEY_PAD_ETC:   /* Key pad entry */
-        if ((! filter) || (0xc0 & statp[1]))
+        if (nofilter || (0xc0 & statp[1]))
             printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40));
         break;
     case ENCLOSURE_ETC:
         a = ((statp[2] >> 2) & 0x3f);
-        if ((! filter) || ((0x80 & statp[1]) || a || (0x2 & statp[2])))
+        if (nofilter || ((0x80 & statp[1]) || a || (0x2 & statp[2])))
             printf("%sIdent=%d, Time until power cycle=%d, "
                    "Failure indication=%d\n", pad, !!(statp[1] & 0x80),
                    a, !!(statp[2] & 0x2));
         b = ((statp[3] >> 2) & 0x3f);
-        if ((! filter) || (0x1 & statp[2]) || a || b)
+        if (nofilter || (0x1 & statp[2]) || a || b)
             printf("%sWarning indication=%d, Requested power off "
                    "duration=%d\n", pad, !!(statp[2] & 0x2), b);
-        if ((! filter) || (0x3 & statp[3]))
+        if (nofilter || (0x3 & statp[3]))
             printf("%sFailure requested=%d, Warning requested=%d\n",
                    pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case SCSI_PORT_TRAN_ETC:   /* SCSI port/transceiver */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x13 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Disabled=%d, Loss of "
                    "link=%d, Xmit fail=%d\n", pad, !!(statp[1] & 0x80),
@@ -1735,13 +1738,13 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                statp + 2);
         break;
     case COMM_PORT_ETC:   /* Communication port */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Disabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x1));
         break;
     case VOLT_SENSOR_ETC:   /* Voltage sensor */
-        if ((! filter) || (0xcf & statp[1])) {
+        if (nofilter || (0xcf & statp[1])) {
             printf("%sIdent=%d, Fail=%d,  Warn Over=%d, Warn Under=%d, "
                    "Crit Over=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[1] & 0x8),
@@ -1757,7 +1760,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
 #endif
         break;
     case CURR_SENSOR_ETC:   /* Current sensor */
-        if ((! filter) || (0xca & statp[1]))
+        if (nofilter || (0xca & statp[1]))
             printf("%sIdent=%d, Fail=%d, Warn Over=%d, Crit Over=%d\n",
                     pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                     !!(statp[1] & 0x8), !!(statp[1] & 0x2));
@@ -1770,14 +1773,14 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
 #endif
         break;
     case SCSI_TPORT_ETC:   /* SCSI target port */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x1));
         break;
     case SCSI_IPORT_ETC:   /* SCSI initiator port */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
@@ -1788,30 +1791,30 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                !!(statp[1] & 0x80), !!(statp[1] & 0x40), statp[3]);
         break;
     case ARRAY_DEV_ETC:   /* Array device */
-        if ((! filter) || (0xf0 & statp[1]))
+        if (nofilter || (0xf0 & statp[1]))
             printf("%sOK=%d, Reserved device=%d, Hot spare=%d, Cons check="
                    "%d\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[1] & 0x20), !!(statp[1] & 0x10));
-        if ((! filter) || (0xf & statp[1]))
+        if (nofilter || (0xf & statp[1]))
             printf("%sIn crit array=%d, In failed array=%d, Rebuild/remap=%d"
                    ", R/R abort=%d\n", pad, !!(statp[1] & 0x8),
                    !!(statp[1] & 0x4), !!(statp[1] & 0x2),
                    !!(statp[1] & 0x1));
-        if ((! filter) || (0xf0 & statp[2]))
+        if (nofilter || (0xf0 & statp[2]))
             printf("%sApp client bypass A=%d, Do not remove=%d, Enc bypass "
                    "A=%d, Enc bypass B=%d\n", pad, !!(statp[2] & 0x80),
                    !!(statp[2] & 0x40), !!(statp[2] & 0x20),
                    !!(statp[2] & 0x10));
-        if ((! filter) || (0xf & statp[2]))
+        if (nofilter || (0xf & statp[2]))
             printf("%sReady to insert=%d, RMV=%d, Ident=%d, Report=%d\n",
                    pad, !!(statp[2] & 0x8), !!(statp[2] & 0x4),
                    !!(statp[2] & 0x2), !!(statp[2] & 0x1));
-        if ((! filter) || (0xf0 & statp[3]))
+        if (nofilter || (0xf0 & statp[3]))
             printf("%sApp client bypass B=%d, Fault sensed=%d, Fault reqstd="
                    "%d, Device off=%d\n", pad, !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x20),
                    !!(statp[3] & 0x10));
-        if ((! filter) || (0xf & statp[3]))
+        if (nofilter || (0xf & statp[3]))
             printf("%sBypassed A=%d, Bypassed B=%d, Dev bypassed A=%d, "
                    "Dev bypassed B=%d\n",
                    pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
@@ -2124,7 +2127,7 @@ sas_addr_non_zero(const unsigned char * ucp)
 }
 
 static const char * sas_device_type[] = {
-    "no device attached",
+    "no SAS device attached",   /* but might be SATA device */
     "end device",
     "expander device",  /* in SAS-1.1 this was a "edge expander device */
     "expander device (fanout, SAS-1.1)",  /* marked obsolete in SAS-2 */
@@ -2137,7 +2140,7 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
 {
     int ports, phys, j, m, desc_type, eip_offset, print_sas_addr;
     const unsigned char * per_ucp;
-    int filter = op->do_filter;
+    int nofilter = ! op->do_filter;
     char b[64];
 
     if (op->inner_hex) {
@@ -2193,12 +2196,12 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                 printf("%sphy index: %d\n", pad, j);
                 printf("%s  device type: %s\n", pad,
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
-                if ((! filter) || (0xe & per_ucp[2]))
+                if (nofilter || (0xe & per_ucp[2]))
                     printf("%s  initiator port for:%s%s%s\n", pad,
                            ((per_ucp[2] & 8) ? " SSP" : ""),
                            ((per_ucp[2] & 4) ? " STP" : ""),
                            ((per_ucp[2] & 2) ? " SMP" : ""));
-                if ((! filter) || (0x8f & per_ucp[3]))
+                if (nofilter || (0x8f & per_ucp[3]))
                     printf("%s  target port for:%s%s%s%s%s\n", pad,
                            ((per_ucp[3] & 0x80) ? " SATA_port_selector" : ""),
                            ((per_ucp[3] & 8) ? " SSP" : ""),
@@ -2206,13 +2209,13 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                            ((per_ucp[3] & 2) ? " SMP" : ""),
                            ((per_ucp[3] & 1) ? " SATA_device" : ""));
                 print_sas_addr = 0;
-                if ((! filter) || sas_addr_non_zero(per_ucp + 4)) {
+                if (nofilter || sas_addr_non_zero(per_ucp + 4)) {
                     ++print_sas_addr;
                     printf("%s  attached SAS address: 0x", pad);
                     for (m = 0; m < 8; ++m)
                         printf("%02x", per_ucp[4 + m]);
                 }
-                if ((! filter) || sas_addr_non_zero(per_ucp + 12)) {
+                if (nofilter || sas_addr_non_zero(per_ucp + 12)) {
                     ++print_sas_addr;
                     printf("\n%s  SAS address: 0x", pad);
                     for (m = 0; m < 8; ++m)
@@ -3146,6 +3149,8 @@ try_again:
                 continue;
         }
         ++got1;
+        if ((op->do_filter > 2) && (1 != (0xf & jrp->enc_statp[0])))
+            continue;   /* when '-fff' and status!=OK, skip */
         cp = find_element_tname(jrp->etype, b, sizeof(b));
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
