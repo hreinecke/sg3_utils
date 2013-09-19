@@ -199,6 +199,8 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp) {
+        if (ptp->ccb)
+            cam_freeccb(ptp->ccb);
         memset(ptp, 0, sizeof(struct sg_pt_freebsd_scsi));
         ptp->dxfer_dir = CAM_DIR_NONE;
     }
