@@ -27,9 +27,9 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.75 20130917";    /* ses3r06 */
+static const char * version_str = "1.76 20130919";    /* ses3r06 */
 
-#define MX_ALLOC_LEN ((64 * 1024) - 1)
+#define MX_ALLOC_LEN ((64 * 1024) - 1)	/* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260
@@ -213,20 +213,27 @@ static struct join_row_t join_arr[MX_JOIN_ROWS];
 static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 
 #ifdef SG_LIB_FREEBSD
+
+#include <sys/param.h>	/* contains PAGE_SIZE */
+
 static unsigned char enc_stat_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (4096)));
+	__attribute__ ((aligned (PAGE_SIZE)));
 static unsigned char elem_desc_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (4096)));
+	__attribute__ ((aligned (PAGE_SIZE)));
 static unsigned char add_elem_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (4096)));
+	__attribute__ ((aligned (PAGE_SIZE)));
 static unsigned char threshold_rsp[MX_ALLOC_LEN]
-	__attribute__ ((aligned (4096)));
+	__attribute__ ((aligned (PAGE_SIZE)));
+
 #else
+
 static unsigned char enc_stat_rsp[MX_ALLOC_LEN];
 static unsigned char elem_desc_rsp[MX_ALLOC_LEN];
 static unsigned char add_elem_rsp[MX_ALLOC_LEN];
 static unsigned char threshold_rsp[MX_ALLOC_LEN];
+
 #endif
+
 static int enc_stat_rsp_len;
 static int elem_desc_rsp_len;
 static int add_elem_rsp_len;
