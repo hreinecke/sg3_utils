@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.37 [20130907] [svn: r512]
+Changelog for sg3_utils-1.37 [20130918] [svn: r513]
   - sg_compare_and_write: fix wrprotect setting
     - add --quiet option to suppress miscompare report
     - merge features from another implementation
@@ -28,6 +28,7 @@ Changelog for sg3_utils-1.37 [20130907] [svn: r512]
     - add dStrHexStr(): ascii hex to string
     - add SG_LIB_CAT_MISCOMPARE to categories
     - clean header files
+  - sg_pt_freebsd: sanity check on sense_resid
   - scripts/rescan-scsi-bus.sh KG's v1.57 + HR patch
     - improve wlun handling, detect updated and resized
       devices, better multipath support

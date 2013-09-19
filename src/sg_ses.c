@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.74 20130907";    /* ses3r06 */
+static const char * version_str = "1.75 20130917";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)
 #define MX_ELEM_HDR 1024
@@ -212,10 +212,21 @@ static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
 static struct join_row_t join_arr[MX_JOIN_ROWS];
 static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 
+#ifdef SG_LIB_FREEBSD
+static unsigned char enc_stat_rsp[MX_ALLOC_LEN]
+	__attribute__ ((aligned (4096)));
+static unsigned char elem_desc_rsp[MX_ALLOC_LEN]
+	__attribute__ ((aligned (4096)));
+static unsigned char add_elem_rsp[MX_ALLOC_LEN]
+	__attribute__ ((aligned (4096)));
+static unsigned char threshold_rsp[MX_ALLOC_LEN]
+	__attribute__ ((aligned (4096)));
+#else
 static unsigned char enc_stat_rsp[MX_ALLOC_LEN];
 static unsigned char elem_desc_rsp[MX_ALLOC_LEN];
 static unsigned char add_elem_rsp[MX_ALLOC_LEN];
 static unsigned char threshold_rsp[MX_ALLOC_LEN];
+#endif
 static int enc_stat_rsp_len;
 static int elem_desc_rsp_len;
 static int add_elem_rsp_len;
