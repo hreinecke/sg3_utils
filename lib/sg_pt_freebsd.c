@@ -356,7 +356,8 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
             return -ptp->os_err;
         }
         ptp->ccb = ccb;
-    }
+    } else
+        ccb = ptp->ccb;
 
     // clear out structure, except for header that was filled in for us
     bzero(&(&ccb->ccb_h)[1],
