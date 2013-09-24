@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.16 20130715";    /* SPC-4 rev 36 */
+static const char * version_str = "1.17 20130923";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -1263,19 +1263,15 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                 printf("%02x", (unsigned int)ip[m]);
             printf("]\n");
             break;
-        case 3: /* NAA */
+        case 3: /* NAA <n> */
             if (1 != c_set) {
                 fprintf(stderr, "      << expected binary code_set (1)>>\n");
                 dStrHexErr((const char *)ip, i_len, -1);
                 break;
             }
             naa = (ip[0] >> 4) & 0xff;
-            if ((naa < 2) || (naa > 6) || (4 == naa)) {
-                fprintf(stderr, "      << unexpected naa [0x%x]>>\n", naa);
-                dStrHexErr((const char *)ip, i_len, -1);
-                break;
-            }
-            if (2 == naa) {             /* NAA IEEE Extended */
+            switch (naa) {
+            case 2:     /* NAA 2: IEEE Extended */
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 2 identifier "
                             "length: 0x%x>>\n", i_len);
@@ -1293,7 +1289,8 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("]\n");
-            } else if (3 == naa) {      /* NAA Locally assigned */
+                break;
+            case 3:     /* NAA 3: Locally assigned */
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 3 identifier "
                             "length: 0x%x>>\n", i_len);
@@ -1305,7 +1302,8 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("]\n");
-            } else if (5 == naa) {      /* NAA IEEE Registered */
+                break;
+            case 5:     /* NAA 5: IEEE Registered */
                 if (8 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 5 identifier "
                             "length: 0x%x>>\n", i_len);
@@ -1326,7 +1324,8 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("]\n");
-            } else if (6 == naa) {      /* NAA IEEE Registered extended */
+                break;
+            case 6:     /* NAA 6: IEEE Registered extended */
                 if (16 != i_len) {
                     fprintf(stderr, "      << unexpected NAA 6 identifier "
                             "length: 0x%x>>\n", i_len);
@@ -1355,6 +1354,11 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                 for (m = 0; m < 16; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("]\n");
+                break;
+            default:
+                fprintf(stderr, "      << unexpected naa [0x%x]>>\n", naa);
+                dStrHexErr((const char *)ip, i_len, -1);
+                break;
             }
             break;
         case 4: /* Relative target port */
