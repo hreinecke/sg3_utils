@@ -335,6 +335,11 @@ first read) then it should remain even if the O_EXCL flag is doing its job.
 The "sg_tst_excl" variant uses the Linux SG_IO v3 interface while the
 "sg_tst_excl2" uses the more generic sg_pt infrastructure. 
 
+"bsg_queue_tst" sends an INQUIRY command via the Linux SG_IO v4 interface
+which is used by the bsg driver. So it will take device names like
+"/dev/bsg/6:0:0:0". It tests if sending repeated INQUIRYs with
+the BSG_FLAG_Q_AT_HEAD or BSG_FLAG_Q_AT_TAIL flag makes any difference.
+
 
 Command line processing
 =======================
@@ -391,4 +396,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-19th September 2013
+21st September 2013
