@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.38 20130819";
+static const char * version_str = "0.39 20131006";
 
 #define ME "sg_xcopy: "
 
@@ -340,8 +340,9 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
 
     fp->pdt = sir.peripheral_type;
     if (verbose)
-        pr2serr("    %s: %.8s  %.16s  %.4s  [pdt=%d]\n", fp->fname,
-                sir.vendor, sir.product, sir.revision, fp->pdt);
+        pr2serr("    %s: %.8s  %.16s  %.4s  [pdt=%d, 3pc=%d]\n", fp->fname,
+                sir.vendor, sir.product, sir.revision, fp->pdt,
+                !! (0x8 & sir.byte_5));
 
     return fp->sg_fd;
 }
@@ -514,13 +515,13 @@ usage()
             "    dc          segment descriptor DC bit (default: 0)\n"
             "    ibs         input block size (if given must be same as "
             "'bs=')\n"
-            "    id_usage    sets list id usage field to hold (0), "
+            "    id_usage    sets list_id_usage field to hold (0), "
             "discard (2) or\n"
             "                disable (3)\n"
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [cat,dc,excl,"
             "flock,null]\n"
-            "    list_id     sets list identifier field to ID (default: 1)\n"
+            "    list_id     sets list_id field to ID (default: 1 or 0)\n"
             "    obs         output block size (if given must be same as "
             "'bs=')\n"
             "    of          file or device to write to (def: stdout), "
@@ -664,7 +665,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
 static int
 scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
 {
-    int res, ftype;
+    int res, ftype, snlid;
     unsigned char rcBuff[256];
     unsigned int rcBuffLen = 256, len, n, td_list = 0;
     unsigned long num, max_target_num, max_segment_num, max_segment_len;
@@ -696,6 +697,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
         pr2serr("\nOutput response in hex:\n");
         dStrHexErr((const char *)rcBuff, len, 1);
     }
+    snlid = rcBuff[4] & 0x1;
     max_target_num = rcBuff[8] << 8 | rcBuff[9];
     max_segment_num = rcBuff[10] << 8 | rcBuff[11];
     max_desc_len = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 |
@@ -707,6 +709,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
                       rcBuff[23];
     if (verbose) {
         pr2serr(" >> Receive copy results (report operating parameters):\n");
+        pr2serr("    Support No List IDentifier (SNLID): %d\n", snlid);
         pr2serr("    Maximum target descriptor count: %lu\n", max_target_num);
         pr2serr("    Maximum segment descriptor count: %lu\n",
                 max_segment_num);
@@ -723,8 +726,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             list_id_usage = 0;
     }
     if (verbose) {
-        pr2serr("    Held data limit: %lu (usage: %d)\n", held_data_limit,
-                list_id_usage);
+        pr2serr("    Held data limit: %lu (list_id_usage: %d)\n",
+                held_data_limit, list_id_usage);
         num = rcBuff[28] << 24 | rcBuff[29] << 16 | rcBuff[30] << 8 |
               rcBuff[31];
         pr2serr("    Maximum stream device transfer size: %lu\n", num);
@@ -1307,14 +1310,16 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
             *np++ = '\0';
         if (0 == strcmp(cp, "append"))
             fp->append = 1;
-        else if (0 == strcmp(cp, "pad"))
-            fp->pad = 1;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = 1;
-        else if (0 == strcmp(cp, "null"))
-            ;
         else if (0 == strcmp(cp, "flock"))
             ++fp->flock;
+        else if (0 == strcmp(cp, "null"))
+            ;
+        else if (0 == strcmp(cp, "pad"))
+            fp->pad = 1;
+        else if (0 == strcmp(cp, "xcopy"))
+            ;   /* ignore, for ddpt compatibility */
         else {
             pr2serr("unrecognised flag: %s\n", cp);
             return 1;
@@ -1608,6 +1613,8 @@ main(int argc, char * argv[])
             verbose += 2;
         else if (0 == strcmp(key, "-v"))
             verbose += 1;
+        else if (0 == strncmp(key, "--xcopy", 6))
+            ;   /* ignore; for compatibility with ddpt */
         else {
             pr2serr("Unrecognized option '%s'\n", key);
             pr2serr("For more information use '--help'\n");
