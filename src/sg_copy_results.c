@@ -34,7 +34,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.4 20130730";
+static const char * version_str = "1.5 20131007";
 
 
 #define MAX_XFER_LEN 10000
@@ -177,7 +177,7 @@ scsi_operating_parameters(unsigned char *rcBuff, unsigned int rcBuffLen)
                 " output truncated\n");
     }
     printf("Receive copy results (report operating parameters):\n");
-    printf("    Supports no list identifier: %s\n",
+    printf("    Supports no list identifier (SNLID): %s\n",
            rcBuff[4] & 1 ? "yes" : "no");
     n = (rcBuff[8] << 8) | rcBuff[9];
     printf("    Maximum target descriptor count: %u\n", n);
@@ -403,7 +403,7 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    cp = (const char *)&rec_copy_name_arr[sa];
+    cp = rec_copy_name_arr[sa];
     if (verbose)
         fprintf(stderr, ME "issue %s to device %s\n\t\txfer_len= %d (0x%x), "
                 "list_id=%d\n", cp, device_name, xfer_len, xfer_len,

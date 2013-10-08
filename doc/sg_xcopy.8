@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_XCOPY "8" "October 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -181,13 +181,6 @@ from the beginning of the file or, if \fISEEK\fR is given, starting at
 block \fISEEK\fR. Note that attempting to 'append' to a device file (e.g.
 a disk) will usually be ignored or may cause an error to be reported.
 .TP
-pad
-sets the SCSI EXTENDED COPY command segment descriptor PAD bit. The
-PAD bit (in conjunction with the CAT bit) controls the handling of
-residual data.(See section
-.B HANDLING OF RESIDUAL DATA
-for details.
-.TP
 excl
 causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 \fIOFILE\fR.
@@ -202,6 +195,16 @@ and no copy is done.
 .TP
 null
 has no affect, just a placeholder.
+.TP
+pad
+sets the SCSI EXTENDED COPY command segment descriptor PAD bit. The
+PAD bit (in conjunction with the CAT bit) controls the handling of
+residual data.(See section
+.B HANDLING OF RESIDUAL DATA
+for details.
+.TP
+xcopy
+has no affect; for compatibility with ddpt.
 .SH HANDLING OF RESIDUAL DATA
 The \fIpad\fR and \fIcat\fR bits control the handling of residual
 data. As the data can be specified either in terms of source or target
@@ -247,6 +250,12 @@ a signed 32 bit number.
 All informative, warning and error output is sent to stderr so that
 dd's output file can be stdout and remain unpolluted. If no options
 are given, then the usage message is output and nothing else happens.
+.PP
+If a device supports xcopy operations then it should set the 3PC
+field (3PC stands for Third Party Copy) in its standard INQUIRY response.
+This utility will attempt a xcopy operation irrespective of the value
+in the 3PC field but if it is zero (cleared) one would expect the
+xcopy operation to fail.
 .PP
 The status of the SCSI EXTENDED COPY command can be queried with
 .B sg_copy_results(sg3_utils)
@@ -327,4 +336,4 @@ recovery see
 .B sdparm(sdparm)
 .PP
 See also
-.B dd(1), sg_copy_results(sg3_utils), ddrescue(GNU), ddpt
+.B dd(1), sg_copy_results(sg3_utils), ddrescue(GNU), ddpt(ddpt)
