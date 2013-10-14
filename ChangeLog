@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.37 [20131014] [svn: r521]
+Changelog for sg3_utils-1.37 [20131014] [svn: r522]
   - sg_compare_and_write: fix wrprotect setting
     - add --quiet option to suppress miscompare report
     - merge features from another implementation

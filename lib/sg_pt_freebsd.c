@@ -298,9 +298,8 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp,
 void
 set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
 {
-    /* do nothing, suppress warnings */
-    objp = objp;
-    flags = flags;
+    if (objp) { ; }     /* unused, suppress warning */
+    if (flags) { ; }     /* unused, suppress warning */
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).

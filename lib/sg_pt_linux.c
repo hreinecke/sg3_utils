@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.19 20130507 */
+/* sg_pt_linux version 1.20 20131014 */
 
 
 #include <stdio.h>
@@ -252,7 +252,7 @@ set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     ++ptp->in_err;
-    tag = tag;                  /* dummy to silence compiler */
+    if (tag) { ; }     /* unused, suppress warning */
 }
 
 /* Note that task management function codes are transport specific */
@@ -262,7 +262,7 @@ set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     ++ptp->in_err;
-    tmf_code = tmf_code;        /* dummy to silence compiler */
+    if (tmf_code) { ; }     /* unused, suppress warning */
 }
 
 void
@@ -271,8 +271,8 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     ++ptp->in_err;
-    attribute = attribute;      /* dummy to silence compiler */
-    priority = priority;        /* dummy to silence compiler */
+    if (attribute) { ; }     /* unused, suppress warning */
+    if (priority) { ; }      /* unused, suppress warning */
 }
 
 #ifndef SG_FLAG_Q_AT_TAIL
