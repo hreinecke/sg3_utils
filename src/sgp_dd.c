@@ -57,7 +57,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "5.44 20130603";
+static const char * version_str = "5.45 20131011";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -534,7 +534,11 @@ read_write_thread(void * v_clp)
     sz = clp->bpt * clp->bs;
     seek_skip =  clp->seek - clp->skip;
     memset(rep, 0, sizeof(Rq_elem));
-    psz = getpagesize();
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#else
+    psz = 4096;     /* give up, pick likely figure */
+#endif
     if (NULL == (rep->alloc_bp = (unsigned char *)malloc(sz + psz)))
         err_exit(ENOMEM, "out of memory creating user buffers\n");
     rep->buffp = (unsigned char *)(((unsigned long)rep->alloc_bp + psz - 1) &
