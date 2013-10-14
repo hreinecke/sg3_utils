@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static const char * version_str = "1.38 20130603 shared_mmap";
+static const char * version_str = "1.38 20131014 shared_mmap";
 #else
-static const char * version_str = "1.38 20130603";
+static const char * version_str = "1.38 20131014";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -808,7 +808,7 @@ main(int argc, char * argv[])
     int n, flags;
     char ebuff[EBUFF_SZ];
     int blocks_per;
-    size_t psz = getpagesize();
+    size_t psz;
     struct flags_t in_flags;
     struct flags_t out_flags;
 #ifdef SG_WANT_SHARED_MMAP_IO
@@ -816,6 +816,11 @@ main(int argc, char * argv[])
 #endif
     int ret = 0;
 
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#else
+    psz = 4096;     /* give up, pick likely figure */
+#endif
     inf[0] = '\0';
     outf[0] = '\0';
     memset(&in_flags, 0, sizeof(in_flags));
@@ -1305,6 +1310,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "Not enough user memory for raw\n");
                 return SG_LIB_FILE_ERROR;
             }
+            /* perhaps use posix_memalign() instead */
             wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         }

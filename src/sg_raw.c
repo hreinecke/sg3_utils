@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2012 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2013 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,22 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.5 (2012-03-28)"
+#define SG_RAW_VERSION "0.4.6 (2013-10-13)"
+
+#ifdef SG_LIB_WIN32
+#ifndef HAVE_SYSCONF
+#include <windows.h>
+
+static size_t
+win_pagesize(void)
+{
+    SYSTEM_INFO sys_info;
+
+    GetSystemInfo(&sys_info);
+    return sys_info.dwPageSize;
+}
+#endif
+#endif
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -236,11 +251,30 @@ my_memalign(int length, unsigned char ** wrkBuffp)
     unsigned char * wrkBuff;
     size_t psz;
 
-#ifdef SG_LIB_MINGW
-    psz = getpagesize();
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#elif defined(SG_LIB_WIN32)
+    psz = win_pagesize();
 #else
-    psz = sysconf(_SC_PAGESIZE); /* was getpagesize() */
+    psz = 4096;     /* give up, pick likely figure */
 #endif
+
+#ifdef HAVE_POSIX_MEMALIGN
+    {
+        int err;
+
+        err = posix_memalign((void **)&wrkBuff, psz, length);
+        if (err) {
+            fprintf(stderr, "posix_memalign: error [%d] out of memory?\n",
+                    err);
+            return NULL;
+        }
+        memset(wrkBuff, 0, length);
+        if (wrkBuffp)
+            *wrkBuffp = wrkBuff;
+        return wrkBuff;
+    }
+#else
     wrkBuff = (unsigned char*)calloc(length + psz, 1);
     if (NULL == wrkBuff) {
         if (wrkBuffp)
@@ -248,9 +282,9 @@ my_memalign(int length, unsigned char ** wrkBuffp)
         return NULL;
     } else if (wrkBuffp)
         *wrkBuffp = wrkBuff;
-    // posix_memalign() could be a better way to do this
     return (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                              (~(psz - 1)));
+#endif
 }
 
 static int

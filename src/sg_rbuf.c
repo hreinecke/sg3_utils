@@ -51,7 +51,7 @@
 #endif
 
 
-static const char * version_str = "4.90 20130603";
+static const char * version_str = "4.90 20131014";
 
 static struct option long_options[] = {
         {"buffer", 1, 0, 'b'},
@@ -341,7 +341,7 @@ main(int argc, char * argv[])
     int buf_capacity = 0;
     int buf_size = 0;
     int64_t total_size = RB_DEF_SIZE;
-    size_t psz = getpagesize();
+    size_t psz;
     int dio_incomplete = 0;
     struct sg_io_hdr io_hdr;
     struct timeval start_tm, end_tm;
@@ -350,6 +350,11 @@ main(int argc, char * argv[])
 #endif
     struct opts_t opts;
 
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#else
+    psz = 4096;     /* give up, pick likely figure */
+#endif
     memset(&opts, 0, sizeof(opts));
     res = process_cl(&opts, argc, argv);
     if (res)
@@ -486,6 +491,7 @@ main(int argc, char * argv[])
             printf("out of memory (data)\n");
             return SG_LIB_CAT_OTHER;
         }
+        /* perhaps use posix_memalign() instead */
         if (opts.do_dio)    /* align to page boundary */
             rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
                                       (~(psz - 1)));

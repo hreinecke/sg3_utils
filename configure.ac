@@ -24,6 +24,8 @@ AC_CHECK_FUNCS(getopt_long,
 	       GETOPT_O_FILES='',
 	       GETOPT_O_FILES='getopt_long.o')
 AC_CHECK_FUNCS(posix_fadvise)
+AC_CHECK_FUNCS(posix_memalign)
+AC_CHECK_FUNCS(sysconf)
 AC_CHECK_FUNCS(lseek64)
 AC_SUBST(GETOPT_O_FILES)
 

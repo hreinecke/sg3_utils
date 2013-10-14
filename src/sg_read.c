@@ -48,7 +48,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.20 20130603";
+static const char * version_str = "1.20 20131014";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -423,7 +423,11 @@ int main(int argc, char * argv[])
     int ret = 0;
     size_t psz;
 
-    psz = getpagesize();
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#else
+    psz = 4096;     /* give up, pick likely figure */
+#endif
     inf[0] = '\0';
 
     for (k = 1; k < argc; k++) {
@@ -654,6 +658,7 @@ int main(int argc, char * argv[])
                         "storage\n");
                 return SG_LIB_CAT_OTHER;
             }
+            /* perhaps use posix_memalign() instead */
             wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         } else if (do_mmap) {

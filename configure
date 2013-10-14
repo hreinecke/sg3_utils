@@ -11390,6 +11390,28 @@ _ACEOF
 fi
 done
 
+for ac_func in posix_memalign
+do :
+  ac_fn_c_check_func "$LINENO" "posix_memalign" "ac_cv_func_posix_memalign"
+if test "x$ac_cv_func_posix_memalign" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_POSIX_MEMALIGN 1
+_ACEOF
+
+fi
+done
+
+for ac_func in sysconf
+do :
+  ac_fn_c_check_func "$LINENO" "sysconf" "ac_cv_func_sysconf"
+if test "x$ac_cv_func_sysconf" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYSCONF 1
+_ACEOF
+
+fi
+done
+
 for ac_func in lseek64
 do :
   ac_fn_c_check_func "$LINENO" "lseek64" "ac_cv_func_lseek64"

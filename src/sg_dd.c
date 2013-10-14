@@ -58,7 +58,8 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "5.78 20130603";
+static const char * version_str = "5.79 20131014";
+
 
 #define ME "sg_dd: "
 
@@ -1869,8 +1870,27 @@ main(int argc, char * argv[])
 
     if (iflag.dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
         (FT_RAW & out_type)) {
-        size_t psz = sysconf(_SC_PAGESIZE); /* was getpagesize() */
+        size_t psz;
 
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+        psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#else
+        psz = 4096;     /* give up, pick likely figure */
+#endif
+
+#ifdef HAVE_POSIX_MEMALIGN
+        {
+            int err;
+
+            err = posix_memalign((void **)&wrkBuff, psz, blk_sz * bpt);
+            if (err) {
+                fprintf(stderr, "posix_memalign: error [%d] out of memory?\n",
+                        err);
+                return SG_LIB_CAT_OTHER;
+            }
+            wrkPos = wrkBuff;
+        }
+#else
         wrkBuff = (unsigned char*)malloc(blk_sz * bpt + psz);
         if (0 == wrkBuff) {
             fprintf(stderr, "Not enough user memory for raw\n");
@@ -1878,6 +1898,7 @@ main(int argc, char * argv[])
         }
         wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                                    (~(psz - 1)));
+#endif
     } else {
         wrkBuff = (unsigned char*)malloc(blk_sz * bpt);
         if (0 == wrkBuff) {
