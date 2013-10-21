@@ -7,7 +7,7 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 CC = g++
 LD = g++
 
-EXECS = sg_tst_excl sg_tst_excl2
+EXECS = sg_tst_excl sg_tst_excl2 sg_tst_excl3
 
 EXTRAS =
 
@@ -45,6 +45,9 @@ sg_tst_excl: sg_tst_excl.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_tst_excl2: sg_tst_excl2.o $(LIBFILESNEW)
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_tst_excl3: sg_tst_excl3.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)
