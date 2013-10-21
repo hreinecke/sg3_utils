@@ -15,9 +15,9 @@
 # SEND DIAGNOSTIC        SBC, SBC-2,3, SSC-2,3
 #
 # This script uses utilities frim sg3_utils package (version
-# 1.21 or later) and sdparm (version 0.99 or later)
+# 1.21 or later)
 #
-# Douglas Gilbert 20111206
+# Douglas Gilbert 20131016
 
 
 log=0
@@ -47,7 +47,7 @@ usage()
   echo "          -q    suppress some output"
   echo "          -v    increase verbosity of output"
   echo ""
-  echo "Check <device> for manadatory SCSI command support"
+  echo "Check <device> for mandatory SCSI command support"
 }
 
 
