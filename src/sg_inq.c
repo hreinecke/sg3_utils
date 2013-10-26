@@ -261,7 +261,7 @@ usage()
     fprintf(stderr,
             "    --block=0|1     0-> open(non-blocking); 1-> "
             "open(blocking)\n"
-            "      -B 0|1        (def: depends on OS; Linux pt: 1)\n"
+            "      -B 0|1        (def: depends on OS; Linux pt: 0)\n"
             "    --cmddt|-c      command support data mode (set opcode "
             "with '--page=PG')\n"
             "                    use twice for list of supported "

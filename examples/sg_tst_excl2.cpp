@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.04 20130829";
+static const char * version_str = "1.05 20131026";
 static const char * util_name = "sg_tst_excl2";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -135,7 +135,7 @@ usage(void)
 }
 
 static int
-pt_err(int res, int sg_fd, struct sg_pt_base * ptp)
+pt_err(int res)
 {
     if (res < 0)
         fprintf(stderr, "  pass through os error: %s\n",
@@ -146,15 +146,11 @@ pt_err(int res, int sg_fd, struct sg_pt_base * ptp)
         fprintf(stderr, "  pass through timeout\n");
     else
         fprintf(stderr, "  do_scsi_pt error=%d\n", res);
-    if (ptp)
-        destruct_scsi_pt_obj(ptp);
-    scsi_pt_close_device(sg_fd);
     return -1;
 }
 
 static int
-pt_cat_no_good(int cat, int sg_fd, struct sg_pt_base * ptp,
-               const unsigned char * sbp)
+pt_cat_no_good(int cat, struct sg_pt_base * ptp, const unsigned char * sbp)
 {
     int slen;
     char b[256];
@@ -182,9 +178,6 @@ pt_cat_no_good(int cat, int sg_fd, struct sg_pt_base * ptp,
         fprintf(stderr, "  unknown pt result category (%d)\n", cat);
         break;
     }
-    if (ptp)
-        destruct_scsi_pt_obj(ptp);
-    scsi_pt_close_device(sg_fd);
     return -1;
 }
 
@@ -251,12 +244,14 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
             fprintf(stderr, "READ_16 do_scsi_pt() error\n");
-            pt_err(res, sg_fd, ptp);
+            res = pt_err(res);
+            goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
         if (SCSI_PT_RESULT_GOOD != cat) {
             fprintf(stderr, "READ_16 do_scsi_pt() category problem\n");
-            return pt_cat_no_good(cat, sg_fd, ptp, sense_buffer);
+            res = pt_cat_no_good(cat, ptp, sense_buffer);
+            goto err;
         }
 
         u = (lb[0] << 24) + (lb[1] << 16) + (lb[2] << 8) + lb[3];
@@ -284,15 +279,17 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
             fprintf(stderr, "WRITE_16 do_scsi_pt() error\n");
-            pt_err(res, sg_fd, ptp);
+            res = pt_err(res);
+            goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
         if (SCSI_PT_RESULT_GOOD != cat) {
             fprintf(stderr, "WRITE_16 do_scsi_pt() category problem\n");
-            return pt_cat_no_good(cat, sg_fd, ptp, sense_buffer);
+            res = pt_cat_no_good(cat, ptp, sense_buffer);
+            goto err;
         }
     }
-
+err:
     if (ptp)
         destruct_scsi_pt_obj(ptp);
     scsi_pt_close_device(sg_fd);
@@ -348,12 +345,14 @@ do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
     res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
     if (res) {
         fprintf(stderr, "INQUIRY do_scsi_pt() error\n");
-        pt_err(res, sg_fd, ptp);
+        res = pt_err(res);
+        goto err;
     }
     cat = get_scsi_pt_result_category(ptp);
     if (SCSI_PT_RESULT_GOOD != cat) {
         fprintf(stderr, "INQUIRY do_scsi_pt() category problem\n");
-        return pt_cat_no_good(cat, sg_fd, ptp, sense_buffer);
+        res = pt_cat_no_good(cat, ptp, sense_buffer);
+        goto err;
     }
 
     /* Good, so fetch Product ID from response, copy to 'b' */
@@ -366,6 +365,7 @@ do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
             b[b_mlen - 1] = '\0';
         }
     }
+err:
     if (ptp)
         destruct_scsi_pt_obj(ptp);
     close(sg_fd);
