@@ -28,7 +28,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.23 20130730";
+static const char * version_str = "1.24 20131029";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -332,7 +332,7 @@ dStrRaw(const char* str, int len)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, m, off, res, c, list_len, luns, trunc;
+    int sg_fd, k, m, off, res, c, list_len, len_cap, luns, trunc;
     int decode = 0;
     int do_hex = 0;
 #ifdef SG_LIB_LINUX
@@ -555,12 +555,15 @@ main(int argc, char * argv[])
     if (0 == res) {
         list_len = (reportLunsBuff[0] << 24) + (reportLunsBuff[1] << 16) +
                    (reportLunsBuff[2] << 8) + reportLunsBuff[3];
+        len_cap = list_len + 8;
+        if (len_cap > maxlen)
+            len_cap = maxlen;
         if (do_raw) {
-            dStrRaw((const char *)reportLunsBuff, list_len + 8);
+            dStrRaw((const char *)reportLunsBuff, len_cap);
             goto the_end;
         }
         if (1 == do_hex) {
-            dStrHex((const char *)reportLunsBuff, list_len + 8, 1);
+            dStrHex((const char *)reportLunsBuff, len_cap, 1);
             goto the_end;
         }
         luns = (list_len / 8);

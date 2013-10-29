@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.04 20130829";
+static const char * version_str = "1.05 20131028";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -98,7 +98,8 @@ using namespace std::chrono;
 static mutex odd_count_mutex;
 static mutex console_mutex;
 static unsigned int odd_count;
-static unsigned int bounce_count;
+static unsigned int ebusy_count;
+static unsigned int eagain_count;
 
 
 static void
@@ -128,7 +129,7 @@ usage(void)
     printf("    -x                don't use O_EXCL on first thread "
            "(def: use\n"
            "                      O_EXCL on all threads)\n\n");
-    printf("Test O_EXCL open flag with sg driver. Each open/close "
+    printf("Test O_EXCL open flag with Linux sg driver. Each open/close "
            "cycle with the\nO_EXCL flag does a double increment on "
            "lba (using its first 4 bytes).\n");
 }
@@ -141,18 +142,19 @@ usage(void)
 
 /* Opens dev_name and spins if busy (i.e. gets EBUSY), sleeping for
  * wait_ms milliseconds if wait_ms is positive.
- * Reads lba and treats the first 4 bytes as an int (SCSI endian),
+ * Reads lba (twice) and treats the first 4 bytes as an int (SCSI endian),
  * increments it and writes it back. Repeats so that happens twice. Then
  * closes dev_name. If an error occurs returns -1 else returns 0 if
  * first int read from lba is even otherwise returns 1. */
 static int
 do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
-                   int excl, int wait_ms, unsigned int & bounces)
+                   int excl, int wait_ms, int id, unsigned int & ebusy,
+                   unsigned int & eagains)
 {
-    int k, sg_fd, ok;
+    int k, sg_fd, ok, res;
     int odd = 0;
     unsigned int u = 0;
-    struct sg_io_hdr pt;
+    struct sg_io_hdr pt, pt2;
     unsigned char r16CmdBlk [READ16_CMD_LEN] =
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     unsigned char w16CmdBlk [WRITE16_CMD_LEN] =
@@ -173,7 +175,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
 
     while (((sg_fd = open(dev_name, open_flags)) < 0) &&
            (EBUSY == errno)) {
-        ++bounces;
+        ++ebusy;
         if (wait_ms > 0)
             this_thread::sleep_for(milliseconds{wait_ms});
         else if (0 == wait_ms)
@@ -200,9 +202,33 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         pt.cmdp = r16CmdBlk;
         pt.sbp = sense_buffer;
         pt.timeout = 20000;     /* 20000 millisecs == 20 seconds */
+        pt.pack_id = id;
 
-        if (ioctl(sg_fd, SG_IO, &pt) < 0) {
-            perror("do_rd_inc_wr_twice: READ_16 SG_IO ioctl error");
+        // queue up two READ_16s to same LBA
+        if (write(sg_fd, &pt, sizeof(pt)) < 0) {
+            perror("do_rd_inc_wr_twice: write(sg, READ_16)");
+            close(sg_fd);
+            return -1;
+        }
+        pt2 = pt;
+        if (write(sg_fd, &pt2, sizeof(pt2)) < 0) {
+            perror("do_rd_inc_wr_twice: write(sg, READ_16) 2");
+            close(sg_fd);
+            return -1;
+        }
+
+        while (((res = read(sg_fd, &pt, sizeof(pt))) < 0) &&
+               (EAGAIN == errno)) {
+            ++eagains;
+            if (wait_ms > 0)
+                this_thread::sleep_for(milliseconds{wait_ms});
+            else if (0 == wait_ms)
+                this_thread::yield();
+            else if (-2 == wait_ms)
+                sleep(0);                   // process yield ??
+        }
+        if (res < 0) {
+            perror("do_rd_inc_wr_twice: read(sg, READ_16)");
             close(sg_fd);
             return -1;
         }
@@ -219,6 +245,38 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         default: /* won't bother decoding other categories */
             sg_chk_n_print3("READ_16 command error", &pt, 1);
             break;
+        }
+        if (ok) {
+            while (((res = read(sg_fd, &pt2, sizeof(pt2))) < 0) &&
+                   (EAGAIN == errno)) {
+                ++eagains;
+                if (wait_ms > 0)
+                    this_thread::sleep_for(milliseconds{wait_ms});
+                else if (0 == wait_ms)
+                    this_thread::yield();
+                else if (-2 == wait_ms)
+                    sleep(0);                   // process yield ??
+            }
+            if (res < 0) {
+                perror("do_rd_inc_wr_twice: read(sg, READ_16) 2");
+                close(sg_fd);
+                return -1;
+            }
+            pt = pt2;
+            /* now for the error processing */
+            ok = 0;
+            switch (sg_err_category3(&pt)) {
+            case SG_LIB_CAT_CLEAN:
+                ok = 1;
+                break;
+            case SG_LIB_CAT_RECOVERED:
+                printf("Recovered error on READ_16, continuing 2\n");
+                ok = 1;
+                break;
+            default: /* won't bother decoding other categories */
+                sg_chk_n_print3("READ_16 command error 2", &pt, 1);
+                break;
+            }
         }
         if (! ok) {
             close(sg_fd);
@@ -252,6 +310,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         pt.cmdp = w16CmdBlk;
         pt.sbp = sense_buffer;
         pt.timeout = 20000;     /* 20000 millisecs == 20 seconds */
+        pt.pack_id = id;
 
         if (ioctl(sg_fd, SG_IO, &pt) < 0) {
             perror("do_rd_inc_wr_twice: WRITE_16 SG_IO ioctl error");
@@ -287,10 +346,11 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
 #define INQ_CMD_LEN 6
 
 /* Send INQUIRY and fetches response. If okay puts PRODUCT ID field
- * in b (up to m_blen bytes). Returns 0 on success, else -1 . */
+ * in b (up to m_blen bytes). Does not use O_EXCL flag. Returns 0 on success,
+ * else -1 . */
 static int
-do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
-                   unsigned int & bounces, char * b, int b_mlen)
+do_inquiry_prod_id(const char * dev_name, int block, int wait_ms,
+                   unsigned int & ebusys, char * b, int b_mlen)
 {
     int sg_fd, ok, ret;
     struct sg_io_hdr pt;
@@ -303,11 +363,9 @@ do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
 
     if (! block)
         open_flags |= O_NONBLOCK;
-    if (excl)
-        open_flags |= O_EXCL;
     while (((sg_fd = open(dev_name, open_flags)) < 0) &&
            (EBUSY == errno)) {
-        ++bounces;
+        ++ebusys;
         if (wait_ms > 0)
             this_thread::sleep_for(milliseconds{wait_ms});
         else if (0 == wait_ms)
@@ -380,15 +438,17 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
             int excl, int num, int wait_ms)
 {
     unsigned int thr_odd_count = 0;
-    unsigned int thr_bounce_count = 0;
+    unsigned int thr_ebusy_count = 0;
+    unsigned int thr_eagain_count = 0;
     int k, res;
 
     console_mutex.lock();
-    cerr << "Enter work_thread id=" << id << " excl=" << excl << endl;
+    cerr << "Enter work_thread id=" << id << " excl=" << excl << " block="
+         << block << endl;
     console_mutex.unlock();
     for (k = 0; k < num; ++k) {
-        res = do_rd_inc_wr_twice(dev_name, lba, block, excl, wait_ms,
-                                 thr_bounce_count);
+        res = do_rd_inc_wr_twice(dev_name, lba, block, excl, wait_ms, k,
+                                 thr_ebusy_count, thr_eagain_count);
         if (res < 0)
             break;
         if (res)
@@ -402,7 +462,8 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
 
     odd_count_mutex.lock();
     odd_count += thr_odd_count;
-    bounce_count += thr_bounce_count;
+    ebusy_count += thr_ebusy_count;
+    eagain_count += thr_eagain_count;
     odd_count_mutex.unlock();
 }
 
@@ -481,8 +542,8 @@ main(int argc, char * argv[])
     try {
 
         if (! force) {
-            res = do_inquiry_prod_id(dev_name, block, ! exclude_o_excl,
-                                     wait_ms, bounce_count, b, sizeof(b));
+            res = do_inquiry_prod_id(dev_name, block, wait_ms, ebusy_count,
+                                     b, sizeof(b));
             if (res) {
                 fprintf(stderr, "INQUIRY failed on %s\n", dev_name);
                 return 1;
@@ -515,7 +576,8 @@ main(int argc, char * argv[])
             delete vt[k];
 
         cout << "Expecting odd count of 0, got " << odd_count << endl;
-        cout << "Number of EBUSYs: bounce_count=" << bounce_count << endl;
+        cout << "Number of EBUSYs: " << ebusy_count << endl;
+        cout << "Number of EAGAINs: " << eagain_count << endl;
 
     }
     catch(system_error& e)  {
