@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.02 20131026";
+static const char * version_str = "1.03 20131029";
 static const char * util_name = "sg_tst_excl3";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -101,14 +101,15 @@ using namespace std::chrono;
 static mutex odd_count_mutex;
 static mutex console_mutex;
 static unsigned int odd_count;
-static unsigned int bounce_count;
+static unsigned int ebusy_count;
 
 
 static void
 usage(void)
 {
     printf("Usage: %s [-b] [-f] [-h] [-l <lba>] [-n <n_per_thr>]\n"
-           "                    [-t <num_thrs>] [-V] [-w <wait_ms>] [-x]\n"
+           "                    [-R] [-t <num_thrs>] [-V] [-w <wait_ms>] "
+           "[-x]\n"
            "                    <disk_device>\n", util_name);
     printf("  where\n");
     printf("    -b                block on open (def: O_NONBLOCK)\n");
@@ -120,6 +121,8 @@ usage(void)
            DEF_LBA);
     printf("    -n <n_per_thr>    number of loops per thread "
            "(def: %d)\n", DEF_NUM_PER_THREAD);
+    printf("    -R                all readers; so first thread (id=0) "
+           "just reads\n");
     printf("    -t <num_thrs>     number of threads (def: %d)\n",
            DEF_NUM_THREADS);
     printf("    -V                print version number then exit\n");
@@ -130,9 +133,9 @@ usage(void)
     printf("    -x                don't use O_EXCL on first thread "
            "(def: use\n"
            "                      O_EXCL on first thread)\n\n");
-    printf("Test O_EXCL open flag with sg driver. First thread (id=0) "
-           "does\nopen/close cycle with the O_EXCL flag then does a double "
-           "increment on\nlba (using its first 4 bytes). Remaining "
+    printf("Test O_EXCL open flag with pass-through drivers. First thread "
+           "(id=0) does\nopen/close cycle with the O_EXCL flag then does a "
+           "double increment on\nlba (using its first 4 bytes). Remaining "
            "theads read (without\nO_EXCL flag on open) and check the "
            "value is even.\n");
 }
@@ -196,7 +199,7 @@ pt_cat_no_good(int cat, struct sg_pt_base * ptp, const unsigned char * sbp)
  * returns -1 else returns 0 if first int read is even otherwise returns 1. */
 static int
 do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
-                   int block, int excl, int wait_ms, unsigned int & bounces)
+                   int block, int excl, int wait_ms, unsigned int & ebusys)
 {
     int k, sg_fd, res, cat;
     int odd = 0;
@@ -222,7 +225,7 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
 
     while (((sg_fd = scsi_pt_open_flags(dev_name, open_flags, 0)) < 0) &&
            (-EBUSY == sg_fd)) {
-        ++bounces;
+        ++ebusys;
         if (wait_ms > 0)
             this_thread::sleep_for(milliseconds{wait_ms});
         else if (0 == wait_ms)
@@ -246,7 +249,7 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
         set_scsi_pt_data_in(ptp, lb, READ16_REPLY_LEN);
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
-            fprintf(stderr, "READ_16 do_scsi_pt() error\n");
+            fprintf(stderr, "READ_16 do_scsi_pt() submission error\n");
             res = pt_err(res);
             goto err;
         }
@@ -284,7 +287,7 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
         set_scsi_pt_data_out(ptp, lb, WRITE16_REPLY_LEN);
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
-            fprintf(stderr, "WRITE_16 do_scsi_pt() error\n");
+            fprintf(stderr, "WRITE_16 do_scsi_pt() submission error\n");
             res = pt_err(res);
             goto err;
         }
@@ -303,15 +306,15 @@ err:
 }
 
 
-
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
 
 /* Send INQUIRY and fetches response. If okay puts PRODUCT ID field
- * in b (up to m_blen bytes). Returns 0 on success, else -1 . */
+ * in b (up to m_blen bytes). Does not use O_EXCL flag. Returns 0 on success,
+ * else -1 . */
 static int
-do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
-                   unsigned int & bounces, char * b, int b_mlen)
+do_inquiry_prod_id(const char * dev_name, int block, int wait_ms,
+                   unsigned int & ebusys, char * b, int b_mlen)
 {
     int sg_fd, res, cat;
     struct sg_pt_base * ptp = NULL;
@@ -324,11 +327,9 @@ do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
 
     if (! block)
         open_flags |= O_NONBLOCK;
-    if (excl)
-        open_flags |= O_EXCL;
     while (((sg_fd = scsi_pt_open_flags(dev_name, open_flags, 0)) < 0) &&
            (-EBUSY == sg_fd)) {
-        ++bounces;
+        ++ebusys;
         if (wait_ms > 0)
             this_thread::sleep_for(milliseconds{wait_ms});
         else if (0 == wait_ms)
@@ -350,7 +351,7 @@ do_inquiry_prod_id(const char * dev_name, int block, int excl, int wait_ms,
     set_scsi_pt_data_in(ptp, inqBuff, INQ_REPLY_LEN);
     res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
     if (res) {
-        fprintf(stderr, "INQUIRY do_scsi_pt() error\n");
+        fprintf(stderr, "INQUIRY do_scsi_pt() submission error\n");
         res = pt_err(res);
         goto err;
     }
@@ -380,19 +381,20 @@ err:
 
 static void
 work_thread(const char * dev_name, unsigned int lba, int id, int block,
-            int excl, int num, int wait_ms)
+            int excl, bool all_readers, int num, int wait_ms)
 {
     unsigned int thr_odd_count = 0;
-    unsigned int thr_bounce_count = 0;
+    unsigned int thr_ebusy_count = 0;
     int k, res;
+    int reader = ((id > 0) || (all_readers));
 
     console_mutex.lock();
     cerr << "Enter work_thread id=" << id << " excl=" << excl << " block="
-         << block << " ro=" << (id > 0) << endl;
+         << block << " reader=" << reader << endl;
     console_mutex.unlock();
     for (k = 0; k < num; ++k) {
-        res = do_rd_inc_wr_twice(dev_name, (id > 0), lba, block, excl,
-                                 wait_ms, thr_bounce_count);
+        res = do_rd_inc_wr_twice(dev_name, reader, lba, block, excl,
+                                 wait_ms, thr_ebusy_count);
         if (res < 0)
             break;
         if (res)
@@ -406,7 +408,7 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
 
     odd_count_mutex.lock();
     odd_count += thr_odd_count;
-    bounce_count += thr_bounce_count;
+    ebusy_count += thr_ebusy_count;
     odd_count_mutex.unlock();
 }
 
@@ -419,6 +421,7 @@ main(int argc, char * argv[])
     int force = 0;
     unsigned int lba = DEF_LBA;
     int num_per_thread = DEF_NUM_PER_THREAD;
+    bool all_readers = false;
     int num_threads = DEF_NUM_THREADS;
     int wait_ms = DEF_WAIT_MS;
     int exclude_o_excl = 0;
@@ -451,7 +454,9 @@ main(int argc, char * argv[])
                 num_threads = atoi(argv[k]);
             else
                 break;
-        } else if (0 == memcmp("-V", argv[k], 2)) {
+        } else if (0 == memcmp("-R", argv[k], 2))
+            all_readers = true;
+        else if (0 == memcmp("-V", argv[k], 2)) {
             printf("%s version: %s\n", util_name, version_str);
             return 0;
         } else if (0 == memcmp("-w", argv[k], 2)) {
@@ -485,8 +490,8 @@ main(int argc, char * argv[])
     try {
 
         if (! force) {
-            res = do_inquiry_prod_id(dev_name, block, ! exclude_o_excl,
-                                     wait_ms, bounce_count, b, sizeof(b));
+            res = do_inquiry_prod_id(dev_name, block, wait_ms, ebusy_count,
+                                     b, sizeof(b));
             if (res) {
                 fprintf(stderr, "INQUIRY failed on %s\n", dev_name);
                 return 1;
@@ -507,7 +512,8 @@ main(int argc, char * argv[])
             int excl = ((0 == k) && (! exclude_o_excl)) ? 1 : 0;
 
             thread * tp = new thread {work_thread, dev_name, lba, k, block,
-                                      excl, num_per_thread, wait_ms};
+                                      excl, all_readers, num_per_thread,
+                                      wait_ms};
             vt.push_back(tp);
         }
 
@@ -518,7 +524,7 @@ main(int argc, char * argv[])
             delete vt[k];
 
         cout << "Expecting odd count of 0, got " << odd_count << endl;
-        cout << "Number of EBUSYs: bounce_count=" << bounce_count << endl;
+        cout << "Number of EBUSYs: " << ebusy_count << endl;
 
     }
     catch(system_error& e)  {
