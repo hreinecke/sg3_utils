@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.05 20131028";
+static const char * version_str = "1.06 20131030";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -540,7 +540,19 @@ main(int argc, char * argv[])
         return 1;
     }
     try {
+        struct stat a_stat;
 
+        if (stat(dev_name, &a_stat) < 0) {
+            perror("stat() on dev_name failed");
+            return 1;
+        }
+        if (! S_ISCHR(a_stat.st_mode)) {
+            fprintf(stderr, "%s should be a sg device which is a char "
+                    "device. %s\n", dev_name, dev_name);
+            fprintf(stderr, "is not a char device and damage could be done "
+                    "if it is a BLOCK\ndevice, exiting ...\n");
+            return 1;
+        }
         if (! force) {
             res = do_inquiry_prod_id(dev_name, block, wait_ms, ebusy_count,
                                      b, sizeof(b));
