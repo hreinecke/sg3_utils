@@ -30,7 +30,7 @@
 
 */
 
-static const char * version_str = "0.70 20130923";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.71 20131030";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -212,7 +212,9 @@ usage()
             "    --raw|-r        output page in binary\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"
-            "Fetch Vital Product Data (VPD) page using SCSI INQUIRY\n");
+            "Fetch Vital Product Data (VPD) page using SCSI INQUIRY. To "
+            "list available\npages try '-p xxx'. And '-p -1' yields the "
+            "standard INQUIRY response.\n");
 }
 
 static const struct svpd_values_name_t *

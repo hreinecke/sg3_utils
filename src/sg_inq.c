@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.19 20131021";    /* SPC-4 rev 36 */
+static const char * version_str = "1.20 20131030";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -3502,7 +3502,6 @@ main(int argc, char * argv[])
 #if defined(O_NONBLOCK) && defined(O_RDONLY)
     if (opts.do_block >= 0) {
         n = O_RDONLY | (opts.do_block ? 0 : O_NONBLOCK);
-fprintf(stderr, "sg_cmds_open: flags =0x%x\n", n);
         if ((sg_fd = sg_cmds_open_flags(opts.device_name, n,
                                         opts.do_verbose)) < 0) {
             fprintf(stderr, "sg_inq: error opening file: %s: %s\n",
@@ -3543,7 +3542,7 @@ fprintf(stderr, "sg_cmds_open: flags =0x%x\n", n);
 #endif
 
     if ((! opts.do_cmddt) && (! opts.do_vpd)) {
-        /* So it's a Standard INQUIRY, try ATA IDENTIFY if that fails */
+        /* So it's a standard INQUIRY, try ATA IDENTIFY if that fails */
         ret = process_std_inq(sg_fd, &opts);
         if (ret)
             goto err_out;
