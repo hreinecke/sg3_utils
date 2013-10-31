@@ -108,7 +108,7 @@ usage(void)
     printf("Usage: %s [-b] [-f] [-h] [-l <lba>] [-n <n_per_thr>] "
            "[-t <num_thrs>]\n"
            "                   [-V] [-w <wait_ms>] [-x] "
-           "<disk_device>\n", util_name);
+           "<sg_disk_device>\n", util_name);
     printf("  where\n");
     printf("    -b                block on open (def: O_NONBLOCK)\n");
     printf("    -f                force: any SCSI disk (def: only "
