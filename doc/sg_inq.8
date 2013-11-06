@@ -1,13 +1,13 @@
-.TH SG_INQ "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_INQ "8" "November 2013" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command, output and decode response
 .SH SYNOPSIS
 .B sg_inq
-[\fI\-\-ata\fR] [\fI\-\-cmddt\fR] [\fI\-\-descriptors\fR] [\fI\-\-export\fR]
-[\fI\-\-extended\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
-[\fI\-\-len=LEN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-vpd\fR] \fIDEVICE\fR
+[\fI\-\-ata\fR] [\fI\-\-block=0|1\fR] [\fI\-\-cmddt\fR]
+[\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-len=LEN\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c\fR] [\fI\-cl\fR]
@@ -58,6 +58,15 @@ commands from the host operating system. Skip the SCSI INQUIRY command and
 use either the ATA IDENTIFY DEVICE command (for non-packet devices) or the
 ATA IDENTIFY PACKET DEVICE command. To show the response in hex, add
 a '\-\-verbose' option. This option is only available in Linux.
+.TP
+\fB\-B\fR, \fB\-\-block\fR=\fI0|1\fR
+this option controls how the file handle to the \fIDEVICE\fR is opened. If
+this argument is 0 then the open is non\-blocking. If the argument is 1 then
+the open is blocking. In Unix a non\-blocking open is indicated by a
+O_NONBLOCK flag while a blocking open is indicated by the absence of that
+flag. The default value depends on the operating system and the type of
+\fIDEVICE\fR node. For Linux pass\-throughs (i.e. the sg and bsg drivers)
+the default is 0.
 .TP
 \fB\-c\fR, \fB\-\-cmddt\fR
 set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
