@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.79 20131105";    /* ses3r06 */
+static const char * version_str = "1.80 20131106";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -519,6 +519,10 @@ usage(int help_num)
             "(ignore\n"
             "                        DEVICE). Use twice for clear,get,set "
             "acronyms\n"
+            "    --filter|-f         filter out enclosure status flags that "
+            "are clear\n"
+            "                        use twice for status=okay entries "
+            "only\n"
             "    --get=STR|-G STR    get value of field by acronym or "
             "position\n"
             "    --help|-h           print out usage message, use twice for "
@@ -560,10 +564,6 @@ usage(int help_num)
             "control pages\n"
             "    --data=- | -d -     fetch string of ASCII hex bytes from "
             "stdin\n"
-            "    --filter|-f         filter out enclosure status flags that "
-            "are clear\n"
-            "                        use thrice for status=okay entries "
-            "only\n"
             "    --hex|-H            print page response (or field) in hex\n"
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
@@ -3281,8 +3281,8 @@ try_again:
                 continue;
         }
         ++got1;
-        if ((op->do_filter > 2) && (1 != (0xf & jrp->enc_statp[0])))
-            continue;   /* when '-fff' and status!=OK, skip */
+        if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
+            continue;   /* when '-ff' and status!=OK, skip */
         cp = find_element_tname(jrp->etype, b, sizeof(b));
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
