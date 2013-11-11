@@ -144,8 +144,7 @@ static int
 pt_err(int res)
 {
     if (res < 0)
-        fprintf(stderr, "  pass through os error: %s\n",
-                    safe_strerror(-res));
+        fprintf(stderr, "  pass through os error: %s\n", safe_strerror(-res));
     else if (SCSI_PT_DO_BAD_PARAMS == res)
         fprintf(stderr, "  bad pass through setup\n");
     else if (SCSI_PT_DO_TIMEOUT == res)
@@ -253,8 +252,8 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
         if (res) {
             console_mutex.lock();
             fprintf(stderr, "READ_16 do_scsi_pt() submission error\n");
-            console_mutex.unlock();
             res = pt_err(res);
+            console_mutex.unlock();
             goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
@@ -295,8 +294,8 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
         if (res) {
             console_mutex.lock();
             fprintf(stderr, "WRITE_16 do_scsi_pt() submission error\n");
-            console_mutex.unlock();
             res = pt_err(res);
+            console_mutex.unlock();
             goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
