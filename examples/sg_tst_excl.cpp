@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.06 20131030";
+static const char * version_str = "1.07 20131110";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -107,7 +107,7 @@ usage(void)
 {
     printf("Usage: %s [-b] [-f] [-h] [-l <lba>] [-n <n_per_thr>] "
            "[-t <num_thrs>]\n"
-           "                   [-V] [-w <wait_ms>] [-x] "
+           "                   [-V] [-w <wait_ms>] [-x] [-xx] "
            "<sg_disk_device>\n", util_name);
     printf("  where\n");
     printf("    -b                block on open (def: O_NONBLOCK)\n");
@@ -128,10 +128,14 @@ usage(void)
            DEF_WAIT_MS);
     printf("    -x                don't use O_EXCL on first thread "
            "(def: use\n"
-           "                      O_EXCL on all threads)\n\n");
+           "                      O_EXCL on all threads)\n"
+           "    -xx               don't use O_EXCL on any thread\n\n");
     printf("Test O_EXCL open flag with Linux sg driver. Each open/close "
            "cycle with the\nO_EXCL flag does a double increment on "
-           "lba (using its first 4 bytes).\n");
+           "lba (using its first 4 bytes).\nEach increment uses a READ_16, "
+           "READ_16, increment, WRITE_16 cycle. The two\nREAD_16s are "
+           "launched asynchronously. Note that '-xx' will run test\n"
+           "without any O_EXCL flags.\n");
 }
 
 
@@ -206,13 +210,17 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
 
         // queue up two READ_16s to same LBA
         if (write(sg_fd, &pt, sizeof(pt)) < 0) {
+            console_mutex.lock();
             perror("do_rd_inc_wr_twice: write(sg, READ_16)");
+            console_mutex.unlock();
             close(sg_fd);
             return -1;
         }
         pt2 = pt;
         if (write(sg_fd, &pt2, sizeof(pt2)) < 0) {
+            console_mutex.lock();
             perror("do_rd_inc_wr_twice: write(sg, READ_16) 2");
+            console_mutex.unlock();
             close(sg_fd);
             return -1;
         }
@@ -228,7 +236,9 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 sleep(0);                   // process yield ??
         }
         if (res < 0) {
+            console_mutex.lock();
             perror("do_rd_inc_wr_twice: read(sg, READ_16)");
+            console_mutex.unlock();
             close(sg_fd);
             return -1;
         }
@@ -239,11 +249,15 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             ok = 1;
             break;
         case SG_LIB_CAT_RECOVERED:
-            printf("Recovered error on READ_16, continuing\n");
+            console_mutex.lock();
+            fprintf(stderr, "Recovered error on READ_16, continuing\n");
+            console_mutex.unlock();
             ok = 1;
             break;
         default: /* won't bother decoding other categories */
+            console_mutex.lock();
             sg_chk_n_print3("READ_16 command error", &pt, 1);
+            console_mutex.unlock();
             break;
         }
         if (ok) {
@@ -258,7 +272,9 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                     sleep(0);                   // process yield ??
             }
             if (res < 0) {
+                console_mutex.lock();
                 perror("do_rd_inc_wr_twice: read(sg, READ_16) 2");
+                console_mutex.unlock();
                 close(sg_fd);
                 return -1;
             }
@@ -270,11 +286,15 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 ok = 1;
                 break;
             case SG_LIB_CAT_RECOVERED:
-                printf("Recovered error on READ_16, continuing 2\n");
+                console_mutex.lock();
+                fprintf(stderr, "Recovered error on READ_16, continuing 2\n");
+                console_mutex.unlock();
                 ok = 1;
                 break;
             default: /* won't bother decoding other categories */
+                console_mutex.lock();
                 sg_chk_n_print3("READ_16 command error 2", &pt, 1);
+                console_mutex.unlock();
                 break;
             }
         }
@@ -313,7 +333,9 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         pt.pack_id = id;
 
         if (ioctl(sg_fd, SG_IO, &pt) < 0) {
+            console_mutex.lock();
             perror("do_rd_inc_wr_twice: WRITE_16 SG_IO ioctl error");
+            console_mutex.unlock();
             close(sg_fd);
             return -1;
         }
@@ -324,11 +346,15 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             ok = 1;
             break;
         case SG_LIB_CAT_RECOVERED:
-            printf("Recovered error on WRITE_16, continuing\n");
+            console_mutex.lock();
+            fprintf(stderr, "Recovered error on WRITE_16, continuing\n");
+            console_mutex.unlock();
             ok = 1;
             break;
         default: /* won't bother decoding other categories */
+            console_mutex.lock();
             sg_chk_n_print3("WRITE_16 command error", &pt, 1);
+            console_mutex.unlock();
             break;
         }
         if (! ok) {
@@ -408,7 +434,7 @@ do_inquiry_prod_id(const char * dev_name, int block, int wait_ms,
         ok = 1;
         break;
     case SG_LIB_CAT_RECOVERED:
-        printf("Recovered error on INQUIRY, continuing\n");
+        fprintf(stderr, "Recovered error on INQUIRY, continuing\n");
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
@@ -454,11 +480,12 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
         if (res)
             ++thr_odd_count;
     }
-    if (k < num) {
-        console_mutex.lock();
-        cerr << "thread id=" << id << " failed k=" << k << '\n';
-        console_mutex.unlock();
-    }
+    console_mutex.lock();
+    if (k < num)
+        cerr << "thread id=" << id << " FAILed at iteration: " << k << '\n';
+    else
+        cerr << "thread id=" << id << " normal exit" << '\n';
+    console_mutex.unlock();
 
     odd_count_mutex.lock();
     odd_count += thr_odd_count;
@@ -478,7 +505,7 @@ main(int argc, char * argv[])
     int num_per_thread = DEF_NUM_PER_THREAD;
     int num_threads = DEF_NUM_THREADS;
     int wait_ms = DEF_WAIT_MS;
-    int exclude_o_excl = 0;
+    int no_o_excl = 0;
     char * dev_name = NULL;
     char b[64];
 
@@ -520,8 +547,12 @@ main(int argc, char * argv[])
                     wait_ms = atoi(argv[k]);
             } else
                 break;
-        } else if (0 == memcmp("-x", argv[k], 2))
-            ++exclude_o_excl;
+        } else if (0 == memcmp("-xxx", argv[k], 4))
+            no_o_excl += 3;
+        else if (0 == memcmp("-xx", argv[k], 3))
+            no_o_excl += 2;
+        else if (0 == memcmp("-x", argv[k], 2))
+            ++no_o_excl;
         else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             dev_name = NULL;
@@ -573,7 +604,12 @@ main(int argc, char * argv[])
         vector<thread *> vt;
 
         for (k = 0; k < num_threads; ++k) {
-            int excl = ((0 == k) && exclude_o_excl) ? 0 : 1;
+            int excl = 1;
+
+            if (no_o_excl > 1)
+                excl = 0;
+            else if ((0 == k) && (1 == no_o_excl))
+                excl = 0;
 
             thread * tp = new thread {work_thread, dev_name, lba, k, block,
                                       excl, num_per_thread, wait_ms};
@@ -587,7 +623,10 @@ main(int argc, char * argv[])
         for (k = 0; k < (int)vt.size(); ++k)
             delete vt[k];
 
-        cout << "Expecting odd count of 0, got " << odd_count << endl;
+        if (no_o_excl)
+            cout << "Odd count: " << odd_count << endl;
+        else
+            cout << "Expecting odd count of 0, got " << odd_count << endl;
         cout << "Number of EBUSYs: " << ebusy_count << endl;
         cout << "Number of EAGAINs: " << eagain_count << endl;
 

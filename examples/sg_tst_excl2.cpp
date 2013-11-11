@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.05 20131029";
+static const char * version_str = "1.06 20131110";
 static const char * util_name = "sg_tst_excl2";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -230,7 +230,9 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
     if (sg_fd < 0) {
         snprintf(ebuff, EBUFF_SZ,
                  "do_rd_inc_wr_twice: error opening file: %s", dev_name);
+        console_mutex.lock();
         perror(ebuff);
+        console_mutex.unlock();
         return -1;
     }
 
@@ -243,13 +245,17 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         set_scsi_pt_data_in(ptp, lb, READ16_REPLY_LEN);
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
+            console_mutex.lock();
             fprintf(stderr, "READ_16 do_scsi_pt() submission error\n");
+            console_mutex.unlock();
             res = pt_err(res);
             goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
         if (SCSI_PT_RESULT_GOOD != cat) {
+            console_mutex.lock();
             fprintf(stderr, "READ_16 do_scsi_pt() category problem\n");
+            console_mutex.unlock();
             res = pt_cat_no_good(cat, ptp, sense_buffer);
             goto err;
         }
@@ -278,13 +284,17 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         set_scsi_pt_data_out(ptp, lb, WRITE16_REPLY_LEN);
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
+            console_mutex.lock();
             fprintf(stderr, "WRITE_16 do_scsi_pt() submission error\n");
+            console_mutex.unlock();
             res = pt_err(res);
             goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
         if (SCSI_PT_RESULT_GOOD != cat) {
+            console_mutex.lock();
             fprintf(stderr, "WRITE_16 do_scsi_pt() category problem\n");
+            console_mutex.unlock();
             res = pt_cat_no_good(cat, ptp, sense_buffer);
             goto err;
         }
@@ -391,11 +401,12 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
         if (res)
             ++thr_odd_count;
     }
-    if (k < num) {
-        console_mutex.lock();
-        cerr << "thread id=" << id << " failed k=" << k << '\n';
-        console_mutex.unlock();
-    }
+    console_mutex.lock();
+    if (k < num)
+        cerr << "thread id=" << id << " FAILed at iteration: " << k << '\n';
+    else
+        cerr << "thread id=" << id << " normal exit" << '\n';
+    console_mutex.unlock();
 
     odd_count_mutex.lock();
     odd_count += thr_odd_count;
