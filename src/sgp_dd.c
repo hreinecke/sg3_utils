@@ -57,7 +57,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "5.45 20131011";
+static const char * version_str = "5.46 20131110";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -293,11 +293,12 @@ tsafe_strerror(int code, char * ebp)
 
 
 /* Following macro from D.R. Butenhof's POSIX threads book:
-   ISBN 0-201-63392-2 . [Highly recommended book.] */
+ * ISBN 0-201-63392-2 . [Highly recommended book.] Changed __FILE__
+ * to __func__ */
 #define err_exit(code,text) do { \
     char strerr_buff[STRERR_BUFF_LEN]; \
     fprintf(stderr, "%s at \"%s\":%d: %s\n", \
-        text, __FILE__, __LINE__, tsafe_strerror(code, strerr_buff)); \
+        text, __func__, __LINE__, tsafe_strerror(code, strerr_buff)); \
     exit(1); \
     } while (0)
 
