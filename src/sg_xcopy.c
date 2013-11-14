@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
@@ -61,11 +62,9 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.34 20130507";
+static const char * version_str = "0.39 20131006";
 
 #define ME "sg_xcopy: "
-
-#define SG_DEBUG
 
 #define STR_SZ 1024
 #define INOUTF_SZ 512
@@ -73,7 +72,7 @@ static const char * version_str = "0.34 20130507";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
-#define DEF_BLOCKS_PER_2048TRANSFER 32
+#define MAX_BLOCKS_PER_TRANSFER 65535
 
 #define DEF_MODE_RESP_LEN 252
 #define RW_ERR_RECOVERY_MP 1
@@ -93,8 +92,7 @@ static const char * version_str = "0.34 20130507";
 #define SG_LIB_FLOCK_ERR 90
 
 #define FT_OTHER 1              /* filetype is probably normal */
-#define FT_SG 2                 /* filetype is sg char device or supports
-                                   SG_IO ioctl */
+#define FT_SG 2                 /* filetype is sg or bsg char device */
 #define FT_RAW 4                /* filetype is raw char device */
 #define FT_DEV_NULL 8           /* either "/dev/null" or "." as filename */
 #define FT_ST 16                /* filetype is st char device (tape) */
@@ -164,11 +162,29 @@ struct xcopy_fp_t {
 #endif
 };
 
-static struct xcopy_fp_t ifp;
-static struct xcopy_fp_t ofp;
+static struct xcopy_fp_t ixcf;
+static struct xcopy_fp_t oxcf;
 
 static void calc_duration_throughput(int contin);
+#ifdef __GNUC__
+static int pr2serr(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2serr(const char * fmt, ...);
+#endif
 
+
+static int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
 
 static void
 install_handler(int sig_num, void (*sig_handler) (int sig))
@@ -189,18 +205,18 @@ static void
 print_stats(const char * str)
 {
     if (0 != dd_count)
-        fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
-    fprintf(stderr, "%s%"PRId64"+%d records in\n", str, in_full - in_partial,
+        pr2serr("  remaining block count=%" PRId64 "\n", dd_count);
+    pr2serr("%s%" PRId64 "+%d records in\n", str, in_full - in_partial,
             in_partial);
-    fprintf(stderr, "%s%"PRId64"+%d records out\n", str,
-            out_full - out_partial, out_partial);
+    pr2serr("%s%" PRId64 "+%d records out\n", str, out_full - out_partial,
+            out_partial);
 #if 0
     if (recovered_errs > 0)
-        fprintf(stderr, "%s%d recovered errors\n", str, recovered_errs);
+        pr2serr("%s%d recovered errors\n", str, recovered_errs);
     if (num_retries > 0)
-        fprintf(stderr, "%s%d retries attempted\n", str, num_retries);
+        pr2serr("%s%d retries attempted\n", str, num_retries);
     else if (unrecovered_errs)
-        fprintf(stderr, "%s%d unrecovered error(s)\n", str,
+        pr2serr("%s%d unrecovered error(s)\n", str,
                 unrecovered_errs);
 #endif
 }
@@ -215,7 +231,7 @@ interrupt_handler(int sig)
     sigemptyset(&sigact.sa_mask);
     sigact.sa_flags = 0;
     sigaction(sig, &sigact, NULL);
-    fprintf(stderr, "Interrupted by signal,");
+    pr2serr("Interrupted by signal,");
     if (do_time)
         calc_duration_throughput(0);
     print_stats("");
@@ -226,8 +242,8 @@ interrupt_handler(int sig)
 static void
 siginfo_handler(int sig)
 {
-    sig = sig;  /* dummy to stop -W warning messages */
-    fprintf(stderr, "Progress report, continuing ...\n");
+    if (sig) { ; }      /* unused, dummy to suppress warning */
+    pr2serr("Progress report, continuing ...\n");
     if (do_time)
         calc_duration_throughput(1);
     print_stats("  ");
@@ -248,8 +264,7 @@ find_bsg_major(void)
 
     if (NULL == (fp = fopen(proc_devices, "r"))) {
         if (verbose)
-            fprintf(stderr, "fopen %s failed: %s\n", proc_devices,
-                    strerror(errno));
+            pr2serr("fopen %s failed: %s\n", proc_devices, strerror(errno));
         return;
     }
     while ((cp = fgets(b, sizeof(b), fp))) {
@@ -268,9 +283,9 @@ find_bsg_major(void)
     }
     if (verbose > 5) {
         if (cp)
-            fprintf(stderr, "found bsg_major=%d\n", bsg_major);
+            pr2serr("found bsg_major=%d\n", bsg_major);
         else
-            fprintf(stderr, "found no bsg char device in %s\n", proc_devices);
+            pr2serr("found no bsg char device in %s\n", proc_devices);
     }
     fclose(fp);
 }
@@ -317,7 +332,7 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
         return -1;
     }
     if (sg_simple_inquiry(fp->sg_fd, &sir, 0, verbose)) {
-        fprintf(stderr, "INQUIRY failed on %s\n", ebuff);
+        pr2serr("INQUIRY failed on %s\n", ebuff);
         sg_cmds_close_device(fp->sg_fd);
         fp->sg_fd = -1;
         return fp->sg_fd;
@@ -325,8 +340,9 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
 
     fp->pdt = sir.peripheral_type;
     if (verbose)
-        fprintf(stderr, "    %s: %.8s  %.16s  %.4s  [pdt=%d]\n",
-                fp->fname, sir.vendor, sir.product, sir.revision, fp->pdt);
+        pr2serr("    %s: %.8s  %.16s  %.4s  [pdt=%d, 3pc=%d]\n", fp->fname,
+                sir.vendor, sir.product, sir.revision, fp->pdt,
+                !! (0x8 & sir.byte_5));
 
     return fp->sg_fd;
 }
@@ -396,6 +412,30 @@ dd_filetype_str(int ft, char * buff)
 }
 
 static int
+simplified_ft(const struct xcopy_fp_t * xfp)
+{
+    int ftype = xfp->sg_type;
+
+    switch (ftype) {
+    case FT_BLOCK:
+    case FT_ST:
+    case FT_OTHER:      /* typically regular file */
+    case FT_DEV_NULL:
+    case FT_FIFO:
+    case FT_ERROR:
+        return ftype;
+    default:
+        if (FT_SG & ftype) {
+            if ((0 == xfp->pdt) || (0xe == xfp->pdt)) /* D-A or RBC */
+            return FT_BLOCK;
+        else if (0x1 == xfp->pdt)
+            return FT_ST;
+        }
+        return FT_OTHER;
+    }
+}
+
+static int
 seg_desc_from_dd_type(int in_ft, int in_off, int out_ft, int out_off)
 {
     int desc_type = -1;
@@ -456,59 +496,56 @@ seg_desc_from_dd_type(int in_ft, int in_off, int out_ft, int out_off)
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-           "sg_xcopy  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
-           " [iflag=FLAGS]\n"
-           "                 [obs=BS] [of=OFILE] [oflag=FLAGS] "
-           "[seek=SEEK] [skip=SKIP]\n"
-           "                 [--help] [--version]\n\n"
-           "                 [bpt=BPT] [cat=0|1] [dc=0|1] "
-           "[id_usage=hold|discard|disable]\n"
-           "                 [list_id=ID] [prio=PRIO] [time=0|1] "
-           "[verbose=VERB]\n"
-           "                 [--on_dst|--on_src] [--verbose]\n"
-           "  where:\n"
-           "    bpt         is blocks_per_transfer (default is 128 or 32 "
-           "when BS>=2048)\n"
-           "    bs          block size (default is 512)\n");
-    fprintf(stderr,
-           "    cat         segment descriptor CAT bit (default: 0)\n"
-           "    count       number of blocks to copy (def: device size)\n"
-           "    dc          segment descriptor DC bit (default: 0)\n"
-           "    ibs         input block size (if given must be same as "
-           "'bs=')\n"
-           "    id_usage    sets list id usage field to hold (0), "
-           "discard (2) or\n"
-           "                disable (3)\n"
-           "    if          file or device to read from (def: stdin)\n"
-           "    iflag       comma separated list from: [cat,dc,excl,"
-           "flock,null]\n"
-           "    list_id     sets list identifier field to ID (default: 1)\n"
-           "    obs         output block size (if given must be same as "
-           "'bs=')\n"
-           "    of          file or device to write to (def: stdout), "
-           "OFILE of '.'\n");
-    fprintf(stderr,
-           "                treated as /dev/null\n"
-           "    oflag       comma separated list from: [append,cat,pad,dc,"
-           "excl,flock,\n"
-           "                null]\n"
-           "    prio        set priority field to PRIO (def: 1)\n"
-           "    seek        block position to start writing to OFILE\n"
-           "    skip        block position to start reading from IFILE\n"
-           "    time        0->no timing(def), 1->time plus calculate "
-           "throughput\n"
-           "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
-           "etc\n"
-           "    --help      print out this usage message then exit\n"
-           "    --on_dst    send XCOPY command to the output file/device\n"
-           "    --on_src    send XCOPY command to the input file/device.\n"
-           "                Default if this and --on_dst options not "
-           "given\n"
-           "    --verbose   same action as verbose=1\n"
-           "    --version   print version information then exit\n\n"
-           "Copy from IFILE to OFILE, similar to dd command; "
-           "but using the SCSI\nEXTENDED COPY (XCOPY) command.\n");
+    pr2serr("Usage: "
+            "sg_xcopy  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
+            " [iflag=FLAGS]\n"
+            "                 [obs=BS] [of=OFILE] [oflag=FLAGS] "
+            "[seek=SEEK] [skip=SKIP]\n"
+            "                 [--help] [--version]\n\n"
+            "                 [bpt=BPT] [cat=0|1] [dc=0|1] "
+            "[id_usage=hold|discard|disable]\n"
+            "                 [list_id=ID] [prio=PRIO] [time=0|1] "
+            "[verbose=VERB]\n"
+            "                 [--on_dst|--on_src] [--verbose]\n"
+            "  where:\n"
+            "    bpt         is blocks_per_transfer (default: 128)\n"
+            "    bs          block size (default is 512)\n");
+    pr2serr("    cat         segment descriptor CAT bit (default: 0)\n"
+            "    count       number of blocks to copy (def: device size)\n"
+            "    dc          segment descriptor DC bit (default: 0)\n"
+            "    ibs         input block size (if given must be same as "
+            "'bs=')\n"
+            "    id_usage    sets list_id_usage field to hold (0), "
+            "discard (2) or\n"
+            "                disable (3)\n"
+            "    if          file or device to read from (def: stdin)\n"
+            "    iflag       comma separated list from: [cat,dc,excl,"
+            "flock,null]\n"
+            "    list_id     sets list_id field to ID (default: 1 or 0)\n"
+            "    obs         output block size (if given must be same as "
+            "'bs=')\n"
+            "    of          file or device to write to (def: stdout), "
+            "OFILE of '.'\n");
+    pr2serr("                treated as /dev/null\n"
+            "    oflag       comma separated list from: [append,cat,pad,dc,"
+            "excl,flock,\n"
+            "                null]\n"
+            "    prio        set priority field to PRIO (def: 1)\n"
+            "    seek        block position to start writing to OFILE\n"
+            "    skip        block position to start reading from IFILE\n"
+            "    time        0->no timing(def), 1->time plus calculate "
+            "throughput\n"
+            "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
+            "etc\n"
+            "    --help      print out this usage message then exit\n"
+            "    --on_dst    send XCOPY command to the output file/device\n"
+            "    --on_src    send XCOPY command to the input file/device.\n"
+            "                Default if this and --on_dst options not "
+            "given\n"
+            "    --verbose   same action as verbose=1\n"
+            "    --version   print version information then exit\n\n"
+            "Copy from IFILE to OFILE, similar to dd command; "
+            "but using the SCSI\nEXTENDED COPY (XCOPY) command.\n");
 }
 
 static int
@@ -561,8 +598,7 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     int seg_desc_len;
     int verb;
 
-    verb = (verbose ? verbose - 1: 0);
-
+    verb = (verbose > 1) ? (verbose - 2) : 0;
     memset(xcopyBuff, 0, 256);
     xcopyBuff[0] = list_id;
     xcopyBuff[1] = (list_id_usage << 3) | priority;
@@ -577,11 +613,8 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
                                         src_lba, dst_lba);
     xcopyBuff[11] = seg_desc_len; /* One segment descriptor */
     desc_offset += seg_desc_len;
-    if (verbose > 3) {
-        fprintf(stderr, "\nParameter list in hex (length %d):\n", desc_offset);
-        dStrHex((const char *)xcopyBuff, desc_offset, 1);
-    }
-    return sg_ll_extended_copy(sg_fd, xcopyBuff, desc_offset, 0, verb);
+    /* set noisy so if a UA happens it will be printed to stderr */
+    return sg_ll_extended_copy(sg_fd, xcopyBuff, desc_offset, 1, verb);
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
@@ -595,7 +628,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
 
     verb = (verbose ? verbose - 1: 0);
     res = sg_ll_readcap_10(xfp->sg_fd, 0, 0, rcBuff,
-                           READ_CAP_REPLY_LEN, 0, verb);
+                           READ_CAP_REPLY_LEN, 1, verb);
     if (0 != res)
         return res;
 
@@ -604,7 +637,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
         int64_t ls;
 
         res = sg_ll_readcap_16(xfp->sg_fd, 0, 0, rcBuff,
-                               RCAP16_REPLY_LEN, 0, verb);
+                               RCAP16_REPLY_LEN, 1, verb);
         if (0 != res)
             return res;
         for (k = 0, ls = 0; k < 8; ++k) {
@@ -623,8 +656,8 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
                        (rcBuff[6] << 8) | rcBuff[7];
     }
     if (verbose)
-        fprintf(stderr, "    %s: number of blocks=%"PRId64" [0x%"PRIx64"], "
-                "block size=%d\n", xfp->fname, xfp->num_sect, xfp->num_sect,
+        pr2serr("    %s: number of blocks=%" PRId64 " [0x%" PRIx64 "], block "
+                "size=%d\n", xfp->fname, xfp->num_sect, xfp->num_sect,
                 xfp->sect_sz);
     return 0;
 }
@@ -632,7 +665,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
 static int
 scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
 {
-    int res;
+    int res, ftype, snlid;
     unsigned char rcBuff[256];
     unsigned int rcBuffLen = 256, len, n, td_list = 0;
     unsigned long num, max_target_num, max_segment_num, max_segment_len;
@@ -640,21 +673,31 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     int verb, valid = 0;
 
     verb = (verbose ? verbose - 1: 0);
+    ftype = xfp->sg_type;
+    if (FT_SG & ftype) {
+        if ((0 == xfp->pdt) || (0xe == xfp->pdt)) /* direct-access or RBC */
+            ftype |= FT_BLOCK;
+        else if (0x1 == xfp->pdt)
+            ftype |= FT_ST;
+    }
+    /* In SPC-4 opcode 0x84, service action 0x3 is called RECEIVE COPY
+     * OPERATING PARAMETERS */
     res = sg_ll_receive_copy_results(xfp->sg_fd, 0x03, 0, rcBuff, rcBuffLen,
-                                     0, verb);
+                                     1, verb);
     if (0 != res)
         return -res;
 
     len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
           rcBuff[3];
     if (len > rcBuffLen) {
-        fprintf(stderr, "  <<report too long for internal buffer,"
-                " output truncated\n");
+        pr2serr("  <<report too long for internal buffer, output "
+                "truncated\n");
     }
     if (verbose > 2) {
-        fprintf(stderr, "\nOutput response in hex:\n");
-        dStrHex((const char *)rcBuff, len, 1);
+        pr2serr("\nOutput response in hex:\n");
+        dStrHexErr((const char *)rcBuff, len, 1);
     }
+    snlid = rcBuff[4] & 0x1;
     max_target_num = rcBuff[8] << 8 | rcBuff[9];
     max_segment_num = rcBuff[10] << 8 | rcBuff[11];
     max_desc_len = rcBuff[12] << 24 | rcBuff[13] << 16 | rcBuff[14] << 8 |
@@ -665,12 +708,14 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 |
                       rcBuff[23];
     if (verbose) {
-        printf(" >> Receive copy results (report operating parameters):\n");
-        printf("    Maximum target descriptor count: %lu\n", max_target_num);
-        printf("    Maximum segment descriptor count: %lu\n", max_segment_num);
-        printf("    Maximum descriptor list length: %lu\n", max_desc_len);
-        printf("    Maximum segment length: %lu\n", max_segment_len);
-        printf("    Maximum inline data length: %lu\n", max_inline_data);
+        pr2serr(" >> Receive copy results (report operating parameters):\n");
+        pr2serr("    Support No List IDentifier (SNLID): %d\n", snlid);
+        pr2serr("    Maximum target descriptor count: %lu\n", max_target_num);
+        pr2serr("    Maximum segment descriptor count: %lu\n",
+                max_segment_num);
+        pr2serr("    Maximum descriptor list length: %lu\n", max_desc_len);
+        pr2serr("    Maximum segment length: %lu\n", max_segment_len);
+        pr2serr("    Maximum inline data length: %lu\n", max_inline_data);
     }
     held_data_limit = rcBuff[24] << 24 | rcBuff[25] << 16 |
         rcBuff[26] << 8 | rcBuff[27];
@@ -681,232 +726,232 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             list_id_usage = 0;
     }
     if (verbose) {
-        printf("    Held data limit: %lu (usage: %d)\n",
-               held_data_limit, list_id_usage);
+        pr2serr("    Held data limit: %lu (list_id_usage: %d)\n",
+                held_data_limit, list_id_usage);
         num = rcBuff[28] << 24 | rcBuff[29] << 16 | rcBuff[30] << 8 |
               rcBuff[31];
-        printf("    Maximum stream device transfer size: %lu\n", num);
-        printf("    Maximum concurrent copies: %u\n", rcBuff[36]);
-        printf("    Data segment granularity: %u bytes\n", 1 << rcBuff[37]);
-        printf("    Inline data granularity: %u bytes\n", 1 << rcBuff[38]);
-        printf("    Held data granularity: %u bytes\n", 1 << rcBuff[39]);
+        pr2serr("    Maximum stream device transfer size: %lu\n", num);
+        pr2serr("    Maximum concurrent copies: %u\n", rcBuff[36]);
+        pr2serr("    Data segment granularity: %u bytes\n", 1 << rcBuff[37]);
+        pr2serr("    Inline data granularity: %u bytes\n", 1 << rcBuff[38]);
+        pr2serr("    Held data granularity: %u bytes\n", 1 << rcBuff[39]);
 
-        printf("    Implemented descriptor list:\n");
+        pr2serr("    Implemented descriptor list:\n");
     }
     xfp->min_bytes = 1 << rcBuff[37];
 
     for (n = 0; n < rcBuff[43]; n++) {
         switch(rcBuff[44 + n]) {
         case 0x00: /* copy block to stream device */
-            if (!is_target && (xfp->sg_type & FT_BLOCK))
+            if (!is_target && (ftype & FT_BLOCK))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_ST))
+            if (is_target && (ftype & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy Block to Stream device\n");
+                pr2serr("        Copy Block to Stream device\n");
             break;
         case 0x01: /* copy stream to block device */
-            if (!is_target && (xfp->sg_type & FT_ST))
+            if (!is_target && (ftype & FT_ST))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_BLOCK))
+            if (is_target && (ftype & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy Stream to Block device\n");
+                pr2serr("        Copy Stream to Block device\n");
             break;
         case 0x02: /* copy block to block device */
-            if (!is_target && (xfp->sg_type & FT_BLOCK))
+            if (!is_target && (ftype & FT_BLOCK))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_BLOCK))
+            if (is_target && (ftype & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy Block to Block device\n");
+                pr2serr("        Copy Block to Block device\n");
             break;
         case 0x03: /* copy stream to stream device */
-            if (!is_target && (xfp->sg_type & FT_ST))
+            if (!is_target && (ftype & FT_ST))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_ST))
+            if (is_target && (ftype & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy Stream to Stream device\n");
+                pr2serr("        Copy Stream to Stream device\n");
             break;
         case 0x04: /* copy inline data to stream device */
-            if (!is_target && (xfp->sg_type & FT_OTHER))
+            if (!is_target && (ftype & FT_OTHER))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_ST))
+            if (is_target && (ftype & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy inline data to Stream device\n");
+                pr2serr("        Copy inline data to Stream device\n");
             break;
         case 0x05: /* copy embedded data to stream device */
-            if (!is_target && (xfp->sg_type & FT_OTHER))
+            if (!is_target && (ftype & FT_OTHER))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_ST))
+            if (is_target && (ftype & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy embedded data to Stream device\n");
+                pr2serr("        Copy embedded data to Stream device\n");
             break;
         case 0x06: /* Read from stream device and discard */
-            if (!is_target && (xfp->sg_type & FT_ST))
+            if (!is_target && (ftype & FT_ST))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_DEV_NULL))
+            if (is_target && (ftype & FT_DEV_NULL))
                 valid++;
             if (verbose)
-                printf("        Read from stream device and discard\n");
+                pr2serr("        Read from stream device and discard\n");
             break;
         case 0x07: /* Verify block or stream device operation */
-            if (!is_target && (xfp->sg_type & (FT_ST | FT_BLOCK)))
+            if (!is_target && (ftype & (FT_ST | FT_BLOCK)))
                 valid++;
-            if (is_target && (xfp->sg_type & (FT_ST | FT_BLOCK)))
+            if (is_target && (ftype & (FT_ST | FT_BLOCK)))
                 valid++;
             if (verbose)
-                printf("        Verify block or stream device operation\n");
+                pr2serr("        Verify block or stream device operation\n");
             break;
         case 0x08: /* copy block device with offset to stream device */
-            if (!is_target && (xfp->sg_type & FT_BLOCK))
+            if (!is_target && (ftype & FT_BLOCK))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_ST))
+            if (is_target && (ftype & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy block device with offset to stream "
+                pr2serr("        Copy block device with offset to stream "
                        "device\n");
             break;
         case 0x09: /* copy stream device to block device with offset */
-            if (!is_target && (xfp->sg_type & FT_ST))
+            if (!is_target && (ftype & FT_ST))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_BLOCK))
+            if (is_target && (ftype & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy stream device to block device with "
+                pr2serr("        Copy stream device to block device with "
                        "offset\n");
             break;
         case 0x0a: /* copy block device with offset to block device with
                     * offset */
-            if (!is_target && (xfp->sg_type & FT_BLOCK))
+            if (!is_target && (ftype & FT_BLOCK))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_BLOCK))
+            if (is_target && (ftype & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy block device with offset to block "
+                pr2serr("        Copy block device with offset to block "
                        "device with offset\n");
             break;
         case 0x0b: /* copy block device to stream device and hold data */
-            if (!is_target && (xfp->sg_type & FT_BLOCK))
+            if (!is_target && (ftype & FT_BLOCK))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_ST))
+            if (is_target && (ftype & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy block device to stream device and hold "
+                pr2serr("        Copy block device to stream device and hold "
                        "data\n");
             break;
         case 0x0c: /* copy stream device to block device and hold data */
-            if (!is_target && (xfp->sg_type & FT_ST))
+            if (!is_target && (ftype & FT_ST))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_BLOCK))
+            if (is_target && (ftype & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy stream device to block device and hold "
+                pr2serr("        Copy stream device to block device and hold "
                        "data\n");
             break;
         case 0x0d: /* copy block device to block device and hold data */
-            if (!is_target && (xfp->sg_type & FT_BLOCK))
+            if (!is_target && (ftype & FT_BLOCK))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_BLOCK))
+            if (is_target && (ftype & FT_BLOCK))
                 valid++;
             if (verbose)
-                printf("        Copy block device to block device and hold "
+                pr2serr("        Copy block device to block device and hold "
                        "data\n");
             break;
         case 0x0e: /* copy stream device to stream device and hold data */
-            if (!is_target && (xfp->sg_type & FT_ST))
+            if (!is_target && (ftype & FT_ST))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_ST))
+            if (is_target && (ftype & FT_ST))
                 valid++;
             if (verbose)
-                printf("        Copy block device to block device and hold "
+                pr2serr("        Copy block device to block device and hold "
                        "data\n");
             break;
         case 0x0f: /* read from stream device and hold data */
-            if (!is_target && (xfp->sg_type & FT_ST))
+            if (!is_target && (ftype & FT_ST))
                 valid++;
-            if (is_target && (xfp->sg_type & FT_DEV_NULL))
+            if (is_target && (ftype & FT_DEV_NULL))
                 valid++;
             if (verbose)
-                printf("        Read from stream device and hold data\n");
+                pr2serr("        Read from stream device and hold data\n");
             break;
         case 0xe0: /* FC N_Port_Name */
             if (verbose)
-                printf("        FC N_Port_Name target descriptor\n");
+                pr2serr("        FC N_Port_Name target descriptor\n");
             td_list |= TD_FC_WWPN;
             break;
         case 0xe1: /* FC Port_ID */
             if (verbose)
-                printf("        FC Port_ID target descriptor\n");
+                pr2serr("        FC Port_ID target descriptor\n");
             td_list |= TD_FC_PORT;
             break;
         case 0xe2: /* FC N_Port_ID with N_Port_Name checking */
             if (verbose)
-                printf("        FC N_Port_ID with N_Port_Name target "
+                pr2serr("        FC N_Port_ID with N_Port_Name target "
                        "descriptor\n");
             td_list |= TD_FC_WWPN_AND_PORT;
             break;
         case 0xe3: /* Parallel Interface T_L  */
             if (verbose)
-                printf("        SPI T_L target descriptor\n");
+                pr2serr("        SPI T_L target descriptor\n");
             td_list |= TD_SPI;
             break;
         case 0xe4: /* identification descriptor */
             if (verbose)
-                printf("        Identification target descriptor\n");
+                pr2serr("        Identification target descriptor\n");
             td_list |= TD_VPD;
             break;
         case 0xe5: /* IPv4  */
             if (verbose)
-                printf("        IPv4 target descriptor\n");
+                pr2serr("        IPv4 target descriptor\n");
             td_list |= TD_IPV4;
             break;
         case 0xe6: /* Alias */
             if (verbose)
-                printf("        Alias target descriptor\n");
+                pr2serr("        Alias target descriptor\n");
             td_list |= TD_ALIAS;
             break;
         case 0xe7: /* RDMA */
             if (verbose)
-                printf("        RDMA target descriptor\n");
+                pr2serr("        RDMA target descriptor\n");
             td_list |= TD_RDMA;
             break;
         case 0xe8: /* FireWire */
             if (verbose)
-                printf("        IEEE 1394 target descriptor\n");
+                pr2serr("        IEEE 1394 target descriptor\n");
             td_list |= TD_FW;
             break;
         case 0xe9: /* SAS */
             if (verbose)
-                printf("        SAS target descriptor\n");
+                pr2serr("        SAS target descriptor\n");
             td_list |= TD_SAS;
             break;
         case 0xea: /* IPv6 */
             if (verbose)
-                printf("        IPv6 target descriptor\n");
+                pr2serr("        IPv6 target descriptor\n");
             td_list |= TD_IPV6;
             break;
         case 0xeb: /* IP Copy Service */
             if (verbose)
-                printf("        IP Copy Service target descriptor\n");
+                pr2serr("        IP Copy Service target descriptor\n");
             td_list |= TD_IP_COPY_SERVICE;
             break;
         case 0xfe: /* ROD */
             if (verbose)
-                printf("        ROD target descriptor\n");
+                pr2serr("        ROD target descriptor\n");
             td_list |= TD_ROD;
             break;
         default:
-            fprintf(stderr, ">> Unhandled target descriptor 0x%02x\n",
-                   rcBuff[44 + n]);
+            pr2serr(">> Unhandled target descriptor 0x%02x\n",
+                    rcBuff[44 + n]);
             break;
         }
     }
     if (!valid) {
-        fprintf(stderr, ">> no matching target descriptor supported\n");
+        pr2serr(">> no matching target descriptor supported\n");
         td_list = 0;
     }
     return td_list;
@@ -927,10 +972,10 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
     piv = ((ucp[1] & 0x80) ? 1 : 0);
     assoc = ((ucp[1] >> 4) & 0x3);
     desig_type = (ucp[1] & 0xf);
-    printf("    designator type: %d,  code set: %d\n", desig_type, c_set);
+    pr2serr("    designator type: %d,  code set: %d\n", desig_type, c_set);
     if (piv && ((1 == assoc) || (2 == assoc)))
-        printf("     transport: %s\n",
-               sg_get_trans_proto_str(p_id, sizeof(b), b));
+        pr2serr("     transport: %s\n",
+                sg_get_trans_proto_str(p_id, sizeof(b), b));
 
     switch (desig_type) {
     case 0: /* vendor specific */
@@ -942,65 +987,66 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
                 k = 1;
         }
         if (k)
-            printf("      vendor specific: %.*s\n", i_len, ip);
-        else
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      vendor specific: %.*s\n", i_len, ip);
+        else {
+            pr2serr("      vendor specific:\n");
+            dStrHexErr((const char *)ip, i_len, 0);
+        }
         break;
     case 1: /* T10 vendor identification */
-        printf("      vendor id: %.8s\n", ip);
+        pr2serr("      vendor id: %.8s\n", ip);
         if (i_len > 8)
-            printf("      vendor specific: %.*s\n", i_len - 8, ip + 8);
+            pr2serr("      vendor specific: %.*s\n", i_len - 8, ip + 8);
         break;
     case 2: /* EUI-64 based */
         if ((8 != i_len) && (12 != i_len) && (16 != i_len)) {
-            fprintf(stderr, "      << expect 8, 12 and 16 byte "
-                    "EUI, got %d>>\n", i_len);
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << expect 8, 12 and 16 byte EUI, got %d>>\n",
+                    i_len);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        printf("      0x");
+        pr2serr("      0x");
         for (m = 0; m < i_len; ++m)
-            printf("%02x", (unsigned int)ip[m]);
-        printf("\n");
+            pr2serr("%02x", (unsigned int)ip[m]);
+        pr2serr("\n");
         break;
     case 3: /* NAA */
         if (1 != c_set) {
-            fprintf(stderr, "      << unexpected code set %d for "
-                    "NAA>>\n", c_set);
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << unexpected code set %d for NAA>>\n", c_set);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         naa = (ip[0] >> 4) & 0xff;
         if (! ((2 == naa) || (5 == naa) || (6 == naa))) {
-            fprintf(stderr, "      << unexpected NAA [0x%x]>>\n", naa);
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << unexpected NAA [0x%x]>>\n", naa);
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         if ((5 == naa) && (0x10 == i_len)) {
             if (verbose > 2)
-                fprintf(stderr, "      << unexpected NAA 5 len 16, assuming "
-                        "NAA 6 >>\n");
+                pr2serr("      << unexpected NAA 5 len 16, assuming NAA 6 "
+                        ">>\n");
             naa = 6;
         }
         if (2 == naa) {
             if (8 != i_len) {
-                fprintf(stderr, "      << unexpected NAA 2 identifier "
-                        "length: 0x%x>>\n", i_len);
-                dStrHex((const char *)ip, i_len, 0);
+                pr2serr("      << unexpected NAA 2 identifier length: "
+                        "0x%x>>\n", i_len);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             d_id = (((ip[0] & 0xf) << 8) | ip[1]);
             /* c_id = ((ip[2] << 16) | (ip[3] << 8) | ip[4]); */
             /* vsi = ((ip[5] << 16) | (ip[6] << 8) | ip[7]); */
-            printf("      0x");
+            pr2serr("      0x");
             for (m = 0; m < 8; ++m)
-                printf("%02x", (unsigned int)ip[m]);
-            printf("\n");
+                pr2serr("%02x", (unsigned int)ip[m]);
+            pr2serr("\n");
         } else if (5 == naa) {
             if (8 != i_len) {
-                fprintf(stderr, "      << unexpected NAA 5 identifier "
-                        "length: 0x%x>>\n", i_len);
-                dStrHex((const char *)ip, i_len, 0);
+                pr2serr("      << unexpected NAA 5 identifier length: "
+                        "0x%x>>\n", i_len);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             /* c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) | */
@@ -1010,15 +1056,15 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
                 vsei <<= 8;
                 vsei |= ip[3 + m];
             }
-            printf("      0x");
+            pr2serr("      0x");
             for (m = 0; m < 8; ++m)
-                printf("%02x", (unsigned int)ip[m]);
-            printf("\n");
+                pr2serr("%02x", (unsigned int)ip[m]);
+            pr2serr("\n");
         } else if (6 == naa) {
             if (16 != i_len) {
-                fprintf(stderr, "      << unexpected NAA 6 identifier "
-                        "length: 0x%x>>\n", i_len);
-                dStrHex((const char *)ip, i_len, 0);
+                pr2serr("      << unexpected NAA 6 identifier length: "
+                        "0x%x>>\n", i_len);
+                dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
             /* c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) | */
@@ -1028,67 +1074,88 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
                 vsei <<= 8;
                 vsei |= ip[3 + m];
             }
-            printf("      0x");
+            pr2serr("      0x");
             for (m = 0; m < 16; ++m)
-                printf("%02x", (unsigned int)ip[m]);
-            printf("\n");
+                pr2serr("%02x", (unsigned int)ip[m]);
+            pr2serr("\n");
         }
         break;
     case 4: /* Relative target port */
         if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-            fprintf(stderr, "      << expected binary code_set, target "
-                    "port association, length 4>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << expected binary code_set, target port "
+                    "association, length 4>>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         d_id = ((ip[2] << 8) | ip[3]);
-        printf("      Relative target port: 0x%x\n", d_id);
+        pr2serr("      Relative target port: 0x%x\n", d_id);
         break;
     case 5: /* (primary) Target port group */
         if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-            fprintf(stderr, "      << expected binary code_set, target "
-                    "port association, length 4>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << expected binary code_set, target port "
+                    "association, length 4>>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         d_id = ((ip[2] << 8) | ip[3]);
-        printf("      Target port group: 0x%x\n", d_id);
+        pr2serr("      Target port group: 0x%x\n", d_id);
         break;
     case 6: /* Logical unit group */
         if ((1 != c_set) || (0 != assoc) || (4 != i_len)) {
-            fprintf(stderr, "      << expected binary code_set, logical "
-                    "unit association, length 4>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << expected binary code_set, logical unit "
+                    "association, length 4>>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
         d_id = ((ip[2] << 8) | ip[3]);
-        printf("      Logical unit group: 0x%x\n", d_id);
+        pr2serr("      Logical unit group: 0x%x\n", d_id);
         break;
     case 7: /* MD5 logical unit identifier */
         if ((1 != c_set) || (0 != assoc)) {
-            printf("      << expected binary code_set, logical "
-                   "unit association>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << expected binary code_set, logical unit "
+                    "association>>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        printf("      MD5 logical unit identifier:\n");
-        dStrHex((const char *)ip, i_len, 0);
+        pr2serr("      MD5 logical unit identifier:\n");
+        dStrHexErr((const char *)ip, i_len, 0);
         break;
     case 8: /* SCSI name string */
         if (3 != c_set) {
-            fprintf(stderr, "      << expected UTF-8 code_set>>\n");
-            dStrHex((const char *)ip, i_len, 0);
+            pr2serr("      << expected UTF-8 code_set>>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        printf("      SCSI name string:\n");
+        pr2serr("      SCSI name string:\n");
         /* does %s print out UTF-8 ok??
          * Seems to depend on the locale. Looks ok here with my
          * locale setting: en_AU.UTF-8
          */
-        printf("      %s\n", (const char *)ip);
+        pr2serr("      %s\n", (const char *)ip);
+        break;
+    case 9: /* Protocol specific port identifier */
+        /* added in spc4r36, PIV must be set, proto_id indicates */
+        /* whether UAS (USB) or SOP (PCIe) or ... */
+        if (! piv)
+            pr2serr("      >>>> Protocol specific port identifier "
+                    "expects protocol\n"
+                    "           identifier to be valid and it is not\n");
+        if (TPROTO_UAS == p_id) {
+            pr2serr("      USB device address: 0x%x\n", 0x7f & ip[0]);
+            pr2serr("      USB interface number: 0x%x\n", ip[2]);
+        } else if (TPROTO_SOP == p_id) {
+            pr2serr("      PCIe routing ID, bus number: 0x%x\n", ip[0]);
+            pr2serr("          function number: 0x%x\n", ip[1]);
+            pr2serr("          [or device number: 0x%x, function number: "
+                    "0x%x]\n", (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
+        } else
+            pr2serr("      >>>> unexpected protocol indentifier: 0x%x\n"
+                    "           with Protocol specific port "
+                    "identifier\n", p_id);
         break;
     default: /* reserved */
-        dStrHex((const char *)ip, i_len, 0);
+        pr2serr("      reserved designator=0x%x\n", desig_type);
+        dStrHexErr((const char *)ip, i_len, 0);
         break;
     }
 }
@@ -1097,32 +1164,33 @@ static int
 desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
                  unsigned int block_size, int pad)
 {
-    int res;
+    int res, verb;
     unsigned char rcBuff[256], *ucp, *best = NULL;
     unsigned int len = 254;
     int off = -1, u, i_len, best_len = 0, assoc, desig, f_desig = 0;
 
+    verb = (verbose ? verbose - 1: 0);
     memset(rcBuff, 0xff, len);
-    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, 4, 1, verbose);
+    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, 4, 1, verb);
     if (0 != res) {
-        fprintf(stderr, "VPD inquiry failed with %d\n", res);
+        pr2serr("VPD inquiry failed with %d\n", res);
         return res;
     } else if (rcBuff[1] != 0x83) {
-        fprintf(stderr, "invalid VPD response\n");
+        pr2serr("invalid VPD response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     len = ((rcBuff[2] << 8) + rcBuff[3]) + 4;
-    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, len, 1, verbose);
+    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, len, 1, verb);
     if (0 != res) {
-        fprintf(stderr, "VPD inquiry failed with %d\n", res);
+        pr2serr("VPD inquiry failed with %d\n", res);
         return res;
     } else if (rcBuff[1] != 0x83) {
-        fprintf(stderr, "invalid VPD response\n");
+        pr2serr("invalid VPD response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     if (verbose > 2) {
-        fprintf(stderr, "Output response in hex:\n");
-        dStrHex((const char *)rcBuff, len, 1);
+        pr2serr("Output response in hex:\n");
+        dStrHexErr((const char *)rcBuff, len, 1);
     }
 
     while ((u = sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1)) ==
@@ -1130,16 +1198,16 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         ucp = rcBuff + 4 + off;
         i_len = ucp[3];
         if (((unsigned int)off + i_len + 4) > len) {
-            fprintf(stderr, "    VPD page error: designator length %d longer "
+            pr2serr("    VPD page error: designator length %d longer "
                     "than\n     remaining response length=%d\n", i_len,
                     (len - off));
             return SG_LIB_CAT_MALFORMED;
         }
         assoc = ((ucp[1] >> 4) & 0x3);
         desig = (ucp[1] & 0xf);
-        if (verbose)
-            fprintf(stderr, "    Desc %d: assoc %u desig %u len %d\n", off,
-                    assoc, desig, i_len);
+        if (verbose > 2)
+            pr2serr("    Desc %d: assoc %u desig %u len %d\n", off, assoc,
+                    desig, i_len);
         /* Descriptor must be less than 16 bytes */
         if (i_len > 16)
             continue;
@@ -1181,8 +1249,8 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
             desc[30] = (block_size >> 8) & 0xff;
             desc[31] = block_size & 0xff;
             if (verbose > 3) {
-                fprintf(stderr, "Descriptor in hex (bs %d):\n", block_size);
-                dStrHex((const char *)desc, 32, 1);
+                pr2serr("Descriptor in hex (bs %d):\n", block_size);
+                dStrHexErr((const char *)desc, 32, 1);
             }
             return 32;
         }
@@ -1210,13 +1278,13 @@ calc_duration_throughput(int contin)
         a = res_tm.tv_sec;
         a += (0.000001 * res_tm.tv_usec);
         b = (double)blk_sz * blks;
-        fprintf(stderr, "time to transfer data%s: %d.%06d secs",
+        pr2serr("time to transfer data%s: %d.%06d secs",
                 (contin ? " so far" : ""), (int)res_tm.tv_sec,
                 (int)res_tm.tv_usec);
         if ((a > 0.00001) && (b > 511))
-            fprintf(stderr, " at %.2f MB/sec\n", b / (a * 1000000.0));
+            pr2serr(" at %.2f MB/sec\n", b / (a * 1000000.0));
         else
-            fprintf(stderr, "\n");
+            pr2serr("\n");
     }
 }
 
@@ -1232,7 +1300,7 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
     strncpy(buff, arg, sizeof(buff));
     buff[sizeof(buff) - 1] = '\0';
     if ('\0' == buff[0]) {
-        fprintf(stderr, "no flag found\n");
+        pr2serr("no flag found\n");
         return 1;
     }
     cp = buff;
@@ -1242,16 +1310,18 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
             *np++ = '\0';
         if (0 == strcmp(cp, "append"))
             fp->append = 1;
-        else if (0 == strcmp(cp, "pad"))
-            fp->pad = 1;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = 1;
-        else if (0 == strcmp(cp, "null"))
-            ;
         else if (0 == strcmp(cp, "flock"))
             ++fp->flock;
+        else if (0 == strcmp(cp, "null"))
+            ;
+        else if (0 == strcmp(cp, "pad"))
+            fp->pad = 1;
+        else if (0 == strcmp(cp, "xcopy"))
+            ;   /* ignore, for ddpt compatibility */
         else {
-            fprintf(stderr, "unrecognised flag: %s\n", cp);
+            pr2serr("unrecognised flag: %s\n", cp);
             return 1;
         }
         cp = np;
@@ -1271,11 +1341,11 @@ open_if(struct xcopy_fp_t * ifp, int verbose)
     ifp->sg_type = dd_filetype(ifp);
 
     if (verbose)
-        fprintf(stderr, " >> Input file type: %s, devno %d:%d\n",
+        pr2serr(" >> Input file type: %s, devno %d:%d\n",
                 dd_filetype_str(ifp->sg_type, ebuff),
                 major(ifp->devno), minor(ifp->devno));
     if (FT_ERROR & ifp->sg_type) {
-        fprintf(stderr, ME "unable access %s\n", ifp->fname);
+        pr2serr(ME "unable access %s\n", ifp->fname);
         goto file_err;
     }
     flags = O_NONBLOCK;
@@ -1292,8 +1362,7 @@ open_if(struct xcopy_fp_t * ifp, int verbose)
         }
     }
     if (verbose)
-        fprintf(stderr, "        open input(sg_io), flags=0x%x\n",
-                fl | flags);
+        pr2serr("        open input(sg_io), flags=0x%x\n", fl | flags);
 
     if (ifp->flock) {
         res = flock(infd, LOCK_EX | LOCK_NB);
@@ -1325,7 +1394,7 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
 
     ofp->sg_type = dd_filetype(ofp);
     if (verbose)
-        fprintf(stderr, " >> Output file type: %s, devno %d:%d\n",
+        pr2serr(" >> Output file type: %s, devno %d:%d\n",
                 dd_filetype_str(ofp->sg_type, ebuff),
                 major(ofp->devno), minor(ofp->devno));
 
@@ -1340,8 +1409,7 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
             goto file_err;
         }
         if (verbose)
-            fprintf(stderr, "        open output(sg_io), flags=0x%x\n",
-                    flags);
+            pr2serr("        open output(sg_io), flags=0x%x\n", flags);
     } else {
         outfd = -1; /* don't bother opening */
     }
@@ -1389,15 +1457,14 @@ main(int argc, char * argv[])
     int on_src = 0;
     int on_dst = 0;
 
-    ifp.fname[0] = '\0';
-    ofp.fname[0] = '\0';
-    ifp.num_sect = -1;
-    ofp.num_sect = -1;
+    ixcf.fname[0] = '\0';
+    oxcf.fname[0] = '\0';
+    ixcf.num_sect = -1;
+    oxcf.num_sect = -1;
 
     if (argc < 2) {
-        fprintf(stderr,
-                "Won't default both IFILE to stdin _and_ OFILE to stdout\n");
-        fprintf(stderr, "For more information use '--help'\n");
+        pr2serr("Won't default both IFILE to stdin _and_ OFILE to stdout\n");
+        pr2serr("For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 
@@ -1412,25 +1479,25 @@ main(int argc, char * argv[])
         if (*buf)
             *buf++ = '\0';
         if (0 == strncmp(key, "app", 3)) {
-            ifp.append = sg_get_num(buf);
-            ofp.append = ifp.append;
+            ixcf.append = sg_get_num(buf);
+            oxcf.append = ixcf.append;
         } else if (0 == strcmp(key, "bpt")) {
             bpt = sg_get_num(buf);
             if (-1 == bpt) {
-                fprintf(stderr, ME "bad argument to 'bpt='\n");
+                pr2serr(ME "bad argument to 'bpt='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             bpt_given = 1;
         } else if (0 == strcmp(key, "bs")) {
             blk_sz = sg_get_num(buf);
             if (-1 == blk_sz) {
-                fprintf(stderr, ME "bad argument to 'bs='\n");
+                pr2serr(ME "bad argument to 'bs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "list_id")) {
             ret = sg_get_num(buf);
             if (-1 == ret || ret > 0xff) {
-                fprintf(stderr, ME "bad argument to 'list_id='\n");
+                pr2serr(ME "bad argument to 'list_id='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             list_id = (ret & 0xff);
@@ -1443,16 +1510,16 @@ main(int argc, char * argv[])
             else if (!strncmp(buf, "disable", 7))
                 list_id_usage = 3;
             else {
-                fprintf(stderr, ME "bad argument to 'list_id_usage='\n");
+                pr2serr(ME "bad argument to 'id_usage='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "conv"))
-            fprintf(stderr, ME ">>> ignoring all 'conv=' arguments\n");
+            pr2serr(ME ">>> ignoring all 'conv=' arguments\n");
         else if (0 == strcmp(key, "count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
                 if (-1LL == dd_count) {
-                    fprintf(stderr, ME "bad argument to 'count='\n");
+                    pr2serr(ME "bad argument to 'count='\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }   /* treat 'count=-1' as calculate count (same as not given) */
@@ -1461,60 +1528,60 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "cat")) {
             xcopy_flag_cat = sg_get_num(buf);
             if (xcopy_flag_cat < 0 || xcopy_flag_cat > 1) {
-                fprintf(stderr, ME "bad argument to 'cat='\n");
+                pr2serr(ME "bad argument to 'cat='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "dc")) {
             xcopy_flag_dc = sg_get_num(buf);
             if (xcopy_flag_dc < 0 || xcopy_flag_dc > 1) {
-                fprintf(stderr, ME "bad argument to 'dc='\n");
+                pr2serr(ME "bad argument to 'dc='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
         } else if (strcmp(key, "if") == 0) {
-            if ('\0' != ifp.fname[0]) {
-                fprintf(stderr, "Second IFILE argument??\n");
+            if ('\0' != ixcf.fname[0]) {
+                pr2serr("Second IFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else
-                strncpy(ifp.fname, buf, INOUTF_SZ);
+                strncpy(ixcf.fname, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "iflag")) {
-            if (process_flags(buf, &ifp)) {
-                fprintf(stderr, ME "bad argument to 'iflag='\n");
+            if (process_flags(buf, &ixcf)) {
+                pr2serr(ME "bad argument to 'iflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
         } else if (strcmp(key, "of") == 0) {
-            if ('\0' != ofp.fname[0]) {
-                fprintf(stderr, "Second OFILE argument??\n");
+            if ('\0' != oxcf.fname[0]) {
+                pr2serr("Second OFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else
-                strncpy(ofp.fname, buf, INOUTF_SZ);
+                strncpy(oxcf.fname, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
-            if (process_flags(buf, &ofp)) {
-                fprintf(stderr, ME "bad argument to 'oflag='\n");
+            if (process_flags(buf, &oxcf)) {
+                pr2serr(ME "bad argument to 'oflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
 #if 0
         } else if (0 == strcmp(key, "retries")) {
-            ifp.retries = sg_get_num(buf);
-            ofp.retries = ifp.retries;
-            if (-1 == ifp.retries) {
-                fprintf(stderr, ME "bad argument to 'retries='\n");
+            ixcf.retries = sg_get_num(buf);
+            oxcf.retries = ixcf.retries;
+            if (-1 == ixcf.retries) {
+                pr2serr(ME "bad argument to 'retries='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
 #endif
         } else if (0 == strcmp(key, "seek")) {
             seek = sg_get_llnum(buf);
             if (-1LL == seek) {
-                fprintf(stderr, ME "bad argument to 'seek='\n");
+                pr2serr(ME "bad argument to 'seek='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "skip")) {
             skip = sg_get_llnum(buf);
             if (-1LL == skip) {
-                fprintf(stderr, ME "bad argument to 'skip='\n");
+                pr2serr(ME "bad argument to 'skip='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "time"))
@@ -1532,7 +1599,7 @@ main(int argc, char * argv[])
             return 0;
         } else if ((0 == strncmp(key, "--vers", 6)) ||
                    (0 == strcmp(key, "-V"))) {
-            fprintf(stderr, ME "%s\n", version_str);
+            pr2serr(ME "%s\n", version_str);
             return 0;
         } else if (0 == strncmp(key, "--verb", 6))
             verbose += 1;
@@ -1546,24 +1613,26 @@ main(int argc, char * argv[])
             verbose += 2;
         else if (0 == strcmp(key, "-v"))
             verbose += 1;
+        else if (0 == strncmp(key, "--xcopy", 6))
+            ;   /* ignore; for compatibility with ddpt */
         else {
-            fprintf(stderr, "Unrecognized option '%s'\n", key);
-            fprintf(stderr, "For more information use '--help'\n");
+            pr2serr("Unrecognized option '%s'\n", key);
+            pr2serr("For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (on_src && on_dst) {
-        fprintf(stderr, "Syntax error - either specify --on_src OR "
+        pr2serr("Syntax error - either specify --on_src OR "
                 "--on_dst\n");
-        fprintf(stderr, "For more information use '--help'\n");
+        pr2serr("For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (!on_src && !on_dst)
         on_src = 1;
     if ((ibs && blk_sz && (ibs != blk_sz)) ||
         (obs && blk_sz && (obs != blk_sz))) {
-        fprintf(stderr, "If 'ibs' or 'obs' given must be same as 'bs'\n");
-        fprintf(stderr, "For more information use '--help'\n");
+        pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
+        pr2serr("For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (blk_sz && !ibs)
@@ -1572,31 +1641,34 @@ main(int argc, char * argv[])
         obs = blk_sz;
 
     if ((skip < 0) || (seek < 0)) {
-        fprintf(stderr, "skip and seek cannot be negative\n");
+        pr2serr("skip and seek cannot be negative\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((ofp.append > 0) && (seek > 0)) {
-        fprintf(stderr, "Can't use both append and seek switches\n");
+    if ((oxcf.append > 0) && (seek > 0)) {
+        pr2serr("Can't use both append and seek switches\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (bpt < 1) {
-        fprintf(stderr, "bpt must be greater than 0\n");
+        pr2serr("bpt must be greater than 0\n");
+        return SG_LIB_SYNTAX_ERROR;
+    } else if (bpt > MAX_BLOCKS_PER_TRANSFER) {
+        pr2serr("bpt must be less than or equal to %d\n",
+                MAX_BLOCKS_PER_TRANSFER);
         return SG_LIB_SYNTAX_ERROR;
     }
     if (list_id_usage == 3) { /* list_id usage disabled */
         if (!list_id_given)
             list_id = 0;
         if (list_id) {
-            fprintf(stderr, "list_id disabled by id_usage flag\n");
+            pr2serr("list_id disabled by id_usage flag\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
-#ifdef SG_DEBUG
-    fprintf(stderr, ME "%s if=%s skip=%" PRId64 " of=%s seek=%" PRId64
-            " count=%" PRId64 "\n", (on_src)?"on-source":"on-destination",
-            ifp.fname, skip, ofp.fname, seek, dd_count);
-#endif
+    if (verbose > 1)
+        pr2serr(ME "%s if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
+                PRId64 "\n", (on_src)?"on-source":"on-destination",
+                ixcf.fname, skip, oxcf.fname, seek, dd_count);
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
     install_handler(SIGPIPE, interrupt_handler);
@@ -1604,134 +1676,133 @@ main(int argc, char * argv[])
 
     infd = STDIN_FILENO;
     outfd = STDOUT_FILENO;
-    ifp.pdt = -1;
-    ofp.pdt = -1;
-    if (ifp.fname[0] && ('-' != ifp.fname[0])) {
-        infd = open_if(&ifp, verbose);
+    ixcf.pdt = -1;
+    oxcf.pdt = -1;
+    if (ixcf.fname[0] && ('-' != ixcf.fname[0])) {
+        infd = open_if(&ixcf, verbose);
         if (infd < 0)
             return -infd;
     }
 
-    if (ofp.fname[0] && ('-' != ofp.fname[0])) {
-        outfd = open_of(&ofp, verbose);
+    if (oxcf.fname[0] && ('-' != oxcf.fname[0])) {
+        outfd = open_of(&oxcf, verbose);
         if (outfd < -1)
             return -outfd;
     }
 
-    if (open_sg(&ifp, verbose) < 0)
+    if (open_sg(&ixcf, verbose) < 0)
         return SG_LIB_CAT_INVALID_OP;
 
-    if (open_sg(&ofp, verbose) < 0)
+    if (open_sg(&oxcf, verbose) < 0)
         return SG_LIB_CAT_INVALID_OP;
 
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
-        fprintf(stderr,
-                "Can't have both 'if' as stdin _and_ 'of' as stdout\n");
-        fprintf(stderr, "For more information use '--help'\n");
+        pr2serr("Can't have both 'if' as stdin _and_ 'of' as stdout\n");
+        pr2serr("For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    res = scsi_read_capacity(&ifp);
+    res = scsi_read_capacity(&ixcf);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        fprintf(stderr, "Unit attention (readcap in), continuing\n");
-        res = scsi_read_capacity(&ifp);
+        pr2serr("Unit attention (readcap in), continuing\n");
+        res = scsi_read_capacity(&ixcf);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-        fprintf(stderr, "Aborted command (readcap in), continuing\n");
-        res = scsi_read_capacity(&ifp);
+        pr2serr("Aborted command (readcap in), continuing\n");
+        res = scsi_read_capacity(&ixcf);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
-            fprintf(stderr, "read capacity not supported on %s\n",
-                    ifp.fname);
+            pr2serr("read capacity not supported on %s\n",
+                    ixcf.fname);
         else if (res == SG_LIB_CAT_NOT_READY)
-            fprintf(stderr, "read capacity failed on %s - not "
-                    "ready\n", ifp.fname);
+            pr2serr("read capacity failed on %s - not "
+                    "ready\n", ixcf.fname);
         else
-            fprintf(stderr, "Unable to read capacity on %s\n", ifp.fname);
-        ifp.num_sect = -1;
-    } else if (ibs && ifp.sect_sz != ibs) {
-        fprintf(stderr, ">> warning: block size on %s confusion: "
-                "ibs=%d, device claims=%d\n", ifp.fname, ibs, ifp.sect_sz);
+            pr2serr("Unable to read capacity on %s\n", ixcf.fname);
+        ixcf.num_sect = -1;
+    } else if (ibs && ixcf.sect_sz != ibs) {
+        pr2serr(">> warning: block size on %s confusion: "
+                "ibs=%d, device claims=%d\n", ixcf.fname, ibs, ixcf.sect_sz);
     }
-    if (skip && ifp.num_sect < skip) {
-        fprintf(stderr, "argument to 'skip=' exceeds device size "
-                "(max %"PRId64")\n", ifp.num_sect);
+    if (skip && ixcf.num_sect < skip) {
+        pr2serr("argument to 'skip=' exceeds device size (max %" PRId64 ")\n",
+                ixcf.num_sect);
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    res = scsi_read_capacity(&ofp);
+    res = scsi_read_capacity(&oxcf);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        fprintf(stderr, "Unit attention (readcap out), continuing\n");
-        res = scsi_read_capacity(&ofp);
+        pr2serr("Unit attention (readcap out), continuing\n");
+        res = scsi_read_capacity(&oxcf);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-        fprintf(stderr,
-                "Aborted command (readcap out), continuing\n");
-        res = scsi_read_capacity(&ofp);
+        pr2serr("Aborted command (readcap out), continuing\n");
+        res = scsi_read_capacity(&oxcf);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
-            fprintf(stderr, "read capacity not supported on %s\n",
-                    ofp.fname);
+            pr2serr("read capacity not supported on %s\n", oxcf.fname);
         else
-            fprintf(stderr, "Unable to read capacity on %s\n", ofp.fname);
-        ofp.num_sect = -1;
-    } else if (obs && obs != ofp.sect_sz) {
-        fprintf(stderr, ">> warning: block size on %s confusion: "
-                "obs=%d, device claims=%d\n", ofp.fname, obs, ofp.sect_sz);
+            pr2serr("Unable to read capacity on %s\n", oxcf.fname);
+        oxcf.num_sect = -1;
+    } else if (obs && obs != oxcf.sect_sz) {
+        pr2serr(">> warning: block size on %s confusion: obs=%d, device "
+                "claims=%d\n", oxcf.fname, obs, oxcf.sect_sz);
     }
-    if (seek && ofp.num_sect < seek) {
-        fprintf(stderr, "argument to 'seek=' exceeds device size "
-                "(max %"PRId64")\n", ofp.num_sect);
+    if (seek && oxcf.num_sect < seek) {
+        pr2serr("argument to 'seek=' exceeds device size (max %" PRId64 ")\n",
+                oxcf.num_sect);
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((dd_count < 0) || ((verbose > 0) && (0 == dd_count))) {
         if (xcopy_flag_dc == 0) {
-            dd_count = ifp.num_sect - skip;
-            if (dd_count * ifp.sect_sz > (ofp.num_sect - seek) * ofp.sect_sz)
-                dd_count = (ofp.num_sect - seek) * ofp.sect_sz / ifp.sect_sz;
+            dd_count = ixcf.num_sect - skip;
+            if ((dd_count * ixcf.sect_sz) >
+                ((oxcf.num_sect - seek) * oxcf.sect_sz))
+                dd_count = (oxcf.num_sect - seek) * oxcf.sect_sz /
+                           ixcf.sect_sz;
         } else {
-            dd_count = ofp.num_sect - seek;
-            if (dd_count * ofp.sect_sz > (ifp.num_sect - skip) * ifp.sect_sz)
-                dd_count = (ifp.num_sect - skip) * ifp.sect_sz / ofp.sect_sz;
+            dd_count = oxcf.num_sect - seek;
+            if ((dd_count * oxcf.sect_sz) >
+                ((ixcf.num_sect - skip) * ixcf.sect_sz))
+                dd_count = (ixcf.num_sect - skip) * ixcf.sect_sz /
+                           oxcf.sect_sz;
         }
     } else {
         int64_t dd_bytes;
 
         if (xcopy_flag_dc)
-            dd_bytes = dd_count * ofp.sect_sz;
+            dd_bytes = dd_count * oxcf.sect_sz;
         else
-            dd_bytes = dd_count * ifp.sect_sz;
+            dd_bytes = dd_count * ixcf.sect_sz;
 
-        if (dd_bytes > ifp.num_sect * ifp.sect_sz) {
-            fprintf(stderr, "access beyond end of source device "
-                    "(max %"PRId64")\n", ifp.num_sect);
+        if (dd_bytes > ixcf.num_sect * ixcf.sect_sz) {
+            pr2serr("access beyond end of source device (max %" PRId64 ")\n",
+                    ixcf.num_sect);
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (dd_bytes > ofp.num_sect * ofp.sect_sz) {
-            fprintf(stderr, "access beyond end of target device "
-                    "(max %"PRId64")\n", ofp.num_sect);
+        if (dd_bytes > oxcf.num_sect * oxcf.sect_sz) {
+            pr2serr("access beyond end of target device (max %" PRId64 ")\n",
+                    oxcf.num_sect);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
-    res = scsi_operating_parameter(&ifp, 0);
+    res = scsi_operating_parameter(&ixcf, 0);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
-            fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(&ifp, 0);
+            pr2serr("Unit attention (oper parm), continuing\n");
+            res = scsi_operating_parameter(&ixcf, 0);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
-                fprintf(stderr, "receive copy results not supported on %s\n",
-                        ifp.fname);
-#ifndef SG_DEBUG
+                pr2serr("receive copy operating parameters not supported "
+                        "on %s\n", ixcf.fname);
                 return EINVAL;
-#endif
             } else if (-res == SG_LIB_CAT_NOT_READY)
-                fprintf(stderr, "receive copy results failed on %s - not "
-                        "ready\n", ifp.fname);
+                pr2serr("receive copy operating parameters failed on %s - "
+                        "not ready\n", ixcf.fname);
             else {
-                fprintf(stderr, "Unable to receive copy results on %s\n",
-                        ifp.fname);
+                pr2serr("Unable to receive copy operating parameters on %s\n",
+                        ixcf.fname);
                 return -res;
             }
         }
@@ -1740,35 +1811,34 @@ main(int argc, char * argv[])
 
     if (res & TD_VPD) {
         if (verbose)
-            printf("  >> using VPD identification for source %s\n", ifp.fname);
-        src_desc_len = desc_from_vpd_id(ifp.sg_fd, src_desc, 256,
-                                        ifp.sect_sz, ifp.pad);
-        if (src_desc_len > 256) {
-            fprintf(stderr, "source descriptor too large (%d bytes)\n", res);
+            pr2serr("  >> using VPD identification for source %s\n",
+                    ixcf.fname);
+        src_desc_len = desc_from_vpd_id(ixcf.sg_fd, src_desc,
+                                 sizeof(src_desc), ixcf.sect_sz, ixcf.pad);
+        if (src_desc_len > (int)sizeof(src_desc)) {
+            pr2serr("source descriptor too large (%d bytes)\n", res);
             return SG_LIB_CAT_MALFORMED;
         }
     } else {
         return SG_LIB_CAT_INVALID_OP;
     }
 
-    res = scsi_operating_parameter(&ofp, 1);
+    res = scsi_operating_parameter(&oxcf, 1);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
-            fprintf(stderr, "Unit attention (oper parm), continuing\n");
-            res = scsi_operating_parameter(&ofp, 1);
+            pr2serr("Unit attention (oper parm), continuing\n");
+            res = scsi_operating_parameter(&oxcf, 1);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
-                fprintf(stderr, "receive copy results not supported on %s\n",
-                        ofp.fname);
-#ifndef SG_DEBUG
+                pr2serr("receive copy operating parameters not supported on "
+                        "%s\n", oxcf.fname);
                 return EINVAL;
-#endif
             } else if (-res == SG_LIB_CAT_NOT_READY)
-                fprintf(stderr, "receive copy results failed on %s - not "
-                        "ready\n", ofp.fname);
+                pr2serr("receive copy operating parameters failed on %s - "
+                        "not ready\n", oxcf.fname);
             else {
-                fprintf(stderr, "Unable to receive copy results on %s\n",
-                        ofp.fname);
+                pr2serr("Unable to receive copy operating parameters on %s\n",
+                        oxcf.fname);
                 return -res;
             }
         }
@@ -1777,13 +1847,12 @@ main(int argc, char * argv[])
 
     if (res & TD_VPD) {
         if (verbose)
-            printf("  >> using VPD identification for destination %s\n",
-                   ofp.fname);
-        dst_desc_len = desc_from_vpd_id(ofp.sg_fd, dst_desc, 256,
-                                        ofp.sect_sz, ofp.pad);
-        if (dst_desc_len > 256) {
-            fprintf(stderr, "destination descriptor too large (%d bytes)\n",
-                    res);
+            pr2serr("  >> using VPD identification for destination %s\n",
+                    oxcf.fname);
+        dst_desc_len = desc_from_vpd_id(oxcf.sg_fd, dst_desc,
+                                 sizeof(dst_desc), oxcf.sect_sz, oxcf.pad);
+        if (dst_desc_len > (int)sizeof(dst_desc)) {
+            pr2serr("destination descriptor too large (%d bytes)\n", res);
             return SG_LIB_CAT_MALFORMED;
         }
     } else {
@@ -1791,43 +1860,45 @@ main(int argc, char * argv[])
     }
 
     if (dd_count < 0) {
-        fprintf(stderr, "Couldn't calculate count, please give one\n");
+        pr2serr("Couldn't calculate count, please give one\n");
         return SG_LIB_CAT_OTHER;
     }
 
-    if ((unsigned long)dd_count < ifp.min_bytes / ifp.sect_sz) {
-        fprintf(stderr, "not enough data to read (min %ld bytes)\n",
-                ofp.min_bytes);
+    if ((unsigned long)dd_count < ixcf.min_bytes / ixcf.sect_sz) {
+        pr2serr("not enough data to read (min %ld bytes)\n", oxcf.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
-    if ((unsigned long)dd_count < ofp.min_bytes / ofp.sect_sz) {
-        fprintf(stderr, "not enough data to write (min %ld bytes)\n",
-                ofp.min_bytes);
+    if ((unsigned long)dd_count < oxcf.min_bytes / oxcf.sect_sz) {
+        pr2serr("not enough data to write (min %ld bytes)\n", oxcf.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
 
     if (bpt_given) {
         if (xcopy_flag_dc) {
-            if ((unsigned long)bpt * ofp.sect_sz > ofp.max_bytes) {
-                fprintf(stderr, "bpt too large (max %ld blocks)\n",
-                        ofp.max_bytes / ofp.sect_sz);
+            if ((unsigned long)bpt * oxcf.sect_sz > oxcf.max_bytes) {
+                pr2serr("bpt too large (max %ld blocks)\n",
+                        oxcf.max_bytes / oxcf.sect_sz);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else {
-            if ((unsigned long)bpt * ifp.sect_sz > ifp.max_bytes) {
-                fprintf(stderr, "bpt too large (max %ld blocks)\n",
-                        ifp.max_bytes / ifp.sect_sz);
+            if ((unsigned long)bpt * ixcf.sect_sz > ixcf.max_bytes) {
+                pr2serr("bpt too large (max %ld blocks)\n",
+                        ixcf.max_bytes / ixcf.sect_sz);
                 return SG_LIB_SYNTAX_ERROR;
             }
         }
     } else {
+        unsigned long r;
+
         if (xcopy_flag_dc)
-            bpt = ofp.max_bytes / ofp.sect_sz;
+            r = oxcf.max_bytes / (unsigned long)oxcf.sect_sz;
         else
-            bpt = ifp.max_bytes / ifp.sect_sz;
+            r = ixcf.max_bytes / (unsigned long)ixcf.sect_sz;
+        bpt = (r > MAX_BLOCKS_PER_TRANSFER) ? MAX_BLOCKS_PER_TRANSFER : r;
     }
 
-    seg_desc_type = seg_desc_from_dd_type(ifp.sg_type, 0, ofp.sg_type, 0);
+    seg_desc_type = seg_desc_from_dd_type(simplified_ft(&ixcf), 0,
+                                          simplified_ft(&oxcf), 0);
 
     if (do_time) {
         start_tm.tv_sec = 0;
@@ -1836,13 +1907,12 @@ main(int argc, char * argv[])
         start_tm_valid = 1;
     }
 
-#ifdef SG_DEBUG
-    fprintf(stderr,
-            "Start of loop, count=%"PRId64", bpt=%d, "
-            "lba_in=%"PRId64", lba_out=%"PRId64"\n",
-            dd_count, bpt, skip, seek);
-#endif
+    if (verbose)
+        pr2serr("Start of loop, count=%" PRId64 ", bpt=%d, lba_in=%" PRId64
+                ", lba_out=%" PRId64 "\n", dd_count, bpt, skip, seek);
+
     xcopy_fd = (on_src) ? infd : outfd;
+
     while (dd_count > 0) {
         if (dd_count > bpt)
             blocks = bpt;
@@ -1855,6 +1925,7 @@ main(int argc, char * argv[])
             break;
         in_full += blocks;
         skip += blocks;
+        seek += blocks;
         dd_count -= blocks;
         num_xcopy++;
     }
@@ -1862,11 +1933,11 @@ main(int argc, char * argv[])
     if (do_time)
         calc_duration_throughput(0);
     if (res)
-        fprintf(stderr, "sg_xcopy: failed with error %d (%"PRId64
-                " blocks left)\n", res, dd_count);
+        pr2serr("sg_xcopy: failed with error %d (%" PRId64 " blocks left)\n",
+                res, dd_count);
     else
-        fprintf(stderr, "sg_xcopy: %"PRId64" blocks, %d command%s\n",
-                in_full, num_xcopy, ((num_xcopy > 1) ? "s" : ""));
+        pr2serr("sg_xcopy: %" PRId64 " blocks, %d command%s\n", in_full,
+                num_xcopy, ((num_xcopy > 1) ? "s" : ""));
 
     return res;
 }

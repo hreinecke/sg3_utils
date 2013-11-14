@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.91 20130507";
+static const char * version_str = "0.93 20130927";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -44,6 +44,10 @@ static const char * version_str = "0.91 20130507";
 
 #define SANITIZE_OP 0x48
 #define SANITIZE_OP_LEN 10
+#define SANITIZE_SA_OVERWRITE 0x1
+#define SANITIZE_SA_BLOCK_ERASE 0x2
+#define SANITIZE_SA_CRYPTO_ERASE 0x3
+#define SANITIZE_SA_EXIT_FAIL_MODE 0x1f
 #define DEF_REQS_RESP_LEN 252
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define MAX_XFER_LEN 65535
@@ -160,13 +164,13 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     memset(sanCmdBlk, 0, sizeof(sanCmdBlk));
     sanCmdBlk[0] = SANITIZE_OP;
     if (op->overwrite)
-        sanCmdBlk[1] = 1;
+        sanCmdBlk[1] = SANITIZE_SA_OVERWRITE;
     else if (op->block)
-        sanCmdBlk[1] = 2;
+        sanCmdBlk[1] = SANITIZE_SA_BLOCK_ERASE;
     else if (op->crypto)
-        sanCmdBlk[1] = 3;
+        sanCmdBlk[1] = SANITIZE_SA_CRYPTO_ERASE;
     else if (op->fail)
-        sanCmdBlk[1] = 0x1f;
+        sanCmdBlk[1] = SANITIZE_SA_EXIT_FAIL_MODE;
     else
         return SG_LIB_SYNTAX_ERROR;
     if (immed)
@@ -184,7 +188,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     }
     if ((op->verbose > 2) && (param_lst_len > 0)) {
         fprintf(stderr, "    Parameter list contents:\n");
-        dStrHex((const char *)param_lstp, param_lst_len, 1);
+        dStrHexErr((const char *)param_lstp, param_lst_len, 1);
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -222,7 +226,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 if (valid)
                     fprintf(stderr, "Medium or hardware error starting at "
-                            "lba=%"PRIu64" [0x%"PRIx64"]\n", ull, ull);
+                            "lba=%" PRIu64 " [0x%" PRIx64 "]\n", ull, ull);
             }
             ret = sense_cat;
             break;
@@ -460,7 +464,7 @@ main(int argc, char * argv[])
         wBuff[3] = (opts.ipl & 0xff);
     }
 
-    if (0 == opts.quick) {
+    if ((0 == opts.quick) && (! opts.fail)) {
         printf("\nA SANITIZE will commence in 15 seconds\n");
         printf("    ALL data on %s will be DESTROYED\n", device_name);
         printf("        Press control-C to abort\n");
@@ -538,7 +542,7 @@ main(int argc, char * argv[])
             resp_len = requestSenseBuff[7] + 8;
             if (vb > 2) {
                 fprintf(stderr, "Parameter data in hex\n");
-                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+                dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
             sg_get_sense_progress_fld(requestSenseBuff, resp_len,

@@ -49,8 +49,6 @@
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 
-static void dStrHexErr(const char* str, int len, int b_len, char * b);
-
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
  * functions. Returns number number of chars placed in cp excluding the
@@ -169,6 +167,22 @@ sg_print_scsi_status(int scsi_status)
     fprintf(sg_warnings_strm, "%s ", buff);
 }
 
+int
+sg_get_sense_key(const unsigned char * sensep, int sense_len)
+{
+    if ((NULL == sensep) || (sense_len < 2))
+        return -1;
+    switch (sensep[0] & 0x7f) {
+    case 0x70:
+    case 0x71:
+        return (sense_len < 3) ? -1 : (sensep[2] & 0xf);
+    case 0x72:
+    case 0x73:
+        return sensep[1] & 0xf;
+    default:
+        return -1;
+    }
+}
 
 char *
 sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
@@ -468,7 +482,7 @@ uds_referral_descriptor_str(char * b, int blen, const unsigned char * dp,
                 ull <<= 8;
             ull |= dp[4 + j];
         }
-        n += my_snprintf(b + n, blen - n, "      first uds LBA: 0x%"PRIx64
+        n += my_snprintf(b + n, blen - n, "      first uds LBA: 0x%" PRIx64
                          "\n", ull);
         ull = 0;
         for (j = 0; j < 8; ++j) {
@@ -476,7 +490,7 @@ uds_referral_descriptor_str(char * b, int blen, const unsigned char * dp,
                 ull <<= 8;
             ull |= dp[12 + j];
         }
-        n += my_snprintf(b + n, blen - n, "      last uds LBA:  0x%"PRIx64
+        n += my_snprintf(b + n, blen - n, "      last uds LBA:  0x%" PRIx64
                          "\n", ull);
         for (j = 0; j < tpgd; ++j) {
             tp = dp + 20 + (j * 4);
@@ -794,7 +808,7 @@ sg_get_sense_sat_pt_fixed_str(const unsigned char * sp, int slen, int blen,
 {
     int n = 0;
 
-    slen = slen;        /* suppress warning */
+    if (slen) { ; }     /* unused, suppress warning */
     if (blen < 1)
         return;
     if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2]))
@@ -1015,7 +1029,8 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                          "\n");
         if (n >= (buff_len - 1))
             return;
-        dStrHexErr((const char *)sense_buffer, len, buff_len - n, buff + n);
+        dStrHexStr((const char *)sense_buffer, len, "        ", 0,
+                   buff_len - n, buff + n);
     }
 }
 
@@ -1099,8 +1114,13 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             break;
         case SPC_SK_ABORTED_COMMAND:
             return SG_LIB_CAT_ABORTED_COMMAND;
+        case SPC_SK_MISCOMPARE:
+            return SG_LIB_CAT_MISCOMPARE;
+        case SPC_SK_DATA_PROTECT:
+        case SPC_SK_COMPLETED:
+            return SG_LIB_CAT_SENSE;
         default:
-            ;   /* drop through (SPC_SK_COMPLETED amongst others) */
+            ;   /* rare and obsolete sense keys return SG_LIB_CAT_SENSE */
         }
     }
     return SG_LIB_CAT_SENSE;
@@ -1234,6 +1254,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                         "action=0x%x", service_action);
         break;
     case SG_EXTENDED_COPY:
+        /* 'Extended copy' was renamed 'Third party copy out' in spc4r34 */
         vnp = get_value_name(sg_lib_xcopy_sa_arr, service_action, peri_type);
         if (vnp)
             my_snprintf(buff, buff_len, "%s", vnp->name);
@@ -1242,6 +1263,8 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                         service_action);
         break;
     case SG_RECEIVE_COPY:
+        /* 'Receive copy results' was renamed 'Third party copy in' in
+         * spc4r34 */
         vnp = get_value_name(sg_lib_rec_copy_sa_arr, service_action,
                              peri_type);
         if (vnp)
@@ -1388,8 +1411,8 @@ safe_strerror(int errnum)
        > 0     each line has address then up to 16 ASCII-hex bytes
        = 0     in addition, the bytes are listed in ASCII to the right
        < 0     only the ASCII-hex bytes are listed (i.e. without address) */
-void
-dStrHex(const char* str, int len, int no_ascii)
+static void
+dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
 {
     const char * p = str;
     const char * formatstr;
@@ -1418,14 +1441,14 @@ dStrHex(const char* str, int len, int no_ascii)
                         (int)(unsigned char)c);
             buff[bpos + 2] = ' ';
             if ((k > 0) && (0 == ((k + 1) % 16))) {
-                printf(formatstr, buff);
+                fprintf(fp, formatstr, buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
             }
         }
         if (bpos > bpstart) {
             buff[bpos + 2] = '\0';
-            printf("%s\n", buff);
+            fprintf(fp, "%s\n", buff);
         }
         return;
     }
@@ -1448,7 +1471,7 @@ dStrHex(const char* str, int len, int no_ascii)
             buff[cpos++] = c;
         }
         if (cpos > (cpstart + 15)) {
-            printf(formatstr, buff);
+            fprintf(fp, formatstr, buff);
             bpos = bpstart;
             cpos = cpstart;
             a += 16;
@@ -1459,45 +1482,75 @@ dStrHex(const char* str, int len, int no_ascii)
     }
     if (cpos > cpstart) {
         buff[cpos] = '\0';
-        printf("%s\n", buff);
+        fprintf(fp, "%s\n", buff);
     }
 }
 
-/* Output to ASCII-Hex bytes to 'b' not to exceed 'b_len' characters.
- * 16 bytes per line with an extra space between the 8th and 9th bytes */
-static void
-dStrHexErr(const char* str, int len, int b_len, char * b)
+void
+dStrHex(const char* str, int len, int no_ascii)
+{
+    dStrHexFp(str, len, no_ascii, stdout);
+}
+
+void
+dStrHexErr(const char* str, int len, int no_ascii)
+{
+    dStrHexFp(str, len, no_ascii,
+              (sg_warnings_strm ? sg_warnings_strm : stderr));
+}
+
+/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
+ * separated) to 'b' not to exceed 'b_len' characters. Each line
+ * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
+ * per line with an extra space between the 8th and 9th bytes. 'format'
+ * is unused (currently), set to 0 . */
+void
+dStrHexStr(const char* str, int len, const char * leadin, int format,
+           int b_len, char * b)
 {
     const char * p = str;
     unsigned char c;
-    char buff[82];
-    const int bpstart = 5;
-    int bpos = bpstart;
-    int k, n;
+    char buff[122];
+    int bpstart, bpos, k, n;
 
     if (len <= 0)
         return;
+    if (0 != format) {
+        ;       /* do nothing different for now */
+    }
+    if (leadin) {
+        bpstart = strlen(leadin);
+        /* Cap leadin at 60 characters */
+        if (bpstart > 60)
+            bpstart = 60;
+    } else
+        bpstart = 0;
+    bpos = bpstart;
     n = 0;
-    memset(buff, ' ', 80);
-    buff[80] = '\0';
+    memset(buff, ' ', 120);
+    buff[120] = '\0';
+    if (bpstart > 0)
+        memcpy(buff, leadin, bpstart);
     for (k = 0; k < len; k++) {
         c = *p++;
-        bpos += 3;
-        if (bpos == (bpstart + (9 * 3)))
+        if (bpos == (bpstart + (8 * 3)))
             bpos++;
         my_snprintf(&buff[bpos], (int)sizeof(buff) - bpos, "%.2x",
                     (int)(unsigned char)c);
         buff[bpos + 2] = ' ';
         if ((k > 0) && (0 == ((k + 1) % 16))) {
-            n += my_snprintf(b + n, b_len - n, "%.60s\n", buff);
+            n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
             if (n >= (b_len - 1))
                 return;
             bpos = bpstart;
-            memset(buff, ' ', 80);
-        }
+            memset(buff, ' ', 120);
+            if (bpstart > 0)
+                memcpy(buff, leadin, bpstart);
+        } else
+            bpos += 3;
     }
     if (bpos > bpstart)
-        n += my_snprintf(b + n, b_len - n, "%.60s\n", buff);
+        n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
     return;
 }
 

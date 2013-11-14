@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static const char * version_str = "1.37 20130507 shared_mmap";
+static const char * version_str = "1.38 20131014 shared_mmap";
 #else
-static const char * version_str = "1.37 20130507";
+static const char * version_str = "1.38 20131014";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -176,10 +176,10 @@ static void
 print_stats()
 {
     if (0 != dd_count)
-        fprintf(stderr, "  remaining block count=%"PRId64"\n", dd_count);
-    fprintf(stderr, "%"PRId64"+%d records in\n", in_full - in_partial,
+        fprintf(stderr, "  remaining block count=%" PRId64 "\n", dd_count);
+    fprintf(stderr, "%" PRId64 "+%d records in\n", in_full - in_partial,
             in_partial);
-    fprintf(stderr, "%"PRId64"+%d records out\n", out_full - out_partial,
+    fprintf(stderr, "%" PRId64 "+%d records out\n", out_full - out_partial,
             out_partial);
 }
 
@@ -229,7 +229,7 @@ interrupt_handler(int sig)
 static void
 siginfo_handler(int sig)
 {
-    sig = sig;  /* dummy to stop -W warning messages */
+    if (sig) { ; }      /* unused, dummy to suppress warning */
     fprintf(stderr, "Progress report, continuing ...\n");
     print_stats();
     if (do_time)
@@ -627,8 +627,8 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     int k, res;
 
     if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, 1, fua, dpo)) {
-        fprintf(stderr, ME "bad wr cdb build, to_block=%"PRId64", blocks=%d\n",
-                to_block, blocks);
+        fprintf(stderr, ME "bad wr cdb build, to_block=%" PRId64
+                ", blocks=%d\n", to_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
 
@@ -808,7 +808,7 @@ main(int argc, char * argv[])
     int n, flags;
     char ebuff[EBUFF_SZ];
     int blocks_per;
-    size_t psz = getpagesize();
+    size_t psz;
     struct flags_t in_flags;
     struct flags_t out_flags;
 #ifdef SG_WANT_SHARED_MMAP_IO
@@ -816,6 +816,11 @@ main(int argc, char * argv[])
 #endif
     int ret = 0;
 
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#else
+    psz = 4096;     /* give up, pick likely figure */
+#endif
     inf[0] = '\0';
     outf[0] = '\0';
     memset(&in_flags, 0, sizeof(in_flags));
@@ -849,7 +854,7 @@ main(int argc, char * argv[])
             cdbsz_given = 1;
         } else if (0 == strcmp(key,"coe")) {
             do_coe = sg_get_num(buf);   /* dummy, just accept + ignore */
-            do_coe = do_coe;    /* suppress warning */
+            if (do_coe) { ; }   /* unused, dummy to suppress warning */
         } else if (0 == strcmp(key,"count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
@@ -1056,7 +1061,7 @@ main(int argc, char * argv[])
                 }
                 if (verbose)
                     fprintf(stderr, "  >> skip: lseek64 SEEK_SET, "
-                            "byte offset=0x%"PRIx64"\n",
+                            "byte offset=0x%" PRIx64 "\n",
                             (uint64_t)offset);
             }
         }
@@ -1155,7 +1160,7 @@ main(int argc, char * argv[])
                 }
                 if (verbose)
                     fprintf(stderr, "   >> seek: lseek64 SEEK_SET, "
-                            "byte offset=0x%"PRIx64"\n",
+                            "byte offset=0x%" PRIx64 "\n",
                             (uint64_t)offset);
             }
         }
@@ -1240,7 +1245,7 @@ main(int argc, char * argv[])
             out_num_sect -= seek;
 #ifdef SG_DEBUG
         fprintf(stderr, "Start of loop, count=%" PRId64 ", in_num_sect=%"
-                PRId64 ", out_num_sect=%"PRId64"\n", dd_count, in_num_sect,
+                PRId64 ", out_num_sect=%" PRId64 "\n", dd_count, in_num_sect,
                 out_num_sect);
 #endif
         if (in_num_sect > 0) {
@@ -1305,6 +1310,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "Not enough user memory for raw\n");
                 return SG_LIB_FILE_ERROR;
             }
+            /* perhaps use posix_memalign() instead */
             wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         }
@@ -1320,7 +1326,7 @@ main(int argc, char * argv[])
 
     blocks_per = bpt;
 #ifdef SG_DEBUG
-    fprintf(stderr, "Start of loop, count=%"PRId64", blocks_per=%d\n",
+    fprintf(stderr, "Start of loop, count=%" PRId64 ", blocks_per=%d\n",
             dd_count, blocks_per);
 #endif
     if (do_time) {
@@ -1354,7 +1360,7 @@ main(int argc, char * argv[])
                               scsi_cdbsz_in, in_flags.fua, in_flags.dpo, 1);
             }
             if (0 != ret) {
-                fprintf(stderr, "sg_read failed, skip=%"PRId64"\n", skip);
+                fprintf(stderr, "sg_read failed, skip=%" PRId64 "\n", skip);
                 break;
             }
             else
@@ -1368,7 +1374,8 @@ main(int argc, char * argv[])
                 fprintf(stderr, "read(unix): count=%d, res=%d\n",
                         blocks * blk_sz, res);
             if (ret < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%"PRId64" ", skip);
+                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%" PRId64 " ",
+                         skip);
                 perror(ebuff);
                 ret = -1;
                 break;
@@ -1411,7 +1418,7 @@ main(int argc, char * argv[])
                                &dio_res);
             }
             if (0 != ret) {
-                fprintf(stderr, "sg_write failed, seek=%"PRId64"\n", seek);
+                fprintf(stderr, "sg_write failed, seek=%" PRId64 "\n", seek);
                 break;
             }
             else {
@@ -1430,7 +1437,8 @@ main(int argc, char * argv[])
                 fprintf(stderr, "write(unix): count=%d, res=%d\n",
                         blocks * blk_sz, res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%"PRId64" ", seek);
+                snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%" PRId64 " ",
+                         seek);
                 perror(ebuff);
                 break;
             }

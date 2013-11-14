@@ -1,12 +1,12 @@
-.TH SG_SAT_PHY_EVENT "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_SAT_PHY_EVENT "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_sat_phy_event \- use ATA READ LOG EXT via a SAT pass\-through to fetch
 SATA phy event counters
 .SH SYNOPSIS
 .B sg_sat_phy_event
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-ignore\fR] [\fI\-\-len=\fR16|12] [\fI\-\-raw\fR] [\fI\-\-reset\fR]
-\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-ignore\fR] [\fI\-\-len=\fR{16|12}] [\fI\-\-raw\fR] [\fI\-\-reset\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -57,7 +57,7 @@ usually the phy counter identifier names are decoded. When this option is
 given, the numeric value of the identifier is output, the vendor flag, the
 data length (in bytes) and the corresponding value.
 .TP
-\fB\-l\fR, \fB\-\-len\fR=16 | 12
+\fB\-l\fR, \fB\-\-len\fR={16|12}
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
 The argument can either be 16 or 12. The default is 16. The larger cdb
 size is needed for 48 bit LBA addressing of ATA devices. On the other
@@ -100,7 +100,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2012 Douglas Gilbert
+Copyright \(co 2006\-2013 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

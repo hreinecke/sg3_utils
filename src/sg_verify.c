@@ -33,7 +33,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.19 20130507";    /* sbc3r34 */
+static const char * version_str = "1.20 20130825";    /* sbc3r34 */
 
 #define ME "sg_verify: "
 
@@ -41,20 +41,22 @@ static const char * version_str = "1.19 20130507";    /* sbc3r34 */
 
 
 static struct option long_options[] = {
-        {"16", 0, 0, 'S'},
-        {"bpc", 1, 0, 'b'},
-        {"bytchk", 1, 0, 'B'},
-        {"count", 1, 0, 'c'},
-        {"dpo", 0, 0, 'd'},
-        {"ebytchk", 1, 0, 'E'},
-        {"group", 1, 0, 'g'},
-        {"help", 0, 0, 'h'},
-        {"in", 1, 0, 'i'},
-        {"lba", 1, 0, 'l'},
-        {"readonly", 0, 0, 'r'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {"vrprotect", 1, 0, 'P'},
+        {"16", no_argument, 0, 'S'},
+        {"bpc", required_argument, 0, 'b'},
+        {"bytchk", required_argument, 0, 'B'},
+        {"count", required_argument, 0, 'c'},
+        {"dpo", no_argument, 0, 'd'},
+        {"ebytchk", required_argument, 0, 'E'},
+        {"group", required_argument, 0, 'g'},
+        {"help", no_argument, 0, 'h'},
+        {"in", required_argument, 0, 'i'},
+        {"lba", required_argument, 0, 'l'},
+        {"nbo", required_argument, 0, 'n'},
+        {"quiet", no_argument, 0, 'q'},
+        {"readonly", no_argument, 0, 'r'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"vrprotect", required_argument, 0, 'P'},
         {0, 0, 0, 0},
 };
 
@@ -62,11 +64,11 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_verify [--16] [--bpc=BPC] [--bytchk=NDO] [--count=COUNT] "
-          "[--dpo]\n"
-          "                 [--ebytchk=BVAL] [--group=GN] [--help] "
-          "[--in=IF]\n"
-          "                 [--lba=LBA] [--readonly] [--verbose] "
+          "sg_verify [--16] [--bpc=BPC] [--count=COUNT] [--dpo] "
+          "[--ebytchk=BCH]\n"
+          "                 [--group=GN] [--help] [--in=IF] "
+          "[--lba=LBA] [--ndo=NDO]\n"
+          "                 [--quiet] [--readonly] [--verbose] "
           "[--version]\n"
           "                 [--vrprotect=VRP] DEVICE\n"
           "  where:\n"
@@ -74,28 +76,20 @@ usage()
           "VERIFY(10) )\n"
           "    --bpc=BPC|-b BPC    max blocks per verify command "
           "(def: 128)\n"
-          "    --bytchk=NDO|-B NDO    set BYTCHK (byte check) to 1, NDO is "
-          "number of\n"
-          "                           bytes placed in data-out buffer. "
-          "These are\n"
-          "                           fetched from IF (or stdin) and used "
-          "to verify\n"
-          "                           the device data against. Forces "
-          "--bpc=COUNT.\n"
           "    --count=COUNT|-c COUNT    count of blocks to verify "
           "(def: 1).\n"
-          "                              If BVAL=3 then COUNT must "
+          "                              If BCH=3 then COUNT must "
           "be 1 .\n"
           "    --dpo|-d            disable page out (cache retention "
           "priority)\n"
-          "    --ebytchk=BVAL|-E BVAL    extra BYTCHK value, either 1, 2 "
-          "or 3.\n"
-          "                              BVAL overrides BYTCHK=1 set by "
-          "'--bytchk='\n"
-          "                              If BVAL is 3 then NDO must be "
-          "the LBA\n"
-          "                              size (plus protection size if "
-          "DIF active)\n"
+          "    --ebytchk=BCH|-E BCH    sets BYTCHK value, either 1, 2 "
+          "or 3 (def: 0).\n"
+          "                            BCH overrides BYTCHK=1 set by "
+          "'--ndo='. If\n"
+          "                            BCH is 3 then NDO must be the LBA "
+          "size\n"
+          "                            (plus protection size if DIF "
+          "active)\n"
           "    --group=GN|-g GN    set group number field to GN (def: 0)\n"
           "    --help|-h           print out usage message\n"
           "    --in=IF|-i IF       input from file called IF (def: "
@@ -103,6 +97,17 @@ usage()
           "                        only active if --bytchk=N given\n"
           "    --lba=LBA|-l LBA    logical block address to start "
           "verify (def: 0)\n"
+          "    --ndo=NDO|-n NDO    NDO is number of bytes placed in "
+          "data-out buffer.\n"
+          "                        These are fetched from IF (or "
+          "stdin) and used\n"
+          "                        to verify the device data against. "
+          "Forces\n"
+          "                        --bpc=COUNT. Sets BYTCHK (byte check) "
+          "to 1\n"
+          "    --quiet|-q          suppress miscompare report to stderr, "
+          "still\n"
+          "                        causes an exit status of 14\n"
           "    --readonly|-r       open DEVICE read-only (def: open it "
           "read-write)\n"
           "    --verbose|-v        increase verbosity\n"
@@ -133,6 +138,7 @@ main(int argc, char * argv[])
     int group = 0;
     uint64_t lba = 0;
     uint64_t orig_lba;
+    int quiet = 0;
     int readonly = 0;
     int verbose = 0;
     int verify16 = 0;
@@ -147,7 +153,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:B:c:dE:g:hi:l:P:rSvV", long_options,
+        c = getopt_long(argc, argv, "b:B:c:dE:g:hi:l:n:P:qrSvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -160,13 +166,6 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++bpc_given;
-            break;
-        case 'B':
-            ndo = sg_get_num(optarg);
-            if (ndo < 1) {
-                fprintf(stderr, "bad argument to '--bytchk'\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
             break;
         case 'c':
             count = sg_get_llnum(optarg);
@@ -207,6 +206,14 @@ main(int argc, char * argv[])
             }
             lba = (uint64_t)ll;
             break;
+        case 'n':
+        case 'B':       /* undocumented, old --bytchk=NDO option */
+            ndo = sg_get_num(optarg);
+            if (ndo < 1) {
+                fprintf(stderr, "bad argument to '--ndo'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
         case 'P':
             vrprotect = sg_get_num(optarg);
             if (-1 == vrprotect) {
@@ -218,6 +225,9 @@ main(int argc, char * argv[])
                         "7 (inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'q':
+            ++quiet;
             break;
         case 'r':
             ++readonly;
@@ -266,7 +276,7 @@ main(int argc, char * argv[])
         }
         bpc = (int)count;
     } else if (bytchk > 0) {
-        fprintf(stderr, "when the 'ebytchk=BVAL' option is given, "
+        fprintf(stderr, "when the 'ebytchk=BCH' option is given, "
                 "then '--bytchk=NDO' must also be given\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -343,11 +353,11 @@ main(int argc, char * argv[])
         if (verify16)
             res = sg_ll_verify16(sg_fd, vrprotect, dpo, bytchk,
                                  lba, num, group, ref_data,
-                                 ndo, &info64, 1, verbose);
+                                 ndo, &info64, !quiet , verbose);
         else
             res = sg_ll_verify10(sg_fd, vrprotect, dpo, bytchk,
                                  (unsigned int)lba, num, ref_data,
-                                 ndo, &info, 1, verbose);
+                                 ndo, &info, !quiet, verbose);
         if (0 != res) {
             ret = res;
             switch (res) {
@@ -378,6 +388,10 @@ main(int argc, char * argv[])
                 else
                     fprintf(stderr, "%s medium or hardware error, reported "
                             "lba=0x%x\n", vc, info);
+                break;
+            case SG_LIB_CAT_MISCOMPARE:
+                if ((0 == quiet) || verbose)
+                    fprintf(stderr, "%s reported MISCOMPARE\n", vc);
                 break;
             default:
                 fprintf(stderr, "%s failed near lba=%" PRIu64 " [0x%" PRIx64

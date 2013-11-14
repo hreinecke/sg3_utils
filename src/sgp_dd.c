@@ -57,7 +57,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "5.43 20130507";
+static const char * version_str = "5.45 20131011";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -225,14 +225,14 @@ print_stats(const char * str)
     int64_t infull, outfull;
 
     if (0 != rcoll.out_rem_count)
-        fprintf(stderr, "  remaining block count=%"PRId64"\n",
+        fprintf(stderr, "  remaining block count=%" PRId64 "\n",
                 rcoll.out_rem_count);
     infull = dd_count - rcoll.in_rem_count;
-    fprintf(stderr, "%s%"PRId64"+%d records in\n", str,
+    fprintf(stderr, "%s%" PRId64 "+%d records in\n", str,
             infull - rcoll.in_partial, rcoll.in_partial);
 
     outfull = dd_count - rcoll.out_rem_count;
-    fprintf(stderr, "%s%"PRId64"+%d records out\n", str,
+    fprintf(stderr, "%s%" PRId64 "+%d records out\n", str,
             outfull - rcoll.out_partial, rcoll.out_partial);
 }
 
@@ -255,7 +255,7 @@ interrupt_handler(int sig)
 static void
 siginfo_handler(int sig)
 {
-    sig = sig;  /* dummy to stop -W warning messages */
+    if (sig) { ; }      /* unused, dummy to suppress warning */
     fprintf(stderr, "Progress report, continuing ...\n");
     if (do_time)
         calc_duration_throughput(1);
@@ -534,7 +534,11 @@ read_write_thread(void * v_clp)
     sz = clp->bpt * clp->bs;
     seek_skip =  clp->seek - clp->skip;
     memset(rep, 0, sizeof(Rq_elem));
-    psz = getpagesize();
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#else
+    psz = 4096;     /* give up, pick likely figure */
+#endif
     if (NULL == (rep->alloc_bp = (unsigned char *)malloc(sz + psz)))
         err_exit(ENOMEM, "out of memory creating user buffers\n");
     rep->buffp = (unsigned char *)(((unsigned long)rep->alloc_bp + psz - 1) &
@@ -655,7 +659,7 @@ normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     if (res < 0) {
         if (clp->in_flags.coe) {
             memset(rep->buffp, 0, rep->num_blks * rep->bs);
-            fprintf(stderr, ">> substituted zeros for in blk=%"PRId64" for "
+            fprintf(stderr, ">> substituted zeros for in blk=%" PRId64 " for "
                     "%d bytes, %s\n", rep->blk,
                     rep->num_blks * rep->bs,
                     tsafe_strerror(errno, strerr_buff));
@@ -700,7 +704,7 @@ normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
         ;
     if (res < 0) {
         if (clp->out_flags.coe) {
-            fprintf(stderr, ">> ignored error for out blk=%"PRId64" for "
+            fprintf(stderr, ">> ignored error for out blk=%" PRId64 " for "
                     "%d bytes, %s\n", rep->blk,
                     rep->num_blks * rep->bs,
                     tsafe_strerror(errno, strerr_buff));
@@ -829,7 +833,7 @@ sg_in_operation(Rq_coll * clp, Rq_elem * rep)
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
-            fprintf(stderr, ME "inputting to sg failed, blk=%"PRId64"\n",
+            fprintf(stderr, ME "inputting to sg failed, blk=%" PRId64 "\n",
                     rep->blk);
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
@@ -900,7 +904,7 @@ sg_out_operation(Rq_coll * clp, Rq_elem * rep)
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
-            fprintf(stderr, ME "outputting from sg failed, blk=%"PRId64"\n",
+            fprintf(stderr, ME "outputting from sg failed, blk=%" PRId64 "\n",
                     rep->blk);
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
@@ -929,8 +933,8 @@ sg_out_operation(Rq_coll * clp, Rq_elem * rep)
                 guarded_stop_both(clp);
                 return;
             } else
-                fprintf(stderr, ">> ignored error for out blk=%"PRId64" for "
-                        "%d bytes\n", rep->blk, rep->num_blks * rep->bs);
+                fprintf(stderr, ">> ignored error for out blk=%" PRId64
+                        " for %d bytes\n", rep->blk, rep->num_blks * rep->bs);
             /* fall through */
         case 0:
             if (rep->dio_incomplete || rep->resid) {
@@ -969,8 +973,8 @@ sg_start_io(Rq_elem * rep)
 
     if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk,
                           rep->wr, fua, dpo)) {
-        fprintf(stderr, ME "bad cdb build, start_blk=%"PRId64", blocks=%d\n",
-                rep->blk, rep->num_blks);
+        fprintf(stderr, ME "bad cdb build, start_blk=%" PRId64
+                ", blocks=%d\n", rep->blk, rep->num_blks);
         return -1;
     }
     memset(hp, 0, sizeof(struct sg_io_hdr));
@@ -988,7 +992,7 @@ sg_start_io(Rq_elem * rep)
     if (dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
     if (rep->debug > 8) {
-        fprintf(stderr, "sg_start_io: SCSI %s, blk=%"PRId64" num_blks=%d\n",
+        fprintf(stderr, "sg_start_io: SCSI %s, blk=%" PRId64 " num_blks=%d\n",
                rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
         sg_print_command(hp->cmdp);
     }
@@ -1054,7 +1058,7 @@ sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
             {
                 char ebuff[EBUFF_SZ];
 
-                snprintf(ebuff, EBUFF_SZ, "%s blk=%"PRId64,
+                snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64,
                          wr ? "writing": "reading", rep->blk);
                 status = pthread_mutex_lock(a_mutp);
                 if (0 != status) err_exit(status, "lock aux_mutex");

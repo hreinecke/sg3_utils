@@ -25,6 +25,9 @@ Eric Schwartz <emschwar at debian dot org> who wrote these man pages:
         sg_readcap, sg_reset, sg_scan, sg_start, sg_test_rwbuf,
         sg_turs and sginfo
 
+Eric Seppanen <eric @ purestorage dot com> borrowed ideas from alternate
+        implementation of sg_compare_and_write [20130823]
+
 Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
         is based.
 
@@ -35,7 +38,7 @@ Grant Grundler <grundler at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
 Greg Inozemtsev <greg at purestorage dot com>
-        extensions to sg_xcopy [20130207]
+        extensions to sg_xcopy [20130207+20130816]
 
 Hannes Reinecke <hare at suse dot de>
         contributed sg_rdac, (and some corresponding VPD entries to
@@ -43,6 +46,7 @@ Hannes Reinecke <hare at suse dot de>
         sg_referrals [20100906]
         sg_inq --export option [20120220+20130109]
         sg_xcopy+sg_copy_results [20120322]
+        rescan-scsi-bus.sh patches to Kurt Garloff's v1.57 [20130715]
 
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]
@@ -66,7 +70,8 @@ Kai Makisara <Kai dot Makisara at kolumbus dot fi> help with tape
         minor numbers in lk 2.6 plus earlier advice [20081008]
 
 Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
-        Additions to sginfo and sg_map.
+        Additions to sginfo and sg_map. Author of rescan-scsi-bus.sh with
+        latest update to v1.57 [20130331]
 
 Lars Marowsky-Brée <lmb at suse dot de> contributed Unit Path Report VPD
         page decoding in sg_inq (vendor specific: EMC) and sg_emc_trespass
@@ -102,6 +107,9 @@ Ronnie Sahlberg <ronniesahlberg at gmail dot com> has written libiscsi and a
 
 Saeed Bishara contributed sg_write_long
 
+Sean Stewart <Sean dot Stewart at netapp dot com> various improvements
+        to rescan-scsi-bush.sh script [20130827]
+
 Shahar Salzman <shahar dot salzman at kaminario dot com> contributed
         sg_compare_and_write [20121205]
 
@@ -119,4 +127,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-8th May 2013
+28th August 2013

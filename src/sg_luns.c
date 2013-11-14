@@ -28,7 +28,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.22 20130528";
+static const char * version_str = "1.23 20130730";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -575,8 +575,8 @@ main(int argc, char * argv[])
         }
         if (verbose > 1) {
             fprintf(stderr, "\nOutput response in hex\n");
-            dStrHex((const char *)reportLunsBuff,
-                    (trunc ? maxlen : list_len + 8), 1);
+            dStrHexErr((const char *)reportLunsBuff,
+                       (trunc ? maxlen : list_len + 8), 1);
         }
         for (k = 0, off = 8; k < luns; ++k, off += 8) {
             if (0 == do_quiet) {

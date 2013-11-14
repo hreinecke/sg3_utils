@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2013 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.10 20100321 */
+/* sg_pt_freebsd version 1.12 20130919 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -199,6 +199,8 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp) {
+        if (ptp->ccb)
+            cam_freeccb(ptp->ccb);
         memset(ptp, 0, sizeof(struct sg_pt_freebsd_scsi));
         ptp->dxfer_dir = CAM_DIR_NONE;
     }
@@ -296,9 +298,8 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp,
 void
 set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
 {
-    /* do nothing, suppress warnings */
-    objp = objp;
-    flags = flags;
+    if (objp) { ; }     /* unused, suppress warning */
+    if (flags) { ; }     /* unused, suppress warning */
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).
@@ -346,13 +347,16 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
-    if (! (ccb = cam_getccb(fdchan->cam_dev))) {
-        if (verbose)
-            fprintf(sg_warnings_strm, "cam_getccb: failed\n");
-        ptp->os_err = ENOMEM;
-        return -ptp->os_err;
-    }
-    ptp->ccb = ccb;
+    if (NULL == ptp->ccb) {     /* re-use if we have one already */
+        if (! (ccb = cam_getccb(fdchan->cam_dev))) {
+            if (verbose)
+                fprintf(sg_warnings_strm, "cam_getccb: failed\n");
+            ptp->os_err = ENOMEM;
+            return -ptp->os_err;
+        }
+        ptp->ccb = ccb;
+    } else
+        ccb = ptp->ccb;
 
     // clear out structure, except for header that was filled in for us
     bzero(&(&ccb->ccb_h)[1],
@@ -393,8 +397,11 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
 
         if ((SAM_STAT_CHECK_CONDITION == ptp->scsi_status) ||
             (SAM_STAT_COMMAND_TERMINATED == ptp->scsi_status)) {
-            len = ptp->sense_len - ptp->sense_resid;
-            if (len)
+            if (ptp->sense_resid > ptp->sense_len)
+                len = ptp->sense_len;   /* crazy; ignore sense_resid */
+            else
+                len = ptp->sense_len - ptp->sense_resid;
+            if (len > 0)
                 memcpy(ptp->sense, &(ccb->csio.sense_data), len);
         }
     } else
@@ -442,10 +449,11 @@ int
 get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 {
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
-    int len;
 
-    len = ptp->sense_len - ptp->sense_resid;
-    return (len > 0) ? len : 0;
+    if (ptp->sense_resid > ptp->sense_len)
+        return ptp->sense_len;  /* strange; ignore ptp->sense_resid */
+    else
+        return ptp->sense_len - ptp->sense_resid;
 }
 
 int

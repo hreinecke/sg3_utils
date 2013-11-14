@@ -27,9 +27,9 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.71 20130507";    /* ses3r05 */
+static const char * version_str = "1.77 20130919";    /* ses3r06 */
 
-#define MX_ALLOC_LEN ((64 * 1024) - 1)
+#define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260
@@ -89,7 +89,7 @@ static const char * version_str = "1.71 20130507";    /* ses3r05 */
 
 struct element_type_t {
     int elem_type_code;
-    const char * abbrev; 
+    const char * abbrev;
     const char * desc;
 };
 
@@ -103,12 +103,13 @@ struct opts_t {
     int do_help;
     int do_hex;
     int ind_given;
-    int ind_th;
-    int ind_indiv;
-    int ind_etp_num;
+    int ind_th;         /* type header index */
+    int ind_indiv;      /* individual element index; -1 for overall */
+    int ind_et_inst;    /* ETs can have multiple type header instances */
     int inner_hex;
     int do_join;
     int do_list;
+    int seid;
     int page_code;
     int page_code_given;
     int do_raw;
@@ -124,6 +125,7 @@ struct opts_t {
     const char * set_str;
     const char * device_name;
     const char * index_str;
+    const char * nickname_str;
     const struct element_type_t * ind_etp;
 };
 
@@ -210,10 +212,28 @@ static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
 static struct join_row_t join_arr[MX_JOIN_ROWS];
 static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 
+#ifdef SG_LIB_FREEBSD
+
+#include <sys/param.h>  /* contains PAGE_SIZE */
+
+static unsigned char enc_stat_rsp[MX_ALLOC_LEN]
+        __attribute__ ((aligned (PAGE_SIZE)));
+static unsigned char elem_desc_rsp[MX_ALLOC_LEN]
+        __attribute__ ((aligned (PAGE_SIZE)));
+static unsigned char add_elem_rsp[MX_ALLOC_LEN]
+        __attribute__ ((aligned (PAGE_SIZE)));
+static unsigned char threshold_rsp[MX_ALLOC_LEN]
+        __attribute__ ((aligned (PAGE_SIZE)));
+
+#else
+
 static unsigned char enc_stat_rsp[MX_ALLOC_LEN];
 static unsigned char elem_desc_rsp[MX_ALLOC_LEN];
 static unsigned char add_elem_rsp[MX_ALLOC_LEN];
 static unsigned char threshold_rsp[MX_ALLOC_LEN];
+
+#endif
+
 static int enc_stat_rsp_len;
 static int elem_desc_rsp_len;
 static int add_elem_rsp_len;
@@ -427,26 +447,28 @@ static int active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
 
 /* Command line long option names with corresponding short letter. */
 static struct option long_options[] = {
-    {"byte1", 1, 0, 'b'},
-    {"control", 0, 0, 'c'},
-    {"clear", 1, 0, 'C'},
-    {"data", 1, 0, 'd'},
-    {"descriptor", 1, 0, 'D'},
-    {"enumerate", 0, 0, 'e'},
-    {"filter", 0, 0, 'f'},
-    {"get", 1, 0, 'G'},
-    {"help", 0, 0, 'h'},
-    {"hex", 0, 0, 'H'},
-    {"inner-hex", 0, 0, 'i'},
-    {"index", 1, 0, 'I'},
-    {"join", 0, 0, 'j'},
-    {"list", 0, 0, 'l'},
-    {"page", 1, 0, 'p'},
-    {"raw", 0, 0, 'r'},
-    {"status", 0, 0, 's'},
-    {"set", 1, 0, 'S'},
-    {"verbose", 0, 0, 'v'},
-    {"version", 0, 0, 'V'},
+    {"byte1", required_argument, 0, 'b'},
+    {"control", no_argument, 0, 'c'},
+    {"clear", required_argument, 0, 'C'},
+    {"data", required_argument, 0, 'd'},
+    {"descriptor", required_argument, 0, 'D'},
+    {"enumerate", no_argument, 0, 'e'},
+    {"filter", no_argument, 0, 'f'},
+    {"get", required_argument, 0, 'G'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"inner-hex", no_argument, 0, 'i'},
+    {"index", required_argument, 0, 'I'},
+    {"join", no_argument, 0, 'j'},
+    {"list", no_argument, 0, 'l'},
+    {"nickname", required_argument, 0, 'n'},
+    {"nickid", required_argument, 0, 'N'},
+    {"page", required_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"status", no_argument, 0, 's'},
+    {"set", required_argument, 0, 'S'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
     {0, 0, 0, 0},
 };
 
@@ -464,10 +486,11 @@ usage()
             "              [--descriptor=DN] [--enumerate] [--filter] "
             "[--get=STR]\n"
             "              [--help] [--hex] [--index=IIA | --index=TIA,II]\n"
-            "              [--inner-hex] [--join] [--list] [--page=PG] "
-            "[--raw]\n"
-            "              [--set=STR] [--status] [--verbose] [--version]\n"
-            "              DEVICE\n"
+            "              [--inner-hex] [--join] [--list] "
+            "[--nickname=SEN]\n"
+            "              [--nickid=SEID] [--page=PG] [--raw] "
+            "[--set=STR]\n"
+            "              [--status] [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
             "to B1\n"
@@ -486,6 +509,8 @@ usage()
             "acronyms\n"
             "    --filter|-f         filter out enclosure status flags that "
             "are clear\n"
+            "                        use thrice for status=okay entries "
+            "only\n"
             "    --get=STR|-G STR    get value of field by acronym or "
             "position\n"
             "    --help|-h           print out usage message\n"
@@ -509,6 +534,9 @@ usage()
             "Use twice\n"
             "                        to add Threshold In page\n"
             "    --list|-l           same as '--enumerate' option\n"
+            "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
+            "    --nickid=SEID|-N SEID   SEID is subenclosure identifier "
+            "(def: 0)\n"
             "    --page=PG|-p PG     diagnostic page code (abbreviation "
             "or number)\n"
             "                        (def: 'ssp' [0x0] (supported diagnostic "
@@ -614,7 +642,7 @@ parse_index(struct opts_t *op)
                                 "for '--index', expect <num> from 0 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->ind_etp_num = n;
+            op->ind_et_inst = n;
         }
         op->ind_etp = &element_type_by_code;
         if (NULL == cp)
@@ -637,7 +665,7 @@ parse_index(struct opts_t *op)
                         "for '--index', expect <num> from 0 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->ind_etp_num = n;
+            op->ind_et_inst = n;
         }
         op->ind_etp = etp;
         if (NULL == cp)
@@ -647,7 +675,7 @@ parse_index(struct opts_t *op)
         if (op->ind_etp)
             fprintf(stderr, "   element type abbreviation: %s, etp_num=%d, "
                     "individual index=%d\n", op->ind_etp->abbrev,
-                    op->ind_etp_num, op->ind_indiv);
+                    op->ind_et_inst, op->ind_indiv);
         else
             fprintf(stderr, "   type header index=%d, individual "
                     "index=%d\n", op->ind_th, op->ind_indiv);
@@ -665,7 +693,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:cC:d:D:efG:hHiI:jlp:rsS:vV",
+        c = getopt_long(argc, argv, "b:cC:d:D:efG:hHiI:jln:N:p:rsS:vV",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -702,7 +730,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             ++op->do_enumerate;
             break;
         case 'f':
-            op->do_filter = 1;
+            ++op->do_filter;
             break;
         case 'G':
             op->get_str = optarg;
@@ -726,6 +754,17 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             break;
         case 'l':
             ++op->do_list;
+            break;
+        case 'n':
+            op->nickname_str = optarg;
+            break;
+        case 'N':
+            op->seid = sg_get_num(optarg);
+            if ((op->seid < 0) || (op->seid > 255)) {
+                fprintf(stderr, "bad argument to '--nick_id' (0 to 255 "
+                        "inclusive)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'p':
             if (isdigit(optarg[0])) {
@@ -837,13 +876,31 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         fprintf(stderr, "For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     } else if (op->do_control) {
-        if (! op->do_data) {
+        if (op->nickname_str)
+            ;
+        else if (! op->do_data) {
             fprintf(stderr, "need to give '--data' in control mode\n");
             fprintf(stderr, "For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     } else if (0 == op->do_status)
         op->do_status = 1;  /* default to receiving status pages */
+
+    if (op->nickname_str) {
+        if (! op->do_control) {
+            fprintf(stderr, "since '--nickname=' implies control mode "
+                    "require '--control' as well\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (op->page_code_given) {
+            if (DPC_SUBENC_NICKNAME != op->page_code) {
+                fprintf(stderr, "since '--nickname=' assume or expect "
+                        "'--page=snic'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else
+            op->page_code = DPC_SUBENC_NICKNAME;
+    }
 
     if (NULL == op->device_name) {
         fprintf(stderr, "missing DEVICE name!\n");
@@ -1093,8 +1150,9 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
     if (0 == res) {
         rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
         if (rsp_len > rsp_buff_size) {
-            fprintf(stderr, "<<< warning response buffer too small "
-                    "[%d but need %d]>>>\n", rsp_buff_size, rsp_len);
+            if (rsp_buff_size > 8) /* tried to get more than header */
+                fprintf(stderr, "<<< warning response buffer too small "
+                        "[%d but need %d]>>>\n", rsp_buff_size, rsp_len);
             rsp_len = rsp_buff_size;
         }
         if (rsp_lenp)
@@ -1103,14 +1161,14 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
             if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
                 fprintf(stderr, "Enclosure busy, try again later\n");
                 if (op->do_hex)
-                    dStrHex((const char *)rsp_buff, rsp_len, 0);
+                    dStrHexErr((const char *)rsp_buff, rsp_len, 0);
             } else if (0x8 == rsp_buff[0]) {
                 fprintf(stderr, "Enclosure only supports Short Enclosure "
                         "Status: 0x%x\n", rsp_buff[1]);
             } else {
                 fprintf(stderr, "Invalid response, wanted page code: 0x%x "
                         "but got 0x%x\n", page_code, rsp_buff[0]);
-                dStrHex((const char *)rsp_buff, rsp_len, 0);
+                dStrHexErr((const char *)rsp_buff, rsp_len, 0);
             }
             return -2;
         }
@@ -1308,7 +1366,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         tdhp[k].txt_len = ucp[3];
     }
     if (op->ind_given && op->ind_etp) {
-        n = op->ind_etp_num;
+        n = op->ind_et_inst;
         for (k = 0; k < sum_type_dheaders; ++k) {
             if (op->ind_etp->elem_type_code == tdhp[k].etype) {
                 if (0 == n)
@@ -1320,9 +1378,9 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         if (k < sum_type_dheaders)
             op->ind_th = k;
         else {
-            if (op->ind_etp_num)
+            if (op->ind_et_inst)
                 fprintf(stderr, "populate: unable to find element type "
-                        "'%s%d'\n", op->ind_etp->abbrev, op->ind_etp_num);
+                        "'%s%d'\n", op->ind_etp->abbrev, op->ind_et_inst);
             else
                 fprintf(stderr, "populate: unable to find element type "
                         "'%s'\n",
@@ -1483,7 +1541,8 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
 {
     int res, a, b;
     char bb[128];
-    int filter = op->do_filter;
+    int nofilter = ! op->do_filter;
+
 
     if (op->inner_hex) {
         printf("%s%02x %02x %02x %02x\n", pad, statp[0], statp[1], statp[2],
@@ -1501,43 +1560,43 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         break;
     case DEVICE_ETC:
         printf("%sSlot address: %d\n", pad, statp[1]);
-        if ((! filter) || (0xe0 & statp[2]))
+        if (nofilter || (0xe0 & statp[2]))
             printf("%sApp client bypassed A=%d, Do not remove=%d, Enc "
                    "bypassed A=%d\n", pad, !!(statp[2] & 0x80),
                    !!(statp[2] & 0x40), !!(statp[2] & 0x20));
-        if ((! filter) || (0x1c & statp[2]))
+        if (nofilter || (0x1c & statp[2]))
             printf("%sEnc bypassed B=%d, Ready to insert=%d, RMV=%d, Ident="
                    "%d\n", pad, !!(statp[2] & 0x10), !!(statp[2] & 0x8),
                    !!(statp[2] & 0x4), !!(statp[2] & 0x2));
-        if ((! filter) || ((1 & statp[2]) || (0xe0 & statp[3])))
+        if (nofilter || ((1 & statp[2]) || (0xe0 & statp[3])))
             printf("%sReport=%d, App client bypassed B=%d, Fault sensed=%d, "
                    "Fault requested=%d\n", pad, !!(statp[2] & 0x1),
                    !!(statp[3] & 0x80), !!(statp[3] & 0x40),
                    !!(statp[3] & 0x20));
-        if ((! filter) || (0x1e & statp[3]))
+        if (nofilter || (0x1e & statp[3]))
             printf("%sDevice off=%d, Bypassed A=%d, Bypassed B=%d, Device "
                    "bypassed A=%d\n", pad, !!(statp[3] & 0x10),
                    !!(statp[3] & 0x8), !!(statp[3] & 0x4), !!(statp[3] & 0x2));
-        if ((! filter) || (0x1 & statp[3]))
+        if (nofilter || (0x1 & statp[3]))
             printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
         break;
     case POWER_SUPPLY_ETC:
-        if ((! filter) || ((0x80 & statp[1]) || (0xe & statp[2])))
+        if (nofilter || ((0x80 & statp[1]) || (0xe & statp[2])))
             printf("%sIdent=%d, DC overvoltage=%d, DC undervoltage=%d, DC "
                    "overcurrent=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[2] & 0x8), !!(statp[2] & 0x4), !!(statp[2] & 0x2));
-        if ((! filter) || (0xf8 & statp[3]))
+        if (nofilter || (0xf8 & statp[3]))
             printf("%sHot swap=%d, Fail=%d, Requested on=%d, Off=%d, "
                    "Overtmp fail=%d\n", pad, !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x20),
                    !!(statp[3] & 0x10), !!(statp[3] & 0x8));
-        if ((! filter) || (0x7 & statp[3]))
+        if (nofilter || (0x7 & statp[3]))
             printf("%sTemperature warn=%d, AC fail=%d, DC fail=%d\n",
                    pad, !!(statp[3] & 0x4), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
     case COOLING_ETC:
-        if ((! filter) || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
             printf("%sIdent=%d, Hot swap=%d, Fail=%d, Requested on=%d, "
                    "Off=%d\n", pad, !!(statp[1] & 0x80), !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x20),
@@ -1547,7 +1606,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                actual_speed_desc[7 & statp[3]]);
         break;
     case TEMPERATURE_ETC:     /* temperature sensor */
-        if ((! filter) || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
+        if (nofilter || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
             printf("%sIdent=%d, Fail=%d, OT failure=%d, OT warning=%d, "
                    "UT failure=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[3] & 0x8),
@@ -1561,31 +1620,31 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
             printf("%sTemperature: <reserved>\n", pad);
         break;
     case DOOR_ETC:      /* OPEN field added in ses3r05 */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Open=%d, Unlock=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case AUD_ALARM_ETC:     /* audible alarm */
-        if ((! filter) || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Request mute=%d, Mute=%d, "
                    "Remind=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x10));
-        if ((! filter) || (0xf & statp[3]))
+        if (nofilter || (0xf & statp[3]))
             printf("%sTone indicator: Info=%d, Non-crit=%d, Crit=%d, "
                    "Unrecov=%d\n", pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case ESC_ELECTRONICS_ETC: /* enclosure services controller electronics */
-        if ((! filter) || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
             (0x80 & statp[3]))
             printf("%sIdent=%d, Fail=%d, Report=%d, Hot swap=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x80));
         break;
     case SCC_CELECTR_ETC:     /* SCC controller electronics */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2])))
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2])))
             printf("%sIdent=%d, Fail=%d, Report=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1));
@@ -1625,12 +1684,12 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
             printf("%sBattery status: 255 or more minutes remaining\n", pad);
         else
             printf("%sBattery status: %d minutes remaining\n", pad, statp[1]);
-        if ((! filter) || (0xf8 & statp[2]))
+        if (nofilter || (0xf8 & statp[2]))
             printf("%sAC low=%d, AC high=%d, AC qual=%d, AC fail=%d, DC fail="
                    "%d\n", pad, !!(statp[2] & 0x80), !!(statp[2] & 0x40),
                    !!(statp[2] & 0x20), !!(statp[2] & 0x10),
                    !!(statp[2] & 0x8));
-        if ((! filter) || ((0x7 & statp[2]) || (0xc3 & statp[3]))) {
+        if (nofilter || ((0x7 & statp[2]) || (0xc3 & statp[3]))) {
             printf("%sUPS fail=%d, Warn=%d, Intf fail=%d, Ident=%d, Fail=%d, "
                    "Batt fail=%d\n", pad, !!(statp[2] & 0x4),
                    !!(statp[2] & 0x2), !!(statp[2] & 0x1),
@@ -1640,33 +1699,33 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         }
         break;
     case DISPLAY_ETC:   /* Display (ses2r15) */
-        if ((! filter) || (0xc0 & statp[1]))
+        if (nofilter || (0xc0 & statp[1]))
             printf("%sIdent=%d, Fail=%d, Display mode status=%d, Display "
                    "character status=0x%x\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), (statp[1] & 0x3),
                    ((statp[2] << 8) & statp[3]));
         break;
     case KEY_PAD_ETC:   /* Key pad entry */
-        if ((! filter) || (0xc0 & statp[1]))
+        if (nofilter || (0xc0 & statp[1]))
             printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40));
         break;
     case ENCLOSURE_ETC:
         a = ((statp[2] >> 2) & 0x3f);
-        if ((! filter) || ((0x80 & statp[1]) || a || (0x2 & statp[2])))
+        if (nofilter || ((0x80 & statp[1]) || a || (0x2 & statp[2])))
             printf("%sIdent=%d, Time until power cycle=%d, "
                    "Failure indication=%d\n", pad, !!(statp[1] & 0x80),
                    a, !!(statp[2] & 0x2));
         b = ((statp[3] >> 2) & 0x3f);
-        if ((! filter) || (0x1 & statp[2]) || a || b)
+        if (nofilter || (0x1 & statp[2]) || a || b)
             printf("%sWarning indication=%d, Requested power off "
                    "duration=%d\n", pad, !!(statp[2] & 0x2), b);
-        if ((! filter) || (0x3 & statp[3]))
+        if (nofilter || (0x3 & statp[3]))
             printf("%sFailure requested=%d, Warning requested=%d\n",
                    pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case SCSI_PORT_TRAN_ETC:   /* SCSI port/transceiver */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x13 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Disabled=%d, Loss of "
                    "link=%d, Xmit fail=%d\n", pad, !!(statp[1] & 0x80),
@@ -1679,13 +1738,13 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                statp + 2);
         break;
     case COMM_PORT_ETC:   /* Communication port */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[3])))
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Disabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[3] & 0x1));
         break;
     case VOLT_SENSOR_ETC:   /* Voltage sensor */
-        if ((! filter) || (0xcf & statp[1])) {
+        if (nofilter || (0xcf & statp[1])) {
             printf("%sIdent=%d, Fail=%d,  Warn Over=%d, Warn Under=%d, "
                    "Crit Over=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[1] & 0x8),
@@ -1701,7 +1760,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
 #endif
         break;
     case CURR_SENSOR_ETC:   /* Current sensor */
-        if ((! filter) || (0xca & statp[1]))
+        if (nofilter || (0xca & statp[1]))
             printf("%sIdent=%d, Fail=%d, Warn Over=%d, Crit Over=%d\n",
                     pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                     !!(statp[1] & 0x8), !!(statp[1] & 0x2));
@@ -1714,14 +1773,14 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
 #endif
         break;
     case SCSI_TPORT_ETC:   /* SCSI target port */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x1));
         break;
     case SCSI_IPORT_ETC:   /* SCSI initiator port */
-        if ((! filter) || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
                            (0x1 & statp[3])))
             printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40),
@@ -1732,30 +1791,30 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                !!(statp[1] & 0x80), !!(statp[1] & 0x40), statp[3]);
         break;
     case ARRAY_DEV_ETC:   /* Array device */
-        if ((! filter) || (0xf0 & statp[1]))
+        if (nofilter || (0xf0 & statp[1]))
             printf("%sOK=%d, Reserved device=%d, Hot spare=%d, Cons check="
                    "%d\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                    !!(statp[1] & 0x20), !!(statp[1] & 0x10));
-        if ((! filter) || (0xf & statp[1]))
+        if (nofilter || (0xf & statp[1]))
             printf("%sIn crit array=%d, In failed array=%d, Rebuild/remap=%d"
                    ", R/R abort=%d\n", pad, !!(statp[1] & 0x8),
                    !!(statp[1] & 0x4), !!(statp[1] & 0x2),
                    !!(statp[1] & 0x1));
-        if ((! filter) || (0xf0 & statp[2]))
+        if (nofilter || (0xf0 & statp[2]))
             printf("%sApp client bypass A=%d, Do not remove=%d, Enc bypass "
                    "A=%d, Enc bypass B=%d\n", pad, !!(statp[2] & 0x80),
                    !!(statp[2] & 0x40), !!(statp[2] & 0x20),
                    !!(statp[2] & 0x10));
-        if ((! filter) || (0xf & statp[2]))
+        if (nofilter || (0xf & statp[2]))
             printf("%sReady to insert=%d, RMV=%d, Ident=%d, Report=%d\n",
                    pad, !!(statp[2] & 0x8), !!(statp[2] & 0x4),
                    !!(statp[2] & 0x2), !!(statp[2] & 0x1));
-        if ((! filter) || (0xf0 & statp[3]))
+        if (nofilter || (0xf0 & statp[3]))
             printf("%sApp client bypass B=%d, Fault sensed=%d, Fault reqstd="
                    "%d, Device off=%d\n", pad, !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x20),
                    !!(statp[3] & 0x10));
-        if ((! filter) || (0xf & statp[3]))
+        if (nofilter || (0xf & statp[3]))
             printf("%sBypassed A=%d, Bypassed B=%d, Dev bypassed A=%d, "
                    "Dev bypassed B=%d\n",
                    pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
@@ -2068,7 +2127,7 @@ sas_addr_non_zero(const unsigned char * ucp)
 }
 
 static const char * sas_device_type[] = {
-    "no device attached",
+    "no SAS device attached",   /* but might be SATA device */
     "end device",
     "expander device",  /* in SAS-1.1 this was a "edge expander device */
     "expander device (fanout, SAS-1.1)",  /* marked obsolete in SAS-2 */
@@ -2081,7 +2140,7 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
 {
     int ports, phys, j, m, desc_type, eip_offset, print_sas_addr;
     const unsigned char * per_ucp;
-    int filter = op->do_filter;
+    int nofilter = ! op->do_filter;
     char b[64];
 
     if (op->inner_hex) {
@@ -2137,12 +2196,12 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                 printf("%sphy index: %d\n", pad, j);
                 printf("%s  device type: %s\n", pad,
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
-                if ((! filter) || (0xe & per_ucp[2]))
+                if (nofilter || (0xe & per_ucp[2]))
                     printf("%s  initiator port for:%s%s%s\n", pad,
                            ((per_ucp[2] & 8) ? " SSP" : ""),
                            ((per_ucp[2] & 4) ? " STP" : ""),
                            ((per_ucp[2] & 2) ? " SMP" : ""));
-                if ((! filter) || (0x8f & per_ucp[3]))
+                if (nofilter || (0x8f & per_ucp[3]))
                     printf("%s  target port for:%s%s%s%s%s\n", pad,
                            ((per_ucp[3] & 0x80) ? " SATA_port_selector" : ""),
                            ((per_ucp[3] & 8) ? " SSP" : ""),
@@ -2150,13 +2209,13 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                            ((per_ucp[3] & 2) ? " SMP" : ""),
                            ((per_ucp[3] & 1) ? " SATA_device" : ""));
                 print_sas_addr = 0;
-                if ((! filter) || sas_addr_non_zero(per_ucp + 4)) {
+                if (nofilter || sas_addr_non_zero(per_ucp + 4)) {
                     ++print_sas_addr;
                     printf("%s  attached SAS address: 0x", pad);
                     for (m = 0; m < 8; ++m)
                         printf("%02x", per_ucp[4 + m]);
                 }
-                if ((! filter) || sas_addr_non_zero(per_ucp + 12)) {
+                if (nofilter || sas_addr_non_zero(per_ucp + 12)) {
                     ++print_sas_addr;
                     printf("\n%s  SAS address: 0x", pad);
                     for (m = 0; m < 8; ++m)
@@ -2286,7 +2345,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                     continue;
             }
             if (eip)
-                printf("      Element index: %d\n", ind);
+                printf("      Element index: %d  eiioe=%d\n", ind,
+                       (ucp[2] & 1));
             else
                 printf("      Element %d descriptor\n", ind);
             if (invalid && (0 == op->inner_hex))
@@ -2783,8 +2843,8 @@ fini:
 static int
 join_work(int sg_fd, struct opts_t * op, int display)
 {
-    int k, j, res, num_t_hdrs, elem_ind, ei, get_out;
-    int desc_len, dn_len, broken_ei, ei2, got1;
+    int k, j, res, num_t_hdrs, elem_ind, ei, get_out, desc_len, dn_len;
+    int et4aes, broken_ei, ei2, got1, jr_max_ind, eip, eiioe;
     unsigned int ref_gen_code, gen_code;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
@@ -2893,8 +2953,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
                           sizeof(threshold_rsp), op, &threshold_rsp_len);
         if (0 == res) {
             if (threshold_rsp_len < 8) {
-                fprintf(stderr, "Additional Element Status response too "
-                        "short\n");
+                fprintf(stderr, "Threshold In response too short\n");
                 return -1;
             }
             gen_code = (threshold_rsp[4] << 24) | (threshold_rsp[5] << 16) |
@@ -2924,7 +2983,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
         jrp->el_ind_indiv = -1;
         jrp->etype = tdhp->etype;
         jrp->ei_asc = -1;
-        broken_ei = active_et_aesp(tdhp->etype);
+        et4aes = active_et_aesp(tdhp->etype);
         jrp->ei_asc2 = -1;
         jrp->se_id = tdhp->se_id;
         /* check es_ucp < es_last_ucp still in range */
@@ -2945,7 +3004,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
             jrp->el_ind_th = k;
             jrp->el_ind_indiv = elem_ind;
             jrp->ei_asc = ei++;
-            if (broken_ei)
+            if (et4aes)
                 jrp->ei_asc2 = ei2++;
             else
                 jrp->ei_asc2 = -1;
@@ -2961,9 +3020,12 @@ join_work(int sg_fd, struct opts_t * op, int display)
                 t_ucp += 4;
             jrp->add_elem_statp = NULL;
         }
-        if (jrp >= join_arr_lastp)
+        if (jrp >= join_arr_lastp) {
+            ++k;
             break;      /* leave last row all zeros */
+        }
     }
+    jr_max_ind = k;
 
     broken_ei = 0;
     if (ae_ucp) {
@@ -2980,7 +3042,19 @@ join_work(int sg_fd, struct opts_t * op, int display)
                                     "page\n");
                         break;
                     }
-                    if (ae_ucp[0] & 0x10) {     /* EIP bit set */
+                    eip = !!(ae_ucp[0] & 0x10);
+                    eiioe = eip ? (ae_ucp[2] & 1) : 0;
+                    if (eip && eiioe) {
+                        ei = ae_ucp[3];
+                        jr2p = join_arr + ei;
+                        if ((ei >= jr_max_ind) || (NULL == jr2p->enc_statp)) {
+                            get_out = 1;
+                            fprintf(stderr, "join_work: oi=%d, ei=%d, eiioe=1 "
+                                    "not in join_arr\n", k, ei);
+                            break;
+                        }
+                        jr2p->add_elem_statp = ae_ucp;
+                    } else if (eip) {     /* and EIIOE=0 */
                         ei = ae_ucp[3];
 try_again:
                         for (jr2p = join_arr; jr2p->enc_statp; ++jr2p) {
@@ -3075,6 +3149,8 @@ try_again:
                 continue;
         }
         ++got1;
+        if ((op->do_filter > 2) && (1 != (0xf & jrp->enc_statp[0])))
+            continue;   /* when '-fff' and status!=OK, skip */
         cp = find_element_tname(jrp->etype, b, sizeof(b));
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
@@ -3454,6 +3530,48 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     return 0;
 }
 
+/* Called when '--nickname=SEN' given. First calls status page to fetch
+ * the generation code. Returns 0 for success, any other return value is
+ * an error. */
+static int
+ses_set_nickname(int sg_fd, struct opts_t * op)
+{
+    int res, len;
+    int resp_len = 0;
+    unsigned char b[64];
+    const int control_plen = 0x24;
+
+    memset(b, 0, sizeof(b));
+    /* Only after the generation code, offset 4 for 4 bytes */
+    res = do_rec_diag(sg_fd, DPC_SUBENC_NICKNAME, b, 8, op, &resp_len);
+    if (res) {
+        fprintf(stderr, "set_nickname: Subenclosure nickname status page, "
+                "res=%d\n", res);
+        return -1;
+    }
+    if (resp_len < 8) {
+        fprintf(stderr, "set_nickname: Subenclosure nickname status page, "
+                "response length too short: %d\n", resp_len);
+        return -1;
+    }
+    if (op->verbose) {
+        unsigned int gc;
+
+        gc = (b[4] << 24) + (b[5] << 16) + (b[6] << 8) + b[7];
+        fprintf(stderr, "set_nickname: generation code from status page: "
+                "%u\n", gc);
+    }
+    b[0] = (unsigned char)DPC_SUBENC_NICKNAME;  /* just in case */
+    b[1] = (unsigned char)op->seid;
+    b[2] = (unsigned char)(control_plen >> 8);
+    b[3] = (unsigned char)control_plen;
+    len = strlen(op->nickname_str);
+    if (len > 32)
+        len = 32;
+    memcpy(b + 8, op->nickname_str, len);
+    return do_senddiag(sg_fd, 1, b, control_plen + 4, 1, op->verbose);
+}
+
 static void
 enumerate_diag_pages(void)
 {
@@ -3616,7 +3734,10 @@ main(int argc, char * argv[])
                 printf("    %s device (not an enclosure)\n", cp);
         }
     }
-    if (have_cgs)
+
+    if (opts.nickname_str)
+        ret = ses_set_nickname(sg_fd, &opts);
+    else if (have_cgs)
         ret = ses_cgs(sg_fd, &tav, &opts);
     else if (opts.do_join)
         ret = join_work(sg_fd, &opts, 1);
@@ -3728,7 +3849,7 @@ err_out:
             break;
         case SG_LIB_CAT_ILLEGAL_REQ:
             fprintf(stderr, "    Send diagnostics command, bad field in "
-                    "cdb\n");
+                    "cdb or parameter list\n");
             break;
         }
     }

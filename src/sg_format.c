@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.23 20130530";
+static const char * version_str = "1.23 20130730";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -276,7 +276,8 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                         resp_len = reqSense[7] + 8;
                         if (verb) {
                                 fprintf(stderr, "Parameter data in hex:\n");
-                                dStrHex((const char *)reqSense, resp_len, 1);
+                                dStrHexErr((const char *)reqSense, resp_len,
+                                           1);
                         }
                         progress = -1;
                         sg_get_sense_progress_fld(reqSense, resp_len,
@@ -318,7 +319,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
                 fprintf(stderr, "Parameter data in hex\n");
-                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+                dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
             sg_get_sense_progress_fld(requestSenseBuff, resp_len,

@@ -84,8 +84,10 @@ extern "C" {
 #define SPC_SK_UNIT_ATTENTION 0x6
 #define SPC_SK_DATA_PROTECT 0x7
 #define SPC_SK_BLANK_CHECK 0x8
+#define SPC_SK_VENDOR_SPECIFIC 0x9
 #define SPC_SK_COPY_ABORTED 0xa
 #define SPC_SK_ABORTED_COMMAND 0xb
+#define SPC_SK_RESERVED 0xc
 #define SPC_SK_VOLUME_OVERFLOW 0xd
 #define SPC_SK_MISCOMPARE 0xe
 #define SPC_SK_COMPLETED 0xf
@@ -100,37 +102,37 @@ extern "C" {
 #define TPROTO_SAS 6
 #define TPROTO_ADT 7
 #define TPROTO_ATA 8
-#define TPROTO_UAS 9
-#define TPROTO_SOP 0xa
+#define TPROTO_UAS 9            /* USB attached SCSI */
+#define TPROTO_SOP 0xa          /* SCSI over PCIe */
 #define TPROTO_NONE 0xf
 
 
-/* The format of the version string is like this: "1.47 20090201" */
-extern const char * sg_lib_version();
+/* The format of the version string is like this: "1.87 20130731" */
+const char * sg_lib_version();
 
 /* Returns length of SCSI command given the opcode (first byte).
  * Yields the wrong answer for variable length commands (opcode=0x7f)
  * and potentially some vendor specific commands. */
-extern int sg_get_command_size(unsigned char cdb_byte0);
+int sg_get_command_size(unsigned char cdb_byte0);
 
 /* Command name given pointer to the cdb. Certain command names
  * depend on peripheral type (give 0 if unknown). Places command
  * name into buff and will write no more than buff_len bytes. */
-extern void sg_get_command_name(const unsigned char * cdbp, int peri_type,
-                                int buff_len, char * buff);
+void sg_get_command_name(const unsigned char * cdbp, int peri_type,
+                         int buff_len, char * buff);
 
 /* Command name given only the first byte (byte 0) of a cdb and
  * peripheral type. */
-extern void sg_get_opcode_name(unsigned char cdb_byte0, int peri_type,
-                               int buff_len, char * buff);
+void sg_get_opcode_name(unsigned char cdb_byte0, int peri_type, int buff_len,
+                        char * buff);
 
 /* Command name given opcode (byte 0), service action and peripheral type.
  * If no service action give 0, if unknown peripheral type give 0. */
-extern void sg_get_opcode_sa_name(unsigned char cdb_byte0, int service_action,
-                                  int peri_type, int buff_len, char * buff);
+void sg_get_opcode_sa_name(unsigned char cdb_byte0, int service_action,
+                           int peri_type, int buff_len, char * buff);
 
 /* Fetch scsi status string. */
-extern void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff);
+void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff);
 
 /* This is a slightly stretched SCSI sense "descriptor" format header.
  * The addition is to allow the 0x70 and 0x71 response codes. The idea
@@ -156,36 +158,37 @@ struct sg_scsi_sense_hdr {
  * non-NULL then zero all fields and then set the appropriate fields in
  * that structure. sshp::additional_length is always 0 for response
  * codes 0x70 and 0x71 (fixed format). */
-extern int sg_scsi_normalize_sense(const unsigned char * sensep,
-                                   int sense_len,
-                                   struct sg_scsi_sense_hdr * sshp);
+int sg_scsi_normalize_sense(const unsigned char * sensep, int sense_len,
+                            struct sg_scsi_sense_hdr * sshp);
 
 /* Attempt to find the first SCSI sense data descriptor that matches the
  * given 'desc_type'. If found return pointer to start of sense data
  * descriptor; otherwise (including fixed format sense data) returns NULL. */
-extern const unsigned char * sg_scsi_sense_desc_find(
-                const unsigned char * sensep, int sense_len, int desc_type);
+const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
+                                              int sense_len, int desc_type);
+
+/* Get sense key from sense buffer. If successful returns a sense key value
+ * between 0 and 15. If sense buffer cannot be decode, returns -1 . */
+int sg_get_sense_key(const unsigned char * sensep, int sense_len);
 
 /* Yield string associated with sense_key value. Returns 'buff'. */
-extern char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff);
+char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff);
 
 /* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
-extern char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len,
-                                  char * buff);
+char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff);
 
 /* Returns 1 if valid bit set, 0 if valid bit clear. Irrespective the
  * information field is written out via 'info_outp' (except when it is
  * NULL). Handles both fixed and descriptor sense formats. */
-extern int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
-                                 uint64_t * info_outp);
+int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
+                          uint64_t * info_outp);
 
 /* Returns 1 if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
  * In descriptor format if the stream commands descriptor not found
  * then returns 0. Writes 1 or 0 corresponding to these bits to the
  * last three arguments if they are non-NULL. */
-extern int sg_get_sense_filemark_eom_ili(const unsigned char * sensep,
-                                         int sb_len, int * filemark_p,
-                                         int * eom_p, int * ili_p);
+int sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
+                                  int * filemark_p, int * eom_p, int * ili_p);
 
 /* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
  * returns 1 if progress indication sense data descriptor found. Places
@@ -193,35 +196,33 @@ extern int sg_get_sense_filemark_eom_ili(const unsigned char * sensep,
  * field is not available returns 0. Handles both fixed and descriptor
  * sense formats. N.B. App should multiply by 100 and divide by 65536
  * to get percentage completion from given value. */
-extern int sg_get_sense_progress_fld(const unsigned char * sensep,
-                                     int sb_len, int * progress_outp);
+int sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
+                              int * progress_outp);
 
 /* Closely related to sg_print_sense(). Puts decoded sense data in 'buff'.
  * Usually multiline with multiple '\n' including one trailing. If
  * 'raw_sinfo' set appends sense buffer in hex. */
-extern void sg_get_sense_str(const char * leadin,
-                             const unsigned char * sense_buffer, int sb_len,
-                             int raw_sinfo, int buff_len, char * buff);
+void sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
+                      int sb_len, int raw_sinfo, int buff_len, char * buff);
 
 /* Yield string associated with peripheral device type (pdt). Returns
  * 'buff'. If 'pdt' out of range yields "bad pdt" string. */
-extern char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
+char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
 
 /* Yield string associated with transport protocol identifier (tpi). Returns
  *    'buff'. If 'tpi' out of range yields "bad tpi" string. */
-extern char * sg_get_trans_proto_str(int tpi, int buff_len, char * buff);
+char * sg_get_trans_proto_str(int tpi, int buff_len, char * buff);
 
 extern FILE * sg_warnings_strm;
 
-extern void sg_set_warnings_strm(FILE * warnings_strm);
+void sg_set_warnings_strm(FILE * warnings_strm);
 
 /* The following "print" functions send ACSII to 'sg_warnings_strm' file
  * descriptor (default value is stderr) */
-extern void sg_print_command(const unsigned char * command);
-extern void sg_print_sense(const char * leadin,
-                           const unsigned char * sense_buffer, int sb_len,
-                           int raw_info);
-extern void sg_print_scsi_status(int scsi_status);
+void sg_print_command(const unsigned char * command);
+void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
+                    int sb_len, int raw_info);
+void sg_print_scsi_status(int scsi_status);
 
 /* Utilities can use these process status values for syntax errors and
  * file (device node) problems (e.g. not found or permissions). */
@@ -246,6 +247,8 @@ extern void sg_print_scsi_status(int scsi_status);
                                 /*       [sk,asc,ascq: 0x5,0x20,0x0] */
 #define SG_LIB_CAT_ABORTED_COMMAND 11 /* interpreted from sense buffer */
                                 /*       [sk,asc,ascq: 0xb,*,*] */
+#define SG_LIB_CAT_MISCOMPARE 14 /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0xe,*,*] */
 #define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense" */
                                 /*       [sk,asc,ascq: 0x0,*,*] */
 #define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err */
@@ -257,8 +260,7 @@ extern void sg_print_scsi_status(int scsi_status);
 
 /* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
  * common sense key then return SG_LIB_CAT_SENSE .*/
-extern int sg_err_category_sense(const unsigned char * sense_buffer,
-                                 int sb_len);
+int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len);
 
 /* Here are some additional sense data categories that are not returned
  * by sg_err_category_sense() but are returned by some related functions. */
@@ -280,16 +282,16 @@ extern int sg_err_category_sense(const unsigned char * sense_buffer,
  * descriptor; returns -1 if normal end condition and -2 for an abnormal
  * termination. Matches association, designator_type and/or code_set when
  * any of those values are greater than or equal to zero. */
-extern int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc,
-                              int page_len, int * off, int m_assoc,
-                              int m_desig_type, int m_code_set);
+int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
+                       int * off, int m_assoc, int m_desig_type,
+                       int m_code_set);
 
 
 /* <<< General purpose (i.e. not SCSI specific) utility functions >>> */
 
 /* Always returns valid string even if errnum is wild (or library problem).
  * If errnum is negative, flip its sign. */
-extern char * safe_strerror(int errnum);
+char * safe_strerror(int errnum);
 
 
 /* Print (to stdout) 'str' of bytes in hex, 16 bytes per line optionally
@@ -300,20 +302,33 @@ extern char * safe_strerror(int errnum);
  *     = 0     in addition, the bytes are listed in ASCII to the right
  *     < 0     only the ASCII-hex bytes are listed (i.e. without address)
 */
-extern void dStrHex(const char* str, int len, int no_ascii);
+void dStrHex(const char* str, int len, int no_ascii);
+
+/* Print (to sg_warnings_strm (stderr)) 'str' of bytes in hex, 16 bytes per
+ * line optionally followed at right by its ASCII interpretation. Same
+ * logic as dStrHex() with different output stream (i.e. stderr). */
+void dStrHexErr(const char* str, int len, int no_ascii);
+
+/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
+ * separated) to 'b' not to exceed 'b_len' characters. Each line
+ * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
+ * per line with an extra space between the 8th and 9th bytes. 'format'
+ * is unused, set to 0 . */
+void dStrHexStr(const char* str, int len, const char * leadin, int format,
+                int b_len, char * b);
 
 /* Returns 1 when executed on big endian machine; else returns 0.
  * Useful for displaying ATA identify words (which need swapping on a
  * big endian machine).
 */
-extern int sg_is_big_endian();
+int sg_is_big_endian();
 
 /* Extract character sequence from ATA words as in the model string
  * in a IDENTIFY DEVICE response. Returns number of characters
  * written to 'ochars' before 0 character is found or 'num' words
  * are processed. */
-extern int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
-                            int num_words, int is_big_endian, char * ochars);
+int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
+                     int num_words, int is_big_endian, char * ochars);
 
 /* Print (to stdout) 16 bit 'words' in hex, 8 words per line optionally
  * followed at the right hand side of the line with an ASCII interpretation
@@ -328,8 +343,7 @@ extern int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
  * If 'swapb' non-zero then bytes in each word swapped. Needs to be set
  * for ATA IDENTIFY DEVICE response on big-endian machines.
 */
-extern void dWordHex(const unsigned short* words, int num, int no_ascii,
-                     int swapb);
+void dWordHex(const unsigned short* words, int num, int no_ascii, int swapb);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
  * then -1 is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
@@ -337,20 +351,20 @@ extern void dWordHex(const unsigned short* words, int num, int no_ascii,
  * multipliers: c C  *1;  w W  *2; b  B *512;  k K KiB  *1,024;
  * KB  *1,000;  m M MiB  *1,048,576; MB *1,000,000; g G GiB *1,073,741,824;
  * GB *1,000,000,000 and <n>x<m> which multiplies <n> by <m> . */
-extern int sg_get_num(const char * buf);
+int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
  * hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
  * assumed. Does not accept multipliers. Accept a comma (","), a whitespace
  * or newline as terminator.  */
-extern int sg_get_num_nomult(const char * buf);
+int sg_get_num_nomult(const char * buf);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
  * then -1LL is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
  * suffix. Otherwise a decimal multiplier suffix may be given. In addition
  * to supporting the multipliers of sg_get_num(), this function supports:
  * t T TiB  *(2**40); TB *(10**12); p P PiB  *(2**50); PB  *(10**15) . */
-extern int64_t sg_get_llnum(const char * buf);
+int64_t sg_get_llnum(const char * buf);
 
 
 /* <<< Architectural support functions [is there a better place?] >>> */
@@ -358,11 +372,11 @@ extern int64_t sg_get_llnum(const char * buf);
 /* Non Unix OSes distinguish between text and binary files.
  * Set text mode on fd. Does nothing in Unix. Returns negative number on
  * failure. */
-extern int sg_set_text_mode(int fd);
+int sg_set_text_mode(int fd);
 
 /* Set binary mode on fd. Does nothing in Unix. Returns negative number on
  * failure. */
-extern int sg_set_binary_mode(int fd);
+int sg_set_binary_mode(int fd);
 
 #ifdef __cplusplus
 }

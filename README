@@ -151,6 +151,16 @@ Darwin is not supported because the Apple folks do not want to give their
 users a pass-through SCSI interface. The author has read about creative
 hackers using a VM containing a real OS to circumvent the Apple restriction.
 
+C standard is C99
+==================
+The C code in this package is written for portability rather than speed.
+It assumes a level of C99 compliance and favours POSIX system and library
+calls over OS specific calls.
+
+The C code is written in a C++ friendly way and is checked from time to
+time that it compiles clean with C++. To accomodate C++ certain C99
+constructs such as designated initializers cannot be used.
+
 Building
 ========
 This package is designed to be built with the usual:
@@ -171,10 +181,6 @@ and disable the creation of the shared library (libsgutils<num>.so) this
 invocation could be used: "./configure --prefix=/usr --disable-shared".
 To reduce the size of an executable as well try this:
 "./configure --prefix=/usr --disable-shared --disable-scsistrings".
-
-The C code in this package is written for portability rather than speed.
-It assumes a level of C99 compliance and favours POSIX system and library
-calls over OS specific calls.
 
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
@@ -255,7 +261,8 @@ subdirectory:
   - bsg_queue_tst, sg_excl, scsi_inquiry, sg_iovec_tst, sg_queue_tst,
     sg_sat_chk_power, sg__sat_identify, sg__sat_phy_event,
     sg__sat_set_features, sg_sat_smart_rd_data, sg_simple1, sg_simple2,
-    sg_simple3, sg_simple4, sg_simple5 and sg_simple16
+    sg_simple3, sg_simple4, sg_simple5, sg_simple16, sg_tst_excl and
+    sg_tst_excl2
 
 Also in that subdirectory is a script to test sg_persist, an example data
 file for sg_persist (called "transport_ids.txt") and an example data file for
@@ -320,6 +327,19 @@ descriptor (as defined in SAT).
 through the SAT-defined ATA PASS_THROUGH (16) SCSI command. If
 successful, the 256 word (512 byte) response is output.
 
+"sg_tst_excl" and "sg_tst_excl2" use multiple threads to bombard the
+given device with O_EXCL open flags, so only one should succeed at a
+time. While holding O_EXCL control a thread attempts a double increment
+on an integer in the given LBA. If the integer starts even (after the
+first read) then it should remain even if the O_EXCL flag is doing its job.
+The "sg_tst_excl" variant uses the Linux SG_IO v3 interface while the
+"sg_tst_excl2" uses the more generic sg_pt infrastructure. 
+
+"bsg_queue_tst" sends an INQUIRY command via the Linux SG_IO v4 interface
+which is used by the bsg driver. So it will take device names like
+"/dev/bsg/6:0:0:0". It tests if sending repeated INQUIRYs with
+the BSG_FLAG_Q_AT_HEAD or BSG_FLAG_Q_AT_TAIL flag makes any difference.
+
 
 Command line processing
 =======================
@@ -376,4 +396,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-31st May 2013
+14th October 2013

@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.02 20130516";
+static const char * version_str = "1.04 20130730";
 
 
 #define ME "sg_write_same: "
@@ -256,7 +256,7 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     }
     if ((optsp->verbose > 3) && (optsp->xfer_len > 0)) {
         fprintf(stderr, "    Data-out buffer contents:\n");
-        dStrHex((const char *)dataoutp, optsp->xfer_len, 1);
+        dStrHexErr((const char *)dataoutp, optsp->xfer_len, 1);
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -293,7 +293,7 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 if (valid)
                     fprintf(stderr, "Medium or hardware error starting at "
-                            "lba=%"PRIu64" [0x%"PRIx64"]\n", ull, ull);
+                            "lba=%" PRIu64 " [0x%" PRIx64 "]\n", ull, ull);
             }
             ret = sense_cat;
             break;
@@ -509,7 +509,7 @@ main(int argc, char * argv[])
                                    RCAP16_RESP_LEN, 0, (vb ? (vb - 1): 0));
             if (0 == res) {
                 if (vb > 3)
-                    dStrHex((const char *)resp_buff, RCAP16_RESP_LEN, 1);
+                    dStrHexErr((const char *)resp_buff, RCAP16_RESP_LEN, 1);
                 block_size = ((resp_buff[8] << 24) |
                               (resp_buff[9] << 16) |
                               (resp_buff[10] << 8) |
@@ -528,7 +528,8 @@ main(int argc, char * argv[])
                                        (vb ? (vb - 1): 0));
                 if (0 == res) {
                     if (vb > 3)
-                        dStrHex((const char *)resp_buff, RCAP10_RESP_LEN, 1);
+                        dStrHexErr((const char *)resp_buff, RCAP10_RESP_LEN,
+                                   1);
                     block_size = ((resp_buff[4] << 24) |
                                   (resp_buff[5] << 16) |
                                   (resp_buff[6] << 8) |

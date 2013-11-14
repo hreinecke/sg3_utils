@@ -1,11 +1,11 @@
-.TH SG_SAT_SET_FEATURES "8" "April 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_SAT_SET_FEATURES "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_sat_set_features \- use ATA SET FEATURES command via a SCSI to ATA
 Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_set_features
 [\fI\-\-count=CO\fR] [\fI\-\-ck_cond\fR] [\fI\-\-feature=FEA\fR]
-[\fI\-\-help\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-len=\fR16|12]
+[\fI\-\-help\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-len=\fR{16|12}]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -63,7 +63,7 @@ value is typically not a "logical block address" as the acronym might
 imply.  The default value placed in the "lba" field is 0. The maximum value
 allowed for \fILBA\fR is 0xfffffffe (or 0xffffff if \fI\-\-len=\fR12).
 .TP
-\fB\-l\fR, \fB\-\-len\fR=16 | 12
+\fB\-l\fR, \fB\-\-len\fR={16|12}
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
 The argument can either be 16 or 12. The default is 16. Some SCSI
 transports cannot convey SCSI commands longer than 12 bytes.

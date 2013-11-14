@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_XCOPY "8" "October 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -10,15 +10,25 @@ COPY (XCOPY)
 [\fI\-\-version\fR]
 .PP
 [\fIbpt=BPT\fR] [\fIcat=\fR0|1] [\fIdc=\fR0|1]
-[\fIid_usage=\fRhold|discard|disable] [\fIlist_id=ID\fR] [\fIprio=PRIO\fR]
+[\fIid_usage=\fR{hold|discard|disable}] [\fIlist_id=ID\fR] [\fIprio=PRIO\fR]
 [\fItime=\fR0|1] [\fIverbose=VERB\fR] [\fI\-\-on_dst|\-\-on_src\fR]
 [\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Copy data to and from any files. Specialized for "files" that are Linux SCSI
-devices that support the SCSI EXTENDED COPY (XCOPY) command. Similar syntax
-and semantics to
+devices that support the SCSI EXTENDED COPY (XCOPY) command.
+.PP
+During the draft stages of SPC\-4 the T10 committee has expanded the XCOPY
+command so that it now has two variants: "LID1" (for a List Identifier
+length of 1 byte) and "LID4" (for a List Identifier length of 4 bytes).
+This utility supports the older, LID1 variant which is also found in SPC\-3
+and earlier.  While the LID1 variant in SPC\-4 is command level (binary)
+compatible with XCOPY as defined in SPC\-3, some of the command naming has
+changed. This utility uses the older, SPC\-3 XCOPY names.
+.PP
+This utility
+has similar syntax and semantics to
 .B dd(1)
 but with no "conversions" is supported.
 .PP
@@ -50,14 +60,14 @@ files are accessed via SCSI commands). Note that this differs from
 which permits \fIBS\fR to be an integral multiple. Defaults to the
 device block size.
 .TP
-\fBcat\fR=0 | 1
+\fBcat\fR={0|1}
 sets the SCSI EXTENDED COPY command segment descriptor CAT bit to 0 or
 1 (default: 0). The CAT bit (in conjunction with the PAD bit) controls
 the handling of residual data. See section
 .B HANDLING OF RESIDUAL DATA
 for details.
 .TP
-\fBdc\fR=0 | 1
+\fBdc\fR={0|1}
 sets the SCSI EXTENDED COPY command segment descriptor DC bit to 0 or
 1 (default: 0). The DC bit controls whether \fICOUNT\fR
 refers to the source (\fIdc=0\fR) or the target (\fIdc=1\fR) descriptor.
@@ -82,7 +92,7 @@ message is issued and no copy takes place.
 \fBibs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
 .TP
-\fBid_usage\fR=hold | discard | disable
+\fBid_usage\fR={hold|discard|disable}
 sets the SCSI EXTENDED COPY command parameter list field called LIST ID
 USAGE to 0 if the argument is 'hold', to 2 if the argument is 'discard',
 or to '3' if the argument is 'disable'.
@@ -130,7 +140,7 @@ Default is block 0 (i.e. start of file).
 start reading \fISKIP\fR bs\-sized blocks from the start of \fIIFILE\fR.
 Default is block 0 (i.e. start of file).
 .TP
-\fBtime\fR=0 | 1
+\fBtime\fR={0|1}
 when 1, times transfer and does throughput calculation, outputting the
 results (to stderr) at completion. When 0 (default) doesn't perform timing.
 .TP
@@ -171,13 +181,6 @@ from the beginning of the file or, if \fISEEK\fR is given, starting at
 block \fISEEK\fR. Note that attempting to 'append' to a device file (e.g.
 a disk) will usually be ignored or may cause an error to be reported.
 .TP
-pad
-sets the SCSI EXTENDED COPY command segment descriptor PAD bit. The
-PAD bit (in conjunction with the CAT bit) controls the handling of
-residual data.(See section
-.B HANDLING OF RESIDUAL DATA
-for details.
-.TP
 excl
 causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 \fIOFILE\fR.
@@ -192,6 +195,16 @@ and no copy is done.
 .TP
 null
 has no affect, just a placeholder.
+.TP
+pad
+sets the SCSI EXTENDED COPY command segment descriptor PAD bit. The
+PAD bit (in conjunction with the CAT bit) controls the handling of
+residual data.(See section
+.B HANDLING OF RESIDUAL DATA
+for details.
+.TP
+xcopy
+has no affect; for compatibility with ddpt.
 .SH HANDLING OF RESIDUAL DATA
 The \fIpad\fR and \fIcat\fR bits control the handling of residual
 data. As the data can be specified either in terms of source or target
@@ -238,6 +251,12 @@ All informative, warning and error output is sent to stderr so that
 dd's output file can be stdout and remain unpolluted. If no options
 are given, then the usage message is output and nothing else happens.
 .PP
+If a device supports xcopy operations then it should set the 3PC
+field (3PC stands for Third Party Copy) in its standard INQUIRY response.
+This utility will attempt a xcopy operation irrespective of the value
+in the 3PC field but if it is zero (cleared) one would expect the
+xcopy operation to fail.
+.PP
 The status of the SCSI EXTENDED COPY command can be queried with
 .B sg_copy_results(sg3_utils)
 .PP
@@ -250,6 +269,11 @@ whole logical unit (i.e. the whole disk) starting at LBA 0. So any
 partition indication (e.g. /dev/sdc2) is ignored. The user should set
 \fISKIP\fR,  \fISEEK\fR and \fICOUNT\fR with information obtained
 from a command like 'fdisk \-l \-u /dev/sdc' to account for partitions.
+.PP
+XCOPY (LID1) capability has been added to the ddpt utility which is in
+a package of the same name. The ddpt utility will run on other
+OSes (e.g. FreeBSD and Windows) while sg_xcopy only runs on Linux. Also
+ddpt permits the arguments to \fIibs=\fR and \fIibs=\fR to be different.
 .SH EXAMPLES
 Copy 2M of data from the start of one device to another:
 .PP
@@ -312,4 +336,4 @@ recovery see
 .B sdparm(sdparm)
 .PP
 See also
-.B dd(1), sg_copy_results(sg3_utils), ddrescue(GNU), ddpt
+.B dd(1), sg_copy_results(sg3_utils), ddrescue(GNU), ddpt(ddpt)

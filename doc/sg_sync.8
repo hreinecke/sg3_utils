@@ -1,4 +1,4 @@
-.TH SG_SYNC "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_SYNC "8" "July 2013" "sg3_utils\-1.37" SG3_UTILS
 .SH NAME
 sg_sync \- send SCSI SYNCHRONIZE CACHE command
 .SH SYNOPSIS
@@ -56,7 +56,7 @@ synchronize to the medium. Default value is 0 .
 synchronize the (volatile) cache with the non\-volatile cache. Without this
 option (or if there is no non\-volatile cache in the device) the
 synchronization is with the medium. The SYNC_NV bit was made obsolete in
-SBC\-3 revsion 35d.
+SBC\-3 revision 35d.
 .TP
 \fB\-t\fR, \fB\-\-timeout\fR=\fISECS\fR
 where \fISECS\fR is the number of seconds the OS allows the SYNCHRONIZE

@@ -48,8 +48,8 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 35 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20121115 */
+/* table from SPC-4 revision 36 [sorted numerically (from Annex E.9)] */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20130321 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
@@ -197,6 +197,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x4aa, "ADC-2 T10/1741-D revision 8"},
     {0x4ac, "ADC-2 ANSI INCITS 441-2008"},
     {0x4c0, "SBC-3 (no version claimed)"},
+    {0x4c3, "SBC-3 T10/BSR INCITS 514 revision 35"},
     {0x4e0, "MMC-6 (no version claimed)"},
     {0x4e3, "MMC-6 T10/1836-D revision 2b"},
     {0x4e5, "MMC-6 T10/1836-D revision 02g"},
@@ -207,6 +208,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x502, "ADC-3 T10/1895-D revision 04"},
     {0x504, "ADC-3 T10/1895-D revision 05"},
     {0x506, "ADC-3 T10/1895-D revision 05a"},
+    {0x50a, "ADC-3 ANSI INCITS 497-2012"},
     {0x520, "SSC-4 (no version claimed)"},
     {0x523, "SSC-4 T10/BSR INCITS 516 revision 2"},
     {0x560, "OSD-3 (no version claimed)"},
@@ -329,6 +331,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc4b, "SAS-2.1 T10/2125-D revision 07"},
     {0xc4e, "SAS-2.1 ANSI INCITS 478-2011"},
     {0xc60, "SAS-3 (no version claimed)"},
+    {0xc63, "SAS-3 T10/BSR INCITS 519 revision 05a"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
     {0xd3c, "FC-PH ANSI INCITS 230-1994 with Amnd 1 ANSI INCITS "

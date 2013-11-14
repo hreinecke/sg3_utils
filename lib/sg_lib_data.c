@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.83 20130530";  /* spc4r36, sbc3r32 */
+const char * sg_lib_version_str = "1.88 20130815";  /* spc4r36, sbc3r32 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -135,8 +135,9 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x81, 0, "Rebuild(16)"},
     {0x81, PDT_TAPE, "Read reverse(16)"},
     {0x82, 0, "Regenerate(16)"},
-    {0x83, 0, "Extended copy"},
-    {0x84, 0, "Receive copy results"},
+    {0x83, 0, "Third party copy out"},  /* Extended copy, before spc4r34 */
+        /* Following was "Receive copy results", before spc4r34 */
+    {0x84, 0, "Third party copy in"},
     {0x85, 0, "ATA command pass through(16)"},  /* was 0x98 in spc3 rev21c */
     {0x86, 0, "Access control in"},
     {0x87, 0, "Access control out"},
@@ -311,22 +312,26 @@ struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
     {0xffff, 0, NULL},
 };
 
+/* 'Extended copy' was renamed 'Third party copy in' in spc4r34 */
+/* LID1 is an abbreviation of List Identifier length of 1 byte */
 struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
-    {0x0, 0, "Extended copy(lid1)"},
-    {0x1, 0, "Extended copy(lid4)"},
+    {0x0, 0, "Extended copy(LID1)"},
+    {0x1, 0, "Extended copy(LID4)"},
     {0x10, 0, "Populate token"},
     {0x11, 0, "Write using token"},
-    {0x1c, 0, "Extended copy abort"},
+    {0x1c, 0, "Copy operation abort"},
     {0xffff, 0, NULL},
 };
 
+/* 'Receive copy results' was renamed 'Third party copy out' in spc4r34 */
+/* LID4 is an abbreviation of List Identifier length of 4 bytes */
 struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
-    {0x0, 0, "Receive copy status(lid1)"},
-    {0x1, 0, "Receive copy data(lid1)"},
+    {0x0, 0, "Receive copy status(LID1)"},
+    {0x1, 0, "Receive copy data(LID1)"},
     {0x3, 0, "Receive copy operating parameters"},
-    {0x4, 0, "Receive copy failure details(lid1)"},
-    {0x5, 0, "Receive copy status(lid4)"},
-    {0x6, 0, "Receive copy data(lid4)"},
+    {0x4, 0, "Receive copy failure details(LID1)"},
+    {0x5, 0, "Receive copy status(LID4)"},
+    {0x6, 0, "Receive copy data(LID4)"},
     {0x7, 0, "Receive ROD token information"},
     {0x8, 0, "Report all ROD tokens"},
     {0xffff, 0, NULL},
@@ -470,7 +475,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20111222 */
+ * The following should match asc-num.txt dated 20130605 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -628,6 +633,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x11,0x12,"Auxiliary memory read error"},
     {0x11,0x13,"Read error - failed retransmission request"},
     {0x11,0x14,"Read error - LBA marked bad by application client"},
+    {0x11,0x15,"Write after sanitize required"},
     {0x12,0x00,"Address mark not found for id field"},
     {0x13,0x00,"Address mark not found for data field"},
     {0x14,0x00,"Recorded entity not found"},
@@ -897,6 +903,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3F,0x12,"iSCSI IP address added"},
     {0x3F,0x13,"iSCSI IP address removed"},
     {0x3F,0x14,"iSCSI IP address changed"},
+    {0x3F,0x15,"Inspect referrals sense descriptors"},
 
     /*
      * ASC 0x40, 0x41 and 0x42 overridden by "additional2" array entries
@@ -1226,7 +1233,7 @@ const char * sg_lib_sense_key_desc[] = {
     "Data Protect",             /* Access to the data is blocked */
     "Blank Check",              /* Reached unexpected written or unwritten
                                    region of the medium */
-    "Key=9",                    /* Vendor specific */
+    "Vendor specific(9)",       /* Vendor specific */
     "Copy Aborted",             /* COPY or COMPARE was aborted */
     "Aborted Command",          /* The target aborted the command */
     "Equal",                    /* SEARCH DATA found data equal (obsolete) */
