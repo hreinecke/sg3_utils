@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.17 20130923";    /* SPC-4 rev 36 */
+static const char * version_str = "1.20 20131030";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -181,32 +181,34 @@ static struct svpd_values_name_t vpd_pg[] = {
 
 static struct option long_options[] = {
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
-        {"ata", 0, 0, 'a'},
+        {"ata", no_argument, 0, 'a'},
 #endif
-        {"cmddt", 0, 0, 'c'},
-        {"descriptors", 0, 0, 'd'},
-        {"export", 0, 0, 'u'},
-        {"extended", 0, 0, 'x'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"id", 0, 0, 'i'},
-        {"len", 1, 0, 'l'},
-        {"maxlen", 1, 0, 'm'},
+        {"block", required_argument, 0, 'B'},
+        {"cmddt", no_argument, 0, 'c'},
+        {"descriptors", no_argument, 0, 'd'},
+        {"export", no_argument, 0, 'u'},
+        {"extended", no_argument, 0, 'x'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"id", no_argument, 0, 'i'},
+        {"len", required_argument, 0, 'l'},
+        {"maxlen", required_argument, 0, 'm'},
 #ifdef SG_SCSI_STRINGS
-        {"new", 0, 0, 'N'},
-        {"old", 0, 0, 'O'},
+        {"new", no_argument, 0, 'N'},
+        {"old", no_argument, 0, 'O'},
 #endif
-        {"page", 1, 0, 'p'},
-        {"raw", 0, 0, 'r'},
-        {"vendor", 0, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {"vpd", 0, 0, 'e'},
+        {"page", required_argument, 0, 'p'},
+        {"raw", no_argument, 0, 'r'},
+        {"vendor", no_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"vpd", no_argument, 0, 'e'},
         {0, 0, 0, 0},
 };
 
 struct opts_t {
     int do_ata;
+    int do_block;
     int do_cmddt;
     int do_descriptors;
     int do_export;
@@ -235,26 +237,31 @@ usage()
 {
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
     fprintf(stderr,
-            "Usage: sg_inq [--ata] [--cmddt] [--descriptors] [--export] "
-            "[--extended]\n"
-            "              [--help] [--hex] [--id] [--len=LEN] "
-            "[--maxlen=LEN]\n"
-            "              [--page=PG] [--raw] [--vendor] [--verbose] "
-            "[--version]\n"
-            "              [--vpd] DEVICE\n"
+            "Usage: sg_inq [--ata] [--block=0|1] [--cmddt] [--descriptors] "
+            "[--export]\n"
+            "              [--extended] [--help] [--hex] [--id] "
+            "[--len=LEN]\n"
+            "              [--maxlen=LEN] [--page=PG] [--raw] [--vendor] "
+            "[--verbose]\n"
+            "              [--version] [--vpd] DEVICE\n"
             "  where:\n"
             "    --ata|-a        treat DEVICE as (directly attached) ATA "
             "device\n");
 #else
     fprintf(stderr,
-            "Usage: sg_inq [--cmddt] [--descriptors] [--export] [--extended] "
-            "[--help]\n"
-            "              [--hex] [--id] [--len=LEN] [--maxlen=LEN] "
-            "[--page=PG]\n"
-            "              [--raw] [--verbose] [--version] [--vpd] DEVICE\n"
+            "Usage: sg_inq [--block=0|1] [--cmddt] [--descriptors] "
+            "[--export]\n"
+            "              [--extended] [--help] [--hex] [--id] "
+            "[--len=LEN]\n"
+            "              [--maxlen=LEN] [--page=PG] [--raw] [--verbose] "
+            "[--version]\n"
+            "              [--vpd] DEVICE\n"
             "  where:\n");
 #endif
     fprintf(stderr,
+            "    --block=0|1     0-> open(non-blocking); 1-> "
+            "open(blocking)\n"
+            "      -B 0|1        (def: depends on OS; Linux pt: 0)\n"
             "    --cmddt|-c      command support data mode (set opcode "
             "with '--page=PG')\n"
             "                    use twice for list of supported "
@@ -299,29 +306,32 @@ usage_old()
 {
 #ifdef SG_LIB_LINUX
     fprintf(stderr,
-            "Usage:  sg_inq [-a] [-A] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
-            "[-i]\n"
-            "               [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
+            "Usage:  sg_inq [-a] [-A] [-b] [-B 0|1] [-c] [-cl] [-d] [-e] "
+            "[-h]\n"
+            "               [-H] [-i] [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
             "[-p=VPD_PG]\n"
-            "               [-P] [-r] [-s] [-v] [-V] [-x] [-36] [-?] "
-            "DEVICE\n"
+            "               [-P] [-r] [-s] [-u] [-U] [-v] [-V] [-x] [-36] "
+            "[-?]\n"
+            "               DEVICE\n"
             "  where:\n"
             "    -a    decode ATA information VPD page (0x89)\n"
             "    -A    treat <device> as (directly attached) ATA device\n");
 #else
     fprintf(stderr,
-            "Usage:  sg_inq [-a] [-b] [-c] [-cl] [-d] [-e] [-h] [-H] "
-            "[-i]\n"
-            "               [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
+            "Usage:  sg_inq [-a] [-b] [-B 0|1] [-c] [-cl] [-d] [-e] [-h] "
+            "[-H]\n"
+            "               [-i] [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
             "[-p=VPD_PG]\n"
-            "               [-P] [-r] [-s] [-v] [-V] [-x] [-36] [-?] "
-            "DEVICE\n"
+            "               [-P] [-r] [-s] [-u] [-v] [-V] [-x] [-36] "
+            "[-?]\n"
+            "               DEVICE\n"
             "  where:\n"
             "    -a    decode ATA information VPD page (0x89)\n");
 
 #endif  /* SG_LIB_LINUX */
     fprintf(stderr,
             "    -b    decode Block limits VPD page (0xb0) (SBC)\n"
+            "    -B 0|1    0-> open(non-blocking); 1->open(blocking)\n"
             "    -c    set CmdDt mode (use -o for opcode) [obsolete]\n"
             "    -cl   list supported commands using CmdDt mode [obsolete]\n"
             "    -d    decode: version descriptors or VPD page\n"
@@ -341,6 +351,7 @@ usage_old()
             "    -P    decode Unit Path Report VPD page (0xc0) (EMC)\n"
             "    -r    output response in binary ('-rr': output for hdparm)\n"
             "    -s    decode SCSI Ports VPD page (0x88)\n"
+            "    -u    SCSI_IDENT_<assoc>_<type>=<ident> output format\n"
             "    -v    verbose (output cdb and, if non-zero, resid)\n"
             "    -V    output version string\n"
             "    -x    decode extended INQUIRY data VPD page (0x86)\n"
@@ -381,18 +392,18 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 
 #ifdef SG_LIB_LINUX
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "acdeEhHil:m:NOp:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "aB:cdeEhHil:m:NOp:rsuvVx", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "cdeEhHil:m:p:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEhHil:m:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #else  /* SG_LIB_LINUX */
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "cdeEhHil:m:NOp:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEhHil:m:NOp:rsuvVx", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "cdeEhHil:m:p:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEhHil:m:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #endif /* SG_LIB_LINUX */
@@ -405,6 +416,20 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_ata;
             break;
 #endif
+        case 'B':
+            if ('-' == optarg[0])
+                n = -1;
+            else {
+                n = sg_get_num(optarg);
+                if ((n < 0) || (n > 1)) {
+                    fprintf(stderr, "bad argument to '--block=' want 0 or "
+                            "1\n");
+                    usage_for(optsp);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }
+            optsp->do_block = n;
+            break;
         case 'c':
             ++optsp->do_cmddt;
             break;
@@ -444,6 +469,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             optsp->resp_len = n;
+            break;
 #ifdef SG_SCSI_STRINGS
         case 'N':
             break;      /* ignore */
@@ -533,6 +559,20 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     optsp->page_num = VPD_BLOCK_LIMITS;
                     ++optsp->do_vpd;
                     ++optsp->num_pages;
+                    break;
+                case 'B':
+                    if ('-' == optarg[0])
+                        n = -1;
+                    else {
+                        n = sg_get_num(optarg);
+                        if ((n < 0) || (n > 1)) {
+                            fprintf(stderr, "bad argument to '--block=' "
+                                    "want 0 or 1\n");
+                            usage_for(optsp);
+                            return SG_LIB_SYNTAX_ERROR;
+                        }
+                    }
+                    optsp->do_block = n;
                     break;
                 case 'c':
                     ++optsp->do_cmddt;
@@ -3307,6 +3347,7 @@ main(int argc, char * argv[])
 
     memset(&opts, 0, sizeof(opts));
     opts.page_num = -1;
+    opts.do_block = -1;         /* use default for OS */
     res = process_cl(&opts, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -3458,12 +3499,32 @@ main(int argc, char * argv[])
         }
     }
 
+#if defined(O_NONBLOCK) && defined(O_RDONLY)
+    if (opts.do_block >= 0) {
+        n = O_RDONLY | (opts.do_block ? 0 : O_NONBLOCK);
+        if ((sg_fd = sg_cmds_open_flags(opts.device_name, n,
+                                        opts.do_verbose)) < 0) {
+            fprintf(stderr, "sg_inq: error opening file: %s: %s\n",
+                    opts.device_name, safe_strerror(-sg_fd));
+            return SG_LIB_FILE_ERROR;
+        }
+
+    } else {
+        if ((sg_fd = sg_cmds_open_device(opts.device_name, 1 /* ro */,
+                                         opts.do_verbose)) < 0) {
+            fprintf(stderr, "sg_inq: error opening file: %s: %s\n",
+                    opts.device_name, safe_strerror(-sg_fd));
+            return SG_LIB_FILE_ERROR;
+        }
+    }
+#else
     if ((sg_fd = sg_cmds_open_device(opts.device_name, 1 /* ro */,
                                      opts.do_verbose)) < 0) {
         fprintf(stderr, "sg_inq: error opening file: %s: %s\n",
                 opts.device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
+#endif
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
@@ -3481,7 +3542,7 @@ main(int argc, char * argv[])
 #endif
 
     if ((! opts.do_cmddt) && (! opts.do_vpd)) {
-        /* So it's a Standard INQUIRY, try ATA IDENTIFY if that fails */
+        /* So it's a standard INQUIRY, try ATA IDENTIFY if that fails */
         ret = process_std_inq(sg_fd, &opts);
         if (ret)
             goto err_out;

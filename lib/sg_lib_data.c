@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.88 20130815";  /* spc4r36, sbc3r32 */
+const char * sg_lib_version_str = "1.89 20131017";  /* spc4r36, sbc3r32 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -138,7 +138,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x83, 0, "Third party copy out"},  /* Extended copy, before spc4r34 */
         /* Following was "Receive copy results", before spc4r34 */
     {0x84, 0, "Third party copy in"},
-    {0x85, 0, "ATA command pass through(16)"},  /* was 0x98 in spc3 rev21c */
+    {0x85, 0, "ATA pass-through(16)"},  /* was 0x98 in spc3 rev21c */
     {0x86, 0, "Access control in"},
     {0x87, 0, "Access control out"},
     {0x88, 0, "Read(16)"},
@@ -160,7 +160,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
     {0xa0, 0, "Report luns"},
-    {0xa1, 0, "ATA command pass through(12)"},
+    {0xa1, 0, "ATA pass-through(12)"},
     {0xa1, PDT_MMC, "Blank"},
     {0xa2, 0, "Security protocol in"},
     {0xa3, 0, "Maintenance in"},
@@ -475,7 +475,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20130605 */
+ * The following should match asc-num.txt dated 20131008 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -556,6 +556,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x1c,"Logical unit not ready, additional power use not yet "
                 "granted"},
     {0x04,0x1d,"Logical unit not ready, configuration in progress"},
+    {0x04,0x1e,"Logical unit not ready, microcode activation required"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -799,6 +800,9 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x0C,"ORWRITE generation does not match"},
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
+    {0x2E,0x01,"Command timeout before processing"},
+    {0x2E,0x02,"Command timeout during processing"},
+    {0x2E,0x03,"Command timeout during processing due to error recovery"},
     {0x2F,0x00,"Commands cleared by another initiator"},
     {0x2F,0x01,"Commands cleared by power loss notification"},
     {0x2F,0x02,"Commands cleared by device server"},
@@ -976,6 +980,11 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x53,0x06,"Volume identifier missing"},
     {0x53,0x07,"Duplicate volume identifier"},
     {0x53,0x08,"Element status unknown"},
+    {0x53,0x09,"Data transfer device error - load failed"},
+    {0x53,0x0A,"Data transfer device error - unload failed"},
+    {0x53,0x0B,"Data transfer device error - unload missing"},
+    {0x53,0x0C,"Data transfer device error - eject failed"},
+    {0x53,0x0D,"Data transfer device error - library communication failed"},
     {0x54,0x00,"SCSI to host system interface failure"},
     {0x55,0x00,"System resource failure"},
     {0x55,0x01,"System buffer full"},

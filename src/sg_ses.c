@@ -27,7 +27,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.77 20130919";    /* ses3r06 */
+static const char * version_str = "1.80 20131106";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -98,6 +98,7 @@ struct opts_t {
     int byte1_given;
     int do_control;
     int do_data;
+    int dev_slot_num;
     int do_enumerate;
     int do_filter;
     int do_help;
@@ -118,6 +119,7 @@ struct opts_t {
     int do_version;
     int num_cgs;
     int arr_len;
+    unsigned char sas_addr[8];
     unsigned char data_arr[MX_DATA_IN + 16];
     const char * clear_str;
     const char * desc_name;
@@ -168,9 +170,11 @@ struct join_row_t {
      * In and Additional element status diagnostic pages. enc_statp only
      * NULL past last, other pointers can be NULL . */
     unsigned char * elem_descp;
-    unsigned char * enc_statp;    /* NULL indicates past last */
+    unsigned char * enc_statp;  /* NULL indicates past last */
     unsigned char * thresh_inp;
     unsigned char * add_elem_statp;
+    int dev_slot_num;           /* if not available, set to -1 */
+    unsigned char sas_addr[8];  /* if not available, set to 0 */
 };
 
 /* Representation of <acronym>[=<value>] or
@@ -189,9 +193,9 @@ struct tuple_acronym_val {
 struct acronym2tuple {
     const char * acron; /* element name or acronym, NULL for past end */
     int etype;          /* -1 for all element types */
-    int start_byte;
-    int start_bit;
-    int num_bits;
+    int start_byte;     /* origin 0, normally 0 to 3 */
+    int start_bit;      /* 7 (MSB or rightmost in SES drafts) to 0 (LSB) */
+    int num_bits;       /* usually 1 */
 };
 
 /* Structure for holding (sub-)enclosure information found in the
@@ -238,6 +242,7 @@ static int enc_stat_rsp_len;
 static int elem_desc_rsp_len;
 static int add_elem_rsp_len;
 static int threshold_rsp_len;
+
 
 /* Diagnostic page names, control and/or status (in and/or out) */
 static struct diag_page_code dpc_arr[] = {
@@ -375,20 +380,24 @@ static struct element_type_t element_type_by_code =
 /* Many control element names below have "RQST" in front in drafts.
    These are for the Enclosure Control/Status diagnostic page */
 static struct acronym2tuple ecs_a2t_arr[] = {
-   {"active", DEVICE_ETC, 2, 7, 1},
-   {"active", ARRAY_DEV_ETC, 2, 7, 1},
-   {"disable", -1, 0, 5, 1},
+   {"active", DEVICE_ETC, 2, 7, 1},     /* in control but not in status */
+   {"active", ARRAY_DEV_ETC, 2, 7, 1},  /* in control but not in status */
+   {"conscheck", ARRAY_DEV_ETC, 1, 4, 1},
+   {"disable", -1, 0, 5, 1},            /* the -1 is for all element types */
    {"devoff", DEVICE_ETC, 3, 4, 1},     /* device off */
    {"devoff", ARRAY_DEV_ETC, 3, 4, 1},
    {"dnr", DEVICE_ETC, 2, 6, 1},        /* do not remove */
    {"dnr", ARRAY_DEV_ETC, 2, 6, 1},
    {"fault", DEVICE_ETC, 3, 5, 1},
    {"fault", ARRAY_DEV_ETC, 3, 5, 1},
+   {"hotspare", ARRAY_DEV_ETC, 1, 5, 1},
    {"ident", DEVICE_ETC, 2, 1, 1},
    {"ident", ARRAY_DEV_ETC, 2, 1, 1},
    {"ident", POWER_SUPPLY_ETC, 1, 7, 1},
    {"ident", COOLING_ETC, 1, 7, 1},
    {"ident", ENCLOSURE_ETC, 1, 7, 1},
+   {"incritarray", ARRAY_DEV_ETC, 1, 3, 1},
+   {"infailedarray", ARRAY_DEV_ETC, 1, 2, 1},
    {"insert", DEVICE_ETC, 2, 3, 1},
    {"insert", ARRAY_DEV_ETC, 2, 3, 1},
    {"locate", DEVICE_ETC, 2, 1, 1},
@@ -398,11 +407,15 @@ static struct acronym2tuple ecs_a2t_arr[] = {
    {"locate", ENCLOSURE_ETC, 1, 7, 1},
    {"missing", DEVICE_ETC, 2, 4, 1},
    {"missing", ARRAY_DEV_ETC, 2, 4, 1},
+   {"ok", ARRAY_DEV_ETC, 1, 7, 1},
    {"locate", DEVICE_ETC, 2, 1, 1},
    {"locate", ARRAY_DEV_ETC, 2, 1, 1},
    {"prdfail", -1, 0, 6, 1},
+   {"rebuildremap", ARRAY_DEV_ETC, 1, 1, 1},
    {"remove", DEVICE_ETC, 2, 2, 1},
    {"remove", ARRAY_DEV_ETC, 2, 2, 1},
+   {"rrabort", ARRAY_DEV_ETC, 1, 0, 1},
+   {"rsvddevice", ARRAY_DEV_ETC, 1, 6, 1},
    {"speed_act", COOLING_ETC, 2, 7, 8}, /* actual speed (rpm / 10) */
    {"speed_code", COOLING_ETC, 3, 2, 3},
    {"swap", -1, 0, 4, 1},               /* Reset swap */
@@ -421,10 +434,10 @@ static struct acronym2tuple th_a2t_arr[] = {
 /* These are for the Additional element status diagnostic page for SAS
  * with the EIP bit set. First phy only. */
 static struct acronym2tuple ae_sas_a2t_arr[] = {
-   {"at_sas_addr", -1, 20, 7, 64},      /* best viewed with --hex --get= */
+   {"at_sas_addr", -1, 12, 7, 64},      /* best viewed with --hex --get= */
    {"dev_type", -1, 8, 6, 3},
    {"phy_id", -1, 28, 7, 8},
-   {"sas_addr", -1, 12, 7, 64},
+   {"sas_addr", -1, 20, 7, 64}, /* from end device's POV, often a disk */
    {"sata_dev", -1, 11, 0, 1},
    {"sata_port_sel", -1, 11, 7, 1},
    {"smp_init", -1, 10, 1, 1},
@@ -448,25 +461,27 @@ static int active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
 /* Command line long option names with corresponding short letter. */
 static struct option long_options[] = {
     {"byte1", required_argument, 0, 'b'},
-    {"control", no_argument, 0, 'c'},
     {"clear", required_argument, 0, 'C'},
+    {"control", no_argument, 0, 'c'},
     {"data", required_argument, 0, 'd'},
     {"descriptor", required_argument, 0, 'D'},
+    {"dev-slot-num", required_argument, 0, 'x'},
     {"enumerate", no_argument, 0, 'e'},
     {"filter", no_argument, 0, 'f'},
     {"get", required_argument, 0, 'G'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
-    {"inner-hex", no_argument, 0, 'i'},
     {"index", required_argument, 0, 'I'},
+    {"inner-hex", no_argument, 0, 'i'},
     {"join", no_argument, 0, 'j'},
     {"list", no_argument, 0, 'l'},
-    {"nickname", required_argument, 0, 'n'},
     {"nickid", required_argument, 0, 'N'},
+    {"nickname", required_argument, 0, 'n'},
     {"page", required_argument, 0, 'p'},
     {"raw", no_argument, 0, 'r'},
-    {"status", no_argument, 0, 's'},
+    {"sas-addr", required_argument, 0, 'A'},
     {"set", required_argument, 0, 'S'},
+    {"status", no_argument, 0, 's'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
     {0, 0, 0, 0},
@@ -475,46 +490,43 @@ static struct option long_options[] = {
 static int read_hex(const char * inp, unsigned char * arr, int * arr_len);
 static int strcase_eq(const char * s1p, const char * s2p);
 static void enumerate_diag_pages(void);
+static int saddr_non_zero(const unsigned char * ucp);
 
 
 
 static void
-usage()
+usage(int help_num)
 {
-    fprintf(stderr, "Usage: "
+    if (1 == help_num) {
+        fprintf(stderr, "Usage: "
             "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
-            "              [--descriptor=DN] [--enumerate] [--filter] "
-            "[--get=STR]\n"
-            "              [--help] [--hex] [--index=IIA | --index=TIA,II]\n"
-            "              [--inner-hex] [--join] [--list] "
-            "[--nickname=SEN]\n"
-            "              [--nickid=SEID] [--page=PG] [--raw] "
-            "[--set=STR]\n"
-            "              [--status] [--verbose] [--version] DEVICE\n"
-            "  where:\n"
-            "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
-            "to B1\n"
+            "              [--descriptor=DN] [--dev-slot-num=SN] "
+            "[--enumerate]\n"
+            "              [--filter] [--get=STR] [--help] [--hex]\n"
+            "              [--index=IIA | =TIA,II] [--inner-hex] "
+            "[--join] [--list]\n"
+            "              [--nickname=SEN] [--nickid=SEID] [--page=PG] "
+            "[--raw]\n"
+            "              [--sas-addr=SA] [--set=STR] [--status] "
+            "[--verbose]\n"
+            "              [--version] DEVICE\n"
+            "  where the main options are:\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
-            "    --control|-c        send control information (def: fetch "
-            "status)\n"
-            "    --data=H,H...|-d H,H...    string of ASCII hex bytes for "
-            "control pages\n"
-            "    --data=- | -d -     fetch string of ASCII hex bytes from "
-            "stdin\n"
-            "    --descriptor=DN|-D DN    descriptor name, alternative to "
-            "--index=...\n"
+            "    --descriptor=DN|-D DN    descriptor name, indexing method\n"
+            "    --dev-slot-num=SN|-x SN    device slot number, indexing "
+            "method\n"
             "    --enumerate|-e      enumerate page names + element types "
             "(ignore\n"
             "                        DEVICE). Use twice for clear,get,set "
             "acronyms\n"
             "    --filter|-f         filter out enclosure status flags that "
             "are clear\n"
-            "                        use thrice for status=okay entries "
+            "                        use twice for status=okay entries "
             "only\n"
             "    --get=STR|-G STR    get value of field by acronym or "
             "position\n"
-            "    --help|-h           print out usage message\n"
-            "    --hex|-H            print page response (or field) in hex\n"
+            "    --help|-h           print out usage message, use twice for "
+            "additional\n"
             "    --index=IIA|-I IIA    individual index ('-1' for overall) "
             "or element\n"
             "                          type abbreviation (e.g. 'arr')\n"
@@ -525,39 +537,63 @@ usage()
             "                                II is individual index ('-1' "
             "for overall)\n"
             );
-    fprintf(stderr,
-            "    --inner-hex|-i      print innermost level of a"
-            " status page in hex\n"
+        fprintf(stderr,
             "    --join|-j           group Enclosure Status, Element "
             "Descriptor\n"
             "                        and Additional Element Status pages. "
             "Use twice\n"
             "                        to add Threshold In page\n"
-            "    --list|-l           same as '--enumerate' option\n"
-            "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
-            "    --nickid=SEID|-N SEID   SEID is subenclosure identifier "
-            "(def: 0)\n"
             "    --page=PG|-p PG     diagnostic page code (abbreviation "
             "or number)\n"
             "                        (def: 'ssp' [0x0] (supported diagnostic "
             "pages))\n"
+            "    --sas-addr=SA|-A SA    SAS address in hex, indexing "
+            "method\n"
+            "    --set=STR|-S STR    set value of field by acronym or "
+            "position\n\n"
+            "Fetches status or sends control data to a SCSI enclosure. Use "
+            "'-hh' for\nmore help, including the options not shown here.\n");
+    } else {    /* for '-hh' or '--help --help' */
+        fprintf(stderr,
+            "  where the remaining sg_ses options are:\n"
+            "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
+            "to B1\n"
+            "    --control|-c        send control information (def: fetch "
+            "status)\n"
+            "    --data=H,H...|-d H,H...    string of ASCII hex bytes for "
+            "control pages\n"
+            "    --data=- | -d -     fetch string of ASCII hex bytes from "
+            "stdin\n"
+            "    --hex|-H            print page response (or field) in hex\n"
+            "    --inner-hex|-i      print innermost level of a"
+            " status page in hex\n"
+            "    --list|-l           same as '--enumerate' option\n"
+            "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
+            "    --nickid=SEID|-N SEID   SEID is subenclosure identifier "
+            "(def: 0)\n"
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
             "                        when used twice outputs page in binary "
             "to stdout\n"
-            "    --set=STR|-S STR    set value of field by acronym or "
-            "position\n"
             "    --status|-s         fetch status information (default "
             "action)\n"
             "    --verbose|-v        increase verbosity\n"
             "    --version|-V        print version string and exit\n\n"
-            "Fetches status or sends control data to a SCSI enclosure. If "
-            "no options\ngiven outputs DEVICE's supported diagnostic pages. "
-            "STR can be\n'<acronym>[=val]' or '<start_byte>:<start_bit>"
-            "[:<num_bits>][=<val>]'.\nElement type abbreviations may be "
-            "followed by a number (e.g. 'ps1' is the\nsecond power supply "
-            "element type).\n"
+            "If no options are given then DEVICE's supported diagnostic "
+            "pages are\noutput. STR can be '<acronym>[=val]' or\n"
+            "'<start_byte>:<start_bit>[:<num_bits>][=<val>]'. Element "
+            "type\nabbreviations may be followed by a number (e.g. 'ps1' "
+            "is the second\npower supply element type).\n\n"
             );
+        fprintf(stderr,
+            "Low level indexing can be done with one of the two '--index=' "
+            "options.\nAlternatively, medium level indexing can be done "
+            "with either the\n'--descriptor=', 'dev-slot-num=' or "
+            "'--sas-addr=' options. Support for\nthe medium level options "
+            "in the SES device is itself optional. The\nmedium level "
+            "options implicitly set '--join'.\n"
+            );
+    }
 }
 
 /* Return 0 for okay, else an error */
@@ -686,19 +722,42 @@ parse_index(struct opts_t *op)
 
 /* process command line options and argument. Returns 0 if ok. */
 static int
-process_cl(struct opts_t *op, int argc, char *argv[])
+cl_process(struct opts_t *op, int argc, char *argv[])
 {
-    int c, ret;
+    int c, j, ret, ff;
+    uint64_t saddr;
+    const char * cp;
 
+    op->dev_slot_num = -1;
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:cC:d:D:efG:hHiI:jln:N:p:rsS:vV",
+        c = getopt_long(argc, argv, "A:b:cC:d:D:efG:hHiI:jln:N:p:rsS:vVx:",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'A':       /* SAS address, assumed to be hex */
+            cp = optarg;
+            if ((strlen(optarg) > 2) && ('X' == toupper(optarg[1])))
+                cp = optarg + 2;
+            if (1 != sscanf(cp, "%" SCNx64 "", &saddr)) {
+                fprintf(stderr, "bad argument to '--sas-addr'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            for (j = 7, ff = 1; j >= 0; --j) {
+                if (ff & (0xff != (saddr & 0xff)))
+                    ff = 0;
+                op->sas_addr[j] = (saddr & 0xff);
+                saddr >>= 8;
+            }
+            if (ff) {
+                fprintf(stderr, "decode error from argument to "
+                        "'--sas-addr'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
         case 'b':
             op->byte1 = sg_get_num(optarg);
             if ((op->byte1 < 0) || (op->byte1 > 255)) {
@@ -739,7 +798,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         case 'h':
         case '?':
             ++op->do_help;
-            return 0;
+            break;
         case 'H':
             ++op->do_hex;
             break;
@@ -808,6 +867,14 @@ process_cl(struct opts_t *op, int argc, char *argv[])
         case 'V':
             ++op->do_version;
             return 0;
+        case 'x':
+            op->dev_slot_num = sg_get_num(optarg);
+            if ((op->dev_slot_num < 0) || (op->dev_slot_num > 255)) {
+                fprintf(stderr, "bad argument to '--dev-slot-num' (0 to 255 "
+                        "inclusive)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             fprintf(stderr, "  For command line usage information use the "
@@ -815,6 +882,8 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+    if (op->do_help)
+        return 0;
     if (optind < argc) {
         if (NULL == op->device_name) {
             op->device_name = argv[optind];
@@ -846,11 +915,18 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             return ret;
         }
     }
-    if (op->desc_name) {
+    if (op->desc_name || (op->dev_slot_num >= 0) ||
+        saddr_non_zero(op->sas_addr)) {
         if (op->ind_given) {
-            fprintf(stderr, "can have either --descriptor or --index but "
-                    "not both\n");
+            fprintf(stderr, "cannot have --index with either --descriptor, "
+                    "--dev-slot-num or --sas-addr\n");
             fprintf(stderr, "  For more information use '--help'\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (((!! op->desc_name) + (op->dev_slot_num >= 0) +
+             saddr_non_zero(op->sas_addr)) > 1) {
+            fprintf(stderr, "can only have one of --descriptor, "
+                    "--dev-slot-num and --sas-addr\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if ((0 == op->do_join) && (0 == op->do_control) &&
@@ -900,6 +976,12 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             }
         } else
             op->page_code = DPC_SUBENC_NICKNAME;
+    }
+    if ((op->verbose > 4) && saddr_non_zero(op->sas_addr)) {
+        fprintf(stderr, "    SAS address (in hex): ");
+        for (j = 0; j < 8; ++j)
+            fprintf(stderr, "%02x", op->sas_addr[j]);
+        fprintf(stderr, "\n");
     }
 
     if (NULL == op->device_name) {
@@ -2115,7 +2197,7 @@ truncated:
 }
 
 static int
-sas_addr_non_zero(const unsigned char * ucp)
+saddr_non_zero(const unsigned char * ucp)
 {
     int k;
 
@@ -2209,13 +2291,13 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                            ((per_ucp[3] & 2) ? " SMP" : ""),
                            ((per_ucp[3] & 1) ? " SATA_device" : ""));
                 print_sas_addr = 0;
-                if (nofilter || sas_addr_non_zero(per_ucp + 4)) {
+                if (nofilter || saddr_non_zero(per_ucp + 4)) {
                     ++print_sas_addr;
                     printf("%s  attached SAS address: 0x", pad);
                     for (m = 0; m < 8; ++m)
                         printf("%02x", per_ucp[4 + m]);
                 }
-                if (nofilter || sas_addr_non_zero(per_ucp + 12)) {
+                if (nofilter || saddr_non_zero(per_ucp + 12)) {
                     ++print_sas_addr;
                     printf("\n%s  SAS address: 0x", pad);
                     for (m = 0; m < 8; ++m)
@@ -2836,6 +2918,32 @@ fini:
     return ret;
 }
 
+static void
+devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
+{
+    int m;
+
+    if ((0 == jrp) || (0 == ae_ucp) || (0 == (0x10 & ae_ucp[0])))
+        return; /* sanity and expect EIP=1 */
+    switch (0xf & ae_ucp[0]) {
+    case TPROTO_FCP:
+        jrp->dev_slot_num = ae_ucp[7];
+        break;
+    case TPROTO_SAS:
+        if (0 == (0xc0 & ae_ucp[5])) {
+            /* only for device slot and array device slot elements */
+            jrp->dev_slot_num = ae_ucp[7];
+            if (ae_ucp[4] > 0) {        /* number of phys */
+                for (m = 0; m < 8; ++m)
+                    jrp->sas_addr[m] = ae_ucp[20 + m];
+            }
+        }
+        break;
+    default:
+        ;
+    }
+}
+
 /* Fetch Configuration, Enclosure Status, Element Descriptor, Additional
  * Element Status and optionally Threshold In pages, place in static arrays.
  * Collate (join) overall and individual elements into the static join_arr[].
@@ -2916,7 +3024,8 @@ join_work(int sg_fd, struct opts_t * op, int display)
                     "available\n");
     }
 
-    if (display || (DPC_ADD_ELEM_STATUS == op->page_code)) {
+    if (display || (DPC_ADD_ELEM_STATUS == op->page_code) ||
+        (op->dev_slot_num >= 0) || saddr_non_zero(op->sas_addr)) {
         res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp,
                           sizeof(add_elem_rsp), op, &add_elem_rsp_len);
         if (0 == res) {
@@ -2994,6 +3103,8 @@ join_work(int sg_fd, struct opts_t * op, int display)
             ed_ucp += (ed_ucp[2] << 8) + ed_ucp[3] + 4;
         jrp->add_elem_statp = NULL;
         jrp->thresh_inp = t_ucp;
+        jrp->dev_slot_num = -1;
+        /* assume sas_addr[8] zeroed since it's static file scope */
         if (t_ucp)
             t_ucp += 4;
         ++jrp;
@@ -3016,6 +3127,8 @@ join_work(int sg_fd, struct opts_t * op, int display)
             if (ed_ucp)
                 ed_ucp += (ed_ucp[2] << 8) + ed_ucp[3] + 4;
             jrp->thresh_inp = t_ucp;
+            jrp->dev_slot_num = -1;
+            /* assume sas_addr[8] zeroed since it's static file scope */
             if (t_ucp)
                 t_ucp += 4;
             jrp->add_elem_statp = NULL;
@@ -3053,6 +3166,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
                                     "not in join_arr\n", k, ei);
                             break;
                         }
+                        devslotnum_and_sasaddr(jr2p, ae_ucp);
                         jr2p->add_elem_statp = ae_ucp;
                     } else if (eip) {     /* and EIIOE=0 */
                         ei = ae_ucp[3];
@@ -3078,8 +3192,9 @@ try_again:
                             ++broken_ei;
                             goto try_again;
                         }
+                        devslotnum_and_sasaddr(jr2p, ae_ucp);
                         jr2p->add_elem_statp = ae_ucp;
-                    } else {
+                    } else {    /* EIP=0 */
                         while (jrp->enc_statp && ((-1 == jrp->el_ind_indiv) ||
                                                   jrp->add_elem_statp))
                             ++jrp;
@@ -3114,16 +3229,23 @@ try_again:
         jrp = join_arr;
         for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
             fprintf(stderr, "el_ind_th=%d el_ind_indiv=%d etype=%d "
-                    "se_id=%d ei=%d ei2=%d %s %s %s %s\n", jrp->el_ind_th,
+                    "se_id=%d ei=%d ei2=%d dsn=%d sa=0x", jrp->el_ind_th,
                     jrp->el_ind_indiv, jrp->etype, jrp->se_id, jrp->ei_asc,
-                    jrp->ei_asc2, (jrp->enc_statp ? "enc_statp" : ""),
-                    (jrp->elem_descp ? "elem_descp" : ""),
-                    (jrp->add_elem_statp ? "add_elem_statp" : ""),
-                    (jrp->thresh_inp ? "thresh_inp" : ""));
+                    jrp->ei_asc2, jrp->dev_slot_num);
+            if (saddr_non_zero(jrp->sas_addr)) {
+                for (j = 0; j < 8; ++j)
+                    fprintf(stderr, "%02x", jrp->sas_addr[j]);
+            } else
+                fprintf(stderr, "0");
+            fprintf(stderr, " %s %s %s %s\n", (jrp->enc_statp ? "ES" : ""),
+                    (jrp->elem_descp ? "ED" : ""),
+                    (jrp->add_elem_statp ? "AES" : ""),
+                    (jrp->thresh_inp ? "TI" : ""));
         }
         fprintf(stderr, ">> elements in join_arr: %d, broken_ei=%d\n", k,
                 broken_ei);
     }
+
     if (! display)      /* probably wanted join_arr[] built only */
         return 0;
 
@@ -3147,10 +3269,20 @@ try_again:
             if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),
                              desc_len))
                 continue;
+        } else if (op->dev_slot_num >= 0) {
+            if (op->dev_slot_num != jrp->dev_slot_num)
+                continue;
+        } else if (saddr_non_zero(op->sas_addr)) {
+            for (j = 0; j < 8; ++j) {
+                if (op->sas_addr[j] != jrp->sas_addr[j])
+                    break;
+            }
+            if (j < 8)
+                continue;
         }
         ++got1;
-        if ((op->do_filter > 2) && (1 != (0xf & jrp->enc_statp[0])))
-            continue;   /* when '-fff' and status!=OK, skip */
+        if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
+            continue;   /* when '-ff' and status!=OK, skip */
         cp = find_element_tname(jrp->etype, b, sizeof(b));
         if (ed_ucp) {
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
@@ -3182,8 +3314,17 @@ try_again:
         if (op->ind_given)
             printf("      >>> no match on --index=%d,%d\n", op->ind_th,
                    op->ind_indiv);
-        if (op->desc_name)
+        else if (op->desc_name)
             printf("      >>> no match on --descriptor=%s\n", op->desc_name);
+        else if (op->dev_slot_num >= 0)
+            printf("      >>> no match on --dev-slot-name=%d\n",
+                   op->dev_slot_num);
+        else if (saddr_non_zero(op->sas_addr)) {
+            printf("      >>> no match on --sas-addr=0x");
+            for (j = 0; j < 8; ++j)
+                printf("%02x", op->sas_addr[j]);
+            printf("\n");
+        }
     }
     return res;
 }
@@ -3456,7 +3597,7 @@ static int
 ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
         struct opts_t * op)
 {
-    int ret, k, desc_len, dn_len, found;
+    int ret, k, j, desc_len, dn_len, found;
     const struct join_row_t * jrp;
     const unsigned char * ed_ucp;
     char b[64];
@@ -3502,6 +3643,16 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
             if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),
                              desc_len))
                 continue;
+        } else if (op->dev_slot_num >= 0) {
+            if (op->dev_slot_num != jrp->dev_slot_num)
+                continue;
+        } else if (saddr_non_zero(op->sas_addr)) {
+            for (j = 0; j < 8; ++j) {
+                if (op->sas_addr[j] != jrp->sas_addr[j])
+                    break;
+            }
+            if (j < 8)
+                continue;
         }
         if (DPC_ENC_CONTROL == op->page_code)
             ret = cgs_enc_ctl_stat(sg_fd, jrp, tavp, op);
@@ -3522,6 +3673,11 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
         if (op->desc_name)
             fprintf(stderr, "descriptor name: %s not found (check the 'ed' "
                     "page [0x7])\n", op->desc_name);
+        else if (op->dev_slot_num >= 0)
+            fprintf(stderr, "device slot number: %d not found\n",
+                    op->dev_slot_num);
+        else if (saddr_non_zero(op->sas_addr))
+            fprintf(stderr, "SAS address not found\n");
         else
             fprintf(stderr, "index: %d,%d not found\n", op->ind_th,
                     op->ind_indiv);
@@ -3655,28 +3811,30 @@ main(int argc, char * argv[])
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
     struct opts_t opts;
+    struct opts_t * op;
     struct tuple_acronym_val tav;
 
-    memset(&opts, 0, sizeof(opts));
-    res = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(*op));
+    res = cl_process(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_version) {
+    if (op->do_version) {
         fprintf(stderr, "version: %s\n", version_str);
         return 0;
     }
-    if (opts.do_help) {
-        usage();
+    if (op->do_help) {
+        usage(op->do_help);
         return 0;
     }
-    if (opts.do_enumerate || opts.do_list) {
-        enumerate_work(&opts);
+    if (op->do_enumerate || op->do_list) {
+        enumerate_work(op);
         return 0;
     }
-    if (opts.num_cgs) {
+    if (op->num_cgs) {
         have_cgs = 1;
-        cp = opts.clear_str ? opts.clear_str :
-             (opts.get_str ? opts.get_str : opts.set_str);
+        cp = op->clear_str ? op->clear_str :
+             (op->get_str ? op->get_str : op->set_str);
         strncpy(buff, cp, sizeof(buff) - 1);
         buff[sizeof(buff) - 1] = '\0';
         if (parse_cgs_str(buff, &tav)) {
@@ -3684,23 +3842,25 @@ main(int argc, char * argv[])
                     "--get or --set\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (opts.get_str && tav.val_str)
+        if (op->get_str && tav.val_str)
             fprintf(stderr, "--get option ignoring =<val> at the end "
                     "of STR argument\n");
-        if ((0 == opts.ind_given) && (! opts.desc_name)) {
+        if (! (op->ind_given || op->desc_name || (op->dev_slot_num >= 0) ||
+               saddr_non_zero(op->sas_addr))) {
             fprintf(stderr, "with --clear, --get or --set option need "
-                    "either --index or --descriptor\n");
+                    "either\n   --index, --descriptor, --dev-slot-num or "
+                    "--sas-addr\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if (NULL == tav.val_str) {
-            if (opts.clear_str)
+            if (op->clear_str)
                 tav.val = 0;
-            if (opts.set_str)
+            if (op->set_str)
                 tav.val = 1;
         }
-        if (opts.page_code_given && (DPC_ENC_STATUS != opts.page_code) &&
-            (DPC_THRESHOLD != opts.page_code) &&
-            (DPC_ADD_ELEM_STATUS != opts.page_code)) {
+        if (op->page_code_given && (DPC_ENC_STATUS != op->page_code) &&
+            (DPC_THRESHOLD != op->page_code) &&
+            (DPC_ADD_ELEM_STATUS != op->page_code)) {
             fprintf(stderr, "--clear, --get or --set options only supported "
                             "for the Enclosure\nControl/Status, Threshold "
                             "In/Out and Additional Element Status pages\n");
@@ -3708,16 +3868,16 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(opts.device_name, 0 /* rw */, opts.verbose);
+    sg_fd = sg_cmds_open_device(op->device_name, 0 /* rw */, op->verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", opts.device_name,
+        fprintf(stderr, "open error: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (! (opts.do_raw || have_cgs)) {
-        if (sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.verbose)) {
+    if (! (op->do_raw || have_cgs)) {
+        if (sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
             fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
-                    opts.device_name);
+                    op->device_name);
             ret = SG_LIB_CAT_OTHER;
             goto err_out;
         } else {
@@ -3726,7 +3886,7 @@ main(int argc, char * argv[])
             pd_type = inq_resp.peripheral_type;
             cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
             if (0xd == pd_type) {
-                if (opts.verbose)
+                if (op->verbose)
                     printf("    enclosure services device\n");
             } else if (0x40 & inq_resp.byte_6)
                 printf("    %s device has EncServ bit set\n", cp);
@@ -3735,25 +3895,25 @@ main(int argc, char * argv[])
         }
     }
 
-    if (opts.nickname_str)
-        ret = ses_set_nickname(sg_fd, &opts);
+    if (op->nickname_str)
+        ret = ses_set_nickname(sg_fd, op);
     else if (have_cgs)
-        ret = ses_cgs(sg_fd, &tav, &opts);
-    else if (opts.do_join)
-        ret = join_work(sg_fd, &opts, 1);
-    else if (opts.do_status)
-        ret = ses_process_status_page(sg_fd, &opts);
+        ret = ses_cgs(sg_fd, &tav, op);
+    else if (op->do_join)
+        ret = join_work(sg_fd, op, 1);
+    else if (op->do_status)
+        ret = ses_process_status_page(sg_fd, op);
     else { /* control page requested */
-        opts.data_arr[0] = opts.page_code;
-        opts.data_arr[1] = opts.byte1;
-        opts.data_arr[2] = (opts.arr_len >> 8) & 0xff;
-        opts.data_arr[3] = opts.arr_len & 0xff;
-        switch (opts.page_code) {
+        op->data_arr[0] = op->page_code;
+        op->data_arr[1] = op->byte1;
+        op->data_arr[2] = (op->arr_len >> 8) & 0xff;
+        op->data_arr[3] = op->arr_len & 0xff;
+        switch (op->page_code) {
         case DPC_ENC_CONTROL:  /* Enclosure Control diagnostic page [0x2] */
             printf("Sending Enclosure Control [0x%x] page, with page "
-                   "length=%d bytes\n", opts.page_code, opts.arr_len);
-            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
-                              opts.verbose);
+                   "length=%d bytes\n", op->page_code, op->arr_len);
+            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
+                              op->verbose);
             if (ret) {
                 fprintf(stderr, "couldn't send Enclosure Control page\n");
                 goto err_out;
@@ -3761,9 +3921,9 @@ main(int argc, char * argv[])
             break;
         case DPC_STRING:       /* String Out diagnostic page [0x4] */
             printf("Sending String Out [0x%x] page, with page length=%d "
-                   "bytes\n", opts.page_code, opts.arr_len);
-            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
-                              opts.verbose);
+                   "bytes\n", op->page_code, op->arr_len);
+            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
+                              op->verbose);
             if (ret) {
                 fprintf(stderr, "couldn't send String Out page\n");
                 goto err_out;
@@ -3771,9 +3931,9 @@ main(int argc, char * argv[])
             break;
         case DPC_THRESHOLD:       /* Threshold Out diagnostic page [0x5] */
             printf("Sending Threshold Out [0x%x] page, with page length=%d "
-                   "bytes\n", opts.page_code, opts.arr_len);
-            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
-                              opts.verbose);
+                   "bytes\n", op->page_code, op->arr_len);
+            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
+                              op->verbose);
             if (ret) {
                 fprintf(stderr, "couldn't send Threshold Out page\n");
                 goto err_out;
@@ -3781,9 +3941,9 @@ main(int argc, char * argv[])
             break;
         case DPC_ARRAY_CONTROL:   /* Array control diagnostic page [0x6] */
             printf("Sending Array Control [0x%x] page, with page "
-                   "length=%d bytes\n", opts.page_code, opts.arr_len);
-            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
-                              opts.verbose);
+                   "length=%d bytes\n", op->page_code, op->arr_len);
+            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
+                              op->verbose);
             if (ret) {
                 fprintf(stderr, "couldn't send Array Control page\n");
                 goto err_out;
@@ -3791,9 +3951,9 @@ main(int argc, char * argv[])
             break;
         case DPC_SUBENC_STRING: /* Subenclosure String Out page [0xc] */
             printf("Sending Subenclosure String Out [0x%x] page, with page "
-                   "length=%d bytes\n", opts.page_code, opts.arr_len);
-            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
-                              opts.verbose);
+                   "length=%d bytes\n", op->page_code, op->arr_len);
+            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
+                              op->verbose);
             if (ret) {
                 fprintf(stderr, "couldn't send Subenclosure String Out "
                         "page\n");
@@ -3802,9 +3962,9 @@ main(int argc, char * argv[])
             break;
         case DPC_DOWNLOAD_MICROCODE: /* Download Microcode Control [0xe] */
             printf("Sending Download Microcode Control [0x%x] page, with "
-                   "page length=%d bytes\n", opts.page_code, opts.arr_len);
-            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
-                              opts.verbose);
+                   "page length=%d bytes\n", op->page_code, op->arr_len);
+            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
+                              op->verbose);
             if (ret) {
                 fprintf(stderr, "couldn't send Download Microcode Control "
                         "page\n");
@@ -3813,9 +3973,9 @@ main(int argc, char * argv[])
             break;
         case DPC_SUBENC_NICKNAME: /* Subenclosure Nickname Control [0xf] */
             printf("Sending Subenclosure Nickname Control [0x%x] page, with "
-                   "page length=%d bytes\n", opts.page_code, opts.arr_len);
-            ret = do_senddiag(sg_fd, 1, opts.data_arr, opts.arr_len + 4, 1,
-                              opts.verbose);
+                   "page length=%d bytes\n", op->page_code, op->arr_len);
+            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
+                              op->verbose);
             if (ret) {
                 fprintf(stderr, "couldn't send Subenclosure Nickname "
                         "Control page\n");
@@ -3824,7 +3984,7 @@ main(int argc, char * argv[])
             break;
         default:
             fprintf(stderr, "Setting SES control page 0x%x not supported "
-                    "by this utility\n", opts.page_code);
+                    "by this utility\n", op->page_code);
             fprintf(stderr, "That can be done with the sg_senddiag utility "
                     "with its '--raw=' option\n");
             ret = SG_LIB_SYNTAX_ERROR;
@@ -3833,7 +3993,7 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    if (0 == opts.do_status) {
+    if (0 == op->do_status) {
         switch (ret) {
         case SG_LIB_CAT_NOT_READY:
             fprintf(stderr, "    device no ready\n");
@@ -3853,7 +4013,7 @@ err_out:
             break;
         }
     }
-    if (ret && (0 == opts.verbose))
+    if (ret && (0 == op->verbose))
         fprintf(stderr, "Problem detected, try again with --verbose option "
                 "for more information\n");
     res = sg_cmds_close_device(sg_fd);

@@ -261,8 +261,8 @@ subdirectory:
   - bsg_queue_tst, sg_excl, scsi_inquiry, sg_iovec_tst, sg_queue_tst,
     sg_sat_chk_power, sg__sat_identify, sg__sat_phy_event,
     sg__sat_set_features, sg_sat_smart_rd_data, sg_simple1, sg_simple2,
-    sg_simple3, sg_simple4, sg_simple5, sg_simple16, sg_tst_excl and
-    sg_tst_excl2
+    sg_simple3, sg_simple4, sg_simple5, sg_simple16, sg_tst_excl,
+    sg_tst_excl2 and sg_tst_excl3
 
 Also in that subdirectory is a script to test sg_persist, an example data
 file for sg_persist (called "transport_ids.txt") and an example data file for
@@ -335,6 +335,11 @@ first read) then it should remain even if the O_EXCL flag is doing its job.
 The "sg_tst_excl" variant uses the Linux SG_IO v3 interface while the
 "sg_tst_excl2" uses the more generic sg_pt infrastructure. 
 
+"sg_tst_excl3" is a variant of "sg_tst_excl2". "sg_tst_excl3" only does
+the double increment from the first thread, each time using O_EXCL on
+open. The remaining threads check the value is even, each time doing
+an open without the O_EXCL flag.
+
 "bsg_queue_tst" sends an INQUIRY command via the Linux SG_IO v4 interface
 which is used by the bsg driver. So it will take device names like
 "/dev/bsg/6:0:0:0". It tests if sending repeated INQUIRYs with
@@ -396,4 +401,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-14th October 2013
+11th November 2013

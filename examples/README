@@ -16,4 +16,4 @@ in C++11. They can be built by calling 'make -f Makefile.cplus'. A
 gcc/g++ compiler of 4.7.3 vintage or later will be required.
 
 Douglas Gilbert
-30th August 2013
+21st October 2013
