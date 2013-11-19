@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.89 20131017";  /* spc4r36, sbc3r32 */
+const char * sg_lib_version_str = "1.90 20131119";  /* spc4r36m, sbc3r36 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -557,6 +557,10 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
                 "granted"},
     {0x04,0x1d,"Logical unit not ready, configuration in progress"},
     {0x04,0x1e,"Logical unit not ready, microcode activation required"},
+    {0x04,0x1f,"Logical unit not ready, microcode download required"},
+    {0x04,0x20,"Logical unit not ready, logical unit reset required"},
+    {0x04,0x21,"Logical unit not ready, hard reset required"},
+    {0x04,0x22,"Logical unit not ready, power cycle required"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
