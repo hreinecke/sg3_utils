@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.00 20131119";
+static const char * version_str = "1.01 20131119";
 static const char * util_name = "sg_tst_context";
 
 /* This is a test program for checking that file handles keep their
@@ -95,7 +95,7 @@ static unsigned int ebusy_count;
 static void
 usage(void)
 {
-    printf("Usage: %s [-e] [-h] [-n <n_per_thr>] [-N] [-s]\n"
+    printf("Usage: %s [-e] [-h] [-n <n_per_thr>] [-N] [-R] [-s]\n"
            "                      [-t <num_thrs>] [-V] <disk_device>\n",
            util_name);
     printf("  where\n");
@@ -104,6 +104,10 @@ usage(void)
     printf("    -n <n_per_thr>    number of loops per thread "
            "(def: %d)\n", DEF_NUM_PER_THREAD);
     printf("    -N                use O_NONBLOCK on open (def: don't)\n");
+    printf("    -R                make sure device in ready (started) "
+           "state after\n"
+           "                      test (do extra iteration if "
+           "necessary)\n");
     printf("    -s                share an open file handle (def: one "
            "per thread)\n");
     printf("    -t <num_thrs>     number of threads (def: %d)\n",
@@ -219,14 +223,14 @@ err:
 /* Returns 0 for good, 1024 for a sense key of NOT_READY, or a negative
  * errno */
 static int
-do_ssu(int pt_fd, int id, int start1_stop0)
+do_ssu(int pt_fd, int id, bool start)
 {
     int slen, res, cat;
     struct sg_pt_base * ptp = NULL;
     unsigned char ssuCmdBlk [SSU_CMD_LEN] = {0x1b, 0x0, 0x0, 0x0, 0x0, 0x0};
     unsigned char sense_buffer[64];
 
-    if (start1_stop0)
+    if (start)
         ssuCmdBlk[4] |= 0x1;
     ptp = construct_scsi_pt_obj();
     set_scsi_pt_cdb(ptp, ssuCmdBlk, sizeof(ssuCmdBlk));
@@ -264,13 +268,14 @@ err:
 
 static void
 work_thread(const char * dev_name, int id, int num, bool share,
-            int pt_fd, int nonblock, int oexcl)
+            int pt_fd, int nonblock, int oexcl, bool ready_after)
 {
     unsigned int thr_even_notreadys = 0;
     unsigned int thr_odd_notreadys = 0;
     unsigned int thr_ebusy_count = 0;
     int k;
     int res = 0;
+    bool started = true;
     char ebuff[EBUFF_SZ];
 
     console_mutex.lock();
@@ -309,7 +314,8 @@ work_thread(const char * dev_name, int id, int num, bool share,
                 res = 0;
             }
         } else {
-            res = do_ssu(pt_fd, id, (0 == (k % 2)));
+            started = (0 == (k % 2));
+            res = do_ssu(pt_fd, id, started);
             if (1024 == res) {
                 ++thr_odd_notreadys;
                 res = 0;
@@ -317,6 +323,8 @@ work_thread(const char * dev_name, int id, int num, bool share,
         }
         if (res)
             break;
+        if (ready_after && (! started))
+            do_ssu(pt_fd, id, true);
     }
     if (! share)
         scsi_pt_close_device(pt_fd);
@@ -344,6 +352,7 @@ main(int argc, char * argv[])
     int oexcl = 0;
     int nonblock = 0;
     int num_per_thread = DEF_NUM_PER_THREAD;
+    bool ready_after = false;
     bool share = false;
     int num_threads = DEF_NUM_THREADS;
     char * dev_name = NULL;
@@ -363,6 +372,8 @@ main(int argc, char * argv[])
                 break;
         } else if (0 == memcmp("-N", argv[k], 2))
             ++nonblock;
+        else if (0 == memcmp("-R", argv[k], 2))
+            ready_after = true;
         else if (0 == memcmp("-s", argv[k], 2))
             share = true;
         else if (0 == memcmp("-t", argv[k], 2)) {
@@ -416,7 +427,8 @@ main(int argc, char * argv[])
 
         for (k = 0; k < num_threads; ++k) {
             thread * tp = new thread {work_thread, dev_name, k, num_per_thread,
-                                      share, pt_fd, nonblock, oexcl};
+                                      share, pt_fd, nonblock, oexcl,
+                                      ready_after};
             vt.push_back(tp);
         }
 
