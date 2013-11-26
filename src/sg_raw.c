@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.6 (2013-10-13)"
+#define SG_RAW_VERSION "0.4.7 (2013-11-24)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -248,7 +248,6 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
 static unsigned char *
 my_memalign(int length, unsigned char ** wrkBuffp)
 {
-    unsigned char * wrkBuff;
     size_t psz;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
@@ -262,28 +261,33 @@ my_memalign(int length, unsigned char ** wrkBuffp)
 #ifdef HAVE_POSIX_MEMALIGN
     {
         int err;
+        void * wp = NULL;
 
-        err = posix_memalign((void **)&wrkBuff, psz, length);
-        if (err) {
-            fprintf(stderr, "posix_memalign: error [%d] out of memory?\n",
+        err = posix_memalign(&wp, psz, length);
+        if (err || (NULL == wp)) {
+            fprintf(stderr, "posix_memalign: error [%d], out of memory?\n",
                     err);
             return NULL;
         }
-        memset(wrkBuff, 0, length);
+        memset(wp, 0, length);
         if (wrkBuffp)
-            *wrkBuffp = wrkBuff;
-        return wrkBuff;
+            *wrkBuffp = (unsigned char *)wp;
+        return (unsigned char *)wp;
     }
 #else
-    wrkBuff = (unsigned char*)calloc(length + psz, 1);
-    if (NULL == wrkBuff) {
-        if (wrkBuffp)
-            *wrkBuffp = NULL;
-        return NULL;
-    } else if (wrkBuffp)
-        *wrkBuffp = wrkBuff;
-    return (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
-                             (~(psz - 1)));
+    {
+        unsigned char * wrkBuff;
+
+        wrkBuff = (unsigned char*)calloc(length + psz, 1);
+        if (NULL == wrkBuff) {
+            if (wrkBuffp)
+                *wrkBuffp = NULL;
+            return NULL;
+        } else if (wrkBuffp)
+            *wrkBuffp = wrkBuff;
+        return (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
+                                 (~(psz - 1)));
+    }
 #endif
 }
 
