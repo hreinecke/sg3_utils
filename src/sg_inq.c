@@ -874,7 +874,8 @@ encode_whitespaces(unsigned char *str, int inlen)
     }
     if (! valid)
         res = 0;
-    str[res] = '\0';
+    if (res < inlen)
+        str[res] = '\0';
     return res;
 }
 
@@ -1543,14 +1544,15 @@ export_dev_ids(unsigned char * buff, int len)
         }
         switch (desig_type) {
         case 0: /* vendor specific */
-            k = 0;
-            if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+            printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
+            if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 k = encode_whitespaces(ip, i_len);
-                if (k >= i_len)
-                    k = 1;
+                printf("%.*s\n", k, ip);
+            } else {
+                for (m = 0; m < i_len; ++m)
+                    printf("%02x", (unsigned int)ip[m]);
+                printf("\n");
             }
-            if (k)
-                printf("SCSI_IDENT_%s_VENDOR=%.*s\n", assoc_str, k, ip);
             break;
         case 1: /* T10 vendor identification */
             printf("SCSI_IDENT_%s_T10=", assoc_str);
