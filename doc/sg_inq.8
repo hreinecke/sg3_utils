@@ -10,23 +10,23 @@ sg_inq \- issue SCSI INQUIRY command, output and decode response
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
-[\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c\fR] [\fI\-cl\fR]
-[\fI\-d\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR] [\fI\-l=LEN\fR]
-[\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR] [\fI\-p=VPD_PG\fR] [\fI\-P\fR]
-[\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-x\fR]
-[\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
+[\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR] [\fI\-c\fR]
+[\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR]
+[\fI\-l=LEN\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR]
+[\fI\-p=VPD_PG\fR] [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
+[\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility by default sends a SCSI INQUIRY command to the given
-device and then outputs the response. All SCSI devices are meant
-to respond to a "standard" INQUIRY command with at least a 36 byte
-response (in SCSI 2 and higher). An INQUIRY is termed as "standard"
-when both the EVPD and CmdDt (now obsolete) bits are clear.
+This utility by default sends a SCSI INQUIRY command to the given device and
+then outputs the response. All SCSI devices are meant to respond to
+a "standard" INQUIRY command with at least a 36 byte response (in SCSI 2 and
+higher). An INQUIRY is termed as "standard" when both the EVPD and CmdDt (now
+obsolete) bits are clear.
 .PP
-This utility supports two command line syntaxes, the preferred one is
-shown first in the synopsis and explained in this section. A later
-section on the old command line syntax outlines the second group of
+This utility supports two command line syntaxes. The preferred one is shown
+first in the synopsis and is described in the main OPTIONS section. A later
+section titled OLDER COMMAND LINE OPTIONS describes the second group of
 options.
 .PP
 An important "non\-standard" INQUIRY page is the Device Identification
@@ -245,37 +245,40 @@ or using \fI\-\-old\fR (or \fI\-O\fR) as the first option.
 only requests 36 bytes of response data for an INQUIRY. Furthermore even
 if the device indicates in its response it can supply more data, a
 second (longer) INQUIRY is not performed. This is a paranoid setting.
-Equivalent to '\-\-len=36' in the main description.
+Equivalent to '\-\-len=36' in the OPTIONS section.
 .TP
 \fB\-a\fR
 fetch the ATA Information VPD page [0x89]. Equivalent to '\-\-page=ai' in
-the main description. This page is defined in SAT (see at www.t10.org).
+the OPTIONS section. This page is defined in SAT (see at www.t10.org).
 .TP
 \fB\-A\fR
 Assume given \fIDEVICE\fR is an ATA or ATAPI device.
-Equivalent to \fI\-\-ata\fR in the main description.
+Equivalent to \fI\-\-ata\fR in the OPTIONS section.
 .TP
 \fB\-b\fR
 decodes the Block Limits VPD page [0xb0].  Equivalent to '\-\-page=bl' in
-the main description. This page is defined in SBC\-2 (see www.t10.org).
+the OPTIONS section. This page is defined in SBC\-2 (see www.t10.org).
+.TP
+\fB\-B\fR=\fI0|1\fR
+equivalent to \fI\-\-block=0|1\fR in OPTIONS section.
 .TP
 \fB\-c\fR
 set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
  conjunction with the \fI\-o=OPCODE_PG\fR option to specify the SCSI command
-opcode to query. Equivalent to \fI\-\-cmddt\fR in the main description.
+opcode to query. Equivalent to \fI\-\-cmddt\fR in the OPTIONS section.
 .TP
 \fB\-cl\fR
 lists the command data for all supported commands (followed by the command
 name) by looping through all 256 opcodes. This option uses the CmdDt bit
 which is now obsolete. See the sg_opcodes(8) utility.
-Equivalent to '\-\-cmddt \-\-cmddt' in the main description.
+Equivalent to '\-\-cmddt \-\-cmddt' in the OPTIONS section.
 .TP
 \fB\-d\fR
 decodes depending on context. If \fI\-e\fR option is given, or any option
 that implies \fI\-e\fR (e.g. '\-i' or '\-p=80'), then this utility attempts
 to decode the indicated VPD page.  Otherwise the version descriptors (if any)
 are listed following a standard INQUIRY response. In the version descriptors
-sense, equivalent to \fI\-\-descriptors\fR in the main description.
+sense, equivalent to \fI\-\-descriptors\fR in the OPTIONS section.
 .TP
 \fB\-e\fR
 enable (i.e. sets) the Vital Product Data (EVPD) bit (defaults to clear(0)).
@@ -285,26 +288,26 @@ VPD pages) is assumed.
 .TP
 \fB\-h\fR
 outputs INQUIRY response in hex rather than trying to decode it.
-Equivalent to \fI\-\-hex\fR in the main description.
+Equivalent to \fI\-\-hex\fR in the OPTIONS section.
 .TP
 \fB\-H\fR
 same action as \fI\-h\fR.
-Equivalent to \fI\-\-hex\fR in the main description.
+Equivalent to \fI\-\-hex\fR in the OPTIONS section.
 .TP
 \fB\-i\fR
-decodes the Device Identification VPD page [0x83]. Equivalent to
-\fI\-\-id\fR in the main description. This page is made up of
-several "designation descriptors". If \fI\-h\fR is given then each
-descriptor header is decoded and the identifier itself is output in hex.
-To see the whole VPD 0x83 page response in hex use '\-p=83 \-h'.
+decodes the Device Identification VPD page [0x83]. Equivalent to \fI\-\-id\fR
+in the OPTIONS section. This page is made up of several "designation
+descriptors". If \fI\-h\fR is given then each descriptor header is decoded
+and the identifier itself is output in hex. To see the whole VPD 0x83 page
+response in hex use '\-p=83 \-h'.
 .TP
 \fB\-m\fR
 decodes the Management network addresses VPD page [0x85]. Equivalent
-to '\-\-page=mna' in the main description.
+to '\-\-page=mna' in the OPTIONS section.
 .TP
 \fB\-M\fR
 decodes the Mode page policy VPD page [0x87].  Equivalent to '\-\-page=mpp'
-in the main description.
+in the OPTIONS section.
 .TP
 \fB\-N\fR
 switch to the newer style options.
@@ -332,21 +335,21 @@ is output.
 .TP
 \fB\-P\fR
 decodes the Unit Path Report VPD page [0xc0] which is EMC specific.
-Equivalent to '\-\-page=upr' in the main description.
+Equivalent to '\-\-page=upr' in the OPTIONS section.
 .TP
 \fB\-r\fR
 outputs the response in binary to stdout.  Equivalent to \fI\-\-raw\fR in
-the main description.  Can be used twice (i.e. '\-rr' (and '\-HHH' has
+the OPTIONS section.  Can be used twice (i.e. '\-rr' (and '\-HHH' has
 same effect)) and if used with the \fI\-A\fR or \fI\-a\fR option yields
 output with the same format as "cat /proc/ide/hd<x>/identify" so that it
 can then be piped to "hdparm \-\-Istdin".
 .TP
 \fB\-s\fR
 decodes the SCSI Ports VPD page [0x88].
-Equivalent to '\-\-page=sp' in the main description.
+Equivalent to '\-\-page=sp' in the OPTIONS section.
 .TP
 \fB\-u\fR
-equivalent to '\-\-export' in the main description.
+equivalent to '\-\-export' in the OPTIONS section.
 .TP
 \fB\-v\fR
 increase level of verbosity. Can be used multiple times.
@@ -356,7 +359,7 @@ print out version string then exit.
 .TP
 \fB\-x\fR
 decodes the Extended INQUIRY data VPD [0x86] page.
-Equivalent to '\-\-page=ei' in the main description.
+Equivalent to '\-\-page=ei' in the OPTIONS section.
 .TP
 \fB\-?\fR
 output usage message and exit. Ignore all other parameters.
