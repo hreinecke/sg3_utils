@@ -37,9 +37,9 @@ The first group in the synopsis above are "standard" Unix
 operands. The second group are extra options added by this utility.
 Both groups are defined below in combined, alphabetical order.
 .PP
-By default the XCOPY command is sent to \fIIFILE\fR. This can be changed
-with the \fI\-\-on_dst\fR option which causes the XCOPY command to be sent
-to \fIOFILE\fR instead.
+By default the XCOPY command is sent to \fIOFILE\fR. This can be changed
+with the \fI\-\-on_src\fR option which causes the XCOPY command to be sent
+to \fIIFILE\fR instead.
 .SH OPTIONS
 .TP
 \fBbpt\fR=\fIBPT\fR
@@ -156,12 +156,12 @@ Unix read() and write() calls) so there can be a lot of output.
 \fB\-h\fR, \fB\-\-help\fR
 outputs usage message and exits.
 .TP
-\fB\-\-on_dst\fR
-send the XCOPY command to the output file/device.
-.TP
 \fB\-\-on_src\fR
-send the XCOPY command to the input file/device. This is the default when
-this option and \fI\-\-on_dst\fR are not given.
+send the XCOPY command to the input file/device.
+.TP
+\fB\-\-on_dst\fR
+send the XCOPY command to the output file/device. This is the default when
+this option and \fI\-\-on_src\fR are not given.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 equivalent to \fIverbose=1\fR. When used twice, equivalent to

@@ -538,9 +538,9 @@ usage()
             "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
             "etc\n"
             "    --help      print out this usage message then exit\n"
-            "    --on_dst    send XCOPY command to the output file/device\n"
             "    --on_src    send XCOPY command to the input file/device.\n"
-            "                Default if this and --on_dst options not "
+            "    --on_dst    send XCOPY command to the output file/device\n"
+            "                Default if this and --on_src options not "
             "given\n"
             "    --verbose   same action as verbose=1\n"
             "    --version   print version information then exit\n\n"
@@ -1628,7 +1628,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (!on_src && !on_dst)
-        on_src = 1;
+        on_dst = 1;
     if ((ibs && blk_sz && (ibs != blk_sz)) ||
         (obs && blk_sz && (obs != blk_sz))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
