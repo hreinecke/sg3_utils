@@ -2460,7 +2460,12 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
             dStrRaw((const char *)rsp_buff, act_len);
         else if (optsp->do_hex)
             dStrHex((const char *)rsp_buff, act_len, 0);
-        else if (!optsp->do_export) {
+        else if (optsp->do_export) {
+            printf("SCSI_TPGS=%d\n", (rsp_buff[5] & 0x30) >> 4);
+            cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
+            if (strlen(cp) > 0)
+                printf("SCSI_TYPE=%s\n", cp);
+        } else {
             printf("  PQual=%d  Device_type=%d  RMB=%d  version=0x%02x ",
                    pqual, peri_type, !!(rsp_buff[1] & 0x80),
                    (unsigned int)rsp_buff[2]);
