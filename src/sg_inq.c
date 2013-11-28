@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.20 20131030";    /* SPC-4 rev 36 */
+static const char * version_str = "1.21 20131127";    /* SPC-4 rev 36 */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -306,7 +306,7 @@ usage_old()
 {
 #ifdef SG_LIB_LINUX
     fprintf(stderr,
-            "Usage:  sg_inq [-a] [-A] [-b] [-B 0|1] [-c] [-cl] [-d] [-e] "
+            "Usage:  sg_inq [-a] [-A] [-b] [-B=0|1] [-c] [-cl] [-d] [-e] "
             "[-h]\n"
             "               [-H] [-i] [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
             "[-p=VPD_PG]\n"
@@ -331,7 +331,7 @@ usage_old()
 #endif  /* SG_LIB_LINUX */
     fprintf(stderr,
             "    -b    decode Block limits VPD page (0xb0) (SBC)\n"
-            "    -B 0|1    0-> open(non-blocking); 1->open(blocking)\n"
+            "    -B=0|1    0-> open(non-blocking); 1->open(blocking)\n"
             "    -c    set CmdDt mode (use -o for opcode) [obsolete]\n"
             "    -cl   list supported commands using CmdDt mode [obsolete]\n"
             "    -d    decode: version descriptors or VPD page\n"
@@ -383,7 +383,7 @@ usage_for(const struct opts_t * optsp)
 /* Processes command line options according to new option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
-process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+cl_new_process(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n;
 
@@ -524,7 +524,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 /* Processes command line options according to old option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
-process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+cl_old_process(struct opts_t * optsp, int argc, char * argv[])
 {
     int k, jmp_out, plen, num, n;
     const char * cp;
@@ -559,20 +559,6 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     optsp->page_num = VPD_BLOCK_LIMITS;
                     ++optsp->do_vpd;
                     ++optsp->num_pages;
-                    break;
-                case 'B':
-                    if ('-' == optarg[0])
-                        n = -1;
-                    else {
-                        n = sg_get_num(optarg);
-                        if ((n < 0) || (n > 1)) {
-                            fprintf(stderr, "bad argument to '--block=' "
-                                    "want 0 or 1\n");
-                            usage_for(optsp);
-                            return SG_LIB_SYNTAX_ERROR;
-                        }
-                    }
-                    optsp->do_block = n;
                     break;
                 case 'c':
                     ++optsp->do_cmddt;
@@ -653,7 +639,14 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             }
             if (plen <= 0)
                 continue;
-            else if (0 == strncmp("l=", cp, 2)) {
+            else if (0 == strncmp("B=", cp, 2)) {
+                if ((1 != num) || (n < 0) || (num > 1)) {
+                    fprintf(stderr, "'B=' option expects 0 or 1\n");
+                    usage_for(optsp);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                optsp->do_block = n;
+            } else if (0 == strncmp("l=", cp, 2)) {
                 num = sscanf(cp + 2, "%d", &n);
                 if ((1 != num) || (n < 1)) {
                     fprintf(stderr, "Inappropriate value after 'l=' "
@@ -698,7 +691,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
  * of these options is detected (when processing the other format), processing
  * stops and is restarted using the other format. Clear? */
 static int
-process_cl(struct opts_t * optsp, int argc, char * argv[])
+cl_process(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -706,14 +699,14 @@ process_cl(struct opts_t * optsp, int argc, char * argv[])
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
         optsp->opt_new = 0;
-        res = process_cl_old(optsp, argc, argv);
+        res = cl_old_process(optsp, argc, argv);
         if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+            res = cl_new_process(optsp, argc, argv);
     } else {
         optsp->opt_new = 1;
-        res = process_cl_new(optsp, argc, argv);
+        res = cl_new_process(optsp, argc, argv);
         if ((0 == res) && (0 == optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+            res = cl_old_process(optsp, argc, argv);
     }
     return res;
 }
@@ -721,9 +714,9 @@ process_cl(struct opts_t * optsp, int argc, char * argv[])
 #else  /* SG_SCSI_STRINGS */
 
 static int
-process_cl(struct opts_t * optsp, int argc, char * argv[])
+cl_process(struct opts_t * optsp, int argc, char * argv[])
 {
-    return process_cl_new(optsp, argc, argv);
+    return cl_new_process(optsp, argc, argv);
 }
 
 #endif  /* SG_SCSI_STRINGS */
@@ -874,7 +867,8 @@ encode_whitespaces(unsigned char *str, int inlen)
     }
     if (! valid)
         res = 0;
-    str[res] = '\0';
+    if (res < inlen)
+        str[res] = '\0';
     return res;
 }
 
@@ -1543,14 +1537,15 @@ export_dev_ids(unsigned char * buff, int len)
         }
         switch (desig_type) {
         case 0: /* vendor specific */
-            k = 0;
-            if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+            printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
+            if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 k = encode_whitespaces(ip, i_len);
-                if (k >= i_len)
-                    k = 1;
+                printf("%.*s\n", k, ip);
+            } else {
+                for (m = 0; m < i_len; ++m)
+                    printf("%02x", (unsigned int)ip[m]);
+                printf("\n");
             }
-            if (k)
-                printf("SCSI_IDENT_%s_VENDOR=%.*s\n", assoc_str, k, ip);
             break;
         case 1: /* T10 vendor identification */
             printf("SCSI_IDENT_%s_T10=", assoc_str);
@@ -2399,7 +2394,7 @@ get_ansi_version_str(int version, char * buff, int buff_len)
 
 /* Process a standard INQUIRY response. Returns 0 if successful */
 static int
-process_std_inq(int sg_fd, const struct opts_t * optsp)
+std_inq_process(int sg_fd, const struct opts_t * optsp)
 {
     int res, len, rlen, act_len, pqual, peri_type, ansi_version, k, j;
     const char * cp;
@@ -2640,7 +2635,7 @@ process_std_inq(int sg_fd, const struct opts_t * optsp)
 #ifdef SG_SCSI_STRINGS
 /* Returns 0 if successful */
 static int
-process_cmddt(int sg_fd, const struct opts_t * optsp)
+cmddt_process(int sg_fd, const struct opts_t * optsp)
 {
     int k, j, num, len, peri_type, reserved_cmddt, support_num, res;
     char op_name[128];
@@ -2754,7 +2749,7 @@ process_cmddt(int sg_fd, const struct opts_t * optsp)
 
 /* Returns 0. */
 static int
-process_cmddt(int sg_fd, const struct opts_t * optsp)
+cmddt_process(int sg_fd, const struct opts_t * optsp)
 {
     sg_fd = sg_fd;
     optsp = optsp;
@@ -2767,7 +2762,7 @@ process_cmddt(int sg_fd, const struct opts_t * optsp)
 
 /* Returns 0 if successful */
 static int
-process_vpd(int sg_fd, const struct opts_t * optsp)
+vpd_mainly_hex(int sg_fd, const struct opts_t * optsp)
 {
     int res, len, num, k, peri_type, vpd;
     const char * cp;
@@ -3162,7 +3157,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         break;
     case 0xb2:  /* VPD pages in B0h to BFh range depend on pdt */
         printf(" Only hex output supported. sg_vpd decodes the B2h page.\n");
-        return process_vpd(sg_fd, optsp);
+        return vpd_mainly_hex(sg_fd, optsp);
     case 0xb3:  /* VPD pages in B0h to BFh range depend on pdt */
         res = sg_ll_inquiry(sg_fd, 0, 1, 0xb3, rsp_buff,
                             DEF_ALLOC_LEN, 1, optsp->do_verbose);
@@ -3316,7 +3311,7 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         break;
     default:
         printf(" Only hex output supported. sg_vpd decodes more pages.\n");
-        return process_vpd(sg_fd, optsp);
+        return vpd_mainly_hex(sg_fd, optsp);
     }
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -3348,7 +3343,7 @@ main(int argc, char * argv[])
     memset(&opts, 0, sizeof(opts));
     opts.page_num = -1;
     opts.do_block = -1;         /* use default for OS */
-    res = process_cl(&opts, argc, argv);
+    res = cl_process(&opts, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
     if (opts.do_help) {
@@ -3543,13 +3538,13 @@ main(int argc, char * argv[])
 
     if ((! opts.do_cmddt) && (! opts.do_vpd)) {
         /* So it's a standard INQUIRY, try ATA IDENTIFY if that fails */
-        ret = process_std_inq(sg_fd, &opts);
+        ret = std_inq_process(sg_fd, &opts);
         if (ret)
             goto err_out;
     } else if (opts.do_cmddt) {
         if (opts.page_num < 0)
             opts.page_num = 0;
-        ret = process_cmddt(sg_fd, &opts);
+        ret = cmddt_process(sg_fd, &opts);
         if (ret)
             goto err_out;
     } else if (opts.do_vpd) {
@@ -3558,7 +3553,7 @@ main(int argc, char * argv[])
             if (ret)
                 goto err_out;
         } else {
-            ret = process_vpd(sg_fd, &opts);
+            ret = vpd_mainly_hex(sg_fd, &opts);
             if (ret)
                 goto err_out;
         }
