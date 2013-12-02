@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.21 20131127";    /* SPC-4 rev 36 */
+static const char * version_str = "1.23 20131202";    /* SPC-4 rev 36n */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -2453,9 +2453,15 @@ std_inq_process(int sg_fd, const struct opts_t * optsp)
             dStrRaw((const char *)rsp_buff, act_len);
         else if (optsp->do_hex)
             dStrHex((const char *)rsp_buff, act_len, 0);
-        else if (!optsp->do_export) {
-            printf("  PQual=%d  Device_type=%d  RMB=%d  version=0x%02x ",
-                   pqual, peri_type, !!(rsp_buff[1] & 0x80),
+        else if (optsp->do_export) {
+            printf("SCSI_TPGS=%d\n", (rsp_buff[5] & 0x30) >> 4);
+            cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
+            if (strlen(cp) > 0)
+                printf("SCSI_TYPE=%s\n", cp);
+        } else {
+            printf("  PQual=%d  Device_type=%d  RMB=%d  LU_CONG=%d  "
+                   "version=0x%02x ", pqual, peri_type,
+                   !!(rsp_buff[1] & 0x80), !!(rsp_buff[1] & 0x40),
                    (unsigned int)rsp_buff[2]);
             printf(" [%s]\n", get_ansi_version_str(ansi_version, buff,
                                                    sizeof(buff)));
@@ -2476,7 +2482,7 @@ std_inq_process(int sg_fd, const struct opts_t * optsp)
             printf("[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
                    !!(rsp_buff[6] & 0x08), !!(rsp_buff[6] & 0x04),
                    !!(rsp_buff[6] & 0x01), !!(rsp_buff[7] & 0x80));
-            printf("WBus16=%d  Sync=%d  Linked=%d  [TranDis=%d]  ",
+            printf("WBus16=%d  Sync=%d  [Linked=%d]  [TranDis=%d]  ",
                    !!(rsp_buff[7] & 0x20), !!(rsp_buff[7] & 0x10),
                    !!(rsp_buff[7] & 0x08), !!(rsp_buff[7] & 0x04));
             printf("CmdQue=%d\n", !!(rsp_buff[7] & 0x02));

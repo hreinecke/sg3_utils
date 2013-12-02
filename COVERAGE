@@ -48,7 +48,7 @@ READ LONG (16)      sg_read_long, ++
 READ MEDIA SERIAL NUMBER     sg_rmsn, ++
 REASSIGN BLOCKS     sg_reassign, ++
 RECEIVE COPY RESULTS   sg_copy_results, ++
-RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses, ++
+RECEIVE DIAGNOSTIC RESULTS  sg_senddiag, sg_ses, ++
 REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
 REPORT LUNS         sg_luns, ++
 REPORT REFERRALS    sg_referrals, ++
@@ -101,4 +101,4 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
 Douglas Gilbert
-16th May 2013
+2nd December 2013

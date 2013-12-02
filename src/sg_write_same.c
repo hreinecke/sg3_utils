@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.04 20130730";
+static const char * version_str = "1.05 20131201";
 
 
 #define ME "sg_write_same: "
@@ -140,7 +140,7 @@ usage()
 }
 
 static int
-do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
+do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
               int * act_cdb_lenp)
 {
     int k, ret, res, sense_cat, cdb_len;
@@ -150,13 +150,13 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    cdb_len = optsp->pref_cdb_size;
+    cdb_len = op->pref_cdb_size;
     if (WRITE_SAME10_LEN == cdb_len) {
-        llba = optsp->lba + optsp->numblocks;
-        if ((optsp->numblocks > 0xffff) || (llba > ULONG_MAX) ||
-            optsp->ndob || (optsp->unmap && (0 == optsp->want_ws10))) {
+        llba = op->lba + op->numblocks;
+        if ((op->numblocks > 0xffff) || (llba > ULONG_MAX) ||
+            op->ndob || (op->unmap && (0 == op->want_ws10))) {
             cdb_len = WRITE_SAME16_LEN;
-            if (optsp->verbose)
+            if (op->verbose)
                 fprintf(stderr, "do_write_same: use WRITE SAME(16) instead "
                         "of 10 byte cdb\n");
         }
@@ -167,76 +167,76 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     switch (cdb_len) {
     case WRITE_SAME10_LEN:
         wsCmdBlk[0] = WRITE_SAME10_OP;
-        wsCmdBlk[1] = ((optsp->wrprotect & 0x7) << 5);
+        wsCmdBlk[1] = ((op->wrprotect & 0x7) << 5);
         /* ANCHOR + UNMAP not allowed for WRITE_SAME10 in sbc3r24+r25 but
          * a proposal has been made to allow it. Anticipate approval. */
-        if (optsp->anchor)
+        if (op->anchor)
             wsCmdBlk[1] |= 0x10;
-        if (optsp->unmap)
+        if (op->unmap)
             wsCmdBlk[1] |= 0x8;
-        if (optsp->pbdata)
+        if (op->pbdata)
             wsCmdBlk[1] |= 0x4;
-        if (optsp->lbdata)
+        if (op->lbdata)
             wsCmdBlk[1] |= 0x2;
-        lba = (uint32_t)optsp->lba;
+        lba = (uint32_t)op->lba;
         for (k = 3; k >= 0; --k) {
             wsCmdBlk[2 + k] = (lba & 0xff);
             lba >>= 8;
         }
-        wsCmdBlk[6] = (optsp->grpnum & 0x1f);
-        wsCmdBlk[7] = ((optsp->numblocks >> 8) & 0xff);
-        wsCmdBlk[8] = (optsp->numblocks & 0xff);
+        wsCmdBlk[6] = (op->grpnum & 0x1f);
+        wsCmdBlk[7] = ((op->numblocks >> 8) & 0xff);
+        wsCmdBlk[8] = (op->numblocks & 0xff);
         break;
     case WRITE_SAME16_LEN:
         wsCmdBlk[0] = WRITE_SAME16_OP;
-        wsCmdBlk[1] = ((optsp->wrprotect & 0x7) << 5);
-        if (optsp->anchor)
+        wsCmdBlk[1] = ((op->wrprotect & 0x7) << 5);
+        if (op->anchor)
             wsCmdBlk[1] |= 0x10;
-        if (optsp->unmap)
+        if (op->unmap)
             wsCmdBlk[1] |= 0x8;
-        if (optsp->pbdata)
+        if (op->pbdata)
             wsCmdBlk[1] |= 0x4;
-        if (optsp->lbdata)
+        if (op->lbdata)
             wsCmdBlk[1] |= 0x2;
-        if (optsp->ndob)
+        if (op->ndob)
             wsCmdBlk[1] |= 0x1;
-        llba = optsp->lba;
+        llba = op->lba;
         for (k = 7; k >= 0; --k) {
             wsCmdBlk[2 + k] = (llba & 0xff);
             llba >>= 8;
         }
-        unum = optsp->numblocks;
+        unum = op->numblocks;
         for (k = 3; k >= 0; --k) {
             wsCmdBlk[10 + k] = (unum & 0xff);
             unum >>= 8;
         }
-        wsCmdBlk[14] = (optsp->grpnum & 0x1f);
+        wsCmdBlk[14] = (op->grpnum & 0x1f);
         break;
     case WRITE_SAME32_LEN:
         /* Note: In Linux at this time the sg driver does not support
          * cdb_s > 16 bytes long, but the bsg driver does. */
         wsCmdBlk[0] = VARIABLE_LEN_OP;
-        wsCmdBlk[6] = (optsp->grpnum & 0x1f);
+        wsCmdBlk[6] = (op->grpnum & 0x1f);
         wsCmdBlk[7] = WRITE_SAME32_ADD;
         wsCmdBlk[8] = ((WRITE_SAME32_SA >> 8) & 0xff);
         wsCmdBlk[9] = (WRITE_SAME32_SA & 0xff);
-        wsCmdBlk[10] = ((optsp->wrprotect & 0x7) << 5);
-        if (optsp->anchor)
+        wsCmdBlk[10] = ((op->wrprotect & 0x7) << 5);
+        if (op->anchor)
             wsCmdBlk[10] |= 0x10;
-        if (optsp->unmap)
+        if (op->unmap)
             wsCmdBlk[10] |= 0x8;
-        if (optsp->pbdata)
+        if (op->pbdata)
             wsCmdBlk[10] |= 0x4;
-        if (optsp->lbdata)
+        if (op->lbdata)
             wsCmdBlk[10] |= 0x2;
-        if (optsp->ndob)
+        if (op->ndob)
             wsCmdBlk[10] |= 0x1;
-        llba = optsp->lba;
+        llba = op->lba;
         for (k = 7; k >= 0; --k) {
             wsCmdBlk[12 + k] = (llba & 0xff);
             llba >>= 8;
         }
-        unum = optsp->numblocks;
+        unum = op->numblocks;
         for (k = 3; k >= 0; --k) {
             wsCmdBlk[28 + k] = (unum & 0xff);
             unum >>= 8;
@@ -247,16 +247,16 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
         return -1;
     }
 
-    if (optsp->verbose > 1) {
+    if (op->verbose > 1) {
         fprintf(stderr, "    Write same(%d) cmd: ", cdb_len);
         for (k = 0; k < cdb_len; ++k)
             fprintf(stderr, "%02x ", wsCmdBlk[k]);
         fprintf(stderr, "\n    Data-out buffer length=%d\n",
-                optsp->xfer_len);
+                op->xfer_len);
     }
-    if ((optsp->verbose > 3) && (optsp->xfer_len > 0)) {
+    if ((op->verbose > 3) && (op->xfer_len > 0)) {
         fprintf(stderr, "    Data-out buffer contents:\n");
-        dStrHexErr((const char *)dataoutp, optsp->xfer_len, 1);
+        dStrHexErr((const char *)dataoutp, op->xfer_len, 1);
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -265,10 +265,10 @@ do_write_same(int sg_fd, const struct opts_t * optsp, const void * dataoutp,
     }
     set_scsi_pt_cdb(ptvp, wsCmdBlk, cdb_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, optsp->xfer_len);
-    res = do_scsi_pt(ptvp, sg_fd, optsp->timeout, optsp->verbose);
+    set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_len);
+    res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
     ret = sg_cmds_process_resp(ptvp, "Write same", res, 0, sense_b,
-                               1 /*noisy */, optsp->verbose, &sense_cat);
+                               1 /*noisy */, op->verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -506,7 +506,13 @@ main(int argc, char * argv[])
         prot_en = 0;
         if (0 == opts.xfer_len) {
             res = sg_ll_readcap_16(sg_fd, 0 /* pmi */, 0 /* llba */, resp_buff,
-                                   RCAP16_RESP_LEN, 0, (vb ? (vb - 1): 0));
+                                   RCAP16_RESP_LEN, 1, (vb ? (vb - 1): 0));
+            if (SG_LIB_CAT_UNIT_ATTENTION == res) {
+                fprintf(stderr, "Read capacity(16) unit attention, try "
+                        "again\n");
+                res = sg_ll_readcap_16(sg_fd, 0, 0, resp_buff,
+                                       RCAP16_RESP_LEN, 1, (vb ? (vb - 1): 0));
+            }
             if (0 == res) {
                 if (vb > 3)
                     dStrHexErr((const char *)resp_buff, RCAP16_RESP_LEN, 1);
@@ -524,7 +530,7 @@ main(int argc, char * argv[])
                     fprintf(stderr, "Read capacity(16) not supported, try "
                             "Read capacity(10)\n");
                 res = sg_ll_readcap_10(sg_fd, 0 /* pmi */, 0 /* lba */,
-                                       resp_buff, RCAP10_RESP_LEN, 0,
+                                       resp_buff, RCAP10_RESP_LEN, 1,
                                        (vb ? (vb - 1): 0));
                 if (0 == res) {
                     if (vb > 3)
@@ -535,12 +541,11 @@ main(int argc, char * argv[])
                                   (resp_buff[6] << 8) |
                                   resp_buff[7]);
                     opts.xfer_len = block_size;
-                }
+                } else
+                    fprintf(stderr, "Read capacity(10) failed. Unable to "
+                            "calculate block size\n");
             } else if (vb)
                 fprintf(stderr, "Read capacity(16) failed. Unable to "
-                        "calculate block size\n");
-            if (res)
-                fprintf(stderr, "Read capacity(10) failed. Unable to "
                         "calculate block size\n");
         }
         if (opts.xfer_len < 1) {
