@@ -30,7 +30,7 @@
 
 */
 
-static const char * version_str = "0.71 20131030";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.72 20131202";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -319,8 +319,9 @@ decode_std_inq(unsigned char * b, int len, int verbose)
     else
         printf("standard INQUIRY: [reserved or vendor specific "
                        "qualifier [%d]]\n", pqual);
-    printf("  PQual=%d  Device_type=%d  RMB=%d  version=0x%02x ",
-           pqual, b[0] & 0x1f, !!(b[1] & 0x80), (unsigned int)b[2]);
+    printf("  PQual=%d  Device_type=%d  RMB=%d  LU_CONG=%d  version=0x%02x ",
+           pqual, b[0] & 0x1f, !!(b[1] & 0x80), !!(b[1] & 0x40),
+           (unsigned int)b[2]);
     printf(" [%s]\n", sg_ansi_version_arr[b[2] & 0xf]);
     printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
            " Resp_data_format=%d\n",
@@ -343,7 +344,7 @@ decode_std_inq(unsigned char * b, int len, int verbose)
     printf("[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
            !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01),
            !!(b[7] & 0x80));
-    printf("WBus16=%d  Sync=%d  Linked=%d  [TranDis=%d]  ",
+    printf("WBus16=%d  Sync=%d  [Linked=%d]  [TranDis=%d]  ",
            !!(b[7] & 0x20), !!(b[7] & 0x10), !!(b[7] & 0x08),
            !!(b[7] & 0x04));
     printf("CmdQue=%d\n", !!(b[7] & 0x02));
