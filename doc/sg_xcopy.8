@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "October 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_XCOPY "8" "December 2013" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -37,9 +37,10 @@ The first group in the synopsis above are "standard" Unix
 operands. The second group are extra options added by this utility.
 Both groups are defined below in combined, alphabetical order.
 .PP
-By default the XCOPY command is sent to \fIIFILE\fR. This can be changed
-with the \fI\-\-on_dst\fR option which causes the XCOPY command to be sent
-to \fIOFILE\fR instead.
+By default the XCOPY command is sent to \fIOFILE\fR. This can be changed
+with the \fI\-\-on_src\fR or \fIiflag=xflag\R options which cause the XCOPY
+command to be sent to \fIIFILE\fR instead. Also see the section on
+ENVIRONMENT VARIABLES.
 .SH OPTIONS
 .TP
 \fBbpt\fR=\fIBPT\fR
@@ -157,11 +158,12 @@ Unix read() and write() calls) so there can be a lot of output.
 outputs usage message and exits.
 .TP
 \fB\-\-on_dst\fR
-send the XCOPY command to the output file/device.
+send the XCOPY command to the output file/device (i.e. \fIOFILE\fR). This is
+the default unless overridden by the \fI\-\-on_src\fR or \fIiflag=xflag\fR
+options. Also see the section below on ENVIRONMENT VARIABLES.
 .TP
 \fB\-\-on_src\fR
-send the XCOPY command to the input file/device. This is the default when
-this option and \fI\-\-on_dst\fR are not given.
+send the XCOPY command to the input file/device (i.e. \fIIFILE\fR).
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 equivalent to \fIverbose=1\fR. When used twice, equivalent to
@@ -231,6 +233,14 @@ transfer.
 If the \fIpad\fR bit is set for both source and target any residual
 source data will be discarded, and any residual destination data will
 be padded.
+.SH ENVIRONMENT VARIABLES
+If the command line invocation does not explicitly (and unambiguously)
+indicate whether the XCOPY SCSI command should be sent to \fIIFILE\fR (i.e.
+the source) or \fIOFILE\fR (i.e. the destination) then a check is
+made for the presence of the XCOPY_TO_SRC and XCOPY_TO_DST environment
+variables. If either one exists (but not both) then it indicates where
+the SCSI XCOPY command will be sent. By default the XCOPY command is
+sent to \fIOFILE\fR.
 .SH RETIRED OPTIONS
 Here are some retired options that are still present:
 .TP
