@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.17 20130507";
+static const char * version_str = "1.18 20131214";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -251,9 +251,10 @@ int main(int argc, char * argv[])
                   goto err_out;
              }
              printf("  Implicit transition time: %d\n", ucp[1]);
-             ucp += 4;;
+             ucp += 4;
         }
-        for (k = 4; k < report_len; k += off, ucp += off) {
+        for (k = ucp - reportTgtGrpBuff; k < report_len;
+             k += off, ucp += off) {
 
             printf("  target port group id : 0x%x , Pref=%d\n",
                    (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));

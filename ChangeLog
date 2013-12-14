@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20131202] [svn: r536]
+Changelog for sg3_utils-1.38 [20131214] [svn: r537]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - error and warning message cleanup
   - sg_inq: add --block=0|1 option to control opens
@@ -10,8 +10,11 @@ Changelog for sg3_utils-1.38 [20131202] [svn: r536]
     - sync version descriptors dated 20131126
     - fix overflow in encode_whitespaces
   - sg_vpd: add LU_CONG to standard inquiry response output
+  - sg_xcopy: environment variables: XCOPY_TO_SRC and
+    XCOPY_TO_DST indicate where xcopy command is sent
   - sg_luns: guard against garbage response
   - sg_write_same: repeat if unit attention
+  - sg_rtpg: fix indexing bug with --extended option
   - sg_lib_data: sync asc/ascq codes with T10 dated 20131110
   - examples: add sg_tst_excl3 for testing O_EXCL
     - improve sg_tst_excl and sg_tst_excl2
