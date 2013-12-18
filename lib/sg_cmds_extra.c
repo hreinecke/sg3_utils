@@ -13,6 +13,7 @@
 #include <inttypes.h>
 
 #include "sg_lib.h"
+#include "sg_lib_data.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"
@@ -2213,20 +2214,6 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
     return ret;
 }
 
-/* If error or debug, want to know the service action */
-#define REC_COPY_RESULTS_NUM_SAS 9
-static const char * receive_copy_results_sas[REC_COPY_RESULTS_NUM_SAS] = {
-    "status (LID1)",
-    "data (LID1)",
-    "unused [0x2]",
-    "operating parameters",
-    "failure details (LID1)",
-    "status (LID4)",
-    "data (LID4)",
-    "ROD token information",    /* this is different name */
-    "Report all ROD tokens",    /* this is different name */
-};
-
 /* Invokes a SCSI RECEIVE COPY RESULTS command. Actually cover all current
  * uses of opcode 0x84 (Third-party copy IN). Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Receive copy results not supported,
@@ -2242,14 +2229,9 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
       {RECEIVE_COPY_RESULTS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
-    const char * old_opcode_name = "Receive copy results";
     char b[64];
 
-    if ((sa >= REC_COPY_RESULTS_NUM_SAS) || ( sa < 0))
-        snprintf(b, sizeof(b), "%s [sa=0x%x]", old_opcode_name, sa);
-    else
-        snprintf(b, sizeof(b), "%s [sa: %s]", old_opcode_name,
-                 receive_copy_results_sas[sa]);
+    sg_get_opcode_sa_name(RECEIVE_COPY_RESULTS_CMD, sa, 0, (int)sizeof(b), b);
     rcvcopyresCmdBlk[1] = (unsigned char)(sa & 0x1f);
     if (sa <= 4)        /* LID1 variants */
         rcvcopyresCmdBlk[2] = (unsigned char)(list_id);
