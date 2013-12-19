@@ -8,12 +8,12 @@ SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
 ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
                     sg_sat_phy_event, ++
-		    [sg_sat_chk_power, sg__sat_identify,
-		     sg__sat_set_features, sg_sat_smart_rd_data
-		     (previous four in the examples directory)]
+                    [sg_sat_chk_power, sg__sat_identify,
+                     sg__sat_set_features, sg_sat_smart_rd_data
+                     (previous four in the examples directory)]
 ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
 COMPARE AND WRITE   sg_compare_and_write
-EXTENDED COPY       sg_xcopy, ++
+EXTENDED COPY(LID1)    sg_xcopy, ++
 GET CONFIGURATION   sg_get_config, ++
 GET LBA STATUS      sg_get_lba_status, ++
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
@@ -43,12 +43,15 @@ READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ DEFECT(10)     sginfo('-d' or '-G'), sg_reassign('-g'), smartmontools, ++
 READ DEFECT(12)     sginfo('-d' or '-G'), smartmontools
-READ LONG (10)      sg_read_long, sg_dd, ++
-READ LONG (16)      sg_read_long, ++
+READ LONG(10)       sg_read_long, sg_dd, ++
+READ LONG(16)       sg_read_long, ++
 READ MEDIA SERIAL NUMBER     sg_rmsn, ++
 REASSIGN BLOCKS     sg_reassign, ++
-RECEIVE COPY RESULTS   sg_copy_results, ++
-RECEIVE DIAGNOSTIC  sg_senddiag, sg_ses, ++
+RECEIVE COPY DATA(LID1)    sg_copy_results, ++
+RECEIVE COPY FAILURE DETAILS(LID1)    sg_copy_results, ++
+RECEIVE COPY OPERATING PARAMETERS    sg_copy_results, sg_xcopy, ++
+RECEIVE COPY STATUS(LID1)    sg_copy_results, ++
+RECEIVE DIAGNOSTIC RESULTS  sg_senddiag, sg_ses, ++
 REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
 REPORT LUNS         sg_luns, ++
 REPORT REFERRALS    sg_referrals, ++
@@ -99,6 +102,10 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 (2) this command was known as REPORT DEVICE IDENTIFIER prior to spc4r07
 (3) this command was known as SET DEVICE IDENTIFIER prior to spc4r07
 
+The RECEIVE COPY * commands in SPC-4 were grouped as one command name
+with 4 service actions in SPC-3 and earlier. The single SPC-3 command
+name is RECEIVE COPY RESULTS.
+
 
 Douglas Gilbert
-16th May 2013
+10th December 2013

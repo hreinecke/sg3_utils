@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.39 20131006";
+static const char * version_str = "0.40 20131214";
 
 #define ME "sg_xcopy: "
 
@@ -114,6 +114,10 @@ static const char * version_str = "0.39 20131006";
 #define TD_IP_COPY_SERVICE 2048
 #define TD_ROD 4096
 
+#define XCOPY_TO_SRC "XCOPY_TO_SRC"
+#define XCOPY_TO_DST "XCOPY_TO_DST"
+#define DEF_XCOPY_SRC0_DST1 1
+
 #define DEV_NULL_MINOR_NUM 3
 
 #define MIN_RESERVED_SIZE 8192
@@ -126,11 +130,6 @@ static int64_t in_full = 0;
 static int in_partial = 0;
 static int64_t out_full = 0;
 static int out_partial = 0;
-#if 0
-static int recovered_errs = 0;
-static int unrecovered_errs = 0;
-static int num_retries = 0;
-#endif
 
 static int do_time = 0;
 static int verbose = 0;
@@ -157,9 +156,7 @@ struct xcopy_fp_t {
     int flock;
     int pad;     /* Data descriptor PAD bit (residual data treatment) */
     int pdt;     /* Peripheral device type */
-#if 0
-    int retries;
-#endif
+    int xcopy_given;
 };
 
 static struct xcopy_fp_t ixcf;
@@ -210,15 +207,6 @@ print_stats(const char * str)
             in_partial);
     pr2serr("%s%" PRId64 "+%d records out\n", str, out_full - out_partial,
             out_partial);
-#if 0
-    if (recovered_errs > 0)
-        pr2serr("%s%d recovered errors\n", str, recovered_errs);
-    if (num_retries > 0)
-        pr2serr("%s%d retries attempted\n", str, num_retries);
-    else if (unrecovered_errs)
-        pr2serr("%s%d unrecovered error(s)\n", str,
-                unrecovered_errs);
-#endif
 }
 
 
@@ -494,43 +482,48 @@ seg_desc_from_dd_type(int in_ft, int in_off, int out_ft, int out_off)
 }
 
 static void
-usage()
+usage(int n_help)
 {
+    if (n_help < 2)
+        goto primary_help;
+    else
+        goto secondary_help;
+
+primary_help:
     pr2serr("Usage: "
-            "sg_xcopy  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
-            " [iflag=FLAGS]\n"
-            "                 [obs=BS] [of=OFILE] [oflag=FLAGS] "
-            "[seek=SEEK] [skip=SKIP]\n"
-            "                 [--help] [--version]\n\n"
-            "                 [bpt=BPT] [cat=0|1] [dc=0|1] "
-            "[id_usage=hold|discard|disable]\n"
-            "                 [list_id=ID] [prio=PRIO] [time=0|1] "
-            "[verbose=VERB]\n"
-            "                 [--on_dst|--on_src] [--verbose]\n"
+            "sg_xcopy  [bpt=BPT] [bs=BS] [cat=0|1] [count=COUNT] [dc=0|1] "
+            "[ibs=BS]\n"
+            "                 [id_usage=hold|discard|disable] [if=IFILE] "
+            "[iflag=FLAGS]\n"
+            "                 [list_id=ID] [obs=BS] [of=OFILE] [oflag=FLAGS] "
+            "[prio=PRIO]\n"
+            "                 [seek=SEEK] [skip=SKIP] [time=0|1] "
+            "[verbose=VERB] [--help]\n"
+            "                 [--on_dst|--on_src] [--verbose] [--version]\n\n"
             "  where:\n"
             "    bpt         is blocks_per_transfer (default: 128)\n"
             "    bs          block size (default is 512)\n");
-    pr2serr("    cat         segment descriptor CAT bit (default: 0)\n"
+    pr2serr("    cat         xcopy segment descriptor CAT bit (default: "
+            "0)\n"
             "    count       number of blocks to copy (def: device size)\n"
-            "    dc          segment descriptor DC bit (default: 0)\n"
+            "    dc          xcopy segment descriptor DC bit (default: 0)\n"
             "    ibs         input block size (if given must be same as "
             "'bs=')\n"
             "    id_usage    sets list_id_usage field to hold (0), "
             "discard (2) or\n"
             "                disable (3)\n"
             "    if          file or device to read from (def: stdin)\n"
-            "    iflag       comma separated list from: [cat,dc,excl,"
-            "flock,null]\n"
+            "    iflag       comma separated list of flags applying to "
+            "IFILE\n"
             "    list_id     sets list_id field to ID (default: 1 or 0)\n"
             "    obs         output block size (if given must be same as "
             "'bs=')\n"
             "    of          file or device to write to (def: stdout), "
             "OFILE of '.'\n");
     pr2serr("                treated as /dev/null\n"
-            "    oflag       comma separated list from: [append,cat,pad,dc,"
-            "excl,flock,\n"
-            "                null]\n"
-            "    prio        set priority field to PRIO (def: 1)\n"
+            "    oflag       comma separated list of flags applying to "
+            "OFILE\n"
+            "    prio        set xcopy priority field to PRIO (def: 1)\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    time        0->no timing(def), 1->time plus calculate "
@@ -538,14 +531,31 @@ usage()
             "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
             "etc\n"
             "    --help      print out this usage message then exit\n"
-            "    --on_src    send XCOPY command to the input file/device.\n"
-            "    --on_dst    send XCOPY command to the output file/device\n"
-            "                Default if this and --on_src options not "
-            "given\n"
+            "    --on_dst    send XCOPY command to OFILE\n"
+            "    --on_src    send XCOPY command to IFILE\n"
             "    --verbose   same action as verbose=1\n"
             "    --version   print version information then exit\n\n"
             "Copy from IFILE to OFILE, similar to dd command; "
-            "but using the SCSI\nEXTENDED COPY (XCOPY) command.\n");
+            "but using the SCSI\nEXTENDED COPY (XCOPY) command. For list "
+            "of flags, use '-hh'.\n");
+    return;
+
+secondary_help:
+    pr2serr("FLAGS:\n"
+            "  append (o)     ignored\n"
+            "  excl           open corresponding device with O_EXCL\n"
+            "  flock          call flock(LOCK_EX|LOCK_NB)\n"
+            "  null           does nothing, placeholder\n"
+            "  pad            set xcopy data descriptor PAD bit on\n"
+            "                 corresponding device\n"
+            "  xcopy          send XCOPY command to corresponding device\n"
+            "\n"
+            "ENVIRONMENT VARIABLES:\n"
+            "  XCOPY_TO_DST   send XCOPY command to OFILE (destination) "
+            "if no other\n"
+            "                 indication\n"
+            "  XCOPY_TO_SRC   send XCOPY command to IFILE (source)\n"
+           );
 }
 
 static int
@@ -1319,7 +1329,7 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
         else if (0 == strcmp(cp, "pad"))
             fp->pad = 1;
         else if (0 == strcmp(cp, "xcopy"))
-            ;   /* ignore, for ddpt compatibility */
+            ++fp->xcopy_given;   /* for ddpt compatibility */
         else {
             pr2serr("unrecognised flag: %s\n", cp);
             return 1;
@@ -1443,6 +1453,7 @@ main(int argc, char * argv[])
     char * key;
     char * buf;
     int blocks = 0;
+    int num_help = 0;
     int num_xcopy = 0;
     int res, k;
     int infd, outfd, xcopy_fd;
@@ -1563,15 +1574,6 @@ main(int argc, char * argv[])
                 pr2serr(ME "bad argument to 'oflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-#if 0
-        } else if (0 == strcmp(key, "retries")) {
-            ixcf.retries = sg_get_num(buf);
-            oxcf.retries = ixcf.retries;
-            if (-1 == ixcf.retries) {
-                pr2serr(ME "bad argument to 'retries='\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
-#endif
         } else if (0 == strcmp(key, "seek")) {
             seek = sg_get_llnum(buf);
             if (-1LL == seek) {
@@ -1592,13 +1594,16 @@ main(int argc, char * argv[])
             on_src = 1;
         else if (0 == strncmp(key, "--on_dst", 8))
             on_dst = 1;
+        else if (0 == strncmp(key, "-hhh", 4))
+            num_help += 3;
+        else if (0 == strncmp(key, "-hh", 3))
+            num_help += 2;
         else if ((0 == strncmp(key, "--help", 7)) ||
                  (0 == strncmp(key, "-h", 2)) ||
-                   (0 == strcmp(key, "-?"))) {
-            usage();
-            return 0;
-        } else if ((0 == strncmp(key, "--vers", 6)) ||
-                   (0 == strcmp(key, "-V"))) {
+                 (0 == strcmp(key, "-?")))
+            ++num_help;
+        else if ((0 == strncmp(key, "--vers", 6)) ||
+                 (0 == strcmp(key, "-V"))) {
             pr2serr(ME "%s\n", version_str);
             return 0;
         } else if (0 == strncmp(key, "--verb", 6))
@@ -1617,9 +1622,16 @@ main(int argc, char * argv[])
             ;   /* ignore; for compatibility with ddpt */
         else {
             pr2serr("Unrecognized option '%s'\n", key);
-            pr2serr("For more information use '--help'\n");
+            if (num_help)
+                usage(num_help);
+            else
+                pr2serr("For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+    if (num_help) {
+        usage(num_help);
+        return 0;
     }
     if (on_src && on_dst) {
         pr2serr("Syntax error - either specify --on_src OR "
@@ -1627,8 +1639,33 @@ main(int argc, char * argv[])
         pr2serr("For more information use '--help'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (!on_src && !on_dst)
-        on_dst = 1;
+    if ((! on_src) && (! on_dst)) {
+        if ((!! ixcf.xcopy_given) == (!! oxcf.xcopy_given)) {
+            char * csp;
+            char * cdp;
+
+            csp = getenv(XCOPY_TO_SRC);
+            cdp = getenv(XCOPY_TO_DST);
+            if ((!! csp) == (!! cdp)) {
+#if DEF_XCOPY_SRC0_DST1 == 0
+                on_src = 1;
+#else
+                on_dst = 1;
+#endif
+            } else if (csp)
+                on_src = 1;
+            else
+                on_dst = 1;
+        } else if (ixcf.xcopy_given)
+            on_src = 1;
+        else
+            on_dst = 1;
+    }
+    if (verbose > 1)
+        pr2serr("Extended Copy(LID1) command will be sent to %s device "
+                "[%s]\n", (on_src ? "src" : "dst"),
+                (on_src ? ixcf.fname : oxcf.fname));
+
     if ((ibs && blk_sz && (ibs != blk_sz)) ||
         (obs && blk_sz && (obs != blk_sz))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -1666,9 +1703,8 @@ main(int argc, char * argv[])
     }
 
     if (verbose > 1)
-        pr2serr(ME "%s if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
-                PRId64 "\n", (on_src)?"on-source":"on-destination",
-                ixcf.fname, skip, oxcf.fname, seek, dd_count);
+        pr2serr(ME " if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
+                PRId64 "\n", ixcf.fname, skip, oxcf.fname, seek, dd_count);
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
     install_handler(SIGPIPE, interrupt_handler);
