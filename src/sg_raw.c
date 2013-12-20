@@ -12,6 +12,8 @@
  * data phase) through a Generic SCSI interface.
  */
 
+#define _XOPEN_SOURCE 600       /* clear up posix_memalign() warning */
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -25,7 +27,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.7 (2013-11-24)"
+#define SG_RAW_VERSION "0.4.8 (2013-12-19)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF

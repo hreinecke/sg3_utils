@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.23 20131202";    /* SPC-4 rev 36n */
+static const char * version_str = "1.24 20131219";    /* SPC-4 rev 36n */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -296,8 +296,8 @@ usage()
             "'--page=PG')\n\n"
             "Performs a SCSI INQUIRY command. "
             "If no options given then does a\n'standard' INQUIRY. Can list "
-            "VPD pages with '--vpd' or '--page=PG'\noption. The sg_vpd "
-            "utility has a more up to date list of VPD pages.\n");
+            "VPD pages with '--vpd' or '--page=PG'\noption. sg_vpd and "
+            "sdparm decode more VPD pages than this utility.\n");
 }
 
 #ifdef SG_SCSI_STRINGS
@@ -3316,7 +3316,8 @@ decode_vpd(int sg_fd, const struct opts_t * optsp)
         }
         break;
     default:
-        printf(" Only hex output supported. sg_vpd decodes more pages.\n");
+        printf(" Only hex output supported. sg_vpd and sdparm decode more "
+               "VPD pages.\n");
         return vpd_mainly_hex(sg_fd, optsp);
     }
     if (res) {

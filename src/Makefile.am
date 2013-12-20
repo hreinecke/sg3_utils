@@ -120,7 +120,7 @@ bin_PROGRAMS = \
 endif
 
 # For C++/clang testing
-## CC = g++ -std=c++11
+## CC = g++
 ## CC = g++
 ## CC = clang
 ## CC = clang++
