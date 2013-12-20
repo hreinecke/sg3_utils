@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.81 20131125";    /* ses3r06 */
+static const char * version_str = "1.82 20131219";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -111,6 +111,7 @@ struct opts_t {
     int inner_hex;
     int do_join;
     int do_list;
+    int maxlen;
     int seid;
     int seid_given;
     int page_code;
@@ -479,6 +480,7 @@ static struct option long_options[] = {
     {"list", no_argument, 0, 'l'},
     {"nickid", required_argument, 0, 'N'},
     {"nickname", required_argument, 0, 'n'},
+    {"maxlen", required_argument, 0, 'm'},
     {"page", required_argument, 0, 'p'},
     {"raw", no_argument, 0, 'r'},
     {"sas-addr", required_argument, 0, 'A'},
@@ -526,9 +528,9 @@ usage(int help_num)
             "              [--filter] [--get=STR] [--help] [--hex]\n"
             "              [--index=IIA | =TIA,II] [--inner-hex] "
             "[--join] [--list]\n"
-            "              [--nickname=SEN] [--nickid=SEID] [--page=PG] "
-            "[--raw]\n"
-            "              [--sas-addr=SA] [--set=STR] [--status] "
+            "              [--maxlen=LEN] [--nickname=SEN] [--nickid=SEID] "
+            "[--page=PG]\n"
+            "              [--raw] [--sas-addr=SA] [--set=STR] [--status] "
             "[--verbose]\n"
             "              [--version] DEVICE\n"
             "  where the main options are:\n"
@@ -589,6 +591,8 @@ usage(int help_num)
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
             "    --list|-l           same as '--enumerate' option\n"
+            "    --maxlen=LEN|-m LEN    max response length (allocation "
+            "length in cdb)\n"
             "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
             "    --nickid=SEID|-N SEID   SEID is subenclosure identifier "
             "(def: 0)\n"
@@ -754,7 +758,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:efG:hHiI:jln:N:p:rsS:vVx:",
+        c = getopt_long(argc, argv, "A:b:cC:d:D:efG:hHiI:jln:N:m:p:rsS:vVx:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -845,6 +849,14 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             }
             ++op->seid_given;
             break;
+        case 'm':
+            op->maxlen = sg_get_num(optarg);
+            if ((op->maxlen < 0) || (op->maxlen > 65535)) {
+                pr2serr("bad argument to '--maxlen' (0 to 65535 "
+                        "inclusive expected)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
         case 'p':
             if (isdigit(optarg[0])) {
                 op->page_code = sg_get_num(optarg);
@@ -913,6 +925,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             goto err_help;
         }
     }
+    if (op->maxlen <= 0)
+        op->maxlen = MX_ALLOC_LEN;
     if (op->do_join && (op->do_control)) {
         pr2serr("cannot have '--join' and '--control'\n");
         goto err_help;
@@ -1401,15 +1415,14 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
-    resp = (unsigned char *)calloc(MX_ALLOC_LEN, 1);
+    resp = (unsigned char *)calloc(op->maxlen, 1);
     if (NULL == resp) {
         pr2serr("populate: unable to allocate %d bytes on heap\n",
-                MX_ALLOC_LEN);
+                op->maxlen);
         ret = -1;
         goto the_end;
     }
-    res = do_rec_diag(fd, DPC_CONFIGURATION, resp, MX_ALLOC_LEN, op,
-                      &resp_len);
+    res = do_rec_diag(fd, DPC_CONFIGURATION, resp, op->maxlen, op, &resp_len);
     if (res) {
         pr2serr("populate: couldn't read config page, res=%d\n", res);
         ret = -1;
@@ -2750,16 +2763,15 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
     const char * cp;
     struct enclosure_info primary_info;
 
-    resp = (unsigned char *)calloc(MX_ALLOC_LEN, 1);
+    resp = (unsigned char *)calloc(op->maxlen, 1);
     if (NULL == resp) {
         pr2serr("process_status_page: unable to allocate %d bytes on heap\n",
-                MX_ALLOC_LEN);
+                op->maxlen);
         ret = -1;
         goto fini;
     }
     cp = find_in_diag_page_desc(op->page_code);
-    ret = do_rec_diag(sg_fd, op->page_code, resp, MX_ALLOC_LEN,
-                      op, &resp_len);
+    ret = do_rec_diag(sg_fd, op->page_code, resp, op->maxlen, op, &resp_len);
     if (ret)
         goto fini;
     if (op->do_raw) {
@@ -2956,7 +2968,7 @@ static int
 join_work(int sg_fd, struct opts_t * op, int display)
 {
     int k, j, res, num_t_hdrs, elem_ind, ei, get_out, desc_len, dn_len;
-    int et4aes, broken_ei, ei2, got1, jr_max_ind, eip, eiioe;
+    int et4aes, broken_ei, ei2, got1, jr_max_ind, eip, eiioe, mlen;
     unsigned int ref_gen_code, gen_code;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
@@ -2987,8 +2999,11 @@ join_work(int sg_fd, struct opts_t * op, int display)
             printf("%02x", primary_info.enc_log_id[j]);
         printf("\n");
     }
-    res = do_rec_diag(sg_fd, DPC_ENC_STATUS, enc_stat_rsp,
-                      sizeof(enc_stat_rsp), op, &enc_stat_rsp_len);
+    mlen = sizeof(enc_stat_rsp);
+    if (mlen > op->maxlen)
+        mlen = op->maxlen;
+    res = do_rec_diag(sg_fd, DPC_ENC_STATUS, enc_stat_rsp, mlen, op,
+                      &enc_stat_rsp_len);
     if (res)
         return res;
     if (enc_stat_rsp_len < 8) {
@@ -3004,8 +3019,11 @@ join_work(int sg_fd, struct opts_t * op, int display)
     es_ucp = enc_stat_rsp + 8;
     /* es_last_ucp = enc_stat_rsp + enc_stat_rsp_len - 1; */
 
-    res = do_rec_diag(sg_fd, DPC_ELEM_DESC, elem_desc_rsp,
-                      sizeof(elem_desc_rsp), op, &elem_desc_rsp_len);
+    mlen = sizeof(elem_desc_rsp);
+    if (mlen > op->maxlen)
+        mlen = op->maxlen;
+    res = do_rec_diag(sg_fd, DPC_ELEM_DESC, elem_desc_rsp, mlen, op,
+                      &elem_desc_rsp_len);
     if (0 == res) {
         if (elem_desc_rsp_len < 8) {
             pr2serr("Element Descriptor response too short\n");
@@ -3029,8 +3047,11 @@ join_work(int sg_fd, struct opts_t * op, int display)
 
     if (display || (DPC_ADD_ELEM_STATUS == op->page_code) ||
         (op->dev_slot_num >= 0) || saddr_non_zero(op->sas_addr)) {
-        res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp,
-                          sizeof(add_elem_rsp), op, &add_elem_rsp_len);
+        mlen = sizeof(add_elem_rsp);
+        if (mlen > op->maxlen)
+            mlen = op->maxlen;
+        res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp, mlen, op,
+                          &add_elem_rsp_len);
         if (0 == res) {
             if (add_elem_rsp_len < 8) {
                 pr2serr("Additional Element Status response too short\n");
@@ -3059,8 +3080,11 @@ join_work(int sg_fd, struct opts_t * op, int display)
 
     if ((op->do_join > 1) ||
         ((0 == display) && (DPC_THRESHOLD == op->page_code))) {
-        res = do_rec_diag(sg_fd, DPC_THRESHOLD, threshold_rsp,
-                          sizeof(threshold_rsp), op, &threshold_rsp_len);
+        mlen = sizeof(threshold_rsp);
+        if (mlen > op->maxlen)
+            mlen = op->maxlen;
+        res = do_rec_diag(sg_fd, DPC_THRESHOLD, threshold_rsp, mlen, op,
+                          &threshold_rsp_len);
         if (0 == res) {
             if (threshold_rsp_len < 8) {
                 pr2serr("Threshold In response too short\n");

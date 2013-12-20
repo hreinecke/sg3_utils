@@ -30,7 +30,7 @@
 
 */
 
-static const char * version_str = "0.72 20131202";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.73 20131219";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -83,7 +83,6 @@ const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 #define VPD_DI_SEL_TPORT 2
 #define VPD_DI_SEL_TARGET 4
 #define VPD_DI_SEL_AS_IS 32
-
 
 #define DEF_ALLOC_LEN 252
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -1515,6 +1514,266 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* This is xcopy(LID4) related: "ROD" == Representation Of Data
+ * Used by VPD_3PARTY_COPY */
+static void
+decode_rod_descriptor(const unsigned char * buff, int len)
+{
+    const unsigned char * ucp = buff;
+    int k, bump, j;
+    uint64_t ull;
+
+    for (k = 0; k < len; k += bump, ucp += bump) {
+        bump = (ucp[2] << 8) + ucp[3];
+        switch (ucp[0]) {
+            case 0:
+                /* Block ROD device type specific descriptor */
+                printf("   Optimal block ROD length granularity: %d\n",
+                       (ucp[6] << 8) + ucp[7]);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[8 + j];
+                }
+                printf("  Maximum Bytes in block ROD: %" PRIu64 "\n", ull);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[16 + j];
+                }
+                printf("  Optimal Bytes in block ROD transfer: %" PRIu64 "\n",
+                       ull);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[24 + j];
+                }
+                printf("  Optimal Bytes to token per segment: %" PRIu64 "\n",
+                       ull);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[32 + j];
+                }
+                printf("  Optimal Bytes from token per segment:"
+                       " %" PRIu64 "\n", ull);
+                break;
+            case 1:
+                /* Stream ROD device type specific descriptor */
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[8 + j];
+                }
+                printf("  Maximum Bytes in stream ROD: %" PRIu64 "\n", ull);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[16 + j];
+                }
+                printf("  Optimal Bytes in stream ROD transfer:"
+                       " %" PRIu64 "\n", ull);
+                break;
+            case 3:
+                /* Copy manager ROD device type specific descriptor */
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[8 + j];
+                }
+                printf("  Maximum Bytes in processor ROD:"
+                       " %" PRIu64 "\n", ull);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[16 + j];
+                }
+                printf("  Optimal Bytes in processor ROD transfer:"
+                       " %" PRIu64 "\n", ull);
+                break;
+            default:
+                printf("  Unhandled descriptor (format %d, device type %d)\n",
+                       ucp[0] >> 5, ucp[0] & 0x1F);
+                break;
+        }
+    }
+}
+
+/* VPD_3PARTY_COPY */
+static void
+decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex)
+{
+    int j, k, bump, desc_type, desc_len, u, c, sa_len;
+    const unsigned char * ucp;
+    uint64_t ull;
+
+    if (len < 4) {
+        fprintf(stderr, "Third-party Copy VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    len -= 4;
+    ucp = buff + 4;
+    for (k = 0; k < len; k += bump, ucp += bump) {
+        desc_type = (ucp[0] << 8) + ucp[1];
+        desc_len = (ucp[2] << 8) + ucp[3];
+        printf("Descriptor type=%d, len %d\n", desc_type, desc_len);
+        bump = 4 + desc_len;
+        if ((k + bump) > len) {
+            fprintf(stderr, "Third-party Copy VPD "
+                    "page, short descriptor length=%d, left=%d\n", bump,
+                    (len - k));
+            return;
+        }
+        if (0 == desc_len)
+            continue;
+        if (2 == do_hex)
+            dStrHex((const char *)ucp + 4, desc_len, 1);
+        else if (do_hex > 2)
+            dStrHex((const char *)ucp, bump, 1);
+        else {
+            switch (desc_type) {
+            case 0x0000:    /* Block Device ROD Limits */
+                printf(" Block Device ROD Limits:\n");
+                printf("  Maximum Range Descriptors: %d\n",
+                       (ucp[10] << 8) + ucp[11]);
+                u = (ucp[12] << 24) | (ucp[13] << 16) | (ucp[14] << 8) |
+                    ucp[15];
+                printf("  Maximum Inactivity Timeout: %d\n", u);
+                u = (ucp[16] << 24) | (ucp[17] << 16) | (ucp[18] << 8) |
+                    ucp[19];
+                printf("  Default Inactivity Timeout: %d\n", u);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[20 + j];
+                }
+                printf("  Maximum Token Transfer Size: %" PRIu64 "\n", ull);
+                ull = 0;
+                for (j = 0; j < 8; j++) {
+                    if (j > 0)
+                        ull <<= 8;
+                    ull |= ucp[28 + j];
+                }
+                printf("  Optimal Transfer Count: %" PRIu64 "\n", ull);
+                break;
+            case 0x0001:    /* Supported Commands */
+                printf(" Supported Commands:\n");
+                j = 0;
+                while (j < ucp[4]) {
+                    c = ucp[5 + j];
+                    printf("  0x%02x\n", c);
+                    sa_len = ucp[6 + j];
+                    for (k = 0; k < sa_len; k++) {
+                        printf("   SA 0x%02x\n", ucp[7 + j + k]);
+                    }
+                    j += sa_len;
+                }
+                break;
+            case 0x0004:    /* Parameter Data */
+                printf(" Parameter Data:\n");
+                printf("  Maximum CSCD Descriptor Count: %d\n",
+                       (ucp[8] << 8) + ucp[9]);
+                printf("  Maximum Segment Descriptor Count: %d\n",
+                       (ucp[10] << 8) + ucp[11]);
+                u = (ucp[12] << 24) | (ucp[13] << 16) | (ucp[14] << 8) |
+                    ucp[15];
+                printf("  Maximum Descriptor List Length: %d\n", u);
+                u = (ucp[16] << 24) | (ucp[17] << 16) | (ucp[18] << 8) |
+                    ucp[19];
+                printf("  Maximum Inline Data Length: %d\n", u);
+                break;
+            case 0x0008:    /* Supported Descriptors */
+                printf(" Supported Descriptors:\n");
+                for (j = 0; j < ucp[4]; j++) {
+                    printf("  0x%x\n", ucp[5 + j]);
+                }
+                break;
+            case 0x000C:    /* Supported CSCD IDs */
+                printf(" Supported CSCD IDs:\n");
+                for (j = 0; j < (ucp[4] << 8) + ucp[5]; j += 2) {
+                    u = (ucp[6 + j] << 8) | ucp[7 + j];
+                    printf("  0x%04x\n", u);
+                }
+                break;
+            case 0x0106:    /* ROD Token Features */
+                printf(" ROD Token Features:\n");
+                printf("  Remote Tokens: %d\n", ucp[4] & 0x0f);
+                u = (ucp[16] << 24) | (ucp[17] << 16) | (ucp[18] << 8) |
+                    ucp[19];
+                printf("  Minimum Token Lifetime: %d\n", u);
+                u = (ucp[20] << 24) | (ucp[21] << 16) | (ucp[22] << 8) |
+                    ucp[23];
+                printf("  Maximum Token Lifetime: %d\n", u);
+                u = (ucp[24] << 24) | (ucp[25] << 16) | (ucp[26] << 8) |
+                    ucp[27];
+                printf("  Maximum Token inactivity timeout: %d\n", u);
+                decode_rod_descriptor(&ucp[48], (ucp[46] << 8) + ucp[47]);
+                break;
+            case 0x0108:    /* Supported ROD Token and ROD Types */
+                printf(" Supported ROD Token and ROD Types:\n");
+                for (j = 0; j < (ucp[6] << 8) + ucp[7]; j+= 64) {
+                    u = (ucp[8 + j] << 24) | (ucp[8 + j + 1] << 16) |
+                        (ucp[8 + j + 2] << 8) | ucp[8 + j + 3];
+                    printf("  ROD Type %d:\n", u);
+                    printf("    Internal: %s\n",
+                           ucp[8 + j + 4] & 0x80 ? "yes" : "no");
+                    printf("    Token In: %s\n",
+                           ucp[8 + j + 4] & 0x02 ? "yes" : "no");
+                    printf("    Token Out: %s\n",
+                           ucp[8 + j + 4] & 0x01 ? "yes" : "no");
+                    printf("    Preference: %d\n",
+                           (ucp[8 + j + 6] << 8) + ucp[8 + j + 7]);
+                }
+                break;
+            case 0x8001:    /* General Copy Operations */
+                printf(" General Copy Operations:\n");
+                u = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) |
+                    ucp[7];
+                printf("  Total Concurrent Copies: %d\n", u);
+                u = (ucp[8] << 24) | (ucp[9] << 16) | (ucp[10] << 8) |
+                    ucp[11];
+                printf("  Maximum Identified Concurrent Copies: %d\n", u);
+                u = (ucp[12] << 24) | (ucp[13] << 16) | (ucp[14] << 8) |
+                    ucp[15];
+                printf("  Maximum Segment Length: %d\n", u);
+                ull = (1 << ucp[16]);
+                printf("  Data Segment Granularity: %" PRIu64 "\n", ull);
+                ull = (1 << ucp[17]);
+                printf("  Inline Data Granularity: %" PRIu64 "\n", ull);
+                break;
+            case 0x9101:    /* Stream Copy Operations */
+                printf(" Stream Copy Operations:\n");
+                u = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) |
+                    ucp[7];
+                printf("  Maximum Stream Device Transfer Size: %d\n", u);
+                break;
+            case 0xC001:    /* Held Data */
+                printf(" Held Data:\n");
+                u = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) |
+                    ucp[7];
+                printf("  Held Data Limit: %d\n", u);
+                ull = (1 << ucp[8]);
+                printf("  Held Data Granularity: %" PRIu64 "\n", ull);
+                break;
+            default:
+                fprintf(stderr, "Unexpected type=%d\n", desc_type);
+                dStrHexErr((const char *)ucp, bump, 1);
+                break;
+            }
+        }
+    }
+}
+
 /* VPD_PROTO_LU */
 static void
 decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
@@ -2596,12 +2855,15 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             }
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
-            else if (do_hex)
+            else if (1 == do_hex)
                 dStrHex((const char *)rsp_buff, len, 0);
             else {
-                printf("   Leave decoding of this page until it is wanted, "
-                       "in hex:\n");
-                dStrHex((const char *)rsp_buff, len, 0);
+                pdt = rsp_buff[0] & 0x1f;
+                if (verbose || do_long)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rsp_buff[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(buff), buff));
+                decode_3party_copy_vpd(rsp_buff, len, do_hex);
             }
             return 0;
         }
