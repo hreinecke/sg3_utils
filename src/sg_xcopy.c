@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2013 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2014 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.41 20131218";
+static const char * version_str = "0.41 20140105";
 
 #define ME "sg_xcopy: "
 
@@ -1443,6 +1443,18 @@ file_err:
     return -SG_LIB_FILE_ERROR;
 }
 
+static int
+num_chs_in_str(const char * s, int slen, int ch)
+{
+    int res = 0;
+
+    while (--slen >= 0) {
+        if (ch == s[slen])
+            ++res;
+    }
+    return res;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -1459,7 +1471,7 @@ main(int argc, char * argv[])
     int blocks = 0;
     int num_help = 0;
     int num_xcopy = 0;
-    int res, k;
+    int res, k, n, keylen;
     int infd, outfd, xcopy_fd;
     int ret = 0;
     unsigned char list_id = 1;
@@ -1493,6 +1505,7 @@ main(int argc, char * argv[])
             buf++;
         if (*buf)
             *buf++ = '\0';
+        keylen = (int)strlen(key);
         if (0 == strncmp(key, "app", 3)) {
             ixcf.append = sg_get_num(buf);
             oxcf.append = ixcf.append;
@@ -1594,37 +1607,45 @@ main(int argc, char * argv[])
             do_time = sg_get_num(buf);
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
-        else if (0 == strncmp(key, "--on_src", 8))
-            on_src = 1;
-        else if (0 == strncmp(key, "--on_dst", 8))
-            on_dst = 1;
-        else if (0 == strncmp(key, "-hhh", 4))
-            num_help += 3;
-        else if (0 == strncmp(key, "-hh", 3))
-            num_help += 2;
-        else if ((0 == strncmp(key, "--help", 7)) ||
-                 (0 == strncmp(key, "-h", 2)) ||
-                 (0 == strcmp(key, "-?")))
+        /* look for long options that start with '--' */
+        else if (0 == strncmp(key, "--help", 6))
             ++num_help;
-        else if ((0 == strncmp(key, "--vers", 6)) ||
-                 (0 == strcmp(key, "-V"))) {
+        else if (0 == strncmp(key, "--on_dst", 8))
+            ++on_dst;
+        else if (0 == strncmp(key, "--on_src", 8))
+            ++on_src;
+        else if (0 == strncmp(key, "--verb", 6))
+            verbose += 1;
+        else if (0 == strncmp(key, "--vers", 6)) {
             pr2serr(ME "%s\n", version_str);
             return 0;
-        } else if (0 == strncmp(key, "--verb", 6))
-            verbose += 1;
-        else if (0 == strcmp(key, "-vvvvv"))
-            verbose += 5;
-        else if (0 == strcmp(key, "-vvvv"))
-            verbose += 4;
-        else if (0 == strcmp(key, "-vvv"))
-            verbose += 3;
-        else if (0 == strcmp(key, "-vv"))
-            verbose += 2;
-        else if (0 == strcmp(key, "-v"))
-            verbose += 1;
-        else if (0 == strncmp(key, "--xcopy", 6))
+        }
+        else if (0 == strncmp(key, "--xcopy", 7))
             ;   /* ignore; for compatibility with ddpt */
-        else {
+        /* look for short options that start with a single '-', they can be
+         * concaternated (e.g. '-vvvV') */
+        else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
+            res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'h');
+            num_help += n;
+            res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'v');
+            verbose += n;
+            res += n;
+            if (num_chs_in_str(key + 1, keylen - 1, 'V')) {
+                pr2serr("%s\n", version_str);
+                return -1;
+            }
+            n = num_chs_in_str(key + 1, keylen - 1, 'x');
+            /* accept and ignore; for compatibility with ddpt */
+            res += n;
+            if (res < (keylen - 1)) {
+                pr2serr(ME "Unrecognised short option in '%s', try "
+                        "'--help'\n", key);
+                if (0 == num_help)
+                    return -1;
+            }
+        } else {
             pr2serr("Unrecognized option '%s'\n", key);
             if (num_help)
                 usage(num_help);
