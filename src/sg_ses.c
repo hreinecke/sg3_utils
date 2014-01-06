@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.82 20131219";    /* ses3r06 */
+static const char * version_str = "1.83 20140106";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -491,7 +491,8 @@ static struct option long_options[] = {
     {0, 0, 0, 0},
 };
 
-static int read_hex(const char * inp, unsigned char * arr, int * arr_len);
+static int read_hex(const char * inp, unsigned char * arr, int * arr_len,
+                    int verb);
 static int strcase_eq(const char * s1p, const char * s2p);
 static void enumerate_diag_pages(void);
 static int saddr_non_zero(const unsigned char * ucp);
@@ -587,6 +588,8 @@ usage(int help_num)
             "control pages\n"
             "    --data=- | -d -     fetch string of ASCII hex bytes from "
             "stdin\n"
+            "    --data=@FN | -d @FN    fetch string of ASCII hex bytes from "
+            "file: FN\n"
             "    --hex|-H            print page response (or field) in hex\n"
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
@@ -751,6 +754,7 @@ static int
 cl_process(struct opts_t *op, int argc, char *argv[])
 {
     int c, j, ret, ff;
+    const char * data_arg = NULL;
     uint64_t saddr;
     const char * cp;
 
@@ -799,11 +803,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->num_cgs;
             break;
         case 'd':
-            memset(op->data_arr, 0, sizeof(op->data_arr));
-            if (read_hex(optarg, op->data_arr + 4, &op->arr_len)) {
-                pr2serr("bad argument to '--data'\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            data_arg = optarg;
             op->do_data = 1;
             break;
         case 'D':
@@ -923,6 +923,13 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             for (; optind < argc; ++optind)
                 pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             goto err_help;
+        }
+    }
+    if (data_arg) {
+        memset(op->data_arr, 0, sizeof(op->data_arr));
+        if (read_hex(data_arg, op->data_arr + 4, &op->arr_len, op->verbose)) {
+            pr2serr("bad argument to '--data'\n");
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (op->maxlen <= 0)
@@ -2648,8 +2655,10 @@ truncated:
     return;
 }
 
+/* Reads hex data from command line, stdin or a file. Returns 0 on success,
+ * 1 otherwise. */
 static int
-read_hex(const char * inp, unsigned char * arr, int * arr_len)
+read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
 {
     int in_len, k, j, m, off;
     unsigned int h;
@@ -2657,6 +2666,8 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
     char * cp;
     char * c2p;
     char line[512];
+    char carry_over[4];
+    FILE * fp = NULL;
 
     if ((NULL == inp) || (NULL == arr) || (NULL == arr_len))
         return 1;
@@ -2665,10 +2676,20 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
     if (0 == in_len) {
         *arr_len = 0;
     }
-    if ('-' == inp[0]) {        /* read from stdin */
+    if (('-' == inp[0]) || ('@' == inp[0])) {    /* read from stdin or file */
+        if ('-' == inp[0])
+            fp = stdin;
+        else {
+            fp = fopen(inp + 1, "r");
+            if (NULL == fp) {
+                pr2serr("read_hex: unable to open file: %s\n", inp + 1);
+                return 1;
+            }
+        }
+        carry_over[0] = 0;
         for (j = 0, off = 0; j < MX_DATA_IN; ++j) {
             /* limit lines read to MX_DATA_IN */
-            if (NULL == fgets(line, sizeof(line), stdin))
+            if (NULL == fgets(line, sizeof(line), fp))
                 break;
             in_len = strlen(line);
             if (in_len > 0) {
@@ -2677,9 +2698,28 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                     line[in_len] = '\0';
                 }
             }
-            if (0 == in_len)
+            if (0 == in_len) {
+                carry_over[0] = 0;
                 continue;
-            lcp = line;
+            }
+            if (carry_over[0]) {
+                if (isxdigit(line[0])) {
+                    carry_over[1] = line[0];
+                    carry_over[2] = '\0';
+                    if (1 == sscanf(carry_over, "%x", &h))
+                        arr[off - 1] = h;       /* back up and overwrite */
+                    else {
+                        pr2serr("read_hex: carry_over error ['%s'] around "
+                                "line %d\n", carry_over, j + 1);
+                        goto err_with_fp;
+                    }
+                    lcp = line + 1;
+                    --in_len;
+                } else
+                    lcp = line;
+                carry_over[0] = 0;
+            } else
+                lcp = line;
             m = strspn(lcp, " \t");
             if (m == in_len)
                 continue;
@@ -2691,7 +2731,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
             if (in_len != k) {
                 pr2serr("read_hex: syntax error at line %d, pos %d\n", j + 1,
                         m + k + 1);
-                return 1;
+                goto err_with_fp;
             }
             for (k = 0; k < (MX_DATA_IN - off); ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
@@ -2699,7 +2739,11 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                         pr2serr("read_hex: hex number larger than 0xff in "
                                 "line %d, pos %d\n", j + 1,
                                 (int)(lcp - line + 1));
-                        return 1;
+                        goto err_with_fp;
+                    }
+                    if (1 == strlen(lcp)) {
+                        /* single trailing hex digit might be a split pair */
+                        carry_over[0] = *lcp;
                     }
                     arr[off + k] = h;
                     lcp = strpbrk(lcp, " ,\t");
@@ -2711,7 +2755,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
                 } else {
                     pr2serr("read_hex: error in line %d, at pos %d\n", j + 1,
                             (int)(lcp - line + 1));
-                    return 1;
+                    goto err_with_fp;
                 }
             }
             off += k + 1;
@@ -2749,7 +2793,16 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len)
         }
         *arr_len = k + 1;
     }
+    if (verb > 3)
+        dStrHex((const char *)arr, *arr_len, 0);
+    if (fp && (fp != stdin))
+        fclose(fp);
     return 0;
+
+err_with_fp:
+    if (fp && (fp != stdin))
+        fclose(fp);
+    return 1;
 }
 
 /* Display "status" page (op->page_code). Return 0 for success. */
