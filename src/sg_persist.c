@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2013 D. Gilbert
+ *  Copyright (C) 2004-2014 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.40 20130626";
+static const char * version_str = "0.42 20140110";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -800,10 +800,11 @@ static int
 decode_file_tids(const char * fnp, struct opts_t * optsp)
 {
     FILE * fp = stdin;
-    int in_len, k, j, m;
+    int in_len, k, j, m, split_line;
     unsigned int h;
     const char * lcp;
-    char line[512];
+    char line[1024];
+    char carry_over[4];
     int off = 0;
     int num = 0;
     unsigned char * tid_arr = optsp->transportid_arr;
@@ -815,6 +816,7 @@ decode_file_tids(const char * fnp, struct opts_t * optsp)
             return 1;
         }
     }
+    carry_over[0] = 0;
     for (j = 0, off = 0; j < 512; ++j) {
         if (NULL == fgets(line, sizeof(line), fp))
             break;
@@ -823,11 +825,32 @@ decode_file_tids(const char * fnp, struct opts_t * optsp)
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-            }
+                split_line = 0;
+            } else
+                split_line = 1;
         }
-        if (0 == in_len)
+        if (in_len < 1) {
+            carry_over[0] = 0;
             continue;
-        lcp = line;
+        }
+        if (carry_over[0]) {
+            if (isxdigit(line[0])) {
+                carry_over[1] = line[0];
+                carry_over[2] = '\0';
+                if (1 == sscanf(carry_over, "%x", &h))
+                    tid_arr[off - 1] = h;       /* back up and overwrite */
+                else {
+                    fprintf(stderr, "decode_file_tids: carry_over error "
+                            "['%s'] around line %d\n", carry_over, j + 1);
+                    goto bad;
+                }
+                lcp = line + 1;
+                --in_len;
+            } else
+                lcp = line;
+            carry_over[0] = 0;
+        } else
+            lcp = line;
         m = strspn(lcp, " \t");
         if (m == in_len)
             continue;
@@ -850,6 +873,10 @@ decode_file_tids(const char * fnp, struct opts_t * optsp)
                             "larger than 0xff in line %d, pos %d\n",
                             j + 1, (int)(lcp - line + 1));
                     goto bad;
+                }
+                if (split_line && (1 == strlen(lcp))) {
+                    /* single trailing hex digit might be a split pair */
+                    carry_over[0] = *lcp;
                 }
                 if ((off + k) >= (int)sizeof(optsp->transportid_arr)) {
                     fprintf(stderr, "decode_file_tids: array length "

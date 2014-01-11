@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2013 Douglas Gilbert.
+ * Copyright (c) 2005-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.12 20130507";
+static const char * version_str = "1.14 20140108";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -144,12 +144,13 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
     if (0 == in_len)
         *lba_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
-        char line[512];
+        char line[1024];
         int off = 0;
 
         for (j = 0; j < 512; ++j) {
             if (NULL == fgets(line, sizeof(line), stdin))
                 break;
+            // could improve with carry_over logic if sizeof(line) too small
             in_len = strlen(line);
             if (in_len > 0) {
                 if ('\n' == line[in_len - 1]) {
@@ -157,7 +158,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                     line[in_len] = '\0';
                 }
             }
-            if (0 == in_len)
+            if (in_len < 1)
                 continue;
             lcp = line;
             m = strspn(lcp, " \t");

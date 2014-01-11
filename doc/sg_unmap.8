@@ -1,4 +1,4 @@
-.TH SG_UNMAP "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_UNMAP "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_unmap \- send SCSI UNMAP command (known as 'trim' in ATA specs)
 .SH SYNOPSIS
@@ -34,7 +34,8 @@ With the '\-\-in=FILE' option an even number of values must be found and are
 interpreted as pairs: the first value in each pair is a starting LBA and the
 second value is the number to unmap from that LBA. Everything from and
 including a "#" on a line is ignored as are blank lines. Values may be
-comma, space and tab separated or appear on separate lines.
+comma, space and tab separated or appear on separate lines. Each line should
+not exceed 1023 bytes in length.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -116,7 +117,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2011 Douglas Gilbert
+Copyright \(co 2009\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

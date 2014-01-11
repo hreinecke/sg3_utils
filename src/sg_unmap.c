@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2013 Douglas Gilbert.
+ * Copyright (c) 2009-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.03 20130627";
+static const char * version_str = "1.04 20140110";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -236,7 +236,7 @@ static int
 build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
               int * arr_len, int max_arr_len)
 {
-    char line[512];
+    char line[1024];
     int off = 0;
     int in_len, k, j, m, have_stdin, ind, bit0;
     char * lcp;
@@ -258,6 +258,7 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
     for (j = 0; j < 512; ++j) {
         if (NULL == fgets(line, sizeof(line), fp))
             break;
+        // could improve with carry_over logic if sizeof(line) too small
         in_len = strlen(line);
         if (in_len > 0) {
             if ('\n' == line[in_len - 1]) {
@@ -265,7 +266,7 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
                 line[in_len] = '\0';
             }
         }
-        if (0 == in_len)
+        if (in_len < 1)
             continue;
         lcp = line;
         m = strspn(lcp, " \t");

@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.83 20140106";    /* ses3r06 */
+static const char * version_str = "1.84 20140110";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2660,7 +2660,7 @@ truncated:
 static int
 read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
 {
-    int in_len, k, j, m, off;
+    int in_len, k, j, m, off, split_line;
     unsigned int h;
     const char * lcp;
     char * cp;
@@ -2696,9 +2696,11 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
                 if ('\n' == line[in_len - 1]) {
                     --in_len;
                     line[in_len] = '\0';
-                }
+                    split_line = 0;
+                } else
+                    split_line = 1;
             }
-            if (0 == in_len) {
+            if (in_len < 1) {
                 carry_over[0] = 0;
                 continue;
             }
@@ -2741,7 +2743,7 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
                                 (int)(lcp - line + 1));
                         goto err_with_fp;
                     }
-                    if (1 == strlen(lcp)) {
+                    if (split_line && (1 == strlen(lcp))) {
                         /* single trailing hex digit might be a split pair */
                         carry_over[0] = *lcp;
                     }
