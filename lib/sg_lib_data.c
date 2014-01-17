@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2013 Douglas Gilbert.
+ * Copyright (c) 2007-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.90 20131119";  /* spc4r36m, sbc3r36 */
+const char * sg_lib_version_str = "1.91 20140117";  /* spc4r36o, sbc3r36 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -309,6 +309,7 @@ struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
     {0x5, 0, "Persistent reserve out, preempt and abort"},
     {0x6, 0, "Persistent reserve out, register and ignore existing key"},
     {0x7, 0, "Persistent reserve out, register and move"},
+    {0x8, 0, "Persistent reserve out, replace lost reservation"},
     {0xffff, 0, NULL},
 };
 

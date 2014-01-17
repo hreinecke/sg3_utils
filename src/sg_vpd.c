@@ -30,7 +30,7 @@
 
 */
 
-static const char * version_str = "0.74 20140111";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.75 20140117";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -1609,7 +1609,7 @@ decode_rod_descriptor(const unsigned char * buff, int len)
 
 /* VPD_3PARTY_COPY [3PC, third party copy] */
 static void
-decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex)
+decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
 {
     int j, k, bump, desc_type, desc_len, sa_len;
     unsigned int u;
@@ -1627,7 +1627,8 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex)
     for (k = 0; k < len; k += bump, ucp += bump) {
         desc_type = (ucp[0] << 8) + ucp[1];
         desc_len = (ucp[2] << 8) + ucp[3];
-        printf("Descriptor type=%d, len %d\n", desc_type, desc_len);
+        if (verbose)
+            printf("Descriptor type=%d, len %d\n", desc_type, desc_len);
         bump = 4 + desc_len;
         if ((k + bump) > len) {
             fprintf(stderr, "Third-party Copy VPD "
@@ -2865,7 +2866,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rsp_buff[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(buff), buff));
-                decode_3party_copy_vpd(rsp_buff, len, do_hex);
+                decode_3party_copy_vpd(rsp_buff, len, do_hex, verbose);
             }
             return 0;
         }

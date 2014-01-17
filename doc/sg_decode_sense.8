@@ -1,9 +1,9 @@
-.TH SG_DECODE_SENSE "8" "March 2011" "sg3_utils\-1.32" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense data
 .SH SYNOPSIS
 .B sg_decode_sense
-[\fI\-\-binary=FN\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR] 
+[\fI\-\-binary=FN\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR]
 [\fI\-\-hex\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write=WFN\fR]
 [H1 H2 H3 ...]
@@ -59,6 +59,9 @@ spaces between them. Bytes are decoded by taking two hexadecimal digits
 at a time, so an even number of digits is expected. The string of
 hexadecimal digits may be on the command line (replacing "H1 H2 H3")
 or spread across multiple lines the \fIFN\fR given to \fI\-\-file=\fR.
+On the command line, spaces (or other whitespace characters) between
+sequences of hexadecimal digits are ignored; the maximum command line
+hex string is 1023 characters long.
 .TP
 \fB\-s\fR, \fB\-\-status\fR=\fISS\fR
 where \fISS\fR is a SCSI status byte value, given in hexadecimal. The
@@ -90,7 +93,7 @@ command line when verbose or debug flags are given. It will be at least
 8 bytes long, often 18 bytes long but may be longer. A sense data string
 might look like this:
 .PP
-f0 00 03 00 00 12 34 0a  00 00 00 00 11 00 00 00    
+f0 00 03 00 00 12 34 0a  00 00 00 00 11 00 00 00
 .br
 00 00
 .PP
@@ -117,7 +120,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2010\-2011 Douglas Gilbert
+Copyright \(co 2010\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

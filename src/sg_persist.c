@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.42 20140110";
+static const char * version_str = "0.43 20140114";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -41,6 +41,7 @@ static const char * version_str = "0.42 20140110";
 #define PROUT_PREE_AB_SA 0x5
 #define PROUT_REG_IGN_SA 0x6
 #define PROUT_REG_MOVE_SA 0x7
+#define PROUT_REPL_LOST_SA 0x8
 #define MX_ALLOC_LEN 8192
 #define MX_TIDS 32
 #define MX_TID_LEN 256
@@ -91,6 +92,7 @@ static struct option long_options[] = {
     {"register-move", 0, 0, 'M'},
     {"release", 0, 0, 'L'},
     {"relative-target-port", 1, 0, 'Q'},
+    {"replace-lost", 0, 0, 'z'},
     {"report-capabilities", 0, 0, 'c'},
     {"reserve", 0, 0, 'R'},
     {"transport-id", 1, 0, 'X'},
@@ -122,7 +124,8 @@ static const char * prout_sa_strs[] = {
     "Preempt and abort",
     "Register and ignore existing key",
     "Register and move",
-    "[reserved 0x8]",
+    "Replace lost reservation",
+    "[reserved 0x9]",
 };
 static const int num_prout_sa_strs = sizeof(prout_sa_strs) /
                                      sizeof(prout_sa_strs[0]);
@@ -183,6 +186,7 @@ usage()
             "identifier\n"
             "                               for '--register-move'\n"
             "    --release|-L               PR Out: Release\n"
+            "    --replace-lost|-x          PR Out: Replace Lost Reservation\n"
             "    --report-capabilities|-c   PR In: Report Capabilities\n"
             "    --reserve|-R               PR Out: Reserve\n"
             "    --transport-id=TIDS|-X TIDS    one or more "
@@ -1019,7 +1023,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQ:rRsS:T:UvVX:YZ",
+        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQ:rRsS:T:UvVX:YzZ",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1153,6 +1157,10 @@ main(int argc, char * argv[])
         case 'Y':
             opts.param_alltgpt = 1;
             ++num_prout_param;
+            break;
+        case 'z':
+            opts.prout_sa = PROUT_REPL_LOST_SA;
+            ++num_prout_sa;
             break;
         case 'Z':
             opts.param_aptpl = 1;
