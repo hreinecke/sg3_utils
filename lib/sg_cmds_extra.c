@@ -83,10 +83,6 @@
 #define READ_MEDIA_SERIAL_NUM_SA 0x1
 #define REPORT_IDENTIFYING_INFORMATION_SA 0x5
 #define REPORT_TGT_PRT_GRP_SA 0xa
-#define RECEIVE_COPY_RES_COPY_STATUS_SA 0x00
-#define RECEIVE_COPY_RES_RECEIVE_DATA_SA 0x01
-#define RECEIVE_COPY_RES_OPERATING_PARMS_SA 0x03
-#define RECEIVE_COPY_RES_FAILED_SEGMENT_DETAILS_SA 0x04
 #define SET_IDENTIFYING_INFORMATION_SA 0x6
 #define SET_TGT_PRT_GRP_SA 0xa
 #define WRITE_LONG_16_SA 0x11
@@ -2385,23 +2381,22 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
       {EXTENDED_COPY_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
-    const char * opcode_name = "bad sa";
+    char cname[80];
 
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
+    sg_get_opcode_sa_name(EXTENDED_COPY_CMD, sa, 0, sizeof(cname), cname);
+    xcopyCmdBlk[1] = (unsigned char)(sa & 0x1f);
     switch (sa) {
-    case 0x0:
-    case 0x1:
-        opcode_name = (0x0 == sa) ? "Extended copy (LID1)" :
-                      "Extended copy (LID4)";
+    case 0x0:   /* XCOPY(LID1) */
+    case 0x1:   /* XCOPY(LID4) */
         xcopyCmdBlk[10] = (unsigned char)((param_len >> 24) & 0xff);
         xcopyCmdBlk[11] = (unsigned char)((param_len >> 16) & 0xff);
         xcopyCmdBlk[12] = (unsigned char)((param_len >> 8) & 0xff);
         xcopyCmdBlk[13] = (unsigned char)(param_len & 0xff);
         break;
-    case 0x10:
-    case 0x11:
-        opcode_name = (0x10 == sa) ? "Populate token" : "Write using token";
+    case 0x10:  /* POPULATE TOKEN (SBC-3) */
+    case 0x11:  /* WRITE USING TOKEN (SBC-3) */
         xcopyCmdBlk[6] = (unsigned char)((list_id >> 24) & 0xff);
         xcopyCmdBlk[7] = (unsigned char)((list_id >> 16) & 0xff);
         xcopyCmdBlk[8] = (unsigned char)((list_id >> 8) & 0xff);
@@ -2412,8 +2407,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
         xcopyCmdBlk[13] = (unsigned char)(param_len & 0xff);
         xcopyCmdBlk[14] = (unsigned char)(group_num & 0x1f);
         break;
-    case 0x1c:
-        opcode_name = "Copy operation abort";
+    case 0x1c:  /* COPY OPERATION ABORT */
         xcopyCmdBlk[2] = (unsigned char)((list_id >> 24) & 0xff);
         xcopyCmdBlk[3] = (unsigned char)((list_id >> 16) & 0xff);
         xcopyCmdBlk[4] = (unsigned char)((list_id >> 8) & 0xff);
@@ -2427,28 +2421,27 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
 
     if (verbose) {
-        fprintf(sg_warnings_strm, "    %s cmd: ", opcode_name);
+        fprintf(sg_warnings_strm, "    %s cmd: ", cname);
         for (k = 0; k < EXTENDED_COPY_CMDLEN; ++k)
             fprintf(sg_warnings_strm, "%02x ", xcopyCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
-            fprintf(sg_warnings_strm, "    %s parameter list:\n",
-                    opcode_name);
+            fprintf(sg_warnings_strm, "    %s parameter list:\n", cname);
             dStrHexErr((const char *)paramp, param_len, -1);
         }
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "%s: out of memory\n", opcode_name);
+        fprintf(sg_warnings_strm, "%s: out of memory\n", cname);
         return -1;
     }
     set_scsi_pt_cdb(ptvp, xcopyCmdBlk, sizeof(xcopyCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
-    ret = sg_cmds_process_resp(ptvp, opcode_name, res, 0, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cname, res, 0, sense_b, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {

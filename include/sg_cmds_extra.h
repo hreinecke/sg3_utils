@@ -273,7 +273,9 @@ int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
 int sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
                                int mx_resp_len, int noisy, int verbose);
 
-/* Invokes a SCSI EXTENDED COPY(LID1) command. Return of 0 -> success,
+/* Invokes a SCSI EXTENDED COPY(LID1) command. For EXTENDED COPY(LID4)
+ * including POPULATE TOKEN and WRITE USING TOKEN use
+ * sg_ll_3party_copy_out().  Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Extended copy not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
@@ -282,8 +284,8 @@ int sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
                         int verbose);
 
 /* Handles various service actions associated with opcode 0x83 which is
- * called THIRD PARTY COPY OUT. These include the EXTENDED COPY(LID4) and
- * WRITE USING TOKEN commands. Return of 0 -> success,
+ * called THIRD PARTY COPY OUT. These include the EXTENDED COPY(LID4),
+ * POPULATE TOKEN and WRITE USING TOKEN commands. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> opcode 0x83 not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
