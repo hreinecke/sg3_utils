@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 Hannes Reinecke, SUSE Labs
+ * Copyright (c) 2011-2014 Hannes Reinecke, SUSE Labs
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.5 20131007";
+static const char * version_str = "1.6 20140111";
 
 
 #define MAX_XFER_LEN 10000
@@ -297,11 +297,11 @@ static const char * rec_copy_name_arr[] = {
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c;
+    int sg_fd, res, c, k;
     unsigned char * cpResultBuff = NULL;
     int xfer_len = 520;
     int sa = 3;
-    int list_id = 0;
+    uint32_t list_id = 0;
     int do_hex = 0;
     int verbose = 0;
     const char * cp;
@@ -330,11 +330,12 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'l':
-            list_id = sg_get_num(optarg);
-            if (-1 == list_id) {
+            k = sg_get_num(optarg);
+            if (-1 == k) {
                 fprintf(stderr, "bad argument to '--list_id'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+	    list_id = (uint32_t)k;
             break;
         case 'p':
             sa = 3;
@@ -406,7 +407,7 @@ main(int argc, char * argv[])
     cp = rec_copy_name_arr[sa];
     if (verbose)
         fprintf(stderr, ME "issue %s to device %s\n\t\txfer_len= %d (0x%x), "
-                "list_id=%d\n", cp, device_name, xfer_len, xfer_len,
+                "list_id=%" PRIu32 "\n", cp, device_name, xfer_len, xfer_len,
                 list_id);
 
     /* In SPC-4 opcode 0x84, service actions have command names:

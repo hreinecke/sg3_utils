@@ -1,7 +1,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2013 D. Gilbert
+*  Copyright (C) 1999 - 2014 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "3.88 20130507";
+static const char * version_str = "3.89 20140115";
 
 #define ME "sg_readcap: "
 
@@ -342,7 +342,7 @@ static void dStrRaw(const char* str, int len)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, res, prot_en, p_type;
+    int sg_fd, k, res, prot_en, p_type, lbppbe;
     uint64_t llast_blk_addr;
     int ret = 0;
     unsigned int last_blk_addr, block_size;
@@ -507,8 +507,14 @@ int main(int argc, char * argv[])
                        PRIx64 "), Number of logical blocks=%" PRIu64 "\n",
                        llast_blk_addr, llast_blk_addr, llast_blk_addr + 1);
             printf("   Logical block length=%u bytes\n", block_size);
-            printf("   Logical blocks per physical block exponent=%d\n",
-                   resp_buff[13] & 0xf);
+            lbppbe = resp_buff[13] & 0xf;
+            printf("   Logical blocks per physical block exponent=%d",
+                   lbppbe);
+            if (lbppbe > 0)
+                printf(" [so physical block length=%u bytes]\n",
+                       block_size * (1 << lbppbe));
+            else
+                printf("\n");
             printf("   Lowest aligned logical block address=%d\n",
                    ((resp_buff[14] & 0x3f) << 8) + resp_buff[15]);
             if (! opts.do_pmi) {

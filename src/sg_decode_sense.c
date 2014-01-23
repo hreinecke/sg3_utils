@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2013 Douglas Gilbert.
+ * Copyright (c) 2010-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 
 
-static const char * version_str = "1.04 20130507";
+static const char * version_str = "1.06 20140117";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -58,6 +58,8 @@ struct opts_t {
     const char * no_space_str;
     int sense_len;
 };
+
+static char concat_buff[1024];
 
 
 static void
@@ -173,13 +175,26 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
         opt = argv[optind++];
         if (optsp->no_space) {
             if (optsp->no_space_str) {
-                fprintf(stderr, "With '--nospace' only want a single string "
-                        "of hex digits, extra: '%s'\n", opt);
-                return SG_LIB_SYNTAX_ERROR;
-            } else {
+                if ('\0' == concat_buff[0]) {
+                    if (strlen(optsp->no_space_str) > sizeof(concat_buff)) {
+                        fprintf(stderr, "'--nospace' concat_buff overflow\n");
+                        return SG_LIB_SYNTAX_ERROR;
+                    }
+                    strcpy(concat_buff, optsp->no_space_str);
+                }
+                if ((strlen(concat_buff) + strlen(opt)) >=
+                    sizeof(concat_buff)) {
+                    fprintf(stderr, "'--nospace' concat_buff overflow\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                if (optsp->do_version)
+                    fprintf(stderr, "'--nospace' and found whitespace so "
+                            "concatenate\n");
+                strcat(concat_buff, opt);
+                optsp->no_space_str = concat_buff;
+            } else
                 optsp->no_space_str = opt;
-                continue;
-            }
+            continue;
         }
         val = strtol(opt, &endptr, 16);
         if (*opt == '\0' || *endptr != '\0' || val < 0x00 || val > 0xff) {
@@ -206,11 +221,12 @@ static int
 f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
           int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m;
+    int fn_len, in_len, k, j, m, split_line;
     unsigned int h;
     const char * lcp;
     FILE * fp;
     char line[512];
+    char carry_over[4];
     int off = 0;
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
@@ -228,6 +244,7 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
         }
     }
 
+    carry_over[0] = 0;
     for (j = 0; j < 512; ++j) {
         if (NULL == fgets(line, sizeof(line), fp))
             break;
@@ -236,11 +253,33 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-            }
+                split_line = 0;
+            } else
+                split_line = 1;
         }
-        if (0 == in_len)
+        if (in_len < 1) {
+            carry_over[0] = 0;
             continue;
-        lcp = line;
+        }
+        if (carry_over[0]) {
+            if (isxdigit(line[0])) {
+                carry_over[1] = line[0];
+                carry_over[2] = '\0';
+                if (1 == sscanf(carry_over, "%x", &h))
+                    mp_arr[off - 1] = h;       /* back up and overwrite */
+                else {
+                    fprintf(stderr, "f2hex_arr: carry_over error ['%s'] "
+                            "around line %d\n", carry_over, j + 1);
+                    goto bad;
+                }
+                lcp = line + 1;
+                --in_len;
+            } else
+                lcp = line;
+            carry_over[0] = 0;
+        } else
+            lcp = line;
+
         m = strspn(lcp, " \t");
         if (m == in_len)
             continue;
@@ -268,6 +307,8 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
                 }
                 mp_arr[off + k] = h;
             }
+            if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
+                carry_over[0] = *lcp;
             off += k;
         } else {
             for (k = 0; k < 1024; ++k) {
@@ -277,6 +318,10 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
                                 "0xff in line %d, pos %d\n", j + 1,
                                 (int)(lcp - line + 1));
                         goto bad;
+                    }
+                    if (split_line && (1 == strlen(lcp))) {
+                        /* single trailing hex digit might be a split pair */
+                        carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
                         fprintf(stderr, "f2hex_arr: array length exceeded\n");
@@ -303,10 +348,12 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
         }
     }
     *mp_arr_len = off;
-    fclose(fp);
+    if (stdin != fp)
+        fclose(fp);
     return 0;
 bad:
-    fclose(fp);
+    if (stdin != fp)
+        fclose(fp);
     return 1;
 }
 
@@ -372,6 +419,8 @@ main(int argc, char *argv[])
     }
 
     if ((0 == opts.sense_len) && opts.no_space_str) {
+        if (opts.do_verbose > 2)
+            fprintf(stderr, "no_space str: %s\n", opts.no_space_str);
         cp = opts.no_space_str;
         for (k = 0; isxdigit(cp[k]) && isxdigit(cp[k + 1]); k += 2) {
             if (1 != sscanf(cp + k, "%2x", &ui)) {

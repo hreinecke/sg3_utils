@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2013 D. Gilbert
+*  Copyright (C) 2003-2014 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +24,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.38 20130507";
+static const char * version_str = "0.40 20140110";
 
 #define ME "sg_senddiag: "
 
@@ -408,8 +408,11 @@ static int build_diag_page(const char * inp, unsigned char * mp_arr,
         *mp_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
         char line[512];
+        char carry_over[4];
         int off = 0;
+        int split_line;
 
+        carry_over[0] = 0;
         for (j = 0; j < 512; ++j) {
             if (NULL == fgets(line, sizeof(line), stdin))
                 break;
@@ -418,11 +421,32 @@ static int build_diag_page(const char * inp, unsigned char * mp_arr,
                 if ('\n' == line[in_len - 1]) {
                     --in_len;
                     line[in_len] = '\0';
-                }
+                    split_line = 0;
+                } else
+                    split_line = 1;
             }
-            if (0 == in_len)
+            if (in_len < 1) {
+                carry_over[0] = 0;
                 continue;
-            lcp = line;
+            }
+            if (carry_over[0]) {
+                if (isxdigit(line[0])) {
+                    carry_over[1] = line[0];
+                    carry_over[2] = '\0';
+                    if (1 == sscanf(carry_over, "%x", &h))
+                        mp_arr[off - 1] = h;       /* back up and overwrite */
+                    else {
+                        fprintf(stderr, "build_diag_page: carry_over error "
+                                "['%s'] around line %d\n", carry_over, j + 1);
+                        return 1;
+                    }
+                    lcp = line + 1;
+                    --in_len;
+                } else
+                    lcp = line;
+                carry_over[0] = 0;
+            } else
+                lcp = line;
             m = strspn(lcp, " \t");
             if (m == in_len)
                 continue;
@@ -443,6 +467,10 @@ static int build_diag_page(const char * inp, unsigned char * mp_arr,
                                 "larger than 0xff in line %d, pos %d\n",
                                 j + 1, (int)(lcp - line + 1));
                         return 1;
+                    }
+                    if (split_line && (1 == strlen(lcp))) {
+                        /* single trailing hex digit might be a split pair */
+                        carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
                         fprintf(stderr, "build_diag_page: array length "

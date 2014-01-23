@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2013 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2014 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.40 20131214";
+static const char * version_str = "0.41 20140105";
 
 #define ME "sg_xcopy: "
 
@@ -161,6 +161,10 @@ struct xcopy_fp_t {
 
 static struct xcopy_fp_t ixcf;
 static struct xcopy_fp_t oxcf;
+
+static const char * read_cap_str = "Read capacity";
+static const char * rec_copy_op_params_str = "Receive copy operating "
+                                             "parameters";
 
 static void calc_duration_throughput(int contin);
 #ifdef __GNUC__
@@ -718,7 +722,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     max_inline_data = rcBuff[20] << 24 | rcBuff[21] << 16 | rcBuff[22] << 8 |
                       rcBuff[23];
     if (verbose) {
-        pr2serr(" >> Receive copy results (report operating parameters):\n");
+        pr2serr(" >> %s response:\n", rec_copy_op_params_str);
         pr2serr("    Support No List IDentifier (SNLID): %d\n", snlid);
         pr2serr("    Maximum target descriptor count: %lu\n", max_target_num);
         pr2serr("    Maximum segment descriptor count: %lu\n",
@@ -1439,6 +1443,18 @@ file_err:
     return -SG_LIB_FILE_ERROR;
 }
 
+static int
+num_chs_in_str(const char * s, int slen, int ch)
+{
+    int res = 0;
+
+    while (--slen >= 0) {
+        if (ch == s[slen])
+            ++res;
+    }
+    return res;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -1455,7 +1471,7 @@ main(int argc, char * argv[])
     int blocks = 0;
     int num_help = 0;
     int num_xcopy = 0;
-    int res, k;
+    int res, k, n, keylen;
     int infd, outfd, xcopy_fd;
     int ret = 0;
     unsigned char list_id = 1;
@@ -1489,6 +1505,7 @@ main(int argc, char * argv[])
             buf++;
         if (*buf)
             *buf++ = '\0';
+        keylen = (int)strlen(key);
         if (0 == strncmp(key, "app", 3)) {
             ixcf.append = sg_get_num(buf);
             oxcf.append = ixcf.append;
@@ -1590,37 +1607,45 @@ main(int argc, char * argv[])
             do_time = sg_get_num(buf);
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
-        else if (0 == strncmp(key, "--on_src", 8))
-            on_src = 1;
-        else if (0 == strncmp(key, "--on_dst", 8))
-            on_dst = 1;
-        else if (0 == strncmp(key, "-hhh", 4))
-            num_help += 3;
-        else if (0 == strncmp(key, "-hh", 3))
-            num_help += 2;
-        else if ((0 == strncmp(key, "--help", 7)) ||
-                 (0 == strncmp(key, "-h", 2)) ||
-                 (0 == strcmp(key, "-?")))
+        /* look for long options that start with '--' */
+        else if (0 == strncmp(key, "--help", 6))
             ++num_help;
-        else if ((0 == strncmp(key, "--vers", 6)) ||
-                 (0 == strcmp(key, "-V"))) {
+        else if (0 == strncmp(key, "--on_dst", 8))
+            ++on_dst;
+        else if (0 == strncmp(key, "--on_src", 8))
+            ++on_src;
+        else if (0 == strncmp(key, "--verb", 6))
+            verbose += 1;
+        else if (0 == strncmp(key, "--vers", 6)) {
             pr2serr(ME "%s\n", version_str);
             return 0;
-        } else if (0 == strncmp(key, "--verb", 6))
-            verbose += 1;
-        else if (0 == strcmp(key, "-vvvvv"))
-            verbose += 5;
-        else if (0 == strcmp(key, "-vvvv"))
-            verbose += 4;
-        else if (0 == strcmp(key, "-vvv"))
-            verbose += 3;
-        else if (0 == strcmp(key, "-vv"))
-            verbose += 2;
-        else if (0 == strcmp(key, "-v"))
-            verbose += 1;
-        else if (0 == strncmp(key, "--xcopy", 6))
+        }
+        else if (0 == strncmp(key, "--xcopy", 7))
             ;   /* ignore; for compatibility with ddpt */
-        else {
+        /* look for short options that start with a single '-', they can be
+         * concaternated (e.g. '-vvvV') */
+        else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
+            res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'h');
+            num_help += n;
+            res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'v');
+            verbose += n;
+            res += n;
+            if (num_chs_in_str(key + 1, keylen - 1, 'V')) {
+                pr2serr("%s\n", version_str);
+                return -1;
+            }
+            n = num_chs_in_str(key + 1, keylen - 1, 'x');
+            /* accept and ignore; for compatibility with ddpt */
+            res += n;
+            if (res < (keylen - 1)) {
+                pr2serr(ME "Unrecognised short option in '%s', try "
+                        "'--help'\n", key);
+                if (0 == num_help)
+                    return -1;
+            }
+        } else {
             pr2serr("Unrecognized option '%s'\n", key);
             if (num_help)
                 usage(num_help);
@@ -1662,7 +1687,7 @@ main(int argc, char * argv[])
             on_dst = 1;
     }
     if (verbose > 1)
-        pr2serr("Extended Copy(LID1) command will be sent to %s device "
+        pr2serr(" >>> Extended Copy(LID1) command will be sent to %s device "
                 "[%s]\n", (on_src ? "src" : "dst"),
                 (on_src ? ixcf.fname : oxcf.fname));
 
@@ -1703,8 +1728,9 @@ main(int argc, char * argv[])
     }
 
     if (verbose > 1)
-        pr2serr(ME " if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
-                PRId64 "\n", ixcf.fname, skip, oxcf.fname, seek, dd_count);
+        pr2serr(" >>> " ME " if=%s skip=%" PRId64 " of=%s seek=%" PRId64
+                " count=%" PRId64 "\n", ixcf.fname, skip, oxcf.fname, seek,
+                dd_count);
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
     install_handler(SIGPIPE, interrupt_handler);
@@ -1718,12 +1744,18 @@ main(int argc, char * argv[])
         infd = open_if(&ixcf, verbose);
         if (infd < 0)
             return -infd;
+    } else {
+        pr2serr("stdin not acceptable for IFILE\n");
+        return SG_LIB_FILE_ERROR;
     }
 
     if (oxcf.fname[0] && ('-' != oxcf.fname[0])) {
         outfd = open_of(&oxcf, verbose);
         if (outfd < -1)
             return -outfd;
+    } else {
+        pr2serr("stdout not acceptable for OFILE\n");
+        return SG_LIB_FILE_ERROR;
     }
 
     if (open_sg(&ixcf, verbose) < 0)
@@ -1740,21 +1772,21 @@ main(int argc, char * argv[])
 
     res = scsi_read_capacity(&ixcf);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        pr2serr("Unit attention (readcap in), continuing\n");
+        pr2serr("Unit attention (%s in), continuing\n", read_cap_str);
         res = scsi_read_capacity(&ixcf);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-        pr2serr("Aborted command (readcap in), continuing\n");
+        pr2serr("Aborted command (%s in), continuing\n", read_cap_str);
         res = scsi_read_capacity(&ixcf);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
-            pr2serr("read capacity not supported on %s\n",
+            pr2serr("%s command not supported on %s\n", read_cap_str,
                     ixcf.fname);
         else if (res == SG_LIB_CAT_NOT_READY)
-            pr2serr("read capacity failed on %s - not "
-                    "ready\n", ixcf.fname);
+            pr2serr("%s failed on %s - not ready\n", read_cap_str,
+                    ixcf.fname);
         else
-            pr2serr("Unable to read capacity on %s\n", ixcf.fname);
+            pr2serr("Unable to %s on %s\n", read_cap_str, ixcf.fname);
         ixcf.num_sect = -1;
     } else if (ibs && ixcf.sect_sz != ibs) {
         pr2serr(">> warning: block size on %s confusion: "
@@ -1768,17 +1800,18 @@ main(int argc, char * argv[])
 
     res = scsi_read_capacity(&oxcf);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        pr2serr("Unit attention (readcap out), continuing\n");
+        pr2serr("Unit attention (%s out), continuing\n", read_cap_str);
         res = scsi_read_capacity(&oxcf);
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-        pr2serr("Aborted command (readcap out), continuing\n");
+        pr2serr("Aborted command (%s out), continuing\n", read_cap_str);
         res = scsi_read_capacity(&oxcf);
     }
     if (0 != res) {
         if (res == SG_LIB_CAT_INVALID_OP)
-            pr2serr("read capacity not supported on %s\n", oxcf.fname);
+            pr2serr("%s command not supported on %s\n", read_cap_str,
+                    oxcf.fname);
         else
-            pr2serr("Unable to read capacity on %s\n", oxcf.fname);
+            pr2serr("Unable to %s on %s\n", read_cap_str, oxcf.fname);
         oxcf.num_sect = -1;
     } else if (obs && obs != oxcf.sect_sz) {
         pr2serr(">> warning: block size on %s confusion: obs=%d, device "
@@ -1826,18 +1859,19 @@ main(int argc, char * argv[])
     res = scsi_operating_parameter(&ixcf, 0);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
-            pr2serr("Unit attention (oper parm), continuing\n");
+            pr2serr("Unit attention (%s), continuing\n",
+                    rec_copy_op_params_str);
             res = scsi_operating_parameter(&ixcf, 0);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
-                pr2serr("receive copy operating parameters not supported "
-                        "on %s\n", ixcf.fname);
+                pr2serr("%s command not supported on %s\n",
+                        rec_copy_op_params_str, ixcf.fname);
                 return EINVAL;
             } else if (-res == SG_LIB_CAT_NOT_READY)
-                pr2serr("receive copy operating parameters failed on %s - "
-                        "not ready\n", ixcf.fname);
+                pr2serr("%s failed on %s - not ready\n",
+                        rec_copy_op_params_str, ixcf.fname);
             else {
-                pr2serr("Unable to receive copy operating parameters on %s\n",
+                pr2serr("Unable to %s on %s\n", rec_copy_op_params_str,
                         ixcf.fname);
                 return -res;
             }
@@ -1862,18 +1896,19 @@ main(int argc, char * argv[])
     res = scsi_operating_parameter(&oxcf, 1);
     if (res < 0) {
         if (SG_LIB_CAT_UNIT_ATTENTION == -res) {
-            pr2serr("Unit attention (oper parm), continuing\n");
+            pr2serr("Unit attention (%s), continuing\n",
+                    rec_copy_op_params_str);
             res = scsi_operating_parameter(&oxcf, 1);
         } else {
             if (-res == SG_LIB_CAT_INVALID_OP) {
-                pr2serr("receive copy operating parameters not supported on "
-                        "%s\n", oxcf.fname);
+                pr2serr("%s command not supported on %s\n",
+                        rec_copy_op_params_str, oxcf.fname);
                 return EINVAL;
             } else if (-res == SG_LIB_CAT_NOT_READY)
-                pr2serr("receive copy operating parameters failed on %s - "
-                        "not ready\n", oxcf.fname);
+                pr2serr("%s failed on %s - not ready\n",
+                        rec_copy_op_params_str, oxcf.fname);
             else {
-                pr2serr("Unable to receive copy operating parameters on %s\n",
+                pr2serr("Unable to %s on %s\n", rec_copy_op_params_str,
                         oxcf.fname);
                 return -res;
             }

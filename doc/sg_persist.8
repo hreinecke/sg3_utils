@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_PERSIST "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -205,6 +205,14 @@ current persistent reservation. The \fI\-\-prout\-type=TYPE\fR
 and \fI\-\-param\-rk=RK\fR options, matching the reservation, must also be
 specified.
 .TP
+\fB\-z\fR, \fB\-\-replace\-lost\fR
+Replace Lost Reservation is a sub\-command of the PROUT command.  It "begins
+a recovery process for the lost persistent reservation that is managed by
+application clients". It also stops the device server terminating commands
+due to a lost persistent reservation. Options should be
+be '\-\-param\-rk=0' (or not given), '\-\-param\-sark=<new_rk>'
+and \fI\-\-prout\-type=TYPE\fR.
+.TP
 \fB\-c\fR, \fB\-\-report\-capabilities\fR
 Report Capabilities is a sub\-command of the PRIN command. It lists
 information about the aspects of persistent reservations that the
@@ -268,7 +276,7 @@ The "sbp," form should be followed by 16 ASCII hex digits that represent an
 initiator's EUI\-64 name. The "srp," form should be followed by 32 ASCII hex
 digits that represent an initiator port identifier. The "sas," form should be
 followed by 16 ASCII hex digits that represent an initiator's port SAS
-address. 
+address.
 .PP
 There are two iSCSI qualified name forms. The shorter form contains the
 iSCSI name of the initiator
@@ -394,7 +402,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Douglas Gilbert
+Copyright \(co 2004\-2014 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

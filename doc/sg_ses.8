@@ -1,4 +1,4 @@
-.TH SG_SES "8" "November 2013" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_SES "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -79,10 +79,16 @@ control page to be specified. The string given should not include the first 4
 bytes (i.e. page code and length).
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\-
-reads a data string from stdin, limit 1024 bytes. stdin may provide ASCII
-hex as a comma separated list (i.e. as with the \fI\-\-data=H,H...\fR
-option).  Additionally spaces, tabs and line feeds are permitted as
-separators from stdin . Stops reading stdin when an EOF is detected.
+reads one or more data strings from stdin, limit 2048 bytes. stdin may
+provide ASCII hex as a comma separated list (i.e. as with the
+\fI\-\-data=H,H...\fR option). Additionally spaces, tabs and line feeds are
+permitted as separators from stdin . Stops reading stdin when an EOF is
+detected.
+.TP
+\fB\-d\fR, \fB\-\-data\fR=@\fIFN\fR
+reads one or more data strings from the file called \fIFN\fR, limit 2048
+bytes. Othewise this option is the same as the previous item that reads
+from stdin.
 .TP
 \fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
 where \fIDN\fR is a descriptor name (string) as found in the Element
@@ -503,7 +509,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2013 Douglas Gilbert
+Copyright \(co 2004\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
