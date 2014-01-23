@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2013 D. Gilbert
+*  Copyright (C) 2000-2014 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.24 20131219";    /* SPC-4 rev 36n */
+static const char * version_str = "1.25 20140123";    /* SPC-4 rev 36o */
 
 
 /* Following VPD pages are in ascending page number order */

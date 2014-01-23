@@ -57,10 +57,10 @@
 #define REASSIGN_BLKS_CMDLEN  6
 #define RECEIVE_DIAGNOSTICS_CMD   0x1c
 #define RECEIVE_DIAGNOSTICS_CMDLEN  6
-#define EXTENDED_COPY_CMD   0x83
-#define EXTENDED_COPY_CMDLEN 16
-#define RECEIVE_COPY_RESULTS_CMD   0x84
-#define RECEIVE_COPY_RESULTS_CMDLEN 16
+#define THIRD_PARTY_COPY_OUT_CMD 0x83   /* was EXTENDED_COPY_CMD */
+#define THIRD_PARTY_COPY_OUT_CMDLEN 16
+#define THIRD_PARTY_COPY_IN_CMD 0x84     /* was RECEIVE_COPY_RESULTS_CMD */
+#define THIRD_PARTY_COPY_IN_CMDLEN 16
 #define SEND_DIAGNOSTIC_CMD   0x1d
 #define SEND_DIAGNOSTIC_CMDLEN  6
 #define SERVICE_ACTION_IN_12_CMD 0xab
@@ -87,6 +87,7 @@
 #define SET_TGT_PRT_GRP_SA 0xa
 #define WRITE_LONG_16_SA 0x11
 #define REPORT_REFERRALS_SA 0x13
+#define EXTENDED_COPY_LID1_SA 0x0
 
 
 /* Invokes a SCSI GET LBA STATUS command (SBC). Returns 0 -> success,
@@ -402,7 +403,9 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
 }
 
 /* Invokes a SCSI SEND DIAGNOSTIC command. Foreground, extended self tests can
- * take a long time, if so set long_duration flag. Return of 0 -> success,
+ * take a long time, if so set long_duration flag in which case the timout
+ * is set to 7200 seconds; if the value of long_duration is > 7200 then that
+ * value is taken as the timeout value in seconds. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Send diagnostic not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
@@ -412,7 +415,7 @@ sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
                 int unitofl_bit, int long_duration, void * paramp,
                 int param_len, int noisy, int verbose)
 {
-    int k, res, ret, sense_cat;
+    int k, res, ret, sense_cat, tmout;
     unsigned char senddiagCmdBlk[SEND_DIAGNOSTIC_CMDLEN] =
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -436,6 +439,10 @@ sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
             dStrHexErr((const char *)paramp, param_len, -1);
         }
     }
+    if (long_duration > LONG_PT_TIMEOUT)
+        tmout = long_duration;
+    else
+        tmout = long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT;
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -445,9 +452,7 @@ sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
     set_scsi_pt_cdb(ptvp, senddiagCmdBlk, sizeof(senddiagCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
-    res = do_scsi_pt(ptvp, sg_fd,
-                     (long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT),
-                     verbose);
+    res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, "send diagnostic", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
@@ -2221,13 +2226,13 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
                            int mx_resp_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char rcvcopyresCmdBlk[RECEIVE_COPY_RESULTS_CMDLEN] =
-      {RECEIVE_COPY_RESULTS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char rcvcopyresCmdBlk[THIRD_PARTY_COPY_IN_CMDLEN] =
+      {THIRD_PARTY_COPY_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     char b[64];
 
-    sg_get_opcode_sa_name(RECEIVE_COPY_RESULTS_CMD, sa, 0, (int)sizeof(b), b);
+    sg_get_opcode_sa_name(THIRD_PARTY_COPY_IN_CMD, sa, 0, (int)sizeof(b), b);
     rcvcopyresCmdBlk[1] = (unsigned char)(sa & 0x1f);
     if (sa <= 4)        /* LID1 variants */
         rcvcopyresCmdBlk[2] = (unsigned char)(list_id);
@@ -2246,7 +2251,7 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
         sg_warnings_strm = stderr;
     if (verbose) {
         fprintf(sg_warnings_strm, "    %s cmd: ", b);
-        for (k = 0; k < RECEIVE_COPY_RESULTS_CMDLEN; ++k)
+        for (k = 0; k < THIRD_PARTY_COPY_IN_CMDLEN; ++k)
             fprintf(sg_warnings_strm, "%02x ", rcvcopyresCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
     }
@@ -2303,12 +2308,13 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
                     int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char xcopyCmdBlk[EXTENDED_COPY_CMDLEN] =
-      {EXTENDED_COPY_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char xcopyCmdBlk[THIRD_PARTY_COPY_OUT_CMDLEN] =
+      {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     const char * opcode_name = "Extended copy (LID1)";
 
+    xcopyCmdBlk[1] = (unsigned char)(EXTENDED_COPY_LID1_SA & 0x1f);
     xcopyCmdBlk[10] = (unsigned char)((param_len >> 24) & 0xff);
     xcopyCmdBlk[11] = (unsigned char)((param_len >> 16) & 0xff);
     xcopyCmdBlk[12] = (unsigned char)((param_len >> 8) & 0xff);
@@ -2318,7 +2324,7 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
         sg_warnings_strm = stderr;
     if (verbose) {
         fprintf(sg_warnings_strm, "    %s cmd: ", opcode_name);
-        for (k = 0; k < EXTENDED_COPY_CMDLEN; ++k)
+        for (k = 0; k < THIRD_PARTY_COPY_OUT_CMDLEN; ++k)
             fprintf(sg_warnings_strm, "%02x ", xcopyCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
@@ -2365,8 +2371,9 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
 }
 
 /* Handles various service actions associated with opcode 0x83 which is
- * called THIRD PARTY COPY OUT. These include the EXTENDED COPY(LID4) and
- * WRITE USING TOKEN commands. Return of 0 -> success,
+ * called THIRD PARTY COPY OUT. These include the EXTENDED COPY(LID1 and
+ * LID4), POPULATE TOKEN and WRITE USING TOKEN commands.
+ * Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> opcode 0x83 not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
@@ -2377,15 +2384,16 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
                       int noisy, int verbose)
 {
     int k, res, ret, sense_cat, tmout;
-    unsigned char xcopyCmdBlk[EXTENDED_COPY_CMDLEN] =
-      {EXTENDED_COPY_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char xcopyCmdBlk[THIRD_PARTY_COPY_OUT_CMDLEN] =
+      {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     char cname[80];
 
     if (NULL == sg_warnings_strm)
         sg_warnings_strm = stderr;
-    sg_get_opcode_sa_name(EXTENDED_COPY_CMD, sa, 0, sizeof(cname), cname);
+    sg_get_opcode_sa_name(THIRD_PARTY_COPY_OUT_CMD, sa, 0, sizeof(cname),
+                          cname);
     xcopyCmdBlk[1] = (unsigned char)(sa & 0x1f);
     switch (sa) {
     case 0x0:   /* XCOPY(LID1) */
@@ -2422,7 +2430,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
 
     if (verbose) {
         fprintf(sg_warnings_strm, "    %s cmd: ", cname);
-        for (k = 0; k < EXTENDED_COPY_CMDLEN; ++k)
+        for (k = 0; k < THIRD_PARTY_COPY_OUT_CMDLEN; ++k)
             fprintf(sg_warnings_strm, "%02x ", xcopyCmdBlk[k]);
         fprintf(sg_warnings_strm, "\n");
         if ((verbose > 1) && paramp && param_len) {
