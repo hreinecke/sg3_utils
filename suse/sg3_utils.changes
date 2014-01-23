@@ -1,0 +1,393 @@
+-------------------------------------------------------------------
+Thu Jan 23 15:00:00 EST 2014 - dgilbert@interlog.com
+
+- import Suse build files into sg3_utils in the suse directory
+  * change suse spec file to be patch-less
+  * henceforth see ChangeLog in main directory
+
+-------------------------------------------------------------------
+Thu Jan 23 08:57:56 CET 2014 - hare@suse.de
+
+- Update to inofficial release 1.38r546
+  * sg_ses: error and warning message cleanup
+    - fix --data=- problem with large buffers
+    - new --data=@FN to read hex data from file FN
+    - add --maxlen= option
+  * sg_inq:
+    - add LU_CONG to standard inquiry response
+    - sync version descriptors dated 20131126
+    - fix overflow in encode_whitespaces
+  * sg_vpd: add LU_CONG to standard inquiry response output
+    - decode Third Party Copy (tpc) page
+  * sg_persist: add PROUT: Replace Lost Reservation (spc4r36)
+  * sg_readcap: for --16 show physical block size if
+  * sg_xcopy:
+    - environment variables: XCOPY_TO_SRC and
+      XCOPY_TO_DST indicate where xcopy command is sent
+    - change default to send xcopy to dst (was src)
+    - improve CL handling of short options (e.g. '-vv')
+  * sg_write_same: repeat if unit attention
+  * sg_rtpg: fix indexing bug with --extended option
+  * sg_lib_data: sync asc/ascq codes with T10 dated 20131110
+  * sg_cmds_extra: fix sa bug in sg_ll_3party_copy_out()
+- Update tarball to 1.38b7r537
+- Add sg3_utils-1.38r546.patch
+
+-------------------------------------------------------------------
+Mon Nov  4 01:59:38 UTC 2013 - jengelh@inai.de
+
+- Update to new upstream release 1.37
+* sg_compare_and_write: add --quiet option to suppress miscompare
+  report
+* sg_persist: fix core dump on -Q option
+* sg_unmap: fix core dump on -g option
+* sg_ses: add --nickname and --nickid options
+- Remove sg3_utils-Fixup-T10-Vendor-designator-display.patch
+  (merged upstream)
+
+-------------------------------------------------------------------
+Sun Aug 25 18:45:14 CEST 2013 - ohering@suse.de
+
+- Fixup T10 Vendor designator display (bnc#805059)
+  sg3_utils-Fixup-T10-Vendor-designator-display.patch
+- In rescan-scsi-bus.sh, check if the HBA driver exports issue_lip
+  in sysfs before using it (bnc#780946)
+  sg3_utils-check-if-hba-supports-issue-lip.patch
+
+-------------------------------------------------------------------
+Thu Jun 13 14:15:26 UTC 2013 - jengelh@inai.de
+
+- Implement shlib packaging guidelines; rename sg3_utils-devel
+  to libsgutils-devel (upstream recommendation)
+- More robust make install call; remove redundant %clean section;
+  simplify file lists
+
+-------------------------------------------------------------------
+Tue Jun 11 08:56:39 UTC 2013 - rmilasan@suse.com
+
+- Update to version 1.36
+  - sg_vpd: Protocol-specific port information VPD page
+    for SAS SSP, persistent connection (spl3r2), power
+    disable (spl3r3)
+    - block device characteristics: add FUAB bit
+  - sg_xcopy: handle more descriptor types; handle zero
+    maximum segment length; allow list IDs to be disabled;
+    improve skip/seek handling; allow xcopy on destination
+  - sg_reset: and --no-esc option to stop reset escalation
+    - clean up cli, add long option names
+  - sg_luns: add --test=ALUN option for decoding LUNs
+    - decoded luns output in decimal or hex (if -HH given)
+    - add '--linux' option to show Linux LUN after T10
+      representation, can map one to the other
+  - sg_inq: add --vendor option to show standard inquiry's
+    vendor specific fields in ASCII
+    - take resid into account with response output
+  - sg_sync: add --16 (for 16 byte command) and --timeout=
+  - sg_logs: add data compression page (ssc4)
+  - sg_sat_set_features: increase --lba from 1 to 4 bytes
+  - sg_write_same: add --ndob option (sbc3r35d)
+  - sg_map: mark as deprecated
+  - sginfo: mark as deprecated, especially -l (list)
+  - sg_lib: improve snprintf handling
+  - sg_lib_data: sync asc/ascq codes with T10 20130117
+  - sg_cmds (lib): if noisy given, give more UA info
+  - make code more C++ friendly
+
+-------------------------------------------------------------------
+Tue Mar 12 09:13:45 CET 2013 - hare@suse.de
+
+- Update to version 1.35
+  - sg_compare_and_write: new utility
+  - sg_inq+sg_vpd: block device characteristics VPD page:
+    add product_type, WABEREQ, WACEREQ and VBULS fields
+  - sg_inq: more --export option changes for udev
+  - sg_vpd: add more rdac vendor specific vpd pages
+  - sg_verify: add --ebytchk option for sbc3r34 changes
+  - sg_stpg: --offline option: fix 'Invalid state 0xe'
+  - sg_ses: Door Lock element changed to Door element and
+    abbreviation changed from 'dl' to 'do' (ses3r05)
+  - archive/rescan-scsi-bus.sh: upgrade to version 1.53hr
+    - move rescan-scsi-bus.sh to scripts directory
+  - sync to sbc3r34
+  - sg_lib: sg_ll_verify10+16 expand BYTCHK to 2 bit field
+  - sg_pt_win32, sg_scan(win32): changes for cygwin 1.7.17
+  - clean up man page summary lines
+  - sg_xcopy: new dd like utility for extended copy command
+  - sg_copy_results: new utility for receive copy results
+  - sg_verify: add 16 byte cdb, bytchk (data-out buffer)
+    and group number support
+  - sync to spc4r36 and sbc3r32
+  - sg_inq: add --export so sg_inq can replace udev's scsi_id
+    - decode old EMC Symmetrix abuse of VPD page 0x83
+  - sg_vpd: decode old EMC Symmetrix abuse of VPD page 0x83
+  - sg_ses: increase max dpage response size to 64 KB
+    - allow ident,locate on enclosure controller
+    - more sanity for additional element status descriptor
+  - sg_sanitize: add --ause, --fail and --test=
+  - sg_luns: add long extended flat space addressing format
+  - sg_logs: add ATA pass-through results lpage (SAT-2)
+  - sg_rtpg: add --extended option
+  - sg_senddiag: list rebuild assist diag page name
+  - sg_pt_linux: expand DID_ (host_byte) codes
+    - cope with a transport error plus sense data
+    - prefer major() over MAJOR() macro
+  - sg_lib: fix sg_get_command_name() service actions
+    - report sdat_ovfl bit (if set) in sense data
+    - decode extended_copy and receive_copy service actions
+    - decode read_buffer and write_buffer modes
+    - decode ATA PT fixed format sense (SAT-2)
+  - sg_cmds_extra: add sg_ll_report_tgt_prt_grp2()
+  - ./configure options:
+    - change --enable-no-linux-bsg to --disable-linuxbsg
+    - add --disable-scsistrings to reduce utility sizes
+
+-------------------------------------------------------------------
+Wed Jul  4 07:01:46 UTC 2012 - cfarrell@suse.com
+
+- license update: GPL-2.0+ and BSD-3-Clause
+  Show aggregation and make compatible with Fedora declaration
+
+-------------------------------------------------------------------
+Sun Apr 22 11:50:44 UTC 2012 - puzel@suse.com
+
+- Update to version 1.33
+  - sg_ses: major rework of indexes (again), now two level
+  - sg_write_buffer: new --specific option for mode specific
+    field; new mode 13 (spc4r32)
+  - sg_vpd: add hp3par volume info vendor VPD page
+    - fix 'scsi ports' [0x88] page problem
+    - add 'sinq' pseudo page for standard inquiry response
+    - add power consumption page
+  - sg_format: add --poll= option for request sense polling
+    - improve handling of disks > 2 TB and DIF (protection)
+  - sg_logs: LB provision lpage extra (sbc3r28)
+  - sg_modes: application tag mpage subcode 0xf0->0x2
+  - sg_write_same: no prot fields when wrprotect=0
+  - sg_get_lba_status: reflect change in sbc3r25 to Parameter
+    Data Length response field (offset reduced from 8 to 4)
+  - sg_inq, sg_vpd: sync with spc4r33
+  - win32: change DataBufferOffset type per MSDN; caused
+    problem with 64 bit machines (with buffered interface)
+  - sg_luns: tweak documentation for vendor specific reports
+  - add man pages for scsi_loging_level, scsi_mandat,
+    scsi_satl and scsi_temperature
+
+-------------------------------------------------------------------
+Mon Jan 16 19:59:42 UTC 2012 - tabraham@novell.com
+
+- Update to version 1.32
+  + sg_sanitize: new utility for command added in sb3r27
+  + sg_sat_identify: add '--ident' to output WWN
+  + sg_ses: major rework of descriptor output
+    + add --index, --descriptor, --join, --clear, --get, and --set
+      options
+  + sg_raw: exit status corrections
+  + sg_decode_sense: add --nospace and --hex options
+  + sg_logs: fix bug with large --maxlen
+    + zero response length when resid implies it is invalid
+    + add scope field to lb provisioning lpage (sb3r27)
+  + sg_inq: sync version descriptors with spc4r31
+  + sb_lib_data: sync asc/ascq codes with spc4r31
+  + sg_vpd: add LBPRZ field in LP provisioning VPD page
+  + sg_format: allow format of pdt 7 (some MO drives)
+  + sg_cmd_basic: sg_cmds_process_resp() handle status good
+    with a sense key other than no_sense (e.g. completed)
+  + add README.iscsi
+
+- Updated rescan-scsi-bus.sh to v1.56
+
+-------------------------------------------------------------------
+Thu Mar 10 08:47:43 UTC 2011 - coolo@novell.com
+
+- fix file list
+
+-------------------------------------------------------------------
+Fri Feb 18 16:41:32 CET 2011 - hare@suse.de
+
+- Update to version 1.31:
+  + sg_decode_sense: new utility to decode sense data
+  + sg_vpd: LB provisioning + Block limits pages (sbc3r26)
+  + sync asc/ascq and version descriptors with spc4r28
+  + sg_get_config, sg_rmsn, sg_verify: add --readonly option
+  + sg_lib: implement forwarded sense data descriptor
+    - decode user data segment referral sense data descriptor
+  + sg_lib, sg_turs, sg_format: more precision for progress
+    indication (two places after decimal point)
+  + sg_lib(win32): add runtime selection of SPT direct or
+    indirect interface
+    - sg_read_buffer+sg_write_buffer: set SPT direct
+ + add examples/forwarded_sense.txt + examples/ref_sense.txt
+
+- Changes from version 1.30:
+  + sg_referrals: new utility for REPORT REFERRALS
+  + sbc3r25 renames 'thin' provisioning' to 'logical block
+    provisioning': changes in sg_format, sg_inq, sg_logs,
+    sg_modes, sg_readcap, sg_vpd
+  + sg_inq: update version descriptor list to spc4r27
+    - extended inquiry vpd page add extended self test
+      completion minutes field
+  + sg_lib: sync asc/ascq list to spc4r27
+    - dStrHex(): trim excess trailing spaces
+  + sg_read_long: add --readonly option (open() is rw)
+  + sg_raw: add --readonly option (open() is rw)
+    - allow bidirectional commands
+  + sg_vpd: rdac vendor page [0xc8] parse corrections
+    - extended inquiry vpd page add extended self test
+    -completion minutes field
+  + sg_ses: expand --data (in) buffer to 2048 bytes
+  + sg_opcodes: add extended parameter data for TMFs (spc4r26)
+  + sg_dd: clean count calculation, document nocache flag
+    - treat bsg devices as implicit sg_io
+  + sg_write_same: if READ CAPACITY(16) fails try 10 byte variant
+    - anticipate approval of proposal to allow UNMAP and ANCHOR
+      bits to be set on WRITE SAME(10) with '--10' option
+  + sg3_utils man page: sections added for OS device names
+
+-------------------------------------------------------------------
+Fri Aug 13 11:42:50 CEST 2010 - dimstar@opensuse.org
+
+- Update to version 1.29:
+  + sg_rtpg: new logical block dependent state and bit (spc4r23)
+  + sg_start: add '--readonly' option for ATA disks
+  + sg_lib: update asc/ascq list to spc4r23
+  + sg_inq: update version descriptor list to spc4r23
+  + sg_vpd: block device characteristics page: fix form factor
+    - update Extended Inquiry VPD page to spc4r23
+    - update Block Limits VPD page to sbc3r22
+    - update Thin Provisioning VPD page to sbc3r22
+    - Automation device serial number and Data transfer device
+      element VPD pages (ssc4r01)
+    - add Referrals VPD page (sbc3r22)
+  + sg_logs: add thin provisioning and solid state media log pages
+    - addition of IBM LTO specific log pages
+  + sg_modes: new page names from ssc4r01
+  + sg_ses: sync with ses3r02 (SAS-2.1 connector types)
+  + sg_unmap: add '--anchor' option (sbc3r22)
+  + sg_write_same: add '--anchor' option (sbc3r22)
+  + sg_pt interface: add set_scsi_pt_flags() to permit passing
+    through SCSI_PT_FLAGS_QUEUE_AT_TAIL and AT_HEAD flags
+  + add examples/sg_queue_tst+bsg_queue_tst for SG_FLAG_Q_AT_TAIL
+  + add AM_MAINTAINER_MODE to configure.ac to lessen build issues
+  + add BSD_LICENSE file to this and lib directories, refer to
+    it from source and header files. Some source has GPL license
+- Changes from version 1.28:
+  + sg_unmap: new utility for thin provisioning
+    - add examples/sg_unmap_example.txt
+  + sg_get_lba_status: new utility for thin provisioning
+  + sg_read_block_limits: new utility for tape drives
+  + sg_logs: add cache memory statistics log (sub)page
+  + sg_vpd, sg_inq: extend Block limits VPD page (sbc3r19)
+  + sg_vpd: add Thin provisioning VPD page (sbc3r20) and
+            TapeAlert supported flags VPD page
+  + sg_inq: note VPD page support better in sg_vpd
+  + sg_persist: add transport specific transportID format
+    - allow transportIDs to be read from named file
+  + sg_opcodes: allow --opcode= option to take OP and SA
+    values (comma seperated)
+    - tweak print format, remove test code
+  + sg_requests: remove test code in progress calculation
+  + sg_reset: add target reset option
+  + sg_luns: reduce default maxlen to 8192 (for FreeBSD)
+  + sg_raw: extend max cdb length from 16 to 256 bytes
+    - align heap allocs to page boundaries
+  + sg_lib: sg_set_binary_mode() needs config.h included
+    - add progress indication sense data descriptor (0xa)
+    - change SG3_UTILS_* constants to SG_LIB_*
+    - decode service actions within persistent reserve in/out
+    - sync with spc4r21
+  + sg_cmds_extra: add sg_ll_unmap() and sg_ll_get_lba_status()
+  + sg_pt_linux: fix check condition but empty sense buffer;
+    - major() macro grief, if present include <linux/kdev_t.h> and
+      use MAJOR() instead
+  + scripts/sas_disk_blink: moved from this package to sdparm
+  + utils/hxascdmp: in Windows set binary mode on read files
+  + examples/sg_persist_tst.sh: add PRIN read full status command
+  + sg_raw,sg_write_buffer,sg_write_long,sg_write_same: in Windows
+    set binary mode on read files
+  + sg_pt_win32: default to non-direct variant of SPT interface
+    - use './configure --enable-win32-spt-direct' to override
+    - non-direct data length set to 16 KB, extended if required
+  + debian: incorporate patch from debian sid
+
+-------------------------------------------------------------------
+Mon Jun 28 06:38:35 UTC 2010 - jengelh@medozas.de
+
+- use %_smp_mflags
+
+-------------------------------------------------------------------
+Tue Jul 21 14:00:16 CEST 2009 - hare@suse.de
+
+- Clean up spec file and remove obsolete cruft
+
+-------------------------------------------------------------------
+Fri Apr 17 20:15:58 CEST 2009 - crrodriguez@suse.de
+
+- remove static libraries and "la" files
+
+-------------------------------------------------------------------
+Mon Jan 26 15:30:31 CET 2009 - hare@suse.de
+
+- Fixes to rescan-scsi-bus.sh:
+  * Implement '--forcerescan' to force a rescan of existing devices
+  * Handle LUN changes correctly
+  * Check variables before evaluation
+
+-------------------------------------------------------------------
+Wed Oct 29 11:05:47 CET 2008 - garloff@suse.de
+
+- rescan-scsi-bus.sh 1.29:
+  * Fix error in script (returning "" does not work)
+  * Support systems without /proc/scsi
+- Don't install INSTALL
+
+-------------------------------------------------------------------
+Tue Sep 30 14:11:15 CEST 2008 - hare@suse.de
+
+-  Add %insserv_prereq (bnc#423204)
+
+-------------------------------------------------------------------
+Fri Sep 12 20:29:08 CEST 2008 - garloff@suse.de
+
+- Update rescan-scsi-bus.sh script to 1.28:
+  * Merge fixes from Hannes
+  * Minor cleanups
+  * Sort hosts numerically
+
+-------------------------------------------------------------------
+Tue Aug 12 18:25:43 CEST 2008 - garloff@suse.de
+
+- Update to sg3_utils-1.27:
+  * Adapted to linux-2.6.26 (sg_map26)
+  * sg_dd uses flock (rw -- if that fails ro)
+  * sg_get_config: OSSC feature (mmc6r02)
+- Update to sg3_utils-1.26:
+  * Minor fixes and enhancements to
+    sg_sat_phy_event, sg_ses, sg_get_config, sg_verify, sg_vpd,
+    sg_inq, sg_modes, sg_start, sg_request, sg_luns, sg_dd,
+    sg_opcodes, sg_turs.
+  * sg_lib: asc/ascq update for spc4r15, osd2r03 service actions,
+    sense key specific unit attn queue overflow decoding, ...
+  * Restructuring: sg_lib -> sg_lib_data, sg_inq_data, (u)int64_t,
+    sg_io_linux -> lib/.
+  * Documentation enhancements.
+
+-------------------------------------------------------------------
+Wed Jul 16 09:55:33 CEST 2008 - hare@suse.de
+
+- Use correct length parameter for sg_inq (bnc#363438)
+
+-------------------------------------------------------------------
+Fri May 23 10:22:31 CEST 2008 - hare@suse.de
+
+- Use 'Provides' to clean update dependency
+
+-------------------------------------------------------------------
+Fri May  9 17:31:33 CEST 2008 - schwab@suse.de
+
+- Use autoreconf -i.
+
+-------------------------------------------------------------------
+Thu Apr 24 14:14:14 CEST 2008 - hare@suse.de
+
+- Split off from original scsi package.
+
