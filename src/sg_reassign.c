@@ -32,7 +32,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.14 20140108";
+static const char * version_str = "1.15 20140126";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -95,7 +95,7 @@ usage()
 
 /* Trying to decode multipliers as sg_get_llnum() [in sg_libs] does would
  * only confuse things here, so use this local trimmed version */
-int64_t
+static int64_t
 get_llnum(const char * buf)
 {
     int res, len;

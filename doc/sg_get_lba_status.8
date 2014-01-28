@@ -1,4 +1,4 @@
-.TH SG_GET_LBA_STATUS "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_GET_LBA_STATUS "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_get_lba_status \- send SCSI GET LBA STATUS command
 .SH SYNOPSIS
@@ -27,11 +27,11 @@ Arguments to long options are mandatory for short options as well.
 when use once then one LBA status descriptor per line is output to stdout.
 Each line has this
 format: "0x<descriptor_LBA>  0x<blocks> <provisioning_status>". So the
-descriptor LBA and blocks are output in hex and the provisioning status
-in decimal. When used twice (e.g. '\-bb' or '\-\-brief \-\-brief') the
-the provisioning status of the given \fILBA\fR (or LBA 0 if the
-\fI\-\-lba\fR option is not given) is output to stdout. A check is made
-that the given \fILBA\fR lies on the range of the first returned LBA
+descriptor's starting LBA and number of blocks are output in hex and the
+provisioning status in decimal. When used twice (e.g. '\-bb' or '\-\-brief
+\-\-brief') then the provisioning status of the given \fILBA\fR (or LBA 0
+if the \fI\-\-lba\fR option is not given) is output to stdout. A check is
+made that the given \fILBA\fR lies in the range of the first returned LBA
 status descriptor (as it should according to SBC\-3 revision 20) and
 warnings are sent to stderr if it doesn't.
 .TP
@@ -76,7 +76,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2012 Douglas Gilbert
+Copyright \(co 2009\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -278,6 +278,7 @@ top_srcdir = @top_srcdir@
 #
 # sg_scan is shared by Linux and Win32
 @OS_LINUX_TRUE@man_MANS = \
+@OS_LINUX_TRUE@	rescan-scsi-bus.sh.8 \
 @OS_LINUX_TRUE@	sg3_utils.8 sg_decode_sense.8 scsi_logging_level.8 \
 @OS_LINUX_TRUE@	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
 @OS_LINUX_TRUE@	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
