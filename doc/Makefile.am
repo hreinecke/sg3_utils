@@ -8,6 +8,7 @@ if OS_LINUX
 # sg_scan is shared by Linux and Win32
 
 man_MANS = \
+	rescan-scsi-bus.sh.8 \
 	sg3_utils.8 sg_decode_sense.8 scsi_logging_level.8 \
 	scsi_mandat.8 scsi_readcap.8  scsi_ready.8  scsi_satl.8 \
 	scsi_start.8  scsi_stop.8 scsi_temperature.8 \
