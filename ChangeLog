@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20140128] [svn: r548]
+Changelog for sg3_utils-1.38 [20140203] [svn: r549]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers
     - new --data=@FN to read hex data from file FN
@@ -15,6 +15,7 @@ Changelog for sg3_utils-1.38 [20140128] [svn: r548]
   - sg_vpd: add LU_CONG to standard inquiry response output
     - decode Third Party Copy (tpc) page
   - sg_persist: add PROUT: Replace Lost Reservation (spc4r36)
+    - add --transport-id= for SOP: 'sop,<routing_id_in_hex>'
   - sg_readcap: for --16 show physical block size if
     different from logical block size
   - sg_xcopy: environment variables: XCOPY_TO_SRC and
@@ -26,7 +27,9 @@ Changelog for sg3_utils-1.38 [20140128] [svn: r548]
     command line, so multiple arguments are concatenated
   - sg_write_same: repeat if unit attention
   - sg_rtpg: fix indexing bug with --extended option
-  - sg_lib_data: sync asc/ascq codes with T10 dated 20131110
+  - sg_lib.h: add PDT_ZBC define (spc4r36p)
+  - sg_lib_data: sync asc/ascq codes with T10 dated 20140122
+    - add pdt string for ZBC (spc4r36p)
   - sg_cmds_extra: fix sa bug in sg_ll_3party_copy_out()
   - scripts/rescan-scsi-bus.sh: check if FC driver exports
     issue_lip before using it

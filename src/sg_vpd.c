@@ -30,7 +30,7 @@
 
 */
 
-static const char * version_str = "0.75 20140117";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.76 20140203";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -407,8 +407,9 @@ static const char * network_service_type_arr[] =
     "status",
     "logging",
     "code download",
+    "copy service",
     "administrative configuration service",
-    "reserved[0x7]", "reserved[0x8]", "reserved[0x9]",
+    "reserved[0x8]", "reserved[0x9]",
     "reserved[0xa]", "reserved[0xb]", "reserved[0xc]", "reserved[0xd]",
     "reserved[0xe]", "reserved[0xf]", "reserved[0x10]", "reserved[0x11]",
     "reserved[0x12]", "reserved[0x13]", "reserved[0x14]", "reserved[0x15]",

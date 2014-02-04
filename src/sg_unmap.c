@@ -30,11 +30,15 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.05 20140126";
+static const char * version_str = "1.05 20140203";
 
 
 #define DEF_TIMEOUT_SECS 60
 #define MAX_NUM_ADDR 128
+
+#ifndef UINT32_MAX
+#define UINT32_MAX ((uint32_t)-1)
+#endif
 
 
 static struct option long_options[] = {
