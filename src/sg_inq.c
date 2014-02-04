@@ -67,7 +67,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.25 20140123";    /* SPC-4 rev 36o */
+static const char * version_str = "1.26 20140203";    /* SPC-4 rev 36p */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -640,7 +640,8 @@ cl_old_process(struct opts_t * optsp, int argc, char * argv[])
             if (plen <= 0)
                 continue;
             else if (0 == strncmp("B=", cp, 2)) {
-                if ((1 != num) || (n < 0) || (num > 1)) {
+                num = sscanf(cp + 2, "%d", &n);
+                if ((1 != num) || (n < 0) || (n > 1)) {
                     fprintf(stderr, "'B=' option expects 0 or 1\n");
                     usage_for(optsp);
                     return SG_LIB_SYNTAX_ERROR;
@@ -996,8 +997,9 @@ static const char * network_service_type_arr[] =
     "status",
     "logging",
     "code download",
+    "copy service",
     "administrative configuration service",
-    "[0x7]", "[0x8]", "[0x9]", "[0xa]", "[0xb]", "[0xc]", "[0xd]",
+    "[0x8]", "[0x9]", "[0xa]", "[0xb]", "[0xc]", "[0xd]",
     "[0xe]", "[0xf]", "[0x10]", "[0x11]", "[0x12]", "[0x13]", "[0x14]",
     "[0x15]", "[0x16]", "[0x17]", "[0x18]", "[0x19]", "[0x1a]",
     "[0x1b]", "[0x1c]", "[0x1d]", "[0x1e]", "[0x1f]",

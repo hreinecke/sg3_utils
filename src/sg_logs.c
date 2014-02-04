@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2013 D. Gilbert
+*  Copyright (C) 2000-2014 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.14 20130730";    /* spc4r35 + sbc3r30 */
+static const char * version_str = "1.15 20140203";    /* spc4r36p + sbc3r30 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -925,45 +925,104 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
 
 /* BUFF_OVER_UNDER_LPAGE [0x1] */
 static void
-show_buffer_under_overrun_page(unsigned char * resp, int len, int show_pcb)
+show_buffer_under_over_run_page(unsigned char * resp, int len, int show_pcb)
 {
-    int num, pl, count_basis, cause, pcb;
+    int num, pl, pcb;
+    unsigned int paramc;
+    uint64_t count;
     unsigned char * ucp;
+    const char * cp;
     char pcb_str[PCB_STR_LEN];
 
     printf("Buffer over-run/under-run page  (spc-2) [0x1]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
+        cp = NULL;
         pl = ucp[3] + 4;
-        count_basis = (ucp[1] >> 5) & 0x7;
-        cause = (ucp[1] >> 1) & 0xf;
-        if ((0 == count_basis) && (0 == cause))
-            printf("Count basis+Cause both undefined(0), unsupported??");
-        else {
-            printf("  Count basis: ");
-            switch (count_basis) {
-            case 0 : printf("undefined"); break;
-            case 1 : printf("per command"); break;
-            case 2 : printf("per failed reconnect"); break;
-            case 3 : printf("per unit of time"); break;
-            default: printf("reserved [0x%x]", count_basis); break;
-            }
-            printf(", Cause: ");
-            switch (cause) {
-            case 0 : printf("undefined"); break;
-            case 1 : printf("bus busy"); break;
-            case 2 : printf("transfer rate too slow"); break;
-            default: printf("reserved [0x%x]", cause); break;
-            }
-            printf(", Type: ");
-            if (ucp[1] & 1)
-                printf("over-run");
-            else
-                printf("under-run");
-            printf(", count");
-            printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
+        count = (pl > 4) ? decode_count(ucp + 4, pl - 4) : 0;
+        paramc = (ucp[0] << 8) + ucp[1];
+        switch (paramc) {
+        case 0x0:
+            cp = "under-run";
+            break;
+        case 0x1:
+            cp = "over-run";
+            break;
+        case 0x2:
+            cp = "transport under-run";
+            break;
+        case 0x3:
+            cp = "transport over-run";
+            break;
+        case 0x4:
+            cp = "transfer too slow, under-run";
+            break;
+        case 0x5:
+            cp = "transfer too slow, over-run";
+            break;
+        case 0x20:
+            cp = "command, under-run";
+            break;
+        case 0x21:
+            cp = "command, over-run";
+            break;
+        case 0x22:
+            cp = "command, transport under-run";
+            break;
+        case 0x23:
+            cp = "command, transport over-run";
+            break;
+        case 0x24:
+            cp = "command, transfer too slow, under-run";
+            break;
+        case 0x25:
+            cp = "command, transfer too slow, over-run";
+            break;
+        case 0x40:
+            cp = "I_T nexus, under-run";
+            break;
+        case 0x41:
+            cp = "I_T nexus, over-run";
+            break;
+        case 0x42:
+            cp = "I_T nexus, transport under-run";
+            break;
+        case 0x43:
+            cp = "I_T nexus, transport over-run";
+            break;
+        case 0x44:
+            cp = "I_T nexus, transfer too slow, under-run";
+            break;
+        case 0x45:
+            cp = "I_T nexus, transfer too slow, over-run";
+            break;
+        case 0x80:
+            cp = "time, under-run";
+            break;
+        case 0x81:
+            cp = "time, over-run";
+            break;
+        case 0x82:
+            cp = "time, transport under-run";
+            break;
+        case 0x83:
+            cp = "time, transport over-run";
+            break;
+        case 0x84:
+            cp = "time, transfer too slow, under-run";
+            break;
+        case 0x85:
+            cp = "time, transfer too slow, over-run";
+            break;
+        default:
+            printf("  undefined parameter code [0x%x], count = %" PRIu64 "",
+                   paramc, count);
+            break;
         }
+        if (cp)
+            printf("  %s = %" PRIu64 "", cp, count);
+
         if (show_pcb) {
             pcb = ucp[2];
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
@@ -4070,7 +4129,7 @@ show_ascii_page(unsigned char * resp, int len,
         }
         break;
     case BUFF_OVER_UNDER_LPAGE: /* 0x1 */
-        show_buffer_under_overrun_page(resp, len, optsp->do_pcb);
+        show_buffer_under_over_run_page(resp, len, optsp->do_pcb);
         break;
     case WRITE_ERR_LPAGE:       /* 0x2 */
     case READ_ERR_LPAGE:        /* 0x3 */

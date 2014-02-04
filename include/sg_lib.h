@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -56,6 +56,7 @@ extern "C" {
 #define PDT_OSD 0x11    /* Object Storage Device (OSD) */
 #define PDT_ADC 0x12    /* Automation/drive commands (ADC) */
 #define PDT_SMD 0x13    /* Security Manager Device (SMD) */
+#define PDT_ZBC 0x14    /* Zoned Block Commands (ZBC) */
 #define PDT_WLUN 0x1e   /* Well known logical unit (WLUN) */
 #define PDT_UNKNOWN 0x1f        /* Unknown or no device type */
 

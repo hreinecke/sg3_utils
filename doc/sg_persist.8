@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_PERSIST "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -265,9 +265,9 @@ When the \fI\-\-transport\-id=TIDS\fR option is given then the \fITIDS\fR
 argument may be a comma (or single space) separated list of ASCII hex bytes
 that represent a single TransportID as defined in SPC\-4. Alternatively the
 \fITIDS\fR argument may be a transport specific string starting with
-either "fcp,", "spi,", "sbp,", "srp,", "iqn", or "sas,". The "iqn" form is
-an iSCSI qualified name. Apart from "iqn" the other transport specific
-leadin string may be given in upper case (e.g. "FCP,").
+either "fcp,", "spi,", "sbp,", "srp,", "iqn", "sas," or "sop,". The "iqn"
+form is an iSCSI qualified name. Apart from "iqn" the other transport
+specific leadin string may be given in upper case (e.g. "FCP,").
 .PP
 The "fcp," form should be followed by 16 ASCII hex digits that represent an
 initiator's N_PORT_NAME. The "spi," form should be followed
@@ -276,7 +276,7 @@ The "sbp," form should be followed by 16 ASCII hex digits that represent an
 initiator's EUI\-64 name. The "srp," form should be followed by 32 ASCII hex
 digits that represent an initiator port identifier. The "sas," form should be
 followed by 16 ASCII hex digits that represent an initiator's port SAS
-address.
+address. The "sop," form takes a hex number that represents a routing id.
 .PP
 There are two iSCSI qualified name forms. The shorter form contains the
 iSCSI name of the initiator
