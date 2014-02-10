@@ -30,10 +30,11 @@
 
 */
 
-static const char * version_str = "0.76 20140203";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.77 20140207";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
+int svpd_search_vendor_vpds(int num_vpd);
 int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                        int do_hex, int do_raw, int do_long, int do_quiet,
                        int verbose);
@@ -70,7 +71,7 @@ const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 #define VPD_REFERRALS 0xb3   /* SBC-3 */
 #define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
-#define VPD_NOT_STD_INQ -2      /* request for standard inquiry */
+#define VPD_NO_RATHER_STD_INQ -2      /* request for standard inquiry */
 
 /* Device identification VPD page associations */
 #define VPD_ASSOC_LU 0
@@ -92,11 +93,10 @@ const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 /* This structure is a duplicate of one of the same name in sg_vpd_vendor.c .
    Take care that both have the same fields (and types). */
 struct svpd_values_name_t {
-    int value;
-    int subvalue;
+    int value;       /* VPD page number */
+    int subvalue;    /* to differentiate if value+pdt are not unique */
     int pdt;         /* peripheral device type id, -1 is the default */
                      /* (all or not applicable) value */
-    int vendor;      /* vendor flag */
     const char * acron;
     const char * name;
 };
@@ -128,56 +128,56 @@ static struct option long_options[] = {
 
 /* arranged in alphabetical order by acronym */
 static struct svpd_values_name_t standard_vpd_pg[] = {
-    {VPD_ATA_INFO, 0, -1, 0, "ai", "ATA information (SAT)"},
-    {VPD_ASCII_OP_DEF, 0, -1, 0, "aod",
+    {VPD_ATA_INFO, 0, -1, "ai", "ATA information (SAT)"},
+    {VPD_ASCII_OP_DEF, 0, -1, "aod",
      "ASCII implemented operating definition (obsolete)"},
-    {VPD_AUTOMATION_DEV_SN, 0, 1, 0, "adsn", "Automation device serial "
+    {VPD_AUTOMATION_DEV_SN, 0, 1, "adsn", "Automation device serial "
      "number (SSC)"},
-    {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
-    {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc", "Block device characteristics "
+    {VPD_BLOCK_LIMITS, 0, 0, "bl", "Block limits (SBC)"},
+    {VPD_BLOCK_DEV_CHARS, 0, 0, "bdc", "Block device characteristics "
      "(SBC)"},
-    {VPD_CFA_PROFILE_INFO, 0, 0, 0, "cfa", "CFA profile information"},
-    {VPD_DEVICE_CONSTITUENTS, 0, 1, 0, "dc", "Device constituents"},
-    {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
-    {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
+    {VPD_CFA_PROFILE_INFO, 0, 0, "cfa", "CFA profile information"},
+    {VPD_DEVICE_CONSTITUENTS, 0, -1, "dc", "Device constituents"},
+    {VPD_DEVICE_ID, 0, -1, "di", "Device identification"},
+    {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, "di_asis", "Like 'di' "
      "but designators ordered as found"},
-    {VPD_DEVICE_ID, VPD_DI_SEL_LU, -1, 0, "di_lu", "Device identification, "
+    {VPD_DEVICE_ID, VPD_DI_SEL_LU, -1, "di_lu", "Device identification, "
      "lu only"},
-    {VPD_DEVICE_ID, VPD_DI_SEL_TPORT, -1, 0, "di_port", "Device "
+    {VPD_DEVICE_ID, VPD_DI_SEL_TPORT, -1, "di_port", "Device "
      "identification, target port only"},
-    {VPD_DEVICE_ID, VPD_DI_SEL_TARGET, -1, 0, "di_target", "Device "
+    {VPD_DEVICE_ID, VPD_DI_SEL_TARGET, -1, "di_target", "Device "
      "identification, target device only"},
-    {VPD_DTDE_ADDRESS, 0, 1, 0, "dtde",
+    {VPD_DTDE_ADDRESS, 0, 1, "dtde",
      "Data transfer device element address (SSC)"},
-    {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
-    {VPD_IMP_OP_DEF, 0, -1, 0, "iod",
+    {VPD_EXT_INQ, 0, -1, "ei", "Extended inquiry data"},
+    {VPD_IMP_OP_DEF, 0, -1, "iod",
      "Implemented operating definition (obsolete)"},
-    {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv",
+    {VPD_LB_PROVISIONING, 0, 0, "lbpv",
      "Logical block provisioning (SBC)"},
-    {VPD_MAN_ASS_SN, 0, 1, 0, "mas",
+    {VPD_MAN_ASS_SN, 0, 1, "mas",
      "Manufacturer assigned serial number (SSC)"},
-    {VPD_MAN_ASS_SN, 0, 0x12, 0, "masa",
+    {VPD_MAN_ASS_SN, 0, 0x12, "masa",
      "Manufacturer assigned serial number (ADC)"},
-    {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
-    {VPD_MODE_PG_POLICY, 0, -1, 0, "mpp", "Mode page policy"},
-    {VPD_OSD_INFO, 0, 0x11, 0, "oi", "OSD information"},
-    {VPD_POWER_CONDITION, 0, -1, 0, "pc", "Power condition"},
-    {VPD_POWER_CONSUMPTION, 0, -1, 0, "psm", "Power consumption"},
-    {VPD_PROTO_LU, 0, 0x0, 0, "pslu", "Protocol-specific logical unit "
+    {VPD_MAN_NET_ADDR, 0, -1, "mna", "Management network addresses"},
+    {VPD_MODE_PG_POLICY, 0, -1, "mpp", "Mode page policy"},
+    {VPD_OSD_INFO, 0, 0x11, "oi", "OSD information"},
+    {VPD_POWER_CONDITION, 0, -1, "pc", "Power condition"},
+    {VPD_POWER_CONSUMPTION, 0, -1, "psm", "Power consumption"},
+    {VPD_PROTO_LU, 0, -1, "pslu", "Protocol-specific logical unit "
      "information"},
-    {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
-    {VPD_REFERRALS, 0, 0, 0, "ref", "Referrals (SBC)"},
-    {VPD_SA_DEV_CAP, 0, 1, 0, "sad",
+    {VPD_PROTO_PORT, 0, -1, "pspo", "Protocol-specific port information"},
+    {VPD_REFERRALS, 0, 0, "ref", "Referrals (SBC)"},
+    {VPD_SA_DEV_CAP, 0, 1, "sad",
      "Sequential access device capabilities (SSC)"},
-    {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
-    {VPD_NOT_STD_INQ, 0, -1, 0, "sinq", "Standard inquiry response"},
-    {VPD_UNIT_SERIAL_NUM, 0, -1, 0, "sn", "Unit serial number"},
-    {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
-    {VPD_SECURITY_TOKEN, 0, 0x11, 0, "st", "Security token (OSD)"},
-    {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
-    {VPD_TA_SUPPORTED, 0, 1, 0, "tas", "TapeAlert supported flags (SSC)"},
-    {VPD_3PARTY_COPY, 0, -1, 0, "tpc", "Third party copy"},
-    {0, 0, 0, 0, NULL, NULL},
+    {VPD_SOFTW_INF_ID, 0, -1, "sii", "Software interface identification"},
+    {VPD_NO_RATHER_STD_INQ, 0, -1, "sinq", "Standard inquiry response"},
+    {VPD_UNIT_SERIAL_NUM, 0, -1, "sn", "Unit serial number"},
+    {VPD_SCSI_PORTS, 0, -1, "sp", "SCSI ports"},
+    {VPD_SECURITY_TOKEN, 0, 0x11, "st", "Security token (OSD)"},
+    {VPD_SUPPORTED_VPDS, 0, -1, "sv", "Supported VPD pages"},
+    {VPD_TA_SUPPORTED, 0, 1, "tas", "TapeAlert supported flags (SSC)"},
+    {VPD_3PARTY_COPY, 0, -1, "tpc", "Third party copy"},
+    {0, 0, 0, NULL, NULL},
 };
 
 static void
@@ -192,7 +192,8 @@ usage()
     fprintf(stderr,
             "  where:\n"
             "    --enumerate|-e    enumerate known VPD pages names (ignore "
-            "DEVICE)\n"
+            "DEVICE),\n"
+            "                      can be used with --page=num to search\n"
             "    --help|-h       output this usage message then exit\n"
             "    --hex|-H        output page in ASCII hexadecimal\n"
             "    --ident|-i      output device identification VPD page, "
@@ -212,7 +213,7 @@ usage()
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"
             "Fetch Vital Product Data (VPD) page using SCSI INQUIRY. To "
-            "list available\npages try '-p xxx'. And '-p -1' yields the "
+            "list available\npages use '-e'. And '-p -1' yields the "
             "standard INQUIRY response.\n");
 }
 
@@ -256,7 +257,7 @@ enumerate_vpds(int standard, int vendor)
 
     if (standard) {
         for (vnp = standard_vpd_pg; vnp->acron; ++vnp) {
-            if (vnp->name && (0 == vnp->vendor)) {
+            if (vnp->name) {
                 if (vnp->value < 0)
                     printf("  %-10s -1        %s\n", vnp->acron, vnp->name);
                 else
@@ -267,6 +268,27 @@ enumerate_vpds(int standard, int vendor)
     }
     if (vendor)
         svpd_enumerate_vendor();
+}
+
+static int
+search_standard_vpds(int num_vpd)
+{
+    const struct svpd_values_name_t * vnp;
+    int matches;
+
+    for (vnp = standard_vpd_pg, matches = 0; vnp->acron; ++vnp) {
+        if ((num_vpd == vnp->value) && vnp->name) {
+            if (0 == matches)
+                printf("Matching standard VPD pages:\n");
+            ++matches;
+            if (vnp->value < 0)
+                printf("  %-10s -1        %s\n", vnp->acron, vnp->name);
+            else
+                printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
+                   vnp->name);
+        }
+    }
+    return matches;
 }
 
 static void
@@ -2290,7 +2312,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
         alloc_len = (VPD_ATA_INFO == num_vpd) ?
                     VPD_ATA_INFO_LEN : DEF_ALLOC_LEN;
     switch(num_vpd) {
-    case VPD_NOT_STD_INQ:         /* -2 (want standard inquiry response) */
+    case VPD_NO_RATHER_STD_INQ:    /* -2 (want standard inquiry response) */
         if (do_long)
             alloc_len = DEF_ALLOC_LEN;
         else if (0 == maxlen)
@@ -3259,12 +3281,13 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, res;
+    int sg_fd, c, res, matches;
     const char * device_name = NULL;
     const struct svpd_values_name_t * vnp;
     const char * page_str = NULL;
     const char * cp;
     int num_vpd = 0;
+    int do_enum = 0;
     int do_hex = 0;
     int do_ident = 0;
     int do_long = 0;
@@ -3285,9 +3308,8 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'e':
-            printf("Standard VPD pages:\n");
-            enumerate_vpds(1, 1);
-            return 0;
+            ++do_enum;
+            break;
         case 'h':
         case '?':
             usage();
@@ -3348,9 +3370,41 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+    if (do_enum) {
+        if (device_name)
+            fprintf(stderr, "Device name %s ignored when --enumerate "
+                    "given\n", device_name);
+        if (page_str) {
+            if ((0 == strcmp("-1", page_str)) ||
+                (0 == strcmp("-2", page_str)))
+                num_vpd = VPD_NO_RATHER_STD_INQ;
+            else if (isdigit(page_str[0])) {
+                num_vpd = sg_get_num_nomult(page_str);
+                if ((num_vpd < 0) || (num_vpd > 255)) {
+                    fprintf(stderr, "Bad page code value after '-p' "
+                            "option\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            } else {
+                fprintf(stderr, "with --enumerate only search using VPD page "
+                        "numbers\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            matches = search_standard_vpds(num_vpd);
+            if (0 == matches)
+                matches = svpd_search_vendor_vpds(num_vpd);
+            if (0 == matches)
+                printf("No matches found for VPD page number 0x%x\n",
+                       num_vpd);
+        } else {        /* enumerate standard then vendor VPD pages */
+            printf("Standard VPD pages:\n");
+            enumerate_vpds(1, 1);
+        }
+        return 0;
+    }
     if (page_str) {
         if ((0 == strcmp("-1", page_str)) || (0 == strcmp("-2", page_str)))
-            num_vpd = VPD_NOT_STD_INQ;
+            num_vpd = VPD_NO_RATHER_STD_INQ;
         else if (isalpha(page_str[0])) {
             vnp = sdp_find_vpd_by_acron(page_str);
             if (NULL == vnp) {

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20140203] [svn: r549]
+Changelog for sg3_utils-1.38 [20140209] [svn: r550]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers
     - new --data=@FN to read hex data from file FN
@@ -14,6 +14,8 @@ Changelog for sg3_utils-1.38 [20140203] [svn: r549]
     - fix overflow in encode_whitespaces
   - sg_vpd: add LU_CONG to standard inquiry response output
     - decode Third Party Copy (tpc) page
+    - add LTO and DDS vendor pages
+    - allow --page=num to restrict --enumerate output
   - sg_persist: add PROUT: Replace Lost Reservation (spc4r36)
     - add --transport-id= for SOP: 'sop,<routing_id_in_hex>'
   - sg_readcap: for --16 show physical block size if
@@ -23,7 +25,7 @@ Changelog for sg3_utils-1.38 [20140203] [svn: r549]
     - change default to send xcopy to dst (was src)
     - improve CL handling of short options (e.g. '-vv')
   - sg_luns: guard against garbage response
-  - sg_decode_sense: with --no-space ignore spaces on
+  - sg_decode_sense: with --nospace ignore spaces on
     command line, so multiple arguments are concatenated
   - sg_write_same: repeat if unit attention
   - sg_rtpg: fix indexing bug with --extended option

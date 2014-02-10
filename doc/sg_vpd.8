@@ -32,10 +32,12 @@ The options are arranged in alphabetical order based on the long
 option name.
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
-list the names of the known VPD pages, first the standard pages, then the
-vendor specific pages. Each group is sorted in abbreviation order. The
-\fIDEVICE\fR and other options are ignored and this utility exits after
-listing the VPD page names.
+list the names of the known VPD pages, first the standard pages (i.e.
+those defined by T10), then the vendor specific pages. Each group is sorted
+in abbreviation order. The \fIDEVICE\fR and most other options are ignored
+and this utility exits after listing the VPD page names. May be used together
+with \fI\-\-page=PG\fR where \fIPG\fR is numeric. If so, it searches for the
+summary lines of all VPD pages whose number matches \fIPG\fR.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options then exits.
@@ -78,7 +80,8 @@ numbers are given the second number indicates which vendor specific VPD page
 to decode when several pages share the same VPD page number. If this option
 is not given (nor '\-i', '\-l' nor '\-V') then the "Supported VPD pages" (0x0)
 VPD page is fetched and decoded. If \fIPG\fR is '\-1' or 'sinq' then the
-standard INQUIRY response is output.
+standard INQUIRY response is output. This option may also be used with the
+\fI\-\-enumerate\fR (see its description).
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 suppress the amount of decoding output.
@@ -187,6 +190,19 @@ option on the Extended inquiry data VPD page:
      GRD_CHK=1
 .br
      ....
+.PP
+Search for the name (and acronym) of all pages that share VPD page number
+0xb0 .
+.PP
+   # sg_vpd \-\-page=0xb0 \-\-enumerate
+.br
+   Matching standard VPD pages:
+.br
+     bl         0xb0      Block limits (SBC)
+.br
+     oi         0xb0      OSD information
+.br
+     sad        0xb0      Sequential access device capabilities (SSC)
 .PP
 Further examples can be found on the http://sg.danny.cz/sg/sg3_utils.html
 web page.
