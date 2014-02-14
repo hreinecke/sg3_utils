@@ -30,7 +30,7 @@
 
 */
 
-static const char * version_str = "0.77 20140207";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.78 20140213";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -447,8 +447,8 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
     int k, bump, na_len;
     unsigned char * ucp;
 
-    if (1 == do_hex) {
-        dStrHex((const char *)buff, len, 1);
+    if ((1 == do_hex) || (do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -494,8 +494,8 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
     int k, bump;
     unsigned char * ucp;
 
-    if (1 == do_hex) {
-        dStrHex((const char *)buff, len, 1);
+    if ((1 == do_hex) || (do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -534,8 +534,8 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
     int k, bump, rel_port, ip_tid_len, tpd_len;
     unsigned char * ucp;
 
-    if (1 == do_hex) {
-        dStrHex((const char *)buff, len, 1);
+    if ((1 == do_hex) || (do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -1284,7 +1284,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)b, len, 0);
+        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (do_long) {
@@ -1378,7 +1378,7 @@ static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
     if (do_hex) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     len -= 4;
@@ -1404,7 +1404,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
         return;
     }
     if (do_hex && (2 != do_hex)) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     memcpy(b, buff + 8, 8);
@@ -1463,7 +1463,7 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     printf("  Standby_y=%d Standby_z=%d Idle_c=%d Idle_b=%d Idle_a=%d\n",
@@ -1503,8 +1503,8 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
     unsigned char * ucp;
     unsigned int value;
 
-    if (1 == do_hex) {
-        dStrHex((const char *)buff, len, 1);
+    if ((1 == do_hex) || (do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -1915,7 +1915,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     unsigned int u;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2005,7 +2005,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     unsigned int u, k;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2169,7 +2169,7 @@ static void
 decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     if (do_hex) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2195,7 +2195,7 @@ decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
     unsigned int u;
 
     if (do_hex) {
-        dStrHex((const char *)b, len, 0);
+        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2325,7 +2325,8 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             else if (do_hex) {
                 if (! do_quiet)
                     printf("Standard Inquiry reponse:\n");
-                dStrHex((const char *)rsp_buff, alloc_len, 0);
+                dStrHex((const char *)rsp_buff, alloc_len,
+                        (1 == do_hex) ? 0 : -1);
             } else
                 decode_std_inq(rsp_buff, alloc_len, verbose);
             return 0;
@@ -2365,7 +2366,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else if (do_hex)
-                dStrHex((const char *)rsp_buff, len, 0);
+                dStrHex((const char *)rsp_buff, len, (1 == do_hex) ? 0 : -1);
             else {
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
@@ -2425,7 +2426,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else if (do_hex)
-                dStrHex((const char *)rsp_buff, len, 0);
+                dStrHex((const char *)rsp_buff, len, (1 == do_hex) ? 0 : -1);
             else {
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
@@ -2476,7 +2477,7 @@ svpd_decode_t10(int sg_fd, int num_vpd, int subvalue, int maxlen, int do_hex,
             if (do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else if (do_hex)
-                dStrHex((const char *)rsp_buff, len, 0);
+                dStrHex((const char *)rsp_buff, len, (1 == do_hex) ? 0 : -1);
             else {
                 pdt = rsp_buff[0] & 0x1f;
                 if (verbose || do_long)
