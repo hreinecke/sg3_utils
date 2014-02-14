@@ -1,28 +1,33 @@
 .TH SG_INQ "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
-sg_inq \- issue SCSI INQUIRY command, output and decode response
+sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
 .B sg_inq
 [\fI\-\-ata\fR] [\fI\-\-block=0|1\fR] [\fI\-\-cmddt\fR]
 [\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-len=LEN\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-inhex=FN\fR]
+[\fI\-\-len=LEN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR] [\fI\-c\fR]
 [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR]
-[\fI\-l=LEN\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR]
+[\fI\-I=FN\fR] [\fI\-l=LEN\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR]
 [\fI\-p=VPD_PG\fR] [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility by default sends a SCSI INQUIRY command to the given device and
+This utility, when \fIDEVICE\fR is given, sends a SCSI INQUIRY command to it
 then outputs the response. All SCSI devices are meant to respond to
 a "standard" INQUIRY command with at least a 36 byte response (in SCSI 2 and
 higher). An INQUIRY is termed as "standard" when both the EVPD and CmdDt (now
 obsolete) bits are clear.
+.PP
+Alternatively the \fI\-\-inhex=FN\fR option can be given. In this case
+\fIFN\fR is assumed to be a file name ('\-' for stdin) containing ASCII
+hexadecimal representing an INQUIRY response.
 .PP
 This utility supports two command line syntaxes. The preferred one is shown
 first in the synopsis and is described in the main OPTIONS section. A later
@@ -122,6 +127,14 @@ to 'hdparm \-\-Istdin'.  See note below.
 .TP
 \fB\-i\fR, \fB\-\-id\fR
 prints the device identification VPD page [0x83].
+.TP
+\fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
+\fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
+ASCII hexadecimal respresenting an INQUIRY (including VPD page) response.
+This utility will then decode that response. The hexadecimal should be
+arranged as 1 or 2 digits representing a byte each of which is whitespace
+or comma separated. Anything from and including a hash mark to the end
+of line is ignored.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.
