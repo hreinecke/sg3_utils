@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20140215] [svn: r552]
+Changelog for sg3_utils-1.38 [20140216] [svn: r553]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers
     - new --data=@FN to read hex data from file FN
