@@ -40,15 +40,15 @@ is mandatory. The \fI\-\-id\fR option decodes this page. New VPD page
 information is no longer being added to this utility. To get information
 on new VPD pages see the sg_vpd(8) or sdparm(8) utilities.
 .PP
-If the \fIDEVICE\fR exists and the SCSI INQUIRY fails (because the SG_IO ioctl
-is not supported) then an ATA IDENTIFY (PACKET) DEVICE is tried. If it
-succeeds then device identification strings are output. The \fI\-\-raw\fR
-and \fI\-\-hex\fR options can be used to manipulate the output. If the
-\fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
+In Linux, if the \fIDEVICE\fR exists and the SCSI INQUIRY fails (e.g. because
+the SG_IO ioctl is not supported) then an ATA IDENTIFY (PACKET) DEVICE is
+tried. If it succeeds then device identification strings are output. The
+\fI\-\-raw\fR and \fI\-\-hex\fR options can be used to manipulate the output.
+If the \fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
 and the \fIDEVICE\fR is assumed to be ATA (or ATAPI).
 .PP
 The reference document used for interpreting an INQUIRY is T10/1713\-D
-Revision 36e (SPC\-4, 24 August 2012) found at http://www.t10.org .
+Revision 36q (SPC\-4, 12 February 2014) found at http://www.t10.org .
 Obsolete and reserved items in the standard INQUIRY response output are
 displayed in brackets. The reference document for the ATA IDENTIFY (PACKET)
 DEVICE command is ATA8\-ACS found at http://www.t13.org .
@@ -313,6 +313,9 @@ in the OPTIONS section. This page is made up of several "designation
 descriptors". If \fI\-h\fR is given then each descriptor header is decoded
 and the identifier itself is output in hex. To see the whole VPD 0x83 page
 response in hex use '\-p=83 \-h'.
+.TP
+\fB\-I\fR=\fIFN\fR
+equivalent to \fI\-\-inhex=FN\fR in the OPTIONS section.
 .TP
 \fB\-m\fR
 decodes the Management network addresses VPD page [0x85]. Equivalent

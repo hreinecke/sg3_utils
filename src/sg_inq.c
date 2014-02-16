@@ -68,7 +68,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.27 20140213";    /* SPC-4 rev 36q */
+static const char * version_str = "1.28 20140214";    /* SPC-4 rev 36q */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -896,8 +896,8 @@ bad:
 /* Local version of sg_ll_inquiry() [found in libsgutils] that additionally
  * passes back resid. Same return values as sg_ll_inquiry() (0 is good). */
 static int
-ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
-           int mx_resp_len, int * residp, int noisy, int verbose)
+pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
+           int * residp, int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
@@ -905,8 +905,6 @@ ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
     unsigned char * up;
     struct sg_pt_base * ptvp;
 
-    if (cmddt)
-        inqCmdBlk[1] |= 2;
     if (evpd)
         inqCmdBlk[1] |= 1;
     inqCmdBlk[2] = (unsigned char)pg_op;
@@ -1141,6 +1139,75 @@ get_vpd_page_str(int vpd_page_num, int scsi_ptype)
 }
 
 static void
+decode_supported_vpd(unsigned char * buff, int len, int do_hex)
+{
+    int vpd, k, rlen, pdt;
+    const char * cp;
+
+    if (do_hex) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("Supported VPD pages VPD page length too short=%d\n", len);
+        return;
+    }
+    pdt = 0x1f & buff[0];
+    rlen = buff[3] + 4;
+    if (rlen > len)
+        pr2serr("Supported VPD pages VPD page truncated, indicates %d, got "
+                "%d\n", rlen, len);
+    else
+        len = rlen;
+    printf("   Supported VPD pages:\n");
+    for (k = 0; k < len - 4; ++k) {
+        vpd = buff[4 + k];
+        cp = get_vpd_page_str(vpd, pdt);
+        if (cp)
+            printf("     0x%x\t%s\n", vpd, cp);
+        else
+            printf("     0x%x\n", vpd);
+    }
+}
+
+/* ASCII Information VPD pages (page numbers: 0x1 to 0x7f) */
+static void
+decode_ascii_inf(unsigned char * buff, int len, int do_hex)
+{
+    int al, k, bump;
+    unsigned char * ucp;
+    unsigned char * p;
+
+    if (do_hex) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("ASCII information VPD page length too short=%d\n", len);
+        return;
+    }
+    if (4 == len)
+        return;
+    al = buff[4];
+    if ((al + 5) > len)
+        al = len - 5;
+    for (k = 0, ucp = buff + 5; k < al; k += bump, ucp += bump) {
+        p = (unsigned char *)memchr(ucp, 0, al - k);
+        if (! p) {
+            printf("  %.*s\n", al - k, (const char *)ucp);
+            break;
+        }
+        printf("  %s\n", (const char *)ucp);
+        bump = (p - ucp) + 1;
+    }
+    ucp = buff + 5 + al;
+    if (ucp < (buff + len)) {
+        printf("Vendor specific information in hex:\n");
+        dStrHex((const char *)ucp, len - (al + 5), 0);
+    }
+}
+
+static void
 decode_id_vpd(unsigned char * buff, int len, int do_hex)
 {
     if (len < 4) {
@@ -1187,6 +1254,10 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
                 len);
         return;
     }
+    if (do_hex > 2) {
+        dStrHex((const char *)buff, len, -1);
+        return;
+    }
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
@@ -1203,8 +1274,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         if (na_len > 0) {
             if (do_hex) {
                 printf("    Network address:\n");
-                dStrHex((const char *)(ucp + 4), na_len,
-                        (1 == do_hex) ? 0 : -1);
+                dStrHex((const char *)(ucp + 4), na_len, 0);
             } else
                 printf("    %s\n", ucp + 4);
         }
@@ -1228,6 +1298,10 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 
     if (len < 4) {
         pr2serr("Mode page policy VPD page length too short=%d\n", len);
+        return;
+    }
+    if (do_hex > 2) {
+        dStrHex((const char *)buff, len, -1);
         return;
     }
     len -= 4;
@@ -1262,6 +1336,10 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
 
     if (len < 4) {
         pr2serr("SCSI Ports VPD page length too short=%d\n", len);
+        return;
+    }
+    if (do_hex > 2) {
+        dStrHex((const char *)buff, len, -1);
         return;
     }
     len -= 4;
@@ -2002,7 +2080,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, 0);
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     printf("  SPT=%d GRD_CHK=%d APP_CHK=%d REF_CHK=%d\n",
@@ -2132,14 +2210,16 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
 }
 
 static void
-decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+decode_b0_vpd(unsigned char * buff, int len, int do_hex)
 {
+    int pdt;
     unsigned int u;
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
+    pdt = 0x1f & buff[0];
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 16) {
@@ -2195,14 +2275,16 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 /* VPD_BLOCK_DEV_CHARS sbc */
 /* VPD_MAN_ASS_SN ssc */
 static void
-decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+decode_b1_vpd(unsigned char * buff, int len, int do_hex)
 {
+    int pdt;
     unsigned int u;
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
+    pdt = 0x1f & buff[0];
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 64) {
@@ -2262,14 +2344,16 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 
 /* VPD_REFERRALS sbc */
 static void
-decode_b3_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+decode_b3_vpd(unsigned char * buff, int len, int do_hex)
 {
+    int pdt;
     unsigned int s, m;
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
+    pdt = 0x1f & buff[0];
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 0x10) {
@@ -2342,12 +2426,16 @@ static const char * failover_mode_arr[] =
 };
 
 static void
-decode_upr_vpd_c0_emc(unsigned char * buff, int len)
+decode_upr_vpd_c0_emc(unsigned char * buff, int len, int do_hex)
 {
     int k, ip_mgmt, vpp80, lun_z;
 
     if (len < 3) {
         pr2serr("EMC upr VPD page [0xc0]: length too short=%d\n", len);
+        return;
+    }
+    if (do_hex) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (buff[9] != 0x00) {
@@ -2416,10 +2504,14 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
 }
 
 static void
-decode_rdac_vpd_c2(unsigned char * buff, int len)
+decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
 {
     if (len < 3) {
         pr2serr("Software Version VPD page length too short=%d\n", len);
+        return;
+    }
+    if (do_hex) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (buff[4] != 's' && buff[5] != 'w' && buff[6] != 'r') {
@@ -2446,10 +2538,14 @@ decode_rdac_vpd_c2(unsigned char * buff, int len)
 }
 
 static void
-decode_rdac_vpd_c9(unsigned char * buff, int len)
+decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
 {
     if (len < 3) {
         pr2serr("Volume Access Control VPD page length too short=%d\n", len);
+        return;
+    }
+    if (do_hex) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (buff[4] != 'v' && buff[5] != 'a' && buff[6] != 'c') {
@@ -2496,32 +2592,27 @@ decode_rdac_vpd_c9(unsigned char * buff, int len)
 static int
 fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
-    int sz, len, k, res;
+    int len, k, res;
     unsigned char b[DEF_ALLOC_LEN];
 
     res = 0;
-    sz = sizeof(b);
     memset(b, 0xff, 4); /* guard against empty response */
     /* first check if unit serial number VPD page is supported */
-    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_SUPPORTED_VPDS, b, sz, 0, verbose);
+    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS, 1, verbose,
+				  &len);
     if (0 == res) {
-        if ((VPD_SUPPORTED_VPDS != b[1]) || (0x0 != b[2])) {
-            if (verbose > 2)
-                pr2serr("fetch_unit_serial_num: bad supported VPDs page\n");
-            return SG_LIB_CAT_MALFORMED;
-        }
-        len = (b[2] << 8) + b[3];       /* spc4r25 */
+	len -= 4;
         for (k = 0; k < len; ++k) {
             if (VPD_UNIT_SERIAL_NUM == b[k + 4])
                 break;
         }
         if (k < len) {
-            res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM,
-                                b, sz, 0, verbose);
+    	    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, 1,
+					  verbose, &len);
             if (0 == res) {
-                len = (b[2] << 8) + b[3];       /* spc4r25 */
+                len -= 4;
                 len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
-                if ((VPD_UNIT_SERIAL_NUM == b[1]) && (len > 0)) {
+                if (len > 0) {
                     memcpy(obuff, b + 4, len);
                     obuff[len] = '\0';
                     return 0;
@@ -2743,14 +2834,14 @@ std_inq_process(int sg_fd, const struct opts_t * op)
 
     rlen = (op->resp_len > 0) ? op->resp_len : SAFE_STD_INQ_RESP_LEN;
     verb = op->do_verbose;
-    res = ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, &resid, 0, verb);
+    res = pt_inquiry(sg_fd, 0, 0, rsp_buff, rlen, &resid, 0, verb);
     if (0 == res) {
         len = rsp_buff[4] + 5;
         if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) &&
             (0 == op->resp_len)) {
             rlen = len;
             memset(rsp_buff, 0, rlen);
-            if (ll_inquiry(sg_fd, 0, 0, 0, rsp_buff, rlen, &resid, 1, verb)) {
+            if (pt_inquiry(sg_fd, 0, 0, rsp_buff, rlen, &resid, 1, verb)) {
                 pr2serr("second INQUIRY (%d byte) failed\n", len);
                 return SG_LIB_CAT_OTHER;
             }
@@ -2941,58 +3032,82 @@ cmddt_process(int sg_fd, const struct opts_t * op)
 #endif /* SG_SCSI_STRINGS */
 
 
+static int
+vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
+                        int short_len, int vb, int * rlenp)
+{
+    int res, resid, rlen, len;
+
+    res = pt_inquiry(sg_fd, 1, page, rp, DEF_ALLOC_LEN, &resid, 1, vb);
+    if (res)
+        return res;
+    rlen = DEF_ALLOC_LEN - resid;
+    if (rlen < 4) {
+        pr2serr("VPD response too short (len=%d)\n", rlen);
+        return SG_LIB_CAT_MALFORMED;
+    }
+    if (page != rp[1]) {
+        pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
+                "response\n");
+        return SG_LIB_CAT_MALFORMED;
+    }
+    if (short_len)
+        len = rp[3] + 4;
+    else
+        len = ((rp[2] << 8) + rp[3]) + 4;
+    if (len <= rlen) {
+        if (rlenp)
+            *rlenp = len;
+        return 0;
+    } else if ((len <= DEF_ALLOC_LEN) && short_len) {
+        if (rlenp)
+            *rlenp = rlen;
+        return 0;
+    }
+    if (len > MX_ALLOC_LEN) {
+        pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
+        return SG_LIB_CAT_MALFORMED;
+    } else {
+        res = pt_inquiry(sg_fd, 1, page, rp, len, &resid, 1, vb);
+        if (res)
+            return res;
+        rlen = len - resid;
+        /* assume it is well behaved: hence page and len still same */
+        if (rlenp)
+            *rlenp = rlen;
+        return 0;
+    }
+}
+
 /* Returns 0 if successful */
 static int
 vpd_mainly_hex(int sg_fd, const struct opts_t * op)
 {
-    int res, len, num, k, peri_type, vpd;
+    int res, len;
+    char b[48];
     const char * cp;
-    char buff[48];
+    unsigned char * rp;
 
-    memset(rsp_buff, 0, DEF_ALLOC_LEN);
-    if (! op->do_raw)
+    rp = rsp_buff;
+    memset(rp, 0, DEF_ALLOC_LEN);
+    if ((! op->do_raw) && (op->do_hex < 2))
         printf("VPD INQUIRY, page code=0x%.2x:\n", op->page_num);
-    res = sg_ll_inquiry(sg_fd, 0, 1, op->page_num, rsp_buff,
-                        DEF_ALLOC_LEN, 1, op->do_verbose);
+    res = vpd_fetch_page_from_dev(sg_fd, rp, op->page_num, 0, op->do_verbose,
+                                  &len);
     if (0 == res) {
-        len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-        if (op->page_num != rsp_buff[1]) {
-            pr2serr("invalid VPD response; probably a STANDARD "
-                    "INQUIRY response\n");
-            return SG_LIB_CAT_MALFORMED;
-        }
-        if (len > MX_ALLOC_LEN) {
-            pr2serr("response length too long: %d > %d\n", len,
-                   MX_ALLOC_LEN);
-            return SG_LIB_CAT_MALFORMED;
-        } else if (len > DEF_ALLOC_LEN) {
-            if (sg_ll_inquiry(sg_fd, 0, 1, op->page_num, rsp_buff, len, 1,
-                              op->do_verbose))
-                return SG_LIB_CAT_OTHER;
-        }
         if (op->do_raw)
-            dStrRaw((const char *)rsp_buff, len);
+            dStrRaw((const char *)rp, len);
         else {
-            if (op->do_hex)
-                dStrHex((const char *)rsp_buff, len,
-                        (1 == op->do_hex) ? 0 : -1);
-            else if (0 == op->page_num) { /* decode this mandatory page */
-                peri_type = rsp_buff[0] & 0x1f;
-                printf("   [PQual=%d  Peripheral device type: %s]\n",
-                       (rsp_buff[0] & 0xe0) >> 5,
-                       sg_get_pdt_str(peri_type, sizeof(buff), buff));
-                printf("   Supported VPD pages:\n");
-                num = rsp_buff[3];
-                for (k = 0; k < num; ++k) {
-                    vpd = rsp_buff[4 + k];
-                    cp = get_vpd_page_str(vpd, peri_type);
-                    if (cp)
-                        printf("     0x%x\t%s\n", vpd, cp);
-                    else
-                        printf("     0x%x\n", vpd);
+            if (0 == op->page_num)
+                decode_supported_vpd(rp, len, op->do_hex);
+            else {
+                if (op->do_hex < 2) {
+                    cp = sg_get_pdt_str(rp[0] & 0x1f, sizeof(b), b);
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rp[0] & 0xe0) >> 5, cp);
                 }
-            } else
-                dStrHex((const char *)rsp_buff, len, 0);
+                dStrHex((const char *)rp, len, ((1 == op->do_hex) ? 0 : -1));
+            }
         }
     } else {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -3006,6 +3121,8 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op)
             pr2serr("    inquiry: unit attention (?)\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
             pr2serr("    inquiry: aborted command\n");
+        else if (SG_LIB_CAT_MALFORMED == res)
+            pr2serr("    inquiry: malformed response\n");
         else
             pr2serr("    inquiry: failed, res=%d\n", res);
     }
@@ -3016,7 +3133,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op)
 static int
 vpd_response(const struct opts_t * op, int rlen)
 {
-    int len, pdt;
+    int len, pdt, pn;
     unsigned char * rp;
     const struct svpd_values_name_t * vnp;
 
@@ -3025,21 +3142,36 @@ vpd_response(const struct opts_t * op, int rlen)
         pr2serr("INQUIRY VPD response too short\n");
         return SG_LIB_CAT_MALFORMED;
     }
-    if (op->page_num != rp[1]) {
+    pn = op->page_num;
+    if (pn != rp[1]) {
         if (op->page_arg) {
             vnp = sdp_find_vpd_by_acron(op->page_arg);
             if (vnp) {
-                pr2serr("requested %s VPD page [0x%x]\n   but FN is for page "
-                        "number 0x%x\n", vnp->name, vnp->value, rp[1]);
+                pr2serr("requested %s VPD page [0x%x]\n   but --inhex is "
+                        "for page number 0x%x\n", vnp->name, vnp->value,
+                        rp[1]);
                 return SG_LIB_CAT_MALFORMED;
             }
         }
         pr2serr("requested VPD page number [0x%x] differs from that in FN "
-                "[0x%x]\n", op->page_num, rp[1]);
+                "[0x%x]\n", pn, rp[1]);
         return SG_LIB_CAT_MALFORMED;
     }
 
-    switch (op->page_num) {
+    switch (pn) {
+    case VPD_SUPPORTED_VPDS:
+        if (! op->do_raw && ! op->do_export && (op->do_hex < 2))
+            printf("VPD INQUIRY: Supported VPD pages page\n");
+        len = ((rp[2] << 8) + rp[3]) + 4; /* spc4r25 */
+        if (len > rlen) {
+            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
+            len = rlen;
+        }
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_supported_vpd(rp, len, op->do_hex);
+        break;
     case VPD_UNIT_SERIAL_NUM:
         if (! op->do_raw && ! op->do_export && (op->do_hex < 2))
             printf("VPD INQUIRY: Unit serial number page\n");
@@ -3198,7 +3330,7 @@ vpd_response(const struct opts_t * op, int rlen)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else
-            decode_b0_vpd(rp, len, op->do_hex, pdt);
+            decode_b0_vpd(rp, len, op->do_hex);
         break;
     case 0xb1:  /* VPD pages in B0h to BFh range depend on pdt */
         pdt = rp[0] & 0x1f;
@@ -3232,7 +3364,7 @@ vpd_response(const struct opts_t * op, int rlen)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else
-            decode_b1_vpd(rp, len, op->do_hex, pdt);
+            decode_b1_vpd(rp, len, op->do_hex);
         break;
     case 0xb2:  /* VPD pages in B0h to BFh range depend on pdt */
         pr2serr(" Only hex output supported. sg_vpd decodes the B2h page.\n");
@@ -3257,7 +3389,7 @@ vpd_response(const struct opts_t * op, int rlen)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else
-            decode_b3_vpd(rp, len, op->do_hex, pdt);
+            decode_b3_vpd(rp, len, op->do_hex);
         break;
     case VPD_UPR_EMC:   /* 0xc0 */
         if (!op->do_raw && (op->do_hex < 2))
@@ -3269,10 +3401,8 @@ vpd_response(const struct opts_t * op, int rlen)
         }
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
-        else if (op->do_hex)
-            dStrHex((const char *)rp, len, (1 == op->do_hex) ? 1 : -1);
         else
-            decode_upr_vpd_c0_emc(rp, len);
+            decode_upr_vpd_c0_emc(rp, len, op->do_hex);
         break;
     case VPD_RDAC_VERS:         /* 0xc2 */
         if (!op->do_raw && (op->do_hex < 2))
@@ -3284,10 +3414,8 @@ vpd_response(const struct opts_t * op, int rlen)
         }
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
-        else if (op->do_hex)
-            dStrHex((const char *)rp, len, (1 == op->do_hex) ? 1 : -1);
         else
-            decode_rdac_vpd_c2(rp, len);
+            decode_rdac_vpd_c2(rp, len, op->do_hex);
         break;
     case VPD_RDAC_VAC:          /* 0xc9 */
         if (!op->do_raw && (op->do_hex < 2))
@@ -3299,10 +3427,8 @@ vpd_response(const struct opts_t * op, int rlen)
         }
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
-        else if (op->do_hex)
-            dStrHex((const char *)rp, len, (1 == op->do_hex) ? 1 : -1);
         else
-            decode_rdac_vpd_c9(rp, len);
+            decode_rdac_vpd_c9(rp, len, op->do_hex);
         break;
     case VPD_SCSI_PORTS:
         if (!op->do_raw && (op->do_hex < 2))
@@ -3318,253 +3444,171 @@ vpd_response(const struct opts_t * op, int rlen)
             decode_scsi_ports_vpd(rp, len, op->do_hex);
         break;
     default:
-        printf(" Only hex output supported. sg_vpd and sdparm decode more "
-               "VPD pages.\n");
-        return SG_LIB_CAT_OTHER;
+        if ((pn > 0) && (pn < 0x80)) {
+            if (!op->do_raw && (op->do_hex < 2))
+                printf("VPD INQUIRY: ASCII information page, FRU code=0x%x\n",
+                       pn);
+            len = ((rp[2] << 8) + rp[3]) + 4;
+            if (len > rlen) {
+                pr2serr("truncated VPD page in inhex file (%s)\n",
+                        op->inhex_fn);
+                len = rlen;
+            }
+            if (op->do_raw)
+                dStrRaw((const char *)rp, len);
+            else
+                decode_ascii_inf(rp, len, op->do_hex);
+        } else {
+            pr2serr(" Only hex output supported. sg_vpd and sdparm decode "
+                    "more VPD pages.\n");
+            return SG_LIB_CAT_OTHER;
+        }
     }
     return 0;
 }
 
 /* Returns 0 if successful */
 static int
-decode_vpd(int sg_fd, const struct opts_t * op)
+vpd_get_and_decode(int sg_fd, const struct opts_t * op)
 {
-    int len, pdt;
+    int len, pdt, pn, vb;
     int res = 0;
+    unsigned char * rp;
 
-    switch (op->page_num) {
+    pn = op->page_num;
+    rp = rsp_buff;
+    vb = op->do_verbose;
+    switch (pn) {
+    case VPD_SUPPORTED_VPDS:
+        if (!op->do_raw && (op->do_hex < 2))
+            printf("VPD INQUIRY: Supported VPD pages page\n");
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else if (op->do_hex)
+            dStrHex((const char *)rp, len,
+                    (1 == op->do_hex) ? 0 : -1);
+        else
+            decode_supported_vpd(rp, len, 0x1f & rp[0]);
+        break;
     case VPD_UNIT_SERIAL_NUM:
         if (! op->do_raw && ! op->do_export && (op->do_hex < 2))
             printf("VPD INQUIRY: Unit serial number page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UNIT_SERIAL_NUM, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
-            if (VPD_UNIT_SERIAL_NUM != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else if (op->do_hex)
-                dStrHex((const char *)rsp_buff, len,
-                        (1 == op->do_hex) ? 0 : -1);
-            else {
-                char obuff[DEF_ALLOC_LEN];
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else if (op->do_hex)
+            dStrHex((const char *)rp, len,
+                    (1 == op->do_hex) ? 0 : -1);
+        else {
+            char obuff[DEF_ALLOC_LEN];
 
-                memset(obuff, 0, sizeof(obuff));
-                len -= 4;
-                if (len >= (int)sizeof(obuff))
-                    len = sizeof(obuff) - 1;
-                memcpy(obuff, rsp_buff + 4, len);
-                if (op->do_export) {
-                    len = encode_whitespaces((unsigned char *)obuff, len);
-                    printf("SCSI_IDENT_SERIAL=%s\n", obuff);
-                } else {
-                    printf("  Unit serial number: %s\n", obuff);
-                }
+            memset(obuff, 0, sizeof(obuff));
+            len -= 4;
+            if (len >= (int)sizeof(obuff))
+                len = sizeof(obuff) - 1;
+            memcpy(obuff, rp + 4, len);
+            if (op->do_export) {
+                len = encode_whitespaces((unsigned char *)obuff, len);
+                printf("SCSI_IDENT_SERIAL=%s\n", obuff);
+            } else {
+                printf("  Unit serial number: %s\n", obuff);
             }
         }
         break;
     case VPD_DEVICE_ID:
         if (! op->do_raw && ! op->do_export && (op->do_hex < 3))
             printf("VPD INQUIRY: Device Identification page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (VPD_DEVICE_ID != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff, len,
-                                  1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else if (op->do_hex > 2)
-                dStrHex((const char *)rsp_buff, len, -1);
-            else if (op->do_export) {
-                if (len < 4) {
-                    pr2serr("Device identification page length too "
-                            "short=%d\n", len);
-                } else {
-                    export_dev_ids(rsp_buff + 4, len - 4);
-                }
-            } else
-                decode_id_vpd(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else if (op->do_hex > 2)
+            dStrHex((const char *)rp, len, -1);
+        else if (op->do_export)
+            export_dev_ids(rp + 4, len - 4);
+        else
+            decode_id_vpd(rp, len, op->do_hex);
         break;
     case VPD_SOFTW_INF_ID:
         if (! op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Software interface identification page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_SOFTW_INF_ID, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4; /* spc4r25 */
-            if (VPD_SOFTW_INF_ID != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
-                decode_softw_inf_id(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_softw_inf_id(rp, len, op->do_hex);
         break;
     case VPD_MAN_NET_ADDR:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Management network addresses page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_MAN_NET_ADDR, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (VPD_MAN_NET_ADDR != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_MAN_NET_ADDR, rsp_buff,
-                                  len, 1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
-                decode_net_man_vpd(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_net_man_vpd(rp, len, op->do_hex);
         break;
     case VPD_MODE_PG_POLICY:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Mode page policy\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_MODE_PG_POLICY, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (VPD_MODE_PG_POLICY != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                       MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_MODE_PG_POLICY, rsp_buff,
-                                  len, 1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
-                decode_mode_policy_vpd(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_mode_policy_vpd(rp, len, op->do_hex);
         break;
     case VPD_EXT_INQ:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: extended INQUIRY data page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_EXT_INQ, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (VPD_EXT_INQ != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_EXT_INQ, rsp_buff, len,
-                                  1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
-                decode_x_inq_vpd(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_x_inq_vpd(rp, len, op->do_hex);
         break;
     case VPD_ATA_INFO:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: ATA information page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_ATA_INFO, rsp_buff,
-                            VPD_ATA_INFO_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (VPD_ATA_INFO != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > VPD_ATA_INFO_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_ATA_INFO, rsp_buff, len,
-                                  1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            /* format output for 'hdparm --Istdin' with '-rr' or '-HHH' */
-            if ((2 == op->do_raw) || (3 == op->do_hex))
-                dWordHex((const unsigned short *)(rsp_buff + 60),
-                         256, -2, sg_is_big_endian());
-            else if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
-                decode_ata_info_vpd(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        /* format output for 'hdparm --Istdin' with '-rr' or '-HHH' */
+        if ((2 == op->do_raw) || (3 == op->do_hex))
+            dWordHex((const unsigned short *)(rp + 60), 256, -2,
+                     sg_is_big_endian());
+        else if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_ata_info_vpd(rp, len, op->do_hex);
         break;
     case VPD_POWER_CONDITION:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Power condition page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_POWER_CONDITION, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (VPD_POWER_CONDITION != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_POWER_CONDITION, rsp_buff,
-                                  len, 1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
-                decode_power_condition(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_power_condition(rp, len, op->do_hex);
         break;
     case 0xb0:  /* VPD pages in B0h to BFh range depend on pdt */
-        res = sg_ll_inquiry(sg_fd, 0, 1, 0xb0, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
         if (0 == res) {
-            pdt = rsp_buff[0] & 0x1f;
+            pdt = rp[0] & 0x1f;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
@@ -3582,33 +3626,17 @@ decode_vpd(int sg_fd, const struct opts_t * op)
                     break;
                 }
             }
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (0xb0 != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, 0xb0, rsp_buff,
-                                  len, 1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
             if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
+                dStrRaw((const char *)rp, len);
             else
-                decode_b0_vpd(rsp_buff, len, op->do_hex, pdt);
+                decode_b0_vpd(rp, len, op->do_hex);
         } else if (! op->do_raw)
-            printf("VPD INQUIRY: page=0xb0\n");
+            pr2serr("VPD INQUIRY: page=0xb0\n");
         break;
     case 0xb1:  /* VPD pages in B0h to BFh range depend on pdt */
-        res = sg_ll_inquiry(sg_fd, 0, 1, 0xb1, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
         if (0 == res) {
-            pdt = rsp_buff[0] & 0x1f;
+            pdt = rp[0] & 0x1f;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
@@ -3631,36 +3659,22 @@ decode_vpd(int sg_fd, const struct opts_t * op)
                     break;
                 }
             }
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (0xb1 != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, 0xb1, rsp_buff,
-                                  len, 1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
             if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
+                dStrRaw((const char *)rp, len);
             else
-                decode_b1_vpd(rsp_buff, len, op->do_hex, pdt);
+                decode_b1_vpd(rp, len, op->do_hex);
         } else if (! op->do_raw)
-            printf("VPD INQUIRY: page=0xb1\n");
+            pr2serr("VPD INQUIRY: page=0xb1\n");
         break;
     case 0xb2:  /* VPD pages in B0h to BFh range depend on pdt */
-        printf(" Only hex output supported. sg_vpd decodes the B2h page.\n");
+        if (!op->do_raw && (op->do_hex < 2))
+            pr2serr(" Only hex output supported. sg_vpd decodes the B2h "
+                    "page.\n");
         return vpd_mainly_hex(sg_fd, op);
     case 0xb3:  /* VPD pages in B0h to BFh range depend on pdt */
-        res = sg_ll_inquiry(sg_fd, 0, 1, 0xb3, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
         if (0 == res) {
-            pdt = rsp_buff[0] & 0x1f;
+            pdt = rp[0] & 0x1f;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
@@ -3671,147 +3685,75 @@ decode_vpd(int sg_fd, const struct opts_t * op)
                     break;
                 }
             }
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (0xb3 != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, 0xb3, rsp_buff,
-                                  len, 1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
             if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
+                dStrRaw((const char *)rp, len);
             else
-                decode_b3_vpd(rsp_buff, len, op->do_hex, pdt);
+                decode_b3_vpd(rp, len, op->do_hex);
         } else if (! op->do_raw)
-            printf("VPD INQUIRY: page=0xb3\n");
+            pr2serr("VPD INQUIRY: page=0xb3\n");
         break;
     case VPD_UPR_EMC:   /* 0xc0 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Unit Path Report Page (EMC)\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_UPR_EMC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = rsp_buff[3] + 4;
-            if (VPD_UPR_EMC != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably not "
-                        "supported\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_UPR_EMC, rsp_buff, len, 1,
-                           op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else if (op->do_hex)
-                dStrHex((const char *)rsp_buff, len,
-                        (1 == op->do_hex) ? 1 : -1);
-            else
-                decode_upr_vpd_c0_emc(rsp_buff, len);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 1, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_upr_vpd_c0_emc(rp, len, op->do_hex);
         break;
     case VPD_RDAC_VERS:         /* 0xc2 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Software Version (RDAC)\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VERS, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = rsp_buff[3] + 4;
-            if (VPD_RDAC_VERS != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably not supported\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VERS, rsp_buff, len, 1,
-                           op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else if (op->do_hex)
-                dStrHex((const char *)rsp_buff, len,
-                        (1 == op->do_hex) ? 1 : -1);
-            else
-                decode_rdac_vpd_c2(rsp_buff, len);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 1, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_rdac_vpd_c2(rp, len, op->do_hex);
         break;
     case VPD_RDAC_VAC:          /* 0xc9 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Volume Access Control (RDAC)\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VAC, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = rsp_buff[3] + 4;
-            if (VPD_RDAC_VAC != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably not supported\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_RDAC_VAC, rsp_buff, len, 1,
-                           op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else if (op->do_hex)
-                dStrHex((const char *)rsp_buff, len,
-                        (1 == op->do_hex) ? 1 : -1);
-            else
-                decode_rdac_vpd_c9(rsp_buff, len);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 1, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_rdac_vpd_c9(rp, len, op->do_hex);
         break;
     case VPD_SCSI_PORTS:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: SCSI Ports page\n");
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_SCSI_PORTS, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
-        if (0 == res) {
-            len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
-            if (VPD_SCSI_PORTS != rsp_buff[1]) {
-                pr2serr("invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
-                return SG_LIB_CAT_MALFORMED;
-            }
-            if (len > MX_ALLOC_LEN) {
-                pr2serr("response length too long: %d > %d\n", len,
-                        MX_ALLOC_LEN);
-                return SG_LIB_CAT_MALFORMED;
-            } else if (len > DEF_ALLOC_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_SCSI_PORTS, rsp_buff, len,
-                                  1, op->do_verbose))
-                    return SG_LIB_CAT_OTHER;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rsp_buff, len);
-            else
-                decode_scsi_ports_vpd(rsp_buff, len, op->do_hex);
-        }
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_scsi_ports_vpd(rp, len, op->do_hex);
         break;
     default:
-        printf(" Only hex output supported. sg_vpd and sdparm decode more "
-               "VPD pages.\n");
-        return vpd_mainly_hex(sg_fd, op);
+        if ((pn > 0) && (pn < 0x80)) {
+            if (!op->do_raw && (op->do_hex < 2))
+                printf("VPD INQUIRY: ASCII information page, FRU code=0x%x\n",
+                       pn);
+            res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+            if (0 == res) {
+                if (op->do_raw)
+                    dStrRaw((const char *)rp, len);
+                else
+                    decode_ascii_inf(rp, len, op->do_hex);
+            }
+        } else {
+            if (op->do_hex < 2)
+                pr2serr(" Only hex output supported. sg_vpd and sdparm "
+                        "decode more VPD pages.\n");
+            return vpd_mainly_hex(sg_fd, op);
+        }
     }
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -3825,6 +3767,8 @@ decode_vpd(int sg_fd, const struct opts_t * op)
             pr2serr("    inquiry: unit attention (?)\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
             pr2serr("    inquiry: aborted command\n");
+        else if (SG_LIB_CAT_MALFORMED == res)
+            pr2serr("    inquiry: malformed response\n");
         else
             pr2serr("    inquiry: failed, res=%d\n", res);
     }
@@ -3837,6 +3781,7 @@ main(int argc, char * argv[])
 {
     int sg_fd, res, n;
     int ret = 0;
+    int inhex_len = 0;
     const struct svpd_values_name_t * vnp;
     struct opts_t opts;
     struct opts_t * op;
@@ -3928,6 +3873,45 @@ main(int argc, char * argv[])
             op->page_num = n;
         }
     }
+    if (op->inhex_fn) {
+        if (op->device_name) {
+            pr2serr("Cannot have both a DEVICE and --inhex= option\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (op->do_cmddt) {
+            pr2serr("Don't support --cmddt with --inhex= option\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (f2hex_arr(op->inhex_fn, 0, rsp_buff, &inhex_len,
+                      sizeof(rsp_buff)))
+            return SG_LIB_FILE_ERROR;
+        if (-1 == op->page_num) {       /* may be able to deduce VPD page */
+            if ((0x2 == (0xf & rsp_buff[3])) && (rsp_buff[2] > 2)) {
+                if (op->do_verbose)
+                    pr2serr("Guessing from --inhex= this is a standard "
+                            "INQUIRY\n");
+                if (op->page_pdt < 0)
+                    op->page_pdt = 0x1f & rsp_buff[0];
+            } else if (rsp_buff[2] < 2) {
+                if (op->do_verbose)
+                    pr2serr("Guessing from --inhex this is VPD page 0x%x\n",
+                            rsp_buff[1]);
+                op->page_num = rsp_buff[1];
+                if (op->page_pdt < 0)
+                    op->page_pdt = 0x1f & rsp_buff[0];
+                ++op->do_decode;
+                ++op->do_vpd;
+            } else {
+                if (op->do_verbose)
+                    pr2serr("page number unclear from --inhex, hope it's a "
+                            "standard INQUIRY\n");
+            }
+        }
+    } else if (0 == op->device_name) {
+        pr2serr("No DEVICE argument given\n");
+        usage_for(op);
+        return SG_LIB_SYNTAX_ERROR;
+    }
     if (op->do_export) {
         if (op->page_num != -1) {
             if (op->page_num != VPD_DEVICE_ID &&
@@ -3985,31 +3969,17 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (op->inhex_fn) {
-        if (op->device_name) {
-            pr2serr("Cannot have both a DEVICE and --inhex= option\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (op->do_cmddt) {
-            pr2serr("Don't support --cmddt with --inhex= option\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (f2hex_arr(op->inhex_fn, 0, rsp_buff, &n, sizeof(rsp_buff)))
-            return SG_LIB_FILE_ERROR;
-        if (op->do_vpd)
-            return vpd_response(op, n);
-        else
-            return std_inq_response(op, n);
-    } else if (0 == op->device_name) {
-        pr2serr("No DEVICE argument given\n");
-        usage_for(op);
-        return SG_LIB_SYNTAX_ERROR;
-    }
     if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
             return SG_LIB_FILE_ERROR;
         }
+    }
+    if (op->inhex_fn) {
+        if (op->do_vpd)
+            return vpd_response(op, inhex_len);
+        else
+            return std_inq_response(op, inhex_len);
     }
 
 #if defined(O_NONBLOCK) && defined(O_RDONLY)
@@ -4067,7 +4037,7 @@ main(int argc, char * argv[])
             goto err_out;
     } else if (op->do_vpd) {
         if (op->do_decode) {
-            ret = decode_vpd(sg_fd, op);
+            ret = vpd_get_and_decode(sg_fd, op);
             if (ret)
                 goto err_out;
         } else {
