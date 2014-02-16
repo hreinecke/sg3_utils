@@ -2587,51 +2587,6 @@ decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
     return;
 }
 
-/* Returns 0 if Unit Serial Number VPD page contents found, else see
-   sg_ll_inquiry() return values */
-static int
-fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
-{
-    int len, k, res;
-    unsigned char b[DEF_ALLOC_LEN];
-
-    res = 0;
-    memset(b, 0xff, 4); /* guard against empty response */
-    /* first check if unit serial number VPD page is supported */
-    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS, 1, verbose,
-				  &len);
-    if (0 == res) {
-	len -= 4;
-        for (k = 0; k < len; ++k) {
-            if (VPD_UNIT_SERIAL_NUM == b[k + 4])
-                break;
-        }
-        if (k < len) {
-    	    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, 1,
-					  verbose, &len);
-            if (0 == res) {
-                len -= 4;
-                len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
-                if (len > 0) {
-                    memcpy(obuff, b + 4, len);
-                    obuff[len] = '\0';
-                    return 0;
-                } else {
-                    if (verbose > 2)
-                        pr2serr("fetch_unit_serial_num: bad sn VPD page\n");
-                    return SG_LIB_CAT_MALFORMED;
-                }
-            }
-        } else {
-            if (verbose > 2)
-                pr2serr("fetch_unit_serial_num: no supported VPDs page\n");
-            return SG_LIB_CAT_MALFORMED;
-        }
-    } else if (verbose > 2)
-        pr2serr("fetch_unit_serial_num: fetch supported VPDs failed\n");
-    return res;
-}
-
 extern const char * sg_ansi_version_arr[];
 
 static const char *
@@ -2821,6 +2776,98 @@ std_inq_response(const struct opts_t * op, int act_len)
         }
     }
     return 0;
+}
+
+static int
+vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
+                        int short_len, int vb, int * rlenp)
+{
+    int res, resid, rlen, len;
+
+    res = pt_inquiry(sg_fd, 1, page, rp, DEF_ALLOC_LEN, &resid, 1, vb);
+    if (res)
+        return res;
+    rlen = DEF_ALLOC_LEN - resid;
+    if (rlen < 4) {
+        pr2serr("VPD response too short (len=%d)\n", rlen);
+        return SG_LIB_CAT_MALFORMED;
+    }
+    if (page != rp[1]) {
+        pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
+                "response\n");
+        return SG_LIB_CAT_MALFORMED;
+    }
+    if (short_len)
+        len = rp[3] + 4;
+    else
+        len = ((rp[2] << 8) + rp[3]) + 4;
+    if (len <= rlen) {
+        if (rlenp)
+            *rlenp = len;
+        return 0;
+    } else if ((len <= DEF_ALLOC_LEN) && short_len) {
+        if (rlenp)
+            *rlenp = rlen;
+        return 0;
+    }
+    if (len > MX_ALLOC_LEN) {
+        pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
+        return SG_LIB_CAT_MALFORMED;
+    } else {
+        res = pt_inquiry(sg_fd, 1, page, rp, len, &resid, 1, vb);
+        if (res)
+            return res;
+        rlen = len - resid;
+        /* assume it is well behaved: hence page and len still same */
+        if (rlenp)
+            *rlenp = rlen;
+        return 0;
+    }
+}
+
+/* Returns 0 if Unit Serial Number VPD page contents found, else see
+   sg_ll_inquiry() return values */
+static int
+fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
+{
+    int len, k, res;
+    unsigned char b[DEF_ALLOC_LEN];
+
+    res = 0;
+    memset(b, 0xff, 4); /* guard against empty response */
+    /* first check if unit serial number VPD page is supported */
+    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS, 1, verbose,
+                                  &len);
+    if (0 == res) {
+        len -= 4;
+        for (k = 0; k < len; ++k) {
+            if (VPD_UNIT_SERIAL_NUM == b[k + 4])
+                break;
+        }
+        if (k < len) {
+            res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, 1,
+                                          verbose, &len);
+            if (0 == res) {
+                len -= 4;
+                len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
+                if (len > 0) {
+                    memcpy(obuff, b + 4, len);
+                    obuff[len] = '\0';
+                    return 0;
+                } else {
+                    if (verbose > 2)
+                        pr2serr("fetch_unit_serial_num: bad sn VPD page\n");
+                    return SG_LIB_CAT_MALFORMED;
+                }
+            }
+        } else {
+            if (verbose > 2)
+                pr2serr("fetch_unit_serial_num: no supported VPDs page\n");
+            return SG_LIB_CAT_MALFORMED;
+        }
+    } else if (verbose > 2)
+        pr2serr("fetch_unit_serial_num: fetch supported VPDs failed\n");
+    return res;
 }
 
 
@@ -3031,53 +3078,6 @@ cmddt_process(int sg_fd, const struct opts_t * op)
 
 #endif /* SG_SCSI_STRINGS */
 
-
-static int
-vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
-                        int short_len, int vb, int * rlenp)
-{
-    int res, resid, rlen, len;
-
-    res = pt_inquiry(sg_fd, 1, page, rp, DEF_ALLOC_LEN, &resid, 1, vb);
-    if (res)
-        return res;
-    rlen = DEF_ALLOC_LEN - resid;
-    if (rlen < 4) {
-        pr2serr("VPD response too short (len=%d)\n", rlen);
-        return SG_LIB_CAT_MALFORMED;
-    }
-    if (page != rp[1]) {
-        pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
-                "response\n");
-        return SG_LIB_CAT_MALFORMED;
-    }
-    if (short_len)
-        len = rp[3] + 4;
-    else
-        len = ((rp[2] << 8) + rp[3]) + 4;
-    if (len <= rlen) {
-        if (rlenp)
-            *rlenp = len;
-        return 0;
-    } else if ((len <= DEF_ALLOC_LEN) && short_len) {
-        if (rlenp)
-            *rlenp = rlen;
-        return 0;
-    }
-    if (len > MX_ALLOC_LEN) {
-        pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
-        return SG_LIB_CAT_MALFORMED;
-    } else {
-        res = pt_inquiry(sg_fd, 1, page, rp, len, &resid, 1, vb);
-        if (res)
-            return res;
-        rlen = len - resid;
-        /* assume it is well behaved: hence page and len still same */
-        if (rlenp)
-            *rlenp = rlen;
-        return 0;
-    }
-}
 
 /* Returns 0 if successful */
 static int
