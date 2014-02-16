@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -119,6 +120,27 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {0, 0, 0, NULL, NULL},
 };
 
+
+#ifdef __GNUC__
+static int pr2serr(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2serr(const char * fmt, ...);
+#endif
+
+
+static int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 static const struct svpd_values_name_t *
 svpd_get_v_detail(int page_num, int subvalue, int pdt)
 {
@@ -204,8 +226,8 @@ decode_vpd_c0_hp3par(unsigned char * buff, int len)
     long offset;
 
     if (len < 24) {
-        fprintf(stderr, "HP/3PAR vendor specific VPD page length too "
-                "short=%d\n", len);
+        pr2serr("HP/3PAR vendor specific VPD page length too short=%d\n",
+                len);
         return;
     }
 
@@ -277,8 +299,8 @@ static void
 decode_firm_vpd_c0_sea(unsigned char * buff, int len)
 {
     if (len < 28) {
-        fprintf(stderr, "Seagate firmware numbers VPD page length too "
-                "short=%d\n", len);
+        pr2serr("Seagate firmware numbers VPD page length too short=%d\n",
+                len);
         return;
     }
     if (28 == len) {
@@ -360,13 +382,12 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
     int k, ip_mgmt, vpp80, lun_z;
 
     if (len < 3) {
-        fprintf(stderr, "EMC upr VPD page [0xc0]: length too short=%d\n",
-                len);
+        pr2serr("EMC upr VPD page [0xc0]: length too short=%d\n", len);
         return;
     }
     if (buff[9] != 0x00) {
-        fprintf(stderr, "Unsupported page revision %d, decoding not "
-                "possible.\n" , buff[9]);
+        pr2serr("Unsupported page revision %d, decoding not possible.\n",
+                buff[9]);
         return;
     }
     printf("  LUN WWN: ");
@@ -436,13 +457,12 @@ decode_rdac_vpd_c0(unsigned char * buff, int len)
     char name[65];
 
     if (len < 3) {
-        fprintf(stderr, "Hardware Version VPD page length too "
-                "short=%d\n", len);
+        pr2serr("Hardware Version VPD page length too short=%d\n", len);
         return;
     }
     if (buff[4] != 'h' && buff[5] != 'w' && buff[6] != 'r') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
     printf("  Number of channels: %x\n", buff[8]);
@@ -483,13 +503,12 @@ decode_rdac_vpd_c1(unsigned char * buff, int len)
     char part[5];
 
     if (len < 3) {
-        fprintf(stderr, "Firmware Version VPD page length too "
-                "short=%d\n", len);
+        pr2serr("Firmware Version VPD page length too short=%d\n", len);
         return;
     }
     if (buff[4] != 'f' && buff[5] != 'w' && buff[6] != 'r') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
     printf("  Firmware Version: %x.%x.%x\n", buff[8], buff[9], buff[10]);
@@ -526,13 +545,12 @@ decode_rdac_vpd_c2(unsigned char * buff, int len)
     char part[5];
 
     if (len < 3) {
-        fprintf(stderr, "Software Version VPD page length too "
-                "short=%d\n", len);
+        pr2serr("Software Version VPD page length too short=%d\n", len);
         return;
     }
     if (buff[4] != 's' && buff[5] != 'w' && buff[6] != 'r') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
     printf("  Software Version: %x.%x.%x\n", buff[8], buff[9], buff[10]);
@@ -579,13 +597,12 @@ static void
 decode_rdac_vpd_c3(unsigned char * buff, int len)
 {
     if (len < 0x2c) {
-        fprintf(stderr, "Feature parameters VPD page length too "
-                "short=%d\n", len);
+        pr2serr("Feature parameters VPD page length too short=%d\n", len);
         return;
     }
     if (buff[4] != 'p' && buff[5] != 'r' && buff[6] != 'm') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
     printf("  Maximum number of drives per LUN: %d\n", buff[8]);
@@ -605,13 +622,12 @@ decode_rdac_vpd_c4(unsigned char * buff, int len)
     char slot_id[3];
 
     if (len < 0x1c) {
-        fprintf(stderr, "Subsystem identifier VPD page length too "
-                "short=%d\n", len);
+        pr2serr("Subsystem identifier VPD page length too short=%d\n", len);
         return;
     }
     if (buff[4] != 's' && buff[5] != 'u' && buff[6] != 'b') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
     memset(subsystem_id, 0, 17);
@@ -656,13 +672,13 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
     int uuid_len;
 
     if (len < 0xab) {
-        fprintf(stderr, "Extended Device Identification VPD page length too "
+        pr2serr("Extended Device Identification VPD page length too "
                 "short=%d\n", len);
         return;
     }
     if (buff[4] != 'e' && buff[5] != 'd' && buff[6] != 'i') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
 
@@ -717,18 +733,16 @@ static void
 decode_rdac_vpd_c9(unsigned char * buff, int len)
 {
     if (len < 3) {
-        fprintf(stderr, "Volume Access Control VPD page length too "
-                "short=%d\n", len);
+        pr2serr("Volume Access Control VPD page length too short=%d\n", len);
         return;
     }
     if (buff[4] != 'v' && buff[5] != 'a' && buff[6] != 'c') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
     if (buff[7] != '1') {
-        fprintf(stderr, "Invalid page version '%c' (should be 1)\n",
-                buff[7]);
+        pr2serr("Invalid page version '%c' (should be 1)\n", buff[7]);
     }
     printf("  AVT:");
     if (buff[8] & 0x80) {
@@ -767,13 +781,13 @@ decode_rdac_vpd_ca(unsigned char * buff, int len)
     int i;
 
     if (len < 16) {
-        fprintf(stderr, "Replicated Volume Source Identifier "
-                "VPD page length too short=%d\n", len);
+        pr2serr("Replicated Volume Source Identifier VPD page length too "
+                "short=%d\n", len);
         return;
     }
     if (buff[4] != 'r' && buff[5] != 'v' && buff[6] != 's') {
-        fprintf(stderr, "Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
         return;
     }
     if (buff[8] & 0x01) {
@@ -800,8 +814,8 @@ decode_rdac_vpd_d0(unsigned char * buff, int len)
     int i;
 
     if (len < 20) {
-        fprintf(stderr, "Storage Array World Wide Name "
-                "VPD page length too short=%d\n", len);
+        pr2serr("Storage Array World Wide Name VPD page length too "
+                "short=%d\n", len);
         return;
     }
     printf("  Storage Array WWN: ");
@@ -822,8 +836,8 @@ decode_dds_vpd_c0(unsigned char * buff, int len)
     char fw_conf[21];
 
     if (len < 0xb3) {
-        fprintf(stderr, "Vendor-Unique Firmware revision page "
-                "invalid length=%d\n", len);
+        pr2serr("Vendor-Unique Firmware revision page invalid length=%d\n",
+                len);
         return;
     }
     memset(firmware_rev, 0x0, 25);
@@ -853,8 +867,8 @@ decode_lto_vpd_cx(unsigned char * buff, int len, int page)
     const char *comp = NULL;
 
     if (len < 0x5c) {
-        fprintf(stderr, "Driver Component Revision Levels page "
-                "invalid length=%d\n", len);
+        pr2serr("Driver Component Revision Levels page invalid length=%d\n",
+                len);
         return;
     }
     switch (page) {
@@ -878,8 +892,8 @@ decode_lto_vpd_cx(unsigned char * buff, int len, int page)
             break;
     }
     if (!comp) {
-        fprintf(stderr, "Driver Component Revision Level invalid "
-                "page=0x%02x\n", page);
+        pr2serr("Driver Component Revision Level invalid page=0x%02x\n",
+                page);
         return;
     }
 
@@ -921,15 +935,14 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
         snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x", num_vpd);
     if (0 == alloc_len)
         alloc_len = DEF_ALLOC_LEN;
-    if ((! do_raw) && (! do_quiet))
+    if ((! do_raw) && (! do_quiet) && (do_hex < 2))
         printf("%s VPD Page:\n", name);
     res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
                         verbose);
     if (0 == res) {
         len = rsp_buff[3] + 4;
         if (num_vpd != rsp_buff[1]) {
-            fprintf(stderr, "invalid VPD response; probably not "
-                    "supported\n");
+            pr2serr("invalid VPD response; probably not supported\n");
             return SG_LIB_CAT_MALFORMED;
         }
         if (len > alloc_len) {
@@ -937,13 +950,13 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                 res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
                                     1, verbose);
                 if (res) {
-                    fprintf(stderr, "fetching 0x%x page "
-                            "(alloc_len=%d) failed\n", num_vpd, len);
+                    pr2serr("fetching 0x%x page (alloc_len=%d) failed\n",
+                            num_vpd, len);
                     return res;
                 }
             } else {
-                fprintf(stderr, ">>> warning: response length (%d) "
-                        "longer than requested (%d)\n", len, alloc_len);
+                pr2serr(">>> warning: response length (%d) longer than "
+                        "requested (%d)\n", len, alloc_len);
                 len = alloc_len;
             }
         }
