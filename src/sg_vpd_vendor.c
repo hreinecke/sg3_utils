@@ -84,6 +84,9 @@ struct svpd_values_name_t {
 };
 
 
+int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
+                            int mxlen, int vb, int * rlenp);
+
 /* Size of this array must match the array of the same name in sg_vpd.c */
 static unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 
@@ -933,37 +936,19 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
         strcpy(name, vnp->name);
     else
         snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x", num_vpd);
-    if (0 == alloc_len)
-        alloc_len = DEF_ALLOC_LEN;
+    if (sg_fd >= 0) {
+        if (0 == alloc_len)
+            alloc_len = DEF_ALLOC_LEN;
+    }
     if ((! do_raw) && (! do_quiet) && (do_hex < 2))
         printf("%s VPD Page:\n", name);
-    res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, alloc_len, 1,
-                        verbose);
+    res = vpd_fetch_page_from_dev(sg_fd, rsp_buff, num_vpd, alloc_len,
+                                  verbose, &len);
     if (0 == res) {
-        len = rsp_buff[3] + 4;
-        if (num_vpd != rsp_buff[1]) {
-            pr2serr("invalid VPD response; probably not supported\n");
-            return SG_LIB_CAT_MALFORMED;
-        }
-        if (len > alloc_len) {
-            if ((0 == maxlen) && (len < MX_ALLOC_LEN)) {
-                res = sg_ll_inquiry(sg_fd, 0, 1, num_vpd, rsp_buff, len,
-                                    1, verbose);
-                if (res) {
-                    pr2serr("fetching 0x%x page (alloc_len=%d) failed\n",
-                            num_vpd, len);
-                    return res;
-                }
-            } else {
-                pr2serr(">>> warning: response length (%d) longer than "
-                        "requested (%d)\n", len, alloc_len);
-                len = alloc_len;
-            }
-        }
         if (do_raw)
             dStrRaw((const char *)rsp_buff, len);
         else if (do_hex)
-            dStrHex((const char *)rsp_buff, len, 0);
+            dStrHex((const char *)rsp_buff, len, ((1 == do_hex) ? 0 : -1));
         else {
             switch(num_vpd) {
                 case 0xc0:

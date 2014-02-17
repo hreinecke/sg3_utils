@@ -1,18 +1,22 @@
 .TH SG_VPD "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
-sg_vpd \- fetch Vital Product Data (VPD) pages via a SCSI INQUIRY command
+sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
 .B sg_vpd
 [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-ident\fR]
-[\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-inhex=FN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility fetches a Vital Product Data page and decodes it or
-outputs it in ASCII hexadecimal or binary. VPD pages are fetched
-with a SCSI INQUIRY command.
+This utility, when \fIDEVICE\fR is given, fetches a Vital Product Data (VPD)
+page and decodes it or outputs it in ASCII hexadecimal or binary. VPD pages
+are fetched with a SCSI INQUIRY command.
+.PP
+Alternatively the \fI\-\-inhex=FN\fR option can be given. In this case
+\fIFN\fR is assumed to be a file name ('\-' for stdin) containing ASCII
+hexadecimal representing a VPD page response.
 .PP
 Probably the most important page is the Device Identification
 VPD page (page number: 0x83). Since SPC\-3, support for this page
@@ -20,9 +24,8 @@ has been flagged as mandatory. This page can be fetched by
 using the \fI\-\-ident\fR option.
 .PP
 The reference document used for interpreting VPD pages (and the INQUIRY
-standard response) is T10/1713\-D Revision 36e (SPC\-4, 24 August 2012)
-found at http://www.t10.org . Obsolete and reserved items in the standard
-INQUIRY response output are displayed in square brackets.
+standard response) is T10/1713\-D Revision 36q (SPC\-4, 12 February 2014)
+found at http://www.t10.org .
 .PP
 When no options are given, other than a \fIDEVICE\fR, then the "Supported
 VPD pages" (0x0) VPD page is fetched and decoded.
@@ -46,12 +49,24 @@ Ignores \fIDEVICE\fR if given.
 \fB\-H\fR, \fB\-\-hex\fR
 outputs the requested VPD page in ASCII hexadecimal. Can be used multiple
 times, see section on the ATA information vpd page.
+.br
+To generate output suitable for placing in a file that can be used by a
+later invocation with the \fI\-\-inhex=FN\fR option, use the '\-HHHH'
+option (e.g. 'sg_vpd \-p di -HHHH /dev/sg3 > dev_id.hex').
 .TP
 \fB\-i\fR, \fB\-\-ident\fR
 decode the device identification (0x83) VPD page. When used once this option
 has the same effect as '\-\-page=di'. When use twice then the short form of
 the device identification VPD page's logical unit designator is decoded. In
 the latter case this option has the same effect as '\-\-quiet \-\-page=di_lu'.
+.TP
+\fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
+\fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
+ASCII hexadecimal respresenting a VPD page (or a standard INQUIRY) response.
+This utility will then decode that response. The hexadecimal should be
+arranged as 1 or 2 digits representing a byte each of which is whitespace
+or comma separated. Anything from and including a hash mark to the end
+of line is ignored.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 when decoding some VPD pages, give a little more output. For example the ATA
