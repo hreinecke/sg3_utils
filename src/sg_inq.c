@@ -68,7 +68,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.28 20140214";    /* SPC-4 rev 36q */
+static const char * version_str = "1.29 20140216";    /* SPC-4 rev 36q */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -2678,7 +2678,7 @@ std_inq_response(const struct opts_t * op, int act_len)
             printf("    length=%d (0x%x), but only fetched %d bytes", len,
                    len, act_len);
         if ((ansi_version >= 2) && (len < SAFE_STD_INQ_RESP_LEN))
-            printf("  [for SCSI>=2, len>=36 is expected]");
+            printf("\n  [for SCSI>=2, len>=36 is expected]");
         cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
         if (strlen(cp) > 0)
             printf("   Peripheral device type: %s\n", cp);
@@ -2778,16 +2778,34 @@ std_inq_response(const struct opts_t * op, int act_len)
     return 0;
 }
 
+/* When sg_fd >= 0 fetch VPD page from device; mxlen is command line
+ * --maxlen=LEN option (def: 0) or -1 for a VPD page with a short length
+ * (1 byte). When sg_fd < 0 then mxlen bytes have been read from
+ * --inhex=FN file. Returns 0 for success. */
 static int
 vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
-                        int short_len, int vb, int * rlenp)
+                        int mxlen, int vb, int * rlenp)
 {
-    int res, resid, rlen, len;
+    int res, resid, rlen, len, n;
 
-    res = pt_inquiry(sg_fd, 1, page, rp, DEF_ALLOC_LEN, &resid, 1, vb);
+    if (sg_fd < 0) {
+        len = ((rp[2] << 8) + rp[3]) + 4;
+        if (vb && (len > mxlen))
+            pr2serr("warning: VPD page's length (%d) > bytes in --inhex=FN "
+                    "file (%d)\n",  len , mxlen);
+        if (rlenp)
+            *rlenp = (len < mxlen) ? len : mxlen;
+        return 0;
+    }
+    if (mxlen > MX_ALLOC_LEN) {
+        pr2serr("--maxlen=LEN too long: %d > %d\n", mxlen, MX_ALLOC_LEN);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    n = (mxlen > 0) ? mxlen : DEF_ALLOC_LEN;
+    res = pt_inquiry(sg_fd, 1, page, rp, n, &resid, 1, vb);
     if (res)
         return res;
-    rlen = DEF_ALLOC_LEN - resid;
+    rlen = n - resid;
     if (rlen < 4) {
         pr2serr("VPD response too short (len=%d)\n", rlen);
         return SG_LIB_CAT_MALFORMED;
@@ -2797,7 +2815,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
                 "response\n");
         return SG_LIB_CAT_MALFORMED;
     }
-    if (short_len)
+    if (mxlen < 0)
         len = rp[3] + 4;
     else
         len = ((rp[2] << 8) + rp[3]) + 4;
@@ -2805,7 +2823,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
         if (rlenp)
             *rlenp = len;
         return 0;
-    } else if ((len <= DEF_ALLOC_LEN) && short_len) {
+    } else if (mxlen) {
         if (rlenp)
             *rlenp = rlen;
         return 0;
@@ -2826,7 +2844,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
 }
 
 /* Returns 0 if Unit Serial Number VPD page contents found, else see
-   sg_ll_inquiry() return values */
+ * sg_ll_inquiry() return values */
 static int
 fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
@@ -2836,7 +2854,7 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
     res = 0;
     memset(b, 0xff, 4); /* guard against empty response */
     /* first check if unit serial number VPD page is supported */
-    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS, 1, verbose,
+    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS, -1, verbose,
                                   &len);
     if (0 == res) {
         len -= 4;
@@ -2845,7 +2863,7 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
                 break;
         }
         if (k < len) {
-            res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, 1,
+            res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, -1,
                                           verbose, &len);
             if (0 == res) {
                 len -= 4;
@@ -2873,12 +2891,14 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 
 /* Process a standard INQUIRY response. Returns 0 if successful */
 static int
-std_inq_process(int sg_fd, const struct opts_t * op)
+std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
 {
     int res, len, rlen, act_len;
     char buff[48];
     int verb, resid;
 
+    if (sg_fd < 0)
+        return std_inq_response(op, inhex_len);
     rlen = (op->resp_len > 0) ? op->resp_len : SAFE_STD_INQ_RESP_LEN;
     verb = op->do_verbose;
     res = pt_inquiry(sg_fd, 0, 0, rsp_buff, rlen, &resid, 0, verb);
@@ -2945,6 +2965,8 @@ std_inq_process(int sg_fd, const struct opts_t * op)
             pr2serr("unit attention (?)%s\n", buff);
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
             pr2serr("aborted command%s\n", buff);
+        else if (SG_LIB_CAT_MALFORMED == res)
+            pr2serr("malformed response%s\n", buff);
         else
             pr2serr("res=%d%s\n", res, buff);
         return res;
@@ -3081,7 +3103,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
 
 /* Returns 0 if successful */
 static int
-vpd_mainly_hex(int sg_fd, const struct opts_t * op)
+vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
 {
     int res, len;
     char b[48];
@@ -3089,11 +3111,19 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op)
     unsigned char * rp;
 
     rp = rsp_buff;
-    memset(rp, 0, DEF_ALLOC_LEN);
     if ((! op->do_raw) && (op->do_hex < 2))
         printf("VPD INQUIRY, page code=0x%.2x:\n", op->page_num);
-    res = vpd_fetch_page_from_dev(sg_fd, rp, op->page_num, 0, op->do_verbose,
-                                  &len);
+    if (sg_fd < 0) {
+        len = ((rp[2] << 8) + rp[3]) + 4;
+        if (op->do_verbose && (len > inhex_len))
+            pr2serr("warning: VPD page's length (%d) > bytes in --inhex=FN "
+                    "file (%d)\n",  len , inhex_len);
+        res = 0;
+    } else {
+        memset(rp, 0, DEF_ALLOC_LEN);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, op->page_num, op->resp_len,
+                                      op->do_verbose, &len);
+    }
     if (0 == res) {
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
@@ -3101,7 +3131,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op)
             if (0 == op->page_num)
                 decode_supported_vpd(rp, len, op->do_hex);
             else {
-                if (op->do_hex < 2) {
+                if (op->do_verbose) {
                     cp = sg_get_pdt_str(rp[0] & 0x1f, sizeof(b), b);
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5, cp);
@@ -3131,358 +3161,24 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op)
 
 /* Returns 0 if successful */
 static int
-vpd_response(const struct opts_t * op, int rlen)
+vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
 {
-    int len, pdt, pn;
-    unsigned char * rp;
-    const struct svpd_values_name_t * vnp;
-
-    rp = rsp_buff;
-    if (rlen < 4) {
-        pr2serr("INQUIRY VPD response too short\n");
-        return SG_LIB_CAT_MALFORMED;
-    }
-    pn = op->page_num;
-    if (pn != rp[1]) {
-        if (op->page_arg) {
-            vnp = sdp_find_vpd_by_acron(op->page_arg);
-            if (vnp) {
-                pr2serr("requested %s VPD page [0x%x]\n   but --inhex is "
-                        "for page number 0x%x\n", vnp->name, vnp->value,
-                        rp[1]);
-                return SG_LIB_CAT_MALFORMED;
-            }
-        }
-        pr2serr("requested VPD page number [0x%x] differs from that in FN "
-                "[0x%x]\n", pn, rp[1]);
-        return SG_LIB_CAT_MALFORMED;
-    }
-
-    switch (pn) {
-    case VPD_SUPPORTED_VPDS:
-        if (! op->do_raw && ! op->do_export && (op->do_hex < 2))
-            printf("VPD INQUIRY: Supported VPD pages page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4; /* spc4r25 */
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_supported_vpd(rp, len, op->do_hex);
-        break;
-    case VPD_UNIT_SERIAL_NUM:
-        if (! op->do_raw && ! op->do_export && (op->do_hex < 2))
-            printf("VPD INQUIRY: Unit serial number page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4; /* spc4r25 */
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else if (op->do_hex)
-            dStrHex((const char *)rp, len, (1 == op->do_hex) ? 0 : -1);
-        else {
-            char obuff[DEF_ALLOC_LEN];
-
-            memset(obuff, 0, sizeof(obuff));
-            len -= 4;
-            if (len >= (int)sizeof(obuff))
-                len = sizeof(obuff) - 1;
-            memcpy(obuff, rp + 4, len);
-            if (op->do_export) {
-                len = encode_whitespaces((unsigned char *)obuff, len);
-                printf("SCSI_IDENT_SERIAL=%s\n", obuff);
-            } else
-                printf("  Unit serial number: %s\n", obuff);
-        }
-        break;
-    case VPD_DEVICE_ID:
-        if (! op->do_raw && ! op->do_export && (op->do_hex < 3))
-            printf("VPD INQUIRY: Device Identification page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else if (op->do_hex > 2)
-            dStrHex((const char *)rp, len, -1);
-        else if (op->do_export) {
-            if (len < 4) {
-                pr2serr("Device identification page length too "
-                        "short=%d\n", len);
-            } else {
-                export_dev_ids(rp + 4, len - 4);
-            }
-        } else
-            decode_id_vpd(rp, len, op->do_hex);
-        break;
-    case VPD_SOFTW_INF_ID:
-        if (! op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: Software interface identification page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4; /* spc4r25 */
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_softw_inf_id(rp, len, op->do_hex);
-        break;
-    case VPD_MAN_NET_ADDR:
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: Management network addresses page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_net_man_vpd(rp, len, op->do_hex);
-        break;
-    case VPD_MODE_PG_POLICY:
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: Mode page policy\n");
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_mode_policy_vpd(rp, len, op->do_hex);
-        break;
-    case VPD_EXT_INQ:
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: extended INQUIRY data page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_x_inq_vpd(rp, len, op->do_hex);
-        break;
-    case VPD_ATA_INFO:
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: ATA information page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        /* format output for 'hdparm --Istdin' with '-rr' or '-HHH' */
-        if ((2 == op->do_raw) || (3 == op->do_hex))
-            dWordHex((const unsigned short *)(rp + 60),
-                     256, -2, sg_is_big_endian());
-        else if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_ata_info_vpd(rp, len, op->do_hex);
-        break;
-    case VPD_POWER_CONDITION:
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: Power condition page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_power_condition(rp, len, op->do_hex);
-        break;
-    case 0xb0:  /* VPD pages in B0h to BFh range depend on pdt */
-        pdt = rp[0] & 0x1f;
-        if (! op->do_raw && (op->do_hex < 2)) {
-            switch (pdt) {
-            case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-                printf("VPD INQUIRY: Block limits page (SBC)\n");
-                break;
-            case PDT_TAPE: case PDT_MCHANGER:
-                printf("VPD INQUIRY: Sequential access device "
-                       "capabilities (SSC)\n");
-                break;
-            case PDT_OSD:
-                printf("VPD INQUIRY: OSD information (OSD)\n");
-                break;
-            default:
-                printf("VPD INQUIRY: page=0x%x, pdt=0x%x\n", 0xb0, pdt);
-                break;
-            }
-        }
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_b0_vpd(rp, len, op->do_hex);
-        break;
-    case 0xb1:  /* VPD pages in B0h to BFh range depend on pdt */
-        pdt = rp[0] & 0x1f;
-        if (! op->do_raw && (op->do_hex < 2)) {
-            switch (pdt) {
-            case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-                printf("VPD INQUIRY: Block device characteristics page "
-                       "(SBC)\n");
-                break;
-            case PDT_TAPE: case PDT_MCHANGER:
-                printf("Manufactured assigned serial number VPD page "
-                       "(SSC):\n");
-                break;
-            case PDT_OSD:
-                printf("Security token VPD page (OSD):\n");
-                break;
-            case PDT_ADC:
-                printf("Manufactured assigned serial number VPD page "
-                       "(ADC):\n");
-                break;
-            default:
-                printf("VPD INQUIRY: page=0x%x, pdt=0x%x\n", 0xb1, pdt);
-                break;
-            }
-        }
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_b1_vpd(rp, len, op->do_hex);
-        break;
-    case 0xb2:  /* VPD pages in B0h to BFh range depend on pdt */
-        pr2serr(" Only hex output supported. sg_vpd decodes the B2h page.\n");
-        return SG_LIB_CAT_OTHER;
-    case 0xb3:  /* VPD pages in B0h to BFh range depend on pdt */
-        pdt = rp[0] & 0x1f;
-        if (! op->do_raw && (op->do_hex < 2)) {
-            switch (pdt) {
-            case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-                printf("VPD INQUIRY: Referrals VPD page (SBC)\n");
-                break;
-            default:
-                printf("VPD INQUIRY: page=0x%x, pdt=0x%x\n", 0xb3, pdt);
-                break;
-            }
-        }
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_b3_vpd(rp, len, op->do_hex);
-        break;
-    case VPD_UPR_EMC:   /* 0xc0 */
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: Unit Path Report Page (EMC)\n");
-        len = rp[3] + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_upr_vpd_c0_emc(rp, len, op->do_hex);
-        break;
-    case VPD_RDAC_VERS:         /* 0xc2 */
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: Software Version (RDAC)\n");
-        len = rp[3] + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_rdac_vpd_c2(rp, len, op->do_hex);
-        break;
-    case VPD_RDAC_VAC:          /* 0xc9 */
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: Volume Access Control (RDAC)\n");
-        len = rp[3] + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_rdac_vpd_c9(rp, len, op->do_hex);
-        break;
-    case VPD_SCSI_PORTS:
-        if (!op->do_raw && (op->do_hex < 2))
-            printf("VPD INQUIRY: SCSI Ports page\n");
-        len = ((rp[2] << 8) + rp[3]) + 4;
-        if (len > rlen) {
-            pr2serr("truncated VPD page in inhex file (%s)\n", op->inhex_fn);
-            len = rlen;
-        }
-        if (op->do_raw)
-            dStrRaw((const char *)rp, len);
-        else
-            decode_scsi_ports_vpd(rp, len, op->do_hex);
-        break;
-    default:
-        if ((pn > 0) && (pn < 0x80)) {
-            if (!op->do_raw && (op->do_hex < 2))
-                printf("VPD INQUIRY: ASCII information page, FRU code=0x%x\n",
-                       pn);
-            len = ((rp[2] << 8) + rp[3]) + 4;
-            if (len > rlen) {
-                pr2serr("truncated VPD page in inhex file (%s)\n",
-                        op->inhex_fn);
-                len = rlen;
-            }
-            if (op->do_raw)
-                dStrRaw((const char *)rp, len);
-            else
-                decode_ascii_inf(rp, len, op->do_hex);
-        } else {
-            pr2serr(" Only hex output supported. sg_vpd and sdparm decode "
-                    "more VPD pages.\n");
-            return SG_LIB_CAT_OTHER;
-        }
-    }
-    return 0;
-}
-
-/* Returns 0 if successful */
-static int
-vpd_get_and_decode(int sg_fd, const struct opts_t * op)
-{
-    int len, pdt, pn, vb;
+    int len, pdt, pn, vb, mxlen;
     int res = 0;
     unsigned char * rp;
 
     pn = op->page_num;
     rp = rsp_buff;
     vb = op->do_verbose;
+    if (sg_fd >= 0)
+        mxlen = op->resp_len;
+    else
+        mxlen = inhex_len;
     switch (pn) {
     case VPD_SUPPORTED_VPDS:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Supported VPD pages page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3496,7 +3192,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_UNIT_SERIAL_NUM:
         if (! op->do_raw && ! op->do_export && (op->do_hex < 2))
             printf("VPD INQUIRY: Unit serial number page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3523,7 +3219,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_DEVICE_ID:
         if (! op->do_raw && ! op->do_export && (op->do_hex < 3))
             printf("VPD INQUIRY: Device Identification page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3538,7 +3234,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_SOFTW_INF_ID:
         if (! op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Software interface identification page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3549,7 +3245,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_MAN_NET_ADDR:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Management network addresses page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3560,7 +3256,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_MODE_PG_POLICY:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Mode page policy\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3571,7 +3267,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_EXT_INQ:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: extended INQUIRY data page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3582,7 +3278,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_ATA_INFO:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: ATA information page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         /* format output for 'hdparm --Istdin' with '-rr' or '-HHH' */
@@ -3597,7 +3293,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_POWER_CONDITION:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Power condition page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3606,7 +3302,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
             decode_power_condition(rp, len, op->do_hex);
         break;
     case 0xb0:  /* VPD pages in B0h to BFh range depend on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (! op->do_raw && (op->do_hex < 2)) {
@@ -3634,7 +3330,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
             pr2serr("VPD INQUIRY: page=0xb0\n");
         break;
     case 0xb1:  /* VPD pages in B0h to BFh range depend on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (! op->do_raw && (op->do_hex < 2)) {
@@ -3670,9 +3366,9 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
         if (!op->do_raw && (op->do_hex < 2))
             pr2serr(" Only hex output supported. sg_vpd decodes the B2h "
                     "page.\n");
-        return vpd_mainly_hex(sg_fd, op);
+        return vpd_mainly_hex(sg_fd, op, inhex_len);
     case 0xb3:  /* VPD pages in B0h to BFh range depend on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (! op->do_raw && (op->do_hex < 2)) {
@@ -3695,7 +3391,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_UPR_EMC:   /* 0xc0 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Unit Path Report Page (EMC)\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 1, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, -1, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3706,7 +3402,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_RDAC_VERS:         /* 0xc2 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Software Version (RDAC)\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 1, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, -1, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3717,7 +3413,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_RDAC_VAC:          /* 0xc9 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Volume Access Control (RDAC)\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 1, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, -1, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3728,7 +3424,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
     case VPD_SCSI_PORTS:
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: SCSI Ports page\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (res)
             break;
         if (op->do_raw)
@@ -3741,7 +3437,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
             if (!op->do_raw && (op->do_hex < 2))
                 printf("VPD INQUIRY: ASCII information page, FRU code=0x%x\n",
                        pn);
-            res = vpd_fetch_page_from_dev(sg_fd, rp, pn, 0, vb, &len);
+            res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
             if (0 == res) {
                 if (op->do_raw)
                     dStrRaw((const char *)rp, len);
@@ -3752,7 +3448,7 @@ vpd_get_and_decode(int sg_fd, const struct opts_t * op)
             if (op->do_hex < 2)
                 pr2serr(" Only hex output supported. sg_vpd and sdparm "
                         "decode more VPD pages.\n");
-            return vpd_mainly_hex(sg_fd, op);
+            return vpd_mainly_hex(sg_fd, op, inhex_len);
         }
     }
     if (res) {
@@ -3886,21 +3582,20 @@ main(int argc, char * argv[])
                       sizeof(rsp_buff)))
             return SG_LIB_FILE_ERROR;
         if (-1 == op->page_num) {       /* may be able to deduce VPD page */
+            if (op->page_pdt < 0)
+                op->page_pdt = 0x1f & rsp_buff[0];
             if ((0x2 == (0xf & rsp_buff[3])) && (rsp_buff[2] > 2)) {
                 if (op->do_verbose)
                     pr2serr("Guessing from --inhex= this is a standard "
                             "INQUIRY\n");
-                if (op->page_pdt < 0)
-                    op->page_pdt = 0x1f & rsp_buff[0];
-            } else if (rsp_buff[2] < 2) {
+            } else if (rsp_buff[2] <= 2) {
                 if (op->do_verbose)
                     pr2serr("Guessing from --inhex this is VPD page 0x%x\n",
                             rsp_buff[1]);
                 op->page_num = rsp_buff[1];
-                if (op->page_pdt < 0)
-                    op->page_pdt = 0x1f & rsp_buff[0];
-                ++op->do_decode;
                 ++op->do_vpd;
+                if ((1 != op->do_hex) && (0 == op->do_raw))
+                    ++op->do_decode;
             } else {
                 if (op->do_verbose)
                     pr2serr("page number unclear from --inhex, hope it's a "
@@ -3976,10 +3671,13 @@ main(int argc, char * argv[])
         }
     }
     if (op->inhex_fn) {
-        if (op->do_vpd)
-            return vpd_response(op, inhex_len);
-        else
-            return std_inq_response(op, inhex_len);
+        if (op->do_vpd) {
+            if (op->do_decode)
+                return vpd_decode(-1, op, inhex_len);
+            else
+                return vpd_mainly_hex(-1, op, inhex_len);
+        } else
+            return std_inq_process(-1, op, inhex_len);
     }
 
 #if defined(O_NONBLOCK) && defined(O_RDONLY)
@@ -4026,7 +3724,7 @@ main(int argc, char * argv[])
 
     if ((! op->do_cmddt) && (! op->do_vpd)) {
         /* So it's a standard INQUIRY, try ATA IDENTIFY if that fails */
-        ret = std_inq_process(sg_fd, op);
+        ret = std_inq_process(sg_fd, op, -1);
         if (ret)
             goto err_out;
     } else if (op->do_cmddt) {
@@ -4037,11 +3735,11 @@ main(int argc, char * argv[])
             goto err_out;
     } else if (op->do_vpd) {
         if (op->do_decode) {
-            ret = vpd_get_and_decode(sg_fd, op);
+            ret = vpd_decode(sg_fd, op, -1);
             if (ret)
                 goto err_out;
         } else {
-            ret = vpd_mainly_hex(sg_fd, op);
+            ret = vpd_mainly_hex(sg_fd, op, -1);
             if (ret)
                 goto err_out;
         }

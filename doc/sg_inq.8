@@ -124,6 +124,10 @@ words). When used three times with the ATA Information VPD page [0x89] or
 the \fI\-\-ata\fR option, this utility outputs the ATA IDENTIFY (PACKET)
 DEVICE response in hexadecimal words suitable for input
 to 'hdparm \-\-Istdin'.  See note below.
+.br
+To generate output suitable for placing in a file that can be used by a
+later invocation with the \fI\-\-inhex=FN\fR option, use the '\-HHHH'
+option (e.g. 'sg_inq \-p di -HHHH /dev/sg3 > dev_id.hex').
 .TP
 \fB\-i\fR, \fB\-\-id\fR
 prints the device identification VPD page [0x83].
