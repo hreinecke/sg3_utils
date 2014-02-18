@@ -63,10 +63,12 @@ the latter case this option has the same effect as '\-\-quiet \-\-page=di_lu'.
 \fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
 \fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
 ASCII hexadecimal respresenting a VPD page (or a standard INQUIRY) response.
-This utility will then decode that response. The hexadecimal should be
-arranged as 1 or 2 digits representing a byte each of which is whitespace
-or comma separated. Anything from and including a hash mark to the end
-of line is ignored.
+This utility will then decode that response. It is preferable to also
+supply the \fI\-\-page=PG\fR option, if not this utulity will attempt
+to guess which VPD page (or standard INQUIRY) the response is associated
+with. The hexadecimal should be arranged as 1 or 2 digits representing a
+byte each of which is whitespace or comma separated. Anything from and
+including a hash mark to the end of line is ignored.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 when decoding some VPD pages, give a little more output. For example the ATA

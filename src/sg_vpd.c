@@ -3246,10 +3246,19 @@ main(int argc, char * argv[])
                 if (page_pdt < 0)
                     page_pdt = 0x1f & rsp_buff[0];
             } else {
-                if (do_verbose)
-                    pr2serr("page number unclear from --inhex, hope it's a "
-                            "standard INQUIRY\n");
-                num_vpd = VPD_NO_RATHER_STD_INQ;
+                if (num_vpd > 0x80) {
+                    num_vpd = rsp_buff[1];
+                    if (page_pdt < 0)
+                        page_pdt = 0x1f & rsp_buff[0];
+                    if (do_verbose)
+                        pr2serr("Guessing from --inhex this is VPD page "
+                                "0x%x\n", rsp_buff[1]);
+                } else {
+                    num_vpd = VPD_NO_RATHER_STD_INQ;
+                    if (do_verbose)
+                        pr2serr("page number unclear from --inhex, hope "
+                                "it's a standard INQUIRY response\n");
+                }
             }
         }
     } else if (NULL == device_name) {
