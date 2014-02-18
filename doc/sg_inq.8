@@ -135,10 +135,12 @@ prints the device identification VPD page [0x83].
 \fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
 \fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
 ASCII hexadecimal respresenting an INQUIRY (including VPD page) response.
-This utility will then decode that response. The hexadecimal should be
-arranged as 1 or 2 digits representing a byte each of which is whitespace
-or comma separated. Anything from and including a hash mark to the end
-of line is ignored.
+This utility will then decode that response. It is preferable to also
+supply the \fI\-\-page=PG\fR option, if not this utulity will attempt
+to guess which VPD page (or standard INQUIRY) the response is associated
+with. The hexadecimal should be arranged as 1 or 2 digits representing a
+byte each of which is whitespace or comma separated. Anything from and
+including a hash mark to the end of line is ignored.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.
@@ -163,6 +165,10 @@ page. To enumerate the available abbreviations for VPD pages use '\-hh' or
 a bad abbreviation (e.g, '\-\-page=xxx'). When the \fI\-\-cmddt\fR option is
 given (once) then \fIPG\fR is interpreted as an opcode number (so VPD page
 abbreviations make little sense).
+.br
+If \fIPG\fR is a negative number, then a standard INQUIRY is performed. This
+can be used to override some guessing logic associated with the
+\fI\-\-inhex=FN\fR option.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the response in binary to stdout. Error messages and warnings, if

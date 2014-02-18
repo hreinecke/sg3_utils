@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2013 Douglas Gilbert.
+ * Copyright (c) 1999-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
 #endif
 
 
-static const char * version_str = "1.64 20131217";
+static const char * version_str = "1.65 20140217";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -113,8 +113,8 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
         if ((mx_di_len > 0) && (resid > 0)) {
             got = mx_di_len - resid;
             if ((verbose > 2) || check_data_in || (got > 0))
-                fprintf(sg_warnings_strm, "    pass-through requested "
-                        "%d bytes but got %d bytes\n", mx_di_len, got);
+                fprintf(sg_warnings_strm, "    pass-through requested %d "
+                        "bytes (data-in) but got %d bytes\n", mx_di_len, got);
         }
     }
     if (o_sense_cat)
@@ -178,8 +178,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
             got = mx_di_len - resid;
             if (verbose && (resid > 0))
                 fprintf(sg_warnings_strm, "    %s: pass-through requested "
-                        "%d bytes but got %d bytes\n", leadin, mx_di_len,
-                        got);
+                        "%d bytes (data-in) but got %d bytes\n", leadin,
+                        mx_di_len, got);
             return got;
         } else
             return 0;

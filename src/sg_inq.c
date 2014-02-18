@@ -3508,7 +3508,7 @@ main(int argc, char * argv[])
                     "implies a page\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (isalpha(*op->page_arg)) {
+        if (isalpha(op->page_arg[0])) {
             vnp = sdp_find_vpd_by_acron(op->page_arg);
             if (NULL == vnp) {
 #ifdef SG_SCSI_STRINGS
@@ -3530,6 +3530,8 @@ main(int argc, char * argv[])
                 ++op->do_decode;
             op->page_num = vnp->value;
             op->page_pdt = vnp->pdt;
+        } else if ('-' == op->page_arg[0]) {
+            op->page_num = -2;  /* request standard INQUIRY response */
         } else {
 #ifdef SG_SCSI_STRINGS
             if (op->opt_new) {
@@ -3607,6 +3609,9 @@ main(int argc, char * argv[])
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (-2 == op->page_num) /* from --page=-<num> to force standard INQUIRY */
+        op->page_num = -1;  /* now past guessing, set to normal indication */
+
     if (op->do_export) {
         if (op->page_num != -1) {
             if (op->page_num != VPD_DEVICE_ID &&

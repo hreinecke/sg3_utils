@@ -1261,8 +1261,8 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             my_snprintf(buff, buff_len, "%s", vnp->name);
         else
-            my_snprintf(buff, buff_len, "Extended copy, service action=0x%x",
-                        service_action);
+            my_snprintf(buff, buff_len, "Third party copy out, service "
+                        "action=0x%x", service_action);
         break;
     case SG_RECEIVE_COPY:
         /* 'Receive copy results' was renamed 'Third party copy in' in
@@ -1272,8 +1272,8 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             my_snprintf(buff, buff_len, "%s", vnp->name);
         else
-            my_snprintf(buff, buff_len, "Receive copy, service action=0x%x",
-                        service_action);
+            my_snprintf(buff, buff_len, "Third party copy in, service "
+                        "action=0x%x", service_action);
         break;
     case SG_READ_BUFFER:
         /* spc4r34 requested treating mode as service action */
