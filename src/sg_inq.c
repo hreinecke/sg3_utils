@@ -68,7 +68,7 @@
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
 
-static const char * version_str = "1.29 20140216";    /* SPC-4 rev 36q */
+static const char * version_str = "1.30 20140222";    /* SPC-4 rev 36q */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -117,6 +117,7 @@ static const char * version_str = "1.29 20140216";    /* SPC-4 rev 36q */
 
 static unsigned char rsp_buff[MX_ALLOC_LEN + 1];
 static char xtra_buff[MX_ALLOC_LEN + 1];
+static char usn_buff[MX_ALLOC_LEN + 1];
 
 static const char * find_version_descriptor_str(int value);
 static void decode_dev_ids(const char * leadin, unsigned char * buff,
@@ -2755,8 +2756,8 @@ std_inq_response(const struct opts_t * op, int act_len)
         }
     }
     if (! op->do_export) {
-        if ((0 == op->resp_len) && xtra_buff[0])
-            printf(" Unit serial number: %s\n", xtra_buff);
+        if ((0 == op->resp_len) && usn_buff[0])
+            printf(" Unit serial number: %s\n", usn_buff);
         if (op->do_descriptors) {
             if (0 == vdesc_arr[0])
                 printf("\n  No version descriptors available\n");
@@ -2853,38 +2854,27 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 
     res = 0;
     memset(b, 0xff, 4); /* guard against empty response */
-    /* first check if unit serial number VPD page is supported */
-    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS, -1, verbose,
+    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, -1, verbose,
                                   &len);
-    if (0 == res) {
+    if ((0 == res) && (len > 3)) {
         len -= 4;
-        for (k = 0; k < len; ++k) {
-            if (VPD_UNIT_SERIAL_NUM == b[k + 4])
-                break;
-        }
-        if (k < len) {
-            res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, -1,
-                                          verbose, &len);
-            if (0 == res) {
-                len -= 4;
-                len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
-                if (len > 0) {
-                    memcpy(obuff, b + 4, len);
-                    obuff[len] = '\0';
-                    return 0;
-                } else {
-                    if (verbose > 2)
-                        pr2serr("fetch_unit_serial_num: bad sn VPD page\n");
-                    return SG_LIB_CAT_MALFORMED;
-                }
-            }
+        len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
+        if (len > 0) {
+            /* replace non-printable ASCII characters with space */
+            for (k = 0; k < len; ++k)
+                obuff[k] = isprint(b[4 + k]) ? b[4 + k] : ' ';
+            obuff[len] = '\0';
+            return 0;
         } else {
             if (verbose > 2)
-                pr2serr("fetch_unit_serial_num: no supported VPDs page\n");
+                pr2serr("fetch_unit_serial_num: bad sn VPD page\n");
             return SG_LIB_CAT_MALFORMED;
         }
-    } else if (verbose > 2)
-        pr2serr("fetch_unit_serial_num: fetch supported VPDs failed\n");
+    } else {
+        if (verbose > 2)
+            pr2serr("fetch_unit_serial_num: no supported VPDs page\n");
+        return SG_LIB_CAT_MALFORMED;
+    }
     return res;
 }
 
@@ -2929,9 +2919,9 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
         if (act_len < SAFE_STD_INQ_RESP_LEN)
             rsp_buff[act_len] = '\0';
         if ((! op->do_export) && (0 == op->resp_len)) {
-            if (fetch_unit_serial_num(sg_fd, xtra_buff, sizeof(xtra_buff),
+            if (fetch_unit_serial_num(sg_fd, usn_buff, sizeof(usn_buff),
                                       op->do_verbose))
-                xtra_buff[0] = '\0';
+                usn_buff[0] = '\0';
         }
         return std_inq_response(op, act_len);
     } else if (res < 0) { /* could be an ATA device */
