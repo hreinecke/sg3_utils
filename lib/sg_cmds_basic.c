@@ -27,7 +27,7 @@
 #endif
 
 
-static const char * version_str = "1.65 20140217";
+static const char * version_str = "1.66 20140222";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -122,13 +122,15 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     return -2;
 }
 
-/* This is a helper function used by sg_cmds_* implementations after
- * the call to the pass-through. pt_res is returned from do_scsi_pt().
- * If valid sense data is found it is decoded and output to sg_warnings_strm
- * (def: stderr); depending on the 'noisy' and 'verbose' settings.
- * Returns -2 for sense data (may not be fatal), -1 for failed, or the
- * number of data in bytes received. For data out (to device) or no data,
- * set 'mx_di_len' to 0 or less. If -2 returned then sense category
+/* This is a helper function used by sg_cmds_* implementations after the
+ * call to the pass-through. pt_res is returned from do_scsi_pt(). If valid
+ * sense data is found it is decoded and output to sg_warnings_strm (def:
+ * stderr); depending on the 'noisy' and 'verbose' settings. Returns -2 for
+ * sense data (may not be fatal), -1 for failed, 0, or a positive number. If
+ * 'mx_di_len > 0' then asks pass-through for resid and returns
+ * (mx_di_len - resid); otherwise returns 0. So for data-in it should return
+ * the actual number of bytes received. For data-out (to device) or no data
+ * call with 'mx_di_len' set to 0 or less. If -2 returned then sense category
  * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
  * categories also have data in bytes received; -2 is still returned. */
 int
