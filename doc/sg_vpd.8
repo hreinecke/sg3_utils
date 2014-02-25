@@ -1,18 +1,22 @@
-.TH SG_VPD "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_VPD "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
-sg_vpd \- fetch Vital Product Data (VPD) pages via a SCSI INQUIRY command
+sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
 .B sg_vpd
 [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-ident\fR]
-[\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-inhex=FN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility fetches a Vital Product Data page and decodes it or
-outputs it in ASCII hexadecimal or binary. VPD pages are fetched
-with a SCSI INQUIRY command.
+This utility, when \fIDEVICE\fR is given, fetches a Vital Product Data (VPD)
+page and decodes it or outputs it in ASCII hexadecimal or binary. VPD pages
+are fetched with a SCSI INQUIRY command.
+.PP
+Alternatively the \fI\-\-inhex=FN\fR option can be given. In this case
+\fIFN\fR is assumed to be a file name ('\-' for stdin) containing ASCII
+hexadecimal representing a VPD page response.
 .PP
 Probably the most important page is the Device Identification
 VPD page (page number: 0x83). Since SPC\-3, support for this page
@@ -20,9 +24,8 @@ has been flagged as mandatory. This page can be fetched by
 using the \fI\-\-ident\fR option.
 .PP
 The reference document used for interpreting VPD pages (and the INQUIRY
-standard response) is T10/1713\-D Revision 36e (SPC\-4, 24 August 2012)
-found at http://www.t10.org . Obsolete and reserved items in the standard
-INQUIRY response output are displayed in square brackets.
+standard response) is T10/1713\-D Revision 36q (SPC\-4, 12 February 2014)
+found at http://www.t10.org .
 .PP
 When no options are given, other than a \fIDEVICE\fR, then the "Supported
 VPD pages" (0x0) VPD page is fetched and decoded.
@@ -32,10 +35,12 @@ The options are arranged in alphabetical order based on the long
 option name.
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
-list the names of the known VPD pages, first the standard pages, then the
-vendor specific pages. Each group is sorted in abbreviation order. The
-\fIDEVICE\fR and other options are ignored and this utility exits after
-listing the VPD page names.
+list the names of the known VPD pages, first the standard pages (i.e.
+those defined by T10), then the vendor specific pages. Each group is sorted
+in abbreviation order. The \fIDEVICE\fR and most other options are ignored
+and this utility exits after listing the VPD page names. May be used together
+with \fI\-\-page=PG\fR where \fIPG\fR is numeric. If so, it searches for the
+summary lines of all VPD pages whose number matches \fIPG\fR.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options then exits.
@@ -44,12 +49,26 @@ Ignores \fIDEVICE\fR if given.
 \fB\-H\fR, \fB\-\-hex\fR
 outputs the requested VPD page in ASCII hexadecimal. Can be used multiple
 times, see section on the ATA information vpd page.
+.br
+To generate output suitable for placing in a file that can be used by a
+later invocation with the \fI\-\-inhex=FN\fR option, use the '\-HHHH'
+option (e.g. 'sg_vpd \-p di -HHHH /dev/sg3 > dev_id.hex').
 .TP
 \fB\-i\fR, \fB\-\-ident\fR
 decode the device identification (0x83) VPD page. When used once this option
 has the same effect as '\-\-page=di'. When use twice then the short form of
 the device identification VPD page's logical unit designator is decoded. In
 the latter case this option has the same effect as '\-\-quiet \-\-page=di_lu'.
+.TP
+\fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
+\fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
+ASCII hexadecimal respresenting a VPD page (or a standard INQUIRY) response.
+This utility will then decode that response. It is preferable to also
+supply the \fI\-\-page=PG\fR option, if not this utulity will attempt
+to guess which VPD page (or standard INQUIRY) the response is associated
+with. The hexadecimal should be arranged as 1 or 2 digits representing a
+byte each of which is whitespace or comma separated. Anything from and
+including a hash mark to the end of line is ignored.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 when decoding some VPD pages, give a little more output. For example the ATA
@@ -78,7 +97,8 @@ numbers are given the second number indicates which vendor specific VPD page
 to decode when several pages share the same VPD page number. If this option
 is not given (nor '\-i', '\-l' nor '\-V') then the "Supported VPD pages" (0x0)
 VPD page is fetched and decoded. If \fIPG\fR is '\-1' or 'sinq' then the
-standard INQUIRY response is output.
+standard INQUIRY response is output. This option may also be used with the
+\fI\-\-enumerate\fR (see its description).
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 suppress the amount of decoding output.
@@ -117,7 +137,7 @@ in the standard INQUIRY response, then the standard INQUIRY response is
 output as a pseudo VPD page when \fIPG\fR is set to '\-1' or 'sinq'. Also
 the decoding of some fields (e.g. the Extended INQUIRY page's SPT field)
 is expanded when the '\-\-long' option is given using the standard INQUIRY
-response information (e.g. the PDT and the PROTECT fields). 
+response information (e.g. the PDT and the PROTECT fields).
 .PP
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
@@ -188,6 +208,19 @@ option on the Extended inquiry data VPD page:
 .br
      ....
 .PP
+Search for the name (and acronym) of all pages that share VPD page number
+0xb0 .
+.PP
+   # sg_vpd \-\-page=0xb0 \-\-enumerate
+.br
+   Matching standard VPD pages:
+.br
+     bl         0xb0      Block limits (SBC)
+.br
+     oi         0xb0      OSD information
+.br
+     sad        0xb0      Sequential access device capabilities (SSC)
+.PP
 Further examples can be found on the http://sg.danny.cz/sg/sg3_utils.html
 web page.
 .SH AUTHOR
@@ -195,7 +228,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2012 Douglas Gilbert
+Copyright \(co 2006\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,28 +1,33 @@
-.TH SG_INQ "8" "November 2013" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_INQ "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
-sg_inq \- issue SCSI INQUIRY command, output and decode response
+sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
 .B sg_inq
 [\fI\-\-ata\fR] [\fI\-\-block=0|1\fR] [\fI\-\-cmddt\fR]
 [\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-len=LEN\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-inhex=FN\fR]
+[\fI\-\-len=LEN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR] [\fI\-c\fR]
 [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR]
-[\fI\-l=LEN\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR]
+[\fI\-I=FN\fR] [\fI\-l=LEN\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR]
 [\fI\-p=VPD_PG\fR] [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility by default sends a SCSI INQUIRY command to the given device and
+This utility, when \fIDEVICE\fR is given, sends a SCSI INQUIRY command to it
 then outputs the response. All SCSI devices are meant to respond to
 a "standard" INQUIRY command with at least a 36 byte response (in SCSI 2 and
 higher). An INQUIRY is termed as "standard" when both the EVPD and CmdDt (now
 obsolete) bits are clear.
+.PP
+Alternatively the \fI\-\-inhex=FN\fR option can be given. In this case
+\fIFN\fR is assumed to be a file name ('\-' for stdin) containing ASCII
+hexadecimal representing an INQUIRY response.
 .PP
 This utility supports two command line syntaxes. The preferred one is shown
 first in the synopsis and is described in the main OPTIONS section. A later
@@ -35,15 +40,15 @@ is mandatory. The \fI\-\-id\fR option decodes this page. New VPD page
 information is no longer being added to this utility. To get information
 on new VPD pages see the sg_vpd(8) or sdparm(8) utilities.
 .PP
-If the \fIDEVICE\fR exists and the SCSI INQUIRY fails (because the SG_IO ioctl
-is not supported) then an ATA IDENTIFY (PACKET) DEVICE is tried. If it
-succeeds then device identification strings are output. The \fI\-\-raw\fR
-and \fI\-\-hex\fR options can be used to manipulate the output. If the
-\fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
+In Linux, if the \fIDEVICE\fR exists and the SCSI INQUIRY fails (e.g. because
+the SG_IO ioctl is not supported) then an ATA IDENTIFY (PACKET) DEVICE is
+tried. If it succeeds then device identification strings are output. The
+\fI\-\-raw\fR and \fI\-\-hex\fR options can be used to manipulate the output.
+If the \fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
 and the \fIDEVICE\fR is assumed to be ATA (or ATAPI).
 .PP
 The reference document used for interpreting an INQUIRY is T10/1713\-D
-Revision 36e (SPC\-4, 24 August 2012) found at http://www.t10.org .
+Revision 36q (SPC\-4, 12 February 2014) found at http://www.t10.org .
 Obsolete and reserved items in the standard INQUIRY response output are
 displayed in brackets. The reference document for the ATA IDENTIFY (PACKET)
 DEVICE command is ATA8\-ACS found at http://www.t13.org .
@@ -119,9 +124,23 @@ words). When used three times with the ATA Information VPD page [0x89] or
 the \fI\-\-ata\fR option, this utility outputs the ATA IDENTIFY (PACKET)
 DEVICE response in hexadecimal words suitable for input
 to 'hdparm \-\-Istdin'.  See note below.
+.br
+To generate output suitable for placing in a file that can be used by a
+later invocation with the \fI\-\-inhex=FN\fR option, use the '\-HHHH'
+option (e.g. 'sg_inq \-p di -HHHH /dev/sg3 > dev_id.hex').
 .TP
 \fB\-i\fR, \fB\-\-id\fR
 prints the device identification VPD page [0x83].
+.TP
+\fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
+\fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
+ASCII hexadecimal respresenting an INQUIRY (including VPD page) response.
+This utility will then decode that response. It is preferable to also
+supply the \fI\-\-page=PG\fR option, if not this utulity will attempt
+to guess which VPD page (or standard INQUIRY) the response is associated
+with. The hexadecimal should be arranged as 1 or 2 digits representing a
+byte each of which is whitespace or comma separated. Anything from and
+including a hash mark to the end of line is ignored.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.
@@ -146,6 +165,10 @@ page. To enumerate the available abbreviations for VPD pages use '\-hh' or
 a bad abbreviation (e.g, '\-\-page=xxx'). When the \fI\-\-cmddt\fR option is
 given (once) then \fIPG\fR is interpreted as an opcode number (so VPD page
 abbreviations make little sense).
+.br
+If \fIPG\fR is a negative number, then a standard INQUIRY is performed. This
+can be used to override some guessing logic associated with the
+\fI\-\-inhex=FN\fR option.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the response in binary to stdout. Error messages and warnings, if
@@ -301,6 +324,9 @@ descriptors". If \fI\-h\fR is given then each descriptor header is decoded
 and the identifier itself is output in hex. To see the whole VPD 0x83 page
 response in hex use '\-p=83 \-h'.
 .TP
+\fB\-I\fR=\fIFN\fR
+equivalent to \fI\-\-inhex=FN\fR in the OPTIONS section.
+.TP
 \fB\-m\fR
 decodes the Management network addresses VPD page [0x85]. Equivalent
 to '\-\-page=mna' in the OPTIONS section.
@@ -393,7 +419,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2013 Douglas Gilbert
+Copyright \(co 2001\-2014 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

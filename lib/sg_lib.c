@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2013 Douglas Gilbert.
+ * Copyright (c) 1999-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -1092,7 +1092,7 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
 
     if ((sense_buffer && (sb_len > 2)) &&
         (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh))) {
-        switch (ssh.sense_key) {
+        switch (ssh.sense_key) {        /* 0 to 0x1f */
         case SPC_SK_NO_SENSE:
             return SG_LIB_CAT_NO_SENSE;
         case SPC_SK_RECOVERED_ERROR:
@@ -1118,9 +1118,11 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
             return SG_LIB_CAT_MISCOMPARE;
         case SPC_SK_DATA_PROTECT:
         case SPC_SK_COMPLETED:
+        case SPC_SK_COPY_ABORTED:
+        case SPC_SK_VOLUME_OVERFLOW:
             return SG_LIB_CAT_SENSE;
         default:
-            ;   /* rare and obsolete sense keys return SG_LIB_CAT_SENSE */
+            ;   /* reserved and vendor specific sense keys fall through */
         }
     }
     return SG_LIB_CAT_SENSE;
@@ -1259,8 +1261,8 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             my_snprintf(buff, buff_len, "%s", vnp->name);
         else
-            my_snprintf(buff, buff_len, "Extended copy, service action=0x%x",
-                        service_action);
+            my_snprintf(buff, buff_len, "Third party copy out, service "
+                        "action=0x%x", service_action);
         break;
     case SG_RECEIVE_COPY:
         /* 'Receive copy results' was renamed 'Third party copy in' in
@@ -1270,8 +1272,8 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         if (vnp)
             my_snprintf(buff, buff_len, "%s", vnp->name);
         else
-            my_snprintf(buff, buff_len, "Receive copy, service action=0x%x",
-                        service_action);
+            my_snprintf(buff, buff_len, "Third party copy in, service "
+                        "action=0x%x", service_action);
         break;
     case SG_READ_BUFFER:
         /* spc4r34 requested treating mode as service action */
@@ -1419,7 +1421,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     unsigned char c;
     char buff[82];
     int a = 0;
-    const int bpstart = 5;
+    int bpstart = 5;
     const int cpstart = 60;
     int cpos = cpstart;
     int bpos = bpstart;
@@ -1428,14 +1430,17 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     if (len <= 0)
         return;
     blen = (int)sizeof(buff);
-    formatstr = (0 == no_ascii) ? "%.76s\n" : "%.56s\n";
+    formatstr = (0 == no_ascii) ? "%.76s\n" : "%.48s\n";
     memset(buff, ' ', 80);
     buff[80] = '\0';
     if (no_ascii < 0) {
+        bpstart = 0;
+        bpos = bpstart;
         for (k = 0; k < len; k++) {
             c = *p++;
-            bpos += 3;
-            if (bpos == (bpstart + (9 * 3)))
+            if (0 != (k % 16))
+                bpos += 3;
+            if (bpos == (bpstart + (8 * 3)))
                 bpos++;
             my_snprintf(&buff[bpos], blen - bpos, "%.2x",
                         (int)(unsigned char)c);

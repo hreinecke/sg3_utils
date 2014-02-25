@@ -2,7 +2,7 @@
 # Skript to rescan SCSI bus, using the 
 # scsi add-single-device mechanism
 # (c) 1998--2010 Kurt Garloff <kurt@garloff.de>, GNU GPL v2 or v3
-# (c) 2006--2013 Hannes Reinecke, GNU GPL v2 or later
+# (c) 2006--2014 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
 SCAN_WILD_CARD=4294967295
@@ -1110,8 +1110,9 @@ else
   echo -n "Scanning host $host "
   if test -e /sys/class/fc_host/host$host ; then
     # It's pointless to do a target scan on FC
-    if test -n "$lipreset" ; then
-      echo 1 > /sys/class/fc_host/host$host/issue_lip 2> /dev/null;
+    issue_lip=/sys/class/fc_host/host$host/issue_lip
+    if test -e $issue_lip -a -n "$lipreset" ; then
+      echo 1 > $issue_lip 2> /dev/null;
       udevadm_settle
     fi
     channelsearch=

@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -29,11 +30,15 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.04 20140110";
+static const char * version_str = "1.05 20140203";
 
 
 #define DEF_TIMEOUT_SECS 60
 #define MAX_NUM_ADDR 128
+
+#ifndef UINT32_MAX
+#define UINT32_MAX ((uint32_t)-1)
+#endif
 
 
 static struct option long_options[] = {
@@ -49,10 +54,30 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+
+#ifdef __GNUC__
+static int pr2serr(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2serr(const char * fmt, ...);
+#endif
+
+static int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
+    pr2serr("Usage: "
           "sg_unmap [--anchor] [--grpnum=GN] [--help] [--in=FILE]\n"
           "                [--lba=LBA,LBA...] [--num=NUM,NUM...] "
           "[--timeout=TO]\n"
@@ -85,7 +110,7 @@ usage()
 
 /* Trying to decode multipliers as sg_get_llnum() [in sg_libs] does would
  * only confuse things here, so use this local trimmed version */
-int64_t
+static int64_t
 get_llnum(const char * buf)
 {
     int res, len;
@@ -133,12 +158,12 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
     if (0 == in_len)
         *lba_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
-        fprintf(stderr, "'--lba' cannot be read from stdin\n");
+        pr2serr("'--lba' cannot be read from stdin\n");
         return 1;
     } else {        /* list of numbers (default decimal) on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX, ");
         if (in_len != k) {
-            fprintf(stderr, "build_lba_arr: error at pos %d\n", k + 1);
+            pr2serr("build_lba_arr: error at pos %d\n", k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
@@ -155,14 +180,14 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                fprintf(stderr, "build_lba_arr: error at pos %d\n",
+                pr2serr("build_lba_arr: error at pos %d\n",
                         (int)(lcp - inp + 1));
                 return 1;
             }
         }
         *lba_arr_len = k + 1;
         if (k == max_arr_len) {
-            fprintf(stderr, "build_lba_arr: array length exceeded\n");
+            pr2serr("build_lba_arr: array length exceeded\n");
             return 1;
         }
     }
@@ -191,18 +216,23 @@ build_num_arr(const char * inp, uint32_t * num_arr,
     if (0 == in_len)
         *num_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
-        fprintf(stderr, "'--len' cannot be read from stdin\n");
+        pr2serr("'--len' cannot be read from stdin\n");
         return 1;
     } else {        /* list of numbers (default decimal) on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX, ");
         if (in_len != k) {
-            fprintf(stderr, "build_num_arr: error at pos %d\n", k + 1);
+            pr2serr("build_num_arr: error at pos %d\n", k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
             ll = get_llnum(lcp);
             if (-1 != ll) {
-                num_arr[k] = (uint32_t)ll;      // could truncate
+                if (ll > UINT32_MAX) {
+                    pr2serr("build_num_arr: number exceeds 32 bits at pos "
+                            "%d\n", (int)(lcp - inp + 1));
+                    return 1;
+                }
+                num_arr[k] = (uint32_t)ll;
                 cp = (char *)strchr(lcp, ',');
                 c2p = (char *)strchr(lcp, ' ');
                 if (NULL == cp)
@@ -213,14 +243,14 @@ build_num_arr(const char * inp, uint32_t * num_arr,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                fprintf(stderr, "build_num_arr: error at pos %d\n",
+                pr2serr("build_num_arr: error at pos %d\n",
                         (int)(lcp - inp + 1));
                 return 1;
             }
         }
         *num_arr_len = k + 1;
         if (k == max_arr_len) {
-            fprintf(stderr, "build_num_arr: array length exceeded\n");
+            pr2serr("build_num_arr: array length exceeded\n");
             return 1;
         }
     }
@@ -249,8 +279,7 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
     else {
         fp = fopen(file_name, "r");
         if (NULL == fp) {
-            fprintf(stderr, "build_joint_arr: unable to open %s\n",
-                    file_name);
+            pr2serr("build_joint_arr: unable to open %s\n", file_name);
             return 1;
         }
     }
@@ -278,8 +307,8 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfFhHxX ,\t");
         if ((k < in_len) && ('#' != lcp[k])) {
-            fprintf(stderr, "build_joint_arr: syntax error at "
-                    "line %d, pos %d\n", j + 1, m + k + 1);
+            pr2serr("build_joint_arr: syntax error at line %d, pos %d\n",
+                    j + 1, m + k + 1);
             return 1;
         }
         for (k = 0; k < 1024; ++k) {
@@ -288,13 +317,18 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
                 ind = ((off + k) >> 1);
                 bit0 = 0x1 & (off + k);
                 if (ind >= max_arr_len) {
-                    fprintf(stderr, "build_joint_arr: array length "
-                            "exceeded\n");
+                    pr2serr("build_joint_arr: array length exceeded\n");
                     return 1;
                 }
-                if (bit0)
-                   num_arr[ind] = (uint32_t)ll;
-                else
+                if (bit0) {
+                    if (ll > UINT32_MAX) {
+                        pr2serr("build_joint_arr: number exceeds 32 bits in "
+                                "line %d, at pos %d\n", j + 1,
+                                (int)(lcp - line + 1));
+                        return 1;
+                    }
+                    num_arr[ind] = (uint32_t)ll;
+                } else
                    lba_arr[ind] = (uint64_t)ll;
                 lcp = strpbrk(lcp, " ,\t");
                 if (NULL == lcp)
@@ -307,17 +341,16 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
                     --k;
                     break;
                 }
-                fprintf(stderr, "build_joint_arr: error in "
-                        "line %d, at pos %d\n", j + 1,
-                        (int)(lcp - line + 1));
+                pr2serr("build_joint_arr: error on line %d, at pos %d\n",
+                        j + 1, (int)(lcp - line + 1));
                 return 1;
             }
         }
         off += (k + 1);
     }
     if (0x1 & off) {
-        fprintf(stderr, "build_joint_arr: expect LBA,NUM pairs but decoded "
-                "odd number\n  from %s\n", have_stdin ? "stdin" : file_name);
+        pr2serr("build_joint_arr: expect LBA,NUM pairs but decoded odd "
+                "number\n  from %s\n", have_stdin ? "stdin" : file_name);
         return 1;
     }
     *arr_len = off >> 1;
@@ -362,7 +395,7 @@ main(int argc, char * argv[])
             if ((1 == num) && ((res < 0) || (res > 31)))
                 grpnum = res;
             else {
-                fprintf(stderr, "value for '--grpnum=' must be 0 to 31\n");
+                pr2serr("value for '--grpnum=' must be 0 to 31\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -382,7 +415,7 @@ main(int argc, char * argv[])
         case 't':
             timeout = sg_get_num(optarg);
             if (timeout < 0)  {
-                fprintf(stderr, "bad argument to '--timeout'\n");
+                pr2serr("bad argument to '--timeout'\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else if (0 == timeout)
                 timeout = DEF_TIMEOUT_SECS;
@@ -391,10 +424,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -406,30 +439,28 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
     if (in_op && (lba_op || num_op)) {
-        fprintf(stderr, "expect '--in=' by itself, or both '--lba=' and "
-                "'--num='\n");
+        pr2serr("expect '--in=' by itself, or both '--lba=' and '--num='\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     } else if (in_op || (lba_op && num_op))
         ;
     else {
         if (lba_op)
-            fprintf(stderr, "since '--lba=' is given, also need '--num='\n");
+            pr2serr("since '--lba=' is given, also need '--num='\n");
         else
-            fprintf(stderr, "expect either both '--lba=' and '--num=', or "
+            pr2serr("expect either both '--lba=' and '--num=', or "
                     "'--in=' by itself\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
@@ -441,16 +472,16 @@ main(int argc, char * argv[])
     if (lba_op && num_op) {
         if (0 != build_lba_arr(lba_op, addr_arr, &addr_arr_len,
                                MAX_NUM_ADDR)) {
-            fprintf(stderr, "bad argument to '--lba'\n");
+            pr2serr("bad argument to '--lba'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if (0 != build_num_arr(num_op, num_arr, &num_arr_len,
                                MAX_NUM_ADDR)) {
-            fprintf(stderr, "bad argument to '--num'\n");
+            pr2serr("bad argument to '--num'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if ((addr_arr_len != num_arr_len) || (num_arr_len <= 0)) {
-            fprintf(stderr, "need same number of arguments to '--lba=' "
+            pr2serr("need same number of arguments to '--lba=' "
                     "and '--num=' options\n");
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -458,12 +489,12 @@ main(int argc, char * argv[])
     if (in_op) {
         if (0 != build_joint_arr(in_op, addr_arr, num_arr, &addr_arr_len,
                                  MAX_NUM_ADDR)) {
-            fprintf(stderr, "bad argument to '--in'\n");
+            pr2serr("bad argument to '--in'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if (addr_arr_len <= 0) {
-            fprintf(stderr, "no addresses found in '--in=' argument, file: "
-                    "%s\n", in_op);
+            pr2serr("no addresses found in '--in=' argument, file: %s\n",
+                    in_op);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -496,8 +527,7 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -505,29 +535,29 @@ main(int argc, char * argv[])
                          1, verbose);
     ret = res;
     if (SG_LIB_CAT_NOT_READY == res) {
-        fprintf(stderr, "UNMAP failed, device not ready\n");
+        pr2serr("UNMAP failed, device not ready\n");
         goto err_out;
     } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        fprintf(stderr, "UNMAP, unit attention\n");
+        pr2serr("UNMAP, unit attention\n");
         goto err_out;
     } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-        fprintf(stderr, "UNMAP, aborted command\n");
+        pr2serr("UNMAP, aborted command\n");
         goto err_out;
     } else if (SG_LIB_CAT_INVALID_OP == res) {
-        fprintf(stderr, "UNMAP not supported\n");
+        pr2serr("UNMAP not supported\n");
         goto err_out;
     } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-        fprintf(stderr, "bad field in UNMAP cdb\n");
+        pr2serr("bad field in UNMAP cdb\n");
         goto err_out;
     } else if (0 != res) {
-        fprintf(stderr, "UNMAP failed (use '-v' to get more information)\n");
+        pr2serr("UNMAP failed (use '-v' to get more information)\n");
         goto err_out;
     }
 
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

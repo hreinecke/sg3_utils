@@ -15,8 +15,11 @@ Christophe Varoqui <christophe dot varoqui at free dot fr> original sg_rtpg
 
 Clayton Weaver <cgweav at email dot com> contributed safe_strerror().
 
+Dan Horak <dhorak at redhat dot com> website support for this package and
+        others. Lot of fixes, recently man pages [20140128]
+
 Dave Johnson <ddj at ccv dot brown dot edu> improved disk defect list
-      handling [20051218]
+        handling [20051218]
 
 Dave Williams <dave at opensourcesolutions dot co dot uk> help with
         sgp_dd especially and "> 0x7fffffff" with sg*_dd [20060303]
@@ -127,4 +130,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-28th August 2013
+28th January 2014

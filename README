@@ -187,7 +187,9 @@ systems. The 'sg3_utils.spec' file in the main directory can be used like
 this: 'rpmbuild -ba sg3_utils.spec' in a rpmbuild tree SPECS directory.
 To cross build or make a more widely distributable package then the --target
 option may be useful: 'rpmbuild --target=i386 -ba sg3_utils.spec' or
-'rpmbuild --target=x86_64 -ba sg3_utils.spec' .
+'rpmbuild --target=x86_64 -ba sg3_utils.spec' . The sg3_utils.spec file
+in the main directory targets Red Hat systems, an alternative "spec" file
+for Suse systems has been placed under the 'suse' directory.
 
 The 'build_debian.sh' script should build several "deb" packages and place
 them in the parent directory. In debian based systems doing
@@ -333,7 +335,7 @@ time. While holding O_EXCL control a thread attempts a double increment
 on an integer in the given LBA. If the integer starts even (after the
 first read) then it should remain even if the O_EXCL flag is doing its job.
 The "sg_tst_excl" variant uses the Linux SG_IO v3 interface while the
-"sg_tst_excl2" uses the more generic sg_pt infrastructure. 
+"sg_tst_excl2" uses the more generic sg_pt infrastructure.
 
 "sg_tst_excl3" is a variant of "sg_tst_excl2". "sg_tst_excl3" only does
 the double increment from the first thread, each time using O_EXCL on
@@ -401,4 +403,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-17th January 2014
+15th February 2014

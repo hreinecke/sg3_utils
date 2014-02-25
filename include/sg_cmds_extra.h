@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -12,16 +12,23 @@
 extern "C" {
 #endif
 
+/* Note: all functions that have an 'int timeout_secs' argument will use
+ * that value if it is > 0. Otherwise they will set an internal default
+ * which is currently 60 seconds. This timeout is typically applied in the
+ * SCSI stack above the initiator. If it goes off then the SCSI command is
+ * aborted and there can be other unwelcome side effects. Note that some
+ * commands (e.g. FORMAT UNIT and the Third Party copy commands) can take
+ * a lot longer than the default timeout. */
 
-/* Invokes a ATA PASS-THROUGH (12 or 16) SCSI command (SAT). If cdb_len
- * is 12 then a ATA PASS-THROUGH (12) command is called. If cdb_len is 16
- * then a ATA PASS-THROUGH (16) command is called. If cdb_len is any other
- * value -1 is returned. After copying from cdbp to an internal buffer,
- * the first byte (i.e. offset 0) is set to 0xa1 if cdb_len is 12; or is
- * set to 0x85 if cdb_len is 16. The last byte (offset 11 or offset 15) is
- * set to 0x0 in the internal buffer. If timeout_secs <= 0 then the timeout
- * is set to 60 seconds. For data in or out transfers set dinp or doutp,
- * and dlen to the number of bytes to transfer. If dlen is zero then no data
+
+/* Invokes a ATA PASS-THROUGH (12 or 16) SCSI command (SAT). If cdb_len is
+ * 12 then a ATA PASS-THROUGH (12) command is called. If cdb_len is 16 then
+ * a ATA PASS-THROUGH (16) command is called. If cdb_len is any other value
+ * -1 is returned. After copying from cdbp to an internal buffer, the first
+ * byte (i.e. offset 0) is set to 0xa1 if cdb_len is 12; or is set to 0x85
+ * if cdb_len is 16. The last byte (offset 11 or offset 15) is set to 0x0 in
+ * the internal buffer. For data in or out transfers set dinp or doutp, and
+ * dlen to the number of bytes to transfer. If dlen is zero then no data
  * transfer is assumed. If sense buffer obtained then it is written to
  * sensep, else sensep[0] is set to 0x0. If ATA return descriptor is obtained
  * then written to ata_return_dp, else ata_return_dp[0] is set to 0x0. Either
@@ -173,7 +180,9 @@ int sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
                            int verbose);
 
 /* Invokes a SCSI SEND DIAGNOSTIC command. Foreground, extended self tests can
- * take a long time, if so set long_duration flag. Return of 0 -> success,
+ * take a long time, if so set long_duration flag in which case the timout
+ * is set to 7200 seconds; if the value of long_duration is > 7200 then that
+ * value is taken as the timeout value in seconds. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Send diagnostic not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,

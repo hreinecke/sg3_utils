@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.41 20140105";
+static const char * version_str = "0.42 20140123";
 
 #define ME "sg_xcopy: "
 
@@ -90,6 +90,32 @@ static const char * version_str = "0.41 20140105";
 #endif
 
 #define SG_LIB_FLOCK_ERR 90
+
+/* In SPC-4 the cdb opcodes have more generic names */
+#define THIRD_PARTY_COPY_OUT_CMD 0x83
+#define THIRD_PARTY_COPY_IN_CMD 0x84
+
+/* Third party copy IN (opcode 0x84) and OUT (opcode 0x83) command service
+ * actions */
+#define SA_XCOPY_LID1           0x0     /* OUT, originate */
+#define SA_XCOPY_LID4           0x1     /* OUT, originate */
+#define SA_POP_TOK              0x10    /* OUT, originate */
+#define SA_WR_USING_TOK         0x11    /* OUT, originate */
+#define SA_COPY_ABORT           0x1C    /* OUT, abort */
+#define SA_COPY_STATUS_LID1     0x0     /* IN, retrieve */
+#define SA_COPY_DATA_LID1       0x1     /* IN, retrieve */
+#define SA_COPY_OP_PARAMS       0x3     /* IN, retrieve */
+#define SA_COPY_FAIL_DETAILS    0x4     /* IN, retrieve */
+#define SA_COPY_STATUS_LID4     0x5     /* IN, retrieve */
+#define SA_COPY_DATA_LID4       0x6     /* IN, retrieve */
+#define SA_ROD_TOK_INFO         0x7     /* IN, retrieve */
+#define SA_ALL_ROD_TOKS         0x8     /* IN, retrieve */
+
+#define DEF_3PC_OUT_TIMEOUT (10 * 60)   /* is 10 minutes enough? */
+#define DEF_GROUP_NUM 0x0
+
+#define VPD_DEVICE_ID 0x83
+#define VPD_3PARTY_COPY 0x8f
 
 #define FT_OTHER 1              /* filetype is probably normal */
 #define FT_SG 2                 /* filetype is sg or bsg char device */
@@ -628,7 +654,9 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     xcopyBuff[11] = seg_desc_len; /* One segment descriptor */
     desc_offset += seg_desc_len;
     /* set noisy so if a UA happens it will be printed to stderr */
-    return sg_ll_extended_copy(sg_fd, xcopyBuff, desc_offset, 1, verb);
+    return sg_ll_3party_copy_out(sg_fd, SA_XCOPY_LID1, list_id,
+                                 DEF_GROUP_NUM, DEF_3PC_OUT_TIMEOUT,
+                                 xcopyBuff, desc_offset, 1, verb);
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
@@ -694,15 +722,13 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
         else if (0x1 == xfp->pdt)
             ftype |= FT_ST;
     }
-    /* In SPC-4 opcode 0x84, service action 0x3 is called RECEIVE COPY
-     * OPERATING PARAMETERS */
-    res = sg_ll_receive_copy_results(xfp->sg_fd, 0x03, 0, rcBuff, rcBuffLen,
-                                     1, verb);
+    res = sg_ll_receive_copy_results(xfp->sg_fd, SA_COPY_OP_PARAMS, 0, rcBuff,
+                                     rcBuffLen, 1, verb);
     if (0 != res)
         return -res;
 
-    len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
-          rcBuff[3];
+    len = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
+           rcBuff[3]) + 4;
     if (len > rcBuffLen) {
         pr2serr("  <<report too long for internal buffer, output "
                 "truncated\n");
@@ -1185,20 +1211,24 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
 
     verb = (verbose ? verbose - 1: 0);
     memset(rcBuff, 0xff, len);
-    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, 4, 1, verb);
+    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, 4, 1, verb);
     if (0 != res) {
-        pr2serr("VPD inquiry failed with %d\n", res);
+        if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            pr2serr("Device identification VPD page not found\n");
+        else
+            pr2serr("VPD inquiry failed with %d, try again with '-vv'\n",
+                    res);
         return res;
-    } else if (rcBuff[1] != 0x83) {
+    } else if (rcBuff[1] != VPD_DEVICE_ID) {
         pr2serr("invalid VPD response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     len = ((rcBuff[2] << 8) + rcBuff[3]) + 4;
-    res = sg_ll_inquiry(sg_fd, 0, 1, 0x83, rcBuff, len, 1, verb);
+    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, len, 1, verb);
     if (0 != res) {
         pr2serr("VPD inquiry failed with %d\n", res);
         return res;
-    } else if (rcBuff[1] != 0x83) {
+    } else if (rcBuff[1] != VPD_DEVICE_ID) {
         pr2serr("invalid VPD response\n");
         return SG_LIB_CAT_MALFORMED;
     }

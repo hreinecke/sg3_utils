@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.91 20140117";  /* spc4r36o, sbc3r36 */
+const char * sg_lib_version_str = "1.94 20140213";  /* spc4r36q, sbc3r36 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -476,7 +476,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20131008 */
+ * The following should match asc-num.txt dated 20140122 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -1261,7 +1261,7 @@ const char * sg_lib_pdt_strs[] = {
     /* 0 */ "disk",
     "tape",
     "printer",
-    "processor",        /* often SAF-TE (seldom scanner) device */
+    "processor",        /* often SAF-TE device, copy manager */
     "write once optical disk",
     /* 5 */ "cd/dvd",
     "scanner",                  /* obsolete */
@@ -1278,7 +1278,8 @@ const char * sg_lib_pdt_strs[] = {
     "object based storage",
     "automation/driver interface",
     "security manager device",
-    "0x14", "0x15", "0x16", "0x17", "0x18",
+    "zoned block commands",
+    "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
     "well known logical unit",
     "no physical device on this lu",
@@ -1292,7 +1293,7 @@ const char * sg_lib_transport_proto_strs[] =
     "Serial Bus Protocol for IEEE 1394 (SBP-3)",
     "SCSI RDMA Protocol (SRP)",
     "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI Protocol (SPL-2)",
+    "Serial Attached SCSI Protocol (SPL-3)",
     "Automation/Drive Interface Transport (ADT-2)",
     "AT Attachment Interface (ACS-2)",          /* 0x8 */
     "USB Attached SCSI (UAS-2)",

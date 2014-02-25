@@ -1,9 +1,9 @@
-.TH HXASCDMP "1" "September 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH HXASCDMP "1" "February 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 hxascdmp \- hexadecimal ASCII dump
 .SH SYNOPSIS
 .B hxascdmp
-[\fI\-b=BPL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-V\fR]
+[\fI\-b=BPL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-N\fR] [\fI\-V\fR]
 [\fIFILE+\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -18,8 +18,12 @@ single space (apart from the 8th and 9th bytes which are separated by two
 spaces). If the \fI\-H\fR is not given, there is then a string of 16 ASCII
 characters corresponding to the hexadecimal bytes earlier in the line; only
 bytes in the range 0x20 to 0x7e are printed in ASCII, other bytes values are
-printed as '.' . Each \fIFILE\fR name that appears on the command line is
-printed on a separate line prior to that file's hexadecimal ASCII dump.
+printed as '.' . If the \fI\-H\fR is not given, each \fIFILE\fR name that
+appears on the command line is printed on a separate line prior to that
+file's hexadecimal ASCII dump.
+.PP
+If the \fI\-N\fR option is given then no address is printed out and each
+line starts with the next hexadecimal byte.
 .PP
 This utility is pretty close to the 'hexdump -C' variant of BSD's
 .B hexdump(1)
@@ -38,6 +42,9 @@ output the usage message then exit.
 \fB\-H\fR
 output hexadecimal only (i.e. don't place an ASCII representation at the
 end of each line).
+.TP
+\fB\-N\fR
+no address; so each line starts with the next hexadecimal byte.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
@@ -91,7 +98,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2010 Douglas Gilbert
+Copyright \(co 2004\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
