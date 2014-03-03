@@ -32,7 +32,7 @@
 
 */
 
-static const char * version_str = "0.79 20140216";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.80 20140303";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -2354,6 +2354,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
+        printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* T10/14-018r02 */
         printf("  FUAB=%d\n", buff[8] & 0x2);
         printf("  VBULS=%d\n", buff[8] & 0x1);
         break;

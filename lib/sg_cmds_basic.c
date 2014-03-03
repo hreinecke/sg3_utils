@@ -178,7 +178,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         }
         if (mx_di_len > 0) {
             got = mx_di_len - resid;
-            if (verbose && (resid > 0))
+            if ((verbose > 1) && (resid > 0))
                 fprintf(sg_warnings_strm, "    %s: pass-through requested "
                         "%d bytes (data-in) but got %d bytes\n", leadin,
                         mx_di_len, got);
