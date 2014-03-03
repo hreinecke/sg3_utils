@@ -41,6 +41,8 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
+static const char * version_str = "1.31 20140303";    /* SPC-4 rev 36q */
+
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
  * standard INQUIRY is 36 (bytes), especially if this is the first
@@ -67,8 +69,6 @@
  * is now a REPORT SUPPORTED OPERATION CODES command that yields similar
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
-
-static const char * version_str = "1.30 20140222";    /* SPC-4 rev 36q */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -2330,6 +2330,8 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
                 printf("reserved [%u]\n", u);
                 break;
             }
+            printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* T10/14-018r02 */
+            printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
             break;
         case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:

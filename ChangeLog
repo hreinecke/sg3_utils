@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20140222] [svn: r556]
+Changelog for sg3_utils-1.38 [20140303] [svn: r557]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers
     - new --data=@FN to read hex data from file FN
@@ -14,6 +14,7 @@ Changelog for sg3_utils-1.38 [20140222] [svn: r556]
       another sg_inq invocation to use --inhex
     - add LU_CONG to standard inquiry response output
     - decode ASCII information VPD pages
+    - add HAW_ZBC in block char. VPD page (14-018r02)
     - sync version descriptors dated 20131126
     - allow --page=-1 to force std INQUIRY decoding
     - fix overflow in encode_whitespaces
@@ -21,6 +22,7 @@ Changelog for sg3_utils-1.38 [20140222] [svn: r556]
   - sg_vpd: add LU_CONG to standard inquiry response output
     - add --inhex=FN to read response in from a file
     - decode Third Party Copy (tpc) page
+    - add HAW_ZBC in block char. VPD page (14-018r02)
     - add LTO and DDS vendor pages
     - allow --page=num to restrict --enumerate output
   - sg_persist: add PROUT: Replace Lost Reservation (spc4r36)
