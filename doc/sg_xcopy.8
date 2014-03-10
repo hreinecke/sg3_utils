@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "December 2013" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_XCOPY "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -41,6 +41,11 @@ By default the XCOPY command is sent to \fIOFILE\fR. This can be changed
 with the \fI\-\-on_src\fR or \fIiflag=xflag\R options which cause the XCOPY
 command to be sent to \fIIFILE\fR instead. Also see the section on
 ENVIRONMENT VARIABLES.
+.PP
+The ddpt utility supports the same xcopy(LID1) functionality as this utility
+with the same options and flags. Additionally ddpt supports a subset of
+xcopy(LID4) functionality variously called "xcopy version 2, lite" or ODX.
+ODX is a market name and stands for Offloaded Data Xfer (i.e. transfer).
 .SH OPTIONS
 .TP
 \fBbpt\fR=\fIBPT\fR
@@ -322,7 +327,7 @@ Written by Hannes Reinecke and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2013 Hannes Reinecke and Douglas Gilbert
+Copyright \(co 2000\-2014 Hannes Reinecke and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -346,4 +351,4 @@ recovery see
 .B sdparm(sdparm)
 .PP
 See also
-.B dd(1), sg_copy_results(sg3_utils), ddrescue(GNU), ddpt(ddpt)
+.B dd(1), sg_copy_results(sg3_utils), ddrescue(GNU), ddpt,ddptctl(ddpt)
