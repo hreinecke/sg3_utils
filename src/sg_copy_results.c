@@ -35,7 +35,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.7 20140123";
+static const char * version_str = "1.8 20140308";
 
 
 #define MAX_XFER_LEN 10000
@@ -286,7 +286,7 @@ usage()
           "sg_copy_results [--failed|--params|--receive|--status] [--help]\n"
           "                       [--hex] [--list_id=ID] [--verbose] "
           "[--version]\n"
-          "                       DEVICE\n"
+          "                       [--xfer_len=BTL] DEVICE\n"
           "  where:\n"
           "    --failed|-f          use FAILED SEGMENT DETAILS service "
           "action\n"
