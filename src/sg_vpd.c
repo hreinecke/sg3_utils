@@ -15,6 +15,7 @@
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#include <errno.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -32,7 +33,7 @@
 
 */
 
-static const char * version_str = "0.80 20140303";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.81 20140311";    /* spc4r36 + sbc3r35 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -227,8 +228,10 @@ usage()
             "twice for\n"
             "                    short logical unit designator (equiv: "
             "'-qp di_lu')\n"
-            "    --inhex=FN|-I FN    use ASCII hex in file FN instead of "
-            "DEVICE\n"
+            "    --inhex=FN|-I FN    read ASCII hex from file FN instead of "
+            "DEVICE;\n"
+            "                        if used with --raw then read binary "
+            "from FN\n"
             "    --long|-l       perform extra decoding\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
@@ -247,16 +250,17 @@ usage()
             "response.\n");
 }
 
-/* Read ASCII hex bytes from fname (a file named '-' taken as stdin).
- * There should be either one entry per line or a comma, space or tab
- * separated list of bytes. If no_space is set then a string of ACSII hex
- * digits is expected, 2 per byte. Everything from and including a '#'
- * on a line is ignored.  Returns 0 if ok, or 1 if error. */
+/* Read ASCII hex bytes or binary from fname (a file named '-' taken as
+ * stdin). If reading ASCII hex then there should be either one entry per
+ * line or a comma, space or tab separated list of bytes. If no_space is
+ * set then a string of ACSII hex digits is expected, 2 per byte. Everything
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
+ * error. */
 static int
-f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
-          int * mp_arr_len, int max_arr_len)
+f2hex_arr(const char * fname, int as_binary, int no_space,
+          unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line;
+    int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
     unsigned int h;
     const char * lcp;
     FILE * fp;
@@ -269,15 +273,44 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
     fn_len = strlen(fname);
     if (0 == fn_len)
         return 1;
-    if ((1 == fn_len) && ('-' == fname[0]))        /* read from stdin */
-        fp = stdin;
-    else {
-        fp = fopen(fname, "r");
-        if (NULL == fp) {
-            pr2serr("Unable to open %s for reading\n", fname);
+    has_stdin = ((1 == fn_len) && ('-' == fname[0]));   /* read from stdin */
+    if (as_binary) {
+        if (has_stdin)
+            fd = STDIN_FILENO;
+        else {
+            fd = open(fname, O_RDONLY);
+            if (fd < 0) {
+                pr2serr("unable to open binary file %s: %s\n", fname,
+                         safe_strerror(errno));
+                return 1;
+            }
+        }
+        k = read(fd, mp_arr, max_arr_len);
+        if (k <= 0) {
+            if (0 == k)
+                pr2serr("read 0 bytes from binary file %s\n", fname);
+            else
+                pr2serr("read from binary file %s: %s\n", fname,
+                        safe_strerror(errno));
+            if (! has_stdin)
+                close(fd);
             return 1;
         }
-    }
+        *mp_arr_len = k;
+        if (! has_stdin)
+            close(fd);
+        return 0;
+    } else {    /* So read the file as ASCII hex */
+        if (has_stdin)
+            fp = stdin;
+        else {
+            fp = fopen(fname, "r");
+            if (NULL == fp) {
+                pr2serr("Unable to open %s for reading\n", fname);
+                return 1;
+            }
+        }
+     }
 
     carry_over[0] = 0;
     for (j = 0; j < 512; ++j) {
@@ -3230,8 +3263,10 @@ main(int argc, char * argv[])
             pr2serr("Cannot have both a DEVICE and --inhex= option\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (f2hex_arr(inhex_fn, 0, rsp_buff, &inhex_len, sizeof(rsp_buff)))
+        if (f2hex_arr(inhex_fn, do_raw, 0, rsp_buff, &inhex_len,
+                      sizeof(rsp_buff)))
             return SG_LIB_FILE_ERROR;
+        do_raw = 0;         /* don't want raw on output with --inhex= */
         if (NULL == page_str) {       /* may be able to deduce VPD page */
             if ((0x2 == (0xf & rsp_buff[3])) && (rsp_buff[2] > 2)) {
                 if (do_verbose)

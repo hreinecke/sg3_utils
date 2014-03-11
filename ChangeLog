@@ -2,14 +2,15 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20140308] [svn: r558]
+Changelog for sg3_utils-1.38 [20140311] [svn: r559]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers
     - new --data=@FN to read hex data from file FN
     - error and warning message cleanup
     - add --maxlen= option
   - sg_inq: add --block=0|1 option to control opens
-    - add --inhex=FN to read response in from a file
+    - add --inhex=FN to read response in ASCII hex from
+      a file; --inhex=FN --raw reads response in binary
     - make -HHH (-HHHH for '-p ai') output suitable for
       another sg_inq invocation to use --inhex
     - add LU_CONG to standard inquiry response output
@@ -20,7 +21,8 @@ Changelog for sg3_utils-1.38 [20140308] [svn: r558]
     - fix overflow in encode_whitespaces
     - improve unit serial number display (VPD page 0x80)
   - sg_vpd: add LU_CONG to standard inquiry response output
-    - add --inhex=FN to read response in from a file
+    - add --inhex=FN to read response in ASCII hex from
+      a file; --inhex=FN --raw reads response in binary
     - decode Third Party Copy (tpc) page
     - add HAW_ZBC in block char. VPD page (14-018r02)
     - add LTO and DDS vendor pages
