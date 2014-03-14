@@ -41,6 +41,8 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
+static const char * version_str = "1.32 20140311";    /* SPC-4 rev 36q */
+
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
  * standard INQUIRY is 36 (bytes), especially if this is the first
@@ -67,8 +69,6 @@
  * is now a REPORT SUPPORTED OPERATION CODES command that yields similar
  * information [MAINTENANCE IN, service action = 0xc]; see sg_opcodes.
  */
-
-static const char * version_str = "1.30 20140222";    /* SPC-4 rev 36q */
 
 
 /* Following VPD pages are in ascending page number order */
@@ -301,8 +301,10 @@ usage()
             "    --hex|-H        output response in hex\n"
             "    --id|-i         decode device identification VPD page "
             "(0x83)\n"
-            "    --inhex=FN|-I FN    use ASCII hex in file FN instead of "
-            "DEVICE\n"
+            "    --inhex=FN|-I FN    read ASCII hex from file FN instead of "
+            "DEVICE;\n"
+            "                        if used with --raw then read binary "
+            "from FN\n"
             "    --len=LEN|-l LEN    requested response length (def: 0 "
             "-> fetch 36\n"
             "                        bytes first, then fetch again as "
@@ -748,16 +750,17 @@ cl_process(struct opts_t * op, int argc, char * argv[])
 #endif  /* SG_SCSI_STRINGS */
 
 
-/* Read ASCII hex bytes from fname (a file named '-' taken as stdin).
- * There should be either one entry per line or a comma, space or tab
- * separated list of bytes. If no_space is set then a string of ACSII hex
- * digits is expected, 2 per byte. Everything from and including a '#'
- * on a line is ignored.  Returns 0 if ok, or 1 if error. */
+/* Read ASCII hex bytes or binary from fname (a file named '-' taken as
+ * stdin). If reading ASCII hex then there should be either one entry per
+ * line or a comma, space or tab separated list of bytes. If no_space is
+ * set then a string of ACSII hex digits is expected, 2 per byte. Everything
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
+ * error. */
 static int
-f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
-          int * mp_arr_len, int max_arr_len)
+f2hex_arr(const char * fname, int as_binary, int no_space,
+          unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line;
+    int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
     unsigned int h;
     const char * lcp;
     FILE * fp;
@@ -770,13 +773,42 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
     fn_len = strlen(fname);
     if (0 == fn_len)
         return 1;
-    if ((1 == fn_len) && ('-' == fname[0]))        /* read from stdin */
-        fp = stdin;
-    else {
-        fp = fopen(fname, "r");
-        if (NULL == fp) {
-            pr2serr("Unable to open %s for reading\n", fname);
+    has_stdin = ((1 == fn_len) && ('-' == fname[0]));  /* read from stdin */
+    if (as_binary) {
+        if (has_stdin)
+            fd = STDIN_FILENO;
+        else {
+            fd = open(fname, O_RDONLY);
+            if (fd < 0) {
+                pr2serr("unable to open binary file %s: %s\n", fname,
+                         safe_strerror(errno));
+                return 1;
+            }
+        }
+        k = read(fd, mp_arr, max_arr_len);
+        if (k <= 0) {
+            if (0 == k)
+                pr2serr("read 0 bytes from binary file %s\n", fname);
+            else
+                pr2serr("read from binary file %s: %s\n", fname,
+                        safe_strerror(errno));
+            if (! has_stdin)
+                close(fd);
             return 1;
+        }
+        *mp_arr_len = k;
+        if (! has_stdin)
+            close(fd);
+        return 0;
+    } else {    /* So read the file as ASCII hex */
+        if (has_stdin)
+            fp = stdin;
+        else {
+            fp = fopen(fname, "r");
+            if (NULL == fp) {
+                pr2serr("Unable to open %s for reading\n", fname);
+                return 1;
+            }
         }
     }
 
@@ -2330,6 +2362,8 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
                 printf("reserved [%u]\n", u);
                 break;
             }
+            printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* T10/14-018r02 */
+            printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
             break;
         case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
@@ -3570,9 +3604,10 @@ main(int argc, char * argv[])
             pr2serr("Don't support --cmddt with --inhex= option\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (f2hex_arr(op->inhex_fn, 0, rsp_buff, &inhex_len,
+        if (f2hex_arr(op->inhex_fn, op->do_raw, 0, rsp_buff, &inhex_len,
                       sizeof(rsp_buff)))
             return SG_LIB_FILE_ERROR;
+        op->do_raw = 0;         /* don't want raw on output with --inhex= */
         if (-1 == op->page_num) {       /* may be able to deduce VPD page */
             if (op->page_pdt < 0)
                 op->page_pdt = 0x1f & rsp_buff[0];

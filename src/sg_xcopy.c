@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.42 20140123";
+static const char * version_str = "0.43 20140308";
 
 #define ME "sg_xcopy: "
 
@@ -566,8 +566,8 @@ primary_help:
             "    --verbose   same action as verbose=1\n"
             "    --version   print version information then exit\n\n"
             "Copy from IFILE to OFILE, similar to dd command; "
-            "but using the SCSI\nEXTENDED COPY (XCOPY) command. For list "
-            "of flags, use '-hh'.\n");
+            "but using the SCSI\nEXTENDED COPY (XCOPY(LID1)) command. For "
+            "list of flags, use '-hh'.\n");
     return;
 
 secondary_help:

@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_INQ "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -134,13 +134,14 @@ prints the device identification VPD page [0x83].
 .TP
 \fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
 \fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
-ASCII hexadecimal respresenting an INQUIRY (including VPD page) response.
-This utility will then decode that response. It is preferable to also
-supply the \fI\-\-page=PG\fR option, if not this utulity will attempt
+ASCII hexadecimal or binary representing an INQUIRY (including VPD page)
+response. This utility will then decode that response. It is preferable to
+also supply the \fI\-\-page=PG\fR option, if not this utility will attempt
 to guess which VPD page (or standard INQUIRY) the response is associated
 with. The hexadecimal should be arranged as 1 or 2 digits representing a
 byte each of which is whitespace or comma separated. Anything from and
-including a hash mark to the end of line is ignored.
+including a hash mark to the end of line is ignored. If the \fI\-\-raw\fR
+option is also given then \fIFN\fR is treated as binary.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.
@@ -171,8 +172,12 @@ can be used to override some guessing logic associated with the
 \fI\-\-inhex=FN\fR option.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-output the response in binary to stdout. Error messages and warnings, if
-any, are sent to stderr.
+in the absence of \fI\-\-inhex=FN\fR then output response in binary.
+The output should be piped to a file or another utility when this option is
+used. The binary is sent to stdout, and errors are sent to stderr.
+.br
+if used with \fI\-\-inhex=FN\fR then the contents of \fIFN\fR is treated as
+binary.
 .TP
 \fB\-s\fR, \fB\-\-vendor\fR
 output a standard INQUIRY response's vendor specific field from offset 36

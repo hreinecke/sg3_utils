@@ -48,5 +48,9 @@ This directory, prior to sg3_utils-1.28, contained the sas_disk_blink
 script. Since it depends on the sdparm utility it has been moved to
 the sdparm package in its scripts directory.
 
+59-scsi-sg3_utils.rules is a Linux specific file for udev. These rules use
+'sg_inq --export' to help udev create identifying device nodes, for example
+/dev/disk/by-id/wwn-0x5001501234567890-part1.
+
 Douglas Gilbert
-9th January 2013
+8th March 2014
