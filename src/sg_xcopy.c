@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.43 20140308";
+static const char * version_str = "0.44 20140312";
 
 #define ME "sg_xcopy: "
 
@@ -308,6 +308,8 @@ find_bsg_major(void)
     fclose(fp);
 }
 
+/* Returns a file descriptor on success (0 or greater), -1 for an open
+ * error, -2 for a standard INQUIRY problem. */
 static int
 open_sg(struct xcopy_fp_t * fp, int verbose)
 {
@@ -353,7 +355,7 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
         pr2serr("INQUIRY failed on %s\n", ebuff);
         sg_cmds_close_device(fp->sg_fd);
         fp->sg_fd = -1;
-        return fp->sg_fd;
+        return -2;
     }
 
     fp->pdt = sir.peripheral_type;
@@ -1788,11 +1790,20 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    if (open_sg(&ixcf, verbose) < 0)
-        return SG_LIB_CAT_INVALID_OP;
-
-    if (open_sg(&oxcf, verbose) < 0)
-        return SG_LIB_CAT_INVALID_OP;
+    res = open_sg(&ixcf, verbose);
+    if (res < 0) {
+        if (-1 == res)
+            return SG_LIB_FILE_ERROR;
+        else
+            return SG_LIB_CAT_OTHER;
+    }
+    res = open_sg(&oxcf, verbose);
+    if (res < 0) {
+        if (-1 == res)
+            return SG_LIB_FILE_ERROR;
+        else
+            return SG_LIB_CAT_OTHER;
+    }
 
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
         pr2serr("Can't have both 'if' as stdin _and_ 'of' as stdout\n");
