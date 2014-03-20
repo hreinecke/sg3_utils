@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20140311] [svn: r559]
+Changelog for sg3_utils-1.38 [20140318] [svn: r560]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers
     - new --data=@FN to read hex data from file FN
@@ -40,6 +40,8 @@ Changelog for sg3_utils-1.38 [20140311] [svn: r559]
     command line, so multiple arguments are concatenated
   - sg_write_same: repeat if unit attention
   - sg_rtpg: fix indexing bug with --extended option
+  - sg_logs: placeholder for pending defects lpage
+  - sg_unmap: fix another problem with --grpnum= option
   - sg_lib.h: add PDT_ZBC define (spc4r36p)
   - sg_lib_data: sync asc/ascq codes with T10 dated 20140122
     - add pdt string for ZBC (spc4r36p)
