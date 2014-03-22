@@ -25,12 +25,12 @@
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#include <errno.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 #ifdef SG_LIB_LINUX
-#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.32 20140311";    /* SPC-4 rev 36q */
+static const char * version_str = "1.33 20140321";    /* SPC-4 rev 36q */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a

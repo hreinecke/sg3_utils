@@ -351,7 +351,8 @@ void dWordHex(const unsigned short* words, int num, int no_ascii, int swapb);
  * suffix. Otherwise a decimal multiplier suffix may be given. Recognised
  * multipliers: c C  *1;  w W  *2; b  B *512;  k K KiB  *1,024;
  * KB  *1,000;  m M MiB  *1,048,576; MB *1,000,000; g G GiB *1,073,741,824;
- * GB *1,000,000,000 and <n>x<m> which multiplies <n> by <m> . */
+ * GB *1,000,000,000 and <n>x<m> which multiplies <n> by <m> . Ignore leading
+ * spaces and tabs; accept comma, space, tab and hash as terminator. */
 int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
@@ -364,7 +365,9 @@ int sg_get_num_nomult(const char * buf);
  * then -1LL is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
  * suffix. Otherwise a decimal multiplier suffix may be given. In addition
  * to supporting the multipliers of sg_get_num(), this function supports:
- * t T TiB  *(2**40); TB *(10**12); p P PiB  *(2**50); PB  *(10**15) . */
+ * t T TiB  *(2**40); TB *(10**12); p P PiB  *(2**50); PB  *(10**15) .
+ * Ignore leading spaces and tabs; accept comma, space, tab and hash as
+ * terminator. */
 int64_t sg_get_llnum(const char * buf);
 
 
