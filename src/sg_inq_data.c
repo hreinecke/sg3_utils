@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2013 D. Gilbert
+*  Copyright (C) 2000-2014 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -49,7 +49,7 @@ struct sg_version_descriptor {
 };
 
 /* table from SPC-4 revision 36 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20140122 */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20140320 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
@@ -213,6 +213,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x520, "SSC-4 (no version claimed)"},
     {0x523, "SSC-4 T10/BSR INCITS 516 revision 2"},
     {0x525, "SSC-4 T10/BSR INCITS 516 revision 3"},
+    {0x527, "SSC-4 SSC-4 ANSI INCITS 516-2013"},
     {0x560, "OSD-3 (no version claimed)"},
     {0x580, "SES-3 (no version claimed)"},
     {0x5a0, "SSC-5 (no version claimed)"},
@@ -254,6 +255,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x955, "SRP T10/1415-D revision 16a"},
     {0x95c, "SRP ANSI INCITS 365-2002"},
     {0x960, "iSCSI (no version claimed)"},
+    {0x961, "iSCSI RFC 7143"},
+    {0x962, "iSCSI RFC 7144"},
+    /* 0x960 up to 0x97f for iSCSI use */
     {0x980, "SBP-3 (no version claimed)"},
     {0x982, "SBP-3 T10/1467-D revision 1f"},
     {0x994, "SBP-3 T10/1467-D revision 3"},

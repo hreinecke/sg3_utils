@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_PERSIST "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -228,7 +228,8 @@ The \fITIDS\fR argument can take one of several forms. It can be a
 comma (or single space) separated list of ASCII hex bytes representing
 a single TransportID as defined in SPC\-4. They are usually 24 bytes
 long apart from in iSCSI. The \fITIDS\fR argument may be a transport
-specific form (e.g. "sas,5000c50005b32001"). The \fITIDS\fR argument
+specific form (e.g. "sas,5000c50005b32001" is clearer than and equivalent
+to the hex byte form: "6,0,0,0,5,0,c5,0,5,b3,20,1"). The \fITIDS\fR argument
 may be "\-" in which case one or more TransportIDs can be read from stdin.
 The \fITIDS\fR argument may be of the form "file=<name>" in which case
 one or more TransportIDs can be read from a file called <name>. See

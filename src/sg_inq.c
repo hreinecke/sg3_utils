@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.33 20140321";    /* SPC-4 rev 36q */
+static const char * version_str = "1.34 20140330";    /* SPC-4 rev 36s */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1583,12 +1583,13 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
             printf("]\n");
             break;
         case 3: /* NAA <n> */
+            naa = (ip[0] >> 4) & 0xff;
             if (1 != c_set) {
-                pr2serr("      << expected binary code_set (1)>>\n");
+                pr2serr("      << expected binary code_set (1), got %d for "
+                        "NAA=%d>>\n", c_set, naa);
                 dStrHexErr((const char *)ip, i_len, -1);
                 break;
             }
-            naa = (ip[0] >> 4) & 0xff;
             switch (naa) {
             case 2:     /* NAA 2: IEEE Extended */
                 if (8 != i_len) {
@@ -1675,7 +1676,8 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                 printf("]\n");
                 break;
             default:
-                pr2serr("      << unexpected naa [0x%x]>>\n", naa);
+                pr2serr("      << bad NAA nibble , expect 2, 3, 5 or 6, "
+                        "got %d>>\n", naa);
                 dStrHexErr((const char *)ip, i_len, -1);
                 break;
             }
@@ -2362,7 +2364,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
                 printf("reserved [%u]\n", u);
                 break;
             }
-            printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* T10/14-018r02 */
+            printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* sbc4r01 */
             printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
             break;

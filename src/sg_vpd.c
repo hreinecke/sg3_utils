@@ -33,7 +33,7 @@
 
 */
 
-static const char * version_str = "0.81 20140311";    /* spc4r36 + sbc3r35 */
+static const char * version_str = "0.81 20140330";  /* spc4r36s + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -1015,18 +1015,15 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
             printf("\n");
             break;
         case 3: /* NAA */
-            if (1 != c_set) {
-                pr2serr("      << unexpected code set %d for NAA>>\n", c_set);
-                dStrHexErr((const char *)ip, i_len, 0);
-                break;
-            }
             naa = (ip[0] >> 4) & 0xff;
-            if ((naa < 2) || (naa > 6) || (4 == naa)) {
-                pr2serr("      << unexpected NAA [0x%x]>>\n", naa);
+            if (1 != c_set) {
+                pr2serr("      << expected binary code_set (1), got %d for "
+                        "NAA=%d>>\n", c_set, naa);
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            if (2 == naa) {             /* NAA IEEE extended */
+            switch (naa) {
+            case 2:             /* NAA IEEE extended */
                 if (8 != i_len) {
                     pr2serr("      << unexpected NAA 2 identifier "
                             "length: 0x%x>>\n", i_len);
@@ -1037,8 +1034,9 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");
-            } else if ((3 == naa) || (5 == naa)) {
-                /* NAA=3 Locally assigned; NAA=5 IEEE Registered */
+                break;
+            case 3:             /* Locally assigned */
+            case 5:             /* IEEE Registered */
                 if (8 != i_len) {
                     pr2serr("      << unexpected NAA 3 or 5 "
                             "identifier length: 0x%x>>\n", i_len);
@@ -1065,7 +1063,8 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                     }
                     memcpy(sas_tport_addr, ip, sizeof(sas_tport_addr));
                 }
-            } else if (6 == naa) {      /* NAA IEEE registered extended */
+                break;
+            case 6:             /* NAA IEEE registered extended */
                 if (16 != i_len) {
                     pr2serr("      << unexpected NAA 6 identifier length: "
                             "0x%x>>\n", i_len);
@@ -1076,6 +1075,12 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 for (m = 0; m < 16; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");
+                break;
+            default:
+                pr2serr("      << bad NAA nibble, expected 2, 3, 5 or 6, got "
+                        "%d>>\n", naa);
+                dStrHexErr((const char *)ip, i_len, 0);
+                break;
             }
             break;
         case 4: /* Relative target port */
@@ -2387,7 +2392,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
-        printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* T10/14-018r02 */
+        printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* sbc4r01 */
         printf("  FUAB=%d\n", buff[8] & 0x2);
         printf("  VBULS=%d\n", buff[8] & 0x1);
         break;
