@@ -1705,7 +1705,8 @@ sg_get_num(const char * buf)
         buf += n;
         len -=n;
     }
-    cp = strpbrk(buf, " \t,#");
+    /* following hack to keep C++ happy */
+    cp = strpbrk((char *)buf, " \t,#");
     if (cp) {
         len = cp - buf;
         n = (int)sizeof(lb) - 1;
@@ -1841,7 +1842,8 @@ sg_get_llnum(const char * buf)
         buf += n;
         len -=n;
     }
-    cp = strpbrk(buf, " \t,#");
+    /* following hack to keep C++ happy */
+    cp = strpbrk((char *)buf, " \t,#");
     if (cp) {
         len = cp - buf;
         n = (int)sizeof(lb) - 1;
