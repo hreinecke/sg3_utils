@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.84 20140110";    /* ses3r06 */
+static const char * version_str = "1.86 20140404";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -101,6 +101,8 @@ struct opts_t {
     int do_data;
     int dev_slot_num;
     int do_enumerate;
+    int eiioe_auto;
+    int eiioe_force;
     int do_filter;
     int do_help;
     int do_hex;
@@ -469,6 +471,7 @@ static struct option long_options[] = {
     {"data", required_argument, 0, 'd'},
     {"descriptor", required_argument, 0, 'D'},
     {"dev-slot-num", required_argument, 0, 'x'},
+    {"eiioe", required_argument, 0, 'E'},
     {"enumerate", no_argument, 0, 'e'},
     {"filter", no_argument, 0, 'f'},
     {"get", required_argument, 0, 'G'},
@@ -525,8 +528,9 @@ usage(int help_num)
         pr2serr("Usage: "
             "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
             "              [--descriptor=DN] [--dev-slot-num=SN] "
-            "[--enumerate]\n"
-            "              [--filter] [--get=STR] [--help] [--hex]\n"
+            "[--eiioe=A_F]\n"
+            "              [--enumerate] [--filter] [--get=STR] [--help] "
+            "[--hex]\n"
             "              [--index=IIA | =TIA,II] [--inner-hex] "
             "[--join] [--list]\n"
             "              [--maxlen=LEN] [--nickname=SEN] [--nickid=SEID] "
@@ -539,6 +543,10 @@ usage(int help_num)
             "    --descriptor=DN|-D DN    descriptor name, indexing method\n"
             "    --dev-slot-num=SN|-x SN    device slot number, indexing "
             "method\n"
+            "    --eiioe=A_F|-E A_F    where A_F is either 'auto' or 'force'."
+            "'force'\n"
+            "                          acts as if EIIOE is set, 'auto' tries "
+            "to guess\n"
             "    --enumerate|-e      enumerate page names + element types "
             "(ignore\n"
             "                        DEVICE). Use twice for clear,get,set "
@@ -762,7 +770,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:efG:hHiI:jln:N:m:p:rsS:vVx:",
+        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:p:rsS:vVx:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -811,6 +819,17 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             break;
         case 'e':
             ++op->do_enumerate;
+            break;
+        case 'E':
+            if (0 == strcmp("auto", optarg))
+                ++op->eiioe_auto;
+            else if (0 == strcmp("force", optarg))
+                ++op->eiioe_force;
+            else {
+                pr2serr("--eiioe option expects 'auto' or 'force' as an "
+                        "argument\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'f':
             ++op->do_filter;
@@ -3120,6 +3139,12 @@ join_work(int sg_fd, struct opts_t * op, int display)
             }
             ae_ucp = add_elem_rsp + 8;
             ae_last_ucp = add_elem_rsp + add_elem_rsp_len - 1;
+            if (op->eiioe_auto && (add_elem_rsp_len > 11)) {
+                /* heuristic: if first element index in this page is 1
+                 * then act as if the EIIOE bit is set. */
+                if ((ae_ucp[0] & 0x10) && (1 == ae_ucp[3]))
+                    op->eiioe_force = 1;
+            }
         } else {
             add_elem_rsp_len = 0;
             ae_ucp = NULL;
@@ -3167,6 +3192,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
 
     jrp = join_arr;
     tdhp = type_desc_hdr_arr;
+    jr_max_ind = 0;
     for (k = 0, ei = 0, ei2 = 0; k < num_t_hdrs; ++k, ++tdhp) {
         jrp->el_ind_th = k;
         jrp->el_ind_indiv = -1;
@@ -3212,13 +3238,13 @@ join_work(int sg_fd, struct opts_t * op, int display)
             if (t_ucp)
                 t_ucp += 4;
             jrp->add_elem_statp = NULL;
+            ++jr_max_ind;
         }
         if (jrp >= join_arr_lastp) {
             ++k;
             break;      /* leave last row all zeros */
         }
     }
-    jr_max_ind = k;
 
     broken_ei = 0;
     if (ae_ucp) {
@@ -3235,14 +3261,18 @@ join_work(int sg_fd, struct opts_t * op, int display)
                         break;
                     }
                     eip = !!(ae_ucp[0] & 0x10);
-                    eiioe = eip ? (ae_ucp[2] & 1) : 0;
+                    if (eip)
+                        eiioe = op->eiioe_force ? 1 : (ae_ucp[2] & 1);
+                    else
+                        eiioe = 0;
                     if (eip && eiioe) {
                         ei = ae_ucp[3];
                         jr2p = join_arr + ei;
                         if ((ei >= jr_max_ind) || (NULL == jr2p->enc_statp)) {
                             get_out = 1;
-                            pr2serr("join_work: oi=%d, ei=%d, eiioe=1 not in "
-                                    "join_arr\n", k, ei);
+                            pr2serr("join_work: oi=%d, ei=%d [max_ind=%d], "
+                                    "eiioe=1 not in join_arr\n", k, ei,
+                                    jr_max_ind);
                             break;
                         }
                         devslotnum_and_sasaddr(jr2p, ae_ucp);

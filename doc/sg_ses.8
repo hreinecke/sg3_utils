@@ -1,12 +1,12 @@
-.TH SG_SES "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_SES "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
 [\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR]
-[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-enumerate\fR] [\fI\-\-filter\fR]
-[\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-enumerate\fR]
+[\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
 [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-nickname=SEN\fR]
 [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
@@ -105,6 +105,16 @@ numbers. \fISN\fR must be a number in the range 0 to 255 (inclusive). This is
 a medium level indexing alternative to the low level \fI\-\-index=\fR
 options. See the DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS section
 below.
+.TP
+\fB\-E\fR, \fB\-\-eiioe\fR=\fIA_F\fR
+\fIA_F\fR is either the string 'auto' or 'force'. There was some fuzziness
+in the interpretation of the 'element index' field in the Additional Element
+Status page between SES\-2 and SES\-3. The EIIOE bit was introduced to
+resolve the problem but not all enclosures have caught up.
+Using '\-\-eiioe=force' will decode this page as if the EIIOE bit is set.
+Using '\-\-eiioe=auto' will decode this page as if the EIIOE bit is set if
+the first element index in this page is 1 (in other words a heuristic to
+guess whether the EIIOE bit should be set or not).
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 enumerate all known page names and SES elements when this option is given
