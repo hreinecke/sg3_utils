@@ -122,7 +122,7 @@
 #define _GNU_SOURCE
 #endif
 
-static const char * version_str = "2.34 [20130603]";
+static const char * version_str = "2.35 [20140403]";
 
 #include <stdio.h>
 #include <string.h>
@@ -155,6 +155,7 @@ static char *device_name;
 #define MAX_BUFFER_SIZE MAX_RESP10_SIZE
 
 #define INQUIRY_RESP_INITIAL_LEN 36
+#define MAX_INQFIELD_LEN 17
 
 #define MAX_HEADS 127
 #define HEAD_SORT_TOKEN 0x55
@@ -3139,11 +3140,23 @@ do_user_page(struct mpage_info * mpi, int decode_in_hex)
     return status;
 }
 
+static void
+inqfieldname(unsigned char *deststr, const unsigned char *srcbuf, int maxlen)
+{
+        int i;
+
+        memset(deststr, '\0', MAX_INQFIELD_LEN);
+        for (i = maxlen - 1; i >= 0 && isspace(srcbuf[i]); --i)
+                ;
+        memcpy(deststr, srcbuf, i + 1);
+}
+
 static int
 do_inquiry(int * peri_type, int * resp_byte6, int inquiry_verbosity)
 {
     int status;
     unsigned char cmd[6];
+    unsigned char fieldname[MAX_INQFIELD_LEN];
     unsigned char *pagestart;
     struct scsi_cmnd_io sci;
 
@@ -3214,14 +3227,18 @@ do_inquiry(int * peri_type, int * resp_byte6, int inquiry_verbosity)
     }
     if (x_interface)
         printf("\n");
-    printf("%s%.8s\n", (!x_interface ? "Vendor:                    " : ""),
-           pagestart + 8);
 
-    printf("%s%.16s\n", (!x_interface ? "Product:                   " : ""),
-           pagestart + 16);
+    inqfieldname(fieldname, pagestart + 8, 8);
+    printf("%s%s\n", (!x_interface ? "Vendor:                    " : ""),
+           fieldname);
 
-    printf("%s%.4s\n", (!x_interface ? "Revision level:            " : ""),
-           pagestart + 32);
+    inqfieldname(fieldname, pagestart + 16, 16);
+    printf("%s%s\n", (!x_interface ? "Product:                   " : ""),
+           fieldname);
+
+    inqfieldname(fieldname, pagestart + 32, 4);
+    printf("%s%s\n", (!x_interface ? "Revision level:            " : ""),
+           fieldname);
 
     printf("\n");
     return status;
