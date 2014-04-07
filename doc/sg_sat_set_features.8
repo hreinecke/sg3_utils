@@ -1,4 +1,4 @@
-.TH SG_SAT_SET_FEATURES "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_SAT_SET_FEATURES "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_sat_set_features \- use ATA SET FEATURES command via a SCSI to ATA
 Translation (SAT) layer
@@ -6,7 +6,7 @@ Translation (SAT) layer
 .B sg_sat_set_features
 [\fI\-\-count=CO\fR] [\fI\-\-ck_cond\fR] [\fI\-\-feature=FEA\fR]
 [\fI\-\-help\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-len=\fR{16|12}]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -23,7 +23,7 @@ www.t10.org) defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16
 byte "cdb" and the other with a 12 byte cdb. This utility defaults to using
 the 16 byte cdb variant. SAT\-2 is also a standard: SAT\-2 ANSI INCITS
 465\-2010 and the draft prior to that is sat2r09.pdf . The SAT-3 project has
-started and the most recent draft is sat3r01.pdf .
+started and the most recent draft is sat3r05b.pdf .
 .PP
 The features can be read using the sg_sat_identify utility which uses either
 the ATA IDENTIFY DEVICE (for non\-packet devices) or the IDENTIFY PACKET
@@ -68,6 +68,14 @@ this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
 The argument can either be 16 or 12. The default is 16. Some SCSI
 transports cannot convey SCSI commands longer than 12 bytes.
 .TP
+\fB\-r\fR, \fB\-\-readonly\fR
+causes the \fIDEVICE\fR to be opened with the read\-only flag (O_RDONLY in
+Unix). The default action is to open \fIDEVICE\fR with the read\-write
+flag (O_RDWR in Unix). In some cases sending power management commands to
+ATA disks are defeated by OS actions on the close() if the \fIDEVICE\fR was
+opened with the read\-write flag (e.g. the OS might think it needs to
+flush something to disk).
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.
 .TP
@@ -89,7 +97,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2007\-2013 Douglas Gilbert
+Copyright \(co 2007\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

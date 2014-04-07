@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2013 Douglas Gilbert.
+ * Copyright (c) 2006-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,10 @@
 
 #include "sg_lib.h"
 
+#ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0602
+#endif
+
 #include "sg_pt_win32.h"
 
 static const char * version_str = "1.10 (win32) 20130507";
