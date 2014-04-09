@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.86 20140404";    /* ses3r06 */
+static const char * version_str = "1.87 20140409";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2417,7 +2417,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                         int resp_len, const struct opts_t * op)
 {
     int j, k, desc_len, elem_type, invalid, el_num, eip, ind, match_ind_th;
-    int elem_count;
+    int elem_count, ei, eiioe, my_eiioe_force, num_elems, skip;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -2437,22 +2437,45 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  additional element status descriptor list\n");
     ucp = resp + 8;
+    my_eiioe_force = op->eiioe_force;
     for (k = 0, tp = tdhp, elem_count = 0; k < num_telems; ++k, ++tp) {
         elem_type = tp->etype;
+        num_elems = tp->num_elements;
         if (! active_et_aesp(elem_type)) {
-            elem_count += tp->num_elements;
+            elem_count += num_elems;
             continue;   /* skip if not element type of interest */
         }
         if ((ucp + 1) > last_ucp)
             goto truncated;
 
-        /* if eip is 1, check that the element index (ucp[3]) is within the
-         * range for the element type (elem_type) because some element types
-         * are optional and might not be included in SES Page 0xA */
+        /* if eip is 1, do bounds check on the element index */
         if (ucp[0] & 0x10)  /* eip=1 */ {
-            if ((ucp[3] < elem_count) ||
-                (ucp[3] >= (elem_count + tp->num_elements))) {
-                elem_count += tp->num_elements;
+            ei = ucp[3];
+            skip = 0;
+            if ((0 == k) && op->eiioe_auto && (1 == ei)) {
+                /* heuristic: if first element index in this page is 1
+                 * then act as if the EIIOE bit is set. */
+                my_eiioe_force = 1;
+            }
+            eiioe = my_eiioe_force ? 1 : (ucp[2] & 1);
+            if (eiioe) {
+                if ((ei < (elem_count + k)) ||
+                    (ei > (elem_count + k + num_elems))) {
+                    elem_count += num_elems;
+                    skip = 1;
+                }
+            } else {
+                if ((ei < elem_count) || (ei > elem_count + num_elems)) {
+                    elem_count += num_elems;
+                    skip = 1;
+                }
+            }
+            if (skip) {
+                if (op->verbose > 2)
+                    pr2serr("skipping elem_type=0x%x, k=%d due to element "
+                            "index bounds\n  effective eiioe=%d, "
+                            "elem_count=%d, num_elems=%d\n", elem_type, k,
+                            eiioe, elem_count, num_elems);
                 continue;
             }
         }
@@ -2461,11 +2484,12 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
                    find_element_tname(elem_type, b, sizeof(b)), tp->se_id, k);
         }
-        for (j = 0, el_num = 0; j < tp->num_elements;
-             ++j, ucp += desc_len, ++el_num) {
+        el_num = 0;
+        for (j = 0; j < num_elems; ++j, ucp += desc_len, ++el_num) {
             invalid = !!(ucp[0] & 0x80);
             desc_len = ucp[1] + 2;
             eip = ucp[0] & 0x10;
+            eiioe = eip ? (ucp[2] & 1) : 0;
             ind = eip ? ucp[3] : el_num;
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
@@ -2473,8 +2497,9 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                     continue;
             }
             if (eip)
-                printf("      Element index: %d  eiioe=%d\n", ind,
-                       (ucp[2] & 1));
+                printf("      Element index: %d  eiioe=%d%s\n", ind, eiioe,
+                       (((! eiioe) && my_eiioe_force) ?
+                        " but overridden" : ""));
             else
                 printf("      Element %d descriptor\n", ind);
             if (invalid && (0 == op->inner_hex))

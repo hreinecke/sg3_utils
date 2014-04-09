@@ -2,9 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140405] [svn: r565]
+Changelog for sg3_utils-1.39 [20140409] [svn: r566]
   - sg_ses: add --eiioe=auto|force option
-    - fix AES dpage element indexing problem
+    - fix AES dpage element indexing problems
   - sginfo: strip trailing spaces from INQUIRY text
   - sg_sat_set_features: add --readonly option
 
