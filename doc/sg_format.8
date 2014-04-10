@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_FORMAT "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
@@ -47,7 +47,7 @@ section for more information.
 Protection information is optional and is made up of 8 additional bytes
 associated with each logical block. Four protection types are defined
 with protection type 0 being no additional protection bytes. See the
-PROTECTION TYPES section below for more information.
+PROTECTION INFORMATION section below for more information.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -124,8 +124,8 @@ bit field (bits 7 and 6 of byte 1 in the cdb). Prior to that it was a single
 bit field (bit 7 of byte 1 in the cdb) and there was an accompanying bit
 called RTO_REQ (bit 6 of byte 1 in the cdb). The deprecated
 options "\-\-pinfo" and "\-\-rto\-req" represent the older usage. This
-option should be used in their place. See the PROTECTION TYPES section below
-for more information.
+option should be used in their place. See the PROTECTION INFORMATION section
+below for more information.
 .TP
 \fB\-F\fR, \fB\-\-format\fR
 issue a SCSI FORMAT UNIT command.
@@ -155,8 +155,8 @@ parameters (e.g. when '\-\-pie=PIE' is greater than zero).
 \fB\-P\fR, \fB\-\-pfu\fR=\fIPFU\fR
 sets the "Protection Field Usage" field in the parameter block associated
 with a FORMAT UNIT command to \fIPFU\fR. The default value is 0, the only
-other defined value currently is 1. See the PROTECTION TYPES section below
-for more information.
+other defined value currently is 1. See the PROTECTION INFORMATION section
+below for more information.
 .TP
 \fB\-q\fR, \fB\-\-pie\fR=\fIPIE\fR
 sets the "Protection Interval Exponent" field in the parameter block
@@ -229,7 +229,7 @@ FORMAT UNIT command waits until the format operation completes before
 returning its response. This can be many hours on large disks. This
 utility sets a 15 hour timeout on such a FORMAT UNIT command!
 .SH LISTS
-The SBC\-3 draft (revision 29) defines PLIST, CLIST, DLIST and GLIST in
+The SBC\-3 draft (revision 36) defines PLIST, CLIST, DLIST and GLIST in
 section 4.13 on "Medium defects". Briefly, the PLIST is the "primary"
 list of manufacturer detected defects, the CLIST ("certification" list)
 contains those detected during the format operation, the DLIST is a list of
@@ -247,20 +247,36 @@ the CLIST is generated and used during the format process.
 .PP
 The sg_format utility does not permit a user to provide a defect
 list (i.e. DLIST).
-.SH PROTECTION TYPES
-SBC\-3 drafts have added several "protection types" to the "protection
-information" introduced in the SBC\-2 standard. See the "protection
-information" section (section 4.21 in draft SBC\-3 rev 29). 8 bytes of
-protection information are added to each logical block (a 2 byte "logical
-block guard" (CRC), a 2 byte "logical block application guard", and a 4
-byte "logical block reference tag"). SBC\-3 defines 4 protection
-types (types 0 to 3) with protection type 0 meaning no protection information
-is maintained.
+.SH PROTECTION INFORMATION
+Protection Information (PI) is additional information held with logical
+blocks so that an application and/or host bus adapter can check the
+correctness of those logical blocks. PI is placed in one or more
+protection intervals beside each logical block. A protection interval
+contains 8 bytes made up of a 2 byte "logical block guard" (CRC), a 2
+byte "logical block application guard", and a 4 byte "logical block
+reference tag". Devices with 512 byte logical block size typically have
+one protection interval appended, making its logical block data 520 bytes
+long. Devices with 4096 byte logical block size often have 8 protection
+intervals spread across its logical block data for a total size of 4160
+bytes. Note that for all other purposes the logical block size is considered
+to be 512 and 4096 bytes respectively.
 .PP
-A device that supports protection information (i.e. supports one or more
-protection types of 1 or higher) sets the "PROTECT" bit in its standard
-INQUIRY response. It also sets the SPT field in the EXTENDED INQUIRY VPD page
-response to indicate which protection types it supports. The current
+SBC\-3 drafts have added several "protection types" to the PI introduced in
+the SBC\-2 standard. SBC\-3 defines 4 protection types (types 0 to 3) with
+protection type 0 meaning no PI is maintained. While a device may support
+one or more protection types, it can only be formatted with 1 of the 4. To
+change a device's protection type, it must be re\-formatted. For more
+information see the Protection Information in section 4.22 of draft SBC\-3
+revision 36.
+.PP
+A device that supports PI information (i.e. supports one or more protection
+types 1, 2 and 3) sets the "PROTECT" bit in its standard INQUIRY response. It
+also sets the SPT field in the EXTENDED INQUIRY VPD page response to indicate
+which protection types it supports. Given PROTECT=1 then SPT=0 implies the
+device supports PI type 1 only, SPT=1 implies the device supports PI types 1
+and 2, and various other non\-obvious mappings up to SPT=7 which implies
+protection types 1, 2 and 3 are supported. The
+.B current
 protection type of a disk can be found in the "P_TYPE" and "PROT_EN"
 fields in the response of a READ CAPACITY (16) command (e.g. with
 the 'sg_readcap \-\-long' utility).

@@ -510,7 +510,7 @@ static const char * sdata_src[] = {
 
 
 /* Decode descriptor format sense descriptors (assumes sense buffer is
-   in descriptor format) */
+ * in descriptor format) */
 static void
 sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                              int blen, char * b)
@@ -1128,7 +1128,7 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
     return SG_LIB_CAT_SENSE;
 }
 
-/* gives wrong answer for variable length command (opcode=0x7f) */
+/* Beware: gives wrong answer for variable length command (opcode=0x7f) */
 int
 sg_get_command_size(unsigned char opcode)
 {
@@ -1381,8 +1381,8 @@ sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
 
 
 /* safe_strerror() contributed by Clayton Weaver <cgweav at email dot com>
-   Allows for situation in which strerror() is given a wild value (or the
-   C library is incomplete) and returns NULL. Still not thread safe.
+ * Allows for situation in which strerror() is given a wild value (or the
+ * C library is incomplete) and returns NULL. Still not thread safe.
  */
 
 static char safe_errbuf[64] = {'u', 'n', 'k', 'n', 'o', 'w', 'n', ' ',
@@ -1408,11 +1408,11 @@ safe_strerror(int errnum)
 
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
-   in this file go to sg_warnings_strm (default stderr).]
-   'no_ascii' allows for 3 output types:
-       > 0     each line has address then up to 16 ASCII-hex bytes
-       = 0     in addition, the bytes are listed in ASCII to the right
-       < 0     only the ASCII-hex bytes are listed (i.e. without address) */
+ * in this file go to sg_warnings_strm (default stderr).]
+ * 'no_ascii' allows for 3 output types:
+ *     > 0     each line has address then up to 16 ASCII-hex bytes
+ *     = 0     in addition, the bytes are listed in ASCII to the right
+ *     < 0     only the ASCII-hex bytes are listed (i.e. without address) */
 static void
 dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
 {
@@ -1560,8 +1560,8 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
 }
 
 /* Returns 1 when executed on big endian machine; else returns 0.
-   Useful for displaying ATA identify words (which need swapping on a
-   big endian machine). */
+ * Useful for displaying ATA identify words (which need swapping on a
+ * big endian machine). */
 int
 sg_is_big_endian()
 {
@@ -1586,15 +1586,15 @@ swapb_ushort(unsigned short u)
 }
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
-   in this file go to sg_warnings_strm (default stderr).]
-   'no_ascii' allows for 3 output types:
-       > 0     each line has address then up to 8 ASCII-hex 16 bit words
-       = 0     in addition, the ASCI bytes pairs are listed to the right
-       = -1    only the ASCII-hex words are listed (i.e. without address)
-       = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
-       < -2    same as -1
-   If 'swapb' non-zero then bytes in each word swapped. Needs to be set
-   for ATA IDENTIFY DEVICE response on big-endian machines. */
+ * in this file go to sg_warnings_strm (default stderr).]
+ * 'no_ascii' allows for 3 output types:
+ *     > 0     each line has address then up to 8 ASCII-hex 16 bit words
+ *     = 0     in addition, the ASCI bytes pairs are listed to the right
+ *     = -1    only the ASCII-hex words are listed (i.e. without address)
+ *     = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
+ *     < -2    same as -1
+ * If 'swapb' non-zero then bytes in each word swapped. Needs to be set
+ * for ATA IDENTIFY DEVICE response on big-endian machines. */
 void
 dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
 {
@@ -1680,29 +1680,50 @@ dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
 }
 
 /* If the number in 'buf' can be decoded or the multiplier is unknown
-   then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
-   Main (SI) multipliers supported: K, M, G. */
+ * then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
+ * multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
+ * Main (SI) multipliers supported: K, M, G. Ignore leading spaces and
+ * tabs; accept comma, space, tab and hash as terminator. */
 int
 sg_get_num(const char * buf)
 {
     int res, num, n, len;
     unsigned int unum;
     char * cp;
+    const char * b;
     char c = 'c';
     char c2, c3;
+    char lb[16];
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1;
     len = strlen(buf);
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%x", &unum);
+    n = strspn(buf, " \t");
+    if (n > 0) {
+        if (n == len)
+            return -1;
+        buf += n;
+        len -=n;
+    }
+    /* following hack to keep C++ happy */
+    cp = strpbrk((char *)buf, " \t,#");
+    if (cp) {
+        len = cp - buf;
+        n = (int)sizeof(lb) - 1;
+        len = (len < n) ? len : n;
+        memcpy(lb, buf, len);
+        lb[len] = '\0';
+        b = lb;
+    } else
+        b = buf;
+    if (('0' == b[0]) && (('x' == b[1]) || ('X' == b[1]))) {
+        res = sscanf(b + 2, "%x", &unum);
         num = unum;
-    } else if ('H' == toupper((int)buf[len - 1])) {
-        res = sscanf(buf, "%x", &unum);
+    } else if ('H' == toupper((int)b[len - 1])) {
+        res = sscanf(b, "%x", &unum);
         num = unum;
     } else
-        res = sscanf(buf, "%d%c%c%c", &num, &c, &c2, &c3);
+        res = sscanf(b, "%d%c%c%c", &num, &c, &c2, &c3);
     if (res < 1)
         return -1LL;
     else if (1 == res)
@@ -1744,9 +1765,9 @@ sg_get_num(const char * buf)
                 return num * 1073741824;
             return -1;
         case 'X':
-            cp = (char *)strchr(buf, 'x');
+            cp = (char *)strchr(b, 'x');
             if (NULL == cp)
-                cp = (char *)strchr(buf, 'X');
+                cp = (char *)strchr(b, 'X');
             if (cp) {
                 n = sg_get_num(cp + 1);
                 if (-1 != n)
@@ -1763,9 +1784,9 @@ sg_get_num(const char * buf)
 }
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
-   hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
-   assumed. Does not accept multipliers. Accept a comma (","), a whitespace
-   or newline as terminator.  */
+ * hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
+ * assumed. Does not accept multipliers. Accept a comma (","), a whitespace
+ * or newline as terminator. */
 int
 sg_get_num_nomult(const char * buf)
 {
@@ -1795,30 +1816,51 @@ sg_get_num_nomult(const char * buf)
 }
 
 /* If the number in 'buf' can be decoded or the multiplier is unknown
-   then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
-   multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
-   Main (SI) multipliers supported: K, M, G, T, P. */
+ * then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
+ * multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
+ * Main (SI) multipliers supported: K, M, G, T, P. Ignore leading spaces
+ * and tabs; accept comma, space, tab and hash as terminator. */
 int64_t
 sg_get_llnum(const char * buf)
 {
-    int res, len;
+    int res, len, n;
     int64_t num, ll;
     uint64_t unum;
     char * cp;
+    const char * b;
     char c = 'c';
     char c2, c3;
+    char lb[32];
 
     if ((NULL == buf) || ('\0' == buf[0]))
         return -1LL;
     len = strlen(buf);
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
+    n = strspn(buf, " \t");
+    if (n > 0) {
+        if (n == len)
+            return -1LL;
+        buf += n;
+        len -=n;
+    }
+    /* following hack to keep C++ happy */
+    cp = strpbrk((char *)buf, " \t,#");
+    if (cp) {
+        len = cp - buf;
+        n = (int)sizeof(lb) - 1;
+        len = (len < n) ? len : n;
+        memcpy(lb, buf, len);
+        lb[len] = '\0';
+        b = lb;
+    } else
+        b = buf;
+    if (('0' == b[0]) && (('x' == b[1]) || ('X' == b[1]))) {
+        res = sscanf(b + 2, "%" SCNx64 "", &unum);
         num = unum;
-    } else if ('H' == toupper((int)buf[len - 1])) {
-        res = sscanf(buf, "%" SCNx64 "", &unum);
+    } else if ('H' == toupper((int)b[len - 1])) {
+        res = sscanf(b, "%" SCNx64 "", &unum);
         num = unum;
     } else
-        res = sscanf(buf, "%" SCNd64 "%c%c%c", &num, &c, &c2, &c3);
+        res = sscanf(b, "%" SCNd64 "%c%c%c", &num, &c, &c2, &c3);
     if (res < 1)
         return -1LL;
     else if (1 == res)
@@ -1876,9 +1918,9 @@ sg_get_llnum(const char * buf)
                 return num * 1099511627776LL * 1024;
             return -1LL;
         case 'X':
-            cp = (char *)strchr(buf, 'x');
+            cp = (char *)strchr(b, 'x');
             if (NULL == cp)
-                cp = (char *)strchr(buf, 'X');
+                cp = (char *)strchr(b, 'X');
             if (cp) {
                 ll = sg_get_llnum(cp + 1);
                 if (-1LL != ll)
@@ -1895,9 +1937,9 @@ sg_get_llnum(const char * buf)
 }
 
 /* Extract character sequence from ATA words as in the model string
-   in a IDENTIFY DEVICE response. Returns number of characters
-   written to 'ochars' before 0 character is found or 'num' words
-   are processed. */
+ * in a IDENTIFY DEVICE response. Returns number of characters
+ * written to 'ochars' before 0 character is found or 'num' words
+ * are processed. */
 int
 sg_ata_get_chars(const unsigned short * word_arr, int start_word,
                  int num_words, int is_big_endian, char * ochars)

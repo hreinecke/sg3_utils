@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.38 [20140311] [svn: r559]
+Changelog for sg3_utils-1.38 [20140401] [svn: r563]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers
     - new --data=@FN to read hex data from file FN
@@ -12,10 +12,10 @@ Changelog for sg3_utils-1.38 [20140311] [svn: r559]
     - add --inhex=FN to read response in ASCII hex from
       a file; --inhex=FN --raw reads response in binary
     - make -HHH (-HHHH for '-p ai') output suitable for
-      another sg_inq invocation to use --inhex
+      another sg_inq invocation to use --inhex to decode
     - add LU_CONG to standard inquiry response output
     - decode ASCII information VPD pages
-    - add HAW_ZBC in block char. VPD page (14-018r02)
+    - add HAW_ZBC in block dev char. VPD page (sbc4r01)
     - sync version descriptors dated 20131126
     - allow --page=-1 to force std INQUIRY decoding
     - fix overflow in encode_whitespaces
@@ -24,7 +24,7 @@ Changelog for sg3_utils-1.38 [20140311] [svn: r559]
     - add --inhex=FN to read response in ASCII hex from
       a file; --inhex=FN --raw reads response in binary
     - decode Third Party Copy (tpc) page
-    - add HAW_ZBC in block char. VPD page (14-018r02)
+    - add HAW_ZBC in block dev char. VPD page (sbc4r01)
     - add LTO and DDS vendor pages
     - allow --page=num to restrict --enumerate output
   - sg_persist: add PROUT: Replace Lost Reservation (spc4r36)
@@ -40,9 +40,12 @@ Changelog for sg3_utils-1.38 [20140311] [svn: r559]
     command line, so multiple arguments are concatenated
   - sg_write_same: repeat if unit attention
   - sg_rtpg: fix indexing bug with --extended option
+  - sg_logs: placeholder for pending defects lpage
+  - sg_unmap: fix another problem with --grpnum= option
   - sg_lib.h: add PDT_ZBC define (spc4r36p)
-  - sg_lib_data: sync asc/ascq codes with T10 dated 20140122
+  - sg_lib_data: sync asc/ascq codes with T10 dated 20140320
     - add pdt string for ZBC (spc4r36p)
+  - sg_lib: extensions to sg_get_num() and sg_get_llnum()
   - sg_cmds_extra: fix sa bug in sg_ll_3party_copy_out()
   - scripts/rescan-scsi-bus.sh: check if FC driver exports
     issue_lip before using it

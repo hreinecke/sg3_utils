@@ -30,7 +30,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.05 20140203";
+static const char * version_str = "1.06 20140318";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -392,7 +392,7 @@ main(int argc, char * argv[])
             break;
         case 'g':
             num = sscanf(optarg, "%d", &res);
-            if ((1 == num) && ((res < 0) || (res > 31)))
+            if ((1 == num) && (res >= 0) && (res <= 31))
                 grpnum = res;
             else {
                 pr2serr("value for '--grpnum=' must be 0 to 31\n");

@@ -158,7 +158,7 @@ It assumes a level of C99 compliance and favours POSIX system and library
 calls over OS specific calls.
 
 The C code is written in a C++ friendly way and is checked from time to
-time that it compiles clean with C++. To accomodate C++ certain C99
+time that it compiles clean with C++. To accommodate C++ certain C99
 constructs such as designated initializers cannot be used.
 
 Building
@@ -403,4 +403,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-11th March 2014
+1st April 2014

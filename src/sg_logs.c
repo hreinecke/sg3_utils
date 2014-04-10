@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.15 20140203";    /* spc4r36p + sbc3r30 */
+static const char * version_str = "1.16 20140314";    /* spc4r36r + sbc4r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -743,6 +743,21 @@ show_page_name(int pg_code, int subpg_code,
             return;
         }
     }
+    if (0x15 == pg_code) {
+        switch (inq_dat->peripheral_type) {
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
+            if (0 == subpg_code) {
+                printf("%sBackground scan results (sbc-3)\n", b);
+                return;
+            } else if (1 == subpg_code) {
+                printf("%sPending defects (sbc-4)\n", b);
+                return;
+            }
+            break;
+        default:
+            break;
+        }
+    }
     if (subpg_code > 0) {
         printf("%s??\n", b);
         return;
@@ -760,9 +775,7 @@ show_page_name(int pg_code, int subpg_code,
             case LB_PROV_LPAGE:                 /* 0xc */
                 printf("%sLogical block provisioning (sbc-3)\n", b);
                 break;
-            case 0x15:
-                printf("%sBackground scan results (sbc-3)\n", b);
-                break;
+            /* case 0x15:       has subpage in sbc4 */
             case SOLID_STATE_MEDIA_LPAGE:       /* 0x11 */
                 printf("%sSolid state media (sbc-3)\n", b);
                 break;
@@ -3047,7 +3060,7 @@ static const char * reassign_status[] = {
     "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
-/* Background scan results [0x15] for disk */
+/* Background scan results [0x15,0] for disk */
 static void
 show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
                                   int verbose)
@@ -4219,8 +4232,11 @@ show_ascii_page(unsigned char * resp, int len,
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
-                show_background_scan_results_page(resp, len, optsp->do_pcb,
-                                                  optsp->do_verbose);
+                if (0 == subpg_code)
+                    show_background_scan_results_page(resp, len,
+                                 optsp->do_pcb, optsp->do_verbose);
+                else
+                    done = 0;   /* todo: pending defects [0x15,1] */
                 break;
             case PDT_MCHANGER: /* smc-3 */
                 show_element_stats_page(resp, len, optsp->do_pcb);

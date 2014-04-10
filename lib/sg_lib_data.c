@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.94 20140213";  /* spc4r36q, sbc3r36 */
+const char * sg_lib_version_str = "1.96 20140401";  /* spc4r36s, sbc4r01 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -476,7 +476,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20140122 */
+ * The following should match asc-num.txt dated 20140320 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -913,6 +913,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3F,0x13,"iSCSI IP address removed"},
     {0x3F,0x14,"iSCSI IP address changed"},
     {0x3F,0x15,"Inspect referrals sense descriptors"},
+    {0x3F,0x16,"Microcode has been changed without reset"},
 
     /*
      * ASC 0x40, 0x41 and 0x42 overridden by "additional2" array entries
