@@ -1,24 +1,40 @@
-.TH SG_WRITE_BUFFER "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_WRITE_BUFFER "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
-sg_write_buffer \- send SCSI WRITE BUFFER command
+sg_write_buffer \- send SCSI WRITE BUFFER commands
 .SH SYNOPSIS
 .B sg_write_buffer
-[\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR] [\fI\-\-length=LEN\fR]
-[\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR] [\fI\-\-raw\fR]
-[\fI\-\-skip=SKIP\fR] [\fI\-\-specific=MS\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-bpw=CS\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR]
+[\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR]
+[\fI\-\-raw\fR] [\fI\-\-skip=SKIP\fR] [\fI\-\-specific=MS\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends a SCSI WRITE BUFFER command to \fIDEVICE\fR, along with data provided
-by the user. In some cases no data is required, or data can be read from the
-file given in the \fI\-\-in=FILE\fR option, or data is read from stdin when
-either \fI\-\-raw\fR or \fI\-\-in=\-\fR is given.
+Sends one or more SCSI WRITE BUFFER commands to \fIDEVICE\fR, along with data
+provided by the user. In some cases no data is required, or data can be read
+from the file given in the \fI\-\-in=FILE\fR option, or data is read from
+stdin when either \fI\-\-raw\fR or \fI\-\-in=\-\fR is given.
 .PP
 Some WRITE BUFFER command variants do not have associated data to send to the
 device, for example "activate_mc" ("activate deferred microcode").
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-bpw\fR=\fICS\fR
+where \fICS\fR is the chunk size in bytes. This will be the maximum number
+of bytes sent per WRITE BUFFER command. So if \fICS\fR is less than the
+effective length then multiple WRITE BUFFER commands are sent, each taking
+the next chunk from the read data and inceasing the buffer offset field
+in the WRITE BUFFER command by the appropriate amount. The default is
+a chunk size of 0 which is interpreted as a very large number hence only
+one WRITE BUFFER command will be sent. This option should only be used with
+modes that "download microcode, with offsets ..."; namely either mode 0x6,
+0x7, 0xd or 0xe.
+.br
+The number in \fICS\fR can optionally be followed by ",act" or ",activate".
+In this case after WRITE BUFFER commands have been sent until the
+effective length is exhausted another WRITE BUFFER command with its mode
+set to "Activate deferred microcode mode" [mode 0xf] is sent.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit. If used multiple times also prints
@@ -31,11 +47,13 @@ this option sets the buffer id field in the cdb. \fIID\fR is a value between
 \fB\-I\fR, \fB\-\-in\fR=\fIFILE\fR
 read data from file \fIFILE\fR that will be sent with the WRITE BUFFER
 command.  If \fIFILE\fR is '\-' then stdin is read until an EOF is
-detected (this is the same action as \fI\-\-raw\fR).
+detected (this is the same action as \fI\-\-raw\fR). Data is read from
+the beginning of \fIFILE\fR except in the case when it is a regular file
+and the \fI\-\-skip=SKIP\fR option is given.
 .TP
 \fB\-l\fR, \fB\-\-length\fR=\fILEN\fR
 where \fILEN\fR is the length, in bytes, of data to be written to the device.
-If not given (and length cannot be deduced from \fI\-\-in=FILE\fR or
+If not given (and the length cannot be deduced from \fI\-\-in=FILE\fR or
 \fI\-\-raw\fR) then defaults to zero. If the option is given and the length
 deduced from \fI\-\-in=FILE\fR or \fI\-\-raw\fR is less (or no data is
 provided), then bytes of 0xff are used as fill bytes.
@@ -56,11 +74,10 @@ the WRITE BUFFER command to \fIDEVICE\fR. The action of this option is the
 same as using '\-\-in=\-'.
 .TP
 \fB\-s\fR, \fB\-\-skip\fR=\fISKIP\fR
-this option is only active when \fI\-\-in=FILE\fR is given and
-\fIFILE\fR is a regular file, rather than stdin. Data is read
-starting at byte offset \fISKIP\fR to the end of file (or the amount
-given by \fI\-\-length=LEN\fR). If not given the byte offset defaults to
-0 (i.e. the start of the file).
+this option is only active when \fI\-\-in=FILE\fR is given and \fIFILE\fR is
+a regular file, rather than stdin. Data is read starting at byte offset
+\fISKIP\fR to the end of file (or the amount given by \fI\-\-length=LEN\fR).
+If not given the byte offset defaults to 0 (i.e. the start of the file).
 .TP
 \fB\-S\fR, \fB\-\-specific\fR=\fIMS\fR
 \fIMS\fR is the mode specific field in the cdb. This is a 3\-bit field
@@ -104,7 +121,7 @@ Written by Luben Tuikov and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2012 Luben Tuikov and Douglas Gilbert
+Copyright \(co 2006\-2014 Luben Tuikov and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

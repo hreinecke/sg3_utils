@@ -12,7 +12,7 @@ EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
 	sg__sat_identify sg__sat_phy_event sg__sat_set_features \
 	sg_sat_chk_power sg_sat_smart_rd_data
 
-EXTRAS = sg_simple_aio sg_queue_tst
+EXTRAS = sg_simple_aio sg_queue_tst sgq_dd
 
 BSG_EXTRAS = bsg_queue_tst
 
@@ -100,6 +100,9 @@ sg_queue_tst: sg_queue_tst.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 bsg_queue_tst: bsg_queue_tst.o $(LIBFILESOLD)
+	$(LD) -o $@ $(LDFLAGS) $^ 
+
+sgq_dd: sgq_dd.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 install: $(EXECS)
