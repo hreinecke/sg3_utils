@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.87 20140409";    /* ses3r06 */
+static const char * version_str = "1.88 20140409";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2472,10 +2472,10 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             }
             if (skip) {
                 if (op->verbose > 2)
-                    pr2serr("skipping elem_type=0x%x, k=%d due to element "
-                            "index bounds\n  effective eiioe=%d, "
+                    pr2serr("skipping elem_type=0x%x, k=%d due to "
+                            "element_index=%d bounds\n  effective eiioe=%d, "
                             "elem_count=%d, num_elems=%d\n", elem_type, k,
-                            eiioe, elem_count, num_elems);
+                            ei, eiioe, elem_count, num_elems);
                 continue;
             }
         }
