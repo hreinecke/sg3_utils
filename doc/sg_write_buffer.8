@@ -93,12 +93,19 @@ print the version string and then exit.
 .SH NOTES
 If no \fI\-\-length=LEN\fR is given this utility reads up to 8 MiB of data
 from the given file \fIFILE\fR (or stdin). If a larger amount of data is
-required then the \fI\-\-length=LEN\fR option should be given. The user
-should be aware that most operating systems have limits on the amount
-of data that can be sent with one SCSI command. In Linux this
-depends on the pass through mechanism used (e.g. block SG_IO or
-the sg driver) and various setting in sysfs in the Linux lk 2.6
-series (e.g. /sys/block/sda/queue/max_sectors_kb).
+required then the \fI\-\-length=LEN\fR option should be given.
+.PP
+The user should be aware that most operating systems have limits on the
+amount of data that can be sent with one SCSI command. In Linux this
+depends on the pass through mechanism used (e.g. block SG_IO or the sg
+driver) and various setting in sysfs in the Linux lk 2.6/3
+series (e.g. /sys/block/sda/queue/max_sectors_kb). Devices (i.e. logical
+units) also typically have limits on the maximum amount of data they can
+handle in one command. These two limitations suggest that modes
+containing the word "offset" togther with the \fI\-\-bpw=CS\fR option
+are required as firmware files get larger and larger. And \fICS\fR
+can be quite small, for example 4096 bytes, resulting in many WRITE
+BUFFER commands being sent.
 .PP
 Downloading incorrect microcode into a device has the ability to render
 that device inoperable. One would hope that the device vendor verifies
@@ -110,9 +117,22 @@ command (or a sequence of them) fails due to device vendor verification
 checks then it should respond with a sense key of ILLEGAL REQUEST and
 an additional sense code of COMMAND SEQUENCE ERROR.
 .PP
+Each WRITE BUFFER command is assigned a timeout of 120 seconds.
+.PP
 All numbers given with options are assumed to be decimal.
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or has a trailing "h" or "H").
+.SH EXAMPLES
+The following sends new firmware to an enclosure. Sending a 1.5 MB
+file in one WRITE BUFFER command caused the enclosure to lock up
+temporarily and did not update the firmware. Breaking the firmware file
+into 4 KB chunks (an educated guess) was more successful:
+.PP
+  sg_write_buffer \-b 4k \-m dmc_offs_save \-I firmware.bin /dev/sg4
+.PP
+The firmware update occurred in the following enclosure power cycle. With
+a modern enclosure the Extended Inquiry VPD page gives indications in which
+situations a firmware upgrade will take place.
 .SH EXIT STATUS
 The exit status of sg_write_buffer is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.

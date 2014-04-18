@@ -26,7 +26,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.11 20140411";    /* spc4r36s */
+static const char * version_str = "1.12 20140414";    /* spc4r36s */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -35,7 +35,7 @@ static const char * version_str = "1.11 20140411";    /* spc4r36s */
 #define WRITE_BUFFER_CMD 0x3b
 #define WRITE_BUFFER_CMDLEN 10
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
-#define DEF_PT_TIMEOUT 60       /* 60 seconds */
+#define DEF_PT_TIMEOUT 120       /* 120 seconds, 2 minutes */
 
 static struct option long_options[] = {
         {"bpw", required_argument, 0, 'b'},
