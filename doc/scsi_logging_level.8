@@ -1,4 +1,4 @@
-.TH SCSI_LOGGING_LEVEL "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SCSI_LOGGING_LEVEL "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 scsi_logging_level \- access Linux SCSI logging level information
 .SH SYNOPSIS
@@ -88,6 +88,12 @@ The \fI\-\-get\fR and \fI\-\-set\fR options access the
 .SH EXIT STATUS
 The exit status of this script is 0 when it is successful. Any other
 exit status indicates that an error has occurred.
+.SH EXAMPLES
+The following will set SCSI_LOG_ERROR to level 5 in the Linux kernel. It
+requires root permissions:
+.PP
+  scsi_logging_level \-s \-E 5
+.PP
 .SH AUTHORS
 Written by IBM. Small alterations by Douglas Gilbert.
 .SH "REPORTING BUGS"

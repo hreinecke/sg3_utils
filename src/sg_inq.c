@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.34 20140330";    /* SPC-4 rev 36s */
+static const char * version_str = "1.35 20140415";    /* SPC-4 rev 36s */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2118,9 +2118,9 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
-    printf("  SPT=%d GRD_CHK=%d APP_CHK=%d REF_CHK=%d\n",
-           ((buff[4] >> 3) & 0x7), !!(buff[4] & 0x4), !!(buff[4] & 0x2),
-           !!(buff[4] & 0x1));
+    printf("  ACTIVATE_MICROCODE=%d SPT=%d GRD_CHK=%d APP_CHK=%d "
+           "REF_CHK=%d\n", ((buff[4] >> 6) & 0x3), ((buff[4] >> 3) & 0x7),
+           !!(buff[4] & 0x4), !!(buff[4] & 0x2), !!(buff[4] & 0x1));
     printf("  UASK_SUP=%d GROUP_SUP=%d PRIOR_SUP=%d HEADSUP=%d ORDSUP=%d "
            "SIMPSUP=%d\n", !!(buff[5] & 0x20), !!(buff[5] & 0x10),
            !!(buff[5] & 0x8), !!(buff[5] & 0x4), !!(buff[5] & 0x2),
@@ -2128,9 +2128,9 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
            !!(buff[6] & 0x1));
-    printf("  P_I_I_SUP=%d LUICLR=%d CBCS=%d R_SUP=%d\n",
-           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x1),
-           !!(buff[8] & 0x10));
+    printf("  P_I_I_SUP=%d LUICLR=%d R_SUP=%d CBCS=%d\n",
+           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x10),
+           !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
            (buff[10] << 8) + buff[11]);     /* spc4r27 */

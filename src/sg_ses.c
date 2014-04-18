@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.88 20140409";    /* ses3r06 */
+static const char * version_str = "1.88 20140414";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -3049,8 +3049,9 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
             /* only for device slot and array device slot elements */
             jrp->dev_slot_num = ae_ucp[7];
             if (ae_ucp[4] > 0) {        /* number of phys */
+                /* Use the first phy's "SAS ADDRESS" field */
                 for (m = 0; m < 8; ++m)
-                    jrp->sas_addr[m] = ae_ucp[20 + m];
+                    jrp->sas_addr[m] = ae_ucp[(4 + 4 + 12) + m];
             }
         }
         break;

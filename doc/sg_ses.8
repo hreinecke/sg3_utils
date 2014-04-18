@@ -215,11 +215,21 @@ later invocation using the \fI\-\-data=\fR option. A page less its first
 the full page contents is output in binary to stdout.
 .TP
 \fB\-A\fR, \fB\-\-sas\-addr\fR=\fISA\fR
-where \fISA\fR is a SAS address found in the Additional Element Status page.
-Only entries for SAS devices (with device slot or array device slot elements)
-have SAS addresses. \fISA\fR is a hex number that is up to 8 digits long. It
-may have a leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a
-medium level indexing alternative to the low level \fI\-\-index=\fR options.
+this is an indexing method for SAS end devices (e.g. SAS disks). The utility
+will try to find the element or slot in the Additional Element Status page
+whose SAS address matches \fISA\fR. For a SAS disk or tape that SAS address
+is its target port identifier for the port connected to that element or slot.
+Most SAS disks and tapes have two such target ports, usually numbered
+consecutively.
+.br
+SATA devices in a SAS enclosure often receive "manufactured" target port
+identifiers from a SAS expander; typically will a SAS address close to
+but different from the SAS address of the expander itself. Note that this
+manufactured target port identifier is different from a SATA disk's WWN.
+.br
+\fISA\fR is a hex number that is up to 8 digits long. It may have a
+leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a medium level
+ indexing alternative to the low level \fI\-\-index=\fR options.
 See the DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS section below.
 .TP
 \fB\-S\fR, \fB\-\-set\fR=\fISTR\fR
