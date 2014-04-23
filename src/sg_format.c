@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2013  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2014  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.23 20130730";
+static const char * version_str = "1.24 20140419";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -86,6 +86,7 @@ static struct option long_options[] = {
         {"fmtpinfo", required_argument, 0, 'f'},
         {"format", no_argument, 0, 'F'},
         {"help", no_argument, 0, 'h'},
+        {"ip_def", no_argument, 0, 'I'},
         {"long", no_argument, 0, 'l'},
         {"pinfo", no_argument, 0, 'p'},
         {"pfu", required_argument, 0, 'P'},
@@ -109,12 +110,12 @@ usage()
         printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
                "[--early]\n"
                "                 [--fmtpinfo=FPI] [--format] [--help] "
-               "[--long] [--pfu=PFU]\n"
-               "                 [--pie=PIE] [--pinfo] [--poll=PT] "
-               "[--resize] [--rto_req]\n"
-               "                 [--security] [--six] [--size=SIZE] "
-               "[--verbose] [--version]\n"
-               "                 [--wait] DEVICE\n"
+               "[--ip_def] [--long]\n"
+               "                 [--pfu=PFU] [--pie=PIE] [--pinfo] "
+               "[--poll=PT] [--resize]\n"
+               "                 [--rto_req] [--security] [--six] "
+               "[--size=SIZE] [--verbose]\n"
+               "                 [--version] [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -132,6 +133,7 @@ usage()
                "    --format|-F     format unit (default: report current "
                "count and size)\n"
                "    --help|-h       prints out this usage message\n"
+               "    --ip_def|-I     initialization pattern: default\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
                "32 bit lbas)\n"
                "    --pfu=PFU|-P PFU    Protection Field Usage value "
@@ -175,10 +177,11 @@ usage()
 /* Return 0 on success, else see sg_ll_format_unit() */
 static int
 scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
-            int dcrt, int pie, int si, int early, int pt, int verbose)
+            int dcrt, int pie, int ip_def, int sec_init, int early, int pt,
+            int verbose)
 {
         int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
-        int resp_len;
+        int resp_len, ip_desc;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
@@ -187,26 +190,29 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
         longlist = (pie > 0);
+        ip_desc = (ip_def || sec_init);
         off = longlist ? LO_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
-        fmt_pl[0] = pf_usage & 0x7;  /* protection_field_usage (bits 2-0) */
-        fmt_pl[1] = (immed ? 0x2 : 0); /* fov=0, [dpry,dcrt,stpf,ip=0] */
+        fmt_pl[0] = pf_usage & 0x7;  /* PROTECTION_FIELD_USAGE (bits 2-0) */
+        fmt_pl[1] = (immed ? 0x2 : 0); /* FOV=0, [DPRY,DCRT,STPF,IP=0] */
         if (dcrt)
-                fmt_pl[1] |= 0xa0;     /* fov=1, dcrt=1 */
-        if (si) {
-                fmt_pl[1] |= 0x88;     /* fov=1, ip=1 */
-                fmt_pl[off + 0] = 0x20;     /* si=1 in init. pattern desc */
+                fmt_pl[1] |= 0xa0;     /* FOV=1, DCRT=1 */
+        if (ip_desc) {
+                fmt_pl[1] |= 0x88;     /* FOV=1, IP=1 */
+                if (sec_init)
+                        fmt_pl[off + 0] = 0x20; /* SI=1 in IP desc */
         }
         if (longlist)
-                fmt_pl[3] = (pie & 0xf);    /* protection interval exponent */
+                fmt_pl[3] = (pie & 0xf);    /* PROTECTION_INTERVAL_EXPONENT */
+        /* with the long parameter list header, P_I_INFORMATION is always 0 */
 
-        need_hdr = (immed || cmplst || dcrt || si || (pf_usage > 0) ||
+        need_hdr = (immed || cmplst || dcrt || ip_desc || (pf_usage > 0) ||
                     (pie > 0));
         fmt_pl_sz = 0;
         if (need_hdr)
-                fmt_pl_sz = off + (si ? INIT_PATTERN_DESC_SZ : 0);
+                fmt_pl_sz = off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0);
 
-        res = sg_ll_format_unit(fd, fmtpinfo, longlist, need_hdr /*fmtdata*/,
-                                cmplst, 0 /* dlist_format */,
+        res = sg_ll_format_unit(fd, fmtpinfo, longlist, need_hdr /* FMTDATA*/,
+                                cmplst, 0 /* DEFECT_LIST_FORMAT */,
                                 (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
                                 fmt_pl, fmt_pl_sz, 1, verbose);
         switch (res) {
@@ -437,6 +443,7 @@ main(int argc, char **argv)
         int64_t blk_count = 0;  /* -c value */
         int blk_size = 0;     /* -s value */
         int format = 0;         /* -F */
+        int ip_def = 0;         /* -I */
         int resize = 0;         /* -r */
         int verbose = 0;        /* -v */
         int fwait = 0;          /* -w */
@@ -462,7 +469,7 @@ main(int argc, char **argv)
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:Def:FhlpP:q:rRs:SvVwx:6",
+                c = getopt_long(argc, argv, "c:C:Def:FhIlpP:q:rRs:SvVwx:6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -509,6 +516,9 @@ main(int argc, char **argv)
                 case 'h':
                         usage();
                         return 0;
+                case 'I':
+                        ip_def = 1;
+                        break;
                 case 'l':
                         long_lba = 1;
                         do_rcap16 = 1;
@@ -586,6 +596,11 @@ main(int argc, char **argv)
         if (NULL == device_name) {
                 fprintf(stderr, "no DEVICE name given\n");
                 usage();
+                return SG_LIB_SYNTAX_ERROR;
+        }
+        if (ip_def && do_si) {
+                fprintf(stderr, "'--ip_def' and '--security' contradict, "
+                        "choose one\n");
                 return SG_LIB_SYNTAX_ERROR;
         }
         if (resize) {
@@ -898,7 +913,7 @@ again_with_long_lba:
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
                 res = scsi_format(fd, fmtpinfo, cmplst, pfu, ! fwait, dcrt,
-                                  pie, do_si, early, pt, verbose);
+                                  pie, ip_def, do_si, early, pt, verbose);
                 ret = res;
                 if (res) {
                         fprintf(stderr, "FORMAT failed\n");

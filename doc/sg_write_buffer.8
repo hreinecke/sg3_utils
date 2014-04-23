@@ -16,7 +16,8 @@ from the file given in the \fI\-\-in=FILE\fR option, or data is read from
 stdin when either \fI\-\-raw\fR or \fI\-\-in=\-\fR is given.
 .PP
 Some WRITE BUFFER command variants do not have associated data to send to the
-device, for example "activate_mc" ("activate deferred microcode").
+device. For example "activate_mc" activates deferred microcode that was sent
+via prior WRITE BUFFER commands.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -59,13 +60,13 @@ deduced from \fI\-\-in=FILE\fR or \fI\-\-raw\fR is less (or no data is
 provided), then bytes of 0xff are used as fill bytes.
 .TP
 \fB\-m\fR, \fB\-\-mode\fR=\fIMO\fR
-this option sets the mode field in the cdb. \fIMO\fR is a value between
+this option sets the MODE field in the cdb. \fIMO\fR is a value between
 0 (default) and 31 inclusive. Alternatively an abbreviation can be given.
-To list the available mode abbreviations give an invalid
-one (e.g. '\-\-mode=xxx') or use the '\-hh' option.
+See the MODES section below. To list the available mode abbreviations at
+run time give an invalid one (e.g. '\-\-mode=xxx') or use the '\-hh' option.
 .TP
 \fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
-this option sets the buffer offset field in the cdb. \fIOFF\fR is a value
+this option sets the BUFFER OFFSET field in the cdb. \fIOFF\fR is a value
 between 0 (default) and 2**24\-1 . It is a byte offset.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
@@ -80,7 +81,7 @@ a regular file, rather than stdin. Data is read starting at byte offset
 If not given the byte offset defaults to 0 (i.e. the start of the file).
 .TP
 \fB\-S\fR, \fB\-\-specific\fR=\fIMS\fR
-\fIMS\fR is the mode specific field in the cdb. This is a 3\-bit field
+\fIMS\fR is the MODE SPECIFIC field in the cdb. This is a 3\-bit field
 so the values 0 to 7 are accepted. This field was introduced in SPC\-4
 revision 32 and can be used to specify additional events that activate
 deferred microcode (when \fIMO\fR is 0xD).
@@ -90,6 +91,60 @@ increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.SH MODES
+Following is a list of WRITE BUFFER command settings for the MODE field.
+First is an acronym accepted by the \fIMO\fR argument of this utility.
+Following the acronym in square brackets are the corresponding decimal and
+hex values that may also be given for \fIMO\fR. The following are listed
+in numerical order.
+.TP
+hd  [0, 0x0]
+Combined header and data (obsolete in SPC\-4).
+.TP
+vendor  [1, 0x1]
+Vendor specific.
+.TP
+data  [2, 0x2]
+Data (was called "Write Data" in SPC\-3).
+.TP
+dmc  [4, 0x4]
+Download microcode and activate (was called "Download microcode" in SPC\-3).
+.TP
+dmc_save  [5, 0x5]
+Download microcode, save, and activate (was called "Download microcode and
+save" in SPC\-3).
+.TP
+dmc_offs  [6, 0x6]
+Download microcode with offsets and activate (was called "Download microcode
+with offsets" in SPC\-3).
+.TP
+dmc_offs_save  [7, 0x7]
+Download microcode with offsets, save, and activate (was called "Download
+microcode with offsets and save" in SPC\-3).
+.TP
+echo  [10, 0xa]
+Write data to echo buffer (was called "Echo buffer" in SPC\-3).
+.TP
+dmc_offs_ev_defer  [13, 0xd]
+Download microcode with offsets, select activation events, save, and defer
+activate (introduced in SPC\-4).
+.TP
+dmc_offs_defer  [14, 0xe]
+Download microcode with offsets, save, and defer activate (introduced in
+SPC\-4).
+.TP
+activate_mc  [15, 0xf]
+Activate deferred microcode (introduced in SPC\-4).
+.TP
+en_ex  [26, 0x1A]
+Enable expander communications protocol and Echo buffer (obsolete in SPC\-4).
+.TP
+dis_ex  [27, 0x1B]
+Disable expander communications protocol (obsolete in SPC\-4).
+.TP
+deh  [28, 0x1C]
+Download application client error history (was called "Download application
+log" in SPC\-3).
 .SH NOTES
 If no \fI\-\-length=LEN\fR is given this utility reads up to 8 MiB of data
 from the given file \fIFILE\fR (or stdin). If a larger amount of data is

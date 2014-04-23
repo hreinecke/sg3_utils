@@ -27,7 +27,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.44 20140202";
+static const char * version_str = "0.45 20140421";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -362,8 +362,8 @@ prin_work(int sg_fd, const struct opts_t * optsp)
        if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr("PR in (%s): command not supported\n", b);
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("PR in (%s): bad field in cdb including unsupported "
-                    "service action\n", b);
+            pr2serr("PR in (%s): bad field in cdb or parameter list (perhaps "
+                    "unsupported service action)\n", b);
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
             pr2serr("PR in (%s): unit attention\n", b);
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -584,8 +584,8 @@ prout_work(int sg_fd, struct opts_t * optsp)
        if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr("PR out:, command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("PR out: bad field in cdb including unsupported "
-                    "service action\n");
+            pr2serr("PR out: bad field in cdb or parameter list (perhaps "
+                    "unsupported service action)\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
             pr2serr("PR out: unit attention\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -649,8 +649,8 @@ prout_reg_move_work(int sg_fd, struct opts_t * optsp)
        if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr("PR out: command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("PR out: bad field in cdb including unsupported "
-                    "service action\n");
+            pr2serr("PR out: bad field in cdb or parameter list (perhaps "
+                    "unsupported service action)\n");
         else if (SG_LIB_CAT_UNIT_ATTENTION == res)
             pr2serr("PR out: unit attention\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)

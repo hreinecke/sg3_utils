@@ -1,14 +1,15 @@
-.TH SG_FORMAT "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_FORMAT "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_format \- format or resize a SCSI disk (perhaps change its block size)
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
 [\fI\-\-early\fR] [\fI\-\-fmtpinfo=FPI\fR] [\fI\-\-format\fR]
-[\fI\-\-help\fR] [\fI\-\-long\fR] [\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR]
-[\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
-[\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=SIZE\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR] [\fI\-\-pfu=PFU\fR]
+[\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR] [\fI\-\-resize\fR]
+[\fI\-\-rto_req\fR] [\fI\-\-security\fR] [\fI\-\-six\fR]
+[\fI\-\-size=SIZE\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-wait\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -139,6 +140,13 @@ EXAMPLES section for typical use.
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage information then exit.
 .TP
+\fB\-I\fR, \fB\-\-ip_def\fR
+sets the default Initialization Pattern. Some disks (SSDs) use this to flag
+that a format should fully provision (i.e. associate a physical block with
+every logical block). The same disks (SSDs) might thin provision if this
+option is not given. If this option is given then the \fI\-\-security\fR
+option cannot be given.
+.TP
 \fB\-l\fR, \fB\-\-long\fR
 the default action of this utility is to assume 32 bit logical block
 addresses. With 512 byte block size this permits more than 2
@@ -161,7 +169,10 @@ below for more information.
 \fB\-q\fR, \fB\-\-pie\fR=\fIPIE\fR
 sets the "Protection Interval Exponent" field in the parameter block
 associated with a FORMAT UNIT command to \fIPIE\fR. The default value is 0.
-This field first appeared in SBC\-3 revision 18.
+The value of 0 is typical for 512 byte blocks, often with 4096 byte blocks
+a value of 3 might be appropriate (i.e. 8 protection intervals interleaved
+with 4096 bytes of user data). This field first appeared in SBC\-3 revision
+18.
 .TP
 \fB\-p\fR, \fB\-\-pinfo\fR
 this option is deprecated, use the \fI\-\-fmtpinfo=FPI\fR option instead.
@@ -195,7 +206,8 @@ sets the "Security Initialization" (SI) bit in the FORMAT UNIT command's
 initialization pattern descriptor within the parameter list. According
 to SBC\-3 the default initialization pattern "shall be written using a
 security erasure write technique". See the NOTES section on the SCSI
-SANITIZE command.
+SANITIZE command. If this option is given then the \fI\-\-ip_def\fR option
+cannot be given.
 .TP
 \fB\-6\fR, \fB\-\-six\fR
 Use 6 byte variants of MODE SENSE and MODE SELECT. The default action
@@ -379,6 +391,13 @@ related to the ATA sanitize disk feature set and can be used to remove all
 existing data from a disk. Sanitize is more likely to be implemented on
 modern disks (including SSDs) than FORMAT UNIT's security initialization
 feature (see the \fI\-\-security\fR option) and in some cases much faster.
+.PP
+SSDs that support thin provisioning will typically unmap all logical blocks
+during a format. The reason is to improve the SSD's endurance. Also thin
+provisioned formats typically complete faster than fully provisioned ones
+on the same disk (see the \fI\-\-ip_def\fR option). In either case format
+operations on SSDs tend to be a lot faster than they are on hard disks with
+spinning media.
 .SH EXAMPLES
 These examples use Linux device names. For suitable device names in
 other supported Operating Systems see the sg3_utils(8) man page.
