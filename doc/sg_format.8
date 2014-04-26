@@ -1,6 +1,6 @@
 .TH SG_FORMAT "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
-sg_format \- format or resize a SCSI disk (perhaps change its block size)
+sg_format \- format, resize or modify protection information of a SCSI disk
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
@@ -45,10 +45,10 @@ time the user is invited twice (5 seconds apart) to abort sg_format. This
 occurs just prior the SCSI FORMAT UNIT command being issued. See the NOTES
 section for more information.
 .PP
-Protection information is optional and is made up of 8 additional bytes
-associated with each logical block. Four protection types are defined
-with protection type 0 being no additional protection bytes. See the
-PROTECTION INFORMATION section below for more information.
+Protection information is optional and is made up of one or more protection
+intervals, each made up of 8 bytes associated with each logical block. Four
+protection types are defined with protection type 0 being no protection
+intervals. See the PROTECTION INFORMATION section below for more information.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -169,10 +169,11 @@ below for more information.
 \fB\-q\fR, \fB\-\-pie\fR=\fIPIE\fR
 sets the "Protection Interval Exponent" field in the parameter block
 associated with a FORMAT UNIT command to \fIPIE\fR. The default value is 0.
-The value of 0 is typical for 512 byte blocks, often with 4096 byte blocks
-a value of 3 might be appropriate (i.e. 8 protection intervals interleaved
-with 4096 bytes of user data). This field first appeared in SBC\-3 revision
-18.
+\fIPIE\fR can only be non-zero with protection types 2 and 3.
+The value of 0 is typical for 512 byte blocks; with 4096 byte blocks a value
+of 3 may be appropriate (i.e. 8 protection intervals interleaved with 4096
+bytes of user data). A device may not support any non-zero values. This
+field first appeared in SBC\-3 revision 18.
 .TP
 \fB\-p\fR, \fB\-\-pinfo\fR
 this option is deprecated, use the \fI\-\-fmtpinfo=FPI\fR option instead.
@@ -239,7 +240,9 @@ command's (short) parameter header. If this option (i.e. \fI\-\-wait\fR) is
 given then the "IMMED" bit is not set. If \fI\-\-wait\fR is given the
 FORMAT UNIT command waits until the format operation completes before
 returning its response. This can be many hours on large disks. This
-utility sets a 15 hour timeout on such a FORMAT UNIT command!
+utility sets a 15 hour timeout on such a FORMAT UNIT command! Some recent
+SSDs go to the other extreme of completing a format operation in 1.5
+seconds hence waiting is not an issue.
 .SH LISTS
 The SBC\-3 draft (revision 36) defines PLIST, CLIST, DLIST and GLIST in
 section 4.13 on "Medium defects". Briefly, the PLIST is the "primary"

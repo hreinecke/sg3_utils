@@ -22,20 +22,21 @@ extern "C" {
 #endif
 
 /* Commands with service actions that change the command name */
+#define SG_EXTENDED_COPY 0x83 /* since spc4r34 called: Third party copy out */
+#define SG_RECEIVE_COPY 0x84  /* since spc4r34 called: Third party copy in */
 #define SG_MAINTENANCE_IN 0xa3
 #define SG_MAINTENANCE_OUT 0xa4
 #define SG_PERSISTENT_RESERVE_IN 0x5e
 #define SG_PERSISTENT_RESERVE_OUT 0x5f
-#define SG_EXTENDED_COPY 0x83 /* since spc4r34 called: Third party copy out */
-#define SG_RECEIVE_COPY 0x84  /* since spc4r34 called: Third party copy in */
-#define SG_SERVICE_ACTION_IN_12 0xab
-#define SG_SERVICE_ACTION_OUT_12 0xa9
-#define SG_SERVICE_ACTION_BIDI 0x9d
-#define SG_SERVICE_ACTION_IN_16 0x9e
-#define SG_SERVICE_ACTION_OUT_16 0x9f
 #define SG_READ_BUFFER 0x3c
-#define SG_WRITE_BUFFER 0x3b
+#define SG_SANITIZE 0x48
+#define SG_SERVICE_ACTION_BIDI 0x9d
+#define SG_SERVICE_ACTION_IN_12 0xab
+#define SG_SERVICE_ACTION_IN_16 0x9e
+#define SG_SERVICE_ACTION_OUT_12 0xa9
+#define SG_SERVICE_ACTION_OUT_16 0x9f
 #define SG_VARIABLE_LENGTH_CMD 0x7f
+#define SG_WRITE_BUFFER 0x3b
 
 
 
@@ -68,6 +69,7 @@ extern struct sg_lib_value_name_t sg_lib_maint_in_arr[];
 extern struct sg_lib_value_name_t sg_lib_maint_out_arr[];
 extern struct sg_lib_value_name_t sg_lib_pr_in_arr[];
 extern struct sg_lib_value_name_t sg_lib_pr_out_arr[];
+extern struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_in12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_out12_arr[];
 extern struct sg_lib_value_name_t sg_lib_serv_in16_arr[];

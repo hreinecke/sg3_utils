@@ -15,7 +15,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.96 20140401";  /* spc4r36s, sbc4r01 */
+const char * sg_lib_version_str = "1.97 20140424";  /* spc4r36s, sbc4r01 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -230,7 +230,7 @@ struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
     {0x7, 0, "download microcode with offsets, save, and activate"},
     {0xa, 0, "write data to echo buffer"},
     {0xd, 0, "download microcode with offsets, select activation events, "
-             " save and defer activate"},
+             "save and defer activate"},
     {0xe, 0, "download microcode with offsets, save and defer activate"},
     {0xf, 0, "activate deferred microcode"},
     {0x1a, 0, "enable expander comms protocol and echo buffer"},
@@ -261,6 +261,14 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
     {0xe, 0, "Set priority"},
     {0xf, 0, "Set timestamp"},
     {0x10, 0, "Management protocol out"},
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = { /* opcode 0x48 */
+    {0x1, 0, "Sanitize, overwrite"},
+    {0x2, 0, "Sanitize, block erase"},
+    {0x3, 0, "Sanitize, cryptographic erase"},
+    {0x1f, 0, "Sanitize, exit failure mode"},
     {0xffff, 0, NULL},
 };
 
