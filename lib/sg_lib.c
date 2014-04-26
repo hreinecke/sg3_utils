@@ -1280,7 +1280,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         vnp = get_value_name(sg_lib_read_buff_arr, service_action,
                              peri_type);
         if (vnp)
-            my_snprintf(buff, buff_len, "Read buffer (%s)\n", vnp->name);
+            my_snprintf(buff, buff_len, "Read buffer, %s", vnp->name);
         else
             my_snprintf(buff, buff_len, "Read buffer, mode=0x%x",
                         service_action);
@@ -1290,9 +1290,18 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         vnp = get_value_name(sg_lib_write_buff_arr, service_action,
                              peri_type);
         if (vnp)
-            my_snprintf(buff, buff_len, "Write buffer (%s)\n", vnp->name);
+            my_snprintf(buff, buff_len, "Write buffer, %s", vnp->name);
         else
             my_snprintf(buff, buff_len, "Write buffer, mode=0x%x",
+                        service_action);
+        break;
+    case SG_SANITIZE:
+        vnp = get_value_name(sg_lib_sanitize_sa_arr, service_action,
+                             peri_type);
+        if (vnp)
+            my_snprintf(buff, buff_len, "%s", vnp->name);
+        else
+            my_snprintf(buff, buff_len, "Sanitize, service action=0x%x",
                         service_action);
         break;
     default:
@@ -1430,7 +1439,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     if (len <= 0)
         return;
     blen = (int)sizeof(buff);
-    formatstr = (0 == no_ascii) ? "%.76s\n" : "%.48s\n";
+    formatstr = (0 == no_ascii) ? "%.76s\n" : "%.58s\n";
     memset(buff, ' ', 80);
     buff[80] = '\0';
     if (no_ascii < 0) {

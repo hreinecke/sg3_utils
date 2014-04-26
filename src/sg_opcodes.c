@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2013 D. Gilbert
+ *  Copyright (C) 2004-2014 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.38 20130507";    /* spc4r26 */
+static const char * version_str = "0.38 20140423";    /* spc4r36s */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -39,7 +39,7 @@ static const char * version_str = "0.38 20130507";    /* spc4r26 */
 #define RSTMF_CMD_LEN 12
 #define MX_ALLOC_LEN 8192
 
-#define NAME_BUFF_SZ 64
+#define NAME_BUFF_SZ 128
 
 
 static int peri_type = 0; /* ugly but not easy to pass to alpha compare */
@@ -55,6 +55,7 @@ static struct option long_options[] = {
         {"alpha", 0, 0, 'a'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
+        {"mask", 0, 0, 'm'},
         {"no-inquiry", 0, 0, 'n'},
         {"new", 0, 0, 'N'},
         {"opcode", 1, 0, 'o'},
@@ -75,6 +76,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int no_inquiry;
+    int do_mask;
     int do_opcode;
     int do_raw;
     int do_rctd;
@@ -93,7 +95,7 @@ static void
 usage()
 {
     fprintf(stderr,
-            "Usage:  sg_opcodes [--alpha] [--help] [--hex] "
+            "Usage:  sg_opcodes [--alpha] [--help] [--hex] [--mask] "
             "[--no-inquiry]\n"
             "                   [--opcode=OP[,SA]] [--raw] [--rctd] "
             "[--repd] [--sa=SA]\n"
@@ -104,6 +106,8 @@ usage()
             "alphabetically\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
+            "    --mask|-m       and show cdb usage data (a mask) when "
+            "all listed\n"
             "    --no-inquiry|-n    don't output INQUIRY information\n"
             "    --opcode=OP|-o OP    first byte of command to query\n"
             "                         (decimal, prefix with '0x' for hex)\n"
@@ -126,20 +130,21 @@ usage()
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string then exit\n\n"
             "Performs a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT "
-            "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command\n");
+            "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command.\n");
 }
 
 static void
 usage_old()
 {
     fprintf(stderr,
-            "Usage:  sg_opcodes [-a] [-H] [-n] [-o=OP] [-q] [-r] [-R] "
+            "Usage:  sg_opcodes [-a] [-H] [-m] [-n] [-o=OP] [-q] [-r] [-R] "
             "[-s=SA]\n"
             "                   [-t] [-u] [-v] [-V] DEVICE\n"
             "  where:\n"
             "    -a    output list of operation codes sorted "
             "alphabetically\n"
             "    -H    print response in hex\n"
+            "    -m    and show cdb usage data (a mask) when all listed\n"
             "    -n    don't output INQUIRY information\n"
             "    -o=OP    first byte of command to query (in hex)\n"
             "    -q    set REPD bit for tmf_s\n"
@@ -166,7 +171,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ahHnNo:OqrRs:tuvV", long_options,
+        c = getopt_long(argc, argv, "ahHmnNo:OqrRs:tuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -181,6 +186,9 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'H':
             ++optsp->do_hex;
+            break;
+        case 'm':
+            ++optsp->do_mask;
             break;
         case 'n':
             ++optsp->no_inquiry;
@@ -295,6 +303,9 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     break;
                 case 'H':
                     ++optsp->do_hex;
+                    break;
+                case 'm':
+                    ++optsp->do_mask;
                     break;
                 case 'n':
                     ++optsp->no_inquiry;
@@ -463,10 +474,10 @@ opcode_alpha_compare(const void * left, const void * right)
 }
 
 static void
-list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
-               int alpha, int rctd)
+list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
+               int sg_fd)
 {
-    int k, j, cd_len, serv_act, len;
+    int k, j, m, cd_len, serv_act, len, servactv, opcode, res;
     unsigned int to;
     unsigned char * ucp;
     char name_buff[NAME_BUFF_SZ];
@@ -484,7 +495,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
         printf("sg_opcodes: no commands to display\n");
         return;
     }
-    if (rctd) {
+    if (op->do_rctd) {
         printf("\nOpcode  Service    CDB   Nominal  Recommended  Name\n");
         printf(  "(hex)   action(h)  size  timeout  timeout(sec)     \n");
         printf("-----------------------------------------------------------"
@@ -495,7 +506,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
         printf("-----------------------------------------------\n");
     }
     /* N.B. SPC-4 does _not_ requiring any ordering of response */
-    if (! unsorted) {
+    if (! op->do_unsorted) {
         sort_arr = (unsigned char **)malloc(cd_len * sizeof(unsigned char *));
         if (NULL == sort_arr) {
             printf("sg_opcodes: no memory to sort operation codes, "
@@ -509,24 +520,26 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
             len = (ucp[5] & 0x2) ? 20 : 8;
         }
         qsort(sort_arr, j, sizeof(unsigned char *),
-              (alpha ? opcode_alpha_compare : opcode_num_compare));
+              (op->do_alpha ? opcode_alpha_compare : opcode_num_compare));
     }
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
-        ucp = unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
+        ucp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
         len = (ucp[5] & 0x2) ? 20 : 8;
-        if (ucp[5] & 1) {
+        opcode = ucp[0];
+        servactv = ucp[5] & 1;
+        serv_act = 0;
+        if (servactv) {
             serv_act = ((ucp[2] << 8) | ucp[3]);
-            sg_get_opcode_sa_name(ucp[0], serv_act, peri_type,
-                                  NAME_BUFF_SZ, name_buff);
+            sg_get_opcode_sa_name(opcode, serv_act, peri_type, NAME_BUFF_SZ,
+                                  name_buff);
             snprintf(sa_buff, sizeof(sa_buff), "%4x", serv_act);
         } else {
-            sg_get_opcode_name(ucp[0], peri_type,
-                               NAME_BUFF_SZ, name_buff);
+            sg_get_opcode_name(opcode, peri_type, NAME_BUFF_SZ, name_buff);
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
-        if (rctd) {
+        if (op->do_rctd) {
             if (ucp[5] & 0x2) {
-                printf(" %.2x     %.4s       %3d", ucp[0], sa_buff,
+                printf(" %.2x     %.4s       %3d", opcode, sa_buff,
                        ((ucp[6] << 8) | ucp[7]));
                 to = ((unsigned int)ucp[12] << 24) + (ucp[13] << 16) +
                      (ucp[14] << 8) + ucp[15];
@@ -543,11 +556,28 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, int unsorted,
                 printf("    %s\n", name_buff);
             } else
                 printf(" %.2x     %.4s       %3d                         "
-                       "%s\n", ucp[0], sa_buff, ((ucp[6] << 8) | ucp[7]),
+                       "%s\n", opcode, sa_buff, ((ucp[6] << 8) | ucp[7]),
                        name_buff);
         } else
             printf(" %.2x     %.4s       %3d    %s\n",
                    ucp[0], sa_buff, ((ucp[6] << 8) | ucp[7]), name_buff);
+        if (op->do_mask) {
+            int cdb_sz;
+            unsigned char b[64];
+
+            memset(b, 0, sizeof(b));
+            res = do_rsoc(sg_fd, 0, (servactv ? 2 : 1), opcode, serv_act,
+                          b, sizeof(b), 1, op->do_verbose);
+            if (0 == res) {
+                cdb_sz = (b[2] << 8) + b[3];
+                if ((cdb_sz > 0) && (cdb_sz <= 80)) {
+                    printf("        cdb usage: ");
+                    for (m = 0; m < cdb_sz; ++m)
+                        printf("%.2x ", b[4 + m]);
+                    printf("\n");
+                }
+            }
+        }
     }
 }
 
@@ -584,8 +614,8 @@ decode_cmd_to_descriptor(unsigned char * dp, int max_b_len, char * b)
 }
 
 static void
-list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts, int do_opcode,
-         int do_servact)
+list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
+         struct opts_t * op)
 {
     int k;
     char name_buff[NAME_BUFF_SZ];
@@ -594,12 +624,12 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts, int do_opcode,
     int v = 0;
 
 
-    printf("\n  Opcode=0x%.2x", do_opcode);
+    printf("\n  Opcode=0x%.2x", op->do_opcode);
     if (rep_opts > 1)
-        printf("  Service_action=0x%.4x", do_servact);
+        printf("  Service_action=0x%.4x", op->do_servact);
     printf("\n");
-    sg_get_opcode_sa_name(((do_opcode > 0) ? do_opcode : 0),
-                          ((do_servact > 0) ? do_servact : 0),
+    sg_get_opcode_sa_name(((op->do_opcode > 0) ? op->do_opcode : 0),
+                          ((op->do_servact > 0) ? op->do_servact : 0),
                           peri_type, NAME_BUFF_SZ, name_buff);
     printf("  Command_name: %s\n", name_buff);
     switch((int)(rsoc_buff[1] & 7)) {
@@ -650,63 +680,65 @@ main(int argc, char * argv[])
     struct sg_simple_inquiry_resp inq_resp;
     const char * op_name;
     struct opts_t opts;
+    struct opts_t * op;
 
-    memset(&opts, 0, sizeof(opts));
-    opts.do_opcode = -1;
-    opts.do_servact = -1;
-    res = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->do_opcode = -1;
+    op->do_servact = -1;
+    res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_help) {
-        if (opts.opt_new)
+    if (op->do_help) {
+        if (op->opt_new)
             usage();
         else
             usage_old();
         return 0;
     }
-    if (opts.do_version) {
+    if (op->do_version) {
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
 
-    if (NULL == opts.device_name) {
+    if (NULL == op->device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
-        if (opts.opt_new)
+        if (op->opt_new)
             usage();
         else
             usage_old();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((-1 != opts.do_servact) && (-1 == opts.do_opcode)) {
+    if ((-1 != op->do_servact) && (-1 == op->do_opcode)) {
         fprintf(stderr, "When '-s' is chosen, so must '-o' be chosen\n");
-        if (opts.opt_new)
+        if (op->opt_new)
             usage();
         else
             usage_old();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_unsorted && opts.do_alpha)
+    if (op->do_unsorted && op->do_alpha)
         fprintf(stderr, "warning: unsorted ('-u') and alpha ('-a') options "
                 "chosen, ignoring alpha\n");
-    if (opts.do_taskman && ((-1 != opts.do_opcode) || opts.do_alpha ||
-        opts.do_unsorted)) {
+    if (op->do_taskman && ((-1 != op->do_opcode) || op->do_alpha ||
+        op->do_unsorted)) {
         fprintf(stderr, "warning: task management functions ('-t') chosen "
                 "so alpha ('-a'),\n          unsorted ('-u') and opcode "
                 "('-o') options ignored\n");
     }
-    op_name = opts.do_taskman ? "Report supported task management functions" :
+    op_name = op->do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
 
-    if (opts.do_opcode < 0) {
-        if ((sg_fd = scsi_pt_open_device(opts.device_name, 1 /* RO */,
-                                         opts.do_verbose)) < 0) {
+    if (op->do_opcode < 0) {
+        if ((sg_fd = scsi_pt_open_device(op->device_name, 1 /* RO */,
+                                         op->do_verbose)) < 0) {
             fprintf(stderr, "sg_opcodes: error opening file (ro): %s: %s\n",
-                    opts.device_name, safe_strerror(-sg_fd));
+                    op->device_name, safe_strerror(-sg_fd));
             return SG_LIB_FILE_ERROR;
         }
-        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.do_verbose)) {
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, op->do_verbose)) {
             peri_type = inq_resp.peripheral_type;
-            if (! (opts.do_raw || opts.no_inquiry)) {
+            if (! (op->do_raw || op->no_inquiry)) {
                 printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
                        inq_resp.product, inq_resp.revision);
                 cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
@@ -717,7 +749,7 @@ main(int argc, char * argv[])
             }
         } else {
             fprintf(stderr, "sg_opcodes: %s doesn't respond to a SCSI "
-                    "INQUIRY\n", opts.device_name);
+                    "INQUIRY\n", op->device_name);
             return SG_LIB_CAT_OTHER;
         }
         res = scsi_pt_close_device(sg_fd);
@@ -727,22 +759,22 @@ main(int argc, char * argv[])
         }
     }
 
-    if ((sg_fd = scsi_pt_open_device(opts.device_name, 0 /* RW */,
-                                     opts.do_verbose)) < 0) {
+    if ((sg_fd = scsi_pt_open_device(op->device_name, 0 /* RW */,
+                                     op->do_verbose)) < 0) {
         fprintf(stderr, "sg_opcodes: error opening file (rw): %s: %s\n",
-                opts.device_name, safe_strerror(-sg_fd));
+                op->device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (opts.do_opcode >= 0)
-        rep_opts = ((opts.do_servact >= 0) ? 2 : 1);
+    if (op->do_opcode >= 0)
+        rep_opts = ((op->do_servact >= 0) ? 2 : 1);
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
-    if (opts.do_taskman)
-        res = do_rstmf(sg_fd, opts.do_repd, rsoc_buff,
-                       (opts.do_repd ? 16 : 4), 1, opts.do_verbose);
+    if (op->do_taskman)
+        res = do_rstmf(sg_fd, op->do_repd, rsoc_buff,
+                       (op->do_repd ? 16 : 4), 1, op->do_verbose);
     else
-        res = do_rsoc(sg_fd, opts.do_rctd, rep_opts, opts.do_opcode,
-                      opts.do_servact, rsoc_buff, sizeof(rsoc_buff), 1,
-                      opts.do_verbose);
+        res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->do_opcode,
+                      op->do_servact, rsoc_buff, sizeof(rsoc_buff), 1,
+                      op->do_verbose);
     switch (res) {
     case 0:
     case SG_LIB_CAT_RECOVERED:
@@ -767,14 +799,14 @@ main(int argc, char * argv[])
         fprintf(stderr, "%s failed\n", op_name);
         goto err_out;
     }
-    if (opts.do_taskman) {
-        if (opts.do_raw) {
-            dStrRaw((const char *)rsoc_buff, (opts.do_repd ? 16 : 4));
+    if (op->do_taskman) {
+        if (op->do_raw) {
+            dStrRaw((const char *)rsoc_buff, (op->do_repd ? 16 : 4));
             goto err_out;
         }
         printf("\nTask Management Functions supported by device:\n");
-        if (opts.do_hex) {
-            dStrHex((const char *)rsoc_buff, (opts.do_repd ? 16 : 4), 1);
+        if (op->do_hex) {
+            dStrHex((const char *)rsoc_buff, (op->do_repd ? 16 : 4), 1);
             goto err_out;
         }
         if (rsoc_buff[0] & 0x80)
@@ -799,7 +831,7 @@ main(int argc, char * argv[])
             printf("    Query task set\n");
         if (rsoc_buff[1] & 0x1)
             printf("    I_T nexus reset\n");
-        if (opts.do_repd) {
+        if (op->do_repd) {
             if (rsoc_buff[3] < 0xc) {
                 fprintf(stderr, "when REPD given, byte 3 of response "
                         "should be >= 12\n");
@@ -829,31 +861,29 @@ main(int argc, char * argv[])
                (rsoc_buff[2] << 8) | rsoc_buff[3]) + 4;
         if (len > (int)sizeof(rsoc_buff))
             len = sizeof(rsoc_buff);
-        if (opts.do_raw) {
+        if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, len);
             goto err_out;
         }
-        if (opts.do_hex) {
+        if (op->do_hex) {
             dStrHex((const char *)rsoc_buff, len, 1);
             goto err_out;
         }
-        list_all_codes(rsoc_buff, sizeof(rsoc_buff), opts.do_unsorted,
-                       opts.do_alpha, opts.do_rctd);
+        list_all_codes(rsoc_buff, sizeof(rsoc_buff), op, sg_fd);
     } else {    /* asked about specific command */
         cd_len = ((rsoc_buff[2] << 8) | rsoc_buff[3]);
         len = cd_len + 4;
         if (len > (int)sizeof(rsoc_buff))
             len = sizeof(rsoc_buff);
-        if (opts.do_raw) {
+        if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, len);
             goto err_out;
         }
-        if (opts.do_hex) {
+        if (op->do_hex) {
             dStrHex((const char *)rsoc_buff, len, 1);
             goto err_out;
         }
-        list_one(rsoc_buff, cd_len, rep_opts, opts.do_opcode,
-                 opts.do_servact);
+        list_one(rsoc_buff, cd_len, rep_opts, op);
     }
     res = 0;
 
