@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.16 20140314";    /* spc4r36r + sbc4r01 */
+static const char * version_str = "1.17 20140426";    /* spc4r36r + sbc4r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1984,7 +1984,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
              * in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
-            case 1: snprintf(s, sz, "end device"); break;
+            case 1: snprintf(s, sz, "SAS or SATA device"); break;
             case 2: snprintf(s, sz, "expander device"); break;
             case 3: snprintf(s, sz, "expander device (fanout)"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;

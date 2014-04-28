@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.24 20140419";
+static const char * version_str = "1.25 20140428";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -904,11 +904,15 @@ again_with_long_lba:
 
         if (format)
 #if 1
+                printf("\nA FORMAT will commence in 15 seconds\n");
+                printf("    ALL data on %s will be DESTROYED\n", device_name);
+                printf("        Press control-C to abort\n");
+                sleep_for(5);
                 printf("\nA FORMAT will commence in 10 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
-                printf("A FORMAT will commence in 5 seconds\n");
+                printf("\nA FORMAT will commence in 5 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);

@@ -572,8 +572,9 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     processed = 0;
                     break;
                 }
-                n += my_snprintf(b + n, blen - n, "    Error in %s byte %d",
-                                 (descp[4] & 0x40) ? "Command" : "Data",
+                n += my_snprintf(b + n, blen - n, "    Error in %s: byte %d",
+                                 (descp[4] & 0x40) ? "Command" :
+                                                     "Data parameters",
                                  (descp[5] << 8) | descp[6]);
                 if (descp[4] & 0x08) {
                     n += my_snprintf(b + n, blen - n, " bit %d\n",
@@ -947,8 +948,9 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 switch (ssh.sense_key) {
                 case SPC_SK_ILLEGAL_REQUEST:
                     r += my_snprintf(b + r, blen - r, "  Sense Key Specific: "
-                             "Error in %s byte %d",
-                             ((sense_buffer[15] & 0x40) ? "Command" : "Data"),
+                             "Error in %s: byte %d",
+                             ((sense_buffer[15] & 0x40) ? "Command" :
+                                                          "Data parameters"),
                              (sense_buffer[16] << 8) | sense_buffer[17]);
                     if (sense_buffer[15] & 0x08)
                         r += my_snprintf(b + r, blen - r, " bit %d\n",
@@ -1439,7 +1441,12 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     if (len <= 0)
         return;
     blen = (int)sizeof(buff);
-    formatstr = (0 == no_ascii) ? "%.76s\n" : "%.58s\n";
+    if (0 == no_ascii)  /* address at left and ASCII at right */
+        formatstr = "%.76s\n";
+    else if (no_ascii > 0)
+        formatstr = "%.58s\n";
+    else /* negative: no address at left and no ASCII at right */
+        formatstr = "%.48s\n";
     memset(buff, ' ', 80);
     buff[80] = '\0';
     if (no_ascii < 0) {
@@ -1447,8 +1454,6 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
         bpos = bpstart;
         for (k = 0; k < len; k++) {
             c = *p++;
-            if (0 != (k % 16))
-                bpos += 3;
             if (bpos == (bpstart + (8 * 3)))
                 bpos++;
             my_snprintf(&buff[bpos], blen - bpos, "%.2x",
@@ -1458,7 +1463,8 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
                 fprintf(fp, formatstr, buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
-            }
+            } else
+                bpos += 3;
         }
         if (bpos > bpstart) {
             buff[bpos + 2] = '\0';
