@@ -12,10 +12,12 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#else
+#define SG_SCSI_STRINGS 1
 #endif
 
 
-const char * sg_lib_version_str = "1.97 20140424";  /* spc4r36s, sbc4r01 */
+const char * sg_lib_version_str = "1.98 20140427";  /* spc4r36s, sbc4r01 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -437,6 +439,10 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
 };
 
 struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {  /* opcode 0x94 */
     {0xffff, 0, NULL},
 };
 

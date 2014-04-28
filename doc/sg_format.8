@@ -40,8 +40,8 @@ for this double check is to detect a "format corrupt" state (see NOTES
 section). This usage will not modify the disk.
 .PP
 When this utility is used with the "\-\-format" (or "\-F") option it will
-attempt to format the given DEVICE. There is a 10 second pause during which
-time the user is invited twice (5 seconds apart) to abort sg_format. This
+attempt to format the given DEVICE. There is a 15 second pause during which
+time the user is invited thrice (5 seconds apart) to abort sg_format. This
 occurs just prior the SCSI FORMAT UNIT command being issued. See the NOTES
 section for more information.
 .PP
@@ -132,7 +132,7 @@ below for more information.
 issue a SCSI FORMAT UNIT command.
 .B This will destroy all the data held on the media.
 This option is required to change the block size of a disk. The user is given
-a 10 second count down to ponder the wisdom of doing this, during which time
+a 15 second count down to ponder the wisdom of doing this, during which time
 control\-C (amongst other Unix commands) can be used to kill this process
 before it does any damage. See NOTES section for implementation details and
 EXAMPLES section for typical use.
