@@ -1,4 +1,4 @@
-.TH SG_SES "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_SES "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -115,6 +115,9 @@ Using '\-\-eiioe=force' will decode this page as if the EIIOE bit is set.
 Using '\-\-eiioe=auto' will decode this page as if the EIIOE bit is set if
 the first element index in this page is 1 (in other words a heuristic to
 guess whether the EIIOE bit should be set or not).
+.br
+If the enclosure sets the EIIOE bit then this option has no effect. It is
+recommended that HP JBOD users set --eiioe=auto .
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 enumerate all known page names and SES elements when this option is given

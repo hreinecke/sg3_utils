@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.35 20140415";    /* SPC-4 rev 36s */
+static const char * version_str = "1.36 20140502";    /* SPC-4 rev 36t */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -775,15 +775,18 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         return 1;
     has_stdin = ((1 == fn_len) && ('-' == fname[0]));  /* read from stdin */
     if (as_binary) {
-        if (has_stdin)
+        if (has_stdin) {
             fd = STDIN_FILENO;
-        else {
+                if (sg_set_binary_mode(STDIN_FILENO) < 0)
+                    perror("sg_set_binary_mode");
+        } else {
             fd = open(fname, O_RDONLY);
             if (fd < 0) {
                 pr2serr("unable to open binary file %s: %s\n", fname,
                          safe_strerror(errno));
                 return 1;
-            }
+            } else if (sg_set_binary_mode(fd) < 0)
+                perror("sg_set_binary_mode");
         }
         k = read(fd, mp_arr, max_arr_len);
         if (k <= 0) {

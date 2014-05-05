@@ -27,7 +27,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.45 20140421";
+static const char * version_str = "0.47 20140504";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -47,6 +47,8 @@ static const char * version_str = "0.45 20140421";
 #define MX_TIDS 32
 #define MX_TID_LEN 256
 
+#define SG_PERSIST_O_RDONLY "SG_PERSIST_O_RDONLY"
+
 struct opts_t {
     unsigned int prout_type;
     uint64_t param_rk;
@@ -60,6 +62,7 @@ struct opts_t {
     int param_unreg;
     int inquiry;
     int hex;
+    int readonly;
     unsigned char transportid_arr[MX_TIDS * MX_TID_LEN];
     int num_transportids;
     unsigned int alloc_len;
@@ -86,6 +89,7 @@ static struct option long_options[] = {
     {"prout-type", 1, 0, 'T'},
     {"read-full-status", 0, 0, 's'},
     {"read-keys", 0, 0, 'k'},
+    {"readonly", 0, 0, 'y'},
     {"read-reservation", 0, 0, 'r'},
     {"read-status", 0, 0, 's'},
     {"register", 0, 0, 'G'},
@@ -195,7 +199,9 @@ usage()
             "    --prout-type=TYPE|-T TYPE    PR Out command type\n"
             "    --read-full-status|-s      PR In: Read Full Status\n"
             "    --read-keys|-k             PR In: Read Keys\n");
-    pr2serr("    --read-reservation|-r      PR In: Read Reservation\n"
+    pr2serr("    --readonly|-y              open DEVICE read-only (def: "
+            "read-write)\n"
+            "    --read-reservation|-r      PR In: Read Reservation\n"
             "    --read-status|-s           PR In: Read Full Status\n"
             "    --register|-G              PR Out: Register\n"
             "    --register-ignore|-I       PR Out: Register and Ignore\n"
@@ -1029,99 +1035,105 @@ main(int argc, char * argv[])
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
     struct opts_t opts;
+    struct opts_t * op;
 
-    memset(&opts, 0, sizeof(opts));
-    opts.prin = 1;
-    opts.prin_sa = -1;
-    opts.prout_sa = -1;
-    opts.inquiry = 1;
-    opts.alloc_len = MX_ALLOC_LEN;
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->prin = 1;
+    op->prin_sa = -1;
+    op->prout_sa = -1;
+    op->inquiry = 1;
+    op->alloc_len = MX_ALLOC_LEN;
+    cp = getenv(SG_PERSIST_O_RDONLY);
+    if (cp)
+        op->readonly = 1;
+
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQ:rRsS:T:UvVX:YzZ",
+        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQ:rRsS:T:UvVX:yYzZ",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'A':
-            opts.prout_sa = PROUT_PREE_AB_SA;
+            op->prout_sa = PROUT_PREE_AB_SA;
             ++num_prout_sa;
             break;
         case 'c':
-            opts.prin_sa = PRIN_RCAP_SA;
+            op->prin_sa = PRIN_RCAP_SA;
             ++num_prin_sa;
             break;
         case 'C':
-            opts.prout_sa = PROUT_CLEAR_SA;
+            op->prout_sa = PROUT_CLEAR_SA;
             ++num_prout_sa;
             break;
         case 'd':
             device_name = optarg;
             break;
         case 'G':
-            opts.prout_sa = PROUT_REG_SA;
+            op->prout_sa = PROUT_REG_SA;
             ++num_prout_sa;
             break;
         case 'h':
             usage();
             return 0;
         case 'H':
-            ++opts.hex;
+            ++op->hex;
             break;
         case 'i':
             want_prin = 1;
             break;
         case 'I':
-            opts.prout_sa = PROUT_REG_IGN_SA;
+            op->prout_sa = PROUT_REG_IGN_SA;
             ++num_prout_sa;
             break;
         case 'k':
-            opts.prin_sa = PRIN_RKEY_SA;
+            op->prin_sa = PRIN_RKEY_SA;
             ++num_prin_sa;
             break;
         case 'K':
-            if (1 != sscanf(optarg, "%" SCNx64 "", &opts.param_rk)) {
+            if (1 != sscanf(optarg, "%" SCNx64 "", &op->param_rk)) {
                 pr2serr("bad argument to '--param-rk'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
         case 'l':
-            if (1 != sscanf(optarg, "%x", &opts.alloc_len)) {
+            if (1 != sscanf(optarg, "%x", &op->alloc_len)) {
                 pr2serr("bad argument to '--alloc-length'\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else if (MX_ALLOC_LEN < opts.alloc_len) {
+            } else if (MX_ALLOC_LEN < op->alloc_len) {
                 pr2serr("'--alloc-length' argument exceeds maximum value "
                         "(%d)\n", MX_ALLOC_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'L':
-            opts.prout_sa = PROUT_REL_SA;
+            op->prout_sa = PROUT_REL_SA;
             ++num_prout_sa;
             break;
         case 'M':
-            opts.prout_sa = PROUT_REG_MOVE_SA;
+            op->prout_sa = PROUT_REG_MOVE_SA;
             ++num_prout_sa;
             break;
         case 'n':
-            opts.inquiry = 0;
+            op->inquiry = 0;
             break;
         case 'o':
             want_prout = 1;
             break;
         case 'P':
-            opts.prout_sa = PROUT_PREE_SA;
+            op->prout_sa = PROUT_PREE_SA;
             ++num_prout_sa;
             break;
         case 'Q':
-            if (1 != sscanf(optarg, "%x", &opts.param_rtp)) {
+            if (1 != sscanf(optarg, "%x", &op->param_rtp)) {
                 pr2serr("bad argument to '--relative-target-port'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            if (opts.param_rtp > 0xffff) {
+            if (op->param_rtp > 0xffff) {
                 pr2serr("argument to '--relative-target-port' 0 to ffff "
                         "inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1129,57 +1141,60 @@ main(int argc, char * argv[])
             ++num_prout_param;
             break;
         case 'r':
-            opts.prin_sa = PRIN_RRES_SA;
+            op->prin_sa = PRIN_RRES_SA;
             ++num_prin_sa;
             break;
         case 'R':
-            opts.prout_sa = PROUT_RES_SA;
+            op->prout_sa = PROUT_RES_SA;
             ++num_prout_sa;
             break;
         case 's':
-            opts.prin_sa = PRIN_RFSTAT_SA;
+            op->prin_sa = PRIN_RFSTAT_SA;
             ++num_prin_sa;
             break;
         case 'S':
-            if (1 != sscanf(optarg, "%" SCNx64 "", &opts.param_sark)) {
+            if (1 != sscanf(optarg, "%" SCNx64 "", &op->param_sark)) {
                 pr2serr("bad argument to '--param-sark'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
         case 'T':
-            if (1 != sscanf(optarg, "%x", &opts.prout_type)) {
+            if (1 != sscanf(optarg, "%x", &op->prout_type)) {
                 pr2serr("bad argument to '--prout-type'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
         case 'U':
-            opts.param_unreg = 1;
+            op->param_unreg = 1;
             break;
         case 'v':
-            ++opts.verbose;
+            ++op->verbose;
             break;
         case 'V':
             pr2serr("version: %s\n", version_str);
             return 0;
         case 'X':
-            if (0 != build_transportid(optarg, &opts)) {
+            if (0 != build_transportid(optarg, op)) {
                 pr2serr("bad argument to '--transport-id'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++num_prout_param;
             break;
+        case 'y':
+            ++op->readonly;
+            break;
         case 'Y':
-            opts.param_alltgpt = 1;
+            op->param_alltgpt = 1;
             ++num_prout_param;
             break;
         case 'z':
-            opts.prout_sa = PROUT_REPL_LOST_SA;
+            op->prout_sa = PROUT_REPL_LOST_SA;
             ++num_prout_sa;
             break;
         case 'Z':
-            opts.param_aptpl = 1;
+            op->param_aptpl = 1;
             ++num_prout_param;
             break;
         case '?':
@@ -1214,7 +1229,7 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     } else if (want_prout) { /* syntax check on PROUT arguments */
-        opts.prin = 0;
+        op->prin = 0;
         if ((1 != num_prout_sa) || (0 != num_prin_sa)) {
             pr2serr(">> For Persistent Reserve Out one and only one "
                     "appropriate\n>> service action must be chosen (e.g. "
@@ -1231,7 +1246,7 @@ main(int argc, char * argv[])
         if (0 == num_prin_sa) {
             pr2serr(">> No service action given; assume Persistent Reserve "
                     "In command\n>> with Read Keys service action\n");
-            opts.prin_sa = 0;
+            op->prin_sa = 0;
             ++num_prin_sa;
         } else if (num_prin_sa > 1)  {
             pr2serr("Too many service actions given; choose one only\n");
@@ -1239,43 +1254,43 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if ((opts.param_unreg || opts.param_rtp) &&
-        (PROUT_REG_MOVE_SA != opts.prout_sa)) {
+    if ((op->param_unreg || op->param_rtp) &&
+        (PROUT_REG_MOVE_SA != op->prout_sa)) {
         pr2serr("--unreg or --relative-target-port only useful with "
                 "--register-move\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((PROUT_REG_MOVE_SA == opts.prout_sa) &&
-        (1 != opts.num_transportids)) {
+    if ((PROUT_REG_MOVE_SA == op->prout_sa) &&
+        (1 != op->num_transportids)) {
         pr2serr("with --register-move one (and only one) --transport-id "
                 "should be given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (((PROUT_RES_SA == opts.prout_sa) ||
-         (PROUT_REL_SA == opts.prout_sa) ||
-         (PROUT_PREE_SA == opts.prout_sa) ||
-         (PROUT_PREE_AB_SA == opts.prout_sa)) &&
-        (0 == opts.prout_type)) {
+    if (((PROUT_RES_SA == op->prout_sa) ||
+         (PROUT_REL_SA == op->prout_sa) ||
+         (PROUT_PREE_SA == op->prout_sa) ||
+         (PROUT_PREE_AB_SA == op->prout_sa)) &&
+        (0 == op->prout_type)) {
         pr2serr("warning>>> --prout-type probably needs to be given\n");
     }
-    if ((opts.verbose > 2) && opts.num_transportids) {
+    if ((op->verbose > 2) && op->num_transportids) {
         pr2serr("number of tranport-ids decoded from command line (or "
-                "stdin): %d\n", opts.num_transportids);
+                "stdin): %d\n", op->num_transportids);
         pr2serr("  Decode given transport-ids:\n");
-        decode_transport_id("      ", opts.transportid_arr,
-                            0, opts.num_transportids);
+        decode_transport_id("      ", op->transportid_arr,
+                            0, op->num_transportids);
     }
 
-    if (opts.inquiry) {
+    if (op->inquiry) {
         if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */,
-                                         opts.verbose)) < 0) {
+                                         op->verbose)) < 0) {
             pr2serr("sg_persist: error opening file (ro): %s: %s\n",
                     device_name, safe_strerror(-sg_fd));
             return SG_LIB_FILE_ERROR;
         }
-        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, opts.verbose)) {
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                    inq_resp.revision);
             peri_type = inq_resp.peripheral_type;
@@ -1292,19 +1307,19 @@ main(int argc, char * argv[])
         sg_cmds_close_device(sg_fd);
     }
 
-    if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,
-                                     opts.verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(device_name, op->readonly,
+                                     op->verbose)) < 0) {
         pr2serr("sg_persist: error opening file (rw): %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
-    if (opts.prin)
-        ret = prin_work(sg_fd, &opts);
-    else if (PROUT_REG_MOVE_SA == opts.prout_sa)
-        ret = prout_reg_move_work(sg_fd, &opts);
+    if (op->prin)
+        ret = prin_work(sg_fd, op);
+    else if (PROUT_REG_MOVE_SA == op->prout_sa)
+        ret = prout_reg_move_work(sg_fd, op);
     else /* PROUT commands other than 'register and move' */
-        ret = prout_work(sg_fd, &opts);
+        ret = prout_work(sg_fd, op);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

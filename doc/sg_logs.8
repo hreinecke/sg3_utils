@@ -1,29 +1,29 @@
-.TH SG_LOGS "8" "February 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_LOGS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
-[\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
+[\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR]
+[\fI\-\-filter=PARC\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR]
+[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
 [\fI\-\-page=PG[,SPG]\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR]
 [\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR]
 [\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-h\fR] [\fI\-H\fR]
-[\fI\-l\fR] [\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG[,SPG]\fR]
-[\fI\-paramp=PP\fR] [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-select\fR]
-[\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
-\fIDEVICE\fR
+[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-f=PARC\fR]
+[\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
+[\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG[,SPG]\fR] [\fI\-paramp=PP\fR]
+[\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-select\fR] [\fI\-sp\fR]
+[\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 This utility sends a SCSI LOG SENSE command to the \fIDEVICE\fR and then
 outputs the response. The LOG SENSE command is used to fetch log pages. Known
 log pages are decoded by default. When the \fI\-\-reset\fR and/or
-\fI\-\-select\fR option is given then a SCSI LOG SELECT command is issued to
-reset parameters (e.g. counters).
+\fI\-\-select\fR option is given then a SCSI LOG SELECT command is issued.
 .PP
 In SPC\-4 revision 5 a subpage code was introduced to both the LOG SENSE and
 LOG SELECT command. At the same time a page code field was introduced to the
@@ -60,6 +60,15 @@ accepts 0, 1, 2 or 3 for the \fIPC\fR argument:
 .br
 The default value is 1 (i.e. current cumulative values).
 .TP
+\fB\-f\fR, \fB\-\-filter\fR=\fIPARC\fR
+only output the log parameter whose parameter code (a number between 0 and
+65535) matches \fIPARC\fR. \fIPARC\fR is assumed to be decimal unless a
+hexadecimal indication is given (e.g. a leading '0x' or a trailing 'h').
+The \fB\-\-hex\fR option outputs log parameter in hexadecimal rather than
+decoding it. If the \fB\-\-hex\fR option is used twice then the leading
+address on each kine of hex is removed. If the \fB\-\-raw\fR option is
+given then the log parameter is output in binary.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
 .TP
@@ -67,6 +76,15 @@ print out the usage message then exit.
 The default action is to decode known mode page numbers (and subpage numbers)
 into text. When this option is used once, the response is output in
 hexadecimal.
+.TP
+\fB\-i\fR, \fB\-\-in\fR=\fIFN\fR
+\fIFN\fR is treated as a file name (or '\-' for stdin) which contains ASCII
+hexadecimal or binary representing a log page that will be sent as parameter
+data of a LOG SELECT command. The hexadecimal should be arranged as 1 or 2
+digits representing a byte each of which is whitespace or comma separated.
+Anything from and including a hash mark to the end of line is ignored. If the
+\fI\-\-raw\fR option is also given then \fIFN\fR is treated as binary. See
+the LOG SELECT section.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 lists the names of all logs sense pages supported by this device. This is
@@ -96,9 +114,9 @@ switch to older style options.
 \fB\-p\fR, \fB\-\-page\fR=\fIPG[,SPG]\fR
 log page code to access. \fIPG\fR is expected to be a decimal number between
 0 and 63 inclusive. A hexadecimal number can be specified by a leading "0x"
-or a trailing "h". Common log page codes are listed below. Optionally
-\fISPG\fR, a subpage code, can be given. \fISPG\fR is expected to be a
-decimal number between 0 and 255 inclusive.
+or a trailing "h" so the valid range is 0x to 0x3f. Common log page codes are
+listed below. Optionally \fISPG\fR, a subpage code, can be given. \fISPG\fR
+is expected to be a decimal or hex number between 0 and 255 inclusive.
 .TP
 \fB\-P\fR, \fB\-\-paramp\fR=\fIPP\fR
 \fIPP\fR is the parameter pointer value to place in a field of that name in
@@ -112,7 +130,7 @@ being output in ASCII).
 .TP
 \fB\-Q\fR, \fB\-\-ppc\fR
 sets the Parameter Pointer Control (PPC) bit in the LOG SENSE cdb. Default
-is 0 (i.e. cleared).
+is 0 (i.e. cleared). This bit was made obsolete in SPC\-4 revision 18.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the response in binary to stdout. Error messages and warnings are
@@ -120,8 +138,7 @@ output to stderr.
 .TP
 \fB\-R\fR, \fB\-\-reset\fR
 use SCSI LOG SELECT command (PCR bit set) to reset the all log pages (or
-the given page). [SPC\-4 (rev 6) doesn't say that a given log (sub)page can
-be reset yet.] Exactly what is reset depends on the accompanying SP
+the given page). Exactly what is reset depends on the accompanying SP
 bit (i.e. \fI\-\-sp\fR option which defaults to 0) and the
 \fIPC\fR ("page control") value (which defaults to 1). Supplying this option
 implies the \fI\-\-select\fR option as well. This option seems to clear error
@@ -132,12 +149,8 @@ which the counter is found will remain "stuck" until something is done.
 .TP
 \fB\-S\fR, \fB\-\-select\fR
 use a LOG SELECT command. The default action (i.e. when neither this option
-nor \fI\-\-reset\fR is given) is to do a LOG SENSE command. When this option
-is given, the SP bit (i.e. \fI\-\-sp\fR option which defaults to 0), the
-\fIPC\fR ("page control") value (which defaults to 1) and the PCR bit (i.e.
-\fI\-\-reset\fR option which defaults to 0) are placed in the LOG SELECT
-cdb. At some stage the log page and subpage options may also be active [but
-SPC\-4 (rev 6) doesn't say that].
+nor \fI\-\-reset\fR is given) is to do a LOG SENSE command. See the LOG
+SELECT section.
 .TP
 \fB\-s\fR, \fB\-\-sp\fR
 sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared). When set
@@ -154,14 +167,38 @@ that is not available tries the Informational Exceptions log page which
 may also have the current temperature (especially on older disks).
 .TP
 \fB\-T\fR, \fB\-\-transport\fR
-outputs the transport ('Protocol specific port') log page. Equivalent
-to setting '\-\-page=18h'.
+outputs the transport ('Protocol specific port') log page. Equivalent to
+setting '\-\-page=18h'.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level of verbosity.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.
+.SH LOG SELECT
+The LOG SELECT command can be used to reset certain parameters to vendor
+specific defaults, save them to non-volatile storage (i.e. the media), or
+supply new page contents. This command has changed between SPC\-3 and SPC\-4
+with the addition of the Page and Subpage Code fields which can only be
+non zero when the Parameter list length is zero.
+.PP
+The \fI\-\-select\fR option is required to issue a LOG SELECT command. If
+the \fI\-\-in=FN\fR option is not given (or \fIFN\fR is effectively empty)
+then the Parameter list length field is set to zero. If the \fI\-\-in=FN\fR
+option is is given then its decoded data is placed in the data-out buffer
+and its length in bytes is placed in the Parameter list length field.
+.PP
+Other options that are active with the LOG SELECT command are
+\fI\-\-control=PC\fR, \fI\-\-reset\fR (which sets the PCR bit) and
+\fI\-\-sp\fR.
+.SH
+APPLICATION CLIENT
+This is the name of a log page that acts as a container for data provided
+by the user. An application client is a SCSI term for the program that issues
+commands to a SCSI initiator (often known as a Host Bus Adapter (HBA)).
+.PP
+The Application client log page has 64 log parameters with parameters codes
+0 to 63. Each can hold 252 bytes of user binary data.
 .SH NOTES
 This utility will usually do a double fetch of log pages with the SCSI LOG
 SENSE command. The first fetch requests a 4 byte response (i.e. place 4 in
@@ -212,6 +249,8 @@ the leading "0x", or as their decimal equivalents.]:
 0xd       Temperature
 .br
 0xe       Start\-stop cycle counter
+.br
+0xf       Application client
 .br
 0x10      Self\-test results
 .br
@@ -265,6 +304,11 @@ Equivalent to \fI\-\-control=PC\fR in the main description.
 \fB\-h\fR
 suppresses decoding of known log sense pages and prints out the
 response in hex instead.
+.TP
+\fB\-i\fR=\fIFN\fR
+\fIFN\fR is treated as a file name (or '\-' for stdin) which contains ASCII
+hexadecimal representing a log page that will be sent as parameter data of a
+LOG SELECT command. See the LOG SELECT section.
 .TP
 \fB\-H\fR
 same action as '\-h' in this section and equivalent to \fI\-\-hex\fR in
