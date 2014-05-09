@@ -5,7 +5,7 @@ sg_read_buffer \- send SCSI READ BUFFER command
 .B sg_read_buffer
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id=ID\fR] [\fI\-\-length=LEN\fR]
 [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR] [\fI\-\-raw\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -49,6 +49,10 @@ between 0 (default) and 2**24\-1 . It is a byte offset.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 if a response is received then it is sent in binary to stdout.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).

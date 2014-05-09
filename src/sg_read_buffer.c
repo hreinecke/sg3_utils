@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2013 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2014 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static const char * version_str = "1.09 20130507";
+static const char * version_str = "1.10 20140507";
 
 
 static struct option long_options[] = {
@@ -36,6 +36,7 @@ static struct option long_options[] = {
         {"mode", 1, 0, 'm'},
         {"offset", 1, 0, 'o'},
         {"raw", 0, 0, 'r'},
+        {"readonly", 0, 0, 'R'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -48,8 +49,9 @@ usage()
     fprintf(stderr, "Usage: "
           "sg_read_buffer [--help] [--hex] [--id=ID] [--length=LEN] "
           "[--mode=MO]\n"
-          "                      [--offset=OFF] [--raw] [--verbose] "
-          "[--version] DEVICE\n"
+          "                      [--offset=OFF] [--raw] [--readonly] "
+          "[--verbose]\n"
+          "                      [--version] DEVICE\n"
           "  where:\n"
           "    --help|-h           print out usage message\n"
           "    --hex|-H            print output in hex\n"
@@ -57,13 +59,13 @@ usage()
           "    --length=LEN|-l LEN    length in bytes to read (def: 4)\n"
           "    --mode=MO|-m MO     read buffer mode, MO is number or "
           "acronym (def: 0)\n"
-          "    --off=OFF|-o OFF    buffer offset (unit: bytes, def: 0)\n"
+          "    --offset=OFF|-o OFF    buffer offset (unit: bytes, def: 0)\n"
           "    --raw|-r            output response to stdout\n"
+          "    --readonly|-R       open DEVICE read-only (def: read-write)\n"
           "    --verbose|-v        increase verbosity\n"
           "    --version|-V        print version string and exit\n\n"
-          "  Numbers given in options are decimal unless they have a "
-          "hex indicator\n"
-          "Performs a SCSI READ BUFFER command\n"
+          "Performs a SCSI READ BUFFER command. Numbers given in options are "
+          "decimal\nunless they have a hex indicator (e.g. a leading '0x').\n"
           );
 
 }
@@ -124,6 +126,7 @@ main(int argc, char * argv[])
     int sg_fd, res, c, len, k;
     int do_help = 0;
     int do_hex = 0;
+    int o_readonly = 0;
     int rb_id = 0;
     int rb_len = 4;
     int rb_mode = 0;
@@ -137,7 +140,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHi:l:m:o:rvV", long_options,
+        c = getopt_long(argc, argv, "hHi:l:m:o:rRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -196,6 +199,9 @@ main(int argc, char * argv[])
             break;
         case 'r':
             ++do_raw;
+            break;
+        case 'R':
+            ++o_readonly;
             break;
         case 'v':
             ++verbose;
@@ -265,7 +271,7 @@ main(int argc, char * argv[])
 #endif
 #endif
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
@@ -293,7 +299,12 @@ main(int argc, char * argv[])
             fprintf(stderr, "bad field in Read buffer cdb\n");
             break;
         default:
-            fprintf(stderr, "Read buffer failed res=%d\n", res);
+            if (-1 == res) {
+                fprintf(stderr, "Read buffer command failed\n");
+            } else
+                fprintf(stderr, "Read buffer failed, res=%d\n", res);
+            if (0 == verbose)
+                fprintf(stderr, "... try again with -v or -vv\n");
             break;
         }
     } else if (rb_len > 0) {

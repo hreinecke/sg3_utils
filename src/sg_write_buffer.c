@@ -26,7 +26,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.12 20140414";    /* spc4r36s */
+static const char * version_str = "1.13 20140507";    /* spc4r36s */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -544,7 +544,12 @@ main(int argc, char * argv[])
             pr2serr("bad field in Write buffer cdb\n");
             break;
         default:
-            pr2serr("Write buffer failed res=%d\n", res);
+            if (-1 == res) {
+                fprintf(stderr, "Write buffer command failed\n");
+            } else
+                fprintf(stderr, "Write buffer failed, res=%d\n", res);
+            if (0 == verbose)
+                fprintf(stderr, "... try again with -v or -vv\n");
             break;
         }
     }

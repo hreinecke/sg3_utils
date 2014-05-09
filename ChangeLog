@@ -2,17 +2,23 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140504] [svn: r572]
+Changelog for sg3_utils-1.39 [20140508] [svn: r573]
   - sg_ses: add --eiioe=auto|force option
     - fix AES dpage element indexing problems
+    - add --readonly option
   - sg_write_buffer: add --bpw=CS option to call
     write buffer multiple times for big blobs
   - sg_format: add --ip_def option to fully provision
   - sg_opcodes: add --mask option
   - sg_logs: add --in=FN option for log select params
     - add --filter=PARC (parameter code)
-  - sg_persist: add --readonly option
-    - or environment variable SG_PERSIST_O_RDONLY
+    - add --no_inq for suppress initial INQUIRY call
+    - add --readonly option
+  - sg_persist: add --readonly option, implicit if
+    environment variable SG_PERSIST_O_RDONLY present
+  - sg_read_buffer: add --readonly option
+  - sg_readcap: add --readonly option
+  - sg_luns: add --readonly option
   - sginfo: strip trailing spaces from INQUIRY text
   - sg_sat_set_features: add --readonly option
   - sg_rbuf: add --echo option (to use echo buffer)

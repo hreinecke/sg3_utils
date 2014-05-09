@@ -3,20 +3,49 @@
 # in the sg3_utils package. This script works as expected on the
 # author's Fujitsu MAM3184, Seagate ST373455 and ST9146803SS disks.
 #
-#  Version 1.6 20090608
+#  Version 1.7 20140508
 
 # N.B. make sure the device name is correct for your environment.
 
-if [ ! -n "$1" ];then
-        echo "Usage: `basename $0` <device_name>"
-        echo
-        echo "Tests various SCSI Persistent Reserve (in + out) commands."
-        echo "Should be harmless (unless key 0x123abc is already in use)."
-        exit 1
+key="123abc"
+key2="333aaa"
+kk=${key}
+verbose=""
+
+usage()
+{
+  echo "Usage: sg_persist_tst.sh [-h] [-s] [-v] <device>"
+  echo "  where:"
+  echo "    -h, --help           print usage message"
+  echo "    -s, --second         use second key"
+  echo "    -v, --verbose        more verbose output"
+  echo ""
+  echo "Test SCSI Persistent Reservations with sg_persist utility."
+  echo "Default key is ${key} and alternate, second key is ${key2} ."
+  echo "Should be harmless (unless one of those keys is already in use)."
+}
+
+opt="$1"
+while test ! -z "$opt" -a -z "${opt##-*}"; do
+  opt=${opt#-}
+  case "$opt" in
+    h|-help) usage ; exit 0 ;;
+    s|-second) kk=${key2} ;;
+    v|-verbose) verbose="-v" ;;
+    *) echo "Unknown option: -$opt " ; exit 1 ;;
+  esac
+  shift
+  opt="$1"
+done
+
+if [ $# -lt 1 ]
+  then
+    usage
+    exit 1
 fi
 
 echo ">>> try to report capabilities:"
-sg_persist -c $1
+sg_persist -c ${verbose} $1
 res=$?
 case "$res" in
     0) ;;
@@ -40,50 +69,50 @@ echo ""
 sleep 1
 
 echo ">>> check if any keys are registered:"
-sg_persist --no-inquiry --read-keys $1
+sg_persist --no-inquiry --read-keys ${verbose} $1
 sleep 1
 
 echo
 echo ">>> register a key:"
-sg_persist -n --out --register --param-sark=123abc $1
+sg_persist -n --out --register --param-sark=${kk} ${verbose} $1
 sleep 1
 
 echo
-echo ">>> now key 123abc should be registered:"
-sg_persist -n --read-keys $1
+echo ">>> now key ${kk} should be registered:"
+sg_persist -n --read-keys ${verbose} $1
 sleep 1
 
 echo
-echo ">>> reserve the device (based on key 123abc):"
-sg_persist -n --out --reserve --param-rk=123abc --prout-type=1 $1
+echo ">>> reserve the device (based on key ${kk}):"
+sg_persist -n --out --reserve --param-rk=${kk} --prout-type=1 ${verbose} $1
 sleep 1
 
 echo
 echo ">>> check if the device is reserved (it should be now):"
-sg_persist -n --read-reservation $1
+sg_persist -n --read-reservation ${verbose} $1
 sleep 1
 
 echo
 echo ">>> try to 'read full status' (may not be supported):"
-sg_persist -n --read-full-status $1
+sg_persist -n --read-full-status ${verbose} $1
 sleep 1
 
 echo
 echo ">>> now release reservation:"
-sg_persist -n --out --release --param-rk=123abc --prout-type=1 $1
+sg_persist -n --out --release --param-rk=${kk} --prout-type=1 ${verbose} $1
 sleep 1
 
 echo
 echo ">>> check if the device is reserved (it should _not_ be now):"
-sg_persist -n --read-reservation $1
+sg_persist -n --read-reservation ${verbose} $1
 sleep 1
 
 echo
-echo ">>> unregister key 123abc:"
-sg_persist -n --out --register --param-rk=123abc $1
+echo ">>> unregister key ${kk}:"
+sg_persist -n --out --register --param-rk=${kk} ${verbose} $1
 sleep 1
 
 echo
-echo ">>> now key 123abc should not be registered:"
-sg_persist -n -k $1
+echo ">>> now key ${kk} should not be registered:"
+sg_persist -n -k ${verbose} $1
 sleep 1

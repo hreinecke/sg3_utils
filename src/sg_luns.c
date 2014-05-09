@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.24 20131029";
+static const char * version_str = "1.25 20140508";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -45,6 +45,7 @@ static struct option long_options[] = {
         {"maxlen", required_argument, 0, 'm'},
         {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
         {"select", required_argument, 0, 's'},
         {"test", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
@@ -59,16 +60,16 @@ usage()
     fprintf(stderr, "Usage: "
             "sg_luns    [--decode] [--help] [--hex] [--linux] "
             "[--maxlen=LEN]\n"
-            "                  [--quiet] [--raw] [--select=SR] "
-            "[--verbose]\n"
-            "                  [--version] DEVICE\n");
+            "                  [--quiet] [--raw] [--readonly] "
+            "[--select=SR]\n"
+            "                  [--verbose] [--version] DEVICE\n");
 #else
     fprintf(stderr, "Usage: "
             "sg_luns    [--decode] [--help] [--hex] [--maxlen=LEN] "
             "[--quiet]\n"
-            "                  [--raw] [--select=SR] [--verbose] "
-            "[--version]\n"
-            "                  DEVICE\n");
+            "                  [--raw] [--readonly] [--select=SR] "
+            "[--verbose]\n"
+            "                  [--version] DEVICE\n");
 #endif
     fprintf(stderr,
             "     or\n"
@@ -90,12 +91,15 @@ usage()
             "                           (def: 0 -> %d bytes)\n"
             "    --quiet|-q         output only ASCII hex lun values\n"
             "    --raw|-r           output response in binary\n"
+            "    --readonly|-R      open DEVICE read-only (def: "
+            "read-write)\n"
             "    --select=SR|-s SR    select report SR (def: 0)\n"
             "                          0 -> luns apart from 'well "
             "known' lus\n"
             "                          1 -> only 'well known' "
             "logical unit numbers\n"
             "                          2 -> all luns\n"
+            "                          spc4r36 added 0x10, 0x11 and 0x12\n"
             "    --test=ALUN|-t ALUN    decode ALUN and ignore most other "
             "options\n"
             "                           and DEVICE (apart from '-H')\n"
@@ -341,6 +345,7 @@ main(int argc, char * argv[])
     int maxlen = 0;
     int do_quiet = 0;
     int do_raw = 0;
+    int o_readonly = 0;
     int select_rep = 0;
     int verbose = 0;
 #ifdef SG_LIB_LINUX
@@ -360,10 +365,10 @@ main(int argc, char * argv[])
         int option_index = 0;
 
 #ifdef SG_LIB_LINUX
-        c = getopt_long(argc, argv, "dhHlm:qrs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHlm:qrRs:t:vV", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "dhHm:qrs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHm:qrRs:t:vV", long_options,
                         &option_index);
 #endif
         if (c == -1)
@@ -399,10 +404,14 @@ main(int argc, char * argv[])
         case 'r':
             ++do_raw;
             break;
+        case 'R':
+            ++o_readonly;
+            break;
         case 's':
-           if ((1 != sscanf(optarg, "%d", &select_rep)) ||
-               (select_rep < 0) || (select_rep > 255)) {
-                fprintf(stderr, "bad argument to '--select'\n");
+           select_rep = sg_get_num(optarg);
+           if ((select_rep < 0) || (select_rep > 255)) {
+                fprintf(stderr, "bad argument to '--select', expect 0 to "
+                        "255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -533,7 +542,7 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

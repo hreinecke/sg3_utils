@@ -1,15 +1,15 @@
-.TH SG_READCAP "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_READCAP "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_readcap \- send SCSI READ CAPACITY command
 .SH SYNOPSIS
 .B sg_readcap
 [\fI\-\-16\fR] [\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-lba=LBA\fR] [\fI\-\-long\fR] [\fI\-\-pmi\fR] [\fI\-\-raw\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_readcap
 [\fI\-16\fR] [\fI\-b\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-lba=LBA\fR]
-[\fI\-pmi\fR] [\fI\-r\fR] [\fI\-v\fR] [\fI\-V\fR] \fIDEVICE\fR
+[\fI\-pmi\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-v\fR] [\fI\-V\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -92,6 +92,12 @@ made obsolete in SBC\-3 revision 26.
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary to stdout.
 .TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default for READ CAPACITY(16) is to open it read\-write. The default
+for READ CAPACITY(10) is to open it read\-only so this option does not
+change anything for this case.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level of verbosity. Can be used multiple times.
 .TP
@@ -147,6 +153,9 @@ Equivalent to \fI\-\-pmi\fR in the main description.
 .TP
 \fB\-r\fR
 output response in binary (to stdout).
+.TP
+\fB\-R\fR
+Equivalent to \fI\-\-readonly\fR in the main description.
 .TP
 \fB\-v\fR
 verbose: print out cdb of issued commands prior to execution. '\-vv'
