@@ -10,8 +10,8 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
 [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-nickname=SEN\fR]
 [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
-[\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR] [\fI\-\-status\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR]
+[\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -216,6 +216,10 @@ outputs the chosen status page in ASCII hex in a format suitable for a
 later invocation using the \fI\-\-data=\fR option. A page less its first
 4 bytes (page code and length) is output. When used twice (e.g. \fI\-rr\fR)
 the full page contents is output in binary to stdout.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
 .TP
 \fB\-A\fR, \fB\-\-sas\-addr\fR=\fISA\fR
 this is an indexing method for SAS end devices (e.g. SAS disks). The utility

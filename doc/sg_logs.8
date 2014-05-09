@@ -5,18 +5,19 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 .B sg_logs
 [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR]
 [\fI\-\-filter=PARC\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR]
-[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
+[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR]
 [\fI\-\-page=PG[,SPG]\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR]
-[\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR]
-[\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-reset\fR]
+[\fI\-\-select\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
+[\fI\-\-transport\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
 [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-f=PARC\fR]
 [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
 [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG[,SPG]\fR] [\fI\-paramp=PP\fR]
-[\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-select\fR] [\fI\-sp\fR]
-[\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
+[\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-select\fR]
+[\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
+[\fI\-x\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -68,6 +69,9 @@ The \fB\-\-hex\fR option outputs log parameter in hexadecimal rather than
 decoding it. If the \fB\-\-hex\fR option is used twice then the leading
 address on each kine of hex is removed. If the \fB\-\-raw\fR option is
 given then the log parameter is output in binary.
+.br
+Most log pages contain one or more log parameters. Examples of those that
+don't are those pages that list supported log pages.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -108,6 +112,18 @@ contains no space and may be abbreviated and the value is decimal unless
 prefixed by '0x'. Nesting is indicated by leading spaces. This form
 is meant to be relatively easy to parse.
 .TP
+\fB\-x\fR, \fB\-\-no_inq\fR
+suppresses the output of information obtained from an initial call to the
+INQUIRY command for the standard response. The default (assuming some other
+options that suppress this output are also not given) is to output several
+device identification strings.
+.br
+If this option is given twice (or more) then no INQUIRY command is sent
+hence there will be no device identification string output either. Also the
+peripheral device type (PDT) field will not be obtained so this utility will
+not be able to differentiate between some log pages that are device
+dependent. It will assume a PDT of 0 (i.e. a disk).
+.TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
 .TP
@@ -135,6 +151,15 @@ is 0 (i.e. cleared). This bit was made obsolete in SPC\-4 revision 18.
 \fB\-r\fR, \fB\-\-raw\fR
 output the response in binary to stdout. Error messages and warnings are
 output to stderr.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag). The
+default action is to try and open \fIDEVICE\fR read\-write then if that
+fails try to open again with read\-only. However when a read\-write open
+succeeds there may still be unwanted actions on the close (e.g. some OSes
+try to do a SYNCHRONIZE CACHE command). So this option forces a read\-only
+open on \fIDEVICE\fR and if it fails, this utility will exit. Note that
+options like \fI\-\-select\fR most likely need a read\-write open.
 .TP
 \fB\-R\fR, \fB\-\-reset\fR
 use SCSI LOG SELECT command (PCR bit set) to reset the all log pages (or
@@ -195,10 +220,16 @@ Other options that are active with the LOG SELECT command are
 APPLICATION CLIENT
 This is the name of a log page that acts as a container for data provided
 by the user. An application client is a SCSI term for the program that issues
-commands to a SCSI initiator (often known as a Host Bus Adapter (HBA)).
+commands to a SCSI initiator (often known as a Host Bus Adapter (HBA)). So,
+for example, this utility is a SCSI application client.
 .PP
-The Application client log page has 64 log parameters with parameters codes
-0 to 63. Each can hold 252 bytes of user binary data.
+The Application Client log page has 64 log parameters with parameters codes
+0 to 63. Each can hold 252 bytes of user binary data. That 252 bytes (or
+less) of user data, with a 4 byte prefix (for a total of 256 bytes) can be
+provided with the \fI\-\-in=FN\fR option. A typical prefix would
+be '0,n,83,fc'. The "n" is the parameter code in hex so the last log
+parameter would be '0,3f,83,fc'. That log parameter could be read back at
+some later time with '\-\-page=0xf \-\-filter=0x<n>'.
 .SH NOTES
 This utility will usually do a double fetch of log pages with the SCSI LOG
 SENSE command. The first fetch requests a 4 byte response (i.e. place 4 in
@@ -355,6 +386,9 @@ sets the Parameter Pointer Control (PPC) bit. Default is 0 (i.e. cleared).
 use SCSI LOG SELECT command (PCR bit set) to reset the all log pages (or
 the given page). Equivalent to \fI\-\-reset\fR in the main description.
 .TP
+\fB\-R\fR
+Equivalent to \fI\-\-readonly\fR in the main description.
+.TP
 \fB\-select\fR
 use a LOG SELECT command. Equivalent to \fI\-\-select\fR in the main
 description.
@@ -364,7 +398,7 @@ sets the Saving Parameters (SP) bit. Default is 0 (i.e. cleared).
 Equivalent to \fI\-\-sp\fR in the main description.
 .TP
 \fB\-t\fR
-outputs the temperature. Equivalent to \fI\-\-temperature in the main
+outputs the temperature. Equivalent to \fI\-\-temperature\fR in the main
 description.
 .TP
 \fB\-T\fR
@@ -376,6 +410,10 @@ increase level of verbosity.
 .TP
 \fB\-V\fR
 print out version string then exit.
+.TP
+\fB\-x\fR
+suppress the INQUIRY command. Equivalent to \fI\-\-no_inq\fR in the main
+description.
 .TP
 \fB\-?\fR
 output usage message then exit.

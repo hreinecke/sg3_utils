@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.88 20140414";    /* ses3r06 */
+static const char * version_str = "1.89 20140507";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -119,6 +119,7 @@ struct opts_t {
     int page_code;
     int page_code_given;
     int do_raw;
+    int o_readonly;
     int do_status;
     int verbose;
     int do_version;
@@ -486,6 +487,7 @@ static struct option long_options[] = {
     {"maxlen", required_argument, 0, 'm'},
     {"page", required_argument, 0, 'p'},
     {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
     {"sas-addr", required_argument, 0, 'A'},
     {"set", required_argument, 0, 'S'},
     {"status", no_argument, 0, 's'},
@@ -613,6 +615,8 @@ usage(int help_num)
             "for '-d';\n"
             "                        when used twice outputs page in binary "
             "to stdout\n"
+            "    --readonly|-R       open DEVICE read-only (def: "
+            "read-write)\n"
             "    --status|-s         fetch status information (default "
             "action)\n"
             "    --verbose|-v        increase verbosity\n"
@@ -770,8 +774,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:p:rsS:vVx:",
-                        long_options, &option_index);
+        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:p:rRsS:v"
+                        "Vx:", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -904,6 +908,9 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             break;
         case 'r':
             ++op->do_raw;
+            break;
+        case 'R':
+            ++op->o_readonly;
             break;
         case 's':
             ++op->do_status;
@@ -3994,7 +4001,7 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(op->dev_name, 0 /* rw */, op->verbose);
+    sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", op->dev_name,
                 safe_strerror(-sg_fd));

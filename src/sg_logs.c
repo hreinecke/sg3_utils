@@ -27,7 +27,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.18 20140504";    /* spc4r36t + sbc4r01 */
+static const char * version_str = "1.19 20140505";    /* spc4r36t + sbc4r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -78,12 +78,14 @@ static struct option long_options[] = {
         {"maxlen", required_argument, 0, 'm'},
         {"name", no_argument, 0, 'n'},
         {"new", no_argument, 0, 'N'},
+        {"no_inq", no_argument, 0, 'x'},
         {"old", no_argument, 0, 'O'},
         {"page", required_argument, 0, 'p'},
         {"paramp", required_argument, 0, 'P'},
         {"pcb", no_argument, 0, 'q'},
         {"ppc", no_argument, 0, 'Q'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'X'},
         {"reset", no_argument, 0, 'R'},
         {"sp", no_argument, 0, 's'},
         {"select", no_argument, 0, 'S'},
@@ -104,6 +106,7 @@ struct opts_t {
     int do_pcb;
     int do_ppc;
     int do_raw;
+    int o_readonly;
     int do_pcreset;
     int do_select;
     int do_sp;
@@ -119,6 +122,7 @@ struct opts_t {
     int subpg_code;
     int paramp;
     int opt_new;
+    int no_inq;
     const char * device_name;
     const char * in_fn;
 };
@@ -149,13 +153,15 @@ usage()
 {
     pr2serr("Usage: sg_logs [--all] [--brief] [--control=PC] [--filter=PARC] "
            " [--help]\n"
-           "               [--hex] [--in=FN] [--list] [--maxlen=LEN] "
-           "[--name]\n"
-           "               [--page=PG[,SPG]] [--paramp=PP] [--pcb] [--ppc] "
-           "[--raw]\n"
-           "               [--reset] [--select] [--sp] [--temperature] "
-           "[--transport]\n"
-           "               [--verbose] [--version] DEVICE\n"
+           "               [--hex] [--in=FN] [--list] [--no_inq] "
+           "[--maxlen=LEN]\n"
+           "               [--name] [--page=PG[,SPG]] [--paramp=PP] [--pcb] "
+           "[--ppc]\n"
+           "               [--raw] [--readonly] [--reset] [--select] "
+           "[--sp]\n"
+           "               [--temperature] [--transport] [--verbose] "
+           "[--version]\n"
+           "               DEVICE\n"
            "  where:\n"
            "    --all|-a        fetch and decode all log pages\n"
            "                    use twice to fetch and decode all log pages "
@@ -179,6 +185,8 @@ usage()
            "'-p 0')\n"
            "                    use twice to list supported log page and "
            "subpage names\n"
+           "    --no_inq|-x     no initial INQUIRY output (twice: no "
+           "INQUIRY call)\n"
            "    --maxlen=LEN|-m LEN    max response length (def: 0 "
            "-> everything)\n"
            "                           when > 1 will request LEN bytes\n"
@@ -194,6 +202,9 @@ usage()
     pr2serr("    --ppc|-Q        set the Parameter Pointer Control (PPC) bit "
            "(def: 0)\n"
            "    --raw|-r        output response in binary to stdout\n"
+           "    --readonly|-X    open DEVICE read-only (def: first "
+           "read-write then if\n"
+           "                     fails try open again read-only)\n"
            "    --reset|-R      reset log parameters (takes PC and SP into "
            "account)\n"
            "                    (uses PCR bit in LOG SELECT)\n"
@@ -218,7 +229,7 @@ usage_old()
            "[-paramp=PP]\n"
            "                [-pcb] [-ppc] [-r] [-select] [-sp] [-t] [-T] "
            "[-v] [-V]\n"
-           "                [-?] DEVICE\n"
+           "                [-x] [-X] [-?] DEVICE\n"
            "  where:\n"
            "    -a     fetch and decode all log pages\n"
            "    -A     fetch and decode all log pages and subpages\n"
@@ -258,6 +269,10 @@ usage_old()
            "page (0x18)\n"
            "    -v     increase verbosity\n"
            "    -V     output version string\n"
+           "    -x     no initial INQUIRY output (twice: no INQUIRY call)\n"
+           "    -X     open DEVICE read-only (def: first read-write then "
+           "if fails\n"
+           "           try open again with read-only)\n"
            "    -?     output this usage message\n\n"
            "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }
@@ -282,7 +297,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:f:hHi:lLm:nNOp:P:qQrRsStTvV",
+        c = getopt_long(argc, argv, "aAbc:f:hHi:lLm:nNOp:P:qQrRsStTvVxX",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -410,6 +425,12 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'V':
             ++op->do_version;
             break;
+        case 'x':
+            ++op->no_inq;
+            break;
+        case 'X':
+            ++op->o_readonly;
+            break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
             if (op->do_help)
@@ -492,6 +513,12 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 'V':
                     ++op->do_version;
+                    break;
+                case 'x':
+                    ++op->no_inq;
+                    break;
+                case 'X':
+                    ++op->o_readonly;
                     break;
                 case '?':
                     ++op->do_help;
@@ -5334,14 +5361,15 @@ main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
     }
 
-    if ((sg_fd = sg_cmds_open_device(op->device_name, 0 /* rw */,
-                                     op->do_verbose)) < 0) {
-        if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* r0 */,
-                                         op->do_verbose)) < 0) {
-            pr2serr("error opening file: %s: %s \n", op->device_name,
-                    safe_strerror(-sg_fd));
-            return SG_LIB_FILE_ERROR;
-        }
+    sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
+                                op->do_verbose);
+    if ((sg_fd < 0) && (0 == op->o_readonly))
+        sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+                                    op->do_verbose);
+    if (sg_fd < 0) {
+        pr2serr("error opening file: %s: %s \n", op->device_name,
+                safe_strerror(-sg_fd));
+        return SG_LIB_FILE_ERROR;
     }
     if (op->do_list || op->do_all) {
         op->pg_code = SUPP_PAGES_LPAGE;
@@ -5359,13 +5387,15 @@ main(int argc, char * argv[])
     }
     pg_len = 0;
 
-    if ((0 == op->do_raw) && (0 == op->do_select)) {
+    if (op->no_inq < 2)  {
         if (sg_simple_inquiry(sg_fd, &inq_out, 1, op->do_verbose)) {
             pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
                     op->device_name);
             sg_cmds_close_device(sg_fd);
             return SG_LIB_CAT_OTHER;
-        } else if ((0 == op->do_hex) && (0 == op->do_name))
+        }
+        if ((0 == op->do_raw) && (0 == op->do_hex) && (0 == op->do_name) &&
+            (0 == op->no_inq))
             printf("    %.8s  %.16s  %.4s\n", inq_out.vendor,
                    inq_out.product, inq_out.revision);
     } else
