@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2013 Douglas Gilbert.
+ * Copyright (c) 2006-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -45,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.09 20130507";
+static const char * version_str = "1.10 20140512";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -56,6 +56,7 @@ static struct option long_options[] = {
         {"ident", no_argument, 0, 'i'},
         {"packet", no_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -67,8 +68,8 @@ static void usage()
           "sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
           "[--ident]\n"
           "                       [--len=16|12] [--packet] [--raw] "
-          "[--verbose]\n"
-          "                       [--version] DEVICE\n"
+          "[--readonly]\n"
+	  "                       [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --ck_cond|-c     sets ck_cond bit in cdb (def: 0)\n"
           "    --extend|-e      sets extend bit in cdb (def: 0)\n"
@@ -82,6 +83,7 @@ static void usage()
           "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
           "DEVICE) command\n"
           "    --raw|-r         output response in binary to stdout\n"
+          "    --readonly|-R    open DEVICE read-only (def: read-write)\n"
           "    --verbose|-v     increase verbosity\n"
           "    --version|-V     print version string and exit\n\n"
           "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
@@ -313,6 +315,7 @@ int main(int argc, char * argv[])
     int do_hex = 0;
     int do_indent = 0;
     int do_raw = 0;
+    int o_readonly = 0;
     int verbose = 0;
     int ck_cond = 0;   /* set to 1 to read register(s) back */
     int extend = 0;    /* set to 1 to send 48 bit LBA with command */
@@ -321,7 +324,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "cehHil:prvV", long_options,
+        c = getopt_long(argc, argv, "cehHil:prRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -355,6 +358,9 @@ int main(int argc, char * argv[])
             break;
         case 'r':
             ++do_raw;
+            break;
+        case 'R':
+            ++o_readonly;
             break;
         case 'v':
             ++verbose;
@@ -394,8 +400,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,
-                                     verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose)) < 0) {
         fprintf(stderr, "error opening file: %s: %s\n",
                 device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;

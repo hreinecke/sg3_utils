@@ -35,7 +35,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.8 20140308";
+static const char * version_str = "1.9 20140512";
 
 
 #define MAX_XFER_LEN 10000
@@ -271,6 +271,7 @@ static struct option long_options[] = {
         {"hex", 0, 0, 'H'},
         {"list_id", 1, 0, 'l'},
         {"params", 0, 0, 'p'},
+        {"readonly", 0, 0, 'R'},
         {"receive", 0, 0, 'r'},
         {"status", 0, 0, 's'},
         {"verbose", 0, 0, 'v'},
@@ -284,9 +285,9 @@ usage()
 {
   pr2serr("Usage: "
           "sg_copy_results [--failed|--params|--receive|--status] [--help]\n"
-          "                       [--hex] [--list_id=ID] [--verbose] "
-          "[--version]\n"
-          "                       [--xfer_len=BTL] DEVICE\n"
+          "                       [--hex] [--list_id=ID] [--readonly] "
+          "[--verbose]\n"
+          "                       [--version] [--xfer_len=BTL] DEVICE\n"
           "  where:\n"
           "    --failed|-f          use FAILED SEGMENT DETAILS service "
           "action\n"
@@ -295,6 +296,7 @@ usage()
           "    --list_id=ID|-l ID   list identifier (default: 0)\n"
           "    --params|-p          use OPERATING PARAMETERS service "
           "action\n"
+          "    --readonly|-R        open DEVICE read-only (def: read-write)\n"
           "    --receive|-r         use RECEIVE DATA service action\n"
           "    --status|-s          use COPY STATUS service action\n"
           "    --verbose|-v         increase verbosity\n"
@@ -324,6 +326,7 @@ main(int argc, char * argv[])
     int sa = 3;
     uint32_t list_id = 0;
     int do_hex = 0;
+    int o_readonly = 0;
     int verbose = 0;
     const char * cp;
     const char * device_name = NULL;
@@ -334,7 +337,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "fhHl:prsvVx:", long_options,
+        c = getopt_long(argc, argv, "fhHl:prRsvVx:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -363,6 +366,9 @@ main(int argc, char * argv[])
             break;
         case 'r':
             sa = 1;
+            break;
+        case 'R':
+            ++o_readonly;
             break;
         case 's':
             sa = 0;
@@ -417,7 +423,7 @@ main(int argc, char * argv[])
     }
     memset(cpResultBuff, 0x00, xfer_len);
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

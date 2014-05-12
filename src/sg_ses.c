@@ -28,7 +28,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.89 20140507";    /* ses3r06 */
+static const char * version_str = "1.89 20140512";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -4001,6 +4001,15 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (verbose > 4)
+        pr2serr("Initial win32 SPT interface state: %s\n",
+                scsi_pt_win32_spt_state() ? "direct" : "indirect");
+    if (op->maxlen >= 16384)
+        scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
+#endif
+#endif
     sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", op->dev_name,

@@ -1,4 +1,4 @@
-.TH SG_VPD "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_VPD "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
@@ -148,6 +148,9 @@ a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
 will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
 device names may be used as well (e.g. "/dev/st0m").
+.PP
+The \fIDEVICE\fR is opened with a read\-only flag (e.g. in Unix with the
+O_RDONLY flag).
 .SH EXIT STATUS
 The exit status of sg_vpd is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

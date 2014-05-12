@@ -1,4 +1,4 @@
-.TH SG_SAT_IDENTIFY "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_SAT_IDENTIFY "8" "May 2014" "sg3_utils\-1.38" SG3_UTILS
 .SH NAME
 sg_sat_identify \- send ATA IDENTIFY DEVICE command via SCSI to ATA
 Translation (SAT) layer
@@ -6,7 +6,7 @@ Translation (SAT) layer
 .B sg_sat_identify
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-indent\fR] [\fI\-\-len=\fR{16|12}] [\fI\-\-packet\fR] [\fI\-\-raw\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -74,6 +74,10 @@ action is to send an ATA IDENTIFY DEVICE command.
 output the ATA IDENTIFY (PACKET) DEVICE response in binary. The output
 should be piped to a file or another utility when this option is used.
 The binary is sent to stdout, and errors are sent to stderr.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.

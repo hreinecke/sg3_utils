@@ -27,7 +27,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.19 20140505";    /* spc4r36t + sbc4r01 */
+static const char * version_str = "1.20 20140512";    /* spc4r36t + sbc4r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -5361,6 +5361,16 @@ main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
     }
 
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (verbose > 4)
+        pr2serr("Initial win32 SPT interface state: %s\n",
+                scsi_pt_win32_spt_state() ? "direct" : "indirect");
+    if ((! op->do_temperature) && (! op->do_select) &&
+        ((op->maxlen <= 0) || (op->maxlen >= 16384)))
+        scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
+#endif
+#endif
     sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
                                 op->do_verbose);
     if ((sg_fd < 0) && (0 == op->o_readonly))

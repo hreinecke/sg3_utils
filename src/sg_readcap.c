@@ -29,7 +29,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "3.90 20140407";
+static const char * version_str = "3.91 20140412";
 
 #define ME "sg_readcap: "
 
@@ -463,9 +463,8 @@ int main(int argc, char * argv[])
         } else if (SG_LIB_CAT_INVALID_OP == res) {
             op->do_long = 1;
             sg_cmds_close_device(sg_fd);
-            if ((sg_fd = sg_cmds_open_device(op->device_name, 0 /*rw */,
-                                             op->do_verbose))
-                < 0) {
+            if ((sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
+                                             op->do_verbose)) < 0) {
                 fprintf(stderr, ME "error re-opening file: %s (rw): %s\n",
                         op->device_name, safe_strerror(-sg_fd));
                 return SG_LIB_FILE_ERROR;
