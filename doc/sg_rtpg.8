@@ -1,19 +1,19 @@
-.TH SG_RTPG "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_RTPG "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_rtpg \- send SCSI REPORT TARGET PORT GROUPS command
 .SH SYNOPSIS
 .B sg_rtpg
 [\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Send a SCSI REPORT TARGET PORT GROUPS command to \fIDEVICE\fR and
 outputs the response.
 .PP
-Target port group access is described in SPC\-3 found at www.t10.org
-in section 5.8 (in rev 21c dated 2005/1/15). The Report Target Port
-Groups command is also described in that document.
+Target port group access is described in SPC\-3 and SPC\-4 found at
+www.t10.org . The most recent draft of SPC\-4 is revision 36t in which
+target port groups are described in section 5.15 .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -23,7 +23,8 @@ target port group descriptor returned. The default action is not
 to decode these values.
 .TP
 \fB\-e\fR, \fB\-\-extended\fR
-use extended header format for parameter data.
+use extended header format for parameter data. This sets the PARAMETER DATA
+FORMAT field in the cdb to 1.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -33,6 +34,10 @@ output response in hex (rather than partially or fully decode it).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary to stdout.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -51,7 +56,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Christophe Varoqui and Douglas Gilbert
+Copyright \(co 2004\-2014 Christophe Varoqui and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

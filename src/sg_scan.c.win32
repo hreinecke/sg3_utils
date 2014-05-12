@@ -25,13 +25,19 @@
 
 #include "sg_lib.h"
 
-#ifndef _WIN32_WINNT
+#ifdef _WIN32_WINNT
+ #if _WIN32_WINNT < 0x0602
+ #undef _WIN32_WINNT
+ #define _WIN32_WINNT 0x0602
+ #endif
+#else
 #define _WIN32_WINNT 0x0602
+/* claim its W8 */
 #endif
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.10 (win32) 20130507";
+static const char * version_str = "1.11 (win32) 20130512";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64

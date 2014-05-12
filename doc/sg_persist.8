@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_PERSIST "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -162,7 +162,9 @@ the default sub\-command for the SCSI PRIN command.
 .TP
 \fB\-y\fR, \fB\-\-readonly\fR
 Open \fIDEVICE\fR read\-only. May be useful with PRIN commands if there are
-unwanted side effects with the default read\-write open.
+unwanted side effects with the default read\-write open. When given twice
+is interpreted as forcing a read\-write open thus overriding the
+SG_PERSIST_IN_RDONLY environment variable if present.
 .TP
 \fB\-r\fR, \fB\-\-read\-reservation\fR
 Read Reservation is a sub\-command of the PRIN command. List information
@@ -317,8 +319,10 @@ is disallowed yielding a CHECK CONDITION status with and ILLEGAL REQUEST
 sense key and an additional sense code set to INVALID FIELD IN PARAMETER
 LIST.
 .SH ENVIRONMENT VARIABLES
-Currently there is one recognised environment variable: SG_PERSIST_O_RDONLY
-which is present has the same effect as the \fI\-\-readonly\fR option.
+Currently there is one recognised environment variable: SG_PERSIST_IN_RDONLY.
+If present and only if a PRIN command has been selected then the
+given \fIDEVICE\fR is opened read\-only (e.g. in Unix that is with the
+O_RDONLY flag). See the \fI\-\-readonly\fR option.
 .SH NOTES
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series any SCSI device

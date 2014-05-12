@@ -1,11 +1,11 @@
-.TH SG_REFERRALS "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_REFERRALS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_referrals \- send SCSI REPORT REFERRALS command
 .SH SYNOPSIS
 .B sg_referrals
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-one-segment\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-one-segment\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -14,7 +14,7 @@ response. This command was introduced in (draft) SBC\-3 revision 24 and
 devices that support referrals should support this command.
 .PP
 The default action is to decode the response for all user data segment
-referral descriptors. The amount of output can be reduced by the 
+referral descriptors. The amount of output can be reduced by the
 \fI\-\-lba\fR and \fI\-\-one-segment\fR options.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
@@ -42,6 +42,10 @@ parameter only.
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary (to stdout).
 .TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). Additional output
 caused by this option is sent to stderr.
@@ -59,7 +63,7 @@ Written by Douglas Gilbert and Hannes Reinecke.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2012 Douglas Gilbert and Hannes Reinecke
+Copyright \(co 2009\-2014 Douglas Gilbert and Hannes Reinecke
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

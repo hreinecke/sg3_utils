@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140508] [svn: r573]
+Changelog for sg3_utils-1.39 [20140512] [svn: r574]
   - sg_ses: add --eiioe=auto|force option
     - fix AES dpage element indexing problems
     - add --readonly option
@@ -14,13 +14,13 @@ Changelog for sg3_utils-1.39 [20140508] [svn: r573]
     - add --filter=PARC (parameter code)
     - add --no_inq for suppress initial INQUIRY call
     - add --readonly option
-  - sg_persist: add --readonly option, implicit if
-    environment variable SG_PERSIST_O_RDONLY present
-  - sg_read_buffer: add --readonly option
-  - sg_readcap: add --readonly option
-  - sg_luns: add --readonly option
+  - sg_persist: add --readonly option, environment
+    variable SG_PERSIST_IN_RDONLY sets ro on prin cmds
+  - sg_copy_results, sg_get_lba_status, sg_luns,
+    sg_read_buffer, sg_readcap, sg_referrals, sg_rtpg,
+    sg_sat_set_features, sg_sat_identify:
+      add --readonly option
   - sginfo: strip trailing spaces from INQUIRY text
-  - sg_sat_set_features: add --readonly option
   - sg_rbuf: add --echo option (to use echo buffer)
   - sg_lib: add sanitize command service action names
     - dStrHex(Err): fix output truncation error

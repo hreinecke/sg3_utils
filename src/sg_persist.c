@@ -27,7 +27,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.47 20140504";
+static const char * version_str = "0.48 20140511";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -47,7 +47,7 @@ static const char * version_str = "0.47 20140504";
 #define MX_TIDS 32
 #define MX_TID_LEN 256
 
-#define SG_PERSIST_O_RDONLY "SG_PERSIST_O_RDONLY"
+#define SG_PERSIST_IN_RDONLY "SG_PERSIST_IN_RDONLY"
 
 struct opts_t {
     unsigned int prout_type;
@@ -1044,9 +1044,6 @@ main(int argc, char * argv[])
     op->prout_sa = -1;
     op->inquiry = 1;
     op->alloc_len = MX_ALLOC_LEN;
-    cp = getenv(SG_PERSIST_O_RDONLY);
-    if (cp)
-        op->readonly = 1;
 
     while (1) {
         int option_index = 0;
@@ -1307,6 +1304,12 @@ main(int argc, char * argv[])
         sg_cmds_close_device(sg_fd);
     }
 
+    if (0 == op->readonly) {
+        cp = getenv(SG_PERSIST_IN_RDONLY);
+        if (cp && op->prin)
+            op->readonly = 1;
+    } else if (op->readonly > 1)        /* -yy forces open(RW) */
+        op->readonly = 0;
     if ((sg_fd = sg_cmds_open_device(device_name, op->readonly,
                                      op->verbose)) < 0) {
         pr2serr("sg_persist: error opening file (rw): %s: %s\n", device_name,
