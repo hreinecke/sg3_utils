@@ -26,8 +26,9 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.20 20140512";    /* spc4r36t + sbc4r01 */
+static const char * version_str = "1.22 20140513";    /* spc4r36t + sbc4r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -126,6 +127,11 @@ struct opts_t {
     const char * device_name;
     const char * in_fn;
 };
+
+#ifdef SG_LIB_WIN32
+static int win32_spt_init_state = 0;
+static int win32_spt_curr_state = 0;
+#endif
 
 
 #ifdef __GNUC__
@@ -875,6 +881,23 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
 {
     int actual_len, res, vb;
 
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (0 == win32_spt_init_state) {
+        if (win32_spt_curr_state) {
+            if (mx_resp_len < 16384) {
+                scsi_pt_win32_direct(0);
+                win32_spt_curr_state = 0;
+            }
+        } else {
+            if (mx_resp_len >= 16384) {
+                scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT direct */);
+                win32_spt_curr_state = 1;
+            }
+        }
+    }
+#endif
+#endif
     memset(resp, 0, mx_resp_len);
     vb = op->do_verbose;
     if (op->maxlen > 1)
@@ -5363,12 +5386,10 @@ main(int argc, char * argv[])
 
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
+    win32_spt_init_state = scsi_pt_win32_spt_state();
     if (verbose > 4)
         pr2serr("Initial win32 SPT interface state: %s\n",
-                scsi_pt_win32_spt_state() ? "direct" : "indirect");
-    if ((! op->do_temperature) && (! op->do_select) &&
-        ((op->maxlen <= 0) || (op->maxlen >= 16384)))
-        scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
+                win32_spt_init_state ? "direct" : "indirect");
 #endif
 #endif
     sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
