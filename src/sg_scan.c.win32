@@ -37,7 +37,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.11 (win32) 20130512";
+static const char * version_str = "1.11 (win32) 20130513";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
@@ -317,6 +317,8 @@ query_dev_uid(HANDLE hdevice,
     return 0;
 }
 
+/* Updates storage_arr based on sep. Returns 1 if update occurred, 0 if
+ * no update occured. */
 static int
 check_devices(const struct storage_elem * sep)
 {
@@ -326,7 +328,18 @@ check_devices(const struct storage_elem * sep)
     for (k = 0; k < next_unused_elem; ++k, ++sarr) {
         if ('\0' == sarr->name[0])
             continue;
-        if (sep->qp_descriptor_valid && sarr->qp_descriptor_valid) {
+        if (sep->qp_uid_valid && sarr->qp_uid_valid) {
+            if (0 == memcmp(&sep->qp_uid, &sarr->qp_uid,
+                            sizeof(sep->qp_uid))) {
+                for (j = 0; j < (int)sizeof(sep->volume_letters); ++j) {
+                    if ('\0' == sarr->volume_letters[j]) {
+                        sarr->volume_letters[j] = sep->name[0];
+                        break;
+                    }
+                }
+                return 1;
+            }
+        } else if (sep->qp_descriptor_valid && sarr->qp_descriptor_valid) {
             if (0 == memcmp(&sep->qp_descriptor, &sarr->qp_descriptor,
                             sizeof(sep->qp_descriptor))) {
                 for (j = 0; j < (int)sizeof(sep->volume_letters); ++j) {
@@ -338,7 +351,6 @@ check_devices(const struct storage_elem * sep)
                 return 1;
             }
         }
-        // should do uid check here (probably before descriptor compare)
     }
     return 0;
 }

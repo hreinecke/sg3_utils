@@ -22,13 +22,14 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
 /*
  * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.89 20140512";    /* ses3r06 */
+static const char * version_str = "1.90 20140512";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
