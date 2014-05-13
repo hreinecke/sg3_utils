@@ -5387,7 +5387,7 @@ main(int argc, char * argv[])
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
     win32_spt_init_state = scsi_pt_win32_spt_state();
-    if (verbose > 4)
+    if (op->do_verbose > 4)
         pr2serr("Initial win32 SPT interface state: %s\n",
                 win32_spt_init_state ? "direct" : "indirect");
 #endif

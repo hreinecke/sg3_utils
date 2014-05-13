@@ -4004,7 +4004,7 @@ main(int argc, char * argv[])
 
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
-    if (verbose > 4)
+    if (op->verbose > 4)
         pr2serr("Initial win32 SPT interface state: %s\n",
                 scsi_pt_win32_spt_state() ? "direct" : "indirect");
     if (op->maxlen >= 16384)
