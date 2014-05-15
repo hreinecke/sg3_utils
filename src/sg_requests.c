@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.24 20130730";
+static const char * version_str = "1.25 20140514";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -118,6 +118,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
+    char b[80];
 #ifndef SG_LIB_MINGW
     struct timeval start_tm, end_tm;
 #endif
@@ -230,11 +231,8 @@ main(int argc, char * argv[])
                 else if (SG_LIB_CAT_ABORTED_COMMAND == res)
                     fprintf(stderr, "Request Sense, aborted command\n");
                 else {
-                    fprintf(stderr, "Request Sense command unexpectedly "
-                            "failed\n");
-                    if (0 == verbose)
-                        fprintf(stderr, "    try the '-v' option for "
-                                "more information\n");
+                    sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                    fprintf(stderr, "Request Sense command: %s\n", b);
                 }
                 break;
             }
@@ -299,10 +297,8 @@ main(int argc, char * argv[])
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
             fprintf(stderr, "Request Sense, aborted command\n");
         else {
-            fprintf(stderr, "Request Sense command unexpectedly failed\n");
-            if (0 == verbose)
-                fprintf(stderr, "    try the '-v' option for "
-                        "more information\n");
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "Request Sense command: %s\n", b);
         }
         break;
     }

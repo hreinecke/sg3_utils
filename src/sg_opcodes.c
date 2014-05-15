@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.38 20140423";    /* spc4r36s */
+static const char * version_str = "0.39 20140515";    /* spc4r36t */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -677,6 +677,7 @@ main(int argc, char * argv[])
     int rep_opts = 0;
     const char * cp;
     char buff[48];
+    char b[80];
     struct sg_simple_inquiry_resp inq_resp;
     const char * op_name;
     struct opts_t opts;
@@ -775,28 +776,9 @@ main(int argc, char * argv[])
         res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->do_opcode,
                       op->do_servact, rsoc_buff, sizeof(rsoc_buff), 1,
                       op->do_verbose);
-    switch (res) {
-    case 0:
-    case SG_LIB_CAT_RECOVERED:
-        break;
-    case SG_LIB_CAT_ABORTED_COMMAND:
-        fprintf(stderr, "%s: aborted command\n", op_name);
-        goto err_out;
-    case SG_LIB_CAT_NOT_READY:
-        fprintf(stderr, "%s: device not ready\n", op_name);
-        goto err_out;
-    case SG_LIB_CAT_UNIT_ATTENTION:
-        fprintf(stderr, "%s: unit attention\n", op_name);
-        goto err_out;
-    case SG_LIB_CAT_INVALID_OP:
-        fprintf(stderr, "%s: operation not supported\n", op_name);
-        goto err_out;
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        fprintf(stderr, "bad field in cdb (including %s not supported)\n",
-                op_name);
-        goto err_out;
-    default:
-        fprintf(stderr, "%s failed\n", op_name);
+    if (res) {
+        sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+        fprintf(stderr, "%s: %s command\n", op_name, b);
         goto err_out;
     }
     if (op->do_taskman) {
@@ -941,19 +923,12 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -1004,19 +979,12 @@ do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, int noisy,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else

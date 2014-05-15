@@ -1115,12 +1115,17 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
                 return SG_LIB_CAT_ILLEGAL_REQ;
             break;
         case SPC_SK_ABORTED_COMMAND:
-            return SG_LIB_CAT_ABORTED_COMMAND;
+            if (0x10 == ssh.asc)
+                return SG_LIB_CAT_PROTECTION;
+            else
+                return SG_LIB_CAT_ABORTED_COMMAND;
         case SPC_SK_MISCOMPARE:
             return SG_LIB_CAT_MISCOMPARE;
         case SPC_SK_DATA_PROTECT:
-        case SPC_SK_COMPLETED:
+            return SG_LIB_CAT_DATA_PROTECT;
         case SPC_SK_COPY_ABORTED:
+            return SG_LIB_CAT_COPY_ABORTED;
+        case SPC_SK_COMPLETED:
         case SPC_SK_VOLUME_OVERFLOW:
             return SG_LIB_CAT_SENSE;
         default:
@@ -1390,6 +1395,139 @@ sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
     return (k == page_len) ? -1 : -2;
 }
 
+static const char * bad_sense_cat = "Bad sense category";
+
+/* Yield string associated with sense++ category. Returns 'buff' (or pointer
+ * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then
+ * yield "Sense category: <sense_cat>" string. */
+const char *
+sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
+                          int verbose)
+{
+    int n;
+
+    if (NULL == buff)
+        return bad_sense_cat;
+    if (buff_len <= 0)
+        return buff;
+    switch (sense_cat) {
+    case SG_LIB_CAT_CLEAN:              /* 0 */
+        snprintf(buff, buff_len, "No errors");
+        break;
+    case SG_LIB_SYNTAX_ERROR:           /* 1 */
+        snprintf(buff, buff_len, "Syntax error");
+        break;
+    case SG_LIB_CAT_NOT_READY:          /* 2 */
+        n = snprintf(buff, buff_len, "Not ready");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_MEDIUM_HARD:        /* 3 */
+        n = snprintf(buff, buff_len, "Medium or hardware error");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key (plus blank check)");
+        break;
+    case SG_LIB_CAT_ILLEGAL_REQ:        /* 5 */
+        n = snprintf(buff, buff_len, "Illegal request");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key, apart from Invalid "
+                     "opcode");
+        break;
+    case SG_LIB_CAT_UNIT_ATTENTION:     /* 6 */
+        n = snprintf(buff, buff_len, "Unit attention");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_DATA_PROTECT:       /* 7 */
+        n = snprintf(buff, buff_len, "Data protect");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key, write protected "
+                     "media?");
+        break;
+    case SG_LIB_CAT_INVALID_OP:         /* 9 */
+        n = snprintf(buff, buff_len, "Illegal request, invalid opcode");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_COPY_ABORTED:       /* 10 */
+        n = snprintf(buff, buff_len, "Copy aborted");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_ABORTED_COMMAND:    /* 11 */
+        n = snprintf(buff, buff_len, "Aborted command");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key, other than "
+                     "protection related (asc=0x10)");
+        break;
+    case SG_LIB_CAT_MISCOMPARE:         /* 14 */
+        n = snprintf(buff, buff_len, "Miscompare");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_FILE_ERROR:             /* 15 */
+        snprintf(buff, buff_len, "File error");
+        break;
+    case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:  /* 17 */
+        snprintf(buff, buff_len, "Illegal request with info");
+        break;
+    case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:  /* 18 */
+        snprintf(buff, buff_len, "Medium or hardware error with info");
+        break;
+    case SG_LIB_CAT_NO_SENSE:           /* 20 */
+        n = snprintf(buff, buff_len, "No sense key");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " probably additional sense "
+                     "information");
+        break;
+    case SG_LIB_CAT_RECOVERED:          /* 21 */
+        n = snprintf(buff, buff_len, "Recovered error");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_RES_CONFLICT:       /* 24 */
+        n = snprintf(buff, buff_len, "Reservation conflict");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " SCSI status");
+        break;
+    case SG_LIB_CAT_TIMEOUT:            /* 33 */
+        snprintf(buff, buff_len, "SCSI command timeout");
+        break;
+    case SG_LIB_CAT_PROTECTION:         /* 40 */
+        n = snprintf(buff, buff_len, "Aborted command, protection");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " information (PI) problem");
+        break;
+    case SG_LIB_CAT_PROTECTION_WITH_INFO: /* 41 */
+        n = snprintf(buff, buff_len, "Aborted command with info, protection");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " information (PI) problem");
+        break;
+    case SG_LIB_CAT_MALFORMED:          /* 97 */
+        n = snprintf(buff, buff_len, "Malformed response");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " to SCSI command");
+        break;
+    case SG_LIB_CAT_SENSE:              /* 98 */
+        n = snprintf(buff, buff_len, "Some other sense data problem");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, ", try '-v' option for more "
+                     "information");
+        break;
+    case SG_LIB_CAT_OTHER:              /* 99 */
+        n = snprintf(buff, buff_len, "Some other error/warning has occurred");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, ", possible transport of driver "
+                     "issue");
+    default:
+        n = snprintf(buff, buff_len, "Sense category: %d", sense_cat);
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, ", try '-v' option for more "
+                     "information");
+        break;
+    }
+    return buff;
+}
 
 /* safe_strerror() contributed by Clayton Weaver <cgweav at email dot com>
  * Allows for situation in which strerror() is given a wild value (or the

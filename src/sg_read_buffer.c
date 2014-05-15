@@ -25,7 +25,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static const char * version_str = "1.10 20140507";
+static const char * version_str = "1.11 20140515";
 
 
 static struct option long_options[] = {
@@ -281,32 +281,11 @@ main(int argc, char * argv[])
     res = sg_ll_read_buffer(sg_fd, rb_mode, rb_id, rb_offset, resp,
                             rb_len, 1, verbose);
     if (0 != res) {
+        char b[80];
+
         ret = res;
-        switch (res) {
-        case SG_LIB_CAT_NOT_READY:
-            fprintf(stderr, "Read buffer failed, device not ready\n");
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            fprintf(stderr, "Read buffer not done, unit attention\n");
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            fprintf(stderr, "Read buffer, aborted command\n");
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            fprintf(stderr, "Read buffer command not supported\n");
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            fprintf(stderr, "bad field in Read buffer cdb\n");
-            break;
-        default:
-            if (-1 == res) {
-                fprintf(stderr, "Read buffer command failed\n");
-            } else
-                fprintf(stderr, "Read buffer failed, res=%d\n", res);
-            if (0 == verbose)
-                fprintf(stderr, "... try again with -v or -vv\n");
-            break;
-        }
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Read buffer failed: %s\n", b);
     } else if (rb_len > 0) {
         if (do_raw)
             dStrRaw((const char *)resp, rb_len);

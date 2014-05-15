@@ -45,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.10 20140512";
+static const char * version_str = "1.10 20140515";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -69,7 +69,7 @@ static void usage()
           "[--ident]\n"
           "                       [--len=16|12] [--packet] [--raw] "
           "[--readonly]\n"
-	  "                       [--verbose] [--version] DEVICE\n"
+          "                       [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --ck_cond|-c     sets ck_cond bit in cdb (def: 0)\n"
           "    --extend|-e      sets extend bit in cdb (def: 0)\n"
@@ -223,9 +223,19 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                             "hardware error\n", cdb_len);
                 return SG_LIB_CAT_MEDIUM_HARD;
             case SPC_SK_ABORTED_COMMAND:
-                fprintf(stderr, "Aborted command: try again with%s '-p' "
-                        "option\n", (do_packet ? "out" : ""));
-                return SG_LIB_CAT_ABORTED_COMMAND;
+                if (0x10 == ssh.asc) {
+                    fprintf(stderr, "Aborted command: protection "
+                            "information\n");
+                    return SG_LIB_CAT_PROTECTION;
+                } else {
+                    fprintf(stderr, "Aborted command: try again with%s '-p' "
+                            "option\n", (do_packet ? "out" : ""));
+                    return SG_LIB_CAT_ABORTED_COMMAND;
+                }
+            case SPC_SK_DATA_PROTECT:
+                fprintf(stderr, "ATA PASS-THROUGH (%d): data protect, read "
+                            "only media?\n", cdb_len);
+                return SG_LIB_CAT_DATA_PROTECT;
             default:
                 if (verbose < 2)
                     fprintf(stderr, "ATA PASS-THROUGH (%d), some sense "
@@ -242,8 +252,13 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
-        fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
-        return SG_LIB_CAT_MALFORMED;
+        if (SAM_STAT_RESERVATION_CONFLICT == res) {
+            fprintf(stderr, "SCSI status: RESERVATION CONFLICT\n");
+            return SG_LIB_CAT_RES_CONFLICT;
+        } else {
+            fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
+            return SG_LIB_CAT_MALFORMED;
+        }
     } else {
         fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
         if (verbose < 2)

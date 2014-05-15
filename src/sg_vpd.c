@@ -33,7 +33,7 @@
 
 */
 
-static const char * version_str = "0.81 20140330";  /* spc4r36s + sbc4r01 */
+static const char * version_str = "0.82 20140514";  /* spc4r36s + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
@@ -473,17 +473,12 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else if (ret < 4) {
@@ -3099,7 +3094,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, res, matches, inhex_len;
+    int sg_fd, c, res, matches;
     const char * device_name = NULL;
     const struct svpd_values_name_t * vnp;
     const char * page_str = NULL;
@@ -3108,6 +3103,7 @@ main(int argc, char * argv[])
     int num_vpd = 0;
     int do_enum = 0;
     int do_hex = 0;
+    int inhex_len = 0;
     int do_ident = 0;
     int do_long = 0;
     int maxlen = 0;
@@ -3362,8 +3358,12 @@ main(int argc, char * argv[])
     }
     if (SG_LIB_CAT_ABORTED_COMMAND == res)
         pr2serr("fetching VPD page failed, aborted command\n");
-    else if (res)
-        pr2serr("fetching VPD page failed\n");
+    else if (res) {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, do_verbose);
+        pr2serr("fetching VPD page failed: %s\n", b);
+    }
     ret = res;
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

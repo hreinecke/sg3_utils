@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.36 20140502";    /* SPC-4 rev 36t */
+static const char * version_str = "1.37 20140514";    /* SPC-4 rev 36t */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -977,17 +977,12 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else if (ret < 4) {
@@ -2979,25 +2974,15 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
         return res;
 #endif
     } else {
+        char b[80];
+
         pr2serr("    inquiry: failed requesting %d byte response: ", rlen);
         if (resid && verb)
             snprintf(buff, sizeof(buff), " [resid=%d]", resid);
         else
             buff[0] = '\0';
-        if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("not supported (?)%s\n", buff);
-        else if (SG_LIB_CAT_NOT_READY == res)
-            pr2serr("device not ready (?)%s\n", buff);
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("field in cdb illegal%s\n", buff);
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            pr2serr("unit attention (?)%s\n", buff);
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("aborted command%s\n", buff);
-        else if (SG_LIB_CAT_MALFORMED == res)
-            pr2serr("malformed response%s\n", buff);
-        else
-            pr2serr("res=%d%s\n", res, buff);
+        sg_get_category_sense_str(res, sizeof(b), b, verb);
+        pr2serr("%s%s\n", b, buff);
         return res;
     }
     return 0;
@@ -3135,7 +3120,7 @@ static int
 vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
 {
     int res, len;
-    char b[48];
+    char b[128];
     const char * cp;
     unsigned char * rp;
 
@@ -3169,21 +3154,13 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
             }
         }
     } else {
-        if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("    inquiry: not supported (?)\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            pr2serr("    inquiry: device not ready (?)\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("    inquiry: field in cdb illegal (page not "
                     "supported)\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            pr2serr("    inquiry: unit attention (?)\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("    inquiry: aborted command\n");
-        else if (SG_LIB_CAT_MALFORMED == res)
-            pr2serr("    inquiry: malformed response\n");
-        else
-            pr2serr("    inquiry: failed, res=%d\n", res);
+        else {
+            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            pr2serr("    inquiry: %s\n", b);
+        }
     }
     return res;
 }
@@ -3481,21 +3458,15 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         }
     }
     if (res) {
-        if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("    inquiry: not supported (?)\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            pr2serr("    inquiry: device not ready (?)\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        char b[80];
+
+        if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("    inquiry: field in cdb illegal (page not "
                     "supported)\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            pr2serr("    inquiry: unit attention (?)\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("    inquiry: aborted command\n");
-        else if (SG_LIB_CAT_MALFORMED == res)
-            pr2serr("    inquiry: malformed response\n");
-        else
-            pr2serr("    inquiry: failed, res=%d\n", res);
+        else {
+            sg_get_category_sense_str(res, sizeof(b), b, vb);
+            pr2serr("    inquiry: %s\n", b);
+        }
     }
     return res;
 }

@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.98 20140427";  /* spc4r36s, sbc4r01 */
+const char * sg_lib_version_str = "1.99 20140514";  /* spc4r36s, sbc4r01 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -289,11 +289,13 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
     {0x11, 0, "Read long(16)"},
     {0x12, 0, "Get LBA status"},
     {0x13, 0, "Report referrals"},
+    {0x14, PDT_ZBC, "Report zones"},
     {0xffff, 0, NULL},
 };
 
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
     {0x11, 0, "Write long(16)"},
+    {0x14, PDT_ZBC, "Reset write pointer"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
     {0xffff, 0, NULL},
 };

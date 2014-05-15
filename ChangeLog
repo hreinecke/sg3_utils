@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140513] [svn: r576]
+Changelog for sg3_utils-1.39 [20140515] [svn: r577]
   - sg_ses: add --eiioe=auto|force option
     - fix AES dpage element indexing problems
     - add --readonly option
@@ -23,6 +23,10 @@ Changelog for sg3_utils-1.39 [20140513] [svn: r576]
   - sginfo: strip trailing spaces from INQUIRY text
   - sg_rbuf: add --echo option (to use echo buffer)
   - sg_lib: add sanitize command service action names
+    - add 'sense' categories for reservation conflict,
+      data protect and protection information violations
+    - add sg_get_category_sense_str() to API
+    - add initial zbc service actions
     - dStrHex(Err): fix output truncation error
   - win32: sg_scan, sg_ses and sg_log fixes
   - examples/sgq_dd: re-add old utility as example

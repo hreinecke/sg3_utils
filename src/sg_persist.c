@@ -27,7 +27,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.48 20140511";
+static const char * version_str = "0.48 20140515";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -346,7 +346,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
 }
 
 static int
-prin_work(int sg_fd, const struct opts_t * optsp)
+prin_work(int sg_fd, const struct opts_t * op)
 {
     int k, j, num, res, add_len, add_desc_len, rel_pt_addr;
     unsigned int pr_gen;
@@ -355,35 +355,34 @@ prin_work(int sg_fd, const struct opts_t * optsp)
     unsigned char pr_buff[MX_ALLOC_LEN];
 
     memset(pr_buff, 0, sizeof(pr_buff));
-    res = sg_ll_persistent_reserve_in(sg_fd, optsp->prin_sa, pr_buff,
-                                      optsp->alloc_len, 1, optsp->verbose);
+    res = sg_ll_persistent_reserve_in(sg_fd, op->prin_sa, pr_buff,
+                                      op->alloc_len, 1, op->verbose);
     if (res) {
         char b[64];
+        char bb[80];
 
-        if (optsp->prin_sa < num_prin_sa_strs)
-            snprintf(b, sizeof(b), "%s", prin_sa_strs[optsp->prin_sa]);
+        if (op->prin_sa < num_prin_sa_strs)
+            snprintf(b, sizeof(b), "%s", prin_sa_strs[op->prin_sa]);
         else
-            snprintf(b, sizeof(b), "service action=0x%x", optsp->prin_sa);
+            snprintf(b, sizeof(b), "service action=0x%x", op->prin_sa);
 
-       if (SG_LIB_CAT_INVALID_OP == res)
+        if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr("PR in (%s): command not supported\n", b);
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("PR in (%s): bad field in cdb or parameter list (perhaps "
                     "unsupported service action)\n", b);
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            pr2serr("PR in (%s): unit attention\n", b);
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("PR in (%s): aborted command\n", b);
-        else
-            pr2serr("PR in (%s): command failed\n", b);
+        else {
+            sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
+            pr2serr("PR in (%s): %s\n", b, bb);
+        }
         return res;
     }
-    if (PRIN_RCAP_SA == optsp->prin_sa) {
+    if (PRIN_RCAP_SA == op->prin_sa) {
         if (8 != pr_buff[1]) {
             pr2serr("Unexpected response for PRIN Report Capabilities\n");
             return SG_LIB_CAT_MALFORMED;
         }
-        if (optsp->hex)
+        if (op->hex)
             dStrHex((const char *)pr_buff, 8, 1);
         else {
             printf("Report capabilities response:\n");
@@ -420,7 +419,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                   (pr_buff[2] << 8) | pr_buff[3]);
         add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) |
                    (pr_buff[6] << 8) | pr_buff[7]);
-        if (optsp->hex) {
+        if (op->hex) {
             printf("  PR generation=0x%x, ", pr_gen);
             if (add_len <= 0)
                 printf("Additional length=%d\n", add_len);
@@ -432,7 +431,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                 printf("Additional length=%d\n", add_len);
                 dStrHex((const char *)(pr_buff + 8), add_len, 1);
             }
-        } else if (PRIN_RKEY_SA == optsp->prin_sa) {
+        } else if (PRIN_RKEY_SA == op->prin_sa) {
             printf("  PR generation=0x%x, ", pr_gen);
             num = add_len / 8;
             if (num > 0) {
@@ -452,7 +451,7 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                 }
             } else
                 printf("there are NO registered reservation keys\n");
-        } else if (PRIN_RRES_SA == optsp->prin_sa) {
+        } else if (PRIN_RRES_SA == op->prin_sa) {
             printf("  PR generation=0x%x, ", pr_gen);
             num = add_len / 16;
             if (num > 0) {
@@ -474,12 +473,12 @@ prin_work(int sg_fd, const struct opts_t * optsp)
                 printf(" type: %s\n", pr_type_strs[j]);
             } else
                 printf("there is NO reservation held\n");
-        } else if (PRIN_RFSTAT_SA == optsp->prin_sa) {
+        } else if (PRIN_RFSTAT_SA == op->prin_sa) {
             printf("  PR generation=0x%x\n", pr_gen);
             ucp = pr_buff + 8;
             if (0 == add_len) {
                 printf("  No full status descriptors\n");
-                if (optsp->verbose)
+                if (op->verbose)
                 printf("  So there are no registered IT nexuses\n");
             }
             for (k = 0; k < add_len; k += num, ucp += num) {
@@ -523,13 +522,13 @@ prin_work(int sg_fd, const struct opts_t * optsp)
 /* Compact the 2 dimensional transportid_arr into a one dimensional
  * array in place returning the length. */
 static int
-compact_transportid_array(struct opts_t * optsp)
+compact_transportid_array(struct opts_t * op)
 {
     int k, off, protocol_id, len;
     int compact_len = 0;
-    unsigned char * ucp = optsp->transportid_arr;
+    unsigned char * ucp = op->transportid_arr;
 
-    for (k = 0, off = 0; ((k < optsp->num_transportids) && (k < MX_TIDS));
+    for (k = 0, off = 0; ((k < op->num_transportids) && (k < MX_TIDS));
          ++k, off += MX_TID_LEN) {
         protocol_id = ucp[off] & 0xf;
         if (TPROTO_ISCSI == protocol_id) {
@@ -550,98 +549,95 @@ compact_transportid_array(struct opts_t * optsp)
 }
 
 static int
-prout_work(int sg_fd, struct opts_t * optsp)
+prout_work(int sg_fd, struct opts_t * op)
 {
     int j, len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
     uint64_t param_rk;
     uint64_t param_sark;
+    char b[64];
+    char bb[80];
 
-    t_arr_len = compact_transportid_array(optsp);
-    param_rk = optsp->param_rk;
+    t_arr_len = compact_transportid_array(op);
+    param_rk = op->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
     for (j = 7; j >= 0; --j) {
         pr_buff[j] = (param_rk & 0xff);
         param_rk >>= 8;
     }
-    param_sark = optsp->param_sark;
+    param_sark = op->param_sark;
     for (j = 7; j >= 0; --j) {
         pr_buff[8 + j] = (param_sark & 0xff);
         param_sark >>= 8;
     }
-    if (optsp->param_alltgpt)
+    if (op->param_alltgpt)
         pr_buff[20] |= 0x4;
-    if (optsp->param_aptpl)
+    if (op->param_aptpl)
         pr_buff[20] |= 0x1;
     len = 24;
     if (t_arr_len > 0) {
         pr_buff[20] |= 0x8;     /* set SPEC_I_PT bit */
-        memcpy(&pr_buff[28], optsp->transportid_arr, t_arr_len);
+        memcpy(&pr_buff[28], op->transportid_arr, t_arr_len);
         len += (t_arr_len + 4);
         pr_buff[24] = (unsigned char)((t_arr_len >> 24) & 0xff);
         pr_buff[25] = (unsigned char)((t_arr_len >> 16) & 0xff);
         pr_buff[26] = (unsigned char)((t_arr_len >> 8) & 0xff);
         pr_buff[27] = (unsigned char)(t_arr_len & 0xff);
     }
-    res = sg_ll_persistent_reserve_out(sg_fd, optsp->prout_sa, 0,
-                                       optsp->prout_type, pr_buff, len, 1,
-                                       optsp->verbose);
-    if (res) {
-       if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("PR out:, command not supported\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("PR out: bad field in cdb or parameter list (perhaps "
-                    "unsupported service action)\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            pr2serr("PR out: unit attention\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("PR out: aborted command\n");
+    res = sg_ll_persistent_reserve_out(sg_fd, op->prout_sa, 0,
+                                       op->prout_type, pr_buff, len, 1,
+                                       op->verbose);
+    if (res || op->verbose) {
+        if (op->prout_sa < num_prout_sa_strs)
+            snprintf(b, sizeof(b), "%s", prout_sa_strs[op->prout_sa]);
         else
-            pr2serr("PR out: command failed\n");
-        return res;
-    } else if (optsp->verbose) {
-        char buff[64];
-
-        if (optsp->prout_sa < num_prout_sa_strs)
-            snprintf(buff, sizeof(buff), "%s",
-                     prout_sa_strs[optsp->prout_sa]);
-        else
-            snprintf(buff, sizeof(buff), "service action=0x%x",
-                     optsp->prout_sa);
-        pr2serr("PR out: command (%s) successful\n", buff);
+            snprintf(b, sizeof(b), "service action=0x%x", op->prout_sa);
+        if (res) {
+            if (SG_LIB_CAT_INVALID_OP == res)
+                pr2serr("PR out (%s): command not supported\n", b);
+            else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                pr2serr("PR out (%s): bad field in cdb or parameter list "
+                        "(perhaps unsupported service action)\n", b);
+            else {
+                sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
+                pr2serr("PR out (%s): %s\n", b, bb);
+            }
+            return res;
+        } else if (op->verbose)
+            pr2serr("PR out: command (%s) successful\n", b);
     }
     return 0;
 }
 
 static int
-prout_reg_move_work(int sg_fd, struct opts_t * optsp)
+prout_reg_move_work(int sg_fd, struct opts_t * op)
 {
     int j, len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
     uint64_t param_rk;
     uint64_t param_sark;
 
-    t_arr_len = compact_transportid_array(optsp);
-    param_rk = optsp->param_rk;
+    t_arr_len = compact_transportid_array(op);
+    param_rk = op->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
     for (j = 7; j >= 0; --j) {
         pr_buff[j] = (param_rk & 0xff);
         param_rk >>= 8;
     }
-    param_sark = optsp->param_sark;
+    param_sark = op->param_sark;
     for (j = 7; j >= 0; --j) {
         pr_buff[8 + j] = (param_sark & 0xff);
         param_sark >>= 8;
     }
-    if (optsp->param_unreg)
+    if (op->param_unreg)
         pr_buff[17] |= 0x2;
-    if (optsp->param_aptpl)
+    if (op->param_aptpl)
         pr_buff[17] |= 0x1;
-    pr_buff[18] = (unsigned char)((optsp->param_rtp >> 8) & 0xff);
-    pr_buff[19] = (unsigned char)(optsp->param_rtp & 0xff);
+    pr_buff[18] = (unsigned char)((op->param_rtp >> 8) & 0xff);
+    pr_buff[19] = (unsigned char)(op->param_rtp & 0xff);
     len = 24;
     if (t_arr_len > 0) {
-        memcpy(&pr_buff[24], optsp->transportid_arr, t_arr_len);
+        memcpy(&pr_buff[24], op->transportid_arr, t_arr_len);
         len += t_arr_len;
         pr_buff[20] = (unsigned char)((t_arr_len >> 24) & 0xff);
         pr_buff[21] = (unsigned char)((t_arr_len >> 16) & 0xff);
@@ -649,22 +645,22 @@ prout_reg_move_work(int sg_fd, struct opts_t * optsp)
         pr_buff[23] = (unsigned char)(t_arr_len & 0xff);
     }
     res = sg_ll_persistent_reserve_out(sg_fd, PROUT_REG_MOVE_SA, 0,
-                                       optsp->prout_type, pr_buff, len, 1,
-                                       optsp->verbose);
+                                       op->prout_type, pr_buff, len, 1,
+                                       op->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("PR out: command not supported\n");
+            pr2serr("PR out (register and move): command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("PR out: bad field in cdb or parameter list (perhaps "
-                    "unsupported service action)\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            pr2serr("PR out: unit attention\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("PR out: aborted command\n");
-        else
-            pr2serr("PR out: command failed\n");
+            pr2serr("PR out (register and move): bad field in cdb or "
+                    "parameter list (perhaps unsupported service action)\n");
+        else {
+            char bb[80];
+
+            sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
+            pr2serr("PR out (register and move): %s\n", bb);
+        }
         return res;
-    } else if (optsp->verbose)
+    } else if (op->verbose)
         pr2serr("PR out: 'register and move' command successful\n");
     return 0;
 }
@@ -826,7 +822,7 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
 /* Read one or more TransportIDs from the given file or from stdin.
  * Returns 0 if successful, 1 otherwise. */
 static int
-decode_file_tids(const char * fnp, struct opts_t * optsp)
+decode_file_tids(const char * fnp, struct opts_t * op)
 {
     FILE * fp = stdin;
     int in_len, k, j, m, split_line;
@@ -836,7 +832,7 @@ decode_file_tids(const char * fnp, struct opts_t * optsp)
     char carry_over[4];
     int off = 0;
     int num = 0;
-    unsigned char * tid_arr = optsp->transportid_arr;
+    unsigned char * tid_arr = op->transportid_arr;
 
     if (fnp) {
         fp = fopen(fnp, "r");
@@ -907,7 +903,7 @@ decode_file_tids(const char * fnp, struct opts_t * optsp)
                     /* single trailing hex digit might be a split pair */
                     carry_over[0] = *lcp;
                 }
-                if ((off + k) >= (int)sizeof(optsp->transportid_arr)) {
+                if ((off + k) >= (int)sizeof(op->transportid_arr)) {
                     pr2serr("decode_file_tids: array length exceeded\n");
                     goto bad;
                 }
@@ -936,7 +932,7 @@ my_cont_a:
         }
         ++num;
     }
-    optsp->num_transportids = num;
+    op->num_transportids = num;
     return 0;
 
 bad:
@@ -954,20 +950,20 @@ bad:
  * sg_persist(8). Returns 0 if successful, else 1 .
  */
 static int
-build_transportid(const char * inp, struct opts_t * optsp)
+build_transportid(const char * inp, struct opts_t * op)
 {
     int in_len;
     int k = 0;
     unsigned int h;
     const char * lcp;
-    unsigned char * tid_arr = optsp->transportid_arr;
+    unsigned char * tid_arr = op->transportid_arr;
     char * cp;
     char * c2p;
 
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len) {
-        optsp->num_transportids = 0;
+        op->num_transportids = 0;
     }
     if (('-' == inp[0]) ||
         (0 == memcmp("file=", inp, 5)) ||
@@ -976,7 +972,7 @@ build_transportid(const char * inp, struct opts_t * optsp)
             lcp = NULL;         /* read from stdin */
         else
             lcp = inp + 5;      /* read from given file */
-        return decode_file_tids(lcp, optsp);
+        return decode_file_tids(lcp, op);
     } else {        /* TransportID given directly on command line */
         if (decode_sym_transportid(lcp, tid_arr))
             goto my_cont_b;
@@ -985,7 +981,7 @@ build_transportid(const char * inp, struct opts_t * optsp)
             pr2serr("build_transportid: error at pos %d\n", k + 1);
             return 1;
         }
-        for (k = 0; k < (int)sizeof(optsp->transportid_arr); ++k) {
+        for (k = 0; k < (int)sizeof(op->transportid_arr); ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
                     pr2serr("build_transportid: hex number larger than 0xff "
@@ -1009,8 +1005,8 @@ build_transportid(const char * inp, struct opts_t * optsp)
             }
         }
 my_cont_b:
-        optsp->num_transportids = 1;
-        if (k >= (int)sizeof(optsp->transportid_arr)) {
+        op->num_transportids = 1;
+        if (k >= (int)sizeof(op->transportid_arr)) {
             pr2serr("build_transportid: array length exceeded\n");
             return 1;
         }
