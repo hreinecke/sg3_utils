@@ -28,7 +28,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.25 20140508";
+static const char * version_str = "1.25 20140514";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -621,9 +621,10 @@ main(int argc, char * argv[])
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "Report Luns command has bad field in cdb\n");
     else {
-        fprintf(stderr, "Report Luns command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' option for more information\n");
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Report Luns command: %s\n", b);
     }
 
 the_end:

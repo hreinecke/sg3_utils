@@ -29,7 +29,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.04 20150511";    /* sbc4r01 */
+static const char * version_str = "1.04 20150515";    /* sbc4r01 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -333,16 +333,11 @@ main(int argc, char * argv[])
             k += res;
             desc++;
         }
-    } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Report Referrals command not supported\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Report Referrals, aborted command\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Report Referrals command has bad field in cdb\n");
-    else {
-        fprintf(stderr, "Report Referrals command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' option for more information\n");
+    } else {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Report Referrals command failed: %s\n", b);
     }
 
 the_end:

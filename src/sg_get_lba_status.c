@@ -28,7 +28,7 @@
  * device.
  */
 
-static const char * version_str = "1.06 20140512";    /* sbc2r29 */
+static const char * version_str = "1.06 20140515";    /* sbc2r29 */
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
@@ -342,14 +342,13 @@ main(int argc, char * argv[])
                     "found\n");
     } else if (SG_LIB_CAT_INVALID_OP == res)
         fprintf(stderr, "Get LBA Status command not supported\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Get LBA Status, aborted command\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Get LBA Status command has bad field in cdb\n");
+        fprintf(stderr, "Get LBA Status command: bad field in cdb\n");
     else {
-        fprintf(stderr, "Get LBA Status command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' option for more information\n");
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Get LBA Status command: %s\n", b);
     }
 
 the_end:

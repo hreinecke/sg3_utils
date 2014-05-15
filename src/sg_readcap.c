@@ -29,7 +29,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "3.91 20140412";
+static const char * version_str = "3.92 20140515";
 
 #define ME "sg_readcap: "
 
@@ -359,6 +359,7 @@ int main(int argc, char * argv[])
     int ret = 0;
     unsigned int last_blk_addr, block_size;
     unsigned char resp_buff[RCAP16_REPLY_LEN];
+    char b[80];
     struct opts_t opts;
     struct opts_t * op;
 
@@ -472,15 +473,10 @@ int main(int argc, char * argv[])
             if (op->do_verbose)
                 fprintf(stderr, "READ CAPACITY (10) not supported, trying "
                         "READ CAPACITY (16)\n");
-        } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            fprintf(stderr, "READ CAPACITY (10) failed, device not ready\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "READ CAPACITY (10) failed, aborted command\n");
-        else if (! op->do_verbose)
-            fprintf(stderr, "READ CAPACITY (10) failed [res=%d], try "
-                    "with '-v'\n", res);
+        } else if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            fprintf(stderr, "READ CAPACITY (10) failed: %s\n", b);
+        }
     }
     if (op->do_long) {
         res = sg_ll_readcap_16(sg_fd, op->do_pmi, op->llba, resp_buff,
@@ -553,19 +549,13 @@ int main(int argc, char * argv[])
 #endif
             }
             goto good;
-        }
-        else if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "READ CAPACITY (16) not supported\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            fprintf(stderr, "READ CAPACITY (16) failed, device not ready\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "READ CAPACITY (16) failed, aborted command\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (16) cdb "
                     "including unsupported service action\n");
-        else if (! op->do_verbose)
-            fprintf(stderr, "READ CAPACITY (16) failed [res=%d], try "
-                    "with '-v'\n", res);
+        else if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            fprintf(stderr, "READ CAPACITY (16) failed: %s\n", b);
+        }
     }
     if (op->do_brief)
         printf("0x0 0x0\n");

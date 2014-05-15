@@ -37,7 +37,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.11 (win32) 20130513";
+static const char * version_str = "1.12 (win32) 20130513";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
@@ -671,6 +671,10 @@ sg_do_wscan(char letter, int show_bt, int scsi_scan)
                     dStrHex(sp->qp_descriptor.raw, 144, 0);
             } else
                 printf("\n");
+            if ((verbose > 3) && sp->qp_uid_valid) {
+                printf("  UID valid, in hex:\n");
+                dStrHex(sp->qp_uid.raw, sizeof(sp->qp_uid.raw), 1);
+            }
         }
     }
 

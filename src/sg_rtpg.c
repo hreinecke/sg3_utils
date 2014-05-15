@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.19 20140511";
+static const char * version_str = "1.19 20140515";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -305,14 +305,11 @@ int main(int argc, char * argv[])
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "bad field in Report Target Port Groups cdb "
                 "including unsupported service action\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Report Target Port Groups, unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Report Target Port Groups, aborted command\n");
     else {
-        fprintf(stderr, "Report Target Port Groups command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' for more information\n");
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Report Target Port Groups: %s\n", b);
     }
 
 err_out:

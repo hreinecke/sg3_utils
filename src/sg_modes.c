@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.43 20140508";
+static const char * version_str = "1.43 20140514";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -907,6 +907,12 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
                 printf("    [0x%x]\n", k);
             if (op->do_hex)
                 dStrHex((const char *)rbuf, len, 1);
+        } else if (op->do_verbose) {
+            char b[80];
+
+            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose - 1);
+            fprintf(stderr, "MODE SENSE (%s) failed: %s\n",
+                    (op->do_six ? "6" : "10"), b);
         }
     }
     return res;
@@ -937,6 +943,7 @@ main(int argc, char * argv[])
     unsigned char uc;
     struct sg_simple_inquiry_resp inq_out;
     char pdt_name[64];
+    char b[80];
     struct opts_t opts;
     struct opts_t * op;
 
@@ -1099,12 +1106,10 @@ main(int argc, char * argv[])
         else
             fprintf(stderr, "invalid field in cdb (perhaps "
                 "page 0x%x not supported)\n", op->pg_code);
-    } else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "device not ready\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "aborted command\n");
+    } else if (res) {
+        sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+        fprintf(stderr, "%s\n", b);
+    }
     ret = res;
     if (0 == res) {
         int medium_type, specific, headerlen;

@@ -3,7 +3,7 @@
  * data transfer (and no REQUEST SENSE command iff the unit is ready)
  * then this can be used for timing per SCSI command overheads.
  *
- * Copyright (C) 2000-2013 D. Gilbert
+ * Copyright (C) 2000-2014 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "3.29 20130530";
+static const char * version_str = "3.30 20140514";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -101,15 +101,15 @@ static void usage_old()
            "Performs a SCSI TEST UNIT READY command (or many of them)\n");
 }
 
-static void usage_for(const struct opts_t * optsp)
+static void usage_for(const struct opts_t * op)
 {
-    if (optsp->opt_new)
+    if (op->opt_new)
         usage();
     else
         usage_old();
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c, n;
 
@@ -124,7 +124,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         switch (c) {
         case 'h':
         case '?':
-            ++optsp->do_help;
+            ++op->do_help;
             break;
         case 'n':
             n = sg_get_num(optarg);
@@ -133,36 +133,36 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_number = n;
+            op->do_number = n;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            optsp->opt_new = 0;
+            op->opt_new = 0;
             return 0;
         case 'p':
-            ++optsp->do_progress;
+            ++op->do_progress;
             break;
         case 't':
-            ++optsp->do_time;
+            ++op->do_time;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->do_verbose;
             break;
         case 'V':
-            ++optsp->do_version;
+            ++op->do_version;
             break;
         default:
             fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
-            if (optsp->do_help)
+            if (op->do_help)
                 break;
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
-        if (NULL == optsp->device_name) {
-            optsp->device_name = argv[optind];
+        if (NULL == op->device_name) {
+            op->device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -176,7 +176,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen;
     const char * cp;
@@ -190,21 +190,21 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'N':
-                    optsp->opt_new = 1;
+                    op->opt_new = 1;
                     return 0;
                 case 'O':
                     break;
                 case 'p':
-                    ++optsp->do_progress;
+                    ++op->do_progress;
                     break;
                 case 't':
-                    ++optsp->do_time;
+                    ++op->do_time;
                     break;
                 case 'v':
-                    ++optsp->do_verbose;
+                    ++op->do_verbose;
                     break;
                 case 'V':
-                    ++optsp->do_verbose;
+                    ++op->do_verbose;
                     break;
                 case '?':
                     usage_old();
@@ -219,8 +219,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             if (plen <= 0)
                 continue;
             if (0 == strncmp("n=", cp, 2)) {
-                optsp->do_number = sg_get_num(cp + 2);
-                if (optsp->do_number <= 0) {
+                op->do_number = sg_get_num(cp + 2);
+                if (op->do_number <= 0) {
                     printf("Couldn't decode number after 'n=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
@@ -232,11 +232,11 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == optsp->device_name)
-            optsp->device_name = cp;
+        } else if (0 == op->device_name)
+            op->device_name = cp;
         else {
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", optsp->device_name, cp);
+                    "%s\n", op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -244,22 +244,22 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = 0;
-        res = process_cl_old(optsp, argc, argv);
-        if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+        op->opt_new = 0;
+        res = process_cl_old(op, argc, argv);
+        if ((0 == res) && op->opt_new)
+            res = process_cl_new(op, argc, argv);
     } else {
-        optsp->opt_new = 1;
-        res = process_cl_new(optsp, argc, argv);
-        if ((0 == res) && (0 == optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+        op->opt_new = 1;
+        res = process_cl_new(op, argc, argv);
+        if ((0 == res) && (0 == op->opt_new))
+            res = process_cl_old(op, argc, argv);
     }
     return res;
 }
@@ -274,40 +274,43 @@ int main(int argc, char * argv[])
     struct timeval start_tm, end_tm;
 #endif
     struct opts_t opts;
+    struct opts_t * op;
+    char b[80];
 
-    memset(&opts, 0, sizeof(opts));
-    opts.do_number = 1;
-    res = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->do_number = 1;
+    res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_help) {
-        usage_for(&opts);
+    if (op->do_help) {
+        usage_for(op);
         return 0;
     }
-    if (opts.do_version) {
+    if (op->do_version) {
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
 
-    if (NULL == opts.device_name) {
+    if (NULL == op->device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
-        usage_for(&opts);
+        usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if ((sg_fd = sg_cmds_open_device(opts.device_name, 1 /* ro */,
-                                     opts.do_verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+                                     op->do_verbose)) < 0) {
         fprintf(stderr, "sg_turs: error opening file: %s: %s\n",
-                opts.device_name, safe_strerror(-sg_fd));
+                op->device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (opts.do_progress) {
-        for (k = 0; k < opts.do_number; ++k) {
+    if (op->do_progress) {
+        for (k = 0; k < op->do_number; ++k) {
             if (k > 0)
                 sleep_for(30);
             progress = -1;
             res = sg_ll_test_unit_ready_progress(sg_fd, k, &progress,
-                     ((1 == opts.do_number) ? 1 : 0), opts.do_verbose);
+                     ((1 == op->do_number) ? 1 : 0), op->do_verbose);
             if (progress < 0) {
                 ret = res;
                 break;
@@ -317,32 +320,38 @@ int main(int argc, char * argv[])
                 printf("Progress indication: %d.%02d%% done\n", pr, rem);
             }
         }
-        if (opts.do_number > 1)
+        if (op->do_number > 1)
             printf("Completed %d Test Unit Ready commands\n",
-                   ((k < opts.do_number) ? k + 1 : k));
+                   ((k < op->do_number) ? k + 1 : k));
     } else {
 #ifndef SG_LIB_MINGW
-        if (opts.do_time) {
+        if (op->do_time) {
             start_tm.tv_sec = 0;
             start_tm.tv_usec = 0;
             gettimeofday(&start_tm, NULL);
         }
 #endif
-        for (k = 0; k < opts.do_number; ++k) {
+        for (k = 0; k < op->do_number; ++k) {
             /* Might get Unit Attention on first invocation */
-            res = sg_ll_test_unit_ready(sg_fd, k, (0 == k), opts.do_verbose);
+            res = sg_ll_test_unit_ready(sg_fd, k, (0 == k), op->do_verbose);
             if (res) {
                 ++num_errs;
                 ret = res;
-                if ((1 == opts.do_number) && (SG_LIB_CAT_NOT_READY == res)) {
-                    printf("device not ready\n");
+                if (1 == op->do_number) {
+                    if (SG_LIB_CAT_NOT_READY == res)
+                        printf("device not ready\n");
+                    else {
+                        sg_get_category_sense_str(res, sizeof(b), b,
+                                                  op->do_verbose);
+                        printf("%s\n", b);
+                    }
                     reported = 1;
                     break;
                 }
             }
         }
 #ifndef SG_LIB_MINGW
-        if ((opts.do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+        if ((op->do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
             struct timeval res_tm;
             double a, b;
 
@@ -355,7 +364,7 @@ int main(int argc, char * argv[])
             }
             a = res_tm.tv_sec;
             a += (0.000001 * res_tm.tv_usec);
-            b = (double)opts.do_number;
+            b = (double)op->do_number;
             printf("time to perform commands was %d.%06d secs",
                    (int)res_tm.tv_sec, (int)res_tm.tv_usec);
             if (a > 0.00001)
@@ -365,9 +374,9 @@ int main(int argc, char * argv[])
         }
 #endif
 
-        if (((opts.do_number > 1) || (num_errs > 0)) && (! reported))
+        if (((op->do_number > 1) || (num_errs > 0)) && (! reported))
             printf("Completed %d Test Unit Ready commands with %d errors\n",
-                   opts.do_number, num_errs);
+                   op->do_number, num_errs);
     }
     sg_cmds_close_device(sg_fd);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;

@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.90 20140512";    /* ses3r06 */
+static const char * version_str = "1.91 20140515";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1171,10 +1171,8 @@ find_out_diag_page_desc(int page_num)
     return NULL;
 }
 
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
- * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failures */
+/* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
+ * failures */
 static int
 do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
             int noisy, int verbose)
@@ -1268,16 +1266,15 @@ active_et_aesp(int el_type)
         return 0;
 }
 
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> command not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -2 -> unexpected response, -1 -> other failure */
+/* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
+ * failures */
 static int
 do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
             int rsp_buff_size, const struct opts_t * op, int * rsp_lenp)
 {
     int rsp_len, res;
     const char * cp;
+    char b[80];
 
     memset(rsp_buff, 0, rsp_buff_size);
     if (rsp_lenp)
@@ -1324,24 +1321,8 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
         else
             pr2serr("Attempt to fetch status diagnostic page [0x%x] failed\n",
                     page_code);
-        switch (res) {
-        case SG_LIB_CAT_NOT_READY:
-            pr2serr("    device no ready\n");
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            pr2serr("    aborted command\n");
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            pr2serr("    unit attention\n");
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            pr2serr("    Receive diagnostic results command not supported\n");
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            pr2serr("    Receive diagnostic results command, bad field in "
-                    "cdb\n");
-            break;
-        }
+        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+        pr2serr("    %s\n", b);
     }
     return res;
 }
@@ -3940,6 +3921,7 @@ main(int argc, char * argv[])
 {
     int sg_fd, res;
     char buff[128];
+    char b[80];
     int pd_type = 0;
     int have_cgs = 0;
     int ret = 0;
@@ -4133,24 +4115,8 @@ main(int argc, char * argv[])
 
 err_out:
     if (0 == op->do_status) {
-        switch (ret) {
-        case SG_LIB_CAT_NOT_READY:
-            pr2serr("    device no ready\n");
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            pr2serr("    aborted command\n");
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            pr2serr("    unit attention\n");
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            pr2serr("    Send diagnostics command not supported\n");
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            pr2serr("    Send diagnostics command, bad field in cdb or "
-                    "parameter list\n");
-            break;
-        }
+        sg_get_category_sense_str(ret, sizeof(b), b, op->verbose);
+        pr2serr("    %s\n", b);
     }
     if (ret && (0 == op->verbose))
         pr2serr("Problem detected, try again with --verbose option for more "

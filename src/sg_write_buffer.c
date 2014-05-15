@@ -26,7 +26,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.13 20140507";    /* spc4r36s */
+static const char * version_str = "1.14 20140515";    /* spc4r36s */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -233,19 +233,12 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -526,32 +519,11 @@ main(int argc, char * argv[])
                                     wb_offset, dop, wb_len, 1, verbose);
     }
     if (0 != res) {
+        char b[80];
+
         ret = res;
-        switch (res) {
-        case SG_LIB_CAT_NOT_READY:
-            pr2serr("Write buffer failed, device not ready\n");
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            pr2serr("Write buffer not done, unit attention\n");
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            pr2serr("Write buffer, aborted command\n");
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            pr2serr("Write buffer command not supported\n");
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            pr2serr("bad field in Write buffer cdb\n");
-            break;
-        default:
-            if (-1 == res) {
-                fprintf(stderr, "Write buffer command failed\n");
-            } else
-                fprintf(stderr, "Write buffer failed, res=%d\n", res);
-            if (0 == verbose)
-                fprintf(stderr, "... try again with -v or -vv\n");
-            break;
-        }
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        pr2serr("Write buffer failed: %s\n", b);
     }
 
 err_out:

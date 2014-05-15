@@ -35,7 +35,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.9 20140512";
+static const char * version_str = "1.9 20140515";
 
 
 #define MAX_XFER_LEN 10000
@@ -430,44 +430,24 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    cp = rec_copy_name_arr[sa];
+    if ((sa < 0) || (sa >= (int)(sizeof(rec_copy_name_arr) / sizeof(char *))))
+        cp = "Out of range service action";
+    else
+        cp = rec_copy_name_arr[sa];
     if (verbose)
         pr2serr(ME "issue %s to device %s\n\t\txfer_len= %d (0x%x), list_id=%"
                 PRIu32 "\n", cp, device_name, xfer_len, xfer_len, list_id);
 
-    /* In SPC-4 opcode 0x84, service actions have command names:
-     *    0x0    RECEIVE COPY STATUS(LID1)
-     *    0x1    RECEIVE COPY DATA(LID1)
-     *    0x3    RECEIVE COPY OPERATING PARAMETERS
-     *    0x4    RECEIVE COPY FAILURE DETAILS(LID1)
-     */
     res = sg_ll_receive_copy_results(sg_fd, sa, list_id, cpResultBuff,
                                      xfer_len, 1, verbose);
     ret = res;
-    switch (res) {
-    case 0:
-        break;
-    case SG_LIB_CAT_NOT_READY:
-        pr2serr("  SCSI %s failed, device not ready\n", cp);
-        break;
-    case SG_LIB_CAT_UNIT_ATTENTION:
-        pr2serr("  SCSI %s failed, unit attention\n", cp);
-        break;
-    case SG_LIB_CAT_ABORTED_COMMAND:
-        pr2serr("  SCSI %s failed, aborted command\n", cp);
-        break;
-    case SG_LIB_CAT_INVALID_OP:
-        pr2serr("  SCSI %s command not supported\n", cp);
-        break;
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        pr2serr("  SCSI %s failed, bad field in cdb\n", cp);
-        break;
-    default:
-        pr2serr("  SCSI %s command error %d\n", cp, res);
-        break;
-    }
-    if (res != 0)
+    if (res) {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        pr2serr("  SCSI %s failed: %s\n", cp, b);
         goto finish;
+    }
     if (1 == do_hex) {
         dStrHex((const char *)cpResultBuff, xfer_len, 1);
         res = 0;

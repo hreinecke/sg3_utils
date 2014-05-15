@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2013 Douglas Gilbert.
+ * Copyright (c) 1999-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -67,10 +67,7 @@
 
 
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
- * SG_LIB_CAT_UNIT_ATTENTION -> repeat,
- * SG_LIB_CAT_INVALID_OP -> cdb not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
                     unsigned int lba, unsigned int count, int noisy,
@@ -120,19 +117,12 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -143,10 +133,7 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
 }
 
 /* Invokes a SCSI READ CAPACITY (16) command. Returns 0 -> success,
- * SG_LIB_CAT_UNIT_ATTENTION -> media changed??, SG_LIB_CAT_INVALID_OP
- *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY -> device not ready,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
                  int mx_resp_len, int noisy, int verbose)
@@ -197,19 +184,12 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -220,10 +200,7 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
 }
 
 /* Invokes a SCSI READ CAPACITY (10) command. Returns 0 -> success,
- * SG_LIB_CAT_UNIT_ATTENTION -> media changed??, SG_LIB_CAT_INVALID_OP
- *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY -> device not ready,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
                  int mx_resp_len, int noisy, int verbose)
@@ -264,19 +241,12 @@ sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -287,10 +257,7 @@ sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
 }
 
 /* Invokes a SCSI MODE SENSE (6) command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
- * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
                   void * resp, int mx_resp_len, int noisy, int verbose)
@@ -332,19 +299,12 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else {
@@ -360,10 +320,7 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
 }
 
 /* Invokes a SCSI MODE SENSE (10) command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
- * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                    int sub_pg_code, void * resp, int mx_resp_len,
@@ -407,19 +364,12 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else {
@@ -435,10 +385,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
 }
 
 /* Invokes a SCSI MODE SELECT (6) command.  Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
- * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
                    int noisy, int verbose)
@@ -483,19 +430,12 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -506,10 +446,7 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
 }
 
 /* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
- * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_UNIT_ATTENTION,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
                     int noisy, int verbose)
@@ -555,19 +492,12 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -632,10 +562,8 @@ sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * should have 4 elements for output of current, changeable, default
  * and saved values respectively. Each element should be NULL or
  * at least mx_mpage_len bytes long.
- * Return of 0 -> overall success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready,
- * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other failure.
+ * Return of 0 -> overall success, various SG_LIB_CAT_* positive values or
+ * -1 -> other errors.
  * If success_mask pointer is not NULL then first zeros it. Then set bits
  * 0, 1, 2 and/or 3 if the current, changeable, default and saved values
  * respectively have been fetched. If error on current page
@@ -744,10 +672,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
 }
 
 /* Invokes a SCSI LOG SENSE command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Log Sense not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
@@ -794,19 +719,12 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else {
@@ -822,10 +740,7 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
 }
 
 /* Invokes a SCSI LOG SELECT command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Log Select not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
                  int subpg_code, unsigned char * paramp, int param_len,
@@ -874,19 +789,12 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -898,10 +806,7 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
 
 /* Invokes a SCSI START STOP UNIT command (SBC + MMC).
  * Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Start stop unit not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure
+ * various SG_LIB_CAT_* positive values or -1 -> other errors.
  * SBC-3 and MMC partially overlap on the power_condition_modifier(sbc) and
  * format_layer_number(mmc) fields. They also overlap on the noflush(sbc)
  * and fl(mmc) one bit field. This is the cause of the awkardly named
@@ -944,19 +849,12 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -969,10 +867,7 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
  * [was in SPC-3 but displaced from SPC-4 into SBC-3, MMC-5, SSC-3]
  * prevent==0 allows removal, prevent==1 prevents removal ...
  * Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> command not supported
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
 {
@@ -1011,19 +906,12 @@ sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
