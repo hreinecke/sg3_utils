@@ -93,6 +93,7 @@ static int fail_all_paths(int fd)
         unsigned char fail_paths_pg[118];
         struct rdac_legacy_page *rdac_page;
         int res;
+        char b[80];
 
         memset(fail_paths_pg, 0, 118);
         memcpy(fail_paths_pg, mode6_hdr, 4);
@@ -113,24 +114,9 @@ static int fail_all_paths(int fd)
                 if (do_verbose)
                         fprintf(stderr, "fail paths successful\n");
                 break;
-        case SG_LIB_CAT_INVALID_OP:
-                fprintf(stderr, "fail paths page failed (Invalid opcode)\n");
-                break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-                fprintf(stderr, "fail paths page failed (illegal request)\n");
-                break;
-        case SG_LIB_CAT_NOT_READY:
-                fprintf(stderr, "fail paths page failed (not ready)\n");
-                break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-                fprintf(stderr, "fail paths page failed (unit attention)\n");
-                break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-                fprintf(stderr, "fail paths page failed (aborted command)\n");
-                break;
         default:
-                if (do_verbose)
-                        fprintf(stderr, "fail paths failed\n");
+                sg_get_category_sense_str(res, sizeof(b), b, do_verbose);
+                fprintf(stderr, "fail paths failed: %s\n", b);
                 break;
         }
 
@@ -142,6 +128,7 @@ static int fail_this_path(int fd, int lun)
         unsigned char fail_paths_pg[118];
         struct rdac_legacy_page *rdac_page;
         int res;
+        char b[80];
 
         memset(fail_paths_pg, 0, 118);
         memcpy(fail_paths_pg, mode6_hdr, 4);
@@ -164,25 +151,10 @@ static int fail_this_path(int fd, int lun)
                 if (do_verbose)
                         fprintf(stderr, "fail paths successful\n");
                 break;
-        case SG_LIB_CAT_INVALID_OP:
-                fprintf(stderr, "fail paths page failed (Invalid opcode)\n");
-                break;
-        case SG_LIB_CAT_NOT_READY:
-                fprintf(stderr, "fail paths page failed (not ready)\n");
-                break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-                fprintf(stderr, "fail paths page failed (unit attention)\n");
-                break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-                fprintf(stderr, "fail paths page failed (aborted command)\n");
-                break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-                fprintf(stderr, "fail lun %d page failed (illegal request)\n",
-                        lun);
-                break;
         default:
-                if (do_verbose)
-                        fprintf(stderr, "fail paths failed\n");
+                sg_get_category_sense_str(res, sizeof(b), b, do_verbose);
+                fprintf(stderr, "fail paths page (lun=%d) failed: %s\n", lun,
+                        b);
                 break;
         }
 
@@ -376,19 +348,25 @@ int main(int argc, char * argv[])
                         if (do_verbose)
                                 dump_mode_page(rsp_buff, rsp_buff[0]);
                         print_rdac_mode(rsp_buff);
+                } else {
+                        if (SG_LIB_CAT_INVALID_OP == res)
+                                fprintf(stderr, ">>>>>> try again without "
+                                        "the '-6' switch for a 10 byte MODE "
+                                        "SENSE command\n");
+                        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                                fprintf(stderr, "mode sense: invalid field "
+                                        "in cdb (perhaps subpages or page "
+                                        "control (PC) not supported)\n");
+                        else {
+                                char b[80];
+
+                                sg_get_category_sense_str(res, sizeof(b), b,
+                                                          do_verbose);
+                                fprintf(stderr, "mode sense failed: %s\n", b);
+                        }
                 }
         }
         ret = res;
-        if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, ">>>>>> try again without the '-6' "
-                        "switch for a 10 byte MODE SENSE command\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "invalid field in cdb (perhaps subpages "
-                        "or page control (PC) not supported)\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-                fprintf(stderr, "mode sense failed, device not ready\n");
-        else if (res)
-                fprintf(stderr," mode sense failed\n");
 
         res = sg_cmds_close_device(fd);
         if (res < 0) {

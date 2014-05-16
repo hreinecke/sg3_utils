@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013 Douglas Gilbert.
+ * Copyright (c) 2011-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.93 20130927";
+static const char * version_str = "0.94 20140516";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -206,13 +206,6 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
@@ -231,7 +224,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
             ret = sense_cat;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -251,15 +244,18 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
     char pdt_name[32];
+    char b[80];
     unsigned char requestSenseBuff[DEF_REQS_RESP_LEN];
     unsigned char * wBuff = NULL;
     int ret = -1;
     struct opts_t opts;
+    struct opts_t * op;
     struct stat a_stat;
     struct sg_simple_inquiry_resp inq_out;
 
-    memset(&opts, 0, sizeof(opts));
-    opts.count = 1;
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->count = 1;
     while (1) {
         int option_index = 0;
 
@@ -270,67 +266,67 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'A':
-            ++opts.ause;
+            ++op->ause;
             break;
         case 'B':
-            ++opts.block;
+            ++op->block;
             break;
         case 'c':
-            opts.count = sg_get_num(optarg);
-            if ((opts.count < 1) || (opts.count > 31))  {
+            op->count = sg_get_num(optarg);
+            if ((op->count < 1) || (op->count > 31))  {
                 fprintf(stderr, "bad argument to '--count', expect 1 to "
                         "31\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'C':
-            ++opts.crypto;
+            ++op->crypto;
             break;
         case 'e':
-            ++opts.early;
+            ++op->early;
             break;
         case 'F':
-            ++opts.fail;
+            ++op->fail;
             break;
         case 'h':
         case '?':
             usage();
             return 0;
         case 'i':
-            opts.ipl = sg_get_num(optarg);
-            if ((opts.ipl < 1) || (opts.ipl > 65535))  {
+            op->ipl = sg_get_num(optarg);
+            if ((op->ipl < 1) || (op->ipl > 65535))  {
                 fprintf(stderr, "bad argument to '--ipl', expect 1 to "
                         "65535\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'I':
-            ++opts.invert;
+            ++op->invert;
             break;
         case 'O':
-            ++opts.overwrite;
+            ++op->overwrite;
             break;
         case 'p':
-            opts.pattern_fn = optarg;
+            op->pattern_fn = optarg;
             break;
         case 'Q':
-            ++opts.quick;
+            ++op->quick;
             break;
         case 'T':
-            opts.test = sg_get_num(optarg);
-            if ((opts.test < 0) || (opts.test > 3))  {
+            op->test = sg_get_num(optarg);
+            if ((op->test < 0) || (op->test > 3))  {
                 fprintf(stderr, "bad argument to '--test', expect 0 to 3\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'v':
-            ++opts.verbose;
+            ++op->verbose;
             break;
         case 'V':
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         case 'w':
-            ++opts.wait;
+            ++op->wait;
             break;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
@@ -356,37 +352,37 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    vb = opts.verbose;
-    n = !!opts.block + !!opts.crypto + !!opts.fail + !!opts.overwrite;
+    vb = op->verbose;
+    n = !!op->block + !!op->crypto + !!op->fail + !!op->overwrite;
     if (1 != n) {
         fprintf(stderr, "one and only one of '--block', '--crypto', "
                 "'--fail' or '--overwrite' please\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.overwrite) {
-        if (NULL == opts.pattern_fn) {
+    if (op->overwrite) {
+        if (NULL == op->pattern_fn) {
             fprintf(stderr, "'--overwrite' requires '--pattern=PF' "
                     "option\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        got_stdin = (0 == strcmp(opts.pattern_fn, "-")) ? 1 : 0;
+        got_stdin = (0 == strcmp(op->pattern_fn, "-")) ? 1 : 0;
         if (! got_stdin) {
             memset(&a_stat, 0, sizeof(a_stat));
-            if (stat(opts.pattern_fn, &a_stat) < 0) {
+            if (stat(op->pattern_fn, &a_stat) < 0) {
                 fprintf(stderr, "pattern file: unable to stat(%s): %s\n",
-                        opts.pattern_fn, safe_strerror(errno));
+                        op->pattern_fn, safe_strerror(errno));
                 return SG_LIB_FILE_ERROR;
             }
-            if (opts.ipl <= 0) {
-                opts.ipl = (int)a_stat.st_size;
-                if (opts.ipl > MAX_XFER_LEN) {
+            if (op->ipl <= 0) {
+                op->ipl = (int)a_stat.st_size;
+                if (op->ipl > MAX_XFER_LEN) {
                     fprintf(stderr, "pattern file length exceeds 65535 "
                             "bytes, need '--ipl=LEN' option\n");
                      return SG_LIB_FILE_ERROR;
                 }
             }
         }
-        if (opts.ipl < 1) {
+        if (op->ipl < 1) {
             fprintf(stderr, "'--overwrite' requires '--ipl=LEN' "
                     "option if can't get PF length\n");
             return SG_LIB_SYNTAX_ERROR;
@@ -414,12 +410,12 @@ main(int argc, char * argv[])
            inq_out.peripheral_type);
 
 
-    if (opts.overwrite) {
-        param_lst_len = opts.ipl + 4;
-        wBuff = (unsigned char*)calloc(opts.ipl + 4, 1);
+    if (op->overwrite) {
+        param_lst_len = op->ipl + 4;
+        wBuff = (unsigned char*)calloc(op->ipl + 4, 1);
         if (NULL == wBuff) {
             fprintf(stderr, "unable to allocate %d bytes of memory with "
-                    "calloc()\n", opts.ipl + 4);
+                    "calloc()\n", op->ipl + 4);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
@@ -428,43 +424,43 @@ main(int argc, char * argv[])
             if (sg_set_binary_mode(STDIN_FILENO) < 0)
                 perror("sg_set_binary_mode");
         } else {
-            if ((infd = open(opts.pattern_fn, O_RDONLY)) < 0) {
+            if ((infd = open(op->pattern_fn, O_RDONLY)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for reading", opts.pattern_fn);
+                         ME "could not open %s for reading", op->pattern_fn);
                 perror(ebuff);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             } else if (sg_set_binary_mode(infd) < 0)
                 perror("sg_set_binary_mode");
         }
-        res = read(infd, wBuff + 4, opts.ipl);
+        res = read(infd, wBuff + 4, op->ipl);
         if (res < 0) {
             snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
-                     opts.pattern_fn);
+                     op->pattern_fn);
             perror(ebuff);
             if (! got_stdin)
                 close(infd);
             ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
-        if (res < opts.ipl) {
+        if (res < op->ipl) {
             fprintf(stderr, "tried to read %d bytes from %s, got %d "
-                    "bytes\n", opts.ipl, opts.pattern_fn, res);
+                    "bytes\n", op->ipl, op->pattern_fn, res);
             fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
         }
         if (! got_stdin)
             close(infd);
 
-        wBuff[0] = opts.count & 0x1f;;
-        if (opts.test)
-            wBuff[0] |= ((opts.test & 0x3) << 5);
-        if (opts.invert)
+        wBuff[0] = op->count & 0x1f;;
+        if (op->test)
+            wBuff[0] |= ((op->test & 0x3) << 5);
+        if (op->invert)
             wBuff[0] |= 0x80;
-        wBuff[2] = ((opts.ipl >> 8) & 0xff);
-        wBuff[3] = (opts.ipl & 0xff);
+        wBuff[2] = ((op->ipl >> 8) & 0xff);
+        wBuff[3] = (op->ipl & 0xff);
     }
 
-    if ((0 == opts.quick) && (! opts.fail)) {
+    if ((0 == op->quick) && (! op->fail)) {
         printf("\nA SANITIZE will commence in 15 seconds\n");
         printf("    ALL data on %s will be DESTROYED\n", device_name);
         printf("        Press control-C to abort\n");
@@ -479,36 +475,13 @@ main(int argc, char * argv[])
         sleep_for(5);
     }
 
-    ret = do_sanitize(sg_fd, &opts, wBuff, param_lst_len);
+    ret = do_sanitize(sg_fd, op, wBuff, param_lst_len);
     if (ret) {
-        switch (ret) {
-        case SG_LIB_CAT_NOT_READY:
-            fprintf(stderr, "Sanitize failed, device not ready\n");
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            fprintf(stderr, "Sanitize, unit attention\n");
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            fprintf(stderr, "Sanitize, aborted command\n");
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            fprintf(stderr, "Sanitize command not supported\n");
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            fprintf(stderr, "bad field in Sanitize cdb, option "
-                    "probably not supported\n");
-            break;
-        case SG_LIB_CAT_MEDIUM_HARD:
-            fprintf(stderr, "Sanitize command reported medium or "
-                    "hardware error\n");
-            break;
-        default:
-            fprintf(stderr, "Sanitize command failed\n");
-            break;
-        }
+        sg_get_category_sense_str(ret, sizeof(b), b, vb);
+        fprintf(stderr, "Sanitize failed: %s\n", b);
     }
 
-    if ((0 == ret) && (0 == opts.early) && (0 == opts.wait)) {
+    if ((0 == ret) && (0 == op->early) && (0 == op->wait)) {
         for (k = 0, desc = 1 ;; ++k) {
             sleep_for(POLL_DURATION_SECS);
             memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
@@ -526,12 +499,9 @@ main(int argc, char * argv[])
                         desc = 0;
                         continue;
                     }
-                }
-                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                    fprintf(stderr, "Request Sense, aborted command\n");
-                else {
-                    fprintf(stderr, "Request Sense command unexpectedly "
-                            "failed\n");
+                } else {
+                    sg_get_category_sense_str(res, sizeof(b), b, vb);
+                    fprintf(stderr, "Request Sense: %s\n", b);
                     if (0 == vb)
                         fprintf(stderr, "    try the '-v' option for "
                                 "more information\n");

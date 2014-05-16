@@ -46,7 +46,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.07 20140405";
+static const char * version_str = "1.08 20140515";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -215,8 +215,18 @@ do_set_features(int sg_fd, int feature, int count, unsigned int lba,
                             "hardware error\n", cdb_len);
                 return SG_LIB_CAT_MEDIUM_HARD;
             case SPC_SK_ABORTED_COMMAND:
-                fprintf(stderr, "Aborted command\n");
-                return SG_LIB_CAT_ABORTED_COMMAND;
+                if (0x10 == ssh.asc) {
+                    fprintf(stderr, "Aborted command: protection "
+                            "information\n");
+                    return SG_LIB_CAT_PROTECTION;
+                } else {
+                    fprintf(stderr, "Aborted command\n");
+                    return SG_LIB_CAT_ABORTED_COMMAND;
+                }
+            case SPC_SK_DATA_PROTECT:
+                fprintf(stderr, "ATA PASS-THROUGH (%d): data protect, read "
+                            "only media?\n", cdb_len);
+                return SG_LIB_CAT_DATA_PROTECT;
             default:
                 if (verbose < 2)
                     fprintf(stderr, "ATA PASS-THROUGH (%d), some sense "
@@ -233,8 +243,13 @@ do_set_features(int sg_fd, int feature, int count, unsigned int lba,
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
-        fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
-        return SG_LIB_CAT_MALFORMED;
+        if (SAM_STAT_RESERVATION_CONFLICT == res) {
+            fprintf(stderr, "SCSI status: RESERVATION CONFLICT\n");
+            return SG_LIB_CAT_RES_CONFLICT;
+        } else {
+            fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
+            return SG_LIB_CAT_MALFORMED;
+        }
     } else {
         fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
         if (verbose < 2)

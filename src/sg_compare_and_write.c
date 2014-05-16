@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2013, Kaminario Technologies LTD
+*  Copyright (c) 2012-2014, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -51,7 +51,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.08 20130824";
+static const char * version_str = "1.09 20140516";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -382,13 +382,6 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                 ;
         else if (-2 == ret) {
                 switch (sense_cat) {
-                case SG_LIB_CAT_NOT_READY:
-                case SG_LIB_CAT_INVALID_OP:
-                case SG_LIB_CAT_UNIT_ATTENTION:
-                case SG_LIB_CAT_ILLEGAL_REQ:
-                case SG_LIB_CAT_ABORTED_COMMAND:
-                        ret = sense_cat;
-                        break;
                 case SG_LIB_CAT_RECOVERED:
                 case SG_LIB_CAT_NO_SENSE:
                         ret = 0;
@@ -421,7 +414,7 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                                 fprintf(stderr, "Miscompare reported\n");
                         break;
                 default:
-                        ret = -1;
+                        ret = sense_cat;
                         break;
                 }
         } else
@@ -476,121 +469,106 @@ main(int argc, char * argv[])
         int devfd = -1;
         unsigned char * wrkBuff = NULL;
         struct opts_t opts;
+        struct opts_t * op;
 
-        memset(&opts, 0, sizeof(opts));
-        res = parse_args(argc, argv, &opts);
+        op = &opts;
+        memset(op, 0, sizeof(opts));
+        res = parse_args(argc, argv, op);
         if (res != 0) {
                 fprintf(stderr, "Failed parsing args\n");
                 goto out;
         }
 
-        if (opts.verbose) {
+        if (op->verbose) {
                 fprintf(stderr, "Running COMPARE AND WRITE command with the "
-                        "following options:\n  in=%s ", opts.ifn);
-                if (opts.wfn_given)
-                        fprintf(stderr, "inw=%s ", opts.wfn);
+                        "following options:\n  in=%s ", op->ifn);
+                if (op->wfn_given)
+                        fprintf(stderr, "inw=%s ", op->wfn);
                 fprintf(stderr, "device=%s\n  lba=0x%" PRIx64
                         " num_blocks=%d xfer_len=%d timeout=%d\n",
-                        opts.device_name, opts.lba, opts.numblocks,
-                        opts.xfer_len, opts.timeout);
+                        op->device_name, op->lba, op->numblocks,
+                        op->xfer_len, op->timeout);
         }
-        ifn_stdin = ((1 == strlen(opts.ifn)) && ('-' == opts.ifn[0]));
-        infd = open_if(opts.ifn, ifn_stdin);
+        ifn_stdin = ((1 == strlen(op->ifn)) && ('-' == op->ifn[0]));
+        infd = open_if(op->ifn, ifn_stdin);
         if (infd < 0) {
                 res = -infd;
                 goto out;
         }
-        if (opts.wfn_given) {
-                if ((1 == strlen(opts.wfn)) && ('-' == opts.wfn[0])) {
+        if (op->wfn_given) {
+                if ((1 == strlen(op->wfn)) && ('-' == op->wfn[0])) {
                         fprintf(stderr, ME "don't allow stdin for write "
                                 "file\n");
                         res = SG_LIB_FILE_ERROR;
                         goto out;
                 }
-                wfd = open_if(opts.wfn, 0);
+                wfd = open_if(op->wfn, 0);
                 if (wfd < 0) {
                         res = -wfd;
                         goto out;
                 }
         }
 
-        devfd = open_dev(opts.device_name, opts.verbose);
+        devfd = open_dev(op->device_name, op->verbose);
         if (devfd < 0) {
                 res = -devfd;
                 goto out;
         }
 
-        wrkBuff = (unsigned char *)malloc(opts.xfer_len);
+        wrkBuff = (unsigned char *)malloc(op->xfer_len);
         if (0 == wrkBuff) {
                 fprintf(stderr, "Not enough user memory\n");
                 res = SG_LIB_CAT_OTHER;
                 goto out;
         }
 
-        if (opts.wfn_given) {
-                half_xlen = opts.xfer_len / 2;
+        if (op->wfn_given) {
+                half_xlen = op->xfer_len / 2;
                 res = read(infd, wrkBuff, half_xlen);
                 if (res < 0) {
-                        fprintf(stderr, "Could not read from %s", opts.ifn);
+                        fprintf(stderr, "Could not read from %s", op->ifn);
                         goto out;
                 } else if (res < half_xlen) {
                         fprintf(stderr, "Read only %d bytes (expected %d) "
-                                "from %s\n", res, half_xlen, opts.ifn);
+                                "from %s\n", res, half_xlen, op->ifn);
                         goto out;
                 }
                 res = read(wfd, wrkBuff + half_xlen, half_xlen);
                 if (res < 0) {
-                        fprintf(stderr, "Could not read from %s", opts.wfn);
+                        fprintf(stderr, "Could not read from %s", op->wfn);
                         goto out;
                 } else if (res < half_xlen) {
                         fprintf(stderr, "Read only %d bytes (expected %d) "
-                                "from %s\n", res, half_xlen, opts.wfn);
+                                "from %s\n", res, half_xlen, op->wfn);
                         goto out;
                 }
         } else {
-                res = read(infd, wrkBuff, opts.xfer_len);
+                res = read(infd, wrkBuff, op->xfer_len);
                 if (res < 0) {
-                        fprintf(stderr, "Could not read from %s", opts.ifn);
+                        fprintf(stderr, "Could not read from %s", op->ifn);
                         goto out;
-                } else if (res < opts.xfer_len) {
+                } else if (res < op->xfer_len) {
                         fprintf(stderr, "Read only %d bytes (expected %d) "
-                                "from %s\n", res, opts.xfer_len, opts.ifn);
+                                "from %s\n", res, op->xfer_len, op->ifn);
                         goto out;
                 }
         }
-        res = sg_compare_and_write(devfd, wrkBuff, opts.numblocks, opts.lba,
-                opts.xfer_len, opts.flags, !opts.quiet, opts.verbose);
+        res = sg_compare_and_write(devfd, wrkBuff, op->numblocks, op->lba,
+                op->xfer_len, op->flags, !op->quiet, op->verbose);
 
 out:
         if (0 != res) {
+                char b[80];
+
                 switch (res) {
-                case SG_LIB_CAT_ILLEGAL_REQ:
-                        fprintf(stderr, ME "SCSI COMPARE AND WRITE: "
-                                "illegal request\n");
-                        break;
-                case SG_LIB_CAT_INVALID_OP:
-                        fprintf(stderr, ME "SCSI COMPARE AND WRITE: "
-                                "invalid opcode\n");
-                        break;
-                case SG_LIB_CAT_NOT_READY:
-                        fprintf(stderr, ME "device not ready\n");
-                        break;
-                case SG_LIB_CAT_UNIT_ATTENTION:
-                        fprintf(stderr, ME "SCSI COMPARE AND WRITE unit "
-                                "attention\n");
-                        break;
-                case SG_LIB_CAT_ABORTED_COMMAND:
-                        fprintf(stderr, ME "SCSI COMPARE AND WRITE command "
-                                "aborted\n");
-                        break;
                 case SG_LIB_CAT_MEDIUM_HARD:
                 case SG_LIB_CAT_MISCOMPARE:
                 case SG_LIB_FILE_ERROR:
                         break;  /* already reported */
                 default:
-                        res = SG_LIB_CAT_OTHER;
-                        fprintf(stderr, ME "SCSI COMPARE AND WRITE failed, "
-                                "add '-vv' for more information\n");
+                        sg_get_category_sense_str(res, sizeof(b), b,
+                                                  op->verbose);
+                        fprintf(stderr, ME "SCSI COMPARE AND WRITE: %s\n", b);
                         break;
                 }
         }

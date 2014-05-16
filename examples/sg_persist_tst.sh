@@ -3,7 +3,7 @@
 # in the sg3_utils package. This script works as expected on the
 # author's Fujitsu MAM3184, Seagate ST373455 and ST9146803SS disks.
 #
-#  Version 1.7 20140508
+#  Version 1.8 20140516
 
 # N.B. make sure the device name is correct for your environment.
 
@@ -31,6 +31,8 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   case "$opt" in
     h|-help) usage ; exit 0 ;;
     s|-second) kk=${key2} ;;
+    vvv) verbose="-vvv" ;;
+    vv) verbose="-vv" ;;
     v|-verbose) verbose="-v" ;;
     *) echo "Unknown option: -$opt " ; exit 1 ;;
   esac

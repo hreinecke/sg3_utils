@@ -31,7 +31,7 @@
 
 static const char * version_str = "1.91 20140515";    /* ses3r06 */
 
-#define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
+#define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260

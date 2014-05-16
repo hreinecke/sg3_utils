@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.44 20140312";
+static const char * version_str = "0.45 20140516";
 
 #define ME "sg_xcopy: "
 
@@ -638,7 +638,8 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     unsigned char xcopyBuff[256];
     int desc_offset = 16;
     int seg_desc_len;
-    int verb;
+    int verb, res;
+    char b[80];
 
     verb = (verbose > 1) ? (verbose - 2) : 0;
     memset(xcopyBuff, 0, 256);
@@ -656,9 +657,14 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     xcopyBuff[11] = seg_desc_len; /* One segment descriptor */
     desc_offset += seg_desc_len;
     /* set noisy so if a UA happens it will be printed to stderr */
-    return sg_ll_3party_copy_out(sg_fd, SA_XCOPY_LID1, list_id,
-                                 DEF_GROUP_NUM, DEF_3PC_OUT_TIMEOUT,
-                                 xcopyBuff, desc_offset, 1, verb);
+    res = sg_ll_3party_copy_out(sg_fd, SA_XCOPY_LID1, list_id,
+                                DEF_GROUP_NUM, DEF_3PC_OUT_TIMEOUT,
+                                xcopyBuff, desc_offset, 1, verb);
+    if (res) {
+        sg_get_category_sense_str(res, sizeof(b), b, verb);
+        pr2serr("Xcopy(LID1): %s\n", b);
+    }
+    return res;
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
@@ -669,12 +675,16 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
     unsigned int ui;
     unsigned char rcBuff[RCAP16_REPLY_LEN];
     int verb;
+    char b[80];
 
     verb = (verbose ? verbose - 1: 0);
     res = sg_ll_readcap_10(xfp->sg_fd, 0, 0, rcBuff,
                            READ_CAP_REPLY_LEN, 1, verb);
-    if (0 != res)
+    if (0 != res) {
+        sg_get_category_sense_str(res, sizeof(b), b, verb);
+        pr2serr("Read capacity(10): %s\n", b);
         return res;
+    }
 
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
@@ -682,8 +692,11 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
 
         res = sg_ll_readcap_16(xfp->sg_fd, 0, 0, rcBuff,
                                RCAP16_REPLY_LEN, 1, verb);
-        if (0 != res)
+        if (0 != res) {
+            sg_get_category_sense_str(res, sizeof(b), b, verb);
+            pr2serr("Read capacity(16): %s\n", b);
             return res;
+        }
         for (k = 0, ls = 0; k < 8; ++k) {
             ls <<= 8;
             ls |= rcBuff[k];
@@ -715,6 +728,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     unsigned long num, max_target_num, max_segment_num, max_segment_len;
     unsigned long max_desc_len, max_inline_data, held_data_limit;
     int verb, valid = 0;
+    char b[80];
 
     verb = (verbose ? verbose - 1: 0);
     ftype = xfp->sg_type;
@@ -726,8 +740,11 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     }
     res = sg_ll_receive_copy_results(xfp->sg_fd, SA_COPY_OP_PARAMS, 0, rcBuff,
                                      rcBuffLen, 1, verb);
-    if (0 != res)
+    if (0 != res) {
+        sg_get_category_sense_str(res, sizeof(b), b, verb);
+        pr2serr("Xcopy operating parameters: %s\n", b);
         return -res;
+    }
 
     len = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
            rcBuff[3]) + 4;
@@ -1210,6 +1227,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
     unsigned char rcBuff[256], *ucp, *best = NULL;
     unsigned int len = 254;
     int off = -1, u, i_len, best_len = 0, assoc, desig, f_desig = 0;
+    char b[80];
 
     verb = (verbose ? verbose - 1: 0);
     memset(rcBuff, 0xff, len);
@@ -1217,9 +1235,11 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
     if (0 != res) {
         if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("Device identification VPD page not found\n");
-        else
-            pr2serr("VPD inquiry failed with %d, try again with '-vv'\n",
-                    res);
+        else {
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            pr2serr("VPD inquiry (Device ID): %s\n", b);
+            pr2serr("   try again with '-vv'\n");
+        }
         return res;
     } else if (rcBuff[1] != VPD_DEVICE_ID) {
         pr2serr("invalid VPD response\n");
@@ -1228,7 +1248,8 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
     len = ((rcBuff[2] << 8) + rcBuff[3]) + 4;
     res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, len, 1, verb);
     if (0 != res) {
-        pr2serr("VPD inquiry failed with %d\n", res);
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        pr2serr("VPD inquiry (Device ID): %s\n", b);
         return res;
     } else if (rcBuff[1] != VPD_DEVICE_ID) {
         pr2serr("invalid VPD response\n");

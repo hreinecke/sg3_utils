@@ -2,7 +2,7 @@
  * LUN ownership from one Service-Processor to this one on an EMC
  * CLARiiON and potentially other devices.
  *
- * Copyright (C) 2004 Lars Marowsky-Bree <lmb@suse.de>
+ * Copyright (C) 2004-2014 Lars Marowsky-Bree <lmb@suse.de>
  *
  * Based on sg_start.c; credits from there also apply.
  * Minor modifications for sg_lib, D. Gilbert 2004/10/19
@@ -28,7 +28,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "0.18 20130507";
+static const char * version_str = "0.19 20140516";
 
 static int debug = 0;
 
@@ -54,6 +54,7 @@ static int do_trespass(int fd, int hr, int short_cmd)
                   0xff,                 /* Trespass target */
         };
         int res;
+        char b[80];
 
         if (hr) {       /* override Trespass code + Honor reservation bit */
                 short_trespass_pg[6] = 0x01;
@@ -87,9 +88,9 @@ static int do_trespass(int fd, int hr, int short_cmd)
                 fprintf(stderr, "unit attention\n");
                 break;
         default:
-                if (debug)
-                        fprintf(stderr, "%s trespass failed\n",
-                                        short_cmd ? "short" : "long");
+                sg_get_category_sense_str(res, sizeof(b), b, debug);
+                fprintf(stderr, "%s trespass failed: %s\n",
+                        (short_cmd ? "short" : "long"), b);
                 break;
         }
         return res;

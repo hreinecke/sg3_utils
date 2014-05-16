@@ -164,7 +164,7 @@ usage_old()
 }
 
 static int
-process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c, n, err;
 
@@ -178,8 +178,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 
         switch (c) {
         case 'e':
-            ++optsp->do_eject;
-            ++optsp->do_loej;
+            ++op->do_eject;
+            ++op->do_loej;
             break;
         case 'f':
             n = sg_get_num(optarg);
@@ -188,23 +188,23 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++optsp->do_loej;
-            ++optsp->do_start;
-            optsp->do_fl = n;
+            ++op->do_loej;
+            ++op->do_start;
+            op->do_fl = n;
             break;
         case 'h':
         case '?':
-            ++optsp->do_help;
+            ++op->do_help;
             break;
         case 'i':
-            ++optsp->do_immed;
+            ++op->do_immed;
             break;
         case 'l':
-            ++optsp->do_load;
-            ++optsp->do_loej;
+            ++op->do_load;
+            ++op->do_loej;
             break;
         case 'L':
-            ++optsp->do_loej;
+            ++op->do_loej;
             break;
         case 'm':
             n = sg_get_num(optarg);
@@ -213,15 +213,15 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_mod = n;
+            op->do_mod = n;
             break;
         case 'n':
-            ++optsp->do_noflush;
+            ++op->do_noflush;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            optsp->opt_new = 0;
+            op->opt_new = 0;
             return 0;
         case 'p':
             n = sg_get_num(optarg);
@@ -230,26 +230,26 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_pc = n;
+            op->do_pc = n;
             break;
         case 'r':
-            ++optsp->do_readonly;
+            ++op->do_readonly;
             break;
         case 's':
-            ++optsp->do_start;
+            ++op->do_start;
             break;
         case 'S':
-            ++optsp->do_stop;
+            ++op->do_stop;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->do_verbose;
             break;
         case 'V':
-            ++optsp->do_version;
+            ++op->do_version;
             break;
         default:
             fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
-            if (optsp->do_help)
+            if (op->do_help)
                 break;
             usage();
             return SG_LIB_SYNTAX_ERROR;
@@ -259,15 +259,15 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     for (; optind < argc; ++optind) {
         if (1 == strlen(argv[optind])) {
             if (0 == strcmp("0", argv[optind])) {
-                ++optsp->do_stop;
+                ++op->do_stop;
                 continue;
             } else if (0 == strcmp("1", argv[optind])) {
-                ++optsp->do_start;
+                ++op->do_start;
                 continue;
             }
         }
-        if (NULL == optsp->device_name)
-            optsp->device_name = argv[optind];
+        if (NULL == op->device_name)
+            op->device_name = argv[optind];
         else {
             fprintf(stderr, "Unexpected extra argument: %s\n", argv[optind]);
             ++err;
@@ -281,7 +281,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static int
-process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     int ambigu = 0;
@@ -300,25 +300,25 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 switch (*cp) {
                 case 'i':
                     if ('\0' == *(cp + 1))
-                        optsp->do_immed = 1;
+                        op->do_immed = 1;
                     else
                         jmp_out = 1;
                     break;
                 case 'r':
-                    ++optsp->do_readonly;
+                    ++op->do_readonly;
                     break;
                 case 'v':
-                    ++optsp->do_verbose;
+                    ++op->do_verbose;
                     break;
                 case 'V':
-                    ++optsp->do_version;
+                    ++op->do_version;
                     break;
                 case 'h':
                 case '?':
-                    ++optsp->do_help;
+                    ++op->do_help;
                     break;
                 case 'N':
-                    optsp->opt_new = 1;
+                    op->opt_new = 1;
                     return 0;
                 case 'O':
                     break;
@@ -338,7 +338,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 continue;
 
             if (0 == strncmp(cp, "eject", 5)) {
-                optsp->do_loej = 1;
+                op->do_loej = 1;
                 if (startstop == 1)
                     ambigu = 1;
                 else
@@ -351,8 +351,8 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 startstop = 1;
-                optsp->do_loej = 1;
-                optsp->do_fl = u;
+                op->do_loej = 1;
+                op->do_fl = u;
             } else if (0 == strncmp("imm=", cp, 4)) {
                 num = sscanf(cp + 4, "%x", &u);
                 if ((1 != num) || (u > 1)) {
@@ -360,15 +360,15 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_immed = u;
+                op->do_immed = u;
             } else if (0 == strncmp(cp, "load", 4)) {
-                optsp->do_loej = 1;
+                op->do_loej = 1;
                 if (startstop == 0)
                     ambigu = 1;
                 else
                     startstop = 1;
             } else if (0 == strncmp(cp, "loej", 4))
-                optsp->do_loej = 1;
+                op->do_loej = 1;
             else if (0 == strncmp("pc=", cp, 3)) {
                 num = sscanf(cp + 3, "%x", &u);
                 if ((1 != num) || (u > 15)) {
@@ -376,7 +376,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_pc = u;
+                op->do_pc = u;
             } else if (0 == strncmp("mod=", cp, 4)) {
                 num = sscanf(cp + 3, "%x", &u);
                 if (1 != num) {
@@ -384,9 +384,9 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_mod = u;
+                op->do_mod = u;
             } else if (0 == strncmp(cp, "noflush", 7)) {
-                optsp->do_noflush = 1;
+                op->do_noflush = 1;
             } else if (0 == strncmp(cp, "start", 5)) {
                 if (startstop == 0)
                     ambigu = 1;
@@ -414,11 +414,11 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 ambigu = 1;
             else
                 startstop = 1;
-        } else if (0 == optsp->device_name)
-                optsp->device_name = cp;
+        } else if (0 == op->device_name)
+                op->device_name = cp;
         else {
             fprintf(stderr, "too many arguments, got: %s, not "
-                    "expecting: %s\n", optsp->device_name, cp);
+                    "expecting: %s\n", op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -428,30 +428,30 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         } else if (0 == startstop)
-            ++optsp->do_stop;
+            ++op->do_stop;
         else if (1 == startstop)
-            ++optsp->do_start;
+            ++op->do_start;
     }
     return 0;
 }
 
 static int
-process_cl(struct opts_t * optsp, int argc, char * argv[])
+process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = 0;
-        res = process_cl_old(optsp, argc, argv);
-        if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+        op->opt_new = 0;
+        res = process_cl_old(op, argc, argv);
+        if ((0 == res) && op->opt_new)
+            res = process_cl_new(op, argc, argv);
     } else {
-        optsp->opt_new = 1;
-        res = process_cl_new(optsp, argc, argv);
-        if ((0 == res) && (0 == optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+        op->opt_new = 1;
+        res = process_cl_new(op, argc, argv);
+        if ((0 == res) && (0 == op->opt_new))
+            res = process_cl_old(op, argc, argv);
     }
     return res;
 }
@@ -463,99 +463,95 @@ main(int argc, char * argv[])
     int fd, res;
     int ret = 0;
     struct opts_t opts;
+    struct opts_t * op;
 
-    memset(&opts, 0, sizeof(opts));
-    opts.do_fl = -1;    /* only when >= 0 set FL bit */
-    res = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->do_fl = -1;    /* only when >= 0 set FL bit */
+    res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_help) {
-        if (opts.opt_new)
+    if (op->do_help) {
+        if (op->opt_new)
             usage();
         else
             usage_old();
         return 0;
     }
-    if (opts.do_version) {
+    if (op->do_version) {
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
 
-    if (opts.do_start && opts.do_stop) {
+    if (op->do_start && op->do_stop) {
         fprintf(stderr, "Ambiguous to give both '--start' and '--stop'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_load && opts.do_eject) {
+    if (op->do_load && op->do_eject) {
         fprintf(stderr, "Ambiguous to give both '--load' and '--eject'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_load)
-       opts.do_start = 1;
-    else if ((opts.do_eject) || (opts.do_stop))
-       opts.do_start = 0;
-    else if (opts.opt_new && opts.do_loej && (0 == opts.do_start))
-        opts.do_start = 1;      /* --loej alone in new interface is load */
-    else if ((0 == opts.do_loej) && (-1 == opts.do_fl) && (0 == opts.do_pc))
-       opts.do_start = 1;
+    if (op->do_load)
+       op->do_start = 1;
+    else if ((op->do_eject) || (op->do_stop))
+       op->do_start = 0;
+    else if (op->opt_new && op->do_loej && (0 == op->do_start))
+        op->do_start = 1;      /* --loej alone in new interface is load */
+    else if ((0 == op->do_loej) && (-1 == op->do_fl) && (0 == op->do_pc))
+       op->do_start = 1;
     /* default action is to start when no other active options */
 
-    if (0 == opts.device_name) {
+    if (0 == op->device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
-        if (opts.opt_new)
+        if (op->opt_new)
             usage();
         else
             usage_old();
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (opts.do_fl >= 0) {
-        if (opts.do_start == 0) {
+    if (op->do_fl >= 0) {
+        if (op->do_start == 0) {
             fprintf(stderr, "Giving '--fl=FL' with '--stop' (or "
                     "'--eject') is invalid\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (opts.do_pc > 0) {
+        if (op->do_pc > 0) {
             fprintf(stderr, "Giving '--fl=FL' with '--pc=PC' "
                     "when PC is non-zero is invalid\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
-    fd = sg_cmds_open_device(opts.device_name,  opts.do_readonly /* rw */,
-                             opts.do_verbose);
+    fd = sg_cmds_open_device(op->device_name, op->do_readonly,
+                             op->do_verbose);
     if (fd < 0) {
         fprintf(stderr, "Error trying to open %s: %s\n",
-                opts.device_name, safe_strerror(-fd));
+                op->device_name, safe_strerror(-fd));
         return SG_LIB_FILE_ERROR;
     }
 
     res = 0;
-    if (opts.do_fl >= 0)
-        res = sg_ll_start_stop_unit(fd, opts.do_immed, opts.do_fl, 0 /* pc */,
+    if (op->do_fl >= 0)
+        res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_fl, 0 /* pc */,
                                     1 /* fl */, 1 /* loej */,
                                     1 /*start */, 1 /* noisy */,
-                                    opts.do_verbose);
-    else if (opts.do_pc > 0)
-        res = sg_ll_start_stop_unit(fd, opts.do_immed, opts.do_mod,
-                                    opts.do_pc, opts.do_noflush, 0, 0, 1,
-                                    opts.do_verbose);
+                                    op->do_verbose);
+    else if (op->do_pc > 0)
+        res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_mod,
+                                    op->do_pc, op->do_noflush, 0, 0, 1,
+                                    op->do_verbose);
     else
-        res = sg_ll_start_stop_unit(fd, opts.do_immed, 0, 0, opts.do_noflush,
-                                    opts.do_loej, opts.do_start, 1,
-                                    opts.do_verbose);
+        res = sg_ll_start_stop_unit(fd, op->do_immed, 0, 0, op->do_noflush,
+                                    op->do_loej, op->do_start, 1,
+                                    op->do_verbose);
     ret = res;
     if (res) {
-        if (opts.do_verbose < 2) {
-            if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "command not supported\n");
-            else if (SG_LIB_CAT_NOT_READY == res)
-                fprintf(stderr, "device not ready\n");
-            else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                fprintf(stderr, "unit attention\n");
-            else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                fprintf(stderr, "aborted command\n");
-            else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "invalid field in cdb\n");
+        if (op->do_verbose < 2) {
+            char b[80];
+
+            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            fprintf(stderr, "%s\n", b);
         }
         fprintf(stderr, "START STOP UNIT command failed\n");
     }
