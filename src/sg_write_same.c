@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2013 Douglas Gilbert.
+ * Copyright (c) 2009-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.05 20131201";
+static const char * version_str = "1.06 20140516";
 
 
 #define ME "sg_write_same: "
@@ -273,13 +273,6 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
@@ -298,7 +291,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
             ret = sense_cat;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -321,16 +314,19 @@ main(int argc, char * argv[])
     uint32_t block_size;
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
+    char b[80];
     unsigned char resp_buff[RCAP16_RESP_LEN];
     unsigned char * wBuff = NULL;
     int ret = -1;
     struct opts_t opts;
+    struct opts_t * op;
     struct stat a_stat;
 
-    memset(&opts, 0, sizeof(opts));
-    opts.numblocks = DEF_WS_NUMBLOCKS;
-    opts.pref_cdb_size = DEF_WS_CDB_SIZE;
-    opts.timeout = DEF_TIMEOUT_SECS;
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->numblocks = DEF_WS_NUMBLOCKS;
+    op->pref_cdb_size = DEF_WS_CDB_SIZE;
+    op->timeout = DEF_TIMEOUT_SECS;
     vb = 0;
     while (1) {
         int option_index = 0;
@@ -342,11 +338,11 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'a':
-            ++opts.anchor;
+            ++op->anchor;
             break;
         case 'g':
-            opts.grpnum = sg_get_num(optarg);
-            if ((opts.grpnum < 0) || (opts.grpnum > 31))  {
+            op->grpnum = sg_get_num(optarg);
+            if ((op->grpnum < 0) || (op->grpnum > 31))  {
                 fprintf(stderr, "bad argument to '--grpnum'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -356,7 +352,7 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'i':
-            strncpy(opts.ifilename, optarg, sizeof(opts.ifilename));
+            strncpy(op->ifilename, optarg, sizeof(op->ifilename));
             if_given = 1;
             break;
         case 'l':
@@ -365,71 +361,71 @@ main(int argc, char * argv[])
                 fprintf(stderr, "bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            opts.lba = (uint64_t)ll;
+            op->lba = (uint64_t)ll;
             lba_given = 1;
             break;
         case 'L':
-            ++opts.lbdata;
+            ++op->lbdata;
             break;
         case 'n':
-            opts.numblocks = sg_get_num(optarg);
-            if (opts.numblocks < 0)  {
+            op->numblocks = sg_get_num(optarg);
+            if (op->numblocks < 0)  {
                 fprintf(stderr, "bad argument to '--num'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             num_given = 1;
             break;
         case 'N':
-            ++opts.ndob;
+            ++op->ndob;
             break;
         case 'P':
-            ++opts.pbdata;
+            ++op->pbdata;
             break;
         case 'R':
-            ++opts.want_ws10;
+            ++op->want_ws10;
             break;
         case 'S':
-            if (DEF_WS_CDB_SIZE != opts.pref_cdb_size) {
+            if (DEF_WS_CDB_SIZE != op->pref_cdb_size) {
                 fprintf(stderr, "only one '--10', '--16' or '--32' "
                         "please\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            opts.pref_cdb_size = 16;
+            op->pref_cdb_size = 16;
             break;
         case 't':
-            opts.timeout = sg_get_num(optarg);
-            if (opts.timeout < 0)  {
+            op->timeout = sg_get_num(optarg);
+            if (op->timeout < 0)  {
                 fprintf(stderr, "bad argument to '--timeout'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'T':
-            if (DEF_WS_CDB_SIZE != opts.pref_cdb_size) {
+            if (DEF_WS_CDB_SIZE != op->pref_cdb_size) {
                 fprintf(stderr, "only one '--10', '--16' or '--32' "
                         "please\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            opts.pref_cdb_size = 32;
+            op->pref_cdb_size = 32;
             break;
         case 'U':
-            ++opts.unmap;
+            ++op->unmap;
             break;
         case 'v':
-            ++opts.verbose;
+            ++op->verbose;
             break;
         case 'V':
             fprintf(stderr, ME "version: %s\n", version_str);
             return 0;
         case 'w':
-            opts.wrprotect = sg_get_num(optarg);
-            if ((opts.wrprotect < 0) || (opts.wrprotect > 7))  {
+            op->wrprotect = sg_get_num(optarg);
+            if ((op->wrprotect < 0) || (op->wrprotect > 7))  {
                 fprintf(stderr, "bad argument to '--wrprotect'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'x':
-            opts.xfer_len = sg_get_num(optarg);
-            if (opts.xfer_len < 0) {
+            op->xfer_len = sg_get_num(optarg);
+            if (op->xfer_len < 0) {
                 fprintf(stderr, "bad argument to '--xferlen'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -453,7 +449,7 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if (opts.want_ws10 && (DEF_WS_CDB_SIZE != opts.pref_cdb_size)) {
+    if (op->want_ws10 && (DEF_WS_CDB_SIZE != op->pref_cdb_size)) {
         fprintf(stderr, "only one '--10', '--16' or '--32' please\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -462,7 +458,7 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    vb = opts.verbose;
+    vb = op->verbose;
 
     if ((! if_given) && (! lba_given) && (! num_given)) {
         fprintf(stderr, "As a precaution require one of '--in=', '--lba=' "
@@ -470,28 +466,28 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (opts.ndob) {
+    if (op->ndob) {
         if (if_given) {
             fprintf(stderr, "Can't have both --ndob and '--in='\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (0 != opts.xfer_len) {
+        if (0 != op->xfer_len) {
             fprintf(stderr, "With --ndob only '--xferlen=0' (or not given) "
                     "is acceptable\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-    } else if (opts.ifilename[0]) {
-        got_stdin = (0 == strcmp(opts.ifilename, "-")) ? 1 : 0;
+    } else if (op->ifilename[0]) {
+        got_stdin = (0 == strcmp(op->ifilename, "-")) ? 1 : 0;
         if (! got_stdin) {
             memset(&a_stat, 0, sizeof(a_stat));
-            if (stat(opts.ifilename, &a_stat) < 0) {
+            if (stat(op->ifilename, &a_stat) < 0) {
                 if (vb)
                     fprintf(stderr, "unable to stat(%s): %s\n",
-                            opts.ifilename, safe_strerror(errno));
+                            op->ifilename, safe_strerror(errno));
                 return SG_LIB_FILE_ERROR;
             }
-            if (opts.xfer_len <= 0)
-                opts.xfer_len = (int)a_stat.st_size;
+            if (op->xfer_len <= 0)
+                op->xfer_len = (int)a_stat.st_size;
         }
     }
 
@@ -502,9 +498,9 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    if (! opts.ndob) {
+    if (! op->ndob) {
         prot_en = 0;
-        if (0 == opts.xfer_len) {
+        if (0 == op->xfer_len) {
             res = sg_ll_readcap_16(sg_fd, 0 /* pmi */, 0 /* llba */, resp_buff,
                                    RCAP16_RESP_LEN, 1, (vb ? (vb - 1): 0));
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
@@ -521,9 +517,9 @@ main(int argc, char * argv[])
                               (resp_buff[10] << 8) |
                               resp_buff[11]);
                 prot_en = !!(resp_buff[12] & 0x1);
-                opts.xfer_len = block_size;
-                if (prot_en && (opts.wrprotect > 0))
-                    opts.xfer_len += 8;
+                op->xfer_len = block_size;
+                if (prot_en && (op->wrprotect > 0))
+                    op->xfer_len += 8;
             } else if ((SG_LIB_CAT_INVALID_OP == res) ||
                        (SG_LIB_CAT_ILLEGAL_REQ == res)) {
                 if (vb)
@@ -540,61 +536,65 @@ main(int argc, char * argv[])
                                   (resp_buff[5] << 16) |
                                   (resp_buff[6] << 8) |
                                   resp_buff[7]);
-                    opts.xfer_len = block_size;
-                } else
-                    fprintf(stderr, "Read capacity(10) failed. Unable to "
-                            "calculate block size\n");
-            } else if (vb)
-                fprintf(stderr, "Read capacity(16) failed. Unable to "
-                        "calculate block size\n");
+                    op->xfer_len = block_size;
+                } else {
+                    sg_get_category_sense_str(res, sizeof(b), b, vb);
+                    fprintf(stderr, "Read capacity(10): %s\n", b);
+                    fprintf(stderr, "Unable to calculate block size\n");
+                }
+            } else if (vb) {
+                sg_get_category_sense_str(res, sizeof(b), b, vb);
+                fprintf(stderr, "Read capacity(16): %s\n", b);
+                fprintf(stderr, "Unable to calculate block size\n");
+            }
         }
-        if (opts.xfer_len < 1) {
+        if (op->xfer_len < 1) {
             fprintf(stderr, "unable to deduce block size, please give "
                     "'--xferlen=' argument\n");
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        if (opts.xfer_len > MAX_XFER_LEN) {
+        if (op->xfer_len > MAX_XFER_LEN) {
             fprintf(stderr, "'--xferlen=%d is out of range ( want <= %d)\n",
-                    opts.xfer_len, MAX_XFER_LEN);
+                    op->xfer_len, MAX_XFER_LEN);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        wBuff = (unsigned char*)calloc(opts.xfer_len, 1);
+        wBuff = (unsigned char*)calloc(op->xfer_len, 1);
         if (NULL == wBuff) {
             fprintf(stderr, "unable to allocate %d bytes of memory with "
-                    "calloc()\n", opts.xfer_len);
+                    "calloc()\n", op->xfer_len);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        if (opts.ifilename[0]) {
+        if (op->ifilename[0]) {
             if (got_stdin) {
                 infd = STDIN_FILENO;
                 if (sg_set_binary_mode(STDIN_FILENO) < 0)
                     perror("sg_set_binary_mode");
             } else {
-                if ((infd = open(opts.ifilename, O_RDONLY)) < 0) {
+                if ((infd = open(op->ifilename, O_RDONLY)) < 0) {
                     snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
-                             "reading", opts.ifilename);
+                             "reading", op->ifilename);
                     perror(ebuff);
                     ret = SG_LIB_FILE_ERROR;
                     goto err_out;
                 } else if (sg_set_binary_mode(infd) < 0)
                     perror("sg_set_binary_mode");
             }
-            res = read(infd, wBuff, opts.xfer_len);
+            res = read(infd, wBuff, op->xfer_len);
             if (res < 0) {
                 snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
-                         opts.ifilename);
+                         op->ifilename);
                 perror(ebuff);
                 if (! got_stdin)
                     close(infd);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
-            if (res < opts.xfer_len) {
+            if (res < op->xfer_len) {
                 fprintf(stderr, "tried to read %d bytes from %s, got %d "
-                        "bytes\n", opts.xfer_len, opts.ifilename, res);
+                        "bytes\n", op->xfer_len, op->ifilename, res);
                 fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
             }
             if (! got_stdin)
@@ -602,10 +602,10 @@ main(int argc, char * argv[])
         } else {
             if (vb)
                 fprintf(stderr, "Default data-out buffer set to %d zeros\n",
-                        opts.xfer_len);
-            if (prot_en && (opts.wrprotect > 0)) {
+                        op->xfer_len);
+            if (prot_en && (op->wrprotect > 0)) {
                /* default for protection is 0xff, rest get 0x0 */
-                memset(wBuff + opts.xfer_len - 8, 0xff, 8);
+                memset(wBuff + op->xfer_len - 8, 0xff, 8);
                 if (vb)
                     fprintf(stderr, " ... apart from last 8 bytes which are "
                             "set to 0xff\n");
@@ -613,35 +613,10 @@ main(int argc, char * argv[])
         }
     }
 
-    ret = do_write_same(sg_fd, &opts, wBuff, &act_cdb_len);
+    ret = do_write_same(sg_fd, op, wBuff, &act_cdb_len);
     if (ret) {
-        switch (ret) {
-        case SG_LIB_CAT_NOT_READY:
-            fprintf(stderr, "Write same(%d) failed, device not ready\n",
-                    act_cdb_len);
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            fprintf(stderr, "Write same(%d), unit attention\n", act_cdb_len);
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            fprintf(stderr, "Write same(%d), aborted command\n", act_cdb_len);
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            fprintf(stderr, "Write same(%d) command not supported\n",
-                    act_cdb_len);
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            fprintf(stderr, "bad field in Write same(%d) cdb, option "
-                    "probably not supported\n", act_cdb_len);
-            break;
-        case SG_LIB_CAT_MEDIUM_HARD:
-            fprintf(stderr, "Write same(%d) command reported medium or "
-                    "hardware error\n", act_cdb_len);
-            break;
-        default:
-            fprintf(stderr, "Write same(%d) command failed\n", act_cdb_len);
-            break;
-        }
+        sg_get_category_sense_str(ret, sizeof(b), b, vb);
+        fprintf(stderr, "Write same(%d): %s\n", act_cdb_len, b);
     }
 
 err_out:

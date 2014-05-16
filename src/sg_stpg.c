@@ -423,6 +423,7 @@ main(int argc, char * argv[])
     int port_arr[MAX_PORT_LIST_ARR_LEN];
     int port_arr_len = 0;
     int state_arr[MAX_PORT_LIST_ARR_LEN];
+    char b[80];
     int state_arr_len = 0;
     int portgroup = -1;
     int relport = -1;
@@ -641,18 +642,9 @@ main(int argc, char * argv[])
                 tgtStatePtr++;
                 off = 8 + tgt_port_count * 4;
             }
-        } else if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Report Target Port Groups command not "
-                    "supported\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Report Target Port Groups cdb "
-                    "including unsupported service action\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            fprintf(stderr, "Report Target Port Groups, unit attention\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "Report Target Port Groups, aborted command\n");
-        else {
-            fprintf(stderr, "Report Target Port Groups command failed\n");
+        } else {
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "Report Target Port Groups: %s\n", b);
             if (0 == verbose)
                 fprintf(stderr, "    try '-v' for more information\n");
         }
@@ -684,17 +676,9 @@ main(int argc, char * argv[])
 
     if (0 == res)
         goto err_out;
-    else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Set Target Port Groups command not supported\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "bad field in Report Target Port Groups cdb "
-                "including unsupported service action\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Set Target Port Groups, unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Set Target Port Groups, aborted command\n");
     else {
-        fprintf(stderr, "Set Target Port Groups command failed\n");
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Set Target Port Groups: %s\n", b);
         if (0 == verbose)
             fprintf(stderr, "    try '-v' for more information\n");
     }

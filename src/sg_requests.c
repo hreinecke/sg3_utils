@@ -25,7 +25,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.25 20140514";
+static const char * version_str = "1.25 20140515";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -114,12 +114,12 @@ main(int argc, char * argv[])
     int do_progress = 0;
     int do_raw = 0;
     int do_status = 0;
-    int do_time = 0;
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
     char b[80];
 #ifndef SG_LIB_MINGW
+    int do_time = 0;
     struct timeval start_tm, end_tm;
 #endif
 
@@ -167,7 +167,9 @@ main(int argc, char * argv[])
             do_status = 1;
             break;
         case 't':
+#ifndef SG_LIB_MINGW
             do_time = 1;
+#endif
             break;
         case 'v':
             ++verbose;

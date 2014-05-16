@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2013 Douglas Gilbert.
+ * Copyright (c) 2005-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.11 20130603";
+static const char * version_str = "1.12 20140516";
 
 #define ME "sg_ident: "
 
@@ -110,6 +110,7 @@ int main(int argc, char * argv[])
 {
     int sg_fd, res, c, ii_len;
     unsigned char rdi_buff[REPORT_ID_INFO_SANITY_LEN + 4];
+    char b[80];
     unsigned char * ucp = NULL;
     int ascii = 0;
     int do_clear = 0;
@@ -229,27 +230,10 @@ int main(int argc, char * argv[])
             res = sg_ll_set_id_info(sg_fd, itype, rdi_buff, 0, 1, verbose);
         if (res) {
             ret = res;
-            if (SG_LIB_CAT_NOT_READY == res)
-                fprintf(stderr, "Set identifying information command, device "
-                        "not ready\n");
-            else if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "Set identifying information command not "
-                        "supported\n");
-            else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                fprintf(stderr, "Set identifying information, unit "
-                        "attention\n");
-            else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                fprintf(stderr, "Set identifying information, aborted "
-                        "command\n");
-            else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "bad field in Set identifying information "
-                        "cdb including unsupported service action\n");
-            else {
-                fprintf(stderr, "Set identifying information command "
-                        "failed\n");
-                if (0 == verbose)
-                    fprintf(stderr, "    try '-v' for more information\n");
-            }
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "Set identifying information: %s\n", b);
+            if (0 == verbose)
+                fprintf(stderr, "    try '-v' for more information\n");
         }
     } else {    /* do report identifying information */
         res = sg_ll_report_id_info(sg_fd, itype, rdi_buff, 4, 1, verbose);
@@ -283,29 +267,10 @@ int main(int argc, char * argv[])
         } else
             ret = res;
         if (ret) {
-            if (SG_LIB_CAT_NOT_READY == ret)
-                fprintf(stderr, "Report identifying information command, "
-                        "device not ready\n");
-            else if (SG_LIB_CAT_UNIT_ATTENTION == ret)
-                fprintf(stderr, "Report identifying information, unit "
-                        "attention\n");
-            else if (SG_LIB_CAT_ABORTED_COMMAND == ret)
-                fprintf(stderr, "Report identifying information, aborted "
-                        "command\n");
-            else if (SG_LIB_CAT_INVALID_OP == ret)
-                fprintf(stderr, "Report identifying information command "
-                        "not supported\n");
-            else if (SG_LIB_CAT_ILLEGAL_REQ == ret)
-                fprintf(stderr, "bad field in Report identifying "
-                        "information cdb including unsupported service "
-                        "action\n");
-            else {
-                fprintf(stderr, "Report identifying information command "
-                        "failed\n");
-                if (0 == verbose)
-                    fprintf(stderr, "    try '-v' for more "
-                            "information\n");
-            }
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "Report identifying information: %s\n", b);
+            if (0 == verbose)
+                fprintf(stderr, "    try '-v' for more information\n");
         }
     }
 

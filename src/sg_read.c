@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2013 D. Gilbert
+*  Copyright (C) 2001 - 2014 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -48,7 +48,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.20 20131014";
+static const char * version_str = "1.21 20140516";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -351,11 +351,11 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
     if (verbose > 2)
         fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     switch (sg_err_category3(&io_hdr)) {
+    case SG_LIB_CAT_CLEAN:
+        break;
     case SG_LIB_CAT_RECOVERED:
         if (verbose > 1)
                 sg_chk_n_print3("reading, continue", &io_hdr, 1);
-        /* fall through */
-    case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_UNIT_ATTENTION:
         if (verbose)

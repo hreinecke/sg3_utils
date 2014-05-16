@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2013 Douglas Gilbert.
+ * Copyright (c) 2006-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,7 +21,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.03 20130507";
+static const char * version_str = "1.04 20140515";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -266,8 +266,18 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                             "hardware error\n", cdb_len);
                 return SG_LIB_CAT_MEDIUM_HARD;
             case SPC_SK_ABORTED_COMMAND:
-                fprintf(stderr, "Aborted command\n");
-                return SG_LIB_CAT_ABORTED_COMMAND;
+                if (0x10 == ssh.asc) {
+                    fprintf(stderr, "Aborted command: protection "
+                            "information\n");
+                    return SG_LIB_CAT_PROTECTION;
+                } else {
+                    fprintf(stderr, "Aborted command\n");
+                    return SG_LIB_CAT_ABORTED_COMMAND;
+                }
+            case SPC_SK_DATA_PROTECT:
+                fprintf(stderr, "ATA PASS-THROUGH (%d): data protect, read "
+                            "only media?\n", cdb_len);
+                return SG_LIB_CAT_DATA_PROTECT;
             default:
                 if (verbose < 2)
                     fprintf(stderr, "ATA PASS-THROUGH (%d), some sense "
@@ -284,8 +294,13 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
-        fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
-        return SG_LIB_CAT_MALFORMED;
+        if (SAM_STAT_RESERVATION_CONFLICT == res) {
+            fprintf(stderr, "SCSI status: RESERVATION CONFLICT\n");
+            return SG_LIB_CAT_RES_CONFLICT;
+        } else {
+            fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
+            return SG_LIB_CAT_MALFORMED;
+        }
     } else {
         fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
         if (verbose < 2)

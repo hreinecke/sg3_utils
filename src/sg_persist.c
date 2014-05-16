@@ -380,6 +380,8 @@ prin_work(int sg_fd, const struct opts_t * op)
     if (PRIN_RCAP_SA == op->prin_sa) {
         if (8 != pr_buff[1]) {
             pr2serr("Unexpected response for PRIN Report Capabilities\n");
+            if (op->hex)
+                dStrHex((const char *)pr_buff, pr_buff[1], 1);
             return SG_LIB_CAT_MALFORMED;
         }
         if (op->hex)
@@ -420,16 +422,22 @@ prin_work(int sg_fd, const struct opts_t * op)
         add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) |
                    (pr_buff[6] << 8) | pr_buff[7]);
         if (op->hex) {
-            printf("  PR generation=0x%x, ", pr_gen);
-            if (add_len <= 0)
-                printf("Additional length=%d\n", add_len);
-            if (add_len > ((int)sizeof(pr_buff) - 8)) {
-                printf("Additional length too large=%d, truncate\n",
-                       add_len);
-                dStrHex((const char *)(pr_buff + 8), sizeof(pr_buff) - 8, 1);
-            } else {
-                printf("Additional length=%d\n", add_len);
-                dStrHex((const char *)(pr_buff + 8), add_len, 1);
+            if (op->hex > 1)
+                dStrHex((const char *)pr_buff, add_len + 8,
+                        ((2 == op->hex) ? 1 : -1));
+            else {
+                printf("  PR generation=0x%x, ", pr_gen);
+                if (add_len <= 0)
+                    printf("Additional length=%d\n", add_len);
+                if (add_len > ((int)sizeof(pr_buff) - 8)) {
+                    printf("Additional length too large=%d, truncate\n",
+                           add_len);
+                    dStrHex((const char *)(pr_buff + 8), sizeof(pr_buff) - 8,
+                            1);
+                } else {
+                    printf("Additional length=%d\n", add_len);
+                    dStrHex((const char *)(pr_buff + 8), add_len, 1);
+                }
             }
         } else if (PRIN_RKEY_SA == op->prin_sa) {
             printf("  PR generation=0x%x, ", pr_gen);

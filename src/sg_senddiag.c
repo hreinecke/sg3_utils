@@ -24,7 +24,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.40 20140110";
+static const char * version_str = "0.41 20140517";
 
 #define ME "sg_senddiag: "
 
@@ -369,21 +369,12 @@ static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
     else
         res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, 1 /* dbd */, 0, 0xa, 0,
                                  resp, mx_resp_len, noisy, verbose);
-    if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Mode sense (%s) command not supported\n",
-                (mode6 ? "6" : "10"));
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "bad field in Mode sense (%s) command\n",
-                (mode6 ? "6" : "10"));
-    else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "Mode sense (%s) failed, device not ready\n",
-                (mode6 ? "6" : "10"));
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Mode sense (%s) failed, unit attention\n",
-                (mode6 ? "6" : "10"));
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Mode sense (%s) failed, aborted command\n",
-                (mode6 ? "6" : "10"));
+    if (res) {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Mode sense (%s): %s\n", (mode6 ? "6" : "10"), b);
+    }
     return res;
 }
 

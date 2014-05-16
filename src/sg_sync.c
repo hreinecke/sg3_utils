@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.10 20130516";
+static const char * version_str = "1.11 20140516";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -132,19 +132,12 @@ ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -266,20 +259,12 @@ int main(int argc, char * argv[])
         res = sg_ll_sync_cache_10(sg_fd, sync_nv, immed, group,
                                   (unsigned int)lba, num_lb, 1, verbose);
     ret = res;
-    if (0 == res)
-        ;
-    else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "Synchronize cache failed, device not ready\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Synchronize cache, unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Synchronize cache, aborted command\n");
-    else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Synchronize cache command not supported\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "bad field in Synchronize cache command\n");
-    else
-        fprintf(stderr, "Synchronize cache failed\n");
+    if (res) {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Synchronize cache failed: %s\n", b);
+    }
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

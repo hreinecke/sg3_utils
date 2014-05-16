@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.25 20140428";
+static const char * version_str = "1.26 20140516";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -187,6 +187,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
         const char INIT_PATTERN_DESC_SZ = 4;
         unsigned char fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
         unsigned char reqSense[MAX_BUFF_SZ];
+        char b[80];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
         longlist = (pie > 0);
@@ -215,31 +216,11 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                 cmplst, 0 /* DEFECT_LIST_FORMAT */,
                                 (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
                                 fmt_pl, fmt_pl_sz, 1, verbose);
-        switch (res) {
-        case 0:
-                break;
-        case SG_LIB_CAT_NOT_READY:
-                fprintf(stderr, "Format command, device not ready\n");
-                break;
-        case SG_LIB_CAT_INVALID_OP:
-                fprintf(stderr, "Format command not supported\n");
-                break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-                fprintf(stderr, "Format command, illegal parameter\n");
-                break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-                fprintf(stderr, "Format command, unit attention\n");
-                break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-                fprintf(stderr, "Format command, aborted command\n");
-                break;
-        default:
-                fprintf(stderr, "Format command failed\n");
-                break;
-        }
-        if (res)
+        if (res) {
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "Format command: %s\n", b);
                 return res;
-
+        }
         if (! immed)
                 return 0;
 
@@ -306,19 +287,8 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                       1, verbose);
             if (res) {
                 ret = res;
-                if (SG_LIB_CAT_INVALID_OP == res)
-                    fprintf(stderr, "Request Sense command not supported\n");
-                else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                    fprintf(stderr, "bad field in Request Sense cdb\n");
-                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                    fprintf(stderr, "Request Sense, aborted command\n");
-                else {
-                    fprintf(stderr, "Request Sense command unexpectedly "
-                            "failed\n");
-                    if (0 == verbose)
-                        fprintf(stderr, "    try the '-v' option for "
-                                "more information\n");
-                }
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "Request Sense command: %s\n", b);
                 break;
             }
             /* "Additional sense length" same in descriptor and fixed */
@@ -358,6 +328,7 @@ print_read_cap(int fd, int do_16, int verbose)
         unsigned char resp_buff[RCAP_REPLY_LEN];
         unsigned int last_blk_addr, block_size;
         uint64_t llast_blk_addr;
+        char b[80];
 
         if (do_16) {
                 res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
@@ -417,18 +388,8 @@ print_read_cap(int fd, int do_16, int verbose)
                         return (int)block_size;
                 }
         }
-        if (SG_LIB_CAT_NOT_READY == res)
-                fprintf(stderr, "READ CAPACITY (%d): device not ready\n",
-                        (do_16 ? 16 : 10));
-        else if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "READ CAPACITY (%d) not supported\n",
-                        (do_16 ? 16 : 10));
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "bad field in READ CAPACITY (%d) "
-                        "cdb\n", (do_16 ? 16 : 10));
-        else if (verbose)
-                fprintf(stderr, "READ CAPACITY (%d) failed "
-                        "[res=%d]\n", (do_16 ? 16 : 10), res);
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "READ CAPACITY (%d): %s\n", (do_16 ? 16 : 10), b);
         return -1;
 }
 
@@ -462,6 +423,7 @@ main(int argc, char **argv)
         int early = 0;
         const char * device_name = NULL;
         char pdt_name[64];
+        char b[80];
         struct sg_simple_inquiry_resp inq_out;
         int ret = 0;
 
@@ -679,22 +641,7 @@ again_with_long_lba:
                                          MAX_BUFF_SZ, 1, verbose);
         ret = res;
         if (res) {
-                if (SG_LIB_CAT_NOT_READY == res)
-                        fprintf(stderr, "MODE SENSE (%d) command, device "
-                                "not ready\n", (mode6 ? 6 : 10));
-                else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                        fprintf(stderr, "MODE SENSE (%d) command, unit "
-                                "attention\n", (mode6 ? 6 : 10));
-                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                        fprintf(stderr, "MODE SENSE (%d) command, aborted "
-                                "command\n", (mode6 ? 6 : 10));
-                else if (SG_LIB_CAT_INVALID_OP == res) {
-                        fprintf(stderr, "MODE SENSE (%d) command is not "
-                                "supported\n", (mode6 ? 6 : 10));
-                        fprintf(stderr, "    try again %s the '--six' "
-                                "option\n", (mode6 ? "without" : "with"));
-
-                } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+                if (SG_LIB_CAT_ILLEGAL_REQ == res) {
                         if (long_lba && (! mode6))
                                 fprintf(stderr, "bad field in MODE SENSE "
                                         "(%d) [longlba flag not supported?]"
@@ -703,12 +650,14 @@ again_with_long_lba:
                                 fprintf(stderr, "bad field in MODE SENSE "
                                         "(%d) [mode_page %d not supported?]"
                                         "\n", (mode6 ? 6 : 10), mode_page);
-                } else
-                        fprintf(stderr, "MODE SENSE (%d) command failed\n",
-                                (mode6 ? 6 : 10));
-                        if (0 == verbose)
-                                fprintf(stderr, "    try '-v' for more "
-                                        "information\n");
+                } else {
+                        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                        fprintf(stderr, "MODE SENSE (%d) command: %s\n",
+                                (mode6 ? 6 : 10), b);
+                }
+                if (0 == verbose)
+                        fprintf(stderr, "    try '-v' for more "
+                                "information\n");
                 goto out;
         }
         if (mode6) {
@@ -854,24 +803,8 @@ again_with_long_lba:
                                                   dbuff, calc_len, 1, verbose);
                 ret = res;
                 if (res) {
-                        if (SG_LIB_CAT_NOT_READY == res)
-                                fprintf(stderr, "MODE SELECT command, "
-                                        "device not ready\n");
-                        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                                fprintf(stderr, "MODE SELECT command, "
-                                        "unit attention\n");
-                        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                                fprintf(stderr, "MODE SELECT command, "
-                                        "aborted command\n");
-                        else if (SG_LIB_CAT_INVALID_OP == res)
-                                fprintf(stderr, "MODE SELECT (%d) command is "
-                                        "not supported\n", (mode6 ? 6 : 10));
-                        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                                fprintf(stderr, "bad field in MODE SELECT "
-                                        "(%d)\n", (mode6 ? 6 : 10));
-                        else
-                                fprintf(stderr, "MODE SELECT (%d) command "
-                                        "failed\n", (mode6 ? 6 : 10));
+                        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                        fprintf(stderr, "MODE SELECT command: %s\n", b);
                         if (0 == verbose)
                                 fprintf(stderr, "    try '-v' for "
                                         "more information\n");

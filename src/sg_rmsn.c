@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2013 Douglas Gilbert.
+ * Copyright (c) 2005-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.09 20130507";
+static const char * version_str = "1.10 20140516";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -174,27 +174,13 @@ int main(int argc, char * argv[])
             }
         }
     }
-    if (0 != res) {
-        if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Read Media Serial Number command not "
-                    "supported\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            fprintf(stderr, "Read Media Serial Number failed, device not "
-                    "ready\n");
-        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-            fprintf(stderr, "Read Media Serial Number failed, unit "
-                    "attention\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "Read Media Serial Number failed, aborted "
-                    "command\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Read Media Serial Number cdb "
-                    "including unsupported service action\n");
-        else {
-            fprintf(stderr, "Read Media Serial Number failed\n");
-            if (0 == verbose)
-                fprintf(stderr, "    try '-v' for more information\n");
-        }
+    if (res) {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Read Media Serial Number: %s\n", b);
+        if (0 == verbose)
+            fprintf(stderr, "    try '-v' for more information\n");
     }
 
 err_out:
