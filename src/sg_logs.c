@@ -28,7 +28,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.22 20140514";    /* spc4r36t + sbc4r01 */
+static const char * version_str = "1.23 20140518";    /* spc4r37 + sbc4r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -908,7 +908,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
                                    op->subpg_code, op->paramp,
                                    resp, LOG_SENSE_PROBE_ALLOC_LEN,
                                    1 /* noisy */, vb)))
-	    return res;
+            return res;
         actual_len = (resp[2] << 8) + resp[3] + 4;
         if ((0 == op->do_raw) && (vb > 1)) {
             pr2serr("  Log sense (find length) response:\n");
@@ -936,7 +936,7 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
                                op->page_control, op->pg_code,
                                op->subpg_code, op->paramp,
                                resp, actual_len, 1 /* noisy */, vb)))
-	return res;
+        return res;
     if ((0 == op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense response:\n");
         dStrHexErr((const char *)resp, actual_len, 1);
@@ -1114,6 +1114,33 @@ show_page_name(int pg_code, int subpg_code,
                 break;
             case 0x32:
                 printf("%sData compression (IBM specific)\n", b);
+                break;
+            case 0x33:
+                printf("%sWrite errors (IBM specific)\n", b);
+                break;
+            case 0x34:
+                printf("%sRead forward errors (IBM specific)\n", b);
+                break;
+            case 0x37:
+                printf("%sPerformance characteristics (IBM specific)\n", b);
+                break;
+            case 0x38:
+                printf("%sBlocks/bytes transferred (IBM specific)\n", b);
+                break;
+            case 0x39:
+                printf("%sHost port 0 interface errors (IBM specific)\n", b);
+                break;
+            case 0x3a:
+                printf("%sDrive control verification (IBM specific)\n", b);
+                break;
+            case 0x3b:
+                printf("%sHost port 1 interface errors (IBM specific)\n", b);
+                break;
+            case 0x3c:
+                printf("%sDrive usage information (IBM specific)\n", b);
+                break;
+            case 0x3d:
+                printf("%sSubsystem statistics (IBM specific)\n", b);
                 break;
             default:
                 done = 0;

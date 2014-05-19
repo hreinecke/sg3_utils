@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.37 20140514";    /* SPC-4 rev 36t */
+static const char * version_str = "1.38 20140518";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a

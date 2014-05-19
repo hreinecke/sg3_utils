@@ -25,7 +25,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.13 20140517";
+static const char * version_str = "1.14 20140518";
 
 #define ME "sg_wr_mode: "
 
@@ -542,11 +542,11 @@ int main(int argc, char * argv[])
 
         memcpy(ref_md + off, read_in, read_in_len);
         if (mode_6)
-            res = sg_ll_mode_select6(sg_fd, 1, save, ref_md, md_len, 1,
-                                     verbose);
+            res = sg_ll_mode_select6(sg_fd, 1 /* PF */, save, ref_md, md_len,
+                                     1, verbose);
         else
-            res = sg_ll_mode_select10(sg_fd, 1, save, ref_md, md_len, 1,
-                                      verbose);
+            res = sg_ll_mode_select10(sg_fd, 1 /* PF */, save, ref_md,
+                                      md_len, 1, verbose);
         ret = res;
         if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);

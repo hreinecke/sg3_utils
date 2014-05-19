@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "1.99 20140514";  /* spc4r36s, sbc4r01 */
+const char * sg_lib_version_str = "2.00 20140518";  /* spc4r36u, sbc4r01 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -158,6 +158,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x92, PDT_TAPE, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, PDT_TAPE, "Erase(16)"},
+    {0x9c, 0, "Write atomic(16)"},
     {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
@@ -492,7 +493,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20140320 */
+ * The following should match asc-num.txt dated 20140516 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -532,6 +533,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x00,0x1e,"Conflicting SA creation request"},
     {0x00,0x1f,"Logical unit transitioning to another power condition"},
     {0x00,0x20,"Extended copy information available"},
+    {0x00,0x21,"Atomic command aborted due to ACA"},
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},
@@ -556,6 +558,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x0c,"Logical unit "
                 "not accessible, target port in unavailable state"},
     {0x04,0x0d,"Logical unit not ready, structure check required"},
+    {0x04,0x0e,"Logical unit not ready, security session in progress"},
     {0x04,0x10,"Logical unit not ready, "
                 "auxiliary memory not accessible"},
     {0x04,0x11,"Logical unit not ready, "
@@ -723,6 +726,10 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x21,0x01,"Invalid element address"},
     {0x21,0x02,"Invalid address for write"},
     {0x21,0x03,"Invalid write crossing layer jump"},
+    {0x21,0x04,"Unaligned write command"},
+    {0x21,0x05,"Write boundary violation"},
+    {0x21,0x06,"Attempt to read invalid data"},
+    {0x21,0x07,"Read boundary violation"},
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
     {0x23,0x00,"Invalid token operation, cause not reportable"},
     {0x23,0x01,"Invalid token operation, unsupported token type"},
@@ -773,6 +780,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x27,0x05,"Permanent write protect"},
     {0x27,0x06,"Conditional write protect"},
     {0x27,0x07,"Space allocation failed write protect"},
+    {0x27,0x08,"Zone is read only"},
     {0x28,0x00,"Not ready to ready change, medium may have changed"},
     {0x28,0x01,"Import or export element accessed"},
     {0x28,0x02,"Format-layer may have changed"},

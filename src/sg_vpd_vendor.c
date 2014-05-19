@@ -42,6 +42,14 @@
 
 */
 
+/* vendor/product identifiers */
+#define VPD_VP_SEAGATE 0
+#define VPD_VP_RDAC 1
+#define VPD_VP_EMC 2
+#define VPD_VP_DDS 3
+#define VPD_VP_LTO 4
+#define VPD_VP_HP3PAR 5
+
 
 /* vendor VPD pages */
 #define VPD_V_HP3PAR 0xc0
@@ -71,11 +79,17 @@
 #define DEF_ALLOC_LEN 252
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 
+struct svpd_vp_name_t {
+    int vp_num;       /* vendor/product identifier */
+    const char * acron;
+    const char * name;
+};
+
 /* This structure is a duplicate of one of the same name in sg_vpd.c .
    Take care that both have the same fields (and types). */
 struct svpd_values_name_t {
     int value;       /* VPD number */
-    int subvalue;    /* used to disambiguate when different vendors use */
+    int subvalue;    /* vendor/product identifier used to disambiguate */
                      /* the same VPD number */
     int pdt;         /* peripheral device type id, -1 is the default */
                      /* (all or not applicable) value */
@@ -92,34 +106,52 @@ static unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 
 
 /* Supported vendor specific VPD pages */
-/* 'subvalue' used to disambiguate; 'vendor' flag should be set */
+/* Arrange in alphabetical order by acronym */
+static struct svpd_vp_name_t vp_arr[] = {
+    {VPD_VP_DDS, "dds", "DDS tape family from IBM"},
+    {VPD_VP_EMC, "emc", "EMC (company)"},
+    {VPD_VP_HP3PAR, "hp3par", "3PAR array (HP was Left Hand)"},
+    {VPD_VP_LTO, "lto", "LTO tape drive/system (IBM and others)"},
+    {VPD_VP_RDAC, "rdac", "RDAC array (EMC Clariion)"},
+    {VPD_VP_SEAGATE, "sea", "Seagate disk"},
+    {0, NULL, NULL},
+};
+
+
+/* Supported vendor specific VPD pages */
+/* 'subvalue' holds vendor/product number to disambiguate */
 /* Arrange in alphabetical order by acronym */
 static struct svpd_values_name_t vendor_vpd_pg[] = {
-    {VPD_V_ACI_LTO, 0, -1, "aci", "ACI revision level (LTO)"},
-    {VPD_V_DATC_SEA, 0, -1, "datc", "Date code (Seagate)"},
-    {VPD_V_FVER_DDS, 4, -1, "ddsver", "Firmware revision (DDS)"},
-    {VPD_V_DEV_BEH_SEA, 0, -1, "devb", "Device behavior (Seagate)"},
-    {VPD_V_EDID_RDAC, 0, -1, "edid", "Extended device identification "
-     "(RDAC)"},
-    {VPD_V_FEAT_RDAC, 1, -1, "feat", "Feature Parameters (RDAC)"},
-    {VPD_V_FIRM_SEA, 0, -1, "firm", "Firmware numbers (Seagate)"},
-    {VPD_V_FVER_LTO, 5, -1, "frl" , "Firmware revision level (LTO)"},
-    {VPD_V_FVER_RDAC, 1, -1, "fver", "Firmware version (RDAC)"},
-    {VPD_V_HEAD_LTO, 1, -1, "head", "Head Assy revision level (LTO)"},
-    {VPD_V_HP3PAR, 2, -1, "hp3par", "Volume information (HP/3PAR)"},
-    {VPD_V_HVER_LTO, 2, -1, "hrl", "Hardware revision level (LTO)"},
-    {VPD_V_HVER_RDAC, 3, -1, "hver", "Hardware version (RDAC)"},
-    {VPD_V_JUMP_SEA, 0, -1, "jump", "Jump setting (Seagate)"},
-    {VPD_V_MECH_LTO, 2, -1, "mech", "Mechanism revision level (LTO)"},
-    {VPD_V_PCA_LTO, 2, -1, "pca", "PCA revision level (LTO)"},
-    {VPD_V_RVSI_RDAC, 0, -1, "rvsi", "Replicated volume source "
+    {VPD_V_ACI_LTO, VPD_VP_LTO, -1, "aci", "ACI revision level (LTO)"},
+    {VPD_V_DATC_SEA, VPD_VP_SEAGATE, -1, "datc", "Date code (Seagate)"},
+    {VPD_V_FVER_DDS, VPD_VP_DDS, -1, "ddsver", "Firmware revision (DDS)"},
+    {VPD_V_DEV_BEH_SEA, VPD_VP_SEAGATE, -1, "devb", "Device behavior "
+     "(Seagate)"},
+    {VPD_V_EDID_RDAC, VPD_VP_RDAC, -1, "edid", "Extended device "
+     "identification (RDAC)"},
+    {VPD_V_FEAT_RDAC, VPD_VP_RDAC, -1, "feat", "Feature Parameters (RDAC)"},
+    {VPD_V_FIRM_SEA, VPD_VP_SEAGATE, -1, "firm", "Firmware numbers "
+     "(Seagate)"},
+    {VPD_V_FVER_LTO, VPD_VP_LTO, -1, "frl" , "Firmware revision level (LTO)"},
+    {VPD_V_FVER_RDAC, VPD_VP_RDAC, -1, "fver", "Firmware version (RDAC)"},
+    {VPD_V_HEAD_LTO, VPD_VP_LTO, -1, "head", "Head Assy revision level "
+     "(LTO)"},
+    {VPD_V_HP3PAR, VPD_VP_HP3PAR, -1, "hp3par", "Volume information "
+     "(HP/3PAR)"},
+    {VPD_V_HVER_LTO, VPD_VP_LTO, -1, "hrl", "Hardware revision level (LTO)"},
+    {VPD_V_HVER_RDAC, VPD_VP_RDAC, -1, "hver", "Hardware version (RDAC)"},
+    {VPD_V_JUMP_SEA, VPD_VP_SEAGATE, -1, "jump", "Jump setting (Seagate)"},
+    {VPD_V_MECH_LTO, VPD_VP_LTO, -1, "mech", "Mechanism revision level "
+     "(LTO)"},
+    {VPD_V_PCA_LTO, VPD_VP_LTO, -1, "pca", "PCA revision level (LTO)"},
+    {VPD_V_RVSI_RDAC, VPD_VP_RDAC, -1, "rvsi", "Replicated volume source "
      "identifier (RDAC)"},
-    {VPD_V_SAID_RDAC, 0, -1, "said", "Storage array world wide name "
-     "(RDAC)"},
-    {VPD_V_SUBS_RDAC, 0, -1, "sub", "Subsystem identifier (RDAC)"},
-    {VPD_V_SVER_RDAC, 1, -1, "sver", "Software version (RDAC)"},
-    {VPD_V_UPR_EMC, 1, -1, "upr", "Unit path report (EMC)"},
-    {VPD_V_VAC_RDAC, 0, -1, "vac", "Volume access control (RDAC)"},
+    {VPD_V_SAID_RDAC, VPD_VP_RDAC, -1, "said", "Storage array world wide "
+     "name (RDAC)"},
+    {VPD_V_SUBS_RDAC, VPD_VP_RDAC, -1, "sub", "Subsystem identifier (RDAC)"},
+    {VPD_V_SVER_RDAC, VPD_VP_RDAC, -1, "sver", "Software version (RDAC)"},
+    {VPD_V_UPR_EMC, VPD_VP_EMC, -1, "upr", "Unit path report (EMC)"},
+    {VPD_V_VAC_RDAC, VPD_VP_RDAC, -1, "vac", "Volume access control (RDAC)"},
     {0, 0, 0, NULL, NULL},
 };
 
@@ -144,7 +176,7 @@ pr2serr(const char * fmt, ...)
     return n;
 }
 
-static const struct svpd_values_name_t *
+const struct svpd_values_name_t *
 svpd_get_v_detail(int page_num, int subvalue, int pdt)
 {
     const struct svpd_values_name_t * vnp;
@@ -166,6 +198,35 @@ svpd_get_v_detail(int page_num, int subvalue, int pdt)
 }
 
 const struct svpd_values_name_t *
+svpd_find_vendor_by_num(int page_num, int vp_num)
+{
+    const struct svpd_values_name_t * vnp;
+
+    for (vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
+        if ((page_num == vnp->value) &&
+            ((vp_num < 0) || (vp_num == vnp->subvalue)))
+            return vnp;
+    }
+    return NULL;
+}
+
+
+int
+svpd_find_vp_num_by_acron(const char * vp_ap)
+{
+    size_t len;
+    const struct svpd_vp_name_t * vpp;
+
+    for (vpp = vp_arr; vpp->acron; ++vpp) {
+        len = strlen(vpp->acron);
+        if (0 == strncmp(vpp->acron, vp_ap, len))
+            return vpp->vp_num;
+    }
+    return -1;
+}
+
+
+const struct svpd_values_name_t *
 svpd_find_vendor_by_acron(const char * ap)
 {
     const struct svpd_values_name_t * vnp;
@@ -180,9 +241,20 @@ svpd_find_vendor_by_acron(const char * ap)
 void
 svpd_enumerate_vendor()
 {
+    const struct svpd_vp_name_t * vpp;
     const struct svpd_values_name_t * vnp;
     int seen;
 
+    for (seen = 0, vpp = vp_arr; vpp->acron; ++vpp) {
+        if (vpp->name) {
+            if (! seen) {
+                printf("\nVendor/product identifiers:\n");
+                seen = 1;
+            }
+            printf("  %-10s %d      %s\n", vpp->acron,
+                   vpp->vp_num, vpp->name);
+        }
+    }
     for (seen = 0, vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
         if (vnp->name) {
             if (! seen) {
@@ -196,18 +268,20 @@ svpd_enumerate_vendor()
 }
 
 int
-svpd_search_vendor_vpds(int num_vpd)
+svpd_count_vendor_vpds(int num_vpd, int vp_num)
 {
     const struct svpd_values_name_t * vnp;
     int matches;
 
     for (vnp = vendor_vpd_pg, matches = 0; vnp->acron; ++vnp) {
         if ((num_vpd == vnp->value) && vnp->name) {
-            if (0 == matches)
-                printf("Matching vendor specific VPD pages:\n");
-            ++matches;
-            printf("  %-10s 0x%02x,%d      %s\n", vnp->acron,
-                   vnp->value, vnp->subvalue, vnp->name);
+            if ((vp_num < 0) || (vp_num == vnp->subvalue)) {
+                if (0 == matches)
+                    printf("Matching vendor specific VPD pages:\n");
+                ++matches;
+                printf("  %-10s 0x%02x,%d      %s\n", vnp->acron,
+                       vnp->value, vnp->subvalue, vnp->name);
+            }
         }
     }
     return matches;

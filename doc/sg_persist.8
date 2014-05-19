@@ -36,7 +36,7 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing. The relevant sections of the SCSI
 Primary Commands document (i.e. SPC\-4 whose most recent draft is revision
-36s dated 21 March 2014) are sections 5.12 (titled "Reservations"),
+37 dated 17 May 2014) are sections 5.12 (titled "Reservations"),
 6.15 (for the PRIN command) and 6.16 (for the PROUT command). To safeguard
 against accidental use, the \fI\-\-out\fR option must be given when a
 PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
@@ -149,7 +149,7 @@ exclusive access \- registrants only, 7\-> write exclusive \- all registrants,
 8\-> exclusive access \- all registrants. Default value is 0 (which is
 an invalid type). Each "persistent reservation type" is explained in more
 detail in a subsection of that name in the read reservation section of
-the PRIN command (section 6.15.3.3 of SPC\-4 revision 36s).
+the PRIN command (section 6.15.3.3 of SPC\-4 revision 37).
 .TP
 \fB\-s\fR, \fB\-\-read\-full\-status\fR
 Read Full Status is a sub\-command of the PRIN command. For each registration
@@ -263,8 +263,8 @@ output usage message. Ignore all other parameters.
 .SH TRANSPORT IDs
 TransportIDs are used in persistent reservations to identify initiators.
 The format of a TransportID differs depending on the type of transport
-being used. Their format is described in SPC\-4 (in draft revision
-36s see section 7.6.4).
+being used. Their format is described in SPC\-4 (in draft revision 37 see
+section 7.6.4).
 .PP
 A TransportID is required for the PROUT 'register and move' sub\-command and
 the PROUT 'register' sub\-command can have zero, one or more TransportIDs.

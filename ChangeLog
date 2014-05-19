@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140517] [svn: r578]
+Changelog for sg3_utils-1.39 [20140519] [svn: r579]
   - sg_ses: add --eiioe=auto|force option
     - fix AES dpage element indexing problems
     - add --readonly option
@@ -16,6 +16,8 @@ Changelog for sg3_utils-1.39 [20140517] [svn: r578]
     - add --readonly option
   - sg_persist: add --readonly option, environment
     variable SG_PERSIST_IN_RDONLY sets ro on prin cmds
+  - sg_inq: sync version descriptors dated 20105176
+  - sg_vpd: add --vendor=VP option
   - sg_copy_results, sg_get_lba_status, sg_luns,
     sg_read_buffer, sg_readcap, sg_referrals, sg_rtpg,
     sg_sat_set_features, sg_sat_identify:
@@ -28,6 +30,8 @@ Changelog for sg3_utils-1.39 [20140517] [svn: r578]
     - add sg_get_category_sense_str() to API
     - add initial zbc service actions
     - dStrHex(Err): fix output truncation error
+  - sg_lib_data: sync asc/ascq codes with T10 20140516
+    - sync operation code with T10 20140515
   - win32: sg_scan, sg_ses and sg_log fixes
   - examples/sgq_dd: re-add old utility as example
 
