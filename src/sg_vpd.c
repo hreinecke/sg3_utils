@@ -33,10 +33,10 @@
 
 */
 
-static const char * version_str = "0.83 20140519";  /* spc4r37 + sbc4r01 */
+static const char * version_str = "0.83 20140520";  /* spc4r37 + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
-void svpd_enumerate_vendor(void);
+void svpd_enumerate_vendor(int vp_only);
 int svpd_count_vendor_vpds(int num_vpd, int vp_num);
 int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                        int do_hex, int do_raw, int do_long, int do_quiet,
@@ -615,7 +615,7 @@ enumerate_vpds(int standard, int vendor)
         }
     }
     if (vendor)
-        svpd_enumerate_vendor();
+        svpd_enumerate_vendor(0);
 }
 
 static int
@@ -2685,7 +2685,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
                                 printf("  %s [%s]\n", vnp->name, vnp->acron);
                         } else
                             printf("  0x%x\n", pn);
-                    } else 
+                    } else
                         printf("  0x%x\n", pn);
                 }
             }
@@ -3276,7 +3276,7 @@ main(int argc, char * argv[])
                 vnp = svpd_find_vendor_by_acron(page_str);
                 if (NULL == vnp) {
                     pr2serr("abbreviation doesn't match a VPD page\n");
-                    printf("available VPD pages:\n");
+                    printf("Available standard VPD pages:\n");
                     enumerate_vpds(1, 1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -3294,36 +3294,46 @@ main(int argc, char * argv[])
             num_vpd = sg_get_num_nomult(page_str);
             if ((num_vpd < 0) || (num_vpd > 255)) {
                 pr2serr("Bad page code value after '-p' option\n");
-                printf("available VPD pages:\n");
+                printf("Available standard VPD pages:\n");
                 enumerate_vpds(1, 1);
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
                 if (isdigit(*(cp + 1)))
-                    subvalue = sg_get_num_nomult(cp + 1);
+                    vp_num = sg_get_num_nomult(cp + 1);
                 else
-                    subvalue = svpd_find_vp_num_by_acron(cp + 1);
-                if ((subvalue < 0) || (subvalue > 255)) {
-                    pr2serr("Bad subvalue code value after '-p' option\n");
+                    vp_num = svpd_find_vp_num_by_acron(cp + 1);
+                if ((vp_num < 0) || (vp_num > 255)) {
+                    pr2serr("Bad vendor/product acronym after comma in '-p' "
+                            "option\n");
+                    if (vp_num < 0)
+                        svpd_enumerate_vendor(1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
+                subvalue = vp_num;
             } else if (vp_str) {
-                vp_num = svpd_find_vp_num_by_acron(vp_str);
-                if (vp_num < 0) {
+                if (isdigit(vp_str[0]))
+                    vp_num = sg_get_num_nomult(vp_str);
+                else
+                    vp_num = svpd_find_vp_num_by_acron(vp_str);
+                if ((vp_num < 0) || (vp_num > 255)) {
                     pr2serr("Bad vendor/product acronym after '--vendor=' "
                             "option\n");
-                    enumerate_vpds(0, 1);
+                    svpd_enumerate_vendor(1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 subvalue = vp_num;
             }
         }
     } else if (vp_str) {
-        vp_num = svpd_find_vp_num_by_acron(vp_str);
-        if (vp_num < 0) {
+        if (isdigit(vp_str[0]))
+            vp_num = sg_get_num_nomult(vp_str);
+        else
+            vp_num = svpd_find_vp_num_by_acron(vp_str);
+        if ((vp_num < 0) || (vp_num > 255)) {
             pr2serr("Bad vendor/product acronym after '--vendor=' "
                     "option\n");
-            enumerate_vpds(0, 1);
+            svpd_enumerate_vendor(1);
             return SG_LIB_SYNTAX_ERROR;
         }
         subvalue = vp_num;
@@ -3397,7 +3407,7 @@ main(int argc, char * argv[])
         res = svpd_decode_t10(-1, num_vpd, subvalue, inhex_len, do_hex,
                               do_raw, do_long, do_quiet, do_verbose);
         if (SG_LIB_SYNTAX_ERROR == res) {
-            res = svpd_decode_vendor(-1, num_vpd, subvalue, inhex_len, do_hex,
+            res = svpd_decode_vendor(-1, num_vpd, vp_num, inhex_len, do_hex,
                                      do_raw, do_long, do_quiet, do_verbose);
             if (SG_LIB_SYNTAX_ERROR == res)
                 res = svpd_unable_to_decode(-1, num_vpd, subvalue, inhex_len,
@@ -3418,7 +3428,7 @@ main(int argc, char * argv[])
     res = svpd_decode_t10(sg_fd, num_vpd, subvalue, maxlen, do_hex, do_raw,
                           do_long, do_quiet, do_verbose);
     if (SG_LIB_SYNTAX_ERROR == res) {
-        res = svpd_decode_vendor(sg_fd, num_vpd, subvalue, maxlen, do_hex,
+        res = svpd_decode_vendor(sg_fd, num_vpd, vp_num, maxlen, do_hex,
                                  do_raw, do_long, do_quiet, do_verbose);
         if (SG_LIB_SYNTAX_ERROR == res)
             res = svpd_unable_to_decode(sg_fd, num_vpd, subvalue, maxlen,

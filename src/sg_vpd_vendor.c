@@ -90,7 +90,7 @@ struct svpd_vp_name_t {
 struct svpd_values_name_t {
     int value;       /* VPD number */
     int subvalue;    /* vendor/product identifier used to disambiguate */
-                     /* the same VPD number */
+                     /* shared VPD numbers */
     int pdt;         /* peripheral device type id, -1 is the default */
                      /* (all or not applicable) value */
     const char * acron;
@@ -176,23 +176,23 @@ pr2serr(const char * fmt, ...)
     return n;
 }
 
-const struct svpd_values_name_t *
-svpd_get_v_detail(int page_num, int subvalue, int pdt)
+static const struct svpd_values_name_t *
+svpd_get_v_detail(int page_num, int vp_num, int pdt)
 {
     const struct svpd_values_name_t * vnp;
-    int sv, ty;
+    int vp, ty;
 
-    sv = (subvalue < 0) ? 1 : 0;
+    vp = (vp_num < 0) ? 1 : 0;
     ty = (pdt < 0) ? 1 : 0;
     for (vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
         if ((page_num == vnp->value) &&
-            (sv || (subvalue == vnp->subvalue)) &&
+            (vp || (vp_num == vnp->subvalue)) &&
             (ty || (pdt == vnp->pdt)))
             return vnp;
     }
     if (! ty)
-        return svpd_get_v_detail(page_num, subvalue, -1);
-    if (! sv)
+        return svpd_get_v_detail(page_num, vp_num, -1);
+    if (! vp)
         return svpd_get_v_detail(page_num, -1, -1);
     return NULL;
 }
@@ -239,7 +239,7 @@ svpd_find_vendor_by_acron(const char * ap)
 }
 
 void
-svpd_enumerate_vendor()
+svpd_enumerate_vendor(int vp_only)
 {
     const struct svpd_vp_name_t * vpp;
     const struct svpd_values_name_t * vnp;
@@ -255,6 +255,8 @@ svpd_enumerate_vendor()
                    vpp->vp_num, vpp->name);
         }
     }
+    if (vp_only)
+        return;
     for (seen = 0, vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
         if (vnp->name) {
             if (! seen) {
@@ -404,6 +406,34 @@ decode_firm_vpd_c0_sea(unsigned char * buff, int len)
         printf("  Servo firmware product family and product family "
                "member: %.4s\n", buff + 56);
     }
+}
+
+static void
+decode_date_code_vpd_c1_sea(unsigned char * buff, int len)
+{
+    if (len < 20) {
+        pr2serr("Seagate Data code VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    printf("  ETF log (mmddyyyy): %.8s\n", buff + 4);
+    printf("  Compile date code (mmddyyyy): %.8s\n", buff + 12);
+}
+
+static void
+decode_dev_beh_vpd_c3_sea(unsigned char * buff, int len)
+{
+    if (len < 25) {
+        pr2serr("Seagate Device behaviour VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    printf("  Version number: %d\n", buff[4]);
+    printf("  Behaviour code: %d\n", buff[5]);
+    printf("  Behaviour code version number: %d\n", buff[6]);
+    printf("  ASCII family number: %.16s\n", buff + 7);
+    printf("  Number of interleaves: %d\n", buff[23]);
+    printf("  Default number of cache segments: %d\n", buff[24]);
 }
 
 static const char * lun_state_arr[] =
@@ -995,7 +1025,7 @@ decode_lto_vpd_cx(unsigned char * buff, int len, int page)
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_SYNTAX_ERROR for
    unsupported page */
 int
-svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
+svpd_decode_vendor(int sg_fd, int num_vpd, int vp_num, int maxlen,
                    int do_hex, int do_raw, int do_long, int do_quiet,
                    int verbose)
 {
@@ -1005,7 +1035,7 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
     int alloc_len = maxlen;
 
     if (do_long) { ; }  /* unused, dummy to suppress warning */
-    vnp = svpd_get_v_detail(num_vpd, subvalue, -1);
+    vnp = svpd_get_v_detail(num_vpd, vp_num, -1);
     if (vnp && vnp->name)
         strcpy(name, vnp->name);
     else
@@ -1026,79 +1056,83 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
         else {
             switch(num_vpd) {
                 case 0xc0:
-                    if (0 == subvalue)
+                    if (VPD_VP_SEAGATE == vp_num)
                         decode_firm_vpd_c0_sea(rsp_buff, len);
-                    else if (1 == subvalue)
+                    else if (VPD_VP_EMC == vp_num)
                         decode_upr_vpd_c0_emc(rsp_buff, len);
-                    else if (2 == subvalue)
+                    else if (VPD_VP_HP3PAR == vp_num)
                         decode_vpd_c0_hp3par(rsp_buff, len);
-                    else if (3 == subvalue)
+                    else if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c0(rsp_buff, len);
-                    else if (4 == subvalue)
+                    else if (VPD_VP_DDS == vp_num)
                         decode_dds_vpd_c0(rsp_buff, len);
-                    else if (5 == subvalue)
+                    else if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xc1:
-                    if (1 == subvalue)
+                    if (VPD_VP_SEAGATE == vp_num)
+                        decode_date_code_vpd_c1_sea(rsp_buff, len);
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c1(rsp_buff, len);
-                    else if (2 == subvalue)
+                    else if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xc2:
-                    if (1 == subvalue)
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c2(rsp_buff, len);
-                    else if (2 == subvalue)
+                    else if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xc3:
-                    if (1 == subvalue)
+                    if (VPD_VP_SEAGATE == vp_num)
+                        decode_dev_beh_vpd_c3_sea(rsp_buff, len);
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c3(rsp_buff, len);
-                    else if (2 == subvalue)
+                    else if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xc4:
-                    if (0 == subvalue)
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c4(rsp_buff, len);
-                    else if (1 == subvalue)
+                    else if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xc5:
-                    if (0 == subvalue)
+                    if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xc8:
-                    if (0 == subvalue)
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c8(rsp_buff, len);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xc9:
-                    if (0 == subvalue)
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c9(rsp_buff, len);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xca:
-                    if (0 == subvalue)
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_ca(rsp_buff, len);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
                     break;
                 case 0xd0:
-                    if (0 == subvalue)
+                    if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_d0(rsp_buff, len);
                     else
                         dStrHex((const char *)rsp_buff, len, 0);
