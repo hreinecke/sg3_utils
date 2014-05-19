@@ -33,15 +33,18 @@
 
 */
 
-static const char * version_str = "0.82 20140514";  /* spc4r36s + sbc4r01 */
+static const char * version_str = "0.83 20140519";  /* spc4r37 + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(void);
-int svpd_search_vendor_vpds(int num_vpd);
+int svpd_count_vendor_vpds(int num_vpd, int vp_num);
 int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                        int do_hex, int do_raw, int do_long, int do_quiet,
                        int verbose);
 const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
+int svpd_find_vp_num_by_acron(const char * vp_ap);
+const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
+                                                          int vp_num);
 
 
 /* standard VPD pages, in ascending page number order */
@@ -129,6 +132,7 @@ static struct option long_options[] = {
         {"page", required_argument, 0, 'p'},
         {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
+        {"vendor", required_argument, 0, 'M'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -217,7 +221,7 @@ usage()
             "[--inhex=fn]\n"
             "               [--long] [--maxlen=LEN] [--page=PG] [--quiet] "
             "[--raw]\n"
-            "               [--verbose] [--version] DEVICE\n");
+            "               [--vendor=VP] [--verbose] [--version] DEVICE\n");
     pr2serr("  where:\n"
             "    --enumerate|-e    enumerate known VPD pages names (ignore "
             "DEVICE),\n"
@@ -242,6 +246,8 @@ usage()
             "is given (e.g. '0x83')\n"
             "    --quiet|-q      suppress some output when decoding\n"
             "    --raw|-r        output page in binary\n"
+            "    --vendor=VP | -M VP    vendor/product abbreviation [or "
+            "number]\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"
             "Fetch Vital Product Data (VPD) page using SCSI INQUIRY or "
@@ -613,7 +619,7 @@ enumerate_vpds(int standard, int vendor)
 }
 
 static int
-search_standard_vpds(int num_vpd)
+count_standard_vpds(int num_vpd)
 {
     const struct svpd_values_name_t * vnp;
     int matches;
@@ -2669,7 +2675,17 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
                                    vnp->acron);
                         else
                             printf("  %s [%s]\n", vnp->name, vnp->acron);
-                    } else
+                    } else if (subvalue >= 0) {
+                        vnp = svpd_find_vendor_by_num(pn, subvalue);
+                        if (vnp) {
+                            if (do_long)
+                                printf("  0x%02x  %s [%s]\n", pn, vnp->name,
+                                       vnp->acron);
+                            else
+                                printf("  %s [%s]\n", vnp->name, vnp->acron);
+                        } else
+                            printf("  0x%x\n", pn);
+                    } else 
                         printf("  0x%x\n", pn);
                 }
             }
@@ -3099,6 +3115,7 @@ main(int argc, char * argv[])
     const struct svpd_values_name_t * vnp;
     const char * page_str = NULL;
     const char * inhex_fn = NULL;
+    const char * vp_str = NULL;
     const char * cp;
     int num_vpd = 0;
     int do_enum = 0;
@@ -3113,11 +3130,12 @@ main(int argc, char * argv[])
     int ret = 0;
     int subvalue = 0;
     int page_pdt = -1;
+    int vp_num = -1;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ehHiI:lm:p:qrvV", long_options,
+        c = getopt_long(argc, argv, "ehHiI:lm:M:p:qrvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -3154,6 +3172,14 @@ main(int argc, char * argv[])
                         MX_ALLOC_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'M':
+            if (vp_str) {
+                pr2serr("only one '--vendor=' option permitted\n");
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            } else
+                vp_str = optarg;
             break;
         case 'p':
             if (page_str) {
@@ -3197,6 +3223,23 @@ main(int argc, char * argv[])
         if (device_name)
             pr2serr("Device name %s ignored when --enumerate given\n",
                     device_name);
+        if (vp_str) {
+            if (isdigit(vp_str[0])) {
+                vp_num = sg_get_num_nomult(vp_str);
+                if ((vp_num < 0) || (vp_num > 10)) {
+                    pr2serr("Bad vendor/product number after '--vendor=' "
+                            "option\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            } else {
+                vp_num = svpd_find_vp_num_by_acron(vp_str);
+                if (vp_num < 0) {
+                    pr2serr("Bad vendor/product acronym after '--vendor=' "
+                            "option\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }
+        }
         if (page_str) {
             if ((0 == strcmp("-1", page_str)) ||
                 (0 == strcmp("-2", page_str)))
@@ -3212,9 +3255,9 @@ main(int argc, char * argv[])
                         "numbers\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            matches = search_standard_vpds(num_vpd);
+            matches = count_standard_vpds(num_vpd);
             if (0 == matches)
-                matches = svpd_search_vendor_vpds(num_vpd);
+                matches = svpd_count_vendor_vpds(num_vpd, vp_num);
             if (0 == matches)
                 printf("No matches found for VPD page number 0x%x\n",
                        num_vpd);
@@ -3243,6 +3286,11 @@ main(int argc, char * argv[])
             page_pdt = vnp->pdt;
         } else {
             cp = strchr(page_str, ',');
+            if (cp && vp_str) {
+                pr2serr("the --page=pg,vp and the --vendor=vp forms overlap, "
+                        "choose one or the other\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             num_vpd = sg_get_num_nomult(page_str);
             if ((num_vpd < 0) || (num_vpd > 255)) {
                 pr2serr("Bad page code value after '-p' option\n");
@@ -3251,13 +3299,34 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
-                subvalue = sg_get_num_nomult(cp + 1);
+                if (isdigit(*(cp + 1)))
+                    subvalue = sg_get_num_nomult(cp + 1);
+                else
+                    subvalue = svpd_find_vp_num_by_acron(cp + 1);
                 if ((subvalue < 0) || (subvalue > 255)) {
                     pr2serr("Bad subvalue code value after '-p' option\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
+            } else if (vp_str) {
+                vp_num = svpd_find_vp_num_by_acron(vp_str);
+                if (vp_num < 0) {
+                    pr2serr("Bad vendor/product acronym after '--vendor=' "
+                            "option\n");
+                    enumerate_vpds(0, 1);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                subvalue = vp_num;
             }
         }
+    } else if (vp_str) {
+        vp_num = svpd_find_vp_num_by_acron(vp_str);
+        if (vp_num < 0) {
+            pr2serr("Bad vendor/product acronym after '--vendor=' "
+                    "option\n");
+            enumerate_vpds(0, 1);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        subvalue = vp_num;
     }
     if (inhex_fn) {
         if (device_name) {

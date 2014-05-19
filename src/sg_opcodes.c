@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.39 20140515";    /* spc4r36t */
+static const char * version_str = "0.40 20140518";    /* spc4r37 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

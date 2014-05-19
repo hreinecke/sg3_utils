@@ -73,7 +73,7 @@ The default is to open it read\-write.
 this option sets the SELECT REPORT field (\fISR\fR) in the SCSI REPORT
 LUNS command. The default value is 0. Hexadecimal values may be given with
 a leading "0x" or a trailing "h". For detailed information see the
-REPORT LUNS command in SPC (most recent is SPC\-4 revision 36s in section
+REPORT LUNS command in SPC (most recent is SPC\-4 revision 37 in section
 6.33). To simplify, for the I_T nexus associated with the \fIDEVICE\fR, the
 meanings of the \fISR\fR values defined to date for SPC\-4 are:
 .br
@@ -91,9 +91,9 @@ meanings of the \fISR\fR values defined to date for SPC\-4 are:
 .br
                subsidiary LUs
 .br
-Values between 0xf8 and 0xff (inclusive) are vendor specific (SPC\-4 rev
-36e), other values greater than 2 are reserved. This utility will accept
-any value between 0 and 255 (0xff) for \fISR\fR .
+Values between 0xf8 and 0xff (inclusive) are vendor specific (added
+SPC\-4 rev 36e), other values greater than 2 are reserved. This utility
+will accept any value between 0 and 255 (0xff) for \fISR\fR .
 .TP
 \fB\-t\fR, \fB\-\-test\fR=\fIALUN\fR
 \fIALUN\fR is assumed to be a hexadecimal number in ASCII hex or the
