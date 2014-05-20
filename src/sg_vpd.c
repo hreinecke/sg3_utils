@@ -33,10 +33,10 @@
 
 */
 
-static const char * version_str = "0.83 20140520";  /* spc4r37 + sbc4r01 */
+static const char * version_str = "0.84 20140520";  /* spc4r37 + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
-void svpd_enumerate_vendor(int vp_only);
+void svpd_enumerate_vendor(int vp_num);
 int svpd_count_vendor_vpds(int num_vpd, int vp_num);
 int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                        int do_hex, int do_raw, int do_long, int do_quiet,
@@ -615,7 +615,7 @@ enumerate_vpds(int standard, int vendor)
         }
     }
     if (vendor)
-        svpd_enumerate_vendor(0);
+        svpd_enumerate_vendor(-2);
 }
 
 static int
@@ -2609,8 +2609,8 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
 
 /* Returns 0 if successful, else see sg_ll_inquiry() */
 static int
-svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
-                int do_raw, int do_long, int do_quiet, int vb)
+svpd_decode_t10(int sg_fd, int pn, int subvalue, int vp_num, int maxlen,
+                int do_hex, int do_raw, int do_long, int do_quiet, int vb)
 {
     int len, pdt, num, k, resid, alloc_len;
     int res = 0;
@@ -2675,8 +2675,8 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
                                    vnp->acron);
                         else
                             printf("  %s [%s]\n", vnp->name, vnp->acron);
-                    } else if (subvalue >= 0) {
-                        vnp = svpd_find_vendor_by_num(pn, subvalue);
+                    } else if (vp_num >= 0) {
+                        vnp = svpd_find_vendor_by_num(pn, vp_num);
                         if (vnp) {
                             if (do_long)
                                 printf("  0x%02x  %s [%s]\n", pn, vnp->name,
@@ -3239,6 +3239,8 @@ main(int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
+            svpd_enumerate_vendor(vp_num);
+	    return 0;
         }
         if (page_str) {
             if ((0 == strcmp("-1", page_str)) ||
@@ -3283,6 +3285,7 @@ main(int argc, char * argv[])
             }
             num_vpd = vnp->value;
             subvalue = vnp->subvalue;
+	    vp_num = subvalue;
             page_pdt = vnp->pdt;
         } else {
             cp = strchr(page_str, ',');
@@ -3307,7 +3310,7 @@ main(int argc, char * argv[])
                     pr2serr("Bad vendor/product acronym after comma in '-p' "
                             "option\n");
                     if (vp_num < 0)
-                        svpd_enumerate_vendor(1);
+                        svpd_enumerate_vendor(-1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 subvalue = vp_num;
@@ -3319,7 +3322,7 @@ main(int argc, char * argv[])
                 if ((vp_num < 0) || (vp_num > 255)) {
                     pr2serr("Bad vendor/product acronym after '--vendor=' "
                             "option\n");
-                    svpd_enumerate_vendor(1);
+                    svpd_enumerate_vendor(-1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 subvalue = vp_num;
@@ -3333,7 +3336,7 @@ main(int argc, char * argv[])
         if ((vp_num < 0) || (vp_num > 255)) {
             pr2serr("Bad vendor/product acronym after '--vendor=' "
                     "option\n");
-            svpd_enumerate_vendor(1);
+            svpd_enumerate_vendor(-1);
             return SG_LIB_SYNTAX_ERROR;
         }
         subvalue = vp_num;
@@ -3404,8 +3407,8 @@ main(int argc, char * argv[])
     }
 
     if (inhex_fn) {
-        res = svpd_decode_t10(-1, num_vpd, subvalue, inhex_len, do_hex,
-                              do_raw, do_long, do_quiet, do_verbose);
+        res = svpd_decode_t10(-1, num_vpd, subvalue, vp_num, inhex_len,
+                              do_hex, do_raw, do_long, do_quiet, do_verbose);
         if (SG_LIB_SYNTAX_ERROR == res) {
             res = svpd_decode_vendor(-1, num_vpd, vp_num, inhex_len, do_hex,
                                      do_raw, do_long, do_quiet, do_verbose);
@@ -3425,8 +3428,8 @@ main(int argc, char * argv[])
     }
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
-    res = svpd_decode_t10(sg_fd, num_vpd, subvalue, maxlen, do_hex, do_raw,
-                          do_long, do_quiet, do_verbose);
+    res = svpd_decode_t10(sg_fd, num_vpd, subvalue, vp_num, maxlen, do_hex,
+                          do_raw, do_long, do_quiet, do_verbose);
     if (SG_LIB_SYNTAX_ERROR == res) {
         res = svpd_decode_vendor(sg_fd, num_vpd, vp_num, maxlen, do_hex,
                                  do_raw, do_long, do_quiet, do_verbose);

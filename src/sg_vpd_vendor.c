@@ -238,26 +238,31 @@ svpd_find_vendor_by_acron(const char * ap)
     return NULL;
 }
 
+/* vp_num=-2 everthing, =-1 only vendor_product, else just that vp_num */
 void
-svpd_enumerate_vendor(int vp_only)
+svpd_enumerate_vendor(int vp_num)
 {
     const struct svpd_vp_name_t * vpp;
     const struct svpd_values_name_t * vnp;
     int seen;
 
-    for (seen = 0, vpp = vp_arr; vpp->acron; ++vpp) {
-        if (vpp->name) {
-            if (! seen) {
-                printf("\nVendor/product identifiers:\n");
-                seen = 1;
+    if (vp_num < 0) {
+        for (seen = 0, vpp = vp_arr; vpp->acron; ++vpp) {
+            if (vpp->name) {
+                if (! seen) {
+                    printf("\nVendor/product identifiers:\n");
+                    seen = 1;
+                }
+                printf("  %-10s %d      %s\n", vpp->acron,
+                       vpp->vp_num, vpp->name);
             }
-            printf("  %-10s %d      %s\n", vpp->acron,
-                   vpp->vp_num, vpp->name);
         }
     }
-    if (vp_only)
+    if (-1 == vp_num)
         return;
     for (seen = 0, vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
+	if ((vp_num >= 0) && (vp_num != vnp->subvalue))
+            continue;
         if (vnp->name) {
             if (! seen) {
                 printf("\nVendor specific VPD pages:\n");
@@ -1074,7 +1079,7 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int vp_num, int maxlen,
                 case 0xc1:
                     if (VPD_VP_SEAGATE == vp_num)
                         decode_date_code_vpd_c1_sea(rsp_buff, len);
-                    if (VPD_VP_RDAC == vp_num)
+                    else if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c1(rsp_buff, len);
                     else if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
@@ -1092,7 +1097,7 @@ svpd_decode_vendor(int sg_fd, int num_vpd, int vp_num, int maxlen,
                 case 0xc3:
                     if (VPD_VP_SEAGATE == vp_num)
                         decode_dev_beh_vpd_c3_sea(rsp_buff, len);
-                    if (VPD_VP_RDAC == vp_num)
+                    else if (VPD_VP_RDAC == vp_num)
                         decode_rdac_vpd_c3(rsp_buff, len);
                     else if (VPD_VP_LTO == vp_num)
                         decode_lto_vpd_cx(rsp_buff, len, num_vpd);
