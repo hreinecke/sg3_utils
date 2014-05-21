@@ -40,7 +40,9 @@ those defined by T10), then the vendor specific pages. Each group is sorted
 in abbreviation order. The \fIDEVICE\fR and most other options are ignored
 and this utility exits after listing the VPD page names. May be used together
 with \fI\-\-page=PG\fR where \fIPG\fR is numeric. If so, it searches for the
-summary lines of all VPD pages whose number matches \fIPG\fR.
+summary lines of all VPD pages whose number matches \fIPG\fR. May be used
+with \fI\-\-vendor=VP\fR to restrict output to known vendor specific pages
+for vendor/product \fIVP\fR.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options then exits.
@@ -118,6 +120,11 @@ acronym (e.g. "hp3par" for the 3PAR array from HP). Many vendors have re-used
 the numbers at the beginning of the vendor specific VPD page range (e.g.
 page 0xc0) and this option is a way of selecting only those which are of
 interest. Using a \fIVP\fR of "xxx" will list the available acronyms.
+.br
+If this option is used with \fI\-\-page=PG\fR and \fIPG\fR is an acronym
+then this option is ignored. If \fIPG\fR is a number (e.g. 0xc0) then
+\fIVP\fR is used to choose the which vendor specific page (e.g. sharing
+page number 0xc0) to decode.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.

@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.00 20140518";  /* spc4r36u, sbc4r01 */
+const char * sg_lib_version_str = "2.01 20140521";  /* spc4r36u, sbc4r02 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -365,7 +365,8 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xb, 0, "Write(32)"},
     {0xc, 0, "Write an verify(32)"},
     {0xd, 0, "Write same(32)"},
-    {0xe, 0, "Orwrite(32)"},    /* added sbc3r25 */
+    {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
+    {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
     {0x1800, 0, "Receive credential"},
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},

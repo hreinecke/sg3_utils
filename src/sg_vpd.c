@@ -33,7 +33,7 @@
 
 */
 
-static const char * version_str = "0.84 20140520";  /* spc4r37 + sbc4r01 */
+static const char * version_str = "0.85 20140521";  /* spc4r37 + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(int vp_num);
@@ -3240,7 +3240,7 @@ main(int argc, char * argv[])
                 }
             }
             svpd_enumerate_vendor(vp_num);
-	    return 0;
+            return 0;
         }
         if (page_str) {
             if ((0 == strcmp("-1", page_str)) ||
@@ -3285,7 +3285,7 @@ main(int argc, char * argv[])
             }
             num_vpd = vnp->value;
             subvalue = vnp->subvalue;
-	    vp_num = subvalue;
+            vp_num = subvalue;
             page_pdt = vnp->pdt;
         } else {
             cp = strchr(page_str, ',');
