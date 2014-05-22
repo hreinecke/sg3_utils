@@ -3,7 +3,7 @@
 # in the sg3_utils package. This script works as expected on the
 # author's Fujitsu MAM3184, Seagate ST373455 and ST9146803SS disks.
 #
-#  Version 1.8 20140516
+#  Version 1.8 20140521
 
 # N.B. make sure the device name is correct for your environment.
 
@@ -19,10 +19,14 @@ usage()
   echo "    -h, --help           print usage message"
   echo "    -s, --second         use second key"
   echo "    -v, --verbose        more verbose output"
+  echo "    -vv                  even more verbose output"
+  echo "    -vvv                 even more verbose output"
   echo ""
   echo "Test SCSI Persistent Reservations with sg_persist utility."
   echo "Default key is ${key} and alternate, second key is ${key2} ."
   echo "Should be harmless (unless one of those keys is already in use)."
+  echo "Also the APTPL bit is not set on the PR register so a power cycle"
+  echo "on the device will clear it."
 }
 
 opt="$1"

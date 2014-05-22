@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.40 20140518";    /* spc4r37 */
+static const char * version_str = "0.41 20140521";    /* spc4r37 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -505,7 +505,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
         printf(  "(hex)   action(h)  size       \n");
         printf("-----------------------------------------------\n");
     }
-    /* N.B. SPC-4 does _not_ requiring any ordering of response */
+    /* SPC-4 does _not_ require any ordering of opcodes in the response */
     if (! op->do_unsorted) {
         sort_arr = (unsigned char **)malloc(cd_len * sizeof(unsigned char *));
         if (NULL == sort_arr) {
@@ -579,6 +579,8 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
             }
         }
     }
+    if (sort_arr)
+        free(sort_arr);
 }
 
 static void
