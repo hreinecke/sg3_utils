@@ -30,7 +30,7 @@ const char * sg_ansi_version_arr[] =
     "SPC-2",
     "SPC-3",
     "SPC-4",
-    "reserved [7h]",
+    "SPC-5",
     "ecma=1, [8h]",
     "ecma=1, [9h]",
     "ecma=1, [Ah]",

@@ -33,7 +33,7 @@
 
 */
 
-static const char * version_str = "0.85 20140522";  /* spc4r37 + sbc4r01 */
+static const char * version_str = "0.86 20140527";  /* spc4r37 + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(int vp_num);
@@ -664,7 +664,7 @@ const char * sg_ansi_version_arr[] =
     "SPC-2",
     "SPC-3",
     "SPC-4",
-    "reserved [7h]",
+    "SPC-5",
     "ecma=1, [8h]",
     "ecma=1, [9h]",
     "ecma=1, [Ah]",
@@ -2410,9 +2410,9 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
-        printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* sbc4r01 */
-        printf("  FUAB=%d\n", buff[8] & 0x2);
-        printf("  VBULS=%d\n", buff[8] & 0x1);
+        printf("  HAW_ZBC=%d\n", !!(buff[8] & 0x10));       /* sbc4r01 */
+        printf("  FUAB=%d\n", !!(buff[8] & 0x2));
+        printf("  VBULS=%d\n", !!(buff[8] & 0x1));
         break;
     case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
         printf("  Manufacturer-assigned serial number: %.*s\n",
