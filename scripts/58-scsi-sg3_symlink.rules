@@ -1,0 +1,29 @@
+# SCSI-ID symlinks for sg3_utils
+
+ACTION=="remove", GOTO="sg3_utils_symlink_end"
+
+SUBSYSTEM!="block", GOTO="sg3_utils_symlink_end"
+
+# Skip symlink generation for multipath
+ENV{DM_MULTIPATH_DEVICE_PATH}=="1", GOTO="sg3_utils_symlink_end"
+
+# Select which identifier to use per default
+# 0: vpd page 0x80 identifier
+ENV{SCSI_IDENT_SERIAL}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}"
+# 1: NAA identifier (prefix 3)
+ENV{SCSI_IDENT_LUN_NAA}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA}"
+ENV{SCSI_IDENT_LUN_NAA}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA}-part%n"
+# 2: EUI-64 identifer (prefix 2)
+ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-2$env{SCSI_IDENT_LUN_EUI64}"
+ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-2$env{SCSI_IDENT_LUN_EUI64}-part%n"
+# 3: SCSI name identifier (prefix 8)
+ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}"
+ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}-part%n"
+# 4: T10 Vendor identifer (prefix 1)
+ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}"
+ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}-part%n"
+# 5: Vendor-specific identifier (prefix 0)
+ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}"
+ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}-part%n"
+
+LABEL="sg3_utils_symlink_end"

@@ -50,6 +50,7 @@ Hannes Reinecke <hare at suse dot de>
         sg_inq --export option [20120220+20130109]
         sg_xcopy+sg_copy_results [20120322]
         rescan-scsi-bus.sh patches to Kurt Garloff's v1.57 [20130715]
+        55-scsi-sg3_id.rules + 58-scsi-sg3_symlink.rules [20140527]
 
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]
@@ -130,4 +131,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-28th January 2014
+27th May 2014

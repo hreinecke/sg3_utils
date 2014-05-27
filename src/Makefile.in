@@ -99,7 +99,9 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_read_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_reassign$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_referrals$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rep_zones$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_requests$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_reset_wp$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_safte$(EXEEXT) \
@@ -142,7 +144,9 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_read_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_reassign$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_referrals$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rep_zones$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_requests$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_reset_wp$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_safte$(EXEEXT) \
@@ -185,7 +189,9 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_read_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_reassign$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_referrals$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rep_zones$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_requests$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_reset_wp$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_safte$(EXEEXT) \
@@ -227,7 +233,9 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_read_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_reassign$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_referrals$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rep_zones$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_requests$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_reset_wp$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_safte$(EXEEXT) \
@@ -279,8 +287,10 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_read_long$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_reassign$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_referrals$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rep_zones$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_requests$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_reset$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_reset_wp$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rmsn$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rtpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_safte$(EXEEXT) \
@@ -312,22 +322,7 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@	sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_opcodes$(EXEEXT) sg_persist$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_prevent$(EXEEXT) sg_raw$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_rdac$(EXEEXT) sg_readcap$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_read_block_limits$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_read_buffer$(EXEEXT) sg_read_long$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_reassign$(EXEEXT) sg_referrals$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_requests$(EXEEXT) sg_rmsn$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_rtpg$(EXEEXT) sg_safte$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sanitize$(EXEEXT) sg_sat_identify$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sat_phy_event$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sat_set_features$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_start$(EXEEXT) sg_stpg$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sync$(EXEEXT) sg_turs$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_unmap$(EXEEXT) sg_verify$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_vpd$(EXEEXT) sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_wr_mode$(EXEEXT)
+@OS_FREEBSD_TRUE@	sg_rdac$(EXEEXT) sg_readcap$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp
@@ -429,12 +424,18 @@ sg_reassign_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_referrals_OBJECTS = sg_referrals.$(OBJEXT)
 sg_referrals_OBJECTS = $(am_sg_referrals_OBJECTS)
 sg_referrals_DEPENDENCIES = ../lib/libsgutils2.la
+am_sg_rep_zones_OBJECTS = sg_rep_zones.$(OBJEXT)
+sg_rep_zones_OBJECTS = $(am_sg_rep_zones_OBJECTS)
+sg_rep_zones_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_requests_OBJECTS = sg_requests.$(OBJEXT)
 sg_requests_OBJECTS = $(am_sg_requests_OBJECTS)
 sg_requests_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_reset_OBJECTS = sg_reset.$(OBJEXT)
 sg_reset_OBJECTS = $(am_sg_reset_OBJECTS)
 sg_reset_DEPENDENCIES =
+am_sg_reset_wp_OBJECTS = sg_reset_wp.$(OBJEXT)
+sg_reset_wp_OBJECTS = $(am_sg_reset_wp_OBJECTS)
+sg_reset_wp_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_rmsn_OBJECTS = sg_rmsn.$(OBJEXT)
 sg_rmsn_OBJECTS = $(am_sg_rmsn_OBJECTS)
 sg_rmsn_DEPENDENCIES = ../lib/libsgutils2.la
@@ -559,7 +560,8 @@ SOURCES = $(sg_compare_and_write_SOURCES) $(sg_copy_results_SOURCES) \
 	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
-	$(sg_requests_SOURCES) $(sg_reset_SOURCES) $(sg_rmsn_SOURCES) \
+	$(sg_rep_zones_SOURCES) $(sg_requests_SOURCES) \
+	$(sg_reset_SOURCES) $(sg_reset_wp_SOURCES) $(sg_rmsn_SOURCES) \
 	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
 	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
@@ -583,7 +585,8 @@ DIST_SOURCES = $(sg_compare_and_write_SOURCES) \
 	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
 	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
 	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
-	$(sg_requests_SOURCES) $(sg_reset_SOURCES) $(sg_rmsn_SOURCES) \
+	$(sg_rep_zones_SOURCES) $(sg_requests_SOURCES) \
+	$(sg_reset_SOURCES) $(sg_reset_wp_SOURCES) $(sg_rmsn_SOURCES) \
 	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
 	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
@@ -855,6 +858,10 @@ sg_copy_results_SOURCES = sg_copy_results.c
 sg_copy_results_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_compare_and_write_SOURCES = sg_compare_and_write.c
 sg_compare_and_write_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_rep_zones_SOURCES = sg_rep_zones.c
+sg_rep_zones_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_reset_wp_SOURCES = sg_reset_wp.c
+sg_reset_wp_LDADD = ../lib/libsgutils2.la @os_libs@
 all: all-am
 
 .SUFFIXES:
@@ -1051,6 +1058,10 @@ sg_referrals$(EXEEXT): $(sg_referrals_OBJECTS) $(sg_referrals_DEPENDENCIES) $(EX
 	@rm -f sg_referrals$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_referrals_OBJECTS) $(sg_referrals_LDADD) $(LIBS)
 
+sg_rep_zones$(EXEEXT): $(sg_rep_zones_OBJECTS) $(sg_rep_zones_DEPENDENCIES) $(EXTRA_sg_rep_zones_DEPENDENCIES) 
+	@rm -f sg_rep_zones$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_rep_zones_OBJECTS) $(sg_rep_zones_LDADD) $(LIBS)
+
 sg_requests$(EXEEXT): $(sg_requests_OBJECTS) $(sg_requests_DEPENDENCIES) $(EXTRA_sg_requests_DEPENDENCIES) 
 	@rm -f sg_requests$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_requests_OBJECTS) $(sg_requests_LDADD) $(LIBS)
@@ -1058,6 +1069,10 @@ sg_requests$(EXEEXT): $(sg_requests_OBJECTS) $(sg_requests_DEPENDENCIES) $(EXTRA
 sg_reset$(EXEEXT): $(sg_reset_OBJECTS) $(sg_reset_DEPENDENCIES) $(EXTRA_sg_reset_DEPENDENCIES) 
 	@rm -f sg_reset$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_reset_OBJECTS) $(sg_reset_LDADD) $(LIBS)
+
+sg_reset_wp$(EXEEXT): $(sg_reset_wp_OBJECTS) $(sg_reset_wp_DEPENDENCIES) $(EXTRA_sg_reset_wp_DEPENDENCIES) 
+	@rm -f sg_reset_wp$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_reset_wp_OBJECTS) $(sg_reset_wp_LDADD) $(LIBS)
 
 sg_rmsn$(EXEEXT): $(sg_rmsn_OBJECTS) $(sg_rmsn_DEPENDENCIES) $(EXTRA_sg_rmsn_DEPENDENCIES) 
 	@rm -f sg_rmsn$(EXEEXT)
@@ -1198,8 +1213,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_readcap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_reassign.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_referrals.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rep_zones.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_requests.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_reset.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_reset_wp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rmsn.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rtpg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_safte.Po@am__quote@
@@ -1480,6 +1497,12 @@ uninstall-am: uninstall-binPROGRAMS
 
 @OS_WIN32_CYGWIN_TRUE@sg_scan.c : sg_scan.c.win32
 @OS_WIN32_CYGWIN_TRUE@	cp sg_scan.c.win32 sg_scan.c
+@OS_FREEBSD_TRUE@	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
+@OS_FREEBSD_TRUE@	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
+@OS_FREEBSD_TRUE@	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
+@OS_FREEBSD_TRUE@	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg sg_sync \
+@OS_FREEBSD_TRUE@	sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long \
+@OS_FREEBSD_TRUE@	sg_write_same sg_wr_mode
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

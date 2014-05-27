@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.38 20140518";    /* SPC-4 rev 37 */
+static const char * version_str = "1.39 20140527";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1765,7 +1765,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
 }
 
 static void
-export_dev_ids(unsigned char * buff, int len)
+export_dev_ids(unsigned char * buff, int len, int verbose)
 {
     int u, j, m, id_len, c_set, assoc, desig_type, i_len;
     int off, d_id, naa, k, p_id;
@@ -1795,9 +1795,10 @@ export_dev_ids(unsigned char * buff, int len)
         i_len = ucp[3];
         id_len = i_len + 4;
         if ((off + id_len) > len) {
-            pr2serr("Device Identification VPD page error: designator "
-                    "length longer than\n     remaining response length=%d\n",
-                    (len - off));
+            if (verbose)
+                pr2serr("Device Identification VPD page error: designator "
+                        "length longer than\n     remaining response "
+                        "length=%d\n", (len - off));
             return;
         }
         ip = ucp + 4;
@@ -1817,7 +1818,8 @@ export_dev_ids(unsigned char * buff, int len)
                 assoc_str = "TARGET";
                 break;
             default:
-                pr2serr("    Invalid association %d\n", assoc);
+                if (verbose)
+                    pr2serr("    Invalid association %d\n", assoc);
                 return;
         }
         switch (desig_type) {
@@ -1837,6 +1839,10 @@ export_dev_ids(unsigned char * buff, int len)
             if ((2 == c_set) || (3 == c_set)) {
                 k = encode_whitespaces(ip, i_len);
                 printf("%.*s\n", k, ip);
+                if (!memcmp(ip, "ATA_", 4)) {
+                    printf("SCSI_IDENT_%s_ATA=%.*s\n", assoc_str,
+                           k - 4, ip + 4);
+                }
             } else {
                 for (m = 0; m < i_len; ++m)
                     printf("%02x", (unsigned int)ip[m]);
@@ -1845,8 +1851,10 @@ export_dev_ids(unsigned char * buff, int len)
             break;
         case 2: /* EUI-64 based */
             if (1 != c_set) {
-                pr2serr("      << expected binary code_set (1)>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                if (verbose) {
+                    pr2serr("      << expected binary code_set (1)>>\n");
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
                 break;
             }
             printf("SCSI_IDENT_%s_EUI64=", assoc_str);
@@ -1856,21 +1864,27 @@ export_dev_ids(unsigned char * buff, int len)
             break;
         case 3: /* NAA */
             if (1 != c_set) {
-                pr2serr("      << expected binary code_set (1)>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                if (verbose) {
+                    pr2serr("      << expected binary code_set (1)>>\n");
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
                 break;
             }
             naa = (ip[0] >> 4) & 0xff;
             if ((naa < 2) || (naa > 6) || (4 == naa)) {
-                pr2serr("      << unexpected naa [0x%x]>>\n", naa);
-                dStrHexErr((const char *)ip, i_len, 0);
+                if (verbose) {
+                    pr2serr("      << unexpected naa [0x%x]>>\n", naa);
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
                 break;
             }
             if (6 != naa) {
                 if (8 != i_len) {
-                    pr2serr("      << unexpected NAA 2 identifier "
-                            "length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    if (verbose) {
+                        pr2serr("      << unexpected NAA 2 identifier "
+                                "length: 0x%x>>\n", i_len);
+                        dStrHexErr((const char *)ip, i_len, 0);
+                    }
                     break;
                 }
                 printf("SCSI_IDENT_%s_NAA=", assoc_str);
@@ -1879,9 +1893,11 @@ export_dev_ids(unsigned char * buff, int len)
                 printf("\n");
             } else {      /* NAA IEEE Registered extended */
                 if (16 != i_len) {
-                    pr2serr("      << unexpected NAA 6 identifier "
-                            "length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    if (verbose) {
+                        pr2serr("      << unexpected NAA 6 identifier "
+                                "length: 0x%x>>\n", i_len);
+                        dStrHexErr((const char *)ip, i_len, 0);
+                    }
                     break;
                 }
                 printf("SCSI_IDENT_%s_NAA=", assoc_str);
@@ -1892,9 +1908,11 @@ export_dev_ids(unsigned char * buff, int len)
             break;
         case 4: /* Relative target port */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-                pr2serr("      << expected binary code_set, target "
-                        "port association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                if (verbose) {
+                    pr2serr("      << expected binary code_set, target "
+                            "port association, length 4>>\n");
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
                 break;
             }
             d_id = ((ip[2] << 8) | ip[3]);
@@ -1902,9 +1920,11 @@ export_dev_ids(unsigned char * buff, int len)
             break;
         case 5: /* (primary) Target port group */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-                pr2serr("      << expected binary code_set, target "
-                        "port association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                if (verbose) {
+                    pr2serr("      << expected binary code_set, target "
+                            "port association, length 4>>\n");
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
                 break;
             }
             d_id = ((ip[2] << 8) | ip[3]);
@@ -1912,9 +1932,11 @@ export_dev_ids(unsigned char * buff, int len)
             break;
         case 6: /* Logical unit group */
             if ((1 != c_set) || (0 != assoc) || (4 != i_len)) {
-                pr2serr("      << expected binary code_set, logical "
-                        "unit association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                if (verbose) {
+                    pr2serr("      << expected binary code_set, logical "
+                            "unit association, length 4>>\n");
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
                 break;
             }
             d_id = ((ip[2] << 8) | ip[3]);
@@ -1922,9 +1944,11 @@ export_dev_ids(unsigned char * buff, int len)
             break;
         case 7: /* MD5 logical unit identifier */
             if ((1 != c_set) || (0 != assoc)) {
-                pr2serr("      << expected binary code_set, logical "
-                        "unit association>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                if (verbose) {
+                    pr2serr("      << expected binary code_set, logical "
+                            "unit association>>\n");
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
                 break;
             }
             printf("SCSI_IDENT_%s_MD5=", assoc_str);
@@ -1932,8 +1956,10 @@ export_dev_ids(unsigned char * buff, int len)
             break;
         case 8: /* SCSI name string */
             if (3 != c_set) {
-                pr2serr("      << expected UTF-8 code_set>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                if (verbose) {
+                    pr2serr("      << expected UTF-8 code_set>>\n");
+                    dStrHexErr((const char *)ip, i_len, -1);
+                }
                 break;
             }
             printf("SCSI_IDENT_%s_NAME=%.*s\n", assoc_str, i_len,
@@ -1942,9 +1968,11 @@ export_dev_ids(unsigned char * buff, int len)
         case 9: /*  Protocol specific port identifier */
             if (TPROTO_UAS == p_id) {
                 if ((4 != i_len) || (1 != assoc)) {
-                    pr2serr("      << UAS (USB) expected target "
-                            "port association>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    if (verbose) {
+                        pr2serr("      << UAS (USB) expected target "
+                                "port association>>\n");
+                        dStrHexErr((const char *)ip, i_len, 0);
+                    }
                     break;
                 }
                 printf("SCSI_IDENT_%s_UAS_DEVICE_ADDRESS=0x%x\n", assoc_str,
@@ -1953,9 +1981,11 @@ export_dev_ids(unsigned char * buff, int len)
                        ip[2]);
             } else if (TPROTO_SOP == p_id) {
                 if ((4 != i_len) && (8 != i_len)) {   /* spc4r36h confused */
-                    pr2serr("      << SOP (PCIe) descriptor "
-                            "length=%d >>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    if (verbose) {
+                        pr2serr("      << SOP (PCIe) descriptor "
+                                "length=%d >>\n", i_len);
+                        dStrHexErr((const char *)ip, i_len, 0);
+                    }
                     break;
                 }
                 printf("SCSI_IDENT_%s_SOP_ROUTING_ID=0x%x\n", assoc_str,
@@ -1966,12 +1996,14 @@ export_dev_ids(unsigned char * buff, int len)
             }
             break;
         default: /* reserved */
-            pr2serr("      reserved designator=0x%x\n", desig_type);
-            dStrHexErr((const char *)ip, i_len, -1);
+            if (verbose) {
+                pr2serr("      reserved designator=0x%x\n", desig_type);
+                dStrHexErr((const char *)ip, i_len, -1);
+            }
             break;
         }
     }
-    if (-2 == u)
+    if (-2 == u && verbose)
         pr2serr("Device identification VPD page error: "
                 "around offset=%d\n", off);
 }
@@ -3233,7 +3265,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         else if (op->do_hex > 2)
             dStrHex((const char *)rp, len, -1);
         else if (op->do_export)
-            export_dev_ids(rp + 4, len - 4);
+            export_dev_ids(rp + 4, len - 4, op->do_verbose);
         else
             decode_id_vpd(rp, len, op->do_hex);
         break;

@@ -2,7 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140522] [svn: r583]
+Changelog for sg3_utils-1.39 [20140527] [svn: r584]
+  - sg_rep_zones: new utility for ZBC REPORT ZONES
+  - sg_reset_wp: new utility, ZBC RESET WRITE POINTER
   - sg_ses: add --eiioe=auto|force option
     - fix AES dpage element indexing problems
     - add --readonly option
@@ -17,6 +19,9 @@ Changelog for sg3_utils-1.39 [20140522] [svn: r583]
   - sg_persist: add --readonly option, environment
     variable SG_PERSIST_IN_RDONLY sets ro on prin cmds
   - sg_inq: sync version descriptors dated 20105176
+    - suppress dev-id VPD messages so they only appear
+      when --verbose is given
+    - add new SCSI_IDENT_*_ATA pair to --export output
   - sg_vpd: add --vendor=VP option, re-order vendor
     specific pages, split lto into lto5 and lto6
     - add Supported block lengths and protection types
@@ -37,6 +42,10 @@ Changelog for sg3_utils-1.39 [20140522] [svn: r583]
     - dStrHex(Err): fix output truncation error
   - sg_lib_data: sync asc/ascq codes with T10 20140516
     - sync operation code with T10 20140515
+    - add id string for SPC-5
+  - scripts/59-scsi-sg3_utils.rules: removed
+    - functionality split into two scripts:
+      55-scsi-sg3_id.rules + 58-scsi-sg3_symlink.rules
   - win32: sg_scan, sg_ses and sg_log fixes
   - examples/sgq_dd: re-add old utility as example
 
